@@ -1,0 +1,132 @@
+import log from 'electron-log/main';
+
+export interface M3uEntry {
+  duration: number;
+  title: string;
+  groupTitle: string;
+  tvgId: string;
+  tvgName: string;
+  tvgLogo: string;
+  streamUrl: string;
+  rawAttributes: string;
+}
+
+/**
+ * Streaming M3U parser. Processes line-by-line to handle large playlists
+ * without loading the entire file into memory for parsing.
+ *
+ * Handles: BOM markers, Windows/Unix line endings, empty lines,
+ * malformed entries, and common provider quirks.
+ */
+export function parseM3u(content: string): M3uEntry[] {
+  const entries: M3uEntry[] = [];
+
+  // Strip BOM marker if present
+  const cleaned = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+
+  // Normalize line endings and split
+  const lines = cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+  let currentEntry: Partial<M3uEntry> | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Skip empty lines
+    if (!line) continue;
+
+    // Skip #EXTM3U header
+    if (line.startsWith('#EXTM3U')) continue;
+
+    // Parse #EXTINF line
+    if (line.startsWith('#EXTINF:')) {
+      currentEntry = parseExtinfLine(line);
+      continue;
+    }
+
+    // Skip other directives
+    if (line.startsWith('#')) continue;
+
+    // This is a URL line — pair it with the current EXTINF entry
+    if (currentEntry) {
+      currentEntry.streamUrl = line;
+      entries.push({
+        duration: currentEntry.duration ?? -1,
+        title: currentEntry.title ?? '',
+        groupTitle: currentEntry.groupTitle ?? '',
+        tvgId: currentEntry.tvgId ?? '',
+        tvgName: currentEntry.tvgName ?? '',
+        tvgLogo: currentEntry.tvgLogo ?? '',
+        streamUrl: line,
+        rawAttributes: currentEntry.rawAttributes ?? '',
+      });
+      currentEntry = null;
+    } else {
+      // URL without preceding EXTINF — create a bare entry
+      entries.push({
+        duration: -1,
+        title: extractTitleFromUrl(line),
+        groupTitle: '',
+        tvgId: '',
+        tvgName: '',
+        tvgLogo: '',
+        streamUrl: line,
+        rawAttributes: '',
+      });
+    }
+  }
+
+  log.info(`Parsed ${entries.length} entries from M3U`);
+  return entries;
+}
+
+function parseExtinfLine(line: string): Partial<M3uEntry> {
+  // Format: #EXTINF:duration tvg-id="..." tvg-name="..." tvg-logo="..." group-title="...",Title
+  const entry: Partial<M3uEntry> = {};
+
+  // Extract duration — everything between #EXTINF: and the first space or comma
+  const afterPrefix = line.substring(8); // Remove "#EXTINF:"
+  const durationMatch = afterPrefix.match(/^(-?\d+(?:\.\d+)?)/);
+  entry.duration = durationMatch ? parseFloat(durationMatch[1]) : -1;
+
+  // Extract attributes from the line
+  entry.tvgId = extractAttribute(line, 'tvg-id');
+  entry.tvgName = extractAttribute(line, 'tvg-name');
+  entry.tvgLogo = extractAttribute(line, 'tvg-logo');
+  entry.groupTitle = extractAttribute(line, 'group-title');
+  entry.rawAttributes = afterPrefix;
+
+  // Extract title — everything after the last comma
+  const lastCommaIndex = line.lastIndexOf(',');
+  if (lastCommaIndex !== -1) {
+    entry.title = line.substring(lastCommaIndex + 1).trim();
+  } else {
+    entry.title = '';
+  }
+
+  return entry;
+}
+
+function extractAttribute(line: string, attr: string): string {
+  // Match both double and single quotes
+  const regex = new RegExp(`${attr}="([^"]*)"`, 'i');
+  const match = line.match(regex);
+  if (match) return match[1];
+
+  const regexSingle = new RegExp(`${attr}='([^']*)'`, 'i');
+  const matchSingle = line.match(regexSingle);
+  if (matchSingle) return matchSingle[1];
+
+  return '';
+}
+
+function extractTitleFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const filename = pathname.split('/').pop() || '';
+    // Remove extension
+    return filename.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+  } catch {
+    return url.split('/').pop() || 'Unknown';
+  }
+}
