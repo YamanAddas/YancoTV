@@ -27,6 +27,7 @@ const api = {
     stop: () => ipcRenderer.invoke(IpcChannels.PLAYER_STOP),
     seek: (seconds: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SEEK, seconds),
     setVolume: (level: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_VOLUME, level),
+    state: () => ipcRenderer.invoke(IpcChannels.PLAYER_STATE),
   },
 
   dialog: {

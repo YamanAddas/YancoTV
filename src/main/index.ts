@@ -8,7 +8,7 @@ import {
   MIN_WINDOW_HEIGHT,
   MIN_WINDOW_WIDTH,
 } from '../shared/constants';
-import { initDatabase } from './services/db';
+import { initDatabase, closeDatabase } from './services/db';
 import { registerIpcHandlers } from './ipc';
 
 log.initialize();
@@ -66,5 +66,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  closeDatabase();
   app.quit();
 });

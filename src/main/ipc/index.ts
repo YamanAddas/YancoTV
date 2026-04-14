@@ -81,7 +81,7 @@ export function registerIpcHandlers(): void {
   });
 
   // File picker for M3U files
-  ipcMain.handle('dialog:openM3uFile', async () => {
+  ipcMain.handle(IpcChannels.DIALOG_OPEN_M3U_FILE, async () => {
     const result = await dialog.showOpenDialog({
       title: 'Select M3U Playlist',
       filters: [

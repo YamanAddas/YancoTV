@@ -1,27 +1,222 @@
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
+import { CategorySidebar } from '../components/CategorySidebar';
+import { EmptyState } from '../components/EmptyState';
+import { SourceSwitcher } from '../components/SourceSwitcher';
+
+interface EpisodeData {
+  id: string;
+  contentId: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  title?: string;
+  streamUrl: string;
+  duration?: number;
+}
+
 export function SeriesPage() {
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-surface-100">Series</h2>
-      <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-24">
-        <div className="text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-surface-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1}
+  const [series, setSeries] = useState<ContentCardData[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedShow, setSelectedShow] = useState<ContentCardData | null>(null);
+  const [episodes, setEpisodes] = useState<EpisodeData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+
+  useEffect(() => {
+    if (!window.api) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setSelectedCategory(null);
+
+    Promise.all([
+      window.api.content.getSeries(selectedSource ?? undefined),
+      window.api.content.getCategories('series'),
+    ]).then(([seriesData, cats]) => {
+      setSeries(seriesData);
+      setCategories(cats);
+      setIsLoading(false);
+    });
+  }, [selectedSource]);
+
+  const filtered = useMemo(() => {
+    if (!selectedCategory) return series;
+    return series.filter((s) => s.groupName === selectedCategory);
+  }, [series, selectedCategory]);
+
+  const handleShowClick = useCallback((item: ContentCardData) => {
+    setSelectedShow(item);
+    setIsLoadingEpisodes(true);
+
+    if (!window.api) {
+      setIsLoadingEpisodes(false);
+      return;
+    }
+
+    window.api.content.getEpisodes(item.id).then((eps: EpisodeData[]) => {
+      setEpisodes(eps);
+      setIsLoadingEpisodes(false);
+    });
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setSelectedShow(null);
+    setEpisodes([]);
+  }, []);
+
+  // Group episodes by season
+  const seasons = useMemo(() => {
+    const map = new Map<number, EpisodeData[]>();
+    for (const ep of episodes) {
+      const season = ep.seasonNumber ?? 1;
+      if (!map.has(season)) map.set(season, []);
+      map.get(season)!.push(ep);
+    }
+    // Sort seasons
+    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  }, [episodes]);
+
+  if (!isLoading && series.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-surface-100">Series</h2>
+          <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
+        </div>
+        <EmptyState
+          icon="layers"
+          title="No series"
+          message="Add an IPTV source in Settings to see series."
+        />
+      </div>
+    );
+  }
+
+  // Episode detail view
+  if (selectedShow) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="mb-4 flex items-center gap-3">
+          <button
+            onClick={handleBack}
+            className="rounded-lg p-2 text-surface-400 transition-colors hover:bg-surface-800 hover:text-surface-200"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-          <p className="mt-3 text-sm text-surface-500">
-            No series available. Add an IPTV source in Settings.
-          </p>
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-surface-100">
+              {selectedShow.cleanTitle || selectedShow.title}
+            </h2>
+            {selectedShow.groupName && (
+              <p className="text-sm text-surface-500">{selectedShow.groupName}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {isLoadingEpisodes ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-14 animate-pulse rounded-lg bg-surface-800" />
+              ))}
+            </div>
+          ) : episodes.length === 0 ? (
+            <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-12">
+              <p className="text-sm text-surface-500">No episodes found for this series.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {seasons.map(([seasonNum, eps]) => (
+                <div key={seasonNum}>
+                  <h3 className="mb-3 text-lg font-semibold text-surface-200">
+                    Season {seasonNum}
+                  </h3>
+                  <div className="space-y-1">
+                    {eps
+                      .sort((a, b) => (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0))
+                      .map((ep) => (
+                        <button
+                          key={ep.id}
+                          className="flex w-full items-center gap-4 rounded-lg border border-surface-800 bg-surface-900 px-4 py-3 text-left transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5"
+                          onClick={() => {
+                            // Playback will be wired in Sprint 5
+                          }}
+                        >
+                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-surface-800 text-sm font-medium text-surface-400">
+                            {ep.episodeNumber ?? '?'}
+                          </span>
+                          <div className="flex-1 overflow-hidden">
+                            <p className="truncate text-sm font-medium text-surface-200">
+                              {ep.title || `Episode ${ep.episodeNumber ?? '?'}`}
+                            </p>
+                            {ep.duration && (
+                              <p className="text-xs text-surface-500">
+                                {formatDuration(ep.duration)}
+                              </p>
+                            )}
+                          </div>
+                          <svg
+                            className="h-5 w-5 flex-shrink-0 text-surface-600"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                            />
+                          </svg>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show grid
+  return (
+    <div className="flex h-full flex-col">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-surface-100">Series</h2>
+        <div className="flex items-center gap-4">
+          <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
+          <span className="text-sm text-surface-500">
+            {filtered.length.toLocaleString()} show{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 gap-4">
+        <CategorySidebar
+          categories={categories}
+          selected={selectedCategory}
+          onSelect={setSelectedCategory}
+          isLoading={isLoading}
+        />
+        <div className="min-h-0 flex-1">
+          <ContentGrid items={filtered} onItemClick={handleShowClick} isLoading={isLoading} />
         </div>
       </div>
     </div>
   );
+}
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
