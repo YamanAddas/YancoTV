@@ -21,9 +21,28 @@ const api = {
       ipcRenderer.invoke(IpcChannels.CONTENT_GET_EPISODES, contentId),
   },
 
+  favorites: {
+    getAll: () => ipcRenderer.invoke(IpcChannels.FAVORITES_GET_ALL),
+    getIds: () => ipcRenderer.invoke(IpcChannels.FAVORITES_GET_IDS),
+    add: (contentId: string) => ipcRenderer.invoke(IpcChannels.FAVORITES_ADD, contentId),
+    remove: (contentId: string) => ipcRenderer.invoke(IpcChannels.FAVORITES_REMOVE, contentId),
+  },
+
+  history: {
+    getRecent: (limit?: number) => ipcRenderer.invoke(IpcChannels.HISTORY_GET_RECENT, limit),
+    getPosition: (contentId: string, episodeId?: string) =>
+      ipcRenderer.invoke(IpcChannels.HISTORY_GET_POSITION, contentId, episodeId),
+    record: (contentId: string, episodeId?: string) =>
+      ipcRenderer.invoke(IpcChannels.HISTORY_RECORD, contentId, episodeId),
+    updatePosition: (historyId: string, positionSeconds: number, durationSeconds?: number) =>
+      ipcRenderer.invoke(IpcChannels.HISTORY_UPDATE_POSITION, historyId, positionSeconds, durationSeconds),
+    remove: (id: string) => ipcRenderer.invoke(IpcChannels.HISTORY_REMOVE, id),
+    clear: () => ipcRenderer.invoke(IpcChannels.HISTORY_CLEAR),
+  },
+
   player: {
-    play: (url: string, title?: string) =>
-      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title),
+    play: (url: string, title?: string, startPosition?: number) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition),
     pause: () => ipcRenderer.invoke(IpcChannels.PLAYER_PAUSE),
     resume: () => ipcRenderer.invoke(IpcChannels.PLAYER_RESUME),
     stop: () => ipcRenderer.invoke(IpcChannels.PLAYER_STOP),

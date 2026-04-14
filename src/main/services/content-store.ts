@@ -360,15 +360,40 @@ export function getCategories(type: ContentType): string[] {
   return rows.map((r) => r.group_name);
 }
 
+function buildFtsQuery(query: string): string {
+  return query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `"${word.replace(/"/g, '""')}"*`)
+    .join(' ');
+}
+
 export function searchContent(query: string): ContentItem[] {
   const db = getDb();
-  const pattern = `%${query}%`;
-  const rows = db
-    .prepare(
-      `SELECT * FROM content WHERE title LIKE ? OR clean_title LIKE ? OR group_name LIKE ? ORDER BY title LIMIT 100`,
-    )
-    .all(pattern, pattern, pattern) as ContentRow[];
-  return rows.map(rowToContent);
+  try {
+    const ftsQuery = buildFtsQuery(query);
+    const rows = db
+      .prepare(
+        `SELECT c.* FROM content c
+         WHERE c.id IN (
+           SELECT content_id FROM content_fts WHERE content_fts MATCH ?
+           ORDER BY rank LIMIT 100
+         )
+         ORDER BY c.type, c.clean_title, c.title`,
+      )
+      .all(ftsQuery) as ContentRow[];
+    return rows.map(rowToContent);
+  } catch {
+    // Fallback to LIKE if FTS5 index not available or query is invalid
+    const pattern = `%${query}%`;
+    const rows = db
+      .prepare(
+        `SELECT * FROM content WHERE title LIKE ? OR clean_title LIKE ? ORDER BY title LIMIT 100`,
+      )
+      .all(pattern, pattern) as ContentRow[];
+    return rows.map(rowToContent);
+  }
 }
 
 export function getContentCountByType(): Record<ContentType, number> {

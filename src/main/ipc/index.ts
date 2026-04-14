@@ -12,6 +12,20 @@ import {
   getContentCountByType,
   getEpisodes,
 } from '../services/content-store';
+import {
+  getFavorites,
+  getFavoriteIds,
+  addFavorite,
+  removeFavorite,
+} from '../services/favorites-store';
+import {
+  getRecentlyWatched,
+  getLastPosition,
+  recordWatch,
+  updatePosition,
+  removeHistoryEntry,
+  clearHistory,
+} from '../services/history-store';
 import { MpvPlayer } from '../player/mpv-player';
 import type { PlayerState } from '../player/player.interface';
 
@@ -158,13 +172,73 @@ export function registerIpcHandlers(): void {
     return getEpisodes(contentId);
   });
 
+  // Favorites
+  ipcMain.handle(IpcChannels.FAVORITES_GET_ALL, () => {
+    return getFavorites();
+  });
+
+  ipcMain.handle(IpcChannels.FAVORITES_GET_IDS, () => {
+    return getFavoriteIds();
+  });
+
+  ipcMain.handle(IpcChannels.FAVORITES_ADD, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') {
+      return { ok: false, error: 'Invalid content ID' };
+    }
+    return addFavorite(contentId);
+  });
+
+  ipcMain.handle(IpcChannels.FAVORITES_REMOVE, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') {
+      return { ok: false, error: 'Invalid content ID' };
+    }
+    return removeFavorite(contentId);
+  });
+
+  // Watch history
+  ipcMain.handle(IpcChannels.HISTORY_GET_RECENT, (_event, limit?: number) => {
+    return getRecentlyWatched(typeof limit === 'number' ? limit : 20);
+  });
+
+  ipcMain.handle(IpcChannels.HISTORY_GET_POSITION, (_event, contentId: string, episodeId?: string) => {
+    if (!contentId || typeof contentId !== 'string') return null;
+    return getLastPosition(contentId, typeof episodeId === 'string' ? episodeId : undefined);
+  });
+
+  ipcMain.handle(IpcChannels.HISTORY_RECORD, (_event, contentId: string, episodeId?: string) => {
+    if (!contentId || typeof contentId !== 'string') {
+      return { ok: false, error: 'Invalid content ID' };
+    }
+    try {
+      const historyId = recordWatch(contentId, typeof episodeId === 'string' ? episodeId : undefined);
+      return { ok: true, historyId };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.HISTORY_UPDATE_POSITION, (_event, historyId: string, positionSeconds: number, durationSeconds?: number) => {
+    if (!historyId || typeof historyId !== 'string') return;
+    if (typeof positionSeconds !== 'number') return;
+    updatePosition(historyId, Math.floor(positionSeconds), typeof durationSeconds === 'number' ? Math.floor(durationSeconds) : undefined);
+  });
+
+  ipcMain.handle(IpcChannels.HISTORY_REMOVE, (_event, id: string) => {
+    if (!id || typeof id !== 'string') return;
+    removeHistoryEntry(id);
+  });
+
+  ipcMain.handle(IpcChannels.HISTORY_CLEAR, () => {
+    clearHistory();
+  });
+
   // Player
-  ipcMain.handle(IpcChannels.PLAYER_PLAY, async (_event, url: string, _title?: string) => {
+  ipcMain.handle(IpcChannels.PLAYER_PLAY, async (_event, url: string, _title?: string, startPosition?: number) => {
     if (!url || typeof url !== 'string') {
       return { ok: false, error: 'Invalid URL' };
     }
     try {
-      await getPlayer().play(url);
+      await getPlayer().play(url, typeof startPosition === 'number' ? { startPosition } : undefined);
       return { ok: true };
     } catch (err) {
       log.error('Player play error:', err);

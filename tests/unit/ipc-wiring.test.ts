@@ -46,13 +46,29 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.PLAYER_ERROR).toBe('player:error');
   });
 
+  it('has all expected favorites channels', () => {
+    expect(IpcChannels.FAVORITES_GET_ALL).toBe('favorites:getAll');
+    expect(IpcChannels.FAVORITES_ADD).toBe('favorites:add');
+    expect(IpcChannels.FAVORITES_REMOVE).toBe('favorites:remove');
+    expect(IpcChannels.FAVORITES_GET_IDS).toBe('favorites:getIds');
+  });
+
+  it('has all expected history channels', () => {
+    expect(IpcChannels.HISTORY_GET_RECENT).toBe('history:getRecent');
+    expect(IpcChannels.HISTORY_RECORD).toBe('history:record');
+    expect(IpcChannels.HISTORY_UPDATE_POSITION).toBe('history:updatePosition');
+    expect(IpcChannels.HISTORY_GET_POSITION).toBe('history:getPosition');
+    expect(IpcChannels.HISTORY_REMOVE).toBe('history:remove');
+    expect(IpcChannels.HISTORY_CLEAR).toBe('history:clear');
+  });
+
   it('has all expected system channels', () => {
     expect(IpcChannels.DB_STATUS).toBe('db:status');
     expect(IpcChannels.DIALOG_OPEN_M3U_FILE).toBe('dialog:openM3uFile');
     expect(IpcChannels.APP_GET_VERSION).toBe('app:getVersion');
   });
 
-  it('exports exactly 23 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(23);
+  it('exports exactly 33 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(33);
   });
 });

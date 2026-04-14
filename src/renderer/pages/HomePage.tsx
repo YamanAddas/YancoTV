@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePlayerStore } from '../stores/player-store';
+import { useFavoritesStore } from '../stores/favorites-store';
+import type { FavoriteEntry } from '../../main/services/favorites-store';
+import type { HistoryEntry } from '../../main/services/history-store';
 
 interface ContentCounts {
   live: number;
@@ -9,7 +13,11 @@ interface ContentCounts {
 
 export function HomePage() {
   const [counts, setCounts] = useState<ContentCounts>({ live: 0, movie: 0, series: 0 });
+  const [recentlyWatched, setRecentlyWatched] = useState<HistoryEntry[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const navigate = useNavigate();
+  const play = usePlayerStore((s) => s.play);
+  const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
 
   useEffect(() => {
     if (!window.api) return;
@@ -18,33 +26,49 @@ export function HomePage() {
         setCounts(status.counts as ContentCounts);
       }
     });
+    window.api.history.getRecent(10).then((data: HistoryEntry[]) => setRecentlyWatched(data));
+    window.api.favorites.getAll().then((data: FavoriteEntry[]) => setFavorites(data.slice(0, 10)));
   }, []);
 
+  // Refresh favorites when favoriteIds change (user toggled from another page)
+  useEffect(() => {
+    if (!window.api) return;
+    window.api.favorites.getAll().then((data: FavoriteEntry[]) => setFavorites(data.slice(0, 10)));
+  }, [favoriteIds]);
+
   const total = counts.live + counts.movie + counts.series;
+
+  const handlePlayHistory = useCallback(
+    (entry: HistoryEntry) => {
+      play(
+        entry.content.streamUrl,
+        entry.content.cleanTitle || entry.content.title,
+        entry.contentId,
+        entry.episodeId,
+      );
+    },
+    [play],
+  );
+
+  const handlePlayFavorite = useCallback(
+    (fav: FavoriteEntry) => {
+      play(
+        fav.content.streamUrl,
+        fav.content.cleanTitle || fav.content.title,
+        fav.content.id,
+      );
+    },
+    [play],
+  );
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-surface-100">Home</h2>
 
       <div className="grid grid-cols-3 gap-4">
-        <StatusCard
-          title="Live TV"
-          count={counts.live}
-          icon="tv"
-          onClick={() => navigate('/live')}
-        />
-        <StatusCard
-          title="Movies"
-          count={counts.movie}
-          icon="film"
-          onClick={() => navigate('/movies')}
-        />
-        <StatusCard
-          title="Series"
-          count={counts.series}
-          icon="layers"
-          onClick={() => navigate('/series')}
-        />
+        <StatusCard title="Live TV" count={counts.live} icon="tv" onClick={() => navigate('/live')} />
+        <StatusCard title="Movies" count={counts.movie} icon="film" onClick={() => navigate('/movies')} />
+        <StatusCard title="Series" count={counts.series} icon="layers" onClick={() => navigate('/series')} />
       </div>
 
       {total === 0 && (
@@ -56,11 +80,7 @@ export function HomePage() {
             stroke="currentColor"
             strokeWidth={1}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
           <h3 className="mt-4 text-sm font-medium text-surface-300">No content yet</h3>
           <p className="mt-1 text-sm text-surface-500">
@@ -78,26 +98,160 @@ export function HomePage() {
       {total > 0 && (
         <>
           <section>
-            <h3 className="mb-3 text-lg font-semibold text-surface-200">Recently Watched</h3>
-            <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-12">
-              <p className="text-sm text-surface-500">
-                Nothing watched yet. Start browsing your content!
-              </p>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-surface-200">Recently Watched</h3>
             </div>
+            {recentlyWatched.length === 0 ? (
+              <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-10">
+                <p className="text-sm text-surface-500">Nothing watched yet. Start browsing!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {recentlyWatched.map((entry) => (
+                  <HistoryCard key={entry.id} entry={entry} onPlay={handlePlayHistory} />
+                ))}
+              </div>
+            )}
           </section>
 
           <section>
-            <h3 className="mb-3 text-lg font-semibold text-surface-200">Favorites</h3>
-            <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-12">
-              <p className="text-sm text-surface-500">
-                No favorites yet. Browse content and mark your favorites.
-              </p>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-surface-200">Favorites</h3>
+              {favorites.length > 0 && (
+                <button
+                  onClick={() => navigate('/favorites')}
+                  className="text-sm text-accent hover:underline"
+                >
+                  See all
+                </button>
+              )}
             </div>
+            {favorites.length === 0 ? (
+              <div className="flex items-center justify-center rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-10">
+                <p className="text-sm text-surface-500">
+                  No favorites yet. Tap the heart on any content item.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {favorites.map((fav) => (
+                  <FavoriteCard key={fav.favoriteId} fav={fav} onPlay={handlePlayFavorite} />
+                ))}
+              </div>
+            )}
           </section>
         </>
       )}
     </div>
   );
+}
+
+function HistoryCard({
+  entry,
+  onPlay,
+}: {
+  entry: HistoryEntry;
+  onPlay: (entry: HistoryEntry) => void;
+}) {
+  const { content, positionSeconds, durationSeconds } = entry;
+  const progress =
+    durationSeconds && durationSeconds > 0
+      ? Math.min(100, (positionSeconds / durationSeconds) * 100)
+      : null;
+
+  return (
+    <button
+      onClick={() => onPlay(entry)}
+      className="group flex flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5"
+    >
+      <div className="relative aspect-video w-full overflow-hidden bg-surface-800">
+        {content.logoUrl ? (
+          <img
+            src={content.logoUrl}
+            alt={content.title}
+            className="h-full w-full object-contain p-2"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <span className="text-xl font-bold text-surface-600">
+              {(content.cleanTitle || content.title).charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+        {progress !== null && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-surface-700">
+            <div className="h-full bg-accent" style={{ width: `${progress}%` }} />
+          </div>
+        )}
+      </div>
+      <div className="p-2.5">
+        <p className="line-clamp-2 text-sm font-medium text-surface-200 group-hover:text-surface-100">
+          {content.cleanTitle || content.title}
+        </p>
+        {positionSeconds > 0 && (
+          <p className="mt-0.5 text-xs text-surface-500">{formatTime(positionSeconds)}</p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function FavoriteCard({
+  fav,
+  onPlay,
+}: {
+  fav: FavoriteEntry;
+  onPlay: (fav: FavoriteEntry) => void;
+}) {
+  const { content } = fav;
+  return (
+    <button
+      onClick={() => onPlay(fav)}
+      className="group flex flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5"
+    >
+      <div className="aspect-video w-full overflow-hidden bg-surface-800">
+        {content.logoUrl ? (
+          <img
+            src={content.logoUrl}
+            alt={content.title}
+            className="h-full w-full object-contain p-2"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <span className="text-xl font-bold text-surface-600">
+              {(content.cleanTitle || content.title).charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="p-2.5">
+        <p className="line-clamp-2 text-sm font-medium text-surface-200 group-hover:text-surface-100">
+          {content.cleanTitle || content.title}
+        </p>
+        {content.groupName && (
+          <p className="mt-0.5 truncate text-xs text-surface-500">{content.groupName}</p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function formatTime(seconds: number): string {
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(sec)}`;
+  return `${m}:${pad(sec)}`;
 }
 
 function StatusCard({

@@ -4,6 +4,7 @@ import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { usePlayerStore } from '../stores/player-store';
+import { useFavoritesStore } from '../stores/favorites-store';
 
 export function LiveTvPage() {
   const [channels, setChannels] = useState<ContentCardData[]>([]);
@@ -37,12 +38,21 @@ export function LiveTvPage() {
   }, [channels, selectedCategory]);
 
   const play = usePlayerStore((s) => s.play);
+  const toggle = useFavoritesStore((s) => s.toggle);
+  const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
 
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
-      play(item.streamUrl, item.cleanTitle || item.title);
+      play(item.streamUrl, item.cleanTitle || item.title, item.id);
     },
     [play],
+  );
+
+  const handleFavoriteToggle = useCallback(
+    (item: ContentCardData) => {
+      toggle(item.id);
+    },
+    [toggle],
   );
 
   if (!isLoading && channels.length === 0) {
@@ -81,7 +91,13 @@ export function LiveTvPage() {
           isLoading={isLoading}
         />
         <div className="min-h-0 flex-1">
-          <ContentGrid items={filtered} onItemClick={handleItemClick} isLoading={isLoading} />
+          <ContentGrid
+            items={filtered}
+            onItemClick={handleItemClick}
+            onFavoriteToggle={handleFavoriteToggle}
+            favoriteIds={favoriteIds}
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </div>

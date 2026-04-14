@@ -5,6 +5,8 @@ import { HomePage } from './pages/HomePage';
 import { LiveTvPage } from './pages/LiveTvPage';
 import { MoviesPage } from './pages/MoviesPage';
 import { SeriesPage } from './pages/SeriesPage';
+import { SearchPage } from './pages/SearchPage';
+import { FavoritesPage } from './pages/FavoritesPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const queryClient = new QueryClient({
@@ -26,6 +28,8 @@ export function App() {
             <Route path="/live" element={<LiveTvPage />} />
             <Route path="/movies" element={<MoviesPage />} />
             <Route path="/series" element={<SeriesPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

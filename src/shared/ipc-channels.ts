@@ -31,6 +31,20 @@ export const IpcChannels = {
   PLAYER_TIME_UPDATE: 'player:timeUpdate',
   PLAYER_ERROR: 'player:error',
 
+  // Favorites
+  FAVORITES_GET_ALL: 'favorites:getAll',
+  FAVORITES_ADD: 'favorites:add',
+  FAVORITES_REMOVE: 'favorites:remove',
+  FAVORITES_GET_IDS: 'favorites:getIds',
+
+  // Watch history
+  HISTORY_GET_RECENT: 'history:getRecent',
+  HISTORY_RECORD: 'history:record',
+  HISTORY_UPDATE_POSITION: 'history:updatePosition',
+  HISTORY_GET_POSITION: 'history:getPosition',
+  HISTORY_REMOVE: 'history:remove',
+  HISTORY_CLEAR: 'history:clear',
+
   // Database
   DB_STATUS: 'db:status',
 

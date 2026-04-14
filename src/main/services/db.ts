@@ -43,10 +43,11 @@ function runMigrations(database: Database.Database): void {
 
   const migrationsDir = path.join(__dirname, 'migrations');
 
-  // In development, migrations are in src; in production, in dist
+  // In development, compiled output is in dist/main/main/services/ so use cwd() fallback.
+  // In production, migrations are bundled alongside the compiled output.
   const dirs = [
     migrationsDir,
-    path.join(__dirname, '..', '..', 'src', 'main', 'services', 'migrations'),
+    path.join(process.cwd(), 'src', 'main', 'services', 'migrations'),
   ];
 
   let migrationFiles: string[] = [];

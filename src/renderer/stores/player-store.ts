@@ -8,11 +8,14 @@ export interface PlayerStoreState {
   muted: boolean;
   currentUrl?: string;
   currentTitle?: string;
+  currentContentId?: string;
+  currentEpisodeId?: string;
+  currentHistoryId?: string;
   error?: string;
 }
 
 interface PlayerStoreActions {
-  play: (url: string, title?: string) => Promise<void>;
+  play: (url: string, title?: string, contentId?: string, episodeId?: string) => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   stop: () => Promise<void>;
@@ -32,13 +35,47 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   muted: false,
   currentUrl: undefined,
   currentTitle: undefined,
+  currentContentId: undefined,
+  currentEpisodeId: undefined,
+  currentHistoryId: undefined,
   error: undefined,
 
   // Actions
-  play: async (url: string, title?: string) => {
+  play: async (url: string, title?: string, contentId?: string, episodeId?: string) => {
     if (!window.api) return;
-    set({ status: 'buffering', currentUrl: url, currentTitle: title, error: undefined });
-    const result = await window.api.player.play(url, title);
+
+    set({
+      status: 'buffering',
+      currentUrl: url,
+      currentTitle: title,
+      currentContentId: contentId,
+      currentEpisodeId: episodeId,
+      currentHistoryId: undefined,
+      error: undefined,
+    });
+
+    let startPosition: number | undefined;
+
+    if (contentId) {
+      // Check for a resume position (skip for live content — duration will be 0)
+      const pos = await window.api.history.getPosition(contentId, episodeId);
+      if (pos && pos.positionSeconds > 30) {
+        // Only resume if not near the end
+        const nearEnd =
+          pos.durationSeconds && pos.positionSeconds > pos.durationSeconds - 60;
+        if (!nearEnd) {
+          startPosition = pos.positionSeconds;
+        }
+      }
+
+      // Record a new history entry
+      const histResult = await window.api.history.record(contentId, episodeId);
+      if (histResult?.ok && histResult.historyId) {
+        set({ currentHistoryId: histResult.historyId });
+      }
+    }
+
+    const result = await window.api.player.play(url, title, startPosition);
     if (!result.ok) {
       set({ status: 'error', error: result.error });
     }
@@ -57,7 +94,16 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   stop: async () => {
     if (!window.api) return;
     await window.api.player.stop();
-    set({ status: 'idle', currentUrl: undefined, currentTitle: undefined, position: 0, duration: 0 });
+    set({
+      status: 'idle',
+      currentUrl: undefined,
+      currentTitle: undefined,
+      currentContentId: undefined,
+      currentEpisodeId: undefined,
+      currentHistoryId: undefined,
+      position: 0,
+      duration: 0,
+    });
   },
 
   seek: async (seconds: number) => {
@@ -82,6 +128,7 @@ export function initPlayerEventListeners(): () => void {
   if (!window.api) return () => {};
 
   const cleanups: (() => void)[] = [];
+  let lastHistoryUpdateAt = 0;
 
   cleanups.push(
     window.api.player.onStateChange((state: unknown) => {
@@ -100,6 +147,20 @@ export function initPlayerEventListeners(): () => void {
   cleanups.push(
     window.api.player.onTimeUpdate((position: number) => {
       usePlayerStore.setState({ position });
+
+      // Throttle history position updates to every 30 seconds
+      const now = Date.now();
+      if (now - lastHistoryUpdateAt < 30_000) return;
+      lastHistoryUpdateAt = now;
+
+      const { currentHistoryId, duration } = usePlayerStore.getState();
+      if (!currentHistoryId) return;
+
+      window.api.history.updatePosition(
+        currentHistoryId,
+        Math.floor(position),
+        duration > 0 ? Math.floor(duration) : undefined,
+      );
     }),
   );
 

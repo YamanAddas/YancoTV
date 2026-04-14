@@ -4,6 +4,7 @@ import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { usePlayerStore } from '../stores/player-store';
+import { useFavoritesStore } from '../stores/favorites-store';
 
 interface EpisodeData {
   id: string;
@@ -65,6 +66,15 @@ export function SeriesPage() {
   }, []);
 
   const play = usePlayerStore((s) => s.play);
+  const toggle = useFavoritesStore((s) => s.toggle);
+  const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
+
+  const handleFavoriteToggle = useCallback(
+    (item: ContentCardData) => {
+      toggle(item.id);
+    },
+    [toggle],
+  );
 
   const handleBack = useCallback(() => {
     setSelectedShow(null);
@@ -150,7 +160,12 @@ export function SeriesPage() {
                           onClick={() => {
                             const title = ep.title || `S${ep.seasonNumber ?? 1}E${ep.episodeNumber ?? '?'}`;
                             const showName = selectedShow?.cleanTitle || selectedShow?.title || '';
-                            play(ep.streamUrl, showName ? `${showName} - ${title}` : title);
+                            play(
+                              ep.streamUrl,
+                              showName ? `${showName} - ${title}` : title,
+                              selectedShow?.id,
+                              ep.id,
+                            );
                           }}
                         >
                           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-surface-800 text-sm font-medium text-surface-400">
@@ -212,7 +227,13 @@ export function SeriesPage() {
           isLoading={isLoading}
         />
         <div className="min-h-0 flex-1">
-          <ContentGrid items={filtered} onItemClick={handleShowClick} isLoading={isLoading} />
+          <ContentGrid
+            items={filtered}
+            onItemClick={handleShowClick}
+            onFavoriteToggle={handleFavoriteToggle}
+            favoriteIds={favoriteIds}
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </div>

@@ -61,6 +61,7 @@ function createWindow(): void {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools({ mode: 'bottom' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
   }
@@ -72,7 +73,7 @@ app.whenReady().then(() => {
   // Enforce Content Security Policy at the session level (cannot be bypassed by renderer)
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const csp = isDev
-      ? "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws://localhost:*; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'"
+      ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws://localhost:*; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'"
       : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'";
     callback({
       responseHeaders: {
