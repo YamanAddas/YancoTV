@@ -20,10 +20,16 @@ export const IpcChannels = {
   // Player control
   PLAYER_PLAY: 'player:play',
   PLAYER_PAUSE: 'player:pause',
+  PLAYER_RESUME: 'player:resume',
   PLAYER_STOP: 'player:stop',
   PLAYER_SEEK: 'player:seek',
   PLAYER_SET_VOLUME: 'player:setVolume',
   PLAYER_STATE: 'player:state',
+
+  // Player events (main → renderer)
+  PLAYER_STATE_CHANGED: 'player:stateChanged',
+  PLAYER_TIME_UPDATE: 'player:timeUpdate',
+  PLAYER_ERROR: 'player:error',
 
   // Database
   DB_STATUS: 'db:status',

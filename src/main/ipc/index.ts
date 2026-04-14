@@ -1,4 +1,4 @@
-import { ipcMain, app, dialog } from 'electron';
+import { ipcMain, app, dialog, BrowserWindow } from 'electron';
 import log from 'electron-log/main';
 import { IpcChannels } from '../../shared/ipc-channels';
 import { addSourceInputSchema } from '../../shared/schemas/source';
@@ -12,6 +12,43 @@ import {
   getContentCountByType,
   getEpisodes,
 } from '../services/content-store';
+import { MpvPlayer } from '../player/mpv-player';
+import type { PlayerState } from '../player/player.interface';
+
+let player: MpvPlayer | null = null;
+
+function getPlayer(): MpvPlayer {
+  if (!player) {
+    player = new MpvPlayer();
+
+    // Forward player events to all renderer windows
+    player.on('state-change', (state: PlayerState) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(IpcChannels.PLAYER_STATE_CHANGED, state);
+      }
+    });
+
+    player.on('time-update', (position: number) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(IpcChannels.PLAYER_TIME_UPDATE, position);
+      }
+    });
+
+    player.on('error', (err: Error) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(IpcChannels.PLAYER_ERROR, err.message);
+      }
+    });
+  }
+  return player;
+}
+
+export function destroyPlayer(): void {
+  if (player) {
+    player.destroy().catch((err) => log.error('Player destroy error:', err));
+    player = null;
+  }
+}
 
 export function registerIpcHandlers(): void {
   log.info('Registering IPC handlers...');
@@ -121,16 +158,74 @@ export function registerIpcHandlers(): void {
     return getEpisodes(contentId);
   });
 
-  // Player — stubs for Sprint 5
-  ipcMain.handle(IpcChannels.PLAYER_PLAY, () => ({ ok: false, error: 'Not implemented yet' }));
-  ipcMain.handle(IpcChannels.PLAYER_PAUSE, () => ({ ok: false, error: 'Not implemented yet' }));
-  ipcMain.handle(IpcChannels.PLAYER_STOP, () => ({ ok: false, error: 'Not implemented yet' }));
-  ipcMain.handle(IpcChannels.PLAYER_SEEK, () => ({ ok: false, error: 'Not implemented yet' }));
-  ipcMain.handle(IpcChannels.PLAYER_SET_VOLUME, () => ({
-    ok: false,
-    error: 'Not implemented yet',
-  }));
-  ipcMain.handle(IpcChannels.PLAYER_STATE, () => null);
+  // Player
+  ipcMain.handle(IpcChannels.PLAYER_PLAY, async (_event, url: string, _title?: string) => {
+    if (!url || typeof url !== 'string') {
+      return { ok: false, error: 'Invalid URL' };
+    }
+    try {
+      await getPlayer().play(url);
+      return { ok: true };
+    } catch (err) {
+      log.error('Player play error:', err);
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_PAUSE, async () => {
+    try {
+      await getPlayer().pause();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_RESUME, async () => {
+    try {
+      await getPlayer().resume();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_STOP, async () => {
+    try {
+      await getPlayer().stop();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SEEK, async (_event, seconds: number) => {
+    if (typeof seconds !== 'number') {
+      return { ok: false, error: 'Invalid seek position' };
+    }
+    try {
+      await getPlayer().seek(seconds);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_VOLUME, async (_event, level: number) => {
+    if (typeof level !== 'number') {
+      return { ok: false, error: 'Invalid volume level' };
+    }
+    try {
+      await getPlayer().setVolume(level);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_STATE, () => {
+    return getPlayer().getState();
+  });
 
   log.info('IPC handlers registered');
 }

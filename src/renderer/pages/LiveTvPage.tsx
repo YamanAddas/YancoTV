@@ -3,6 +3,7 @@ import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
+import { usePlayerStore } from '../stores/player-store';
 
 export function LiveTvPage() {
   const [channels, setChannels] = useState<ContentCardData[]>([]);
@@ -35,9 +36,14 @@ export function LiveTvPage() {
     return channels.filter((ch) => ch.groupName === selectedCategory);
   }, [channels, selectedCategory]);
 
-  const handleItemClick = useCallback((_item: ContentCardData) => {
-    // Playback will be wired in Sprint 5
-  }, []);
+  const play = usePlayerStore((s) => s.play);
+
+  const handleItemClick = useCallback(
+    (item: ContentCardData) => {
+      play(item.streamUrl, item.cleanTitle || item.title);
+    },
+    [play],
+  );
 
   if (!isLoading && channels.length === 0) {
     return (

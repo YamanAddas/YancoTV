@@ -9,7 +9,7 @@ import {
   MIN_WINDOW_WIDTH,
 } from '../shared/constants';
 import { initDatabase, closeDatabase } from './services/db';
-import { registerIpcHandlers } from './ipc';
+import { registerIpcHandlers, destroyPlayer } from './ipc';
 
 log.initialize();
 log.info(`${APP_NAME} starting...`);
@@ -94,6 +94,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  destroyPlayer();
   closeDatabase();
   app.quit();
 });

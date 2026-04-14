@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IpcChannels } from '../shared/ipc-channels';
 
 const api = {
@@ -22,12 +22,38 @@ const api = {
   },
 
   player: {
-    play: (url: string) => ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url),
+    play: (url: string, title?: string) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title),
     pause: () => ipcRenderer.invoke(IpcChannels.PLAYER_PAUSE),
+    resume: () => ipcRenderer.invoke(IpcChannels.PLAYER_RESUME),
     stop: () => ipcRenderer.invoke(IpcChannels.PLAYER_STOP),
     seek: (seconds: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SEEK, seconds),
     setVolume: (level: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_VOLUME, level),
     state: () => ipcRenderer.invoke(IpcChannels.PLAYER_STATE),
+
+    onStateChange: (callback: (state: unknown) => void) => {
+      const handler = (_event: IpcRendererEvent, state: unknown) => callback(state);
+      ipcRenderer.on(IpcChannels.PLAYER_STATE_CHANGED, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_STATE_CHANGED, handler);
+      };
+    },
+
+    onTimeUpdate: (callback: (position: number) => void) => {
+      const handler = (_event: IpcRendererEvent, position: number) => callback(position);
+      ipcRenderer.on(IpcChannels.PLAYER_TIME_UPDATE, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_TIME_UPDATE, handler);
+      };
+    },
+
+    onError: (callback: (message: string) => void) => {
+      const handler = (_event: IpcRendererEvent, message: string) => callback(message);
+      ipcRenderer.on(IpcChannels.PLAYER_ERROR, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_ERROR, handler);
+      };
+    },
   },
 
   dialog: {

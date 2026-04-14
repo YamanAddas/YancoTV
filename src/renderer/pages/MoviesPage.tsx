@@ -3,6 +3,7 @@ import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
+import { usePlayerStore } from '../stores/player-store';
 
 export function MoviesPage() {
   const [movies, setMovies] = useState<ContentCardData[]>([]);
@@ -35,9 +36,14 @@ export function MoviesPage() {
     return movies.filter((m) => m.groupName === selectedCategory);
   }, [movies, selectedCategory]);
 
-  const handleItemClick = useCallback((_item: ContentCardData) => {
-    // Playback will be wired in Sprint 5
-  }, []);
+  const play = usePlayerStore((s) => s.play);
+
+  const handleItemClick = useCallback(
+    (item: ContentCardData) => {
+      play(item.streamUrl, item.cleanTitle || item.title);
+    },
+    [play],
+  );
 
   if (!isLoading && movies.length === 0) {
     return (

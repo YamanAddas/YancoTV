@@ -36,10 +36,14 @@ describe('IPC Wiring Consistency', () => {
   it('has all expected player channels', () => {
     expect(IpcChannels.PLAYER_PLAY).toBe('player:play');
     expect(IpcChannels.PLAYER_PAUSE).toBe('player:pause');
+    expect(IpcChannels.PLAYER_RESUME).toBe('player:resume');
     expect(IpcChannels.PLAYER_STOP).toBe('player:stop');
     expect(IpcChannels.PLAYER_SEEK).toBe('player:seek');
     expect(IpcChannels.PLAYER_SET_VOLUME).toBe('player:setVolume');
     expect(IpcChannels.PLAYER_STATE).toBe('player:state');
+    expect(IpcChannels.PLAYER_STATE_CHANGED).toBe('player:stateChanged');
+    expect(IpcChannels.PLAYER_TIME_UPDATE).toBe('player:timeUpdate');
+    expect(IpcChannels.PLAYER_ERROR).toBe('player:error');
   });
 
   it('has all expected system channels', () => {
@@ -48,7 +52,7 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.APP_GET_VERSION).toBe('app:getVersion');
   });
 
-  it('exports exactly 19 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(19);
+  it('exports exactly 23 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(23);
   });
 });

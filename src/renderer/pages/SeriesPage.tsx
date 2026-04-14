@@ -3,6 +3,7 @@ import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
+import { usePlayerStore } from '../stores/player-store';
 
 interface EpisodeData {
   id: string;
@@ -62,6 +63,8 @@ export function SeriesPage() {
       setIsLoadingEpisodes(false);
     });
   }, []);
+
+  const play = usePlayerStore((s) => s.play);
 
   const handleBack = useCallback(() => {
     setSelectedShow(null);
@@ -145,7 +148,9 @@ export function SeriesPage() {
                           key={ep.id}
                           className="flex w-full items-center gap-4 rounded-lg border border-surface-800 bg-surface-900 px-4 py-3 text-left transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5"
                           onClick={() => {
-                            // Playback will be wired in Sprint 5
+                            const title = ep.title || `S${ep.seasonNumber ?? 1}E${ep.episodeNumber ?? '?'}`;
+                            const showName = selectedShow?.cleanTitle || selectedShow?.title || '';
+                            play(ep.streamUrl, showName ? `${showName} - ${title}` : title);
                           }}
                         >
                           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-surface-800 text-sm font-medium text-surface-400">
