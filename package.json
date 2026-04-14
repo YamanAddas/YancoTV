@@ -17,7 +17,10 @@
     "test:e2e": "playwright test",
     "lint": "eslint src/ --ext .ts,.tsx",
     "lint:fix": "eslint src/ --ext .ts,.tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\"",
+    "audit": "pnpm audit",
+    "audit:fix": "pnpm audit --fix",
+    "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
