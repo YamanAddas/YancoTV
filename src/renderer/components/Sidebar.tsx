@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../stores/settings-store';
 
 const navItems = [
@@ -40,6 +41,7 @@ function useClock() {
 }
 
 export function Sidebar() {
+  const [expanded, setExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -58,12 +60,25 @@ export function Sidebar() {
     [searchQuery, navigate],
   );
 
-  // Ctrl+F / Cmd+F to focus search
+  // Ctrl+F to focus search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        inputRef.current?.focus();
+        if (!expanded) setExpanded(true);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [expanded]);
+
+  // Ctrl+B to toggle sidebar
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        setExpanded((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handler);
@@ -71,46 +86,85 @@ export function Sidebar() {
   }, []);
 
   return (
-    <nav className="flex w-56 flex-col border-r border-surface-800 bg-surface-900">
-      <div className="flex h-14 items-center px-5">
-        <h1 className="text-lg font-bold text-accent">YancoTV</h1>
+    <motion.nav
+      className="glass-strong relative z-30 flex flex-col overflow-hidden"
+      animate={{ width: expanded ? 208 : 56 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+    >
+      {/* Header — logo + hamburger */}
+      <div className="flex h-14 items-center gap-2 px-3">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-700/40 hover:text-accent"
+          title={expanded ? 'Collapse sidebar (Ctrl+B)' : 'Expand sidebar (Ctrl+B)'}
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        <AnimatePresence>
+          {expanded && (
+            <motion.h1
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.2 }}
+              className="text-lg font-bold text-accent text-glow-sm truncate"
+            >
+              YancoTV
+            </motion.h1>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Search bar */}
-      <form onSubmit={handleSearchSubmit} className="px-3 pb-2">
-        <div className="relative">
-          <svg
-            className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
+      {/* Search bar — only when expanded */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.form
+            onSubmit={handleSearchSubmit}
+            className="px-3 pb-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d={iconMap.search} />
-          </svg>
-          <input
-            ref={inputRef}
-            type="search"
-            placeholder="Search... (Ctrl+F)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-surface-700 bg-surface-800 py-2 pl-8 pr-3 text-sm text-surface-200 placeholder-surface-500 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
-          />
-        </div>
-      </form>
+            <div className="relative">
+              <svg
+                className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d={iconMap.search} />
+              </svg>
+              <input
+                ref={inputRef}
+                type="search"
+                placeholder="Search... (Ctrl+F)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-surface-700/50 bg-surface-800/40 py-2 pl-8 pr-3 text-sm text-surface-200 placeholder-surface-500 outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
+              />
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
-      <div className="flex flex-1 flex-col gap-1 px-3">
+      {/* Navigation items */}
+      <div className="flex flex-1 flex-col gap-1 px-2">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             end={item.path === '/'}
+            title={expanded ? undefined : item.label}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-accent/10 text-accent'
-                  : 'text-surface-400 hover:bg-surface-800 hover:text-surface-200'
-              }`
+                  ? 'bg-accent/10 text-accent shadow-glow-sm'
+                  : 'text-surface-400 hover:bg-surface-700/30 hover:text-surface-200'
+              } ${expanded ? '' : 'justify-center px-0'}`
             }
           >
             <svg
@@ -122,17 +176,58 @@ export function Sidebar() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" d={iconMap[item.icon]} />
             </svg>
-            {item.label}
+            <AnimatePresence>
+              {expanded && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="truncate"
+                >
+                  {item.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </NavLink>
         ))}
       </div>
 
-      <div className="border-t border-surface-800 p-4">
-        {showClock && (
-          <p className="mb-1 text-sm font-medium tabular-nums text-surface-300">{time}</p>
-        )}
-        <p className="text-xs text-surface-500">v0.1.0</p>
+      {/* Footer */}
+      <div className="border-t border-accent/10 p-3">
+        <AnimatePresence mode="wait">
+          {expanded ? (
+            <motion.div
+              key="expanded-footer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              {showClock && (
+                <p className="mb-1 text-sm font-medium tabular-nums text-surface-300">{time}</p>
+              )}
+              <p className="text-xs text-surface-600">v0.1.0</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="collapsed-footer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              {showClock && (
+                <p className="text-center text-[10px] tabular-nums text-surface-500">
+                  {time.split(':')[0]}
+                  <br />
+                  {time.split(':')[1]}
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </nav>
+    </motion.nav>
   );
 }

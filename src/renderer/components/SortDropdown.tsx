@@ -53,7 +53,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-sm text-surface-300 transition-colors hover:border-surface-600 hover:text-surface-200"
+        className="flex items-center gap-1.5 rounded-lg border border-accent/5 bg-surface-800 px-3 py-1.5 text-sm text-surface-300 transition-colors hover:border-accent/20 hover:text-surface-200"
         title="Sort by"
       >
         <svg
@@ -78,7 +78,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-48 overflow-hidden rounded-lg border border-surface-700 bg-surface-800 shadow-xl shadow-black/30">
+        <div className="absolute right-0 z-50 mt-1 w-48 overflow-hidden rounded-xl border border-accent/5 bg-surface-800 shadow-xl shadow-black/30">
           {SORT_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -88,7 +88,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
               }}
               className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
                 option.value === value
-                  ? 'bg-accent/10 text-accent'
+                  ? 'bg-accent/10 text-accent shadow-glow-sm'
                   : 'text-surface-300 hover:bg-surface-700 hover:text-surface-200'
               }`}
             >

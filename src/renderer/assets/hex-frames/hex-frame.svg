@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 230" fill="none">
+  <defs>
+    <!-- Multi-layer glow -->
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="b2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="b3"/>
+      <feMerge>
+        <feMergeNode in="b3"/>
+        <feMergeNode in="b2"/>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- 3D bevel highlight -->
+    <filter id="bevel" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur"/>
+      <feOffset in="blur" dx="0" dy="-1.5" result="offset"/>
+      <feComposite in="SourceGraphic" in2="offset" operator="over"/>
+    </filter>
+    <!-- Outer gradient — green to teal -->
+    <linearGradient id="outerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FFAA" stop-opacity="0.85"/>
+      <stop offset="35%" stop-color="#00DDBB" stop-opacity="0.5"/>
+      <stop offset="65%" stop-color="#00BBDD" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#00CCFF" stop-opacity="0.85"/>
+    </linearGradient>
+    <!-- Inner bevel highlight — simulates light hitting top edge -->
+    <linearGradient id="bevelGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#66FFCC" stop-opacity="0.4"/>
+      <stop offset="30%" stop-color="#00FFAA" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#003322" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Crystalline inner reflection -->
+    <linearGradient id="crystalGrad" x1="30%" y1="10%" x2="70%" y2="90%">
+      <stop offset="0%" stop-color="#CCFFEE" stop-opacity="0.06"/>
+      <stop offset="40%" stop-color="#00FFAA" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="#001108" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Dark inner fill with subtle color -->
+    <radialGradient id="innerFill" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#0a1a18" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#040a0e" stop-opacity="0.95"/>
+    </radialGradient>
+    <!-- Corner accent -->
+    <linearGradient id="cornerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#44FFCC" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#00CCFF" stop-opacity="0.3"/>
+    </linearGradient>
+    <!-- Clip for content -->
+    <clipPath id="hexClip">
+      <polygon points="100,10 186,61 186,169 100,220 14,169 14,61"/>
+    </clipPath>
+  </defs>
+
+  <!-- Layer 0: Deep glow aura -->
+  <polygon
+    points="100,8 188,60 188,170 100,222 12,170 12,60"
+    stroke="url(#outerGrad)"
+    stroke-width="1.5"
+    fill="none"
+    filter="url(#glow)"
+    opacity="0.45"
+  />
+
+  <!-- Layer 1: Dark base fill -->
+  <polygon
+    points="100,12 185,62 185,168 100,218 15,168 15,62"
+    fill="url(#innerFill)"
+  />
+
+  <!-- Layer 2: Crystalline reflection overlay -->
+  <polygon
+    points="100,12 185,62 185,168 100,218 15,168 15,62"
+    fill="url(#crystalGrad)"
+  />
+
+  <!-- Layer 3: Top bevel highlight -->
+  <polygon
+    points="100,12 185,62 185,168 100,218 15,168 15,62"
+    fill="url(#bevelGrad)"
+  />
+
+  <!-- Layer 4: Main outer border -->
+  <polygon
+    points="100,8 188,60 188,170 100,222 12,170 12,60"
+    stroke="url(#outerGrad)"
+    stroke-width="1.8"
+    fill="none"
+  />
+
+  <!-- Layer 5: Inner border line (3D depth) -->
+  <polygon
+    points="100,14 183,64 183,166 100,216 17,166 17,64"
+    stroke="url(#outerGrad)"
+    stroke-width="0.5"
+    fill="none"
+    opacity="0.25"
+  />
+
+  <!-- Corner accent strokes — top vertex -->
+  <line x1="100" y1="8" x2="148" y2="36" stroke="url(#cornerGrad)" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="100" y1="8" x2="52" y2="36" stroke="url(#cornerGrad)" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Corner accents — bottom vertex (dimmer) -->
+  <line x1="100" y1="222" x2="145" y2="196" stroke="url(#cornerGrad)" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="100" y1="222" x2="55" y2="196" stroke="url(#cornerGrad)" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Side detail lines — right -->
+  <line x1="188" y1="90" x2="194" y2="90" stroke="#00FFAA" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="188" y1="115" x2="196" y2="115" stroke="#00FFAA" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
+  <line x1="188" y1="140" x2="194" y2="140" stroke="#00FFAA" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+
+  <!-- Side detail lines — left -->
+  <line x1="12" y1="90" x2="6" y2="90" stroke="#00CCFF" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="12" y1="115" x2="4" y2="115" stroke="#00CCFF" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
+  <line x1="12" y1="140" x2="6" y2="140" stroke="#00CCFF" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+
+  <!-- Top highlight shimmer — simulates light catch on upper edges -->
+  <line x1="52" y1="36" x2="100" y2="12" stroke="#AAFFDD" stroke-width="0.8" opacity="0.2" stroke-linecap="round"/>
+  <line x1="100" y1="12" x2="148" y2="36" stroke="#AAFFDD" stroke-width="0.8" opacity="0.15" stroke-linecap="round"/>
+
+  <!-- Small diamond accent at midpoints -->
+  <polygon points="192,115 188,112 184,115 188,118" fill="#00FFAA" opacity="0.3"/>
+  <polygon points="8,115 12,112 16,115 12,118" fill="#00CCFF" opacity="0.3"/>
+</svg>

@@ -99,7 +99,7 @@ export function SeriesPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-surface-100">Series</h2>
+          <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Series</h2>
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
         </div>
         <EmptyState
@@ -125,7 +125,7 @@ export function SeriesPage() {
             </svg>
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-surface-100">
+            <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">
               {selectedShow.cleanTitle || selectedShow.title}
             </h2>
             {selectedShow.groupName && (
@@ -158,7 +158,7 @@ export function SeriesPage() {
                       .map((ep) => (
                         <button
                           key={ep.id}
-                          className="flex w-full items-center gap-4 rounded-lg border border-surface-800 bg-surface-900 px-4 py-3 text-left transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5"
+                          className="flex w-full items-center gap-4 rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 text-left transition-all hover:border-accent/20 hover:shadow-glow-sm"
                           onClick={() => {
                             const title = ep.title || `S${ep.seasonNumber ?? 1}E${ep.episodeNumber ?? '?'}`;
                             const showName = selectedShow?.cleanTitle || selectedShow?.title || '';
@@ -212,7 +212,7 @@ export function SeriesPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100">Series</h2>
+        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Series</h2>
         <div className="flex items-center gap-3">
           <SortDropdown value={sortBy} onChange={setSortBy} />
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />

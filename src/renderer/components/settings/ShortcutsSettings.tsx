@@ -35,7 +35,7 @@ function ShortcutTable({
   shortcuts: ShortcutDef[];
 }) {
   return (
-    <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+    <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
         {title}
       </h3>
@@ -46,7 +46,7 @@ function ShortcutTable({
             className="flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-surface-800/60"
           >
             <span className="text-sm text-surface-300">{s.description}</span>
-            <kbd className="rounded-md border border-surface-700 bg-surface-800 px-2.5 py-1 text-xs font-mono text-surface-300">
+            <kbd className="rounded-md border border-surface-700/50 bg-surface-800/40 px-2.5 py-1 text-xs font-mono text-surface-300">
               {s.key}
             </kbd>
           </div>

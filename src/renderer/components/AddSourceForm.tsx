@@ -104,7 +104,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
   }
 
   return (
-    <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+    <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-surface-200">Add Source</h3>
         <button
@@ -121,7 +121,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
       </div>
 
       {/* Source type tabs */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-surface-800 p-1">
+      <div className="mb-4 flex gap-1 rounded-lg bg-surface-800/40 p-1">
         {([
           ['m3u_url', 'M3U URL'],
           ['m3u_file', 'M3U File'],
@@ -135,7 +135,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
             }}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               sourceType === type
-                ? 'bg-accent text-white'
+                ? 'bg-accent shadow-glow-sm text-white'
                 : 'text-surface-400 hover:text-surface-200'
             }`}
           >
@@ -160,7 +160,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
                 value={filePath}
                 readOnly
                 placeholder="Select an M3U file..."
-                className="flex-1 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500"
+                className="flex-1 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500"
               />
               <button
                 type="button"
@@ -215,7 +215,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-700">
               <div
-                className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+                className="h-full rounded-full bg-accent shadow-glow-sm transition-all duration-300 ease-out"
                 style={{
                   width: `${
                     syncProgress.phase === 'deleting'
@@ -235,7 +235,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+          className="w-full rounded-lg bg-accent shadow-glow-sm px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
         >
           {loading ? 'Adding & Syncing...' : 'Add Source'}
         </button>
@@ -268,7 +268,7 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        className="w-full rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
       />
     </div>
   );

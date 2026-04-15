@@ -40,18 +40,18 @@ const categories: CategoryDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// SettingsPage — sidebar + content
+// SettingsPage — glass sidebar + content
 // ---------------------------------------------------------------------------
 
 export function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general');
 
   return (
-    <div className="flex h-full gap-0 overflow-hidden rounded-xl border border-surface-800">
+    <div className="glass flex h-full gap-0 overflow-hidden rounded-2xl">
       {/* Sidebar */}
-      <nav className="w-52 flex-shrink-0 border-r border-surface-800 bg-surface-900/80">
+      <nav className="w-52 flex-shrink-0 border-r border-accent/8">
         <div className="p-3">
-          <h2 className="px-2 pb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
+          <h2 className="px-2 pb-3 text-sm font-semibold uppercase tracking-wider text-accent/60">
             Settings
           </h2>
           <div className="space-y-0.5">
@@ -59,10 +59,10 @@ export function SettingsPage() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-all duration-200 ${
                   activeCategory === cat.id
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-surface-400 hover:bg-surface-800 hover:text-surface-200'
+                    ? 'bg-accent/10 text-accent shadow-glow-sm'
+                    : 'text-surface-400 hover:bg-surface-700/30 hover:text-surface-200'
                 }`}
               >
                 <svg
@@ -82,7 +82,7 @@ export function SettingsPage() {
       </nav>
 
       {/* Content */}
-      <div className="min-w-0 flex-1 overflow-y-auto bg-surface-950/50 p-6">
+      <div className="min-w-0 flex-1 overflow-y-auto p-6">
         {activeCategory === 'general' && <GeneralSettings />}
         {activeCategory === 'playlists' && <PlaylistSettings />}
         {activeCategory === 'epg' && <EpgSettings />}

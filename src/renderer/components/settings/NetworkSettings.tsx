@@ -15,7 +15,7 @@ function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
       <div className="min-w-0">
         <p className="text-sm font-medium text-surface-200">{label}</p>
         {description && (
@@ -41,7 +41,7 @@ function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-        checked ? 'bg-accent' : 'bg-surface-600'
+        checked ? 'bg-accent shadow-glow-sm' : 'bg-surface-600'
       }`}
     >
       <span
@@ -80,7 +80,7 @@ export function NetworkSettings() {
       </div>
 
       {/* Proxy */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-surface-500">
@@ -97,7 +97,7 @@ export function NetworkSettings() {
         </div>
 
         {proxyEnabled && (
-          <div className="space-y-3 border-t border-surface-800 pt-4">
+          <div className="space-y-3 border-t border-accent/5 pt-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-surface-300">
                 Proxy type
@@ -105,7 +105,7 @@ export function NetworkSettings() {
               <select
                 value={get('network_proxy_type')}
                 onChange={(e) => set('network_proxy_type', e.target.value)}
-                className="rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
               >
                 <option value="http">HTTP</option>
                 <option value="https">HTTPS</option>
@@ -123,7 +123,7 @@ export function NetworkSettings() {
                   value={get('network_proxy_host')}
                   onChange={(e) => set('network_proxy_host', e.target.value)}
                   placeholder="proxy.example.com"
-                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
                 />
               </div>
               <div className="w-24">
@@ -137,7 +137,7 @@ export function NetworkSettings() {
                     set('network_proxy_port', e.target.value.replace(/\D/g, ''))
                   }
                   placeholder="8080"
-                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
                 />
               </div>
             </div>
@@ -146,7 +146,7 @@ export function NetworkSettings() {
       </section>
 
       {/* Connection settings */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Connection
         </h3>
@@ -158,7 +158,7 @@ export function NetworkSettings() {
             <select
               value={get('network_connection_timeout')}
               onChange={(e) => set('network_connection_timeout', e.target.value)}
-              className="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
             >
               <option value="10">10 seconds</option>
               <option value="20">20 seconds</option>
@@ -175,7 +175,7 @@ export function NetworkSettings() {
             <select
               value={get('network_retry_attempts')}
               onChange={(e) => set('network_retry_attempts', e.target.value)}
-              className="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
             >
               <option value="0">No retry</option>
               <option value="1">1 attempt</option>
@@ -198,7 +198,7 @@ export function NetworkSettings() {
       </section>
 
       {/* User-Agent */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Advanced
         </h3>
@@ -215,7 +215,7 @@ export function NetworkSettings() {
             value={get('network_user_agent')}
             onChange={(e) => set('network_user_agent', e.target.value)}
             placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64) ..."
-            className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className="w-full rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
           />
         </div>
       </section>

@@ -63,7 +63,7 @@ export function PinModal({ title = 'Enter PIN', onResult }: PinModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-xs rounded-2xl border border-surface-700 bg-surface-900 p-6 shadow-2xl">
+      <div className="w-full max-w-xs rounded-2xl border border-accent/5 bg-surface-900/30 p-6 shadow-2xl">
         {/* Lock icon */}
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface-800">
           <svg className="h-7 w-7 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -89,7 +89,7 @@ export function PinModal({ title = 'Enter PIN', onResult }: PinModalProps) {
           onKeyDown={handleKeyDown}
           placeholder="----"
           disabled={checking}
-          className="mb-3 w-full rounded-lg border border-surface-700 bg-surface-800 px-4 py-3 text-center text-2xl tracking-[0.5em] text-surface-100 placeholder-surface-600 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+          className="mb-3 w-full rounded-lg border border-accent/5 bg-surface-800 px-4 py-3 text-center text-2xl tracking-[0.5em] text-surface-100 placeholder-surface-600 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
           autoComplete="off"
         />
 
@@ -101,14 +101,14 @@ export function PinModal({ title = 'Enter PIN', onResult }: PinModalProps) {
           <button
             onClick={() => onResult(false)}
             disabled={checking}
-            className="flex-1 rounded-lg border border-surface-700 bg-surface-800 px-4 py-2.5 text-sm font-medium text-surface-300 transition-colors hover:bg-surface-700 disabled:opacity-50"
+            className="flex-1 rounded-lg border border-accent/5 bg-surface-800 px-4 py-2.5 text-sm font-medium text-surface-300 transition-colors hover:bg-surface-700 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleVerify}
             disabled={checking || pin.length < 4}
-            className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="flex-1 rounded-lg bg-accent shadow-glow-sm px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
           >
             {checking ? 'Checking...' : 'Verify'}
           </button>

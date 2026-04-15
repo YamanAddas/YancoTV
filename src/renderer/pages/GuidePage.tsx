@@ -89,7 +89,7 @@ export function GuidePage() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-surface-100">TV Guide</h2>
+          <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">TV Guide</h2>
           {stats && (
             <p className="text-sm text-surface-500">
               {stats.programmeCount.toLocaleString()} programmes across{' '}
@@ -103,7 +103,7 @@ export function GuidePage() {
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+          className="rounded-lg bg-accent shadow-glow-sm px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
         >
           {isRefreshing ? 'Refreshing...' : 'Refresh EPG'}
         </button>
@@ -219,16 +219,16 @@ function EpgGrid({
   }, [nowOffset]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-surface-800">
+    <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-accent/5">
       <div className="flex h-full">
         {/* Channel labels (fixed left column) */}
         <div
-          className="flex-shrink-0 border-r border-surface-800 bg-surface-900"
+          className="flex-shrink-0 border-r border-accent/5 bg-surface-900/30"
           style={{ width: CHANNEL_LABEL_WIDTH }}
         >
           {/* Corner spacer */}
           <div
-            className="border-b border-surface-800 bg-surface-950 px-3 flex items-center"
+            className="border-b border-accent/5 bg-surface-950 px-3 flex items-center"
             style={{ height: TIME_HEADER_HEIGHT }}
           >
             <span className="text-xs font-medium text-surface-500">Channel</span>
@@ -239,7 +239,7 @@ function EpgGrid({
             {channels.map((ch) => (
               <div
                 key={ch.tvgId}
-                className="flex items-center gap-2 border-b border-surface-800/50 px-3"
+                className="flex items-center gap-2 border-b border-accent/5 px-3"
                 style={{ height: CHANNEL_ROW_HEIGHT }}
               >
                 {ch.logoUrl && (
@@ -264,13 +264,13 @@ function EpgGrid({
         <div className="min-w-0 flex-1 overflow-auto" ref={gridRef} onScroll={syncScroll}>
           {/* Time header */}
           <div
-            className="sticky top-0 z-10 flex border-b border-surface-800 bg-surface-950"
+            className="sticky top-0 z-10 flex border-b border-accent/5 bg-surface-950"
             style={{ width: totalWidth, height: TIME_HEADER_HEIGHT }}
           >
             {hours.map((h) => (
               <div
                 key={h}
-                className="flex-shrink-0 border-r border-surface-800/30 px-2 flex items-center"
+                className="flex-shrink-0 border-r border-accent/5 px-2 flex items-center"
                 style={{ width: HOUR_WIDTH }}
               >
                 <span className="text-xs font-medium text-surface-400">
@@ -335,7 +335,7 @@ function ChannelRow({
 }) {
   return (
     <div
-      className="relative flex border-b border-surface-800/30"
+      className="relative flex border-b border-accent/5"
       style={{ height: CHANNEL_ROW_HEIGHT }}
     >
       {channel.programmes.map((prog) => {
@@ -470,7 +470,7 @@ function ProgrammeDetail({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-surface-700 bg-surface-900 p-6 shadow-xl"
+        className="w-full max-w-md rounded-xl border border-accent/5 bg-surface-900/30 p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between">
@@ -521,7 +521,7 @@ function ProgrammeDetail({
               </div>
               <button
                 onClick={handlePlayLive}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent shadow-glow-sm px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow"
               >
                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
@@ -550,7 +550,7 @@ function ProgrammeDetail({
               ) : catchupStatus.available && catchupStatus.streamUrl ? (
                 <button
                   onClick={handlePlayCatchup}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent shadow-glow-sm px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 15l3-3m0 0l-3-3m3 3h-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -617,7 +617,7 @@ function EmptyEpgState({
       <button
         onClick={onRefresh}
         disabled={isRefreshing}
-        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+        className="rounded-lg bg-accent shadow-glow-sm px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
       >
         {isRefreshing ? 'Refreshing...' : 'Refresh EPG'}
       </button>
@@ -627,7 +627,7 @@ function EmptyEpgState({
 
 function GridSkeleton() {
   return (
-    <div className="flex-1 space-y-1 rounded-lg border border-surface-800 p-4">
+    <div className="flex-1 space-y-1 rounded-xl border border-accent/5 p-4">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="flex gap-2">
           <div className="h-12 w-48 animate-pulse rounded bg-surface-800" />

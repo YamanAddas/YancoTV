@@ -73,7 +73,7 @@ export function PlayerOverlay() {
   }
 
   return (
-    <div className="border-t border-surface-800 bg-surface-900">
+    <div className="glass-strong border-t border-accent/10">
       {/* Seek bar — full width above controls (VOD only) */}
       {duration > 0 && (
         <div className="px-4 pt-2">
@@ -83,7 +83,7 @@ export function PlayerOverlay() {
             max={Math.floor(duration)}
             value={Math.floor(position)}
             onChange={handleSeek}
-            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-surface-700 accent-accent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent"
+            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-surface-700/50 accent-accent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent [&::-webkit-slider-thumb]:shadow-glow-sm"
           />
         </div>
       )}
@@ -94,7 +94,7 @@ export function PlayerOverlay() {
           {/* Play/Pause */}
           <button
             onClick={handlePlayPause}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-surface-950 transition-colors hover:bg-accent/80"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-surface-950 shadow-glow-sm transition-colors hover:bg-accent-hover hover:shadow-glow"
             title={status === 'playing' ? 'Pause' : 'Play'}
           >
             {status === 'buffering' ? (
@@ -146,7 +146,7 @@ export function PlayerOverlay() {
                 onClick={cycleSpeed}
                 className={`rounded-md px-1.5 py-1 text-xs font-medium transition-colors ${
                   speed !== 1
-                    ? 'bg-accent/15 text-accent'
+                    ? 'bg-accent/15 text-accent text-glow-sm'
                     : 'text-surface-400 hover:text-surface-200'
                 }`}
                 title={`Playback speed: ${speed}x (click to cycle)`}
@@ -160,7 +160,7 @@ export function PlayerOverlay() {
               onClick={cycleAspectRatio}
               className={`rounded-md px-1.5 py-1 text-xs font-medium transition-colors ${
                 aspectRatio !== 'auto'
-                  ? 'bg-accent/15 text-accent'
+                  ? 'bg-accent/15 text-accent text-glow-sm'
                   : 'text-surface-400 hover:text-surface-200'
               }`}
               title={`Aspect ratio: ${aspectRatio} (click to cycle)`}
@@ -248,7 +248,7 @@ export function PlayerOverlay() {
             max={100}
             value={muted ? 0 : volume}
             onChange={handleVolume}
-            className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-surface-700 accent-accent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent"
+            className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-surface-700 accent-accent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent [&::-webkit-slider-thumb]:shadow-glow-sm"
           />
         </div>
       </div>
@@ -270,7 +270,7 @@ function TrackMenu({
   onSelect: (id: number) => void;
 }) {
   return (
-    <div className="absolute bottom-full right-0 z-50 mb-2 min-w-[180px] rounded-lg border border-surface-700 bg-surface-900 py-1 shadow-xl">
+    <div className="glass-strong absolute bottom-full right-0 z-50 mb-2 min-w-[180px] rounded-xl py-1 shadow-glass">
       <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-surface-500">
         {title}
       </p>

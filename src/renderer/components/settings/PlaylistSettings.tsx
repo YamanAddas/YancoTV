@@ -52,12 +52,12 @@ export function PlaylistSettings() {
 
       {/* Auto-sync settings */}
       {loaded && (
-        <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+        <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-surface-500">
             Sync Options
           </h3>
           <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-surface-200">
                   Auto-sync on startup
@@ -74,7 +74,7 @@ export function PlaylistSettings() {
                   setBool('playlist_auto_sync_on_start', !getBool('playlist_auto_sync_on_start'))
                 }
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  getBool('playlist_auto_sync_on_start') ? 'bg-accent' : 'bg-surface-600'
+                  getBool('playlist_auto_sync_on_start') ? 'bg-accent shadow-glow-sm' : 'bg-surface-600'
                 }`}
               >
                 <span
@@ -87,7 +87,7 @@ export function PlaylistSettings() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-surface-200">
                   Auto-sync interval
@@ -99,7 +99,7 @@ export function PlaylistSettings() {
               <select
                 value={get('playlist_auto_sync_interval')}
                 onChange={(e) => set('playlist_auto_sync_interval', e.target.value)}
-                className="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
               >
                 <option value="0">Manual only</option>
                 <option value="6">Every 6 hours</option>

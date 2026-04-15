@@ -98,7 +98,7 @@ export function ParentalSettings() {
       </div>
 
       {/* PIN Management */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <div className="mb-4">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-surface-500">
             PIN Protection
@@ -128,7 +128,7 @@ export function ParentalSettings() {
 
         {/* Set / Change PIN form */}
         {!removingPin && (
-          <div className="space-y-3 border-t border-surface-800 pt-4">
+          <div className="space-y-3 border-t border-accent/5 pt-4">
             <p className="text-sm font-medium text-surface-300">
               {settings.pinSet ? 'Change PIN' : 'Set a new PIN'}
             </p>
@@ -144,7 +144,7 @@ export function ParentalSettings() {
                   value={pin}
                   onChange={(e) => setLocalPin(e.target.value.replace(/\D/g, ''))}
                   placeholder="4-6 digits"
-                  className="w-36 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-36 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
                 />
               </div>
               <div>
@@ -160,7 +160,7 @@ export function ParentalSettings() {
                     setConfirmPin(e.target.value.replace(/\D/g, ''))
                   }
                   placeholder="Re-enter"
-                  className="w-36 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-36 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
                 />
               </div>
             </div>
@@ -168,7 +168,7 @@ export function ParentalSettings() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSavePin}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                className="rounded-lg bg-accent shadow-glow-sm px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow"
               >
                 {settings.pinSet ? 'Update PIN' : 'Save PIN'}
               </button>
@@ -190,7 +190,7 @@ export function ParentalSettings() {
 
         {/* Remove PIN confirmation */}
         {removingPin && (
-          <div className="space-y-3 border-t border-surface-800 pt-4">
+          <div className="space-y-3 border-t border-accent/5 pt-4">
             <p className="text-sm font-medium text-red-400">
               Enter current PIN to remove it
             </p>
@@ -201,7 +201,7 @@ export function ParentalSettings() {
               value={currentPin}
               onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
               placeholder="Current PIN"
-              className="w-36 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-36 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
               autoFocus
             />
             <div className="flex items-center gap-3">
@@ -232,7 +232,7 @@ export function ParentalSettings() {
       </section>
 
       {/* Content Restrictions */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Content Restrictions
         </h3>
@@ -259,7 +259,7 @@ export function ParentalSettings() {
       </section>
 
       {/* Channel management info */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Channel Management
         </h3>
@@ -291,7 +291,7 @@ function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-3">
+    <div className="flex items-center justify-between rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
       <div>
         <p className={`text-sm font-medium ${disabled ? 'text-surface-500' : 'text-surface-200'}`}>
           {label}
@@ -305,7 +305,7 @@ function ToggleRow({
         onClick={onChange}
         disabled={disabled}
         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-          checked ? 'bg-accent' : 'bg-surface-600'
+          checked ? 'bg-accent shadow-glow-sm' : 'bg-surface-600'
         } ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
       >
         <span

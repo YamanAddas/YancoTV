@@ -36,7 +36,7 @@ export function EmptyState({ icon, title, message, showSettingsLink = true }: Em
       {showSettingsLink && (
         <button
           onClick={() => navigate('/settings')}
-          className="mt-4 rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+          className="mt-4 rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent shadow-glow-sm transition-colors hover:bg-accent/20"
         >
           Go to Settings
         </button>

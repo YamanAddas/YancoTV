@@ -61,7 +61,7 @@ export function MoviesPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-surface-100">Movies</h2>
+          <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Movies</h2>
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
         </div>
         <EmptyState
@@ -76,7 +76,7 @@ export function MoviesPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100">Movies</h2>
+        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Movies</h2>
         <div className="flex items-center gap-3">
           <SortDropdown value={sortBy} onChange={setSortBy} />
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />

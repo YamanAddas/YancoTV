@@ -71,7 +71,7 @@ export function EpgSettings() {
       </div>
 
       {/* Global EPG URL */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           EPG Source
         </h3>
@@ -89,12 +89,12 @@ export function EpgSettings() {
               setUrlDirty(true);
             }}
             placeholder="https://epg-provider.com/guide.xml.gz"
-            className="flex-1 rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className="flex-1 rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-2 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
           />
           <button
             onClick={handleSaveUrl}
             disabled={saving || !urlDirty}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-lg bg-accent shadow-glow-sm px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
@@ -102,7 +102,7 @@ export function EpgSettings() {
       </section>
 
       {/* Refresh controls */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Refresh
         </h3>
@@ -110,7 +110,7 @@ export function EpgSettings() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-accent shadow-glow-sm px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
           >
             <svg
               className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
@@ -144,7 +144,7 @@ export function EpgSettings() {
           </p>
         )}
 
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-3">
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div>
             <p className="text-sm font-medium text-surface-200">
               Auto-refresh interval
@@ -156,7 +156,7 @@ export function EpgSettings() {
           <select
             value={get('epg_refresh_interval')}
             onChange={(e) => saveSetting('epg_refresh_interval', e.target.value)}
-            className="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
           >
             <option value={6}>Every 6 hours</option>
             <option value={12}>Every 12 hours</option>
@@ -167,7 +167,7 @@ export function EpgSettings() {
       </section>
 
       {/* EPG Stats */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Statistics
         </h3>
@@ -197,7 +197,7 @@ function StatCard({
   small?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-surface-800 bg-surface-950/50 px-4 py-3 text-center">
+    <div className="rounded-lg border border-accent/5 bg-surface-950/50 px-4 py-3 text-center">
       <p className="text-xs text-surface-500">{label}</p>
       <p
         className={`mt-1 font-semibold text-surface-200 ${small ? 'text-xs' : 'text-lg'}`}

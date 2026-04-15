@@ -1,6 +1,10 @@
 import { VirtuosoGrid, Virtuoso } from 'react-virtuoso';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../stores/settings-store';
+import { HexCard } from './HexCard';
+import { ChannelHexRow } from './ChannelHexRow';
+import hexFrameSrc from '../assets/hex-frames/hex-frame.svg';
+import hexFrameLockedSrc from '../assets/hex-frames/hex-frame-locked.svg';
 import type { NowNextMap } from '../../shared/types/epg';
 
 export interface ContentCardData {
@@ -45,13 +49,13 @@ export function ContentGrid({
   const showLogos = useSettingsStore((s) => s.getBool('ui_channel_logos'));
   const viewMode = viewModeProp ?? settingsViewMode ?? 'grid';
 
-  // One stable callback for grid item rendering
+  // One stable callback for grid item rendering (HexCard)
   const gridItemContent = useCallback(
     (index: number) => {
       const item = items[index];
       const nowNext = item.tvgId && nowNextMap ? nowNextMap[item.tvgId] : undefined;
       return (
-        <GridCard
+        <HexGridItem
           item={item}
           onClick={() => onItemClick(item)}
           onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
@@ -97,7 +101,8 @@ export function ContentGrid({
       <VirtuosoGrid
         totalCount={items.length}
         overscan={200}
-        listClassName="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+        listClassName="hex-card-grid"
+        itemClassName="hex-card-grid-item"
         itemContent={gridItemContent}
         style={{ height: '100%' }}
       />
@@ -131,10 +136,10 @@ interface CardProps {
 }
 
 // ---------------------------------------------------------------------------
-// Grid card
+// Hex grid item — wraps HexCard with context menu
 // ---------------------------------------------------------------------------
 
-function GridCard({
+function HexGridItem({
   item,
   onClick,
   onFavoriteToggle,
@@ -165,68 +170,22 @@ function GridCard({
   }, [contextMenu]);
 
   const nowTitle = nowNext?.now?.title;
-  const nextTitle = nowNext?.next?.title;
 
   return (
     <>
-      <button
+      <ChannelHexRow
+        title={item.title}
+        cleanTitle={item.cleanTitle}
+        groupName={item.groupName}
+        logoUrl={item.logoUrl}
+        isFavorite={isFavorite}
+        isLocked={isLocked}
+        showLogo={showLogo}
         onClick={onClick}
+        onFavoriteToggle={onFavoriteToggle}
         onContextMenu={handleContextMenu}
-        className="group flex w-full flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 focus:outline-none focus:ring-2 focus:ring-accent/50"
-      >
-        <div className="relative aspect-video w-full overflow-hidden bg-surface-800">
-          {showLogo && item.logoUrl ? (
-            <img
-              src={item.logoUrl}
-              alt={item.title}
-              className="h-full w-full object-contain p-2 transition-transform group-hover:scale-105"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <span className="text-2xl font-bold text-surface-600">
-                {(item.cleanTitle || item.title).charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
-
-          {isLocked && (
-            <div className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/90">
-              <LockIcon size="sm" />
-            </div>
-          )}
-
-          {onFavoriteToggle && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onFavoriteToggle(); }}
-              className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full transition-all ${
-                isFavorite
-                  ? 'bg-red-500/90 text-white opacity-100'
-                  : 'bg-surface-950/70 text-surface-400 opacity-0 group-hover:opacity-100 hover:text-red-400'
-              }`}
-              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              <HeartIcon filled={isFavorite} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-1 flex-col p-2.5">
-          <p className="line-clamp-2 text-sm font-medium text-surface-200 group-hover:text-surface-100">
-            {item.cleanTitle || item.title}
-          </p>
-          {item.groupName && !nowTitle && (
-            <p className="mt-1 truncate text-xs text-surface-500">{item.groupName}</p>
-          )}
-          {nowTitle && (
-            <p className="mt-1 truncate text-xs text-green-400" title={nowTitle}>{nowTitle}</p>
-          )}
-          {nextTitle && (
-            <p className="truncate text-xs text-surface-500" title={nextTitle}>Next: {nextTitle}</p>
-          )}
-        </div>
-      </button>
+        variant="grid"
+      />
 
       {contextMenu && (
         <ContextMenu
@@ -244,7 +203,78 @@ function GridCard({
 }
 
 // ---------------------------------------------------------------------------
-// List row
+// HexThumb — pure visual hex (div, not button) for use inside other buttons
+// ---------------------------------------------------------------------------
+
+function HexThumb({
+  imageUrl,
+  letter,
+  isLocked,
+}: {
+  imageUrl?: string;
+  letter: string;
+  isLocked?: boolean;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const showImage = imageUrl && !imgError;
+
+  return (
+    <div className="relative w-full" style={{ aspectRatio: '200 / 230' }}>
+      {/* Glow */}
+      <img
+        src={isLocked ? hexFrameLockedSrc : hexFrameSrc}
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-[-12%] h-[124%] w-[124%]"
+        style={{ filter: 'blur(8px)', opacity: 0.25 }}
+      />
+      {/* Frame */}
+      <img
+        src={isLocked ? hexFrameLockedSrc : hexFrameSrc}
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full"
+      />
+      {/* Content */}
+      <div className="absolute inset-[7%] clip-hex-tall overflow-hidden">
+        {showImage ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-surface-900/90">
+            <span className="text-xs font-bold text-surface-500">{letter}</span>
+          </div>
+        )}
+        {/* Vignette */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(0,0,0,0.55) 100%)' }}
+        />
+        {/* Glass shine */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'linear-gradient(170deg, rgba(255,255,255,0.08) 0%, transparent 35%)' }}
+        />
+        {isLocked && (
+          <div className="absolute inset-0 flex items-center justify-center bg-surface-950/60">
+            <svg className="h-4 w-4 text-amber-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// List row — glass styled
 // ---------------------------------------------------------------------------
 
 function ListRow({
@@ -282,65 +312,20 @@ function ListRow({
 
   return (
     <>
-      <button
+      <ChannelHexRow
+        title={item.title}
+        cleanTitle={item.cleanTitle}
+        groupName={item.groupName}
+        logoUrl={item.logoUrl}
+        isFavorite={isFavorite}
+        isLocked={isLocked}
+        showLogo={showLogo}
+        nowPlaying={nowTitle}
+        nextProgram={nextTitle}
         onClick={onClick}
+        onFavoriteToggle={onFavoriteToggle}
         onContextMenu={handleContextMenu}
-        className="group mb-1 flex w-full items-center gap-3 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2.5 text-left transition-all hover:border-accent/50 hover:bg-surface-800/60 focus:outline-none focus:ring-2 focus:ring-accent/50"
-      >
-        <div className="relative h-10 w-16 flex-shrink-0 overflow-hidden rounded-md bg-surface-800">
-          {showLogo && item.logoUrl ? (
-            <img
-              src={item.logoUrl}
-              alt={item.title}
-              className="h-full w-full object-contain p-1"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <span className="text-sm font-bold text-surface-600">
-                {(item.cleanTitle || item.title).charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
-          {isLocked && (
-            <div className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500/90">
-              <LockIcon size="xs" />
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-surface-200 group-hover:text-surface-100">
-            {item.cleanTitle || item.title}
-          </p>
-          {item.groupName && (
-            <p className="truncate text-xs text-surface-500">{item.groupName}</p>
-          )}
-        </div>
-
-        {(nowTitle || nextTitle) && (
-          <div className="hidden w-64 flex-shrink-0 text-right md:block">
-            {nowTitle && (
-              <p className="truncate text-xs text-green-400" title={nowTitle}>{nowTitle}</p>
-            )}
-            {nextTitle && (
-              <p className="truncate text-xs text-surface-500" title={nextTitle}>Next: {nextTitle}</p>
-            )}
-          </div>
-        )}
-
-        {onFavoriteToggle && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onFavoriteToggle(); }}
-            className={`flex-shrink-0 rounded-full p-1 transition-colors ${
-              isFavorite ? 'text-red-500' : 'text-surface-600 opacity-0 group-hover:opacity-100 hover:text-red-400'
-            }`}
-          >
-            <HeartIcon filled={isFavorite} />
-          </button>
-        )}
-      </button>
+      />
 
       {contextMenu && (
         <ContextMenu
@@ -358,7 +343,7 @@ function ListRow({
 }
 
 // ---------------------------------------------------------------------------
-// Compact row
+// Compact row — glass styled
 // ---------------------------------------------------------------------------
 
 function CompactRow({
@@ -397,11 +382,11 @@ function CompactRow({
       <button
         onClick={onClick}
         onContextMenu={handleContextMenu}
-        className="group flex w-full items-center gap-2.5 border-b border-surface-800/60 px-2 py-1.5 text-left transition-colors hover:bg-surface-800/40 focus:outline-none"
+        className="group flex w-full items-center gap-2.5 border-b border-accent/5 px-2 py-1.5 text-left transition-colors hover:bg-surface-800/30 focus:outline-none"
       >
         {isLocked && <LockIcon size="xs" className="flex-shrink-0 text-amber-500" />}
 
-        <p className="min-w-0 flex-1 truncate text-sm text-surface-200 group-hover:text-surface-100">
+        <p className="min-w-0 flex-1 truncate text-sm text-surface-200 transition-colors group-hover:text-accent">
           {item.cleanTitle || item.title}
         </p>
 
@@ -445,7 +430,7 @@ function CompactRow({
 }
 
 // ---------------------------------------------------------------------------
-// Context Menu
+// Context Menu — glass styled
 // ---------------------------------------------------------------------------
 
 function ContextMenu({
@@ -467,7 +452,7 @@ function ContextMenu({
 }) {
   return (
     <div
-      className="fixed z-50 min-w-[160px] overflow-hidden rounded-lg border border-surface-700 bg-surface-800 py-1 shadow-xl"
+      className="glass-strong fixed z-50 min-w-[160px] overflow-hidden rounded-xl py-1 shadow-glass"
       style={{ left: x, top: y }}
     >
       {onFavoriteToggle && (
@@ -506,7 +491,7 @@ function ContextMenuItem({
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
-        danger ? 'text-red-400 hover:bg-red-500/10' : 'text-surface-300 hover:bg-surface-700'
+        danger ? 'text-red-400 hover:bg-red-500/10' : 'text-surface-300 hover:bg-accent/10 hover:text-accent'
       }`}
     >
       <span className="flex h-4 w-4 items-center justify-center">{icon}</span>
@@ -551,16 +536,17 @@ export function HorizontalContentRow({
 
   return (
     <div ref={scrollRef} className="overflow-x-auto overflow-y-hidden pb-2">
-      <div className="flex w-max gap-3">
+      <div className="flex w-max gap-2">
         {items.map((item) => (
-          <div key={item.id} className="w-40 flex-shrink-0">
-            <GridCard
-              item={item}
+          <div key={item.id} className="w-[120px] flex-shrink-0">
+            <HexCard
+              title={item.cleanTitle || item.title}
+              subtitle={item.groupName}
+              imageUrl={showLogos ? item.logoUrl : undefined}
+              fallbackLetter={(item.cleanTitle || item.title).charAt(0).toUpperCase()}
+              isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
               onClick={() => onItemClick(item)}
               onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
-              isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
-              isLocked={false}
-              showLogo={showLogos}
             />
           </div>
         ))}
@@ -611,14 +597,17 @@ function EyeOffIcon() {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-      {Array.from({ length: 18 }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-lg border border-surface-800 bg-surface-900">
-          <div className="aspect-video w-full bg-surface-800" />
-          <div className="p-2.5 space-y-2">
-            <div className="h-4 w-3/4 rounded bg-surface-800" />
-            <div className="h-3 w-1/2 rounded bg-surface-800" />
-          </div>
+    <div className="hex-card-grid">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="hex-card-grid-item">
+          <div
+            className="h-[68px] animate-pulse"
+            style={{
+              clipPath:
+                'polygon(22px 0, calc(100% - 22px) 0, 100% 50%, calc(100% - 22px) 100%, 22px 100%, 0 50%)',
+              background: 'rgba(var(--surface-800), 0.3)',
+            }}
+          />
         </div>
       ))}
     </div>

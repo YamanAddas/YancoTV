@@ -31,7 +31,7 @@ export function SourceList({ sources, onRefresh }: SourceListProps) {
   if (sources.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+    <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
       <h3 className="mb-4 text-lg font-semibold text-surface-200">Sources</h3>
       <div className="space-y-2">
         {sources.map((source) => (
@@ -105,7 +105,7 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
   };
 
   return (
-    <div className="rounded-lg border border-surface-700 bg-surface-800 p-3">
+    <div className="rounded-lg border border-surface-700/50 bg-surface-800/40 p-3">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-700">
             <div
-              className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+              className="h-full rounded-full bg-accent shadow-glow-sm transition-all duration-300 ease-out"
               style={{
                 width: `${progress.phase === 'deleting' ? 10 : progress.phase === 'indexing' ? 95 : progressPercent}%`,
               }}

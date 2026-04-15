@@ -8,49 +8,49 @@
    so switching data-theme on <html> instantly re-themes the entire app.
    --------------------------------------------------------------------------- */
 
-/* Dark (default) — Slate palette */
+/* Dark (default) — Deep space palette with blue-green undertone */
 :root,
 [data-theme="dark"] {
-  --surface-50:  248 250 252;
-  --surface-100: 241 245 249;
-  --surface-200: 226 232 240;
-  --surface-300: 203 213 225;
-  --surface-400: 148 163 184;
-  --surface-500: 100 116 139;
-  --surface-600:  71  85 105;
-  --surface-700:  51  65  85;
-  --surface-800:  30  41  59;
-  --surface-900:  15  23  42;
-  --surface-950:   2   6  23;
+  --surface-50:  230 240 240;
+  --surface-100: 200 215 220;
+  --surface-200: 160 180 190;
+  --surface-300: 130 150 165;
+  --surface-400: 90 110 130;
+  --surface-500: 60 80 100;
+  --surface-600: 35 50 65;
+  --surface-700: 20 32 45;
+  --surface-800: 12 20 32;
+  --surface-900: 6 12 22;
+  --surface-950: 3 6 14;
 }
 
-/* OLED Black — same as dark but backgrounds go to pure black */
+/* OLED Black — same tones but backgrounds go pure black */
 [data-theme="oled"] {
-  --surface-50:  248 250 252;
-  --surface-100: 241 245 249;
-  --surface-200: 226 232 240;
-  --surface-300: 203 213 225;
-  --surface-400: 148 163 184;
-  --surface-500: 100 116 139;
-  --surface-600:  60  72  90;
-  --surface-700:  30  38  52;
-  --surface-800:  10  14  22;
-  --surface-900:   3   5   9;
-  --surface-950:   0   0   0;
+  --surface-50:  230 240 240;
+  --surface-100: 200 215 220;
+  --surface-200: 160 180 190;
+  --surface-300: 130 150 165;
+  --surface-400: 90 110 130;
+  --surface-500: 60 80 100;
+  --surface-600: 25 35 48;
+  --surface-700: 12 18 28;
+  --surface-800: 5 8 14;
+  --surface-900: 2 3 6;
+  --surface-950: 0 0 0;
 }
 
-/* Light — inverted scale so surface-950 becomes near-white */
+/* Light — inverted scale */
 [data-theme="light"] {
-  --surface-50:   2   6  23;
-  --surface-100:  15  23  42;
-  --surface-200:  30  41  59;
-  --surface-300:  51  65  85;
-  --surface-400:  71  85 105;
-  --surface-500: 100 116 139;
-  --surface-600: 148 163 184;
-  --surface-700: 203 213 225;
-  --surface-800: 226 232 240;
-  --surface-900: 241 245 249;
+  --surface-50:  3 6 14;
+  --surface-100: 6 12 22;
+  --surface-200: 12 20 32;
+  --surface-300: 35 50 65;
+  --surface-400: 60 80 100;
+  --surface-500: 90 110 130;
+  --surface-600: 130 150 165;
+  --surface-700: 180 195 205;
+  --surface-800: 220 230 235;
+  --surface-900: 240 244 248;
   --surface-950: 248 250 252;
 }
 
@@ -63,15 +63,138 @@
     @apply overflow-hidden;
   }
 
+  /* Custom scrollbar — thin, dark, with accent glow on hover */
   ::-webkit-scrollbar {
-    @apply h-2 w-2;
+    @apply h-1.5 w-1.5;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-surface-900;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-surface-600 hover:bg-surface-500;
+    @apply rounded-full;
+    background: rgba(0, 255, 170, 0.15);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 170, 0.3);
+  }
+}
+
+@layer components {
+  /* ── Glass panel ─────────────────────────────────────────────────────── */
+  .glass {
+    background: rgba(6, 12, 22, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 255, 170, 0.08);
+  }
+
+  .glass-strong {
+    background: rgba(6, 12, 22, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(0, 255, 170, 0.12);
+  }
+
+  .glass-subtle {
+    background: rgba(6, 12, 22, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  /* ── Glow border on hover ────────────────────────────────────────────── */
+  .glow-border {
+    position: relative;
+  }
+
+  .glow-border::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, rgba(0, 255, 170, 0.2), rgba(0, 204, 255, 0.1)) border-box;
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .glow-border:hover::after {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  /* ── Hex grid — fixed 130px columns, auto-fill so all hexes same size ── */
+  .hex-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 130px);
+    justify-content: center;
+    gap: 8px 4px;
+    padding: 4px;
+  }
+  .hex-grid-item {
+    width: 130px;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ── Hex card grid — responsive multi-column layout for hex row cards ── */
+  .hex-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 10px;
+    padding: 4px;
+  }
+  .hex-card-grid-item {
+    width: 100%;
+  }
+
+  /* ── Hex clip-path ───────────────────────────────────────────────────── */
+  .clip-hex {
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  }
+
+  /* Tall hex — matches the SVG frame aspect ratio */
+  .clip-hex-tall {
+    clip-path: polygon(50% 3.5%, 94% 26%, 94% 74%, 50% 96.5%, 6% 74%, 6% 26%);
+  }
+
+  /* ── Atmosphere background ───────────────────────────────────────────── */
+  .bg-space {
+    background-color: rgb(var(--surface-950));
+    background-image:
+      radial-gradient(ellipse at 15% 50%, rgba(0, 255, 170, 0.07) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 20%, rgba(0, 204, 255, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 85%, rgba(0, 255, 200, 0.04) 0%, transparent 50%);
+  }
+
+  /* ── Text glow ───────────────────────────────────────────────────────── */
+  .text-glow {
+    text-shadow: 0 0 8px rgba(0, 255, 170, 0.4), 0 0 16px rgba(0, 255, 170, 0.2);
+  }
+
+  .text-glow-sm {
+    text-shadow: 0 0 6px rgba(0, 255, 170, 0.3);
+  }
+
+  /* ── Hex row ────────────────────────────────────────────────────────── */
+  .hex-row {
+    transition: transform 0.25s ease;
+  }
+
+  .hex-row:hover {
+    transform: translateY(-1px);
+  }
+
+  .hex-row:hover .hex-row-title {
+    text-shadow: 0 0 8px rgba(0, 255, 170, 0.3);
   }
 }

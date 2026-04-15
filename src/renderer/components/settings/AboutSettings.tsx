@@ -21,6 +21,7 @@ export function AboutSettings() {
   }>({});
 
   useEffect(() => {
+    if (!window.api) return;
     window.api.app.getVersion().then((v: string) => setVersion(v));
     window.api.db.status().then((s: DbStatus) => setDbStatus(s));
     window.api.epg.getStats().then(
@@ -39,7 +40,7 @@ export function AboutSettings() {
       </div>
 
       {/* App info */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10">
             <svg
@@ -67,7 +68,7 @@ export function AboutSettings() {
       </section>
 
       {/* Database stats */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Database
         </h3>
@@ -105,7 +106,7 @@ export function AboutSettings() {
       </section>
 
       {/* System info */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           System
         </h3>
@@ -121,7 +122,7 @@ export function AboutSettings() {
       </section>
 
       {/* Tech stack */}
-      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+      <section className="rounded-xl border border-accent/5 bg-surface-900/30 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
           Built With
         </h3>
@@ -137,7 +138,7 @@ export function AboutSettings() {
           ].map((tech) => (
             <span
               key={tech}
-              className="rounded-full border border-surface-700 bg-surface-800 px-3 py-1 text-xs font-medium text-surface-300"
+              className="rounded-full border border-surface-700/50 bg-surface-800/40 px-3 py-1 text-xs font-medium text-surface-300"
             >
               {tech}
             </span>
@@ -150,7 +151,7 @@ export function AboutSettings() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-surface-800 bg-surface-950/50 px-4 py-3 text-center">
+    <div className="rounded-lg border border-accent/5 bg-surface-950/50 px-4 py-3 text-center">
       <p className="text-xs text-surface-500">{label}</p>
       <p className="mt-1 text-lg font-semibold text-surface-200">{value}</p>
     </div>

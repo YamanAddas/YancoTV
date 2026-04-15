@@ -27,7 +27,7 @@ export function SourceSwitcher({ selected, onSelect }: SourceSwitcherProps) {
       <select
         value={selected ?? ''}
         onChange={(e) => onSelect(e.target.value || null)}
-        className="rounded-md border border-surface-700 bg-surface-800 px-2 py-1 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        className="rounded-md border border-accent/5 bg-surface-800 px-2 py-1 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       >
         <option value="">All Sources</option>
         {sources.map((s) => (

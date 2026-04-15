@@ -15,7 +15,7 @@ function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 transition-colors hover:border-accent/10">
       <div className="min-w-0">
         <p className="text-sm font-medium text-surface-200">{label}</p>
         {description && (
@@ -40,8 +40,8 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-        checked ? 'bg-accent' : 'bg-surface-600'
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all ${
+        checked ? 'bg-accent shadow-glow-sm' : 'bg-surface-600'
       }`}
     >
       <span
@@ -66,7 +66,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-surface-700 bg-surface-800 px-3 py-1.5 text-sm text-surface-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>

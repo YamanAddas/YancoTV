@@ -82,7 +82,7 @@ export function SearchPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="mb-4 text-2xl font-bold text-surface-100">Search</h2>
+        <h2 className="mb-4 text-2xl font-bold text-surface-100 text-glow-sm">Search</h2>
         <div className="relative">
           <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-surface-500" />
           <input
@@ -91,7 +91,7 @@ export function SearchPage() {
             value={query}
             onChange={handleQueryChange}
             autoFocus
-            className="w-full rounded-xl border border-surface-700 bg-surface-800 py-3 pl-10 pr-4 text-surface-100 placeholder-surface-500 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
+            className="w-full rounded-xl border border-accent/5 bg-surface-800 py-3 pl-10 pr-4 text-surface-100 placeholder-surface-500 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
           />
         </div>
       </div>

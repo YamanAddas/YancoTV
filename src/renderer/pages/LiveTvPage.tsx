@@ -80,6 +80,17 @@ export function LiveTvPage() {
     return result;
   }, [channels, hiddenIds, parentalSettings.hideAdultContent]);
 
+  // Per-category channel counts for the sidebar
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const ch of visibleChannels) {
+      if (ch.groupName) {
+        counts[ch.groupName] = (counts[ch.groupName] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [visibleChannels]);
+
   const filtered = useMemo(() => {
     if (!selectedCategory) return visibleChannels;
     return visibleChannels.filter((ch) => ch.groupName === selectedCategory);
@@ -187,6 +198,8 @@ export function LiveTvPage() {
           selected={selectedCategory}
           onSelect={setSelectedCategory}
           isLoading={isLoading}
+          categoryCounts={categoryCounts}
+          totalCount={visibleChannels.length}
         />
         <div className="min-h-0 flex-1">
           <ContentGrid

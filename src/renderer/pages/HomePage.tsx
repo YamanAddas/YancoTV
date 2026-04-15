@@ -63,7 +63,7 @@ export function HomePage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-surface-100">Home</h2>
+      <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Home</h2>
 
       <div className="grid grid-cols-3 gap-4">
         <StatusCard title="Live TV" count={counts.live} icon="tv" onClick={() => navigate('/live')} />
@@ -88,7 +88,7 @@ export function HomePage() {
           </p>
           <button
             onClick={() => navigate('/settings')}
-            className="mt-4 rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+            className="mt-4 rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent shadow-glow-sm transition-colors hover:bg-accent/20"
           >
             Go to Settings
           </button>
@@ -162,7 +162,7 @@ function HistoryCard({
   return (
     <button
       onClick={() => onPlay(entry)}
-      className="group flex flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5"
+      className="group flex flex-col overflow-hidden rounded-xl border border-accent/5 bg-surface-900/30 text-left transition-all hover:border-accent/20 hover:shadow-glow-sm"
     >
       <div className="relative aspect-video w-full overflow-hidden bg-surface-800">
         {content.logoUrl ? (
@@ -211,7 +211,7 @@ function FavoriteCard({
   return (
     <button
       onClick={() => onPlay(fav)}
-      className="group flex flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5"
+      className="group flex flex-col overflow-hidden rounded-xl border border-accent/5 bg-surface-900/30 text-left transition-all hover:border-accent/20 hover:shadow-glow-sm"
     >
       <div className="aspect-video w-full overflow-hidden bg-surface-800">
         {content.logoUrl ? (
@@ -275,7 +275,7 @@ function StatusCard({
   return (
     <button
       onClick={onClick}
-      className="rounded-xl border border-surface-800 bg-surface-900 p-5 text-left transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5"
+      className="rounded-xl border border-accent/5 bg-surface-900/30 p-5 text-left transition-all hover:border-accent/20 hover:shadow-glow-sm"
     >
       <div className="flex items-center gap-3">
         <svg
