@@ -68,9 +68,16 @@ export function SearchPage() {
     [toggle],
   );
 
-  const live = results.filter((r) => r.type === 'live').map(toCardData);
-  const movies = results.filter((r) => r.type === 'movie').map(toCardData);
-  const series = results.filter((r) => r.type === 'series').map(toCardData);
+  // Max cards shown per zone before the "and N more" overflow hint
+  const ZONE_DISPLAY_CAP = 24;
+
+  const allLive   = results.filter((r) => r.type === 'live').map(toCardData);
+  const allMovies = results.filter((r) => r.type === 'movie').map(toCardData);
+  const allSeries = results.filter((r) => r.type === 'series').map(toCardData);
+
+  const live   = allLive.slice(0, ZONE_DISPLAY_CAP);
+  const movies = allMovies.slice(0, ZONE_DISPLAY_CAP);
+  const series = allSeries.slice(0, ZONE_DISPLAY_CAP);
 
   return (
     <div className="space-y-6">
@@ -89,9 +96,19 @@ export function SearchPage() {
         </div>
       </div>
 
-      {!query.trim() && (
+      {isLoading && (
+        <div className="flex items-center justify-center py-16 text-surface-500">
+          <svg className="mr-2 h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
+          <span className="text-sm">Searching…</span>
+        </div>
+      )}
+
+      {!query.trim() && !isLoading && (
         <div className="flex flex-col items-center justify-center py-20 text-surface-500">
-          <SearchIcon className="h-12 w-12 mb-4 opacity-30" />
+          <SearchIcon className="mb-4 h-12 w-12 opacity-30" />
           <p className="text-sm">Type to search your content library</p>
         </div>
       )}
@@ -102,49 +119,73 @@ export function SearchPage() {
         </div>
       )}
 
-      {live.length > 0 && (
+      {!isLoading && live.length > 0 && (
         <section>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-400">
-            Live TV &middot; {live.length}
-          </h3>
+          <ZoneHeader icon="📡" label="Live TV" total={allLive.length} cap={ZONE_DISPLAY_CAP} />
           <ContentGrid
             items={live}
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
-            isLoading={isLoading}
+            isLoading={false}
           />
         </section>
       )}
 
-      {movies.length > 0 && (
+      {!isLoading && movies.length > 0 && (
         <section>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-400">
-            Movies &middot; {movies.length}
-          </h3>
+          <ZoneHeader icon="🎬" label="Movies" total={allMovies.length} cap={ZONE_DISPLAY_CAP} />
           <ContentGrid
             items={movies}
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
-            isLoading={isLoading}
+            isLoading={false}
           />
         </section>
       )}
 
-      {series.length > 0 && (
+      {!isLoading && series.length > 0 && (
         <section>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-400">
-            Series &middot; {series.length}
-          </h3>
+          <ZoneHeader icon="📺" label="Series" total={allSeries.length} cap={ZONE_DISPLAY_CAP} />
           <ContentGrid
             items={series}
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
-            isLoading={isLoading}
+            isLoading={false}
           />
         </section>
+      )}
+    </div>
+  );
+}
+
+function ZoneHeader({
+  icon,
+  label,
+  total,
+  cap,
+}: {
+  icon: string;
+  label: string;
+  total: number;
+  cap: number;
+}) {
+  const overflow = total - cap;
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <span className="text-base leading-none">{icon}</span>
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-surface-400">
+        {label}
+      </h3>
+      <span className="rounded-full bg-surface-800 px-2 py-0.5 text-xs font-medium text-surface-400">
+        {total}
+      </span>
+      {overflow > 0 && (
+        <span className="text-xs text-surface-600">
+          (showing first {cap} — refine your search to narrow results)
+        </span>
       )}
     </div>
   );

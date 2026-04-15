@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import log from 'electron-log/main';
 import { getDb, dropFtsTriggers, restoreFtsTriggers, rebuildFtsIndex } from './db';
-import { classifyEntry, normalizeCategory } from './content-classifier';
+import { classifyEntry } from './content-classifier';
 import { cleanTitle, extractSeasonEpisode, extractShowName } from './title-cleaner';
 import type { ContentItem, ContentType, Episode, SortOption } from '../../shared/types';
 import type { M3uEntry } from './m3u-parser';
@@ -124,7 +124,7 @@ export async function storeM3uEntries(
     for (const entry of entries) {
       const contentType = classifyEntry(entry);
       const cleaned = cleanTitle(entry.title);
-      const group = normalizeCategory(entry.groupTitle);
+      const group = entry.groupTitle.trim();
 
       if (contentType === 'series') {
         const showName = extractShowName(entry.title);
@@ -297,7 +297,7 @@ export async function storeXtreamContent(
       const insertBatch = db.transaction(() => {
         for (const stream of chunk) {
           const category = liveStreams.categories.get(stream.categoryId) ?? '';
-          const group = normalizeCategory(category);
+          const group = category.trim();
           const url = client.buildStreamUrl(stream.streamId, 'live');
 
           insertContent.run(
@@ -330,7 +330,7 @@ export async function storeXtreamContent(
       const insertBatch = db.transaction(() => {
         for (const stream of chunk) {
           const category = vodStreams.categories.get(stream.categoryId) ?? '';
-          const group = normalizeCategory(category);
+          const group = category.trim();
           const url = client.buildStreamUrl(
             stream.streamId,
             'movie',
@@ -367,7 +367,7 @@ export async function storeXtreamContent(
       const insertBatch = db.transaction(() => {
         for (const series of chunk) {
           const category = seriesList.categories.get(series.categoryId) ?? '';
-          const group = normalizeCategory(category);
+          const group = category.trim();
 
           const metadata = JSON.stringify({
             seriesId: series.seriesId,
@@ -525,7 +525,8 @@ export function getCategories(type: ContentType): string[] {
   return rows.map((r) => r.group_name);
 }
 
-function buildFtsQuery(query: string): string {
+/** Build an FTS5 query where ALL words must match (AND logic, prefix on each word) */
+function buildFtsQueryAnd(query: string): string {
   return query
     .trim()
     .split(/\s+/)
@@ -534,31 +535,70 @@ function buildFtsQuery(query: string): string {
     .join(' ');
 }
 
+/** Build an FTS5 query where ANY word can match (OR logic, prefix on each word).
+ *  Returns empty string when the query has only one word (AND and OR are identical). */
+function buildFtsQueryOr(query: string): string {
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return '';
+  return words.map((word) => `"${word.replace(/"/g, '""')}"*`).join(' OR ');
+}
+
+/** Max results returned per content type from a single search. */
+const SEARCH_LIMIT_PER_TYPE = 60;
+
+/**
+ * Smart search: runs separate per-type queries so Live TV results can't crowd
+ * out Movies/Series. Within each type it tries:
+ *   1. FTS5 AND (all words must match) — precise, ranked by relevance
+ *   2. FTS5 OR  (any word matches)    — broader, still ranked
+ *   3. LIKE fallback                  — handles corrupted/empty FTS index
+ */
 export function searchContent(query: string): ContentItem[] {
   const db = getDb();
-  try {
-    const ftsQuery = buildFtsQuery(query);
-    const rows = db
-      .prepare(
-        `SELECT c.* FROM content c
-         WHERE c.id IN (
-           SELECT content_id FROM content_fts WHERE content_fts MATCH ?
-           ORDER BY rank LIMIT 100
-         )
-         ORDER BY c.type, c.clean_title, c.title`,
-      )
-      .all(ftsQuery) as ContentRow[];
-    return rows.map(rowToContent);
-  } catch {
-    // Fallback to LIKE if FTS5 index not available or query is invalid
-    const pattern = `%${query}%`;
-    const rows = db
-      .prepare(
-        `SELECT * FROM content WHERE title LIKE ? OR clean_title LIKE ? ORDER BY title LIMIT 100`,
-      )
-      .all(pattern, pattern) as ContentRow[];
-    return rows.map(rowToContent);
+  const types: ContentType[] = ['live', 'movie', 'series'];
+  const allResults: ContentItem[] = [];
+
+  const andQuery = buildFtsQueryAnd(query);
+  const orQuery = buildFtsQueryOr(query);
+
+  const ftsStmt = db.prepare(
+    `SELECT c.* FROM content c
+     WHERE c.type = ? AND c.id IN (
+       SELECT content_id FROM content_fts WHERE content_fts MATCH ?
+       ORDER BY rank LIMIT ?
+     )
+     ORDER BY COALESCE(c.clean_title, c.title) COLLATE NOCASE`,
+  );
+
+  const likeStmt = db.prepare(
+    `SELECT * FROM content
+     WHERE type = ? AND (title LIKE ? OR clean_title LIKE ? OR group_name LIKE ?)
+     ORDER BY COALESCE(clean_title, title) COLLATE NOCASE
+     LIMIT ?`,
+  );
+
+  for (const type of types) {
+    try {
+      // 1. Try AND: every word must appear
+      let rows = ftsStmt.all(type, andQuery, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
+
+      // 2. OR fallback: at least one word must appear
+      if (rows.length === 0 && orQuery) {
+        rows = ftsStmt.all(type, orQuery, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
+      }
+
+      allResults.push(...rows.map(rowToContent));
+    } catch {
+      // 3. FTS unavailable / corrupt query — fall back to LIKE
+      const pattern = `%${query.trim()}%`;
+      const rows = likeStmt.all(
+        type, pattern, pattern, pattern, SEARCH_LIMIT_PER_TYPE,
+      ) as ContentRow[];
+      allResults.push(...rows.map(rowToContent));
+    }
   }
+
+  return allResults;
 }
 
 export function getContentCountByType(): Record<ContentType, number> {
