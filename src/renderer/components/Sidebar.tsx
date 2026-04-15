@@ -159,15 +159,33 @@ export function Sidebar() {
       </AnimatePresence>
 
       {/* Navigation items */}
-      <div className="flex flex-1 flex-col gap-1 px-2">
+      <div
+        className="flex flex-1 flex-col gap-1 px-2"
+        role="navigation"
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const links = Array.from(
+              e.currentTarget.querySelectorAll<HTMLElement>('[data-nav-item]'),
+            );
+            const current = links.findIndex((el) => el === document.activeElement);
+            const next =
+              e.key === 'ArrowDown'
+                ? Math.min(current + 1, links.length - 1)
+                : Math.max(current - 1, 0);
+            links[next]?.focus();
+          }
+        }}
+      >
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             end={item.path === '/'}
             title={expanded ? undefined : item.label}
+            data-nav-item=""
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-accent/50 ${
                 isActive
                   ? 'bg-accent/10 text-accent shadow-glow-sm'
                   : 'text-surface-400 hover:bg-surface-700/30 hover:text-surface-200'

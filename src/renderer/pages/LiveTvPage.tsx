@@ -13,7 +13,7 @@ import { useNowNextBatch } from '../hooks/use-epg';
 export function LiveTvPage() {
   const [channels, setChannels] = useState<ContentCardData[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
   const [isLoading, setIsLoading] = useState(true);
@@ -93,6 +93,10 @@ export function LiveTvPage() {
 
   const filtered = useMemo(() => {
     if (!selectedCategory) return visibleChannels;
+    if (Array.isArray(selectedCategory)) {
+      const set = new Set(selectedCategory);
+      return visibleChannels.filter((ch) => ch.groupName != null && set.has(ch.groupName));
+    }
     return visibleChannels.filter((ch) => ch.groupName === selectedCategory);
   }, [visibleChannels, selectedCategory]);
 

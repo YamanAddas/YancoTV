@@ -20,7 +20,7 @@ interface EpisodeData {
 export function SeriesPage() {
   const [series, setSeries] = useState<ContentCardData[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
   const [selectedShow, setSelectedShow] = useState<ContentCardData | null>(null);
@@ -47,8 +47,22 @@ export function SeriesPage() {
     });
   }, [selectedSource, sortBy]);
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of series) {
+      if (s.groupName) {
+        counts[s.groupName] = (counts[s.groupName] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [series]);
+
   const filtered = useMemo(() => {
     if (!selectedCategory) return series;
+    if (Array.isArray(selectedCategory)) {
+      const set = new Set(selectedCategory);
+      return series.filter((s) => s.groupName != null && set.has(s.groupName));
+    }
     return series.filter((s) => s.groupName === selectedCategory);
   }, [series, selectedCategory]);
 
@@ -228,6 +242,8 @@ export function SeriesPage() {
           selected={selectedCategory}
           onSelect={setSelectedCategory}
           isLoading={isLoading}
+          categoryCounts={categoryCounts}
+          totalCount={series.length}
         />
         <div className="min-h-0 flex-1">
           <ContentGrid

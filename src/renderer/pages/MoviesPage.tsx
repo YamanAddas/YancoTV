@@ -10,7 +10,7 @@ import { useFavoritesStore } from '../stores/favorites-store';
 export function MoviesPage() {
   const [movies, setMovies] = useState<ContentCardData[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
   const [isLoading, setIsLoading] = useState(true);
@@ -34,8 +34,22 @@ export function MoviesPage() {
     });
   }, [selectedSource, sortBy]);
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of movies) {
+      if (m.groupName) {
+        counts[m.groupName] = (counts[m.groupName] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [movies]);
+
   const filtered = useMemo(() => {
     if (!selectedCategory) return movies;
+    if (Array.isArray(selectedCategory)) {
+      const set = new Set(selectedCategory);
+      return movies.filter((m) => m.groupName != null && set.has(m.groupName));
+    }
     return movies.filter((m) => m.groupName === selectedCategory);
   }, [movies, selectedCategory]);
 
@@ -92,6 +106,8 @@ export function MoviesPage() {
           selected={selectedCategory}
           onSelect={setSelectedCategory}
           isLoading={isLoading}
+          categoryCounts={categoryCounts}
+          totalCount={movies.length}
         />
         <div className="min-h-0 flex-1">
           <ContentGrid

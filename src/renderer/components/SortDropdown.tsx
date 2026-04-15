@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 export type SortOption = 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group';
 
@@ -23,7 +23,27 @@ interface SortDropdownProps {
 
 export function SortDropdown({ value, onChange }: SortDropdownProps) {
   const [open, setOpen] = useState(false);
+  const [focusIndex, setFocusIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // When opening, focus the current value (or first item)
+  useEffect(() => {
+    if (open) {
+      const idx = SORT_OPTIONS.findIndex((o) => o.value === value);
+      setFocusIndex(idx >= 0 ? idx : 0);
+    } else {
+      setFocusIndex(-1);
+    }
+  }, [open, value]);
+
+  // Focus the active item when focusIndex changes
+  useEffect(() => {
+    if (open && focusIndex >= 0) {
+      itemRefs.current[focusIndex]?.focus();
+    }
+  }, [open, focusIndex]);
 
   // Close on click outside
   useEffect(() => {
@@ -37,24 +57,76 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open]);
+  const select = useCallback(
+    (option: SortOption) => {
+      onChange(option);
+      setOpen(false);
+      triggerRef.current?.focus();
+    },
+    [onChange],
+  );
+
+  // Keyboard handling on the trigger button
+  const handleTriggerKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!open) setOpen(true);
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setOpen((v) => !v);
+      }
+    },
+    [open],
+  );
+
+  // Keyboard handling within the dropdown menu
+  const handleMenuKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusIndex((i) => Math.min(i + 1, SORT_OPTIONS.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusIndex((i) => Math.max(i - 1, 0));
+          break;
+        case 'Home':
+          e.preventDefault();
+          setFocusIndex(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          setFocusIndex(SORT_OPTIONS.length - 1);
+          break;
+        case 'Enter':
+        case ' ':
+          e.preventDefault();
+          if (focusIndex >= 0) select(SORT_OPTIONS[focusIndex].value);
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setOpen(false);
+          triggerRef.current?.focus();
+          break;
+      }
+    },
+    [focusIndex, select],
+  );
 
   const current = SORT_OPTIONS.find((o) => o.value === value) ?? SORT_OPTIONS[0];
 
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-lg border border-accent/5 bg-surface-800 px-3 py-1.5 text-sm text-surface-300 transition-colors hover:border-accent/20 hover:text-surface-200"
+        onKeyDown={handleTriggerKeyDown}
+        className="flex items-center gap-1.5 rounded-lg border border-accent/5 bg-surface-800 px-3 py-1.5 text-sm text-surface-300 transition-colors hover:border-accent/20 hover:text-surface-200 focus:outline-none focus:ring-1 focus:ring-accent/50"
         title="Sort by"
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
         <svg
           className="h-4 w-4 text-surface-400"
@@ -78,18 +150,25 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-48 overflow-hidden rounded-xl border border-accent/5 bg-surface-800 shadow-xl shadow-black/30">
-          {SORT_OPTIONS.map((option) => (
+        <div
+          className="absolute right-0 z-50 mt-1 w-48 overflow-hidden rounded-xl border border-accent/5 bg-surface-800 shadow-xl shadow-black/30"
+          role="listbox"
+          onKeyDown={handleMenuKeyDown}
+        >
+          {SORT_OPTIONS.map((option, i) => (
             <button
               key={option.value}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+              ref={(el) => { itemRefs.current[i] = el; }}
+              onClick={() => select(option.value)}
+              role="option"
+              aria-selected={option.value === value}
+              tabIndex={i === focusIndex ? 0 : -1}
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors focus:outline-none ${
                 option.value === value
                   ? 'bg-accent/10 text-accent shadow-glow-sm'
-                  : 'text-surface-300 hover:bg-surface-700 hover:text-surface-200'
+                  : i === focusIndex
+                    ? 'bg-surface-700 text-surface-200'
+                    : 'text-surface-300 hover:bg-surface-700 hover:text-surface-200'
               }`}
             >
               <svg
