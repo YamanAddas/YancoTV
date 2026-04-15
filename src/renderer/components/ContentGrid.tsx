@@ -1,5 +1,5 @@
 import { VirtuosoGrid } from 'react-virtuoso';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export interface ContentCardData {
   id: string;
@@ -141,10 +141,35 @@ export function HorizontalContentRow({
   onFavoriteToggle,
   favoriteIds,
 }: HorizontalContentRowProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Translate vertical touchpad/wheel scroll into horizontal scroll.
+  // Without this, the vertical wheel event bubbles up to the page's
+  // overflow-y-auto container and scrolls the page instead of the row.
+  // Must be { passive: false } so preventDefault() is allowed.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // Only hijack when there is horizontal overflow to scroll
+      if (el.scrollWidth <= el.clientWidth) return;
+
+      e.preventDefault();
+      el.scrollLeft += e.deltaY || e.deltaX;
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
   if (items.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto overflow-y-hidden pb-2">
+    <div
+      ref={scrollRef}
+      className="overflow-x-auto overflow-y-hidden pb-2"
+    >
       <div className="flex w-max gap-3">
         {items.map((item) => (
           <div key={item.id} className="w-40 flex-shrink-0">
