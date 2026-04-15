@@ -30,6 +30,8 @@ interface ContentGridProps {
   onHideChannel?: (item: ContentCardData) => void;
   /** Override list style — defaults to the global ui_list_style setting */
   viewMode?: 'grid' | 'list' | 'compact';
+  /** 'channel' = compact hex rows (Live TV); 'poster' = tall hex artwork cards (Movies/Series) */
+  cardStyle?: 'channel' | 'poster';
 }
 
 export function ContentGrid({
@@ -43,13 +45,14 @@ export function ContentGrid({
   onLockToggle,
   onHideChannel,
   viewMode: viewModeProp,
+  cardStyle = 'channel',
 }: ContentGridProps) {
   // ── All hooks must be called unconditionally ──────────────────────────────
   const settingsViewMode = useSettingsStore((s) => s.get('ui_list_style')) as 'grid' | 'list' | 'compact';
   const showLogos = useSettingsStore((s) => s.getBool('ui_channel_logos'));
   const viewMode = viewModeProp ?? settingsViewMode ?? 'grid';
 
-  // One stable callback for grid item rendering (HexCard)
+  // One stable callback for grid item rendering
   const gridItemContent = useCallback(
     (index: number) => {
       const item = items[index];
@@ -65,10 +68,11 @@ export function ContentGrid({
           nowNext={nowNext}
           onLockToggle={onLockToggle ? () => onLockToggle(item) : undefined}
           onHideChannel={onHideChannel ? () => onHideChannel(item) : undefined}
+          cardStyle={cardStyle}
         />
       );
     },
-    [items, onItemClick, onFavoriteToggle, favoriteIds, lockedIds, nowNextMap, showLogos, onLockToggle, onHideChannel],
+    [items, onItemClick, onFavoriteToggle, favoriteIds, lockedIds, nowNextMap, showLogos, onLockToggle, onHideChannel, cardStyle],
   );
 
   // One stable callback for list/compact row rendering
@@ -93,16 +97,18 @@ export function ContentGrid({
   );
   // ── End hooks ─────────────────────────────────────────────────────────────
 
-  if (isLoading) return <SkeletonGrid />;
+  if (isLoading) return <SkeletonGrid cardStyle={cardStyle} />;
   if (items.length === 0) return null;
 
   if (viewMode === 'grid') {
+    const listCls = cardStyle === 'poster' ? 'hex-grid' : 'hex-card-grid';
+    const itemCls = cardStyle === 'poster' ? 'hex-grid-item' : 'hex-card-grid-item';
     return (
       <VirtuosoGrid
         totalCount={items.length}
         overscan={200}
-        listClassName="hex-card-grid"
-        itemClassName="hex-card-grid-item"
+        listClassName={listCls}
+        itemClassName={itemCls}
         itemContent={gridItemContent}
         style={{ height: '100%' }}
       />
@@ -149,7 +155,8 @@ function HexGridItem({
   nowNext,
   onLockToggle,
   onHideChannel,
-}: CardProps) {
+  cardStyle = 'channel',
+}: CardProps & { cardStyle?: 'channel' | 'poster' }) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleContextMenu = useCallback(
@@ -173,19 +180,35 @@ function HexGridItem({
 
   return (
     <>
-      <ChannelHexRow
-        title={item.title}
-        cleanTitle={item.cleanTitle}
-        groupName={item.groupName}
-        logoUrl={item.logoUrl}
-        isFavorite={isFavorite}
-        isLocked={isLocked}
-        showLogo={showLogo}
-        onClick={onClick}
-        onFavoriteToggle={onFavoriteToggle}
-        onContextMenu={handleContextMenu}
-        variant="grid"
-      />
+      {cardStyle === 'poster' ? (
+        <HexCard
+          title={item.cleanTitle || item.title}
+          subtitle={item.groupName}
+          imageUrl={showLogo ? item.logoUrl : undefined}
+          fallbackLetter={(item.cleanTitle || item.title).charAt(0).toUpperCase()}
+          isFavorite={isFavorite}
+          isLocked={isLocked}
+          nowPlaying={nowTitle}
+          onClick={onClick}
+          onFavoriteToggle={onFavoriteToggle}
+          onContextMenu={handleContextMenu}
+        />
+      ) : (
+        <ChannelHexRow
+          title={item.title}
+          cleanTitle={item.cleanTitle}
+          groupName={item.groupName}
+          logoUrl={item.logoUrl}
+          isFavorite={isFavorite}
+          isLocked={isLocked}
+          showLogo={showLogo}
+          nowPlaying={nowTitle}
+          onClick={onClick}
+          onFavoriteToggle={onFavoriteToggle}
+          onContextMenu={handleContextMenu}
+          variant="grid"
+        />
+      )}
 
       {contextMenu && (
         <ContextMenu
@@ -595,7 +618,27 @@ function EyeOffIcon() {
   );
 }
 
-function SkeletonGrid() {
+function SkeletonGrid({ cardStyle = 'channel' }: { cardStyle?: 'channel' | 'poster' }) {
+  if (cardStyle === 'poster') {
+    return (
+      <div className="hex-grid">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div key={i} className="hex-grid-item">
+            <div className="relative w-full animate-pulse" style={{ aspectRatio: '200 / 230' }}>
+              <div
+                className="absolute inset-[7%]"
+                style={{
+                  clipPath: 'polygon(50% 3.5%, 94% 26%, 94% 74%, 50% 96.5%, 6% 74%, 6% 26%)',
+                  background: 'rgba(var(--surface-800), 0.4)',
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="hex-card-grid">
       {Array.from({ length: 12 }).map((_, i) => (

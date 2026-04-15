@@ -88,11 +88,11 @@ export function Sidebar() {
   return (
     <motion.nav
       className="glass-strong relative z-30 flex flex-col overflow-hidden"
-      animate={{ width: expanded ? 208 : 56 }}
+      animate={{ width: expanded ? 260 : 56 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
-      {/* Header — logo + hamburger */}
-      <div className="flex h-14 items-center gap-2 px-3">
+      {/* Header — hamburger toggle */}
+      <div className="flex h-10 flex-shrink-0 items-center px-3">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-surface-400 transition-colors hover:bg-surface-700/40 hover:text-accent"
@@ -102,20 +102,27 @@ export function Sidebar() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
         </button>
-        <AnimatePresence>
-          {expanded && (
-            <motion.h1
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2 }}
-              className="text-lg font-bold text-accent text-glow-sm truncate"
-            >
-              YancoTV
-            </motion.h1>
-          )}
-        </AnimatePresence>
       </div>
+
+      {/* Logo — full-width, dedicated section */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-shrink-0 overflow-hidden px-2 pb-3"
+          >
+            <img
+              src={new URL('../assets/yancotv_logo.png', import.meta.url).href}
+              alt="YancoTV"
+              className="w-full h-auto object-contain object-left"
+              draggable={false}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Search bar — only when expanded */}
       <AnimatePresence>

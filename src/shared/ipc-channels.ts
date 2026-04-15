@@ -62,6 +62,8 @@ export const IpcChannels = {
   EPG_GET_STATS: 'epg:getStats',
   EPG_SET_GLOBAL_URL: 'epg:setGlobalUrl',
   EPG_GET_SETTINGS: 'epg:getSettings',
+  /** Push event: main → renderer when a refresh starts/completes/errors */
+  EPG_REFRESH_PROGRESS: 'epg:refreshProgress',
 
   // Catch-up
   CATCHUP_GET_URL: 'catchup:getUrl',

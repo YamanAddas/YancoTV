@@ -1,13 +1,18 @@
 /**
  * XMLTV parser for EPG data.
  *
- * Parses XMLTV format (plain XML or gzipped) into structured programme data.
- * Uses a simple regex-based approach rather than a full DOM parser to keep
- * memory usage low on large EPG files (some are 100MB+).
+ * Uses an indexOf-based approach instead of regex to avoid catastrophic
+ * backtracking and O(n²) behaviour on large EPG files (100-200 MB).
+ * The main parse function is async and yields to the event loop every
+ * 2 000 programmes so IPC handlers remain responsive throughout.
  */
 
 import zlib from 'zlib';
 import log from 'electron-log/main';
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 export interface XmltvProgramme {
   channelId: string;
@@ -30,17 +35,33 @@ export interface XmltvResult {
   programmes: XmltvProgramme[];
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const OPEN_PROG = '<programme ';
+const CLOSE_PROG = '</programme>';
+const OPEN_CHAN = '<channel ';
+const CLOSE_CHAN = '</channel>';
+const YIELD_EVERY = 2_000; // yield to event loop every N programmes
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 /**
- * Parse XMLTV content (string or gzipped buffer) into channels and programmes.
+ * Parse XMLTV content (plain XML or gzipped buffer) into channels + programmes.
+ *
+ * Async — safe to await on the Electron main process without blocking IPC.
  */
-export function parseXmltv(input: string | Buffer): XmltvResult {
+export async function parseXmltv(input: string | Buffer): Promise<XmltvResult> {
   let xml: string;
 
   if (Buffer.isBuffer(input)) {
-    // Try to decompress as gzip; fall back to treating as plain text
     try {
-      xml = zlib.gunzipSync(input).toString('utf-8');
+      xml = await gunzipAsync(input);
     } catch {
+      // Not gzipped — decode as plain UTF-8
       xml = input.toString('utf-8');
     }
   } else {
@@ -48,10 +69,9 @@ export function parseXmltv(input: string | Buffer): XmltvResult {
   }
 
   const channels = parseChannels(xml);
-  const programmes = parseProgrammes(xml);
+  const programmes = await parseProgrammesAsync(xml);
 
   log.info(`XMLTV parsed: ${channels.length} channels, ${programmes.length} programmes`);
-
   return { channels, programmes };
 }
 
@@ -60,38 +80,29 @@ export function parseXmltv(input: string | Buffer): XmltvResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse XMLTV timestamp format: "YYYYMMDDHHmmss +HHMM" or "YYYYMMDDHHmmss"
+ * Parse XMLTV timestamp: "YYYYMMDDHHmmss +HHMM" or "YYYYMMDDHHmmss"
  * Returns Unix seconds, or 0 if unparseable.
  */
 export function parseXmltvTimestamp(ts: string): number {
   if (!ts) return 0;
 
-  // Strip whitespace
   const cleaned = ts.trim();
-
-  // Match: 20260414120000 +0200  or  20260414120000
   const match = cleaned.match(
     /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-]\d{4})?$/,
   );
   if (!match) return 0;
 
   const [, year, month, day, hour, minute, second, offset] = match;
-
-  // Build an ISO-like string the Date constructor can handle
   let isoStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 
   if (offset) {
-    // Convert "+0200" -> "+02:00"
     isoStr += `${offset.slice(0, 3)}:${offset.slice(3)}`;
   } else {
-    // No offset specified — assume UTC
     isoStr += 'Z';
   }
 
   const date = new Date(isoStr);
-  if (isNaN(date.getTime())) return 0;
-
-  return Math.floor(date.getTime() / 1000);
+  return isNaN(date.getTime()) ? 0 : Math.floor(date.getTime() / 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,20 +111,29 @@ export function parseXmltvTimestamp(ts: string): number {
 
 function parseChannels(xml: string): XmltvChannel[] {
   const channels: XmltvChannel[] = [];
-  const channelRegex = /<channel\s+id="([^"]*)"[^>]*>([\s\S]*?)<\/channel>/gi;
+  let pos = 0;
 
-  let match;
-  while ((match = channelRegex.exec(xml)) !== null) {
-    const id = match[1];
-    const body = match[2];
+  while (true) {
+    const start = xml.indexOf(OPEN_CHAN, pos);
+    if (start === -1) break;
 
-    const displayName = extractTagContent(body, 'display-name');
-    const iconUrl = extractAttr(body, 'icon', 'src');
+    const attrEnd = xml.indexOf('>', start + OPEN_CHAN.length);
+    if (attrEnd === -1) break;
+
+    const closeStart = xml.indexOf(CLOSE_CHAN, attrEnd + 1);
+    if (closeStart === -1) break;
+
+    const attrs = xml.slice(start + OPEN_CHAN.length, attrEnd);
+    const body = xml.slice(attrEnd + 1, closeStart);
+    pos = closeStart + CLOSE_CHAN.length;
+
+    const id = extractAttrFast(attrs, 'id');
+    if (!id) continue;
 
     channels.push({
       id,
-      displayName: displayName || undefined,
-      iconUrl: iconUrl || undefined,
+      displayName: extractTagFast(body, 'display-name') ?? undefined,
+      iconUrl: extractAttrFromTag(body, 'icon', 'src') ?? undefined,
     });
   }
 
@@ -121,83 +141,139 @@ function parseChannels(xml: string): XmltvChannel[] {
 }
 
 // ---------------------------------------------------------------------------
-// Programme parsing
+// Programme parsing — async with periodic event-loop yields
 // ---------------------------------------------------------------------------
 
-function parseProgrammes(xml: string): XmltvProgramme[] {
+async function parseProgrammesAsync(xml: string): Promise<XmltvProgramme[]> {
   const programmes: XmltvProgramme[] = [];
+  let pos = 0;
+  let count = 0;
 
-  // Match <programme ...>...</programme>
-  const progRegex =
-    /<programme\s+([^>]*)>([\s\S]*?)<\/programme>/gi;
+  while (true) {
+    const start = xml.indexOf(OPEN_PROG, pos);
+    if (start === -1) break;
 
-  let match;
-  while ((match = progRegex.exec(xml)) !== null) {
-    const attrs = match[1];
-    const body = match[2];
+    const attrEnd = xml.indexOf('>', start + OPEN_PROG.length);
+    if (attrEnd === -1) break;
 
-    const startStr = extractAttrFromString(attrs, 'start');
-    const stopStr = extractAttrFromString(attrs, 'stop');
-    const channelId = extractAttrFromString(attrs, 'channel');
+    // Skip self-closing <programme .../> (rare but valid XML)
+    if (xml[attrEnd - 1] === '/') {
+      pos = attrEnd + 1;
+      continue;
+    }
 
-    if (!startStr || !stopStr || !channelId) continue;
+    const closeStart = xml.indexOf(CLOSE_PROG, attrEnd + 1);
+    if (closeStart === -1) break;
+
+    const attrs = xml.slice(start + OPEN_PROG.length, attrEnd);
+    const body = xml.slice(attrEnd + 1, closeStart);
+    pos = closeStart + CLOSE_PROG.length;
+
+    const channelId = extractAttrFast(attrs, 'channel');
+    const startStr = extractAttrFast(attrs, 'start');
+    const stopStr = extractAttrFast(attrs, 'stop');
+
+    if (!channelId || !startStr || !stopStr) continue;
 
     const startTime = parseXmltvTimestamp(startStr);
     const endTime = parseXmltvTimestamp(stopStr);
     if (!startTime || !endTime) continue;
 
-    const title = extractTagContent(body, 'title');
+    const title = extractTagFast(body, 'title');
     if (!title) continue;
-
-    const description = extractTagContent(body, 'desc') || undefined;
-    const category = extractTagContent(body, 'category') || undefined;
-    const iconUrl = extractAttr(body, 'icon', 'src') || undefined;
 
     programmes.push({
       channelId,
       title,
-      description,
+      description: extractTagFast(body, 'desc') ?? undefined,
       startTime,
       endTime,
-      category,
-      iconUrl,
+      category: extractTagFast(body, 'category') ?? undefined,
+      iconUrl: extractAttrFromTag(body, 'icon', 'src') ?? undefined,
     });
+
+    // Yield to event loop so IPC handlers stay responsive during parse
+    if (++count % YIELD_EVERY === 0) {
+      await yieldToEventLoop();
+    }
   }
 
   return programmes;
 }
 
 // ---------------------------------------------------------------------------
-// XML helpers — lightweight extraction without a full parser
+// Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract text content of the first occurrence of a tag */
-function extractTagContent(xml: string, tagName: string): string | null {
-  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'i');
-  const match = regex.exec(xml);
-  return match ? decodeXmlEntities(match[1].trim()) : null;
+function gunzipAsync(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    zlib.gunzip(buffer, (err, result) => {
+      if (err) reject(err);
+      else resolve(result.toString('utf-8'));
+    });
+  });
 }
 
-/** Extract an attribute value from within a tag's body (looks for <tagName attr="value" />) */
-function extractAttr(
-  xml: string,
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+/**
+ * Extract an attribute value from an attribute-string slice.
+ * e.g. extractAttrFast('start="20260415" channel="BBC1"', 'channel') → "BBC1"
+ */
+function extractAttrFast(attrs: string, name: string): string | null {
+  const search = `${name}="`;
+  const idx = attrs.indexOf(search);
+  if (idx === -1) return null;
+  const valStart = idx + search.length;
+  const valEnd = attrs.indexOf('"', valStart);
+  if (valEnd === -1) return null;
+  return decodeXmlEntities(attrs.slice(valStart, valEnd));
+}
+
+/**
+ * Extract the text content of the first matching element.
+ * e.g. extractTagFast('<title lang="en">News</title>', 'title') → "News"
+ */
+function extractTagFast(body: string, tagName: string): string | null {
+  const open = `<${tagName}`;
+  const close = `</${tagName}>`;
+
+  const openIdx = body.indexOf(open);
+  if (openIdx === -1) return null;
+
+  const gtIdx = body.indexOf('>', openIdx + open.length);
+  if (gtIdx === -1) return null;
+
+  if (body[gtIdx - 1] === '/') return null; // self-closing
+
+  const closeIdx = body.indexOf(close, gtIdx + 1);
+  if (closeIdx === -1) return null;
+
+  return decodeXmlEntities(body.slice(gtIdx + 1, closeIdx).trim());
+}
+
+/**
+ * Extract an attribute from a child tag within a body string.
+ * e.g. extractAttrFromTag('<icon src="http://..." />', 'icon', 'src') → "http://..."
+ */
+function extractAttrFromTag(
+  body: string,
   tagName: string,
   attrName: string,
 ): string | null {
-  const regex = new RegExp(`<${tagName}\\s+[^>]*${attrName}="([^"]*)"`, 'i');
-  const match = regex.exec(xml);
-  return match ? decodeXmlEntities(match[1]) : null;
+  const open = `<${tagName}`;
+  const idx = body.indexOf(open);
+  if (idx === -1) return null;
+  const tagEnd = body.indexOf('>', idx + open.length);
+  if (tagEnd === -1) return null;
+  return extractAttrFast(body.slice(idx + open.length, tagEnd), attrName);
 }
 
-/** Extract an attribute value from an attributes string */
-function extractAttrFromString(attrs: string, name: string): string | null {
-  const regex = new RegExp(`${name}="([^"]*)"`, 'i');
-  const match = regex.exec(attrs);
-  return match ? decodeXmlEntities(match[1]) : null;
-}
-
-/** Decode common XML entities */
+/** Decode common XML character entities. Fast-path when no '&' present. */
 function decodeXmlEntities(str: string): string {
+  if (!str.includes('&')) return str;
   return str
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

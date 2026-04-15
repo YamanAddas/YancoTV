@@ -58,7 +58,12 @@ export function AboutSettings() {
             </svg>
           </div>
           <div>
-            <h3 className="text-xl font-bold text-surface-100">YancoTV</h3>
+            <img
+              src={new URL('../../assets/yancotv_logo.png', import.meta.url).href}
+              alt="YancoTV"
+              className="h-8 w-auto object-contain"
+              draggable={false}
+            />
             <p className="text-sm text-surface-400">Version {version}</p>
             <p className="mt-0.5 text-xs text-surface-500">
               Custom IPTV media application

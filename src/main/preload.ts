@@ -59,6 +59,16 @@ const api = {
     getStats: () => ipcRenderer.invoke(IpcChannels.EPG_GET_STATS),
     setGlobalUrl: (url: string) => ipcRenderer.invoke(IpcChannels.EPG_SET_GLOBAL_URL, url),
     getSettings: () => ipcRenderer.invoke(IpcChannels.EPG_GET_SETTINGS),
+    onRefreshProgress: (
+      callback: (progress: { phase: string; programmeCount?: number; channelCount?: number; error?: string }) => void,
+    ) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        progress: { phase: string; programmeCount?: number; channelCount?: number; error?: string },
+      ) => callback(progress);
+      ipcRenderer.on(IpcChannels.EPG_REFRESH_PROGRESS, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.EPG_REFRESH_PROGRESS, handler);
+    },
   },
 
   timeshift: {

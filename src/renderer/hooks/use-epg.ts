@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   NowNextMap,
   EpgGuideChannel,
@@ -9,14 +10,20 @@ import type {
 /**
  * Fetch now/next EPG data for a batch of tvg IDs.
  * Used by the Live TV grid to show current + next programme on each channel card.
+ *
+ * - staleTime 2 min: programmes rarely change more often than that
+ * - No refetchInterval: the main-process push event (`epg:refreshProgress`)
+ *   invalidates the cache when a full EPG refresh completes, so we don't need
+ *   a background polling loop burning IPC bandwidth every 60 s.
+ * - refetchOnWindowFocus: catches the case where the user leaves and returns.
  */
 export function useNowNextBatch(tvgIds: string[]) {
   return useQuery<NowNextMap>({
     queryKey: ['epg', 'nowNextBatch', tvgIds],
     queryFn: () => window.api.epg.getNowNextBatch(tvgIds),
     enabled: tvgIds.length > 0,
-    staleTime: 60_000, // 1 minute — EPG changes slowly
-    refetchInterval: 60_000, // Auto-refresh every minute
+    staleTime: 2 * 60_000, // 2 minutes
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -76,8 +83,41 @@ export function useEpgSettings() {
 }
 
 /**
- * Trigger an EPG refresh. Returns a function that can be called.
+ * Trigger an EPG refresh.
  */
 export async function triggerEpgRefresh(): Promise<EpgRefreshResult> {
   return window.api.epg.refresh();
+}
+
+/**
+ * Listen for EPG refresh progress events pushed from the main process.
+ * Calls `onComplete` when a refresh finishes successfully so components
+ * can invalidate their caches without polling.
+ */
+export function useEpgRefreshProgress(onComplete: () => void) {
+  const stableOnComplete = useCallback(onComplete, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!window.api?.epg?.onRefreshProgress) return;
+
+    return window.api.epg.onRefreshProgress((progress) => {
+      if (progress.phase === 'complete') {
+        stableOnComplete();
+      }
+    });
+  }, [stableOnComplete]);
+}
+
+/**
+ * Convenience hook: subscribes to EPG refresh events and automatically
+ * invalidates all EPG queries when a refresh completes.
+ */
+export function useEpgAutoInvalidate() {
+  const queryClient = useQueryClient();
+
+  useEpgRefreshProgress(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['epg'] });
+    }, [queryClient]),
+  );
 }

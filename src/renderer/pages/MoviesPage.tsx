@@ -100,6 +100,7 @@ export function MoviesPage() {
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
             isLoading={isLoading}
+            cardStyle="poster"
           />
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { useGuideData, useEpgStats, triggerEpgRefresh } from '../hooks/use-epg';
+import { useGuideData, useEpgStats, triggerEpgRefresh, useEpgAutoInvalidate } from '../hooks/use-epg';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePlayerStore } from '../stores/player-store';
 import type { EpgProgramme, EpgGuideChannel } from '../../shared/types/epg';
@@ -13,6 +13,7 @@ const CHANNEL_ROW_HEIGHT = 60; // pixels per channel row
 const CHANNEL_LABEL_WIDTH = 200; // left sidebar width
 const TIME_HEADER_HEIGHT = 40; // top time header height
 const HOURS_TO_SHOW = 6; // default time window
+const OVERSCAN = 5; // extra rows to render above/below viewport
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,6 +45,9 @@ export function GuidePage() {
     programme: EpgProgramme;
     channel: EpgGuideChannel;
   } | null>(null);
+
+  // Auto-invalidate EPG queries when a push refresh completes
+  useEpgAutoInvalidate();
 
   // Time window: start at the current hour, show HOURS_TO_SHOW hours
   const now = useMemo(() => Math.floor(Date.now() / 1000), []);
@@ -175,7 +179,16 @@ export function GuidePage() {
 }
 
 // ---------------------------------------------------------------------------
-// EpgGrid — the scrollable grid component
+// EpgGrid — single-container virtualized grid
+//
+// Layout strategy: one overflow:auto div handles BOTH scroll axes.
+//   - Time header:     position:sticky top:0        → stays visible on vertical scroll
+//   - Corner cell:     position:sticky top:0 left:0  → sticks to top-left corner
+//   - Channel labels:  position:sticky left:0        → stay visible on horizontal scroll
+//
+// Row virtualization uses paddingTop/paddingBottom so only visible rows are
+// in the DOM (+ OVERSCAN rows). Eliminates ~4 000 DOM nodes for large EPG feeds.
+// No separate scroll sync hack needed — single container keeps everything in sync.
 // ---------------------------------------------------------------------------
 
 function EpgGrid({
@@ -191,8 +204,21 @@ function EpgGrid({
   now: number;
   onProgrammeClick: (p: EpgProgramme, ch: EpgGuideChannel) => void;
 }) {
-  const gridRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(600);
+
   const totalWidth = ((windowEnd - windowStart) / 3600) * HOUR_WIDTH;
+
+  // Track container height for virtual row computation
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
+    ro.observe(el);
+    setContainerHeight(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
 
   // Generate hour marks
   const hours = useMemo(() => {
@@ -205,42 +231,91 @@ function EpgGrid({
     return result;
   }, [windowStart, windowEnd]);
 
-  // Now indicator position
+  // Now indicator horizontal position
   const nowOffset =
     now >= windowStart && now <= windowEnd
       ? ((now - windowStart) / 3600) * HOUR_WIDTH
       : null;
 
-  // Scroll to "now" on mount
+  // Scroll to "now" on initial mount
   useEffect(() => {
-    if (gridRef.current && nowOffset !== null) {
-      gridRef.current.scrollLeft = Math.max(0, nowOffset - 100);
+    if (containerRef.current && nowOffset !== null) {
+      containerRef.current.scrollLeft = Math.max(0, nowOffset - 100);
     }
-  }, [nowOffset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Virtual row window
+  const visibleAreaHeight = Math.max(containerHeight - TIME_HEADER_HEIGHT, 1);
+  const firstVisible = Math.max(0, Math.floor(scrollTop / CHANNEL_ROW_HEIGHT) - OVERSCAN);
+  const lastVisible = Math.min(
+    channels.length - 1,
+    Math.ceil((scrollTop + visibleAreaHeight) / CHANNEL_ROW_HEIGHT) + OVERSCAN,
+  );
+  const visibleChannels = channels.slice(firstVisible, lastVisible + 1);
+  const paddingTop = firstVisible * CHANNEL_ROW_HEIGHT;
+  const paddingBottom = Math.max(0, (channels.length - lastVisible - 1) * CHANNEL_ROW_HEIGHT);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  }, []);
 
   return (
-    <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-accent/5">
-      <div className="flex h-full">
-        {/* Channel labels (fixed left column) */}
+    <div
+      ref={containerRef}
+      className="min-h-0 flex-1 overflow-auto rounded-xl border border-accent/5"
+      onScroll={handleScroll}
+    >
+      {/* Inner div drives the total scrollable area */}
+      <div style={{ minWidth: CHANNEL_LABEL_WIDTH + totalWidth }}>
+
+        {/* ── Time header row — sticky top ─────────────────────────────── */}
         <div
-          className="flex-shrink-0 border-r border-accent/5 bg-surface-900/30"
-          style={{ width: CHANNEL_LABEL_WIDTH }}
+          className="sticky top-0 z-20 flex border-b border-accent/5 bg-surface-950"
+          style={{ height: TIME_HEADER_HEIGHT }}
         >
-          {/* Corner spacer */}
+          {/* Corner cell — also sticky left so it sticks on both axes */}
           <div
-            className="border-b border-accent/5 bg-surface-950 px-3 flex items-center"
-            style={{ height: TIME_HEADER_HEIGHT }}
+            className="sticky left-0 z-30 flex flex-shrink-0 items-center border-r border-accent/5 bg-surface-950 px-3"
+            style={{ width: CHANNEL_LABEL_WIDTH }}
           >
             <span className="text-xs font-medium text-surface-500">Channel</span>
           </div>
 
-          {/* Channel name list */}
-          <div className="overflow-y-auto" style={{ height: `calc(100% - ${TIME_HEADER_HEIGHT}px)` }} id="epg-channel-list">
-            {channels.map((ch) => (
+          {hours.map((h) => (
+            <div
+              key={h}
+              className="flex flex-shrink-0 items-center border-r border-accent/5 px-2"
+              style={{ width: HOUR_WIDTH }}
+            >
+              <span className="text-xs font-medium text-surface-400">{formatTime(h)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Channel rows — virtualized ────────────────────────────────── */}
+        <div
+          className="relative"
+          style={{ paddingTop, paddingBottom }}
+        >
+          {/* Now indicator — vertical red line */}
+          {nowOffset !== null && (
+            <div
+              className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-red-500/80"
+              style={{ left: CHANNEL_LABEL_WIDTH + nowOffset }}
+            />
+          )}
+
+          {visibleChannels.map((ch) => (
+            <div
+              key={ch.tvgId}
+              className="flex border-b border-accent/5"
+              style={{ height: CHANNEL_ROW_HEIGHT }}
+            >
+              {/* Channel label — sticky left */}
               <div
-                key={ch.tvgId}
-                className="flex items-center gap-2 border-b border-accent/5 px-3"
-                style={{ height: CHANNEL_ROW_HEIGHT }}
+                className="sticky left-0 z-10 flex flex-shrink-0 items-center gap-2 border-r border-accent/5 bg-surface-950 px-3"
+                style={{ width: CHANNEL_LABEL_WIDTH }}
               >
                 {ch.logoUrl && (
                   <img
@@ -256,87 +331,47 @@ function EpgGrid({
                   {ch.name}
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Scrollable grid area */}
-        <div className="min-w-0 flex-1 overflow-auto" ref={gridRef} onScroll={syncScroll}>
-          {/* Time header */}
-          <div
-            className="sticky top-0 z-10 flex border-b border-accent/5 bg-surface-950"
-            style={{ width: totalWidth, height: TIME_HEADER_HEIGHT }}
-          >
-            {hours.map((h) => (
-              <div
-                key={h}
-                className="flex-shrink-0 border-r border-accent/5 px-2 flex items-center"
-                style={{ width: HOUR_WIDTH }}
-              >
-                <span className="text-xs font-medium text-surface-400">
-                  {formatTime(h)}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Programme rows */}
-          <div style={{ width: totalWidth }} className="relative">
-            {/* Now indicator line */}
-            {nowOffset !== null && (
-              <div
-                className="absolute top-0 bottom-0 z-10 w-0.5 bg-red-500"
-                style={{ left: nowOffset }}
-              />
-            )}
-
-            {channels.map((ch) => (
-              <ChannelRow
-                key={ch.tvgId}
+              {/* Programme cells */}
+              <ProgrammeRow
                 channel={ch}
                 windowStart={windowStart}
                 windowEnd={windowEnd}
+                totalWidth={totalWidth}
                 now={now}
                 onProgrammeClick={onProgrammeClick}
               />
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-/** Sync vertical scroll between channel labels and programme grid */
-function syncScroll(e: React.UIEvent<HTMLDivElement>) {
-  const scrollTop = e.currentTarget.scrollTop;
-  const channelList = document.getElementById('epg-channel-list');
-  if (channelList) {
-    channelList.scrollTop = scrollTop;
-  }
-}
-
 // ---------------------------------------------------------------------------
-// ChannelRow — programmes for one channel
+// ProgrammeRow — horizontally-positioned programme buttons for one channel
 // ---------------------------------------------------------------------------
 
-function ChannelRow({
+function ProgrammeRow({
   channel,
   windowStart,
   windowEnd,
+  totalWidth,
   now,
   onProgrammeClick,
 }: {
   channel: EpgGuideChannel;
   windowStart: number;
   windowEnd: number;
+  totalWidth: number;
   now: number;
   onProgrammeClick: (p: EpgProgramme, ch: EpgGuideChannel) => void;
 }) {
   return (
     <div
-      className="relative flex border-b border-accent/5"
-      style={{ height: CHANNEL_ROW_HEIGHT }}
+      className="relative flex-shrink-0"
+      style={{ width: totalWidth, height: CHANNEL_ROW_HEIGHT }}
     >
       {channel.programmes.map((prog) => {
         const clampedStart = Math.max(prog.startTime, windowStart);
@@ -363,9 +398,7 @@ function ChannelRow({
             style={{ left, width: Math.max(width - 2, 1) }}
             title={`${prog.title}\n${formatTime(prog.startTime)} - ${formatTime(prog.endTime)}`}
           >
-            <p className="truncate text-xs font-medium text-surface-200">
-              {prog.title}
-            </p>
+            <p className="truncate text-xs font-medium text-surface-200">{prog.title}</p>
             <p className="truncate text-[10px] text-surface-500">
               {formatTime(prog.startTime)} - {formatTime(prog.endTime)}
             </p>
@@ -438,29 +471,31 @@ function ProgrammeDetail({
       });
   }, [isPast, programme.channelTvgId, programme.startTime, programme.endTime]);
 
-  // For live playback, we need the channel's stream URL
+  // Use channel.streamUrl directly — avoids fetching all channels just for one URL
   const handlePlayLive = useCallback(async () => {
+    // Fast path: use the streamUrl already embedded in the guide data
+    if (channel.streamUrl) {
+      onPlay(channel.streamUrl, `${channel.name} - ${programme.title}`);
+      return;
+    }
+    // Fallback: look up from content list (only if streamUrl was missing)
     if (!window.api) return;
-    // Look up the content item for this channel to get its stream URL
     try {
-      const channels = await window.api.content.getLive();
-      const match = (channels as Array<{ tvgId?: string; streamUrl: string; title: string; id: string }>).find(
-        (c) => c.tvgId === programme.channelTvgId,
-      );
+      const allChannels = await window.api.content.getLive();
+      const match = (
+        allChannels as Array<{ tvgId?: string; streamUrl: string; title: string; id: string }>
+      ).find((c) => c.tvgId === programme.channelTvgId);
       if (match) {
         onPlay(match.streamUrl, `${channel.name} - ${programme.title}`);
       }
     } catch {
-      // fallback
+      // unable to resolve stream URL
     }
-  }, [programme.channelTvgId, programme.title, channel.name, onPlay]);
+  }, [channel.streamUrl, channel.name, programme.channelTvgId, programme.title, onPlay]);
 
   const handlePlayCatchup = useCallback(() => {
     if (catchupStatus.streamUrl) {
-      onPlay(
-        catchupStatus.streamUrl,
-        `[Catch-up] ${channel.name} - ${programme.title}`,
-      );
+      onPlay(catchupStatus.streamUrl, `[Catch-up] ${channel.name} - ${programme.title}`);
     }
   }, [catchupStatus.streamUrl, channel.name, programme.title, onPlay]);
 
@@ -487,22 +522,9 @@ function ProgrammeDetail({
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-surface-400 hover:text-surface-200"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+          <button onClick={onClose} className="text-surface-400 hover:text-surface-200">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>

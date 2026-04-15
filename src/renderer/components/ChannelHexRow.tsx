@@ -164,7 +164,7 @@ export const ChannelHexRow = memo(function ChannelHexRow({
                 <img
                   src={logoUrl}
                   alt=""
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain p-1"
                   loading="lazy"
                   onError={() => setImgError(true)}
                 />
@@ -232,6 +232,18 @@ export const ChannelHexRow = memo(function ChannelHexRow({
                 ))}
             </div>
           </div>
+
+          {/* ── EPG now playing (grid, on hover) ─────────────────────── */}
+          {isGrid && nowPlaying && (
+            <div className="hidden w-36 flex-shrink-0 text-right lg:block">
+              <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                <span className="inline-block h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-green-400" />
+                <p className="truncate text-[10px] text-green-400/80" title={nowPlaying}>
+                  {nowPlaying}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── EPG now / next (list only) ────────────────────────────── */}
           {!isGrid && (nowPlaying || nextProgram) && (

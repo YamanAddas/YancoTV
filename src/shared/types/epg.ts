@@ -32,6 +32,8 @@ export interface EpgGuideChannel {
   /** Channel display name (joined from content table) */
   name: string;
   logoUrl?: string;
+  /** Stream URL for direct playback — avoids a second getLive() call from the Guide page */
+  streamUrl?: string;
   programmes: EpgProgramme[];
 }
 

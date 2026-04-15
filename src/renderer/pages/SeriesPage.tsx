@@ -236,6 +236,7 @@ export function SeriesPage() {
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
             isLoading={isLoading}
+            cardStyle="poster"
           />
         </div>
       </div>
