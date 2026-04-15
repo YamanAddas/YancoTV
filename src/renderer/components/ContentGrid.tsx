@@ -124,6 +124,41 @@ function ContentCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Horizontal scrollable row — used for search result zones
+// ---------------------------------------------------------------------------
+
+interface HorizontalContentRowProps {
+  items: ContentCardData[];
+  onItemClick: (item: ContentCardData) => void;
+  onFavoriteToggle?: (item: ContentCardData) => void;
+  favoriteIds?: Set<string>;
+}
+
+export function HorizontalContentRow({
+  items,
+  onItemClick,
+  onFavoriteToggle,
+  favoriteIds,
+}: HorizontalContentRowProps) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-surface-900 scrollbar-thumb-surface-700">
+      {items.map((item) => (
+        <div key={item.id} className="w-40 flex-shrink-0">
+          <ContentCard
+            item={item}
+            onClick={() => onItemClick(item)}
+            onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
+            isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>

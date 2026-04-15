@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
+import { HorizontalContentRow, type ContentCardData } from '../components/ContentGrid';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import type { ContentItem } from '../../shared/types';
@@ -122,12 +122,11 @@ export function SearchPage() {
       {!isLoading && live.length > 0 && (
         <section>
           <ZoneHeader icon="📡" label="Live TV" total={allLive.length} cap={ZONE_DISPLAY_CAP} />
-          <ContentGrid
+          <HorizontalContentRow
             items={live}
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
-            isLoading={false}
           />
         </section>
       )}
@@ -135,12 +134,11 @@ export function SearchPage() {
       {!isLoading && movies.length > 0 && (
         <section>
           <ZoneHeader icon="🎬" label="Movies" total={allMovies.length} cap={ZONE_DISPLAY_CAP} />
-          <ContentGrid
+          <HorizontalContentRow
             items={movies}
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
-            isLoading={false}
           />
         </section>
       )}
@@ -148,12 +146,11 @@ export function SearchPage() {
       {!isLoading && series.length > 0 && (
         <section>
           <ZoneHeader icon="📺" label="Series" total={allSeries.length} cap={ZONE_DISPLAY_CAP} />
-          <ContentGrid
+          <HorizontalContentRow
             items={series}
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
-            isLoading={false}
           />
         </section>
       )}
