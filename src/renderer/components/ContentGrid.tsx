@@ -144,17 +144,22 @@ export function HorizontalContentRow({
   if (items.length === 0) return null;
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-surface-900 scrollbar-thumb-surface-700">
-      {items.map((item) => (
-        <div key={item.id} className="w-40 flex-shrink-0">
-          <ContentCard
-            item={item}
-            onClick={() => onItemClick(item)}
-            onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
-            isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
-          />
-        </div>
-      ))}
+    /* Outer div is the scroll viewport */
+    <div className="overflow-x-auto pb-2">
+      {/* Inner div is w-max so it is always exactly as wide as all cards —
+          this is what makes overflow-x-auto actually trigger scrolling */}
+      <div className="flex w-max gap-3">
+        {items.map((item) => (
+          <div key={item.id} className="w-40">
+            <ContentCard
+              item={item}
+              onClick={() => onItemClick(item)}
+              onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
+              isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
