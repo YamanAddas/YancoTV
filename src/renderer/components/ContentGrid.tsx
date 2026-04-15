@@ -144,20 +144,10 @@ export function HorizontalContentRow({
   if (items.length === 0) return null;
 
   return (
-    // Scroll viewport — clips and scrolls its oversized child horizontally.
-    // Inline styles used deliberately: these utility classes are only used
-    // here so Tailwind's JIT scanner may not generate them.
-    <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
-      {/*
-        Inner container must be exactly as wide as all cards combined.
-        width: max-content achieves this: the flex layout naturally sizes
-        to fit all children in one row, and max-content locks that in so
-        the outer div has something real to scroll over.
-      */}
-      <div style={{ display: 'flex', gap: '12px', width: 'max-content' }}>
+    <div className="overflow-x-auto overflow-y-hidden pb-2">
+      <div className="flex w-max gap-3">
         {items.map((item) => (
-          // Fixed 160 px wide slot — ContentCard fills it via w-full on the button
-          <div key={item.id} style={{ width: '160px', flexShrink: 0 }}>
+          <div key={item.id} className="w-40 flex-shrink-0">
             <ContentCard
               item={item}
               onClick={() => onItemClick(item)}
