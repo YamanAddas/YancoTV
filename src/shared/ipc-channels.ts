@@ -46,6 +46,16 @@ export const IpcChannels = {
   HISTORY_REMOVE: 'history:remove',
   HISTORY_CLEAR: 'history:clear',
 
+  // EPG
+  EPG_REFRESH: 'epg:refresh',
+  EPG_GET_NOW_NEXT: 'epg:getNowNext',
+  EPG_GET_NOW_NEXT_BATCH: 'epg:getNowNextBatch',
+  EPG_GET_GUIDE: 'epg:getGuide',
+  EPG_GET_FOR_CHANNEL: 'epg:getForChannel',
+  EPG_GET_STATS: 'epg:getStats',
+  EPG_SET_GLOBAL_URL: 'epg:setGlobalUrl',
+  EPG_GET_SETTINGS: 'epg:getSettings',
+
   // Database
   DB_STATUS: 'db:status',
 

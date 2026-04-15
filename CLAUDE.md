@@ -33,14 +33,23 @@ YancoTV/
 │   │   ├── preload.ts           # Preload script (IPC bridge)
 │   │   ├── ipc/                 # IPC handlers (strict channel definitions)
 │   │   ├── services/            # Backend logic
+│   │   │   ├── db.ts
 │   │   │   ├── source-manager.ts
 │   │   │   ├── m3u-parser.ts
 │   │   │   ├── xtream-client.ts
+│   │   │   ├── stalker-client.ts
 │   │   │   ├── content-classifier.ts
-│   │   │   ├── epg-service.ts
 │   │   │   ├── title-cleaner.ts
-│   │   │   ├── db.ts
-│   │   │   └── subtitle-service.ts
+│   │   │   ├── epg-service.ts
+│   │   │   ├── recording-service.ts
+│   │   │   ├── download-manager.ts
+│   │   │   ├── metadata-service.ts
+│   │   │   ├── subtitle-service.ts
+│   │   │   ├── timeshift-service.ts
+│   │   │   ├── parental-service.ts
+│   │   │   ├── settings-service.ts
+│   │   │   ├── backup-service.ts
+│   │   │   └── notification-service.ts
 │   │   └── player/
 │   │       ├── player.interface.ts  # IPlayer abstraction
 │   │       └── mpv-player.ts        # mpv implementation
@@ -122,5 +131,5 @@ pnpm lint:fix         # Auto-fix lint issues
 - Do not render provider HTML/content in BrowserWindow
 - Do not store M3U/Xtream credentials in plaintext files
 - Do not couple any service directly to mpv — use the player interface
-- Do not add features not in the current phase without explicit approval
+- Do not add features not in the production plan without explicit approval
 - Do not add unnecessary abstractions — keep it simple until complexity is earned

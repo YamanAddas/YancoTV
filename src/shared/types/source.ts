@@ -6,6 +6,7 @@ export interface Source {
   type: SourceType;
   url?: string;
   filePath?: string;
+  epgUrl?: string;
   lastSynced?: number;
   isActive: boolean;
   createdAt: number;
@@ -19,4 +20,5 @@ export interface AddSourceInput {
   filePath?: string;
   username?: string;
   password?: string;
+  epgUrl?: string;
 }

@@ -7,7 +7,7 @@ import log from 'electron-log/main';
 import { parseM3u } from './m3u-parser';
 import { storeM3uEntries, storeXtreamContent } from './content-store';
 import type { SyncProgress } from './content-store';
-import { getSourceById, updateSourceSyncTime, getSourceCredentials } from './source-manager';
+import { getSourceById, updateSourceSyncTime, getSourceCredentials, updateSourceEpgUrl } from './source-manager';
 import { XtreamClient } from './xtream-client';
 import { IpcChannels } from '../../shared/ipc-channels';
 import type { Result } from '../../shared/types/result';
@@ -62,8 +62,14 @@ export async function syncSource(sourceId: string): Promise<Result<number>> {
       }
       log.info(`Fetching M3U from URL: ${source.url}`);
       const m3uContent = await fetchUrl(source.url);
-      const entries = parseM3u(m3uContent);
+      const { entries, epgUrl } = parseM3u(m3uContent);
       count = await storeM3uEntries(sourceId, entries, onProgress);
+
+      // Auto-detect EPG URL from M3U header (url-tvg attribute)
+      if (epgUrl) {
+        log.info(`Auto-detected EPG URL from M3U: ${epgUrl}`);
+        updateSourceEpgUrl(sourceId, epgUrl);
+      }
     } else if (source.type === 'm3u_file') {
       if (!source.filePath) {
         return { ok: false, error: new Error('Source has no file path') };
@@ -80,8 +86,14 @@ export async function syncSource(sourceId: string): Promise<Result<number>> {
       }
 
       const m3uContent = await fs.readFile(source.filePath, 'utf-8');
-      const entries = parseM3u(m3uContent);
+      const { entries, epgUrl } = parseM3u(m3uContent);
       count = await storeM3uEntries(sourceId, entries, onProgress);
+
+      // Auto-detect EPG URL from M3U header (url-tvg attribute)
+      if (epgUrl) {
+        log.info(`Auto-detected EPG URL from M3U file: ${epgUrl}`);
+        updateSourceEpgUrl(sourceId, epgUrl);
+      }
     } else if (source.type === 'xtream') {
       count = await syncXtreamSource(sourceId, onProgress);
     } else {
@@ -131,6 +143,11 @@ async function syncXtreamSource(
   log.info(
     `Xtream auth OK — user: ${authResult.value.userInfo.username}, status: ${authResult.value.userInfo.status}`,
   );
+
+  // Auto-detect EPG URL from Xtream API
+  const xtreamEpgUrl = client.buildEpgUrl();
+  log.info(`Auto-detected Xtream EPG URL: ${xtreamEpgUrl}`);
+  updateSourceEpgUrl(sourceId, xtreamEpgUrl);
 
   // Fetch categories in parallel (small responses, safe to parallelize)
   log.info('Fetching Xtream categories...');

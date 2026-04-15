@@ -48,6 +48,19 @@ const api = {
     clear: () => ipcRenderer.invoke(IpcChannels.HISTORY_CLEAR),
   },
 
+  epg: {
+    refresh: () => ipcRenderer.invoke(IpcChannels.EPG_REFRESH),
+    getNowNext: (tvgId: string) => ipcRenderer.invoke(IpcChannels.EPG_GET_NOW_NEXT, tvgId),
+    getNowNextBatch: (tvgIds: string[]) => ipcRenderer.invoke(IpcChannels.EPG_GET_NOW_NEXT_BATCH, tvgIds),
+    getGuide: (startTime: number, endTime: number, sourceId?: string) =>
+      ipcRenderer.invoke(IpcChannels.EPG_GET_GUIDE, startTime, endTime, sourceId),
+    getForChannel: (tvgId: string, startTime: number, endTime: number) =>
+      ipcRenderer.invoke(IpcChannels.EPG_GET_FOR_CHANNEL, tvgId, startTime, endTime),
+    getStats: () => ipcRenderer.invoke(IpcChannels.EPG_GET_STATS),
+    setGlobalUrl: (url: string) => ipcRenderer.invoke(IpcChannels.EPG_SET_GLOBAL_URL, url),
+    getSettings: () => ipcRenderer.invoke(IpcChannels.EPG_GET_SETTINGS),
+  },
+
   player: {
     play: (url: string, title?: string, startPosition?: number) =>
       ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition),

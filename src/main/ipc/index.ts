@@ -26,6 +26,14 @@ import {
   removeHistoryEntry,
   clearHistory,
 } from '../services/history-store';
+import {
+  refreshEpg,
+  getNowNext,
+  getNowNextBatch,
+  getGuideData,
+  getProgrammesForChannel,
+  getEpgStats,
+} from '../services/epg-service';
 import { MpvPlayer } from '../player/mpv-player';
 import type { PlayerState } from '../player/player.interface';
 
@@ -230,6 +238,82 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.HISTORY_CLEAR, () => {
     clearHistory();
+  });
+
+  // EPG
+  ipcMain.handle(IpcChannels.EPG_REFRESH, async () => {
+    try {
+      const result = await refreshEpg();
+      return result;
+    } catch (err) {
+      log.error('EPG refresh error:', err);
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.EPG_GET_NOW_NEXT, (_event, tvgId: string) => {
+    if (!tvgId || typeof tvgId !== 'string') return { channelTvgId: '' };
+    return getNowNext(tvgId);
+  });
+
+  ipcMain.handle(IpcChannels.EPG_GET_NOW_NEXT_BATCH, (_event, tvgIds: string[]) => {
+    if (!Array.isArray(tvgIds)) return {};
+    return getNowNextBatch(tvgIds);
+  });
+
+  ipcMain.handle(
+    IpcChannels.EPG_GET_GUIDE,
+    (_event, startTime: number, endTime: number, sourceId?: string) => {
+      if (typeof startTime !== 'number' || typeof endTime !== 'number') return [];
+      return getGuideData(startTime, endTime, typeof sourceId === 'string' ? sourceId : undefined);
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannels.EPG_GET_FOR_CHANNEL,
+    (_event, tvgId: string, startTime: number, endTime: number) => {
+      if (!tvgId || typeof tvgId !== 'string') return [];
+      if (typeof startTime !== 'number' || typeof endTime !== 'number') return [];
+      return getProgrammesForChannel(tvgId, startTime, endTime);
+    },
+  );
+
+  ipcMain.handle(IpcChannels.EPG_GET_STATS, () => {
+    return getEpgStats();
+  });
+
+  ipcMain.handle(IpcChannels.EPG_SET_GLOBAL_URL, (_event, url: string) => {
+    try {
+      const db = getDb();
+      db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+      if (url && typeof url === 'string' && url.trim()) {
+        db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('epg_global_url', ?)`).run(url.trim());
+      } else {
+        db.prepare(`DELETE FROM settings WHERE key = 'epg_global_url'`).run();
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.EPG_GET_SETTINGS, () => {
+    try {
+      const db = getDb();
+      db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+      const globalUrl = db.prepare(`SELECT value FROM settings WHERE key = 'epg_global_url'`).get() as { value: string } | undefined;
+      const lastRefreshed = db.prepare(`SELECT value FROM settings WHERE key = 'epg_last_refreshed'`).get() as { value: string } | undefined;
+      const refreshInterval = db.prepare(`SELECT value FROM settings WHERE key = 'epg_refresh_interval'`).get() as { value: string } | undefined;
+
+      return {
+        globalEpgUrl: globalUrl?.value || '',
+        refreshIntervalHours: refreshInterval ? parseInt(refreshInterval.value, 10) : 12,
+        lastRefreshedAt: lastRefreshed ? parseInt(lastRefreshed.value, 10) : null,
+      };
+    } catch (err) {
+      log.error('Failed to get EPG settings:', err);
+      return { globalEpgUrl: '', refreshIntervalHours: 12, lastRefreshedAt: null };
+    }
   });
 
   // Player

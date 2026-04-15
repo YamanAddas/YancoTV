@@ -10,6 +10,7 @@ export const addSourceInputSchema = z
     filePath: z.string().optional(),
     username: z.string().optional(),
     password: z.string().optional(),
+    epgUrl: z.string().url().optional().or(z.literal('')),
   })
   .superRefine((data, ctx) => {
     if (data.type === 'm3u_url' && !data.url) {

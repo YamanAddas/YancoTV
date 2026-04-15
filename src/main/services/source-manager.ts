@@ -11,6 +11,7 @@ interface SourceRow {
   type: string;
   url: string | null;
   file_path: string | null;
+  epg_url: string | null;
   username_encrypted: Buffer | null;
   password_encrypted: Buffer | null;
   last_synced: number | null;
@@ -26,6 +27,7 @@ function rowToSource(row: SourceRow): Source {
     type: row.type as Source['type'],
     url: row.url ?? undefined,
     filePath: row.file_path ?? undefined,
+    epgUrl: row.epg_url ?? undefined,
     lastSynced: row.last_synced ?? undefined,
     isActive: row.is_active === 1,
     createdAt: row.created_at,
@@ -60,14 +62,15 @@ export function addSource(input: AddSourceInput): Result<Source> {
 
   try {
     db.prepare(
-      `INSERT INTO sources (id, name, type, url, file_path, username_encrypted, password_encrypted, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO sources (id, name, type, url, file_path, epg_url, username_encrypted, password_encrypted, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     ).run(
       id,
       input.name,
       input.type,
       input.url ?? null,
       input.filePath ?? null,
+      input.epgUrl ?? null,
       usernameEncrypted,
       passwordEncrypted,
       now,
@@ -108,6 +111,16 @@ export function updateSourceSyncTime(id: string): void {
     Date.now(),
     Date.now(),
     id,
+  );
+}
+
+export function updateSourceEpgUrl(id: string, epgUrl: string): void {
+  const db = getDb();
+  db.prepare('UPDATE sources SET epg_url = ?, updated_at = ? WHERE id = ? AND (epg_url IS NULL OR epg_url = ?)').run(
+    epgUrl,
+    Date.now(),
+    id,
+    '', // Only update if currently empty — don't overwrite user's manual setting
   );
 }
 

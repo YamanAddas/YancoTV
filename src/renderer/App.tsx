@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { LiveTvPage } from './pages/LiveTvPage';
+import { GuidePage } from './pages/GuidePage';
 import { MoviesPage } from './pages/MoviesPage';
 import { SeriesPage } from './pages/SeriesPage';
 import { SearchPage } from './pages/SearchPage';
@@ -26,6 +27,7 @@ export function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/live" element={<LiveTvPage />} />
+            <Route path="/guide" element={<GuidePage />} />
             <Route path="/movies" element={<MoviesPage />} />
             <Route path="/series" element={<SeriesPage />} />
             <Route path="/search" element={<SearchPage />} />

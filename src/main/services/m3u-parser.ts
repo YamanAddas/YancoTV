@@ -11,6 +11,12 @@ export interface M3uEntry {
   rawAttributes: string;
 }
 
+export interface M3uParseResult {
+  entries: M3uEntry[];
+  /** EPG URL extracted from the #EXTM3U url-tvg header attribute */
+  epgUrl?: string;
+}
+
 /**
  * Streaming M3U parser. Processes line-by-line to handle large playlists
  * without loading the entire file into memory for parsing.
@@ -18,8 +24,9 @@ export interface M3uEntry {
  * Handles: BOM markers, Windows/Unix line endings, empty lines,
  * malformed entries, and common provider quirks.
  */
-export function parseM3u(content: string): M3uEntry[] {
+export function parseM3u(content: string): M3uParseResult {
   const entries: M3uEntry[] = [];
+  let epgUrl: string | undefined;
 
   // Strip BOM marker if present
   const cleaned = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
@@ -35,8 +42,18 @@ export function parseM3u(content: string): M3uEntry[] {
     // Skip empty lines
     if (!line) continue;
 
-    // Skip #EXTM3U header
-    if (line.startsWith('#EXTM3U')) continue;
+    // Parse #EXTM3U header — extract url-tvg for EPG auto-detection
+    if (line.startsWith('#EXTM3U')) {
+      epgUrl = extractAttribute(line, 'url-tvg') || undefined;
+      // Also check x-tvg-url (alternative attribute some providers use)
+      if (!epgUrl) {
+        epgUrl = extractAttribute(line, 'x-tvg-url') || undefined;
+      }
+      if (epgUrl) {
+        log.info(`M3U header contains EPG URL: ${epgUrl}`);
+      }
+      continue;
+    }
 
     // Parse #EXTINF line
     if (line.startsWith('#EXTINF:')) {
@@ -77,7 +94,7 @@ export function parseM3u(content: string): M3uEntry[] {
   }
 
   log.info(`Parsed ${entries.length} entries from M3U`);
-  return entries;
+  return { entries, epgUrl };
 }
 
 function parseExtinfLine(line: string): Partial<M3uEntry> {

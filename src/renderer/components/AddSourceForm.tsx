@@ -14,6 +14,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
   const [filePath, setFilePath] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [epgUrl, setEpgUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -36,6 +37,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
     setFilePath('');
     setUsername('');
     setPassword('');
+    setEpgUrl('');
     setError('');
     setSuccess('');
   };
@@ -64,6 +66,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
         ...(sourceType === 'm3u_url' && { url }),
         ...(sourceType === 'm3u_file' && { filePath }),
         ...(sourceType === 'xtream' && { url, username, password }),
+        ...(epgUrl.trim() && { epgUrl: epgUrl.trim() }),
       };
 
       const result = await window.api.sources.add(input);
@@ -177,6 +180,13 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
             <Input label="Password" value={password} onChange={setPassword} type="password" required />
           </>
         )}
+
+        <Input
+          label="EPG URL (optional)"
+          value={epgUrl}
+          onChange={setEpgUrl}
+          placeholder="https://example.com/epg.xml.gz"
+        />
 
         {error && (
           <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>

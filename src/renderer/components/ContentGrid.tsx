@@ -1,5 +1,6 @@
 import { VirtuosoGrid } from 'react-virtuoso';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
+import type { NowNextMap } from '../../shared/types/epg';
 
 export interface ContentCardData {
   id: string;
@@ -8,6 +9,7 @@ export interface ContentCardData {
   groupName?: string;
   logoUrl?: string;
   streamUrl: string;
+  tvgId?: string;
   type: string;
 }
 
@@ -17,6 +19,7 @@ interface ContentGridProps {
   onFavoriteToggle?: (item: ContentCardData) => void;
   favoriteIds?: Set<string>;
   isLoading?: boolean;
+  nowNextMap?: NowNextMap;
 }
 
 export function ContentGrid({
@@ -25,20 +28,24 @@ export function ContentGrid({
   onFavoriteToggle,
   favoriteIds,
   isLoading,
+  nowNextMap,
 }: ContentGridProps) {
   const ItemContent = useCallback(
     (index: number) => {
       const item = items[index];
+      const nowNext = item.tvgId && nowNextMap ? nowNextMap[item.tvgId] : undefined;
       return (
         <ContentCard
           item={item}
           onClick={() => onItemClick(item)}
           onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
           isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
+          nowTitle={nowNext?.now?.title}
+          nextTitle={nowNext?.next?.title}
         />
       );
     },
-    [items, onItemClick, onFavoriteToggle, favoriteIds],
+    [items, onItemClick, onFavoriteToggle, favoriteIds, nowNextMap],
   );
 
   if (isLoading) {
@@ -65,11 +72,15 @@ function ContentCard({
   onClick,
   onFavoriteToggle,
   isFavorite,
+  nowTitle,
+  nextTitle,
 }: {
   item: ContentCardData;
   onClick: () => void;
   onFavoriteToggle?: () => void;
   isFavorite: boolean;
+  nowTitle?: string;
+  nextTitle?: string;
 }) {
   return (
     <button
@@ -116,8 +127,18 @@ function ContentCard({
         <p className="line-clamp-2 text-sm font-medium text-surface-200 group-hover:text-surface-100">
           {item.cleanTitle || item.title}
         </p>
-        {item.groupName && (
+        {item.groupName && !nowTitle && (
           <p className="mt-1 truncate text-xs text-surface-500">{item.groupName}</p>
+        )}
+        {nowTitle && (
+          <p className="mt-1 truncate text-xs text-green-400" title={nowTitle}>
+            {nowTitle}
+          </p>
+        )}
+        {nextTitle && (
+          <p className="truncate text-xs text-surface-500" title={nextTitle}>
+            Next: {nextTitle}
+          </p>
         )}
       </div>
     </button>

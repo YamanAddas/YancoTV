@@ -69,7 +69,7 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.APP_GET_VERSION).toBe('app:getVersion');
   });
 
-  it('exports exactly 34 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(34);
+  it('exports exactly 42 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(42);
   });
 });

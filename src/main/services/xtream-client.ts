@@ -319,6 +319,11 @@ export class XtreamClient {
     };
   }
 
+  /** Build the XMLTV EPG URL for this Xtream source */
+  buildEpgUrl(): string {
+    return `${this.baseUrl}/xmltv.php?username=${encodeURIComponent(this.username)}&password=${encodeURIComponent(this.password)}`;
+  }
+
   /** Build a playback URL for a stream */
   buildStreamUrl(streamId: number, type: 'live' | 'movie' | 'series', extension?: string): string {
     const ext = extension ?? (type === 'live' ? 'ts' : 'mp4');

@@ -6,6 +6,7 @@ import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useNowNextBatch } from '../hooks/use-epg';
 
 export function LiveTvPage() {
   const [channels, setChannels] = useState<ContentCardData[]>([]);
@@ -38,6 +39,13 @@ export function LiveTvPage() {
     if (!selectedCategory) return channels;
     return channels.filter((ch) => ch.groupName === selectedCategory);
   }, [channels, selectedCategory]);
+
+  // Collect tvg IDs from visible channels for EPG now/next lookup
+  const tvgIds = useMemo(
+    () => filtered.map((ch) => ch.tvgId).filter((id): id is string => !!id),
+    [filtered],
+  );
+  const { data: nowNextMap } = useNowNextBatch(tvgIds);
 
   const play = usePlayerStore((s) => s.play);
   const toggle = useFavoritesStore((s) => s.toggle);
@@ -100,6 +108,7 @@ export function LiveTvPage() {
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
             isLoading={isLoading}
+            nowNextMap={nowNextMap}
           />
         </div>
       </div>

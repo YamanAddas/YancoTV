@@ -10,6 +10,7 @@ import {
 } from '../shared/constants';
 import { initDatabase, closeDatabase } from './services/db';
 import { registerIpcHandlers, destroyPlayer } from './ipc';
+import { startAutoRefresh, stopAutoRefresh } from './services/epg-service';
 
 log.initialize();
 log.info(`${APP_NAME} starting...`);
@@ -84,6 +85,7 @@ app.whenReady().then(() => {
 
   initDatabase();
   registerIpcHandlers();
+  startAutoRefresh(12); // Refresh EPG every 12 hours
   createWindow();
 
   app.on('activate', () => {
@@ -94,6 +96,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  stopAutoRefresh();
   destroyPlayer();
   closeDatabase();
   app.quit();
