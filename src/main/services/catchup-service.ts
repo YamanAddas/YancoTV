@@ -216,7 +216,8 @@ export function checkCatchupSupport(tvgId: string): CatchupInfo {
  *
  * We use the path-based format as it's more widely supported.
  */
-function buildXtreamTimeshiftUrl(
+/** @internal Exported for testing */
+export function buildXtreamTimeshiftUrl(
   baseUrl: string,
   username: string,
   password: string,
@@ -260,7 +261,8 @@ function buildXtreamTimeshiftUrl(
  *   {stream_id}    — Extracted from original URL
  *   {Y}, {m}, {d}, {H}, {M}, {S} — Date components
  */
-function buildM3uCatchupUrl(
+/** @internal Exported for testing */
+export function buildM3uCatchupUrl(
   originalUrl: string,
   metadata: Record<string, unknown>,
   programmeStart: number,

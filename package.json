@@ -13,7 +13,7 @@
     "build:preload": "esbuild src/main/preload.ts --bundle --platform=node --outfile=dist/main/main/preload.js --external:electron --format=cjs",
     "build:renderer": "vite build",
     "package": "pnpm build && electron-builder",
-    "test": "vitest run",
+    "test": "node scripts/run-tests.js",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "lint": "eslint src/ --ext .ts,.tsx",
