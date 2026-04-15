@@ -8,6 +8,7 @@ export const IpcChannels = {
   SOURCES_ADD: 'sources:add',
   SOURCES_REMOVE: 'sources:remove',
   SOURCES_SYNC: 'sources:sync',
+  SOURCES_SYNC_PROGRESS: 'sources:syncProgress',
 
   // Content browsing
   CONTENT_GET_LIVE: 'content:getLive',

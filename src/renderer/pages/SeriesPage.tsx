@@ -3,6 +3,7 @@ import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
+import { SortDropdown, type SortOption } from '../components/SortDropdown';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 
@@ -21,6 +22,7 @@ export function SeriesPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('provider');
   const [selectedShow, setSelectedShow] = useState<ContentCardData | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,14 +38,14 @@ export function SeriesPage() {
     setSelectedCategory(null);
 
     Promise.all([
-      window.api.content.getSeries(selectedSource ?? undefined),
+      window.api.content.getSeries(selectedSource ?? undefined, sortBy),
       window.api.content.getCategories('series'),
     ]).then(([seriesData, cats]) => {
       setSeries(seriesData);
       setCategories(cats);
       setIsLoading(false);
     });
-  }, [selectedSource]);
+  }, [selectedSource, sortBy]);
 
   const filtered = useMemo(() => {
     if (!selectedCategory) return series;
@@ -211,7 +213,8 @@ export function SeriesPage() {
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-2xl font-bold text-surface-100">Series</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <SortDropdown value={sortBy} onChange={setSortBy} />
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
           <span className="text-sm text-surface-500">
             {filtered.length.toLocaleString()} show{filtered.length !== 1 ? 's' : ''}

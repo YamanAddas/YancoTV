@@ -6,6 +6,11 @@ directories:
 files:
   - dist/**/*
   - package.json
+extraResources:
+  - from: mpv/
+    to: mpv/
+    filter:
+      - "**/*"
 win:
   target:
     - target: nsis

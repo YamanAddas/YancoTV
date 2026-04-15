@@ -22,8 +22,11 @@ export function initDatabase(): void {
 
   db = new Database(dbPath);
 
-  // Enable WAL mode for better concurrent read performance
+  // Performance pragmas — safe with WAL mode on desktop
   db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL'); // Safe with WAL, 2x faster than FULL
+  db.pragma('cache_size = -64000'); // 64MB page cache (negative = KB)
+  db.pragma('temp_store = MEMORY'); // Temp tables in RAM
   db.pragma('foreign_keys = ON');
 
   runMigrations(db);
@@ -87,6 +90,58 @@ function runMigrations(database: Database.Database): void {
     applyMigration(file, sql);
     log.info(`Migration applied: ${file}`);
   }
+}
+
+/** Temporarily disable FTS5 triggers for bulk operations */
+export function dropFtsTriggers(): void {
+  const database = getDb();
+  database.exec('DROP TRIGGER IF EXISTS content_ai');
+  database.exec('DROP TRIGGER IF EXISTS content_ad');
+  database.exec('DROP TRIGGER IF EXISTS content_au');
+}
+
+/** Re-create FTS5 triggers after bulk operations */
+export function restoreFtsTriggers(): void {
+  const database = getDb();
+  database.exec(`
+    CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN
+      INSERT INTO content_fts (content_id, title, clean_title, group_name)
+      VALUES (new.id, new.title, new.clean_title, new.group_name);
+    END;
+  `);
+  database.exec(`
+    CREATE TRIGGER IF NOT EXISTS content_ad AFTER DELETE ON content BEGIN
+      DELETE FROM content_fts WHERE content_id = old.id;
+    END;
+  `);
+  database.exec(`
+    CREATE TRIGGER IF NOT EXISTS content_au AFTER UPDATE ON content BEGIN
+      DELETE FROM content_fts WHERE content_id = old.id;
+      INSERT INTO content_fts (content_id, title, clean_title, group_name)
+      VALUES (new.id, new.title, new.clean_title, new.group_name);
+    END;
+  `);
+}
+
+/** Rebuild FTS index from scratch for a specific source (or all content) */
+export function rebuildFtsIndex(sourceId?: string): void {
+  const database = getDb();
+  if (sourceId) {
+    // Only add entries for the given source
+    database.prepare(`
+      INSERT INTO content_fts (content_id, title, clean_title, group_name)
+      SELECT id, title, clean_title, group_name FROM content WHERE source_id = ?
+    `).run(sourceId);
+  } else {
+    // Full rebuild
+    database.exec("DELETE FROM content_fts");
+    database.exec(`
+      INSERT INTO content_fts (content_id, title, clean_title, group_name)
+      SELECT id, title, clean_title, group_name FROM content
+    `);
+  }
+  // Optimize the FTS index segments
+  database.exec("INSERT INTO content_fts(content_fts) VALUES('optimize')");
 }
 
 export function closeDatabase(): void {

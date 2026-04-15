@@ -8,3 +8,4 @@ release/
 .env.local
 *.log
 .claude/
+mpv/

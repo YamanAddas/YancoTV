@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import log from 'electron-log/main';
 import type {
   IPlayer,
@@ -12,8 +12,8 @@ import type {
 import { MpvIpc } from './mpv-ipc';
 import { findMpvPath } from './mpv-path';
 
-const CONNECT_RETRY_DELAY = 200;
-const CONNECT_MAX_RETRIES = 15;
+const CONNECT_RETRY_DELAY = 300;
+const CONNECT_MAX_RETRIES = 20; // 20 * 300ms = 6 seconds — enough for cold mpv starts
 
 function defaultState(): PlayerState {
   return {
@@ -36,7 +36,7 @@ export class MpvPlayer implements IPlayer {
   private destroyed = false;
 
   constructor() {
-    this.pipeName = `mpv-yancotv-${uuid().slice(0, 8)}`;
+    this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
     this.mpvPath = findMpvPath();
   }
 
@@ -226,13 +226,29 @@ export class MpvPlayer implements IPlayer {
   private async connectIpc(): Promise<void> {
     this.ipc = new MpvIpc(this.pipeName);
 
+    // Prevent uncaught EventEmitter errors from crashing the process.
+    // The 'error' event on MpvIpc fires for post-connection socket errors.
+    this.ipc.on('error', (err: Error) => {
+      log.error('mpv IPC EventEmitter error:', err.message);
+      this.state.status = 'error';
+      this.emitEvent('error', err);
+      this.emitEvent('state-change', this.state);
+    });
+
     for (let i = 0; i < CONNECT_MAX_RETRIES; i++) {
+      // If mpv process died during retries, bail out
+      if (!this.process || this.destroyed) {
+        throw new Error('mpv process exited before IPC connection was established');
+      }
+
       try {
         await this.ipc.connect();
         return;
       } catch {
         if (i === CONNECT_MAX_RETRIES - 1) {
-          throw new Error('Failed to connect to mpv IPC pipe after retries');
+          throw new Error(
+            `Failed to connect to mpv IPC pipe after ${CONNECT_MAX_RETRIES} retries (pipe: ${this.pipeName})`,
+          );
         }
         await sleep(CONNECT_RETRY_DELAY);
       }

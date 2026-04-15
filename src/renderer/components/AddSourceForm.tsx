@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type SourceType = 'm3u_url' | 'm3u_file' | 'xtream';
 
@@ -17,6 +17,18 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [syncProgress, setSyncProgress] = useState<{ phase: string; current: number; total: number } | null>(null);
+
+  // Listen for sync progress during add
+  useEffect(() => {
+    if (!loading) return;
+    const unsubscribe = window.api.sources.onSyncProgress(
+      (_sourceId: string, progress: { phase: string; current: number; total: number }) => {
+        setSyncProgress(progress);
+      },
+    );
+    return unsubscribe;
+  }, [loading]);
 
   const resetForm = () => {
     setName('');
@@ -70,6 +82,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
       setError(String(err));
     } finally {
       setLoading(false);
+      setSyncProgress(null);
     }
   };
 
@@ -170,6 +183,43 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
         )}
         {success && (
           <p className="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">{success}</p>
+        )}
+
+        {loading && syncProgress && syncProgress.phase !== 'done' && (
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs text-surface-400">
+              <span>
+                {syncProgress.phase === 'deleting'
+                  ? 'Preparing...'
+                  : syncProgress.phase === 'inserting'
+                    ? 'Importing entries...'
+                    : syncProgress.phase === 'indexing'
+                      ? 'Building search index...'
+                      : 'Syncing...'}
+              </span>
+              {syncProgress.phase === 'inserting' && syncProgress.total > 0 && (
+                <span>
+                  {syncProgress.current.toLocaleString()} / {syncProgress.total.toLocaleString()}
+                </span>
+              )}
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-700">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+                style={{
+                  width: `${
+                    syncProgress.phase === 'deleting'
+                      ? 5
+                      : syncProgress.phase === 'indexing'
+                        ? 95
+                        : syncProgress.total > 0
+                          ? Math.round((syncProgress.current / syncProgress.total) * 100)
+                          : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
         )}
 
         <button

@@ -18,6 +18,7 @@ interface HistoryRow {
   logo_url: string | null;
   tvg_id: string | null;
   metadata_json: string | null;
+  sort_order: number;
   created_at: number;
 }
 
@@ -50,6 +51,7 @@ function rowToEntry(row: HistoryRow): HistoryEntry {
       logoUrl: row.logo_url ?? undefined,
       tvgId: row.tvg_id ?? undefined,
       metadataJson: row.metadata_json ?? undefined,
+      sortOrder: row.sort_order ?? 0,
       createdAt: row.created_at,
     },
   };

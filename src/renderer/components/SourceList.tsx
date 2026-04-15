@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Source {
   id: string;
@@ -8,6 +8,12 @@ interface Source {
   filePath?: string;
   lastSynced?: number;
   isActive: boolean;
+}
+
+interface SyncProgress {
+  phase: string;
+  current: number;
+  total: number;
 }
 
 interface SourceListProps {
@@ -40,10 +46,24 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
   const [syncing, setSyncing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [progress, setProgress] = useState<SyncProgress | null>(null);
 
-  const handleSync = async () => {
+  // Listen for sync progress events
+  useEffect(() => {
+    const unsubscribe = window.api.sources.onSyncProgress(
+      (sourceId: string, prog: SyncProgress) => {
+        if (sourceId === source.id) {
+          setProgress(prog);
+        }
+      },
+    );
+    return unsubscribe;
+  }, [source.id]);
+
+  const handleSync = useCallback(async () => {
     setSyncing(true);
     setSyncResult(null);
+    setProgress(null);
     try {
       const result = await window.api.sources.sync(source.id);
       setSyncResult(result.ok ? `${result.count} entries synced` : result.error);
@@ -52,10 +72,11 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
       setSyncResult(String(err));
     } finally {
       setSyncing(false);
+      setProgress(null);
     }
-  };
+  }, [source.id, onRefresh]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
       await window.api.sources.remove(source.id);
@@ -65,11 +86,23 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
     } finally {
       setDeleting(false);
     }
-  };
+  }, [source.id, onRefresh]);
 
   const lastSynced = source.lastSynced
     ? new Date(source.lastSynced).toLocaleString()
     : 'Never';
+
+  const progressPercent =
+    progress && progress.total > 0
+      ? Math.round((progress.current / progress.total) * 100)
+      : 0;
+
+  const phaseLabel: Record<string, string> = {
+    deleting: 'Clearing old data...',
+    inserting: 'Importing entries...',
+    indexing: 'Building search index...',
+    done: 'Done!',
+  };
 
   return (
     <div className="rounded-lg border border-surface-700 bg-surface-800 p-3">
@@ -112,7 +145,7 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
           </button>
           <button
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={deleting || syncing}
             title="Delete"
             className="rounded-md bg-surface-700 p-1.5 text-surface-400 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50"
           >
@@ -127,7 +160,30 @@ function SourceItem({ source, onRefresh }: { source: Source; onRefresh: () => vo
         </div>
       </div>
 
-      {syncResult && (
+      {/* Progress bar during sync */}
+      {syncing && progress && progress.phase !== 'done' && (
+        <div className="mt-2">
+          <div className="mb-1 flex items-center justify-between text-xs text-surface-400">
+            <span>{phaseLabel[progress.phase] ?? progress.phase}</span>
+            <span>
+              {progress.phase === 'inserting'
+                ? `${progress.current.toLocaleString()} / ${progress.total.toLocaleString()}`
+                : `${progressPercent}%`}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-700">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+              style={{
+                width: `${progress.phase === 'deleting' ? 10 : progress.phase === 'indexing' ? 95 : progressPercent}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Sync result message */}
+      {syncResult && !syncing && (
         <p className="mt-2 text-xs text-surface-400">{syncResult}</p>
       )}
     </div>

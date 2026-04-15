@@ -145,16 +145,16 @@ export function registerIpcHandlers(): void {
   });
 
   // Content browsing
-  ipcMain.handle(IpcChannels.CONTENT_GET_LIVE, (_event, sourceId?: string) => {
-    return getContentByType('live', sourceId);
+  ipcMain.handle(IpcChannels.CONTENT_GET_LIVE, (_event, sourceId?: string, sort?: string) => {
+    return getContentByType('live', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider');
   });
 
-  ipcMain.handle(IpcChannels.CONTENT_GET_MOVIES, (_event, sourceId?: string) => {
-    return getContentByType('movie', sourceId);
+  ipcMain.handle(IpcChannels.CONTENT_GET_MOVIES, (_event, sourceId?: string, sort?: string) => {
+    return getContentByType('movie', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider');
   });
 
-  ipcMain.handle(IpcChannels.CONTENT_GET_SERIES, (_event, sourceId?: string) => {
-    return getContentByType('series', sourceId);
+  ipcMain.handle(IpcChannels.CONTENT_GET_SERIES, (_event, sourceId?: string, sort?: string) => {
+    return getContentByType('series', sourceId, (sort as 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group') || 'provider');
   });
 
   ipcMain.handle(IpcChannels.CONTENT_GET_CATEGORIES, (_event, type: string) => {

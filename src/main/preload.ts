@@ -7,13 +7,21 @@ const api = {
     add: (input: unknown) => ipcRenderer.invoke(IpcChannels.SOURCES_ADD, input),
     remove: (id: string) => ipcRenderer.invoke(IpcChannels.SOURCES_REMOVE, id),
     sync: (id: string) => ipcRenderer.invoke(IpcChannels.SOURCES_SYNC, id),
+    onSyncProgress: (callback: (sourceId: string, progress: { phase: string; current: number; total: number }) => void) => {
+      const handler = (_event: IpcRendererEvent, sourceId: string, progress: { phase: string; current: number; total: number }) =>
+        callback(sourceId, progress);
+      ipcRenderer.on(IpcChannels.SOURCES_SYNC_PROGRESS, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.SOURCES_SYNC_PROGRESS, handler);
+      };
+    },
   },
 
   content: {
-    getLive: (sourceId?: string) => ipcRenderer.invoke(IpcChannels.CONTENT_GET_LIVE, sourceId),
-    getMovies: (sourceId?: string) => ipcRenderer.invoke(IpcChannels.CONTENT_GET_MOVIES, sourceId),
-    getSeries: (sourceId?: string) =>
-      ipcRenderer.invoke(IpcChannels.CONTENT_GET_SERIES, sourceId),
+    getLive: (sourceId?: string, sort?: string) => ipcRenderer.invoke(IpcChannels.CONTENT_GET_LIVE, sourceId, sort),
+    getMovies: (sourceId?: string, sort?: string) => ipcRenderer.invoke(IpcChannels.CONTENT_GET_MOVIES, sourceId, sort),
+    getSeries: (sourceId?: string, sort?: string) =>
+      ipcRenderer.invoke(IpcChannels.CONTENT_GET_SERIES, sourceId, sort),
     getCategories: (type: string) =>
       ipcRenderer.invoke(IpcChannels.CONTENT_GET_CATEGORIES, type),
     search: (query: string) => ipcRenderer.invoke(IpcChannels.CONTENT_SEARCH, query),

@@ -1,9 +1,9 @@
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import log from 'electron-log/main';
-import { getDb } from './db';
+import { getDb, dropFtsTriggers, restoreFtsTriggers, rebuildFtsIndex } from './db';
 import { classifyEntry, normalizeCategory } from './content-classifier';
 import { cleanTitle, extractSeasonEpisode, extractShowName } from './title-cleaner';
-import type { ContentItem, ContentType, Episode } from '../../shared/types';
+import type { ContentItem, ContentType, Episode, SortOption } from '../../shared/types';
 import type { M3uEntry } from './m3u-parser';
 import type {
   XtreamLiveStream,
@@ -12,6 +12,13 @@ import type {
   XtreamClient,
   XtreamSeriesEpisode,
 } from './xtream-client';
+
+// --- Constants ---
+
+/** Rows per transaction batch — balances memory vs. transaction overhead */
+const BATCH_SIZE = 2000;
+
+// --- Row mapping ---
 
 interface ContentRow {
   id: string;
@@ -24,6 +31,7 @@ interface ContentRow {
   logo_url: string | null;
   tvg_id: string | null;
   metadata_json: string | null;
+  sort_order: number;
   created_at: number;
 }
 
@@ -49,6 +57,7 @@ function rowToContent(row: ContentRow): ContentItem {
     logoUrl: row.logo_url ?? undefined,
     tvgId: row.tvg_id ?? undefined,
     metadataJson: row.metadata_json ?? undefined,
+    sortOrder: row.sort_order,
     createdAt: row.created_at,
   };
 }
@@ -65,215 +74,346 @@ function rowToEpisode(row: EpisodeRow): Episode {
   };
 }
 
+// --- Progress callback ---
+
+export interface SyncProgress {
+  phase: 'deleting' | 'inserting' | 'indexing' | 'done';
+  current: number;
+  total: number;
+}
+
+export type ProgressCallback = (progress: SyncProgress) => void;
+
+/** Yield to the event loop so Electron can process UI events between batches */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 // --- M3U storage ---
 
-export function storeM3uEntries(sourceId: string, entries: M3uEntry[]): number {
+export async function storeM3uEntries(
+  sourceId: string,
+  entries: M3uEntry[],
+  onProgress?: ProgressCallback,
+): Promise<number> {
   const db = getDb();
   const now = Date.now();
 
-  // Clear existing content for this source before re-importing
-  db.prepare('DELETE FROM content WHERE source_id = ?').run(sourceId);
+  // 1. Drop FTS triggers to avoid per-row overhead and known transaction bugs
+  dropFtsTriggers();
 
-  const insertContent = db.prepare(
-    `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
+  try {
+    // 2. Clear existing content for this source
+    onProgress?.({ phase: 'deleting', current: 0, total: entries.length });
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.prepare('DELETE FROM episodes WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)').run(sourceId);
+    db.prepare('DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)').run(sourceId);
+    db.prepare('DELETE FROM content WHERE source_id = ?').run(sourceId);
+    db.exec('PRAGMA foreign_keys = ON');
 
-  const insertEpisode = db.prepare(
-    `INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  );
+    // 3. Pre-classify and group entries
+    const directEntries: Array<{
+      entry: M3uEntry;
+      contentType: ContentType;
+      cleaned: string;
+      group: string;
+    }> = [];
 
-  // Group series entries by show name for series grouping
-  const seriesMap = new Map<string, { contentId: string; entries: M3uEntry[] }>();
+    const seriesMap = new Map<string, { contentId: string; showName: string; group: string; logo: string; tvgId: string; entries: M3uEntry[] }>();
 
-  const insertMany = db.transaction((items: M3uEntry[]) => {
-    for (const entry of items) {
+    for (const entry of entries) {
       const contentType = classifyEntry(entry);
       const cleaned = cleanTitle(entry.title);
       const group = normalizeCategory(entry.groupTitle);
 
       if (contentType === 'series') {
-        // Group by show name
         const showName = extractShowName(entry.title);
         const key = `${group}::${showName}`.toLowerCase();
 
         if (!seriesMap.has(key)) {
-          const contentId = uuid();
-          seriesMap.set(key, { contentId, entries: [] });
+          seriesMap.set(key, {
+            contentId: randomUUID(),
+            showName,
+            group,
+            logo: entry.tvgLogo,
+            tvgId: entry.tvgId,
+            entries: [],
+          });
+        }
+        seriesMap.get(key)!.entries.push(entry);
+      } else {
+        directEntries.push({ entry, contentType, cleaned, group });
+      }
+    }
 
-          // Insert the series parent entry
+    // 4. Prepare statements once
+    const insertContent = db.prepare(
+      `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    const insertEpisode = db.prepare(
+      `INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    // 5. Insert direct entries (live + movies) in batches
+    let inserted = 0;
+    let sortOrder = 0;
+    const totalToInsert = directEntries.length + seriesMap.size;
+
+    for (let i = 0; i < directEntries.length; i += BATCH_SIZE) {
+      const chunk = directEntries.slice(i, i + BATCH_SIZE);
+
+      const insertBatch = db.transaction(() => {
+        for (const { entry, contentType, cleaned, group } of chunk) {
           insertContent.run(
-            contentId,
+            randomUUID(),
             sourceId,
             contentType,
-            showName,
-            cleanTitle(showName),
+            entry.title,
+            cleaned,
             group || null,
-            entry.streamUrl, // First episode URL as fallback
+            entry.streamUrl,
             entry.tvgLogo || null,
             entry.tvgId || null,
+            sortOrder++,
             now,
           );
         }
+      });
 
-        seriesMap.get(key)!.entries.push(entry);
-      } else {
-        // Live or movie — insert directly
-        insertContent.run(
-          uuid(),
-          sourceId,
-          contentType,
-          entry.title,
-          cleaned,
-          group || null,
-          entry.streamUrl,
-          entry.tvgLogo || null,
-          entry.tvgId || null,
-          now,
-        );
-      }
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalToInsert });
+
+      // Yield to event loop every batch so UI stays responsive
+      await yieldToEventLoop();
     }
 
-    // Now insert episodes for grouped series
-    for (const [, seriesData] of seriesMap) {
-      for (const entry of seriesData.entries) {
-        const se = extractSeasonEpisode(entry.title);
-        insertEpisode.run(
-          uuid(),
-          seriesData.contentId,
-          se?.season ?? null,
-          se?.episode ?? null,
-          entry.title,
-          entry.streamUrl,
-          entry.duration > 0 ? entry.duration : null,
-        );
-      }
+    // 6. Insert series parent entries + episodes in batches
+    const seriesEntries = Array.from(seriesMap.values());
+
+    for (let i = 0; i < seriesEntries.length; i += BATCH_SIZE) {
+      const chunk = seriesEntries.slice(i, i + BATCH_SIZE);
+
+      const insertSeriesBatch = db.transaction(() => {
+        for (const series of chunk) {
+          // Insert series parent
+          insertContent.run(
+            series.contentId,
+            sourceId,
+            'series',
+            series.showName,
+            cleanTitle(series.showName),
+            series.group || null,
+            series.entries[0].streamUrl, // First episode URL as fallback
+            series.logo || null,
+            series.tvgId || null,
+            sortOrder++,
+            now,
+          );
+
+          // Insert episodes for this series
+          for (const ep of series.entries) {
+            const se = extractSeasonEpisode(ep.title);
+            insertEpisode.run(
+              randomUUID(),
+              series.contentId,
+              se?.season ?? null,
+              se?.episode ?? null,
+              ep.title,
+              ep.streamUrl,
+              ep.duration > 0 ? ep.duration : null,
+            );
+          }
+        }
+      });
+
+      insertSeriesBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalToInsert });
+      await yieldToEventLoop();
     }
-  });
 
-  insertMany(entries);
+    // 7. Rebuild FTS index in one shot (much faster than per-row triggers)
+    onProgress?.({ phase: 'indexing', current: 0, total: 1 });
+    rebuildFtsIndex(sourceId);
+    onProgress?.({ phase: 'done', current: entries.length, total: entries.length });
 
-  const seriesCount = seriesMap.size;
-  const episodeCount = Array.from(seriesMap.values()).reduce(
-    (sum, s) => sum + s.entries.length,
-    0,
-  );
-
-  log.info(
-    `Stored ${entries.length} M3U entries for source ${sourceId} (${seriesCount} series with ${episodeCount} episodes)`,
-  );
-  return entries.length;
+    const episodeCount = seriesEntries.reduce((sum, s) => sum + s.entries.length, 0);
+    log.info(
+      `Stored ${entries.length} M3U entries for source ${sourceId} (${seriesMap.size} series with ${episodeCount} episodes)`,
+    );
+    return entries.length;
+  } finally {
+    // Always restore triggers even if something fails
+    restoreFtsTriggers();
+  }
 }
 
 // --- Xtream storage ---
 
-export function storeXtreamContent(
+export async function storeXtreamContent(
   sourceId: string,
   client: XtreamClient,
   liveStreams: { streams: XtreamLiveStream[]; categories: Map<string, string> },
   vodStreams: { streams: XtreamVodStream[]; categories: Map<string, string> },
   seriesList: { series: XtreamSeriesInfo[]; categories: Map<string, string> },
-): number {
+  onProgress?: ProgressCallback,
+): Promise<number> {
   const db = getDb();
   const now = Date.now();
 
-  // Clear existing content for this source before re-importing
-  db.prepare('DELETE FROM content WHERE source_id = ?').run(sourceId);
+  const totalItems =
+    liveStreams.streams.length +
+    vodStreams.streams.length +
+    seriesList.series.length;
 
-  const insertContent = db.prepare(
-    `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, metadata_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
+  // 1. Drop FTS triggers
+  dropFtsTriggers();
 
-  let count = 0;
+  try {
+    // 2. Clear existing content for this source
+    onProgress?.({ phase: 'deleting', current: 0, total: totalItems });
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.prepare('DELETE FROM episodes WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)').run(sourceId);
+    db.prepare('DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)').run(sourceId);
+    db.prepare('DELETE FROM content WHERE source_id = ?').run(sourceId);
+    db.exec('PRAGMA foreign_keys = ON');
 
-  const insertAll = db.transaction(() => {
-    // Live streams
-    for (const stream of liveStreams.streams) {
-      const category = liveStreams.categories.get(stream.categoryId) ?? '';
-      const group = normalizeCategory(category);
-      const url = client.buildStreamUrl(stream.streamId, 'live');
+    const insertContent = db.prepare(
+      `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
 
-      insertContent.run(
-        uuid(),
-        sourceId,
-        'live',
-        stream.name,
-        cleanTitle(stream.name),
-        group || null,
-        url,
-        stream.streamIcon || null,
-        stream.epgChannelId || null,
-        null,
-        now,
-      );
-      count++;
-    }
+    let inserted = 0;
+    let sortOrder = 0;
 
-    // VOD streams
-    for (const stream of vodStreams.streams) {
-      const category = vodStreams.categories.get(stream.categoryId) ?? '';
-      const group = normalizeCategory(category);
-      const url = client.buildStreamUrl(
-        stream.streamId,
-        'movie',
-        stream.containerExtension,
-      );
+    // 3. Insert live streams in batches
+    for (let i = 0; i < liveStreams.streams.length; i += BATCH_SIZE) {
+      const chunk = liveStreams.streams.slice(i, i + BATCH_SIZE);
 
-      insertContent.run(
-        uuid(),
-        sourceId,
-        'movie',
-        stream.name,
-        cleanTitle(stream.name),
-        group || null,
-        url,
-        stream.streamIcon || null,
-        null,
-        stream.rating ? JSON.stringify({ rating: stream.rating }) : null,
-        now,
-      );
-      count++;
-    }
+      const insertBatch = db.transaction(() => {
+        for (const stream of chunk) {
+          const category = liveStreams.categories.get(stream.categoryId) ?? '';
+          const group = normalizeCategory(category);
+          const url = client.buildStreamUrl(stream.streamId, 'live');
 
-    // Series — insert as series type, episodes will be fetched on demand
-    for (const series of seriesList.series) {
-      const category = seriesList.categories.get(series.categoryId) ?? '';
-      const group = normalizeCategory(category);
-
-      const metadata = JSON.stringify({
-        seriesId: series.seriesId,
-        plot: series.plot || undefined,
-        cast: series.cast || undefined,
-        director: series.director || undefined,
-        genre: series.genre || undefined,
-        releaseDate: series.releaseDate || undefined,
-        rating: series.rating || undefined,
+          insertContent.run(
+            randomUUID(),
+            sourceId,
+            'live',
+            stream.name,
+            cleanTitle(stream.name),
+            group || null,
+            url,
+            stream.streamIcon || null,
+            stream.epgChannelId || null,
+            null,
+            sortOrder++,
+            now,
+          );
+        }
       });
 
-      insertContent.run(
-        uuid(),
-        sourceId,
-        'series',
-        series.name,
-        cleanTitle(series.name),
-        group || null,
-        '', // No direct stream URL for series parent
-        series.cover || null,
-        null,
-        metadata,
-        now,
-      );
-      count++;
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalItems });
+      await yieldToEventLoop();
     }
-  });
 
-  insertAll();
-  log.info(
-    `Stored ${count} Xtream entries for source ${sourceId} (${liveStreams.streams.length} live, ${vodStreams.streams.length} VOD, ${seriesList.series.length} series)`,
-  );
-  return count;
+    // 4. Insert VOD streams in batches
+    for (let i = 0; i < vodStreams.streams.length; i += BATCH_SIZE) {
+      const chunk = vodStreams.streams.slice(i, i + BATCH_SIZE);
+
+      const insertBatch = db.transaction(() => {
+        for (const stream of chunk) {
+          const category = vodStreams.categories.get(stream.categoryId) ?? '';
+          const group = normalizeCategory(category);
+          const url = client.buildStreamUrl(
+            stream.streamId,
+            'movie',
+            stream.containerExtension,
+          );
+
+          insertContent.run(
+            randomUUID(),
+            sourceId,
+            'movie',
+            stream.name,
+            cleanTitle(stream.name),
+            group || null,
+            url,
+            stream.streamIcon || null,
+            null,
+            stream.rating ? JSON.stringify({ rating: stream.rating }) : null,
+            sortOrder++,
+            now,
+          );
+        }
+      });
+
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalItems });
+      await yieldToEventLoop();
+    }
+
+    // 5. Insert series in batches (episodes fetched on demand)
+    for (let i = 0; i < seriesList.series.length; i += BATCH_SIZE) {
+      const chunk = seriesList.series.slice(i, i + BATCH_SIZE);
+
+      const insertBatch = db.transaction(() => {
+        for (const series of chunk) {
+          const category = seriesList.categories.get(series.categoryId) ?? '';
+          const group = normalizeCategory(category);
+
+          const metadata = JSON.stringify({
+            seriesId: series.seriesId,
+            plot: series.plot || undefined,
+            cast: series.cast || undefined,
+            director: series.director || undefined,
+            genre: series.genre || undefined,
+            releaseDate: series.releaseDate || undefined,
+            rating: series.rating || undefined,
+          });
+
+          insertContent.run(
+            randomUUID(),
+            sourceId,
+            'series',
+            series.name,
+            cleanTitle(series.name),
+            group || null,
+            '', // No direct stream URL for series parent
+            series.cover || null,
+            null,
+            metadata,
+            sortOrder++,
+            now,
+          );
+        }
+      });
+
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalItems });
+      await yieldToEventLoop();
+    }
+
+    // 6. Rebuild FTS index
+    onProgress?.({ phase: 'indexing', current: 0, total: 1 });
+    rebuildFtsIndex(sourceId);
+    onProgress?.({ phase: 'done', current: totalItems, total: totalItems });
+
+    log.info(
+      `Stored ${totalItems} Xtream entries for source ${sourceId} (${liveStreams.streams.length} live, ${vodStreams.streams.length} VOD, ${seriesList.series.length} series)`,
+    );
+    return totalItems;
+  } finally {
+    restoreFtsTriggers();
+  }
 }
 
 /** Store episodes for a specific series (fetched on demand from Xtream API) */
@@ -308,7 +448,7 @@ export function storeXtreamEpisodes(
           ? parseDuration(ep.info.duration)
           : null;
 
-        insert.run(uuid(), contentId, season, ep.episodeNum, ep.title, streamUrl, durationSecs);
+        insert.run(randomUUID(), contentId, season, ep.episodeNum, ep.title, streamUrl, durationSecs);
         count++;
       }
     }
@@ -334,18 +474,43 @@ function parseDuration(duration: string): number | null {
   return isNaN(secs) ? null : secs;
 }
 
+// --- Sort helpers ---
+
+function sortClause(sort: SortOption): string {
+  switch (sort) {
+    case 'provider':
+      return 'ORDER BY sort_order ASC';
+    case 'name-asc':
+      return 'ORDER BY COALESCE(clean_title, title) COLLATE NOCASE ASC';
+    case 'name-desc':
+      return 'ORDER BY COALESCE(clean_title, title) COLLATE NOCASE DESC';
+    case 'recent':
+      return 'ORDER BY created_at DESC, sort_order ASC';
+    case 'group':
+      return 'ORDER BY group_name COLLATE NOCASE ASC, COALESCE(clean_title, title) COLLATE NOCASE ASC';
+    default:
+      return 'ORDER BY sort_order ASC';
+  }
+}
+
 // --- Query functions ---
 
-export function getContentByType(type: ContentType, sourceId?: string): ContentItem[] {
+export function getContentByType(
+  type: ContentType,
+  sourceId?: string,
+  sort: SortOption = 'provider',
+): ContentItem[] {
   const db = getDb();
+  const order = sortClause(sort);
+
   if (sourceId) {
     const rows = db
-      .prepare('SELECT * FROM content WHERE type = ? AND source_id = ? ORDER BY group_name, title')
+      .prepare(`SELECT * FROM content WHERE type = ? AND source_id = ? ${order}`)
       .all(type, sourceId) as ContentRow[];
     return rows.map(rowToContent);
   }
   const rows = db
-    .prepare('SELECT * FROM content WHERE type = ? ORDER BY group_name, title')
+    .prepare(`SELECT * FROM content WHERE type = ? ${order}`)
     .all(type) as ContentRow[];
   return rows.map(rowToContent);
 }

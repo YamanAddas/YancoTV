@@ -21,36 +21,50 @@ export class MpvIpc extends EventEmitter {
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Clean up any previous socket from a failed attempt
+      if (this.socket) {
+        this.socket.removeAllListeners();
+        this.socket.destroy();
+        this.socket = null;
+      }
+
       const pipePath = `\\\\.\\pipe\\${this.pipeName}`;
       this.socket = net.connect(pipePath);
 
       const onConnect = () => {
         this.connected = true;
         this.socket!.removeListener('error', onError);
+
+        // Only attach persistent handlers AFTER successful connection.
+        // This prevents 'error' events during connect retries from
+        // bubbling up as uncaught EventEmitter errors.
+        this.socket!.on('data', (chunk) => this.onData(chunk));
+
+        this.socket!.on('close', () => {
+          this.connected = false;
+          this.rejectAllPending('mpv IPC connection closed');
+          this.emit('close');
+        });
+
+        this.socket!.on('error', (err) => {
+          log.error('mpv IPC error:', err.message);
+          this.emit('error', err);
+        });
+
         log.info(`mpv IPC connected: ${pipePath}`);
         resolve();
       };
 
       const onError = (err: Error) => {
         this.socket!.removeListener('connect', onConnect);
+        this.socket!.removeAllListeners();
+        this.socket!.destroy();
+        this.socket = null;
         reject(err);
       };
 
       this.socket.once('connect', onConnect);
       this.socket.once('error', onError);
-
-      this.socket.on('data', (chunk) => this.onData(chunk));
-
-      this.socket.on('close', () => {
-        this.connected = false;
-        this.rejectAllPending('mpv IPC connection closed');
-        this.emit('close');
-      });
-
-      this.socket.on('error', (err) => {
-        log.error('mpv IPC error:', err.message);
-        this.emit('error', err);
-      });
     });
   }
 
@@ -94,6 +108,7 @@ export class MpvIpc extends EventEmitter {
   destroy(): void {
     this.rejectAllPending('mpv IPC destroyed');
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.destroy();
       this.socket = null;
     }

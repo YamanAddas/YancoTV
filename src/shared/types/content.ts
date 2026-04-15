@@ -1,5 +1,7 @@
 export type ContentType = 'live' | 'movie' | 'series';
 
+export type SortOption = 'provider' | 'name-asc' | 'name-desc' | 'recent' | 'group';
+
 export interface ContentItem {
   id: string;
   sourceId: string;
@@ -11,6 +13,7 @@ export interface ContentItem {
   logoUrl?: string;
   tvgId?: string;
   metadataJson?: string;
+  sortOrder: number;
   createdAt: number;
 }
 

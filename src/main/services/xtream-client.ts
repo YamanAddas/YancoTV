@@ -105,6 +105,27 @@ export interface XtreamSeriesDetail {
   };
 }
 
+// --- Constants ---
+
+const MAX_RESPONSE_SIZE = 150 * 1024 * 1024; // 150 MB guard
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 3000, 8000]; // Exponential-ish backoff
+
+function isRetryableError(message: string): boolean {
+  return (
+    message.includes('timed out') ||
+    message.includes('ECONNRESET') ||
+    message.includes('ECONNREFUSED') ||
+    message.includes('ETIMEDOUT') ||
+    message.includes('ENOTFOUND') ||
+    message.includes('socket hang up') ||
+    message.includes('HTTP 429') ||
+    message.includes('HTTP 502') ||
+    message.includes('HTTP 503') ||
+    message.includes('HTTP 504')
+  );
+}
+
 // --- Client ---
 
 export class XtreamClient {
@@ -113,7 +134,7 @@ export class XtreamClient {
   private password: string;
   private timeout: number;
 
-  constructor(url: string, username: string, password: string, timeout = 30_000) {
+  constructor(url: string, username: string, password: string, timeout = 60_000) {
     // Normalize base URL: strip trailing slash and /player_api.php if present
     this.baseUrl = url.replace(/\/+$/, '').replace(/\/player_api\.php$/, '');
     this.username = username;
@@ -311,37 +332,71 @@ export class XtreamClient {
   private async request(action: string): Promise<Result<any>> {
     const url = `${this.baseUrl}/player_api.php?username=${encodeURIComponent(this.username)}&password=${encodeURIComponent(this.password)}&action=${action}`;
 
-    try {
-      const body = await this.fetchJson(url);
-      return { ok: true, value: body };
-    } catch (error) {
-      log.error(`Xtream API error [${action}]:`, error);
-      return {
-        ok: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-      };
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const body = await this.fetchJson(url);
+        return { ok: true, value: body };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+
+        if (attempt < MAX_RETRIES && isRetryableError(msg)) {
+          const delay = RETRY_DELAYS[attempt] ?? 8000;
+          log.warn(`Xtream API [${action}] attempt ${attempt + 1} failed: ${msg} — retrying in ${delay}ms`);
+          await sleep(delay);
+          continue;
+        }
+
+        log.error(`Xtream API error [${action}]:`, error);
+        return {
+          ok: false,
+          error: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
     }
+
+    // Should not reach here, but TypeScript requires it
+    return { ok: false, error: new Error('Max retries exceeded') };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private fetchJson(url: string): Promise<any> {
     return new Promise((resolve, reject) => {
       const callback = (res: IncomingMessage) => {
+        // Follow redirects (301, 302, 307, 308)
+        if (res.statusCode && [301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+          this.fetchJson(res.headers.location).then(resolve, reject);
+          return;
+        }
+
         if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
           reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
           return;
         }
 
+        let receivedBytes = 0;
         const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+        res.on('data', (chunk: Buffer) => {
+          receivedBytes += chunk.length;
+          if (receivedBytes > MAX_RESPONSE_SIZE) {
+            res.destroy();
+            reject(new Error(`Response exceeded ${Math.round(MAX_RESPONSE_SIZE / 1024 / 1024)}MB limit`));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
         res.on('end', () => {
           const text = Buffer.concat(chunks).toString('utf-8');
           try {
             resolve(JSON.parse(text));
           } catch {
-            reject(new Error('Invalid JSON response from Xtream API'));
+            // Some providers return HTML error pages instead of JSON
+            const preview = text.slice(0, 200);
+            reject(new Error(`Invalid JSON from Xtream API: ${preview}`));
           }
         });
+
         res.on('error', reject);
       };
 
@@ -372,4 +427,8 @@ export class XtreamClient {
 
     return { ok: true, value: categories };
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

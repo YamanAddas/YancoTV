@@ -22,6 +22,7 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.SOURCES_ADD).toBe('sources:add');
     expect(IpcChannels.SOURCES_REMOVE).toBe('sources:remove');
     expect(IpcChannels.SOURCES_SYNC).toBe('sources:sync');
+    expect(IpcChannels.SOURCES_SYNC_PROGRESS).toBe('sources:syncProgress');
   });
 
   it('has all expected content channels', () => {
@@ -68,7 +69,7 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.APP_GET_VERSION).toBe('app:getVersion');
   });
 
-  it('exports exactly 33 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(33);
+  it('exports exactly 34 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(34);
   });
 });

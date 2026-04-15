@@ -295,6 +295,6 @@ describe('XtreamClient', () => {
       if (!result.ok) {
         expect(result.error.message).toContain('ECONNREFUSED');
       }
-    });
+    }, 20_000); // Retry logic adds delay before final failure
   });
 });

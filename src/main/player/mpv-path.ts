@@ -5,13 +5,17 @@ import { execFileSync } from 'child_process';
 import log from 'electron-log/main';
 
 const WINDOWS_SEARCH_PATHS = [
-  // Bundled with the app
-  () => path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : process.cwd(), 'mpv', 'mpv.exe'),
+  // Bundled with the app (dev mode — project root)
+  () => path.join(process.cwd(), 'mpv', 'mpv.exe'),
+  // Bundled with the app (packaged — extraResources)
+  () => path.join(process.resourcesPath, 'mpv', 'mpv.exe'),
+  // Next to the exe (portable packaging)
+  () => path.join(path.dirname(app.getPath('exe')), 'mpv', 'mpv.exe'),
   // Common install locations
   () => 'C:\\Program Files\\mpv\\mpv.exe',
   () => 'C:\\Program Files (x86)\\mpv\\mpv.exe',
   () => path.join(process.env.LOCALAPPDATA ?? '', 'Programs', 'mpv', 'mpv.exe'),
-  () => path.join(process.env.USERPROFILE ?? '', 'scoop', 'apps', 'mpv', 'current', 'mpv.exe'),
+  () => path.join(process.env.USERPROFILE ?? '', 'scoop', 'apps', 'mpv', 'mpv.exe'),
 ];
 
 /**
