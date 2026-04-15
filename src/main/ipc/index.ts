@@ -34,6 +34,35 @@ import {
   getProgrammesForChannel,
   getEpgStats,
 } from '../services/epg-service';
+import { getCatchupUrl, checkCatchupSupport } from '../services/catchup-service';
+import {
+  activateTimeshift,
+  deactivateTimeshift,
+  getTimeshiftState,
+} from '../services/timeshift-service';
+import {
+  getAllSettings,
+  setSetting,
+  setSettings,
+} from '../services/settings-service';
+import {
+  getParentalSettings,
+  setPin,
+  verifyPin,
+  removePin,
+  updateParentalSetting,
+  lockChannel,
+  unlockChannel,
+  getLockedChannelIds,
+  isChannelLocked,
+  hideChannel,
+  unhideChannel,
+  getHiddenChannelIds,
+  setChannelOverride,
+  removeChannelOverride,
+  getAllChannelOverrides,
+} from '../services/parental-service';
+import type { ChannelOverride } from '../services/parental-service';
 import { MpvPlayer } from '../player/mpv-player';
 import type { PlayerState } from '../player/player.interface';
 
@@ -316,6 +345,194 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  // Catch-up
+  ipcMain.handle(
+    IpcChannels.CATCHUP_GET_URL,
+    (_event, tvgId: string, programmeStart: number, programmeDuration: number) => {
+      if (!tvgId || typeof tvgId !== 'string') return { ok: false, error: 'Invalid tvgId' };
+      if (typeof programmeStart !== 'number' || typeof programmeDuration !== 'number') {
+        return { ok: false, error: 'Invalid time parameters' };
+      }
+      const result = getCatchupUrl(tvgId, programmeStart, programmeDuration);
+      if (!result.ok) return { ok: false, error: result.error.message };
+      return { ok: true, ...result.value };
+    },
+  );
+
+  ipcMain.handle(IpcChannels.CATCHUP_CHECK_SUPPORT, (_event, tvgId: string) => {
+    if (!tvgId || typeof tvgId !== 'string') return { available: false, archiveHours: 0 };
+    return checkCatchupSupport(tvgId);
+  });
+
+  // Timeshift
+  ipcMain.handle(IpcChannels.TIMESHIFT_ACTIVATE, () => {
+    activateTimeshift();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.TIMESHIFT_DEACTIVATE, () => {
+    deactivateTimeshift();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.TIMESHIFT_GET_STATE, () => {
+    return getTimeshiftState();
+  });
+
+  // App settings
+  ipcMain.handle(IpcChannels.SETTINGS_GET_ALL, () => {
+    return getAllSettings();
+  });
+
+  ipcMain.handle(IpcChannels.SETTINGS_SET, (_event, key: string, value: string) => {
+    if (!key || typeof key !== 'string') return { ok: false, error: 'Invalid key' };
+    if (typeof value !== 'string') return { ok: false, error: 'Value must be a string' };
+    // Block internal keys that have their own dedicated handlers
+    const blockedPrefixes = ['parental_', 'epg_last_refreshed'];
+    if (blockedPrefixes.some((p) => key.startsWith(p))) {
+      return { ok: false, error: 'Use the dedicated API for this setting' };
+    }
+    try {
+      setSetting(key, value);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.SETTINGS_SET_MANY, (_event, entries: Record<string, string>) => {
+    if (!entries || typeof entries !== 'object') return { ok: false, error: 'Invalid entries' };
+    try {
+      setSettings(entries);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  // Parental Controls
+  ipcMain.handle(IpcChannels.PARENTAL_GET_SETTINGS, () => {
+    return getParentalSettings();
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_SET_PIN, (_event, pin: string) => {
+    if (!pin || typeof pin !== 'string' || pin.length < 4 || !/^\d+$/.test(pin)) {
+      return { ok: false, error: 'PIN must be at least 4 digits' };
+    }
+    try {
+      setPin(pin);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_VERIFY_PIN, (_event, pin: string) => {
+    if (!pin || typeof pin !== 'string') return { verified: false };
+    return { verified: verifyPin(pin) };
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_REMOVE_PIN, () => {
+    try {
+      removePin();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_UPDATE_SETTING, (_event, key: string, value: boolean) => {
+    if (!key || typeof key !== 'string') return { ok: false, error: 'Invalid key' };
+    if (typeof value !== 'boolean') return { ok: false, error: 'Value must be boolean' };
+    const allowedKeys = ['hide_adult', 'require_pin_settings'];
+    if (!allowedKeys.includes(key)) return { ok: false, error: 'Unknown setting key' };
+    try {
+      updateParentalSetting(key, value);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_LOCK_CHANNEL, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') return { ok: false, error: 'Invalid content ID' };
+    try {
+      lockChannel(contentId);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_UNLOCK_CHANNEL, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') return { ok: false, error: 'Invalid content ID' };
+    try {
+      unlockChannel(contentId);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_GET_LOCKED_IDS, () => {
+    return getLockedChannelIds();
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_IS_LOCKED, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') return false;
+    return isChannelLocked(contentId);
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_HIDE_CHANNEL, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') return { ok: false, error: 'Invalid content ID' };
+    try {
+      hideChannel(contentId);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_UNHIDE_CHANNEL, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') return { ok: false, error: 'Invalid content ID' };
+    try {
+      unhideChannel(contentId);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_GET_HIDDEN_IDS, () => {
+    return getHiddenChannelIds();
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_SET_OVERRIDE, (_event, override: ChannelOverride) => {
+    if (!override || typeof override !== 'object' || !override.contentId) {
+      return { ok: false, error: 'Invalid override data' };
+    }
+    try {
+      setChannelOverride(override);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_REMOVE_OVERRIDE, (_event, contentId: string) => {
+    if (!contentId || typeof contentId !== 'string') return { ok: false, error: 'Invalid content ID' };
+    try {
+      removeChannelOverride(contentId);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PARENTAL_GET_OVERRIDES, () => {
+    return getAllChannelOverrides();
+  });
+
   // Player
   ipcMain.handle(IpcChannels.PLAYER_PLAY, async (_event, url: string, _title?: string, startPosition?: number) => {
     if (!url || typeof url !== 'string') {
@@ -375,6 +592,80 @@ export function registerIpcHandlers(): void {
     }
     try {
       await getPlayer().setVolume(level);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_TOGGLE_MUTE, async () => {
+    try {
+      await getPlayer().toggleMute();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_SPEED, async (_event, speed: number) => {
+    if (typeof speed !== 'number') {
+      return { ok: false, error: 'Invalid speed value' };
+    }
+    try {
+      await getPlayer().setSpeed(speed);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_ASPECT_RATIO, async (_event, ratio: string) => {
+    if (!ratio || typeof ratio !== 'string') {
+      return { ok: false, error: 'Invalid aspect ratio' };
+    }
+    try {
+      await getPlayer().setAspectRatio(ratio as 'auto' | '16:9' | '4:3' | '21:9' | 'fill');
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_TOGGLE_FULLSCREEN, async () => {
+    try {
+      await getPlayer().toggleFullscreen();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_GET_TRACKS, () => {
+    const p = getPlayer();
+    return {
+      subtitles: p.getSubtitleTracks(),
+      audio: p.getAudioTracks(),
+    };
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_SUBTITLE_TRACK, async (_event, id: number) => {
+    if (typeof id !== 'number') {
+      return { ok: false, error: 'Invalid track ID' };
+    }
+    try {
+      await getPlayer().setSubtitleTrack(id);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_AUDIO_TRACK, async (_event, id: number) => {
+    if (typeof id !== 'number') {
+      return { ok: false, error: 'Invalid track ID' };
+    }
+    try {
+      await getPlayer().setAudioTrack(id);
       return { ok: true };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };

@@ -3,13 +3,20 @@ export interface PlayOptions {
   subtitleFile?: string;
 }
 
+export type AspectRatio = 'auto' | '16:9' | '4:3' | '21:9' | 'fill';
+
 export interface PlayerState {
   status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error';
   position: number;
   duration: number;
   volume: number;
   muted: boolean;
+  speed: number;
+  aspectRatio: AspectRatio;
+  fullscreen: boolean;
   currentUrl?: string;
+  subtitleTracks: SubtitleTrack[];
+  audioTracks: AudioTrack[];
 }
 
 export interface SubtitleTrack {
@@ -39,6 +46,10 @@ export interface IPlayer {
   stop(): Promise<void>;
   seek(seconds: number): Promise<void>;
   setVolume(level: number): Promise<void>;
+  toggleMute(): Promise<void>;
+  setSpeed(speed: number): Promise<void>;
+  setAspectRatio(ratio: AspectRatio): Promise<void>;
+  toggleFullscreen(): Promise<void>;
   getState(): PlayerState;
 
   getSubtitleTracks(): SubtitleTrack[];

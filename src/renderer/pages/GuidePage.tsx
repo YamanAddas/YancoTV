@@ -40,7 +40,10 @@ export function GuidePage() {
   const queryClient = useQueryClient();
   const play = usePlayerStore((s) => s.play);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedProgramme, setSelectedProgramme] = useState<EpgProgramme | null>(null);
+  const [selectedProgramme, setSelectedProgramme] = useState<{
+    programme: EpgProgramme;
+    channel: EpgGuideChannel;
+  } | null>(null);
 
   // Time window: start at the current hour, show HOURS_TO_SHOW hours
   const now = useMemo(() => Math.floor(Date.now() / 1000), []);
@@ -71,6 +74,13 @@ export function GuidePage() {
   const handleNow = useCallback(() => {
     setWindowStart(startOfHour(Math.floor(Date.now() / 1000)));
   }, []);
+
+  const handleProgrammeClick = useCallback(
+    (programme: EpgProgramme, channel: EpgGuideChannel) => {
+      setSelectedProgramme({ programme, channel });
+    },
+    [],
+  );
 
   const hasEpgData = stats && stats.programmeCount > 0;
 
@@ -138,7 +148,7 @@ export function GuidePage() {
               windowStart={windowStart}
               windowEnd={windowEnd}
               now={Math.floor(Date.now() / 1000)}
-              onProgrammeClick={setSelectedProgramme}
+              onProgrammeClick={handleProgrammeClick}
             />
           ) : (
             <p className="text-center text-surface-500 py-12">
@@ -151,7 +161,8 @@ export function GuidePage() {
       {/* Programme detail popup */}
       {selectedProgramme && (
         <ProgrammeDetail
-          programme={selectedProgramme}
+          programme={selectedProgramme.programme}
+          channel={selectedProgramme.channel}
           onClose={() => setSelectedProgramme(null)}
           onPlay={(streamUrl, title) => {
             play(streamUrl, title);
@@ -178,7 +189,7 @@ function EpgGrid({
   windowStart: number;
   windowEnd: number;
   now: number;
-  onProgrammeClick: (p: EpgProgramme) => void;
+  onProgrammeClick: (p: EpgProgramme, ch: EpgGuideChannel) => void;
 }) {
   const gridRef = useRef<HTMLDivElement>(null);
   const totalWidth = ((windowEnd - windowStart) / 3600) * HOUR_WIDTH;
@@ -320,7 +331,7 @@ function ChannelRow({
   windowStart: number;
   windowEnd: number;
   now: number;
-  onProgrammeClick: (p: EpgProgramme) => void;
+  onProgrammeClick: (p: EpgProgramme, ch: EpgGuideChannel) => void;
 }) {
   return (
     <div
@@ -341,12 +352,12 @@ function ChannelRow({
         return (
           <button
             key={prog.id}
-            onClick={() => onProgrammeClick(prog)}
+            onClick={() => onProgrammeClick(prog, channel)}
             className={`absolute top-1 bottom-1 overflow-hidden rounded border px-2 py-1 text-left transition-colors ${
               isNow
                 ? 'border-accent/50 bg-accent/15 hover:bg-accent/25'
                 : isPast
-                  ? 'border-surface-800/50 bg-surface-800/30 text-surface-500'
+                  ? 'border-surface-800/50 bg-surface-800/30 text-surface-500 hover:bg-surface-800/50'
                   : 'border-surface-700/50 bg-surface-800/60 hover:bg-surface-700/60'
             }`}
             style={{ left, width: Math.max(width - 2, 1) }}
@@ -371,17 +382,87 @@ function ChannelRow({
 
 function ProgrammeDetail({
   programme,
+  channel,
   onClose,
   onPlay,
 }: {
   programme: EpgProgramme;
+  channel: EpgGuideChannel;
   onClose: () => void;
   onPlay: (streamUrl: string, title: string) => void;
 }) {
   const duration = Math.round((programme.endTime - programme.startTime) / 60);
-  const isNow =
-    programme.startTime <= Math.floor(Date.now() / 1000) &&
-    programme.endTime > Math.floor(Date.now() / 1000);
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const isNow = programme.startTime <= nowSecs && programme.endTime > nowSecs;
+  const isPast = programme.endTime <= nowSecs;
+  const isFuture = programme.startTime > nowSecs;
+
+  const [catchupStatus, setCatchupStatus] = useState<{
+    loading: boolean;
+    available: boolean;
+    archiveHours: number;
+    streamUrl?: string;
+    error?: string;
+  }>({ loading: false, available: false, archiveHours: 0 });
+
+  // Check catch-up availability for past programmes
+  useEffect(() => {
+    if (!isPast || !window.api?.catchup) return;
+
+    setCatchupStatus({ loading: true, available: false, archiveHours: 0 });
+
+    const progDuration = programme.endTime - programme.startTime;
+    window.api.catchup
+      .getUrl(programme.channelTvgId, programme.startTime, progDuration)
+      .then(
+        (result: { ok: boolean; available?: boolean; archiveHours?: number; streamUrl?: string; error?: string }) => {
+          if (result.ok) {
+            setCatchupStatus({
+              loading: false,
+              available: result.available ?? false,
+              archiveHours: result.archiveHours ?? 0,
+              streamUrl: result.streamUrl,
+            });
+          } else {
+            setCatchupStatus({
+              loading: false,
+              available: false,
+              archiveHours: 0,
+              error: result.error,
+            });
+          }
+        },
+      )
+      .catch(() => {
+        setCatchupStatus({ loading: false, available: false, archiveHours: 0 });
+      });
+  }, [isPast, programme.channelTvgId, programme.startTime, programme.endTime]);
+
+  // For live playback, we need the channel's stream URL
+  const handlePlayLive = useCallback(async () => {
+    if (!window.api) return;
+    // Look up the content item for this channel to get its stream URL
+    try {
+      const channels = await window.api.content.getLive();
+      const match = (channels as Array<{ tvgId?: string; streamUrl: string; title: string; id: string }>).find(
+        (c) => c.tvgId === programme.channelTvgId,
+      );
+      if (match) {
+        onPlay(match.streamUrl, `${channel.name} - ${programme.title}`);
+      }
+    } catch {
+      // fallback
+    }
+  }, [programme.channelTvgId, programme.title, channel.name, onPlay]);
+
+  const handlePlayCatchup = useCallback(() => {
+    if (catchupStatus.streamUrl) {
+      onPlay(
+        catchupStatus.streamUrl,
+        `[Catch-up] ${channel.name} - ${programme.title}`,
+      );
+    }
+  }, [catchupStatus.streamUrl, channel.name, programme.title, onPlay]);
 
   return (
     <div
@@ -394,6 +475,7 @@ function ProgrammeDetail({
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
+            <p className="mb-1 text-xs font-medium text-surface-500">{channel.name}</p>
             <h3 className="text-lg font-semibold text-surface-100">{programme.title}</h3>
             <p className="text-sm text-surface-400">
               {formatTime(programme.startTime)} &ndash; {formatTime(programme.endTime)} ({duration}{' '}
@@ -429,12 +511,77 @@ function ProgrammeDetail({
           <p className="mb-4 text-sm text-surface-300">{programme.description}</p>
         )}
 
-        {isNow && (
-          <p className="mb-3 text-sm font-medium text-green-400">Currently airing</p>
-        )}
+        {/* Status badges + action buttons */}
+        <div className="space-y-3">
+          {isNow && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-sm font-medium text-green-400">Currently airing</span>
+              </div>
+              <button
+                onClick={handlePlayLive}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                </svg>
+                Watch Live
+              </button>
+            </>
+          )}
+
+          {isPast && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-surface-500">
+                  Ended {formatTimeSince(nowSecs - programme.endTime)} ago
+                </span>
+              </div>
+
+              {catchupStatus.loading ? (
+                <div className="flex items-center gap-2 rounded-lg bg-surface-800 px-4 py-2.5 text-sm text-surface-400">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Checking catch-up availability...
+                </div>
+              ) : catchupStatus.available && catchupStatus.streamUrl ? (
+                <button
+                  onClick={handlePlayCatchup}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 15l3-3m0 0l-3-3m3 3h-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Watch Catch-up
+                </button>
+              ) : (
+                <p className="rounded-lg bg-surface-800 px-4 py-2.5 text-center text-sm text-surface-500">
+                  Catch-up not available for this channel
+                </p>
+              )}
+            </>
+          )}
+
+          {isFuture && (
+            <p className="rounded-lg bg-surface-800 px-4 py-2.5 text-center text-sm text-surface-500">
+              Starts in {formatTimeSince(programme.startTime - nowSecs)}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+function formatTimeSince(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 // ---------------------------------------------------------------------------

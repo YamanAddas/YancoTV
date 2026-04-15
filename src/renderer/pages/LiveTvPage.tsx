@@ -4,8 +4,10 @@ import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
+import { PinModal } from '../components/PinModal';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useParentalStore } from '../stores/parental-store';
 import { useNowNextBatch } from '../hooks/use-epg';
 
 export function LiveTvPage() {
@@ -15,6 +17,23 @@ export function LiveTvPage() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Parental controls
+  const parentalSettings = useParentalStore((s) => s.settings);
+  const hiddenIds = useParentalStore((s) => s.hiddenIds);
+  const lockedIds = useParentalStore((s) => s.lockedIds);
+  const parentalLoaded = useParentalStore((s) => s.loaded);
+  const parentalLoad = useParentalStore((s) => s.load);
+  const lockChannel = useParentalStore((s) => s.lockChannel);
+  const unlockChannel = useParentalStore((s) => s.unlockChannel);
+  const hideChannel = useParentalStore((s) => s.hideChannel);
+
+  // PIN modal state
+  const [pinModalTarget, setPinModalTarget] = useState<ContentCardData | null>(null);
+
+  useEffect(() => {
+    parentalLoad();
+  }, [parentalLoad]);
 
   useEffect(() => {
     if (!window.api) {
@@ -35,10 +54,36 @@ export function LiveTvPage() {
     });
   }, [selectedSource, sortBy]);
 
+  // Filter hidden channels and optionally adult content
+  const visibleChannels = useMemo(() => {
+    let result = channels;
+
+    // Filter hidden channels
+    if (hiddenIds.size > 0) {
+      result = result.filter((ch) => !hiddenIds.has(ch.id));
+    }
+
+    // Filter adult content if enabled
+    if (parentalSettings.hideAdultContent) {
+      result = result.filter((ch) => {
+        const name = (ch.groupName || '').toLowerCase();
+        const title = (ch.title || '').toLowerCase();
+        return !(
+          name.includes('adult') ||
+          name.includes('xxx') ||
+          name.includes('18+') ||
+          title.includes('xxx')
+        );
+      });
+    }
+
+    return result;
+  }, [channels, hiddenIds, parentalSettings.hideAdultContent]);
+
   const filtered = useMemo(() => {
-    if (!selectedCategory) return channels;
-    return channels.filter((ch) => ch.groupName === selectedCategory);
-  }, [channels, selectedCategory]);
+    if (!selectedCategory) return visibleChannels;
+    return visibleChannels.filter((ch) => ch.groupName === selectedCategory);
+  }, [visibleChannels, selectedCategory]);
 
   // Collect tvg IDs from visible channels for EPG now/next lookup
   const tvgIds = useMemo(
@@ -53,9 +98,28 @@ export function LiveTvPage() {
 
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
+      // If channel is locked, prompt for PIN before playing
+      if (lockedIds.has(item.id) && parentalSettings.pinEnabled) {
+        setPinModalTarget(item);
+        return;
+      }
       play(item.streamUrl, item.cleanTitle || item.title, item.id);
     },
-    [play],
+    [play, lockedIds, parentalSettings.pinEnabled],
+  );
+
+  const handlePinResult = useCallback(
+    (verified: boolean) => {
+      if (verified && pinModalTarget) {
+        play(
+          pinModalTarget.streamUrl,
+          pinModalTarget.cleanTitle || pinModalTarget.title,
+          pinModalTarget.id,
+        );
+      }
+      setPinModalTarget(null);
+    },
+    [play, pinModalTarget],
   );
 
   const handleFavoriteToggle = useCallback(
@@ -64,6 +128,29 @@ export function LiveTvPage() {
     },
     [toggle],
   );
+
+  const handleLockToggle = useCallback(
+    (item: ContentCardData) => {
+      if (lockedIds.has(item.id)) {
+        unlockChannel(item.id);
+      } else {
+        lockChannel(item.id);
+      }
+    },
+    [lockedIds, lockChannel, unlockChannel],
+  );
+
+  const handleHideChannel = useCallback(
+    (item: ContentCardData) => {
+      hideChannel(item.id);
+    },
+    [hideChannel],
+  );
+
+  if (!isLoading && !parentalLoaded) {
+    // Still loading parental settings — show spinner briefly
+    return null;
+  }
 
   if (!isLoading && channels.length === 0) {
     return (
@@ -107,11 +194,22 @@ export function LiveTvPage() {
             onItemClick={handleItemClick}
             onFavoriteToggle={handleFavoriteToggle}
             favoriteIds={favoriteIds}
+            lockedIds={lockedIds}
             isLoading={isLoading}
             nowNextMap={nowNextMap}
+            onLockToggle={handleLockToggle}
+            onHideChannel={handleHideChannel}
           />
         </div>
       </div>
+
+      {/* PIN verification modal for locked channels */}
+      {pinModalTarget && (
+        <PinModal
+          title={`Unlock "${pinModalTarget.cleanTitle || pinModalTarget.title}"`}
+          onResult={handlePinResult}
+        />
+      )}
     </div>
   );
 }

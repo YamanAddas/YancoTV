@@ -8,9 +8,11 @@ import type {
   PlayerEventMap,
   SubtitleTrack,
   AudioTrack,
+  AspectRatio,
 } from './player.interface';
 import { MpvIpc } from './mpv-ipc';
 import { findMpvPath } from './mpv-path';
+import { getTimeshiftMpvArgs } from '../services/timeshift-service';
 
 const CONNECT_RETRY_DELAY = 300;
 const CONNECT_MAX_RETRIES = 20; // 20 * 300ms = 6 seconds — enough for cold mpv starts
@@ -22,6 +24,11 @@ function defaultState(): PlayerState {
     duration: 0,
     volume: 100,
     muted: false,
+    speed: 1,
+    aspectRatio: 'auto',
+    fullscreen: false,
+    subtitleTracks: [],
+    audioTracks: [],
   };
 }
 
@@ -87,7 +94,13 @@ export class MpvPlayer implements IPlayer {
     } catch {
       // Process might already be gone
     }
-    this.state = { ...defaultState(), volume: this.state.volume, muted: this.state.muted };
+    this.state = {
+      ...defaultState(),
+      volume: this.state.volume,
+      muted: this.state.muted,
+      speed: this.state.speed,
+      aspectRatio: this.state.aspectRatio,
+    };
     this.state.status = 'stopped';
     this.emitEvent('state-change', this.state);
   }
@@ -110,9 +123,48 @@ export class MpvPlayer implements IPlayer {
     return { ...this.state };
   }
 
+  async toggleMute(): Promise<void> {
+    if (this.ipc?.isConnected()) {
+      await this.ipc.command(['cycle', 'mute']);
+    } else {
+      this.state.muted = !this.state.muted;
+      this.emitEvent('state-change', this.state);
+    }
+  }
+
+  async setSpeed(speed: number): Promise<void> {
+    const clamped = Math.max(0.25, Math.min(4, speed));
+    if (this.ipc?.isConnected()) {
+      await this.ipc.command(['set_property', 'speed', clamped]);
+    }
+    this.state.speed = clamped;
+    this.emitEvent('state-change', this.state);
+  }
+
+  async setAspectRatio(ratio: AspectRatio): Promise<void> {
+    if (this.ipc?.isConnected()) {
+      if (ratio === 'auto') {
+        await this.ipc.command(['set_property', 'video-aspect-override', '-1']);
+        await this.ipc.command(['set_property', 'panscan', 0]);
+      } else if (ratio === 'fill') {
+        await this.ipc.command(['set_property', 'panscan', 1]);
+      } else {
+        await this.ipc.command(['set_property', 'panscan', 0]);
+        await this.ipc.command(['set_property', 'video-aspect-override', ratio]);
+      }
+    }
+    this.state.aspectRatio = ratio;
+    this.emitEvent('state-change', this.state);
+  }
+
+  async toggleFullscreen(): Promise<void> {
+    if (this.ipc?.isConnected()) {
+      await this.ipc.command(['cycle', 'fullscreen']);
+    }
+  }
+
   getSubtitleTracks(): SubtitleTrack[] {
-    // Populated by property observations — stored when mpv reports track-list changes
-    return [];
+    return this.state.subtitleTracks;
   }
 
   async setSubtitleTrack(id: number): Promise<void> {
@@ -126,7 +178,7 @@ export class MpvPlayer implements IPlayer {
   }
 
   getAudioTracks(): AudioTrack[] {
-    return [];
+    return this.state.audioTracks;
   }
 
   async setAudioTrack(id: number): Promise<void> {
@@ -178,6 +230,8 @@ export class MpvPlayer implements IPlayer {
       '--force-window=yes',
       '--title=YancoTV Player',
       `--volume=${this.state.volume}`,
+      // Enable timeshift buffering (cache for live rewind/pause)
+      ...getTimeshiftMpvArgs(),
     ];
 
     if (options?.startPosition && options.startPosition > 0) {
@@ -281,6 +335,9 @@ export class MpvPlayer implements IPlayer {
     await this.ipc.observeProperty('mute');
     await this.ipc.observeProperty('core-idle');
     await this.ipc.observeProperty('idle-active');
+    await this.ipc.observeProperty('speed');
+    await this.ipc.observeProperty('fullscreen');
+    await this.ipc.observeProperty('track-list');
   }
 
   private handlePropertyChange(name: string, data: unknown): void {
@@ -325,7 +382,54 @@ export class MpvPlayer implements IPlayer {
           this.emitEvent('state-change', this.state);
         }
         break;
+      case 'speed':
+        if (typeof data === 'number') {
+          this.state.speed = data;
+          this.emitEvent('state-change', this.state);
+        }
+        break;
+      case 'fullscreen':
+        if (typeof data === 'boolean') {
+          this.state.fullscreen = data;
+          this.emitEvent('state-change', this.state);
+        }
+        break;
+      case 'track-list':
+        if (Array.isArray(data)) {
+          this.parseTrackList(data);
+          this.emitEvent('state-change', this.state);
+        }
+        break;
     }
+  }
+
+  private parseTrackList(
+    tracks: Array<{
+      id: number;
+      type: string;
+      title?: string;
+      lang?: string;
+      selected?: boolean;
+      codec?: string;
+    }>,
+  ): void {
+    this.state.subtitleTracks = tracks
+      .filter((t) => t.type === 'sub')
+      .map((t) => ({
+        id: t.id,
+        title: t.title || t.lang || `Subtitle ${t.id}`,
+        language: t.lang,
+        selected: t.selected === true,
+      }));
+
+    this.state.audioTracks = tracks
+      .filter((t) => t.type === 'audio')
+      .map((t) => ({
+        id: t.id,
+        title: t.title || t.lang || `Audio ${t.id}`,
+        language: t.lang,
+        selected: t.selected === true,
+      }));
   }
 
   private handleMpvEvent(msg: { event: string; reason?: string }): void {

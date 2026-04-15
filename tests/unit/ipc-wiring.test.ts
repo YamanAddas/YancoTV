@@ -41,6 +41,13 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.PLAYER_STOP).toBe('player:stop');
     expect(IpcChannels.PLAYER_SEEK).toBe('player:seek');
     expect(IpcChannels.PLAYER_SET_VOLUME).toBe('player:setVolume');
+    expect(IpcChannels.PLAYER_TOGGLE_MUTE).toBe('player:toggleMute');
+    expect(IpcChannels.PLAYER_SET_SPEED).toBe('player:setSpeed');
+    expect(IpcChannels.PLAYER_SET_ASPECT_RATIO).toBe('player:setAspectRatio');
+    expect(IpcChannels.PLAYER_TOGGLE_FULLSCREEN).toBe('player:toggleFullscreen');
+    expect(IpcChannels.PLAYER_GET_TRACKS).toBe('player:getTracks');
+    expect(IpcChannels.PLAYER_SET_SUBTITLE_TRACK).toBe('player:setSubtitleTrack');
+    expect(IpcChannels.PLAYER_SET_AUDIO_TRACK).toBe('player:setAudioTrack');
     expect(IpcChannels.PLAYER_STATE).toBe('player:state');
     expect(IpcChannels.PLAYER_STATE_CHANGED).toBe('player:stateChanged');
     expect(IpcChannels.PLAYER_TIME_UPDATE).toBe('player:timeUpdate');
@@ -63,13 +70,37 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.HISTORY_CLEAR).toBe('history:clear');
   });
 
+  it('has all expected settings channels', () => {
+    expect(IpcChannels.SETTINGS_GET_ALL).toBe('settings:getAll');
+    expect(IpcChannels.SETTINGS_SET).toBe('settings:set');
+    expect(IpcChannels.SETTINGS_SET_MANY).toBe('settings:setMany');
+  });
+
   it('has all expected system channels', () => {
     expect(IpcChannels.DB_STATUS).toBe('db:status');
     expect(IpcChannels.DIALOG_OPEN_M3U_FILE).toBe('dialog:openM3uFile');
     expect(IpcChannels.APP_GET_VERSION).toBe('app:getVersion');
   });
 
-  it('exports exactly 42 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(42);
+  it('has all expected parental control channels', () => {
+    expect(IpcChannels.PARENTAL_GET_SETTINGS).toBe('parental:getSettings');
+    expect(IpcChannels.PARENTAL_SET_PIN).toBe('parental:setPin');
+    expect(IpcChannels.PARENTAL_VERIFY_PIN).toBe('parental:verifyPin');
+    expect(IpcChannels.PARENTAL_REMOVE_PIN).toBe('parental:removePin');
+    expect(IpcChannels.PARENTAL_UPDATE_SETTING).toBe('parental:updateSetting');
+    expect(IpcChannels.PARENTAL_LOCK_CHANNEL).toBe('parental:lockChannel');
+    expect(IpcChannels.PARENTAL_UNLOCK_CHANNEL).toBe('parental:unlockChannel');
+    expect(IpcChannels.PARENTAL_GET_LOCKED_IDS).toBe('parental:getLockedIds');
+    expect(IpcChannels.PARENTAL_IS_LOCKED).toBe('parental:isLocked');
+    expect(IpcChannels.PARENTAL_HIDE_CHANNEL).toBe('parental:hideChannel');
+    expect(IpcChannels.PARENTAL_UNHIDE_CHANNEL).toBe('parental:unhideChannel');
+    expect(IpcChannels.PARENTAL_GET_HIDDEN_IDS).toBe('parental:getHiddenIds');
+    expect(IpcChannels.PARENTAL_SET_OVERRIDE).toBe('parental:setOverride');
+    expect(IpcChannels.PARENTAL_REMOVE_OVERRIDE).toBe('parental:removeOverride');
+    expect(IpcChannels.PARENTAL_GET_OVERRIDES).toBe('parental:getOverrides');
+  });
+
+  it('exports exactly 73 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(73);
   });
 });

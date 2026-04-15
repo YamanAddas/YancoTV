@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
@@ -9,6 +10,7 @@ import { SeriesPage } from './pages/SeriesPage';
 import { SearchPage } from './pages/SearchPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { useSettingsStore } from './stores/settings-store';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,23 +21,64 @@ const queryClient = new QueryClient({
   },
 });
 
+// Map setting values to route paths
+const START_PAGE_ROUTES: Record<string, string> = {
+  live: '/live',
+  movies: '/movies',
+  series: '/series',
+  guide: '/guide',
+  favorites: '/favorites',
+  history: '/history',
+  home: '/',
+};
+
+function AppInner() {
+  const { load, get } = useSettingsStore();
+
+  // Load settings once on mount, then keep theme in sync
+  useEffect(() => {
+    load().then(() => {
+      const theme = useSettingsStore.getState().get('ui_theme');
+      document.documentElement.setAttribute('data-theme', theme || 'dark');
+    });
+  }, [load]);
+
+  // Subscribe to theme changes so the setting takes effect immediately
+  useEffect(() => {
+    return useSettingsStore.subscribe((state) => {
+      const theme = state.data.ui_theme || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    });
+  }, []);
+
+  // Resolve the configured start page to a route
+  const startPageSetting = get('ui_start_page');
+  const startRoute = START_PAGE_ROUTES[startPageSetting] ?? '/live';
+
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        {/* '/' redirects to the configured start page */}
+        <Route path="/" element={<Navigate to={startRoute} replace />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/live" element={<LiveTvPage />} />
+        <Route path="/guide" element={<GuidePage />} />
+        <Route path="/movies" element={<MoviesPage />} />
+        <Route path="/series" element={<SeriesPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/favorites" element={<FavoritesPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to={startRoute} replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/live" element={<LiveTvPage />} />
-            <Route path="/guide" element={<GuidePage />} />
-            <Route path="/movies" element={<MoviesPage />} />
-            <Route path="/series" element={<SeriesPage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/favorites" element={<FavoritesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+        <AppInner />
       </HashRouter>
     </QueryClientProvider>
   );

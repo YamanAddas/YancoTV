@@ -1,8 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSettingsStore } from '../stores/settings-store';
 
 const navItems = [
-  { path: '/', label: 'Home', icon: 'home' },
+  { path: '/home', label: 'Home', icon: 'home' },
   { path: '/live', label: 'Live TV', icon: 'tv' },
   { path: '/guide', label: 'TV Guide', icon: 'guide' },
   { path: '/movies', label: 'Movies', icon: 'film' },
@@ -27,10 +28,23 @@ const iconMap: Record<string, string> = {
     'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 10.607z',
 };
 
+function useClock() {
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
+}
+
 export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const showClock = useSettingsStore((s) => s.getBool('ui_show_clock'));
+  const time = useClock();
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -114,6 +128,9 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-surface-800 p-4">
+        {showClock && (
+          <p className="mb-1 text-sm font-medium tabular-nums text-surface-300">{time}</p>
+        )}
         <p className="text-xs text-surface-500">v0.1.0</p>
       </div>
     </nav>

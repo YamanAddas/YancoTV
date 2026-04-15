@@ -25,6 +25,13 @@ export const IpcChannels = {
   PLAYER_STOP: 'player:stop',
   PLAYER_SEEK: 'player:seek',
   PLAYER_SET_VOLUME: 'player:setVolume',
+  PLAYER_TOGGLE_MUTE: 'player:toggleMute',
+  PLAYER_SET_SPEED: 'player:setSpeed',
+  PLAYER_SET_ASPECT_RATIO: 'player:setAspectRatio',
+  PLAYER_TOGGLE_FULLSCREEN: 'player:toggleFullscreen',
+  PLAYER_GET_TRACKS: 'player:getTracks',
+  PLAYER_SET_SUBTITLE_TRACK: 'player:setSubtitleTrack',
+  PLAYER_SET_AUDIO_TRACK: 'player:setAudioTrack',
   PLAYER_STATE: 'player:state',
 
   // Player events (main → renderer)
@@ -55,6 +62,38 @@ export const IpcChannels = {
   EPG_GET_STATS: 'epg:getStats',
   EPG_SET_GLOBAL_URL: 'epg:setGlobalUrl',
   EPG_GET_SETTINGS: 'epg:getSettings',
+
+  // Catch-up
+  CATCHUP_GET_URL: 'catchup:getUrl',
+  CATCHUP_CHECK_SUPPORT: 'catchup:checkSupport',
+
+  // Timeshift
+  TIMESHIFT_ACTIVATE: 'timeshift:activate',
+  TIMESHIFT_DEACTIVATE: 'timeshift:deactivate',
+  TIMESHIFT_GET_STATE: 'timeshift:getState',
+  TIMESHIFT_STATE: 'timeshift:state', // main → renderer event
+
+  // General app settings (key-value store)
+  SETTINGS_GET_ALL: 'settings:getAll',
+  SETTINGS_SET: 'settings:set',
+  SETTINGS_SET_MANY: 'settings:setMany',
+
+  // Parental Controls
+  PARENTAL_GET_SETTINGS: 'parental:getSettings',
+  PARENTAL_SET_PIN: 'parental:setPin',
+  PARENTAL_VERIFY_PIN: 'parental:verifyPin',
+  PARENTAL_REMOVE_PIN: 'parental:removePin',
+  PARENTAL_UPDATE_SETTING: 'parental:updateSetting',
+  PARENTAL_LOCK_CHANNEL: 'parental:lockChannel',
+  PARENTAL_UNLOCK_CHANNEL: 'parental:unlockChannel',
+  PARENTAL_GET_LOCKED_IDS: 'parental:getLockedIds',
+  PARENTAL_IS_LOCKED: 'parental:isLocked',
+  PARENTAL_HIDE_CHANNEL: 'parental:hideChannel',
+  PARENTAL_UNHIDE_CHANNEL: 'parental:unhideChannel',
+  PARENTAL_GET_HIDDEN_IDS: 'parental:getHiddenIds',
+  PARENTAL_SET_OVERRIDE: 'parental:setOverride',
+  PARENTAL_REMOVE_OVERRIDE: 'parental:removeOverride',
+  PARENTAL_GET_OVERRIDES: 'parental:getOverrides',
 
   // Database
   DB_STATUS: 'db:status',

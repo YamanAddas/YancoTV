@@ -148,8 +148,8 @@ export async function storeM3uEntries(
 
     // 4. Prepare statements once
     const insertContent = db.prepare(
-      `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const insertEpisode = db.prepare(
@@ -167,6 +167,16 @@ export async function storeM3uEntries(
 
       const insertBatch = db.transaction(() => {
         for (const { entry, contentType, cleaned, group } of chunk) {
+          // Build metadata for catch-up support (M3U sources)
+          let m3uMetadata: string | null = null;
+          if (entry.catchupType || entry.catchupSource || entry.catchupDays) {
+            m3uMetadata = JSON.stringify({
+              ...(entry.catchupType && { catchupType: entry.catchupType }),
+              ...(entry.catchupSource && { catchupSource: entry.catchupSource }),
+              ...(entry.catchupDays && { tvArchiveDuration: entry.catchupDays * 24 }),
+            });
+          }
+
           insertContent.run(
             randomUUID(),
             sourceId,
@@ -177,6 +187,7 @@ export async function storeM3uEntries(
             entry.streamUrl,
             entry.tvgLogo || null,
             entry.tvgId || null,
+            m3uMetadata,
             sortOrder++,
             now,
           );
@@ -210,6 +221,7 @@ export async function storeM3uEntries(
             series.entries[0].streamUrl, // First episode URL as fallback
             series.logo || null,
             series.tvgId || null,
+            null, // metadata_json
             sortOrder++,
             now,
           );
@@ -300,6 +312,18 @@ export async function storeXtreamContent(
           const group = category.trim();
           const url = client.buildStreamUrl(stream.streamId, 'live');
 
+          // Store tvArchive info so catch-up service can check availability
+          const liveMetadata =
+            stream.tvArchive > 0
+              ? JSON.stringify({
+                  streamId: stream.streamId,
+                  tvArchive: stream.tvArchive,
+                  tvArchiveDuration: stream.tvArchiveDuration,
+                })
+              : stream.streamId
+                ? JSON.stringify({ streamId: stream.streamId })
+                : null;
+
           insertContent.run(
             randomUUID(),
             sourceId,
@@ -310,7 +334,7 @@ export async function storeXtreamContent(
             url,
             stream.streamIcon || null,
             stream.epgChannelId || null,
-            null,
+            liveMetadata,
             sortOrder++,
             now,
           );
@@ -622,4 +646,13 @@ export function getEpisodes(contentId: string): Episode[] {
     )
     .all(contentId) as EpisodeRow[];
   return rows.map(rowToEpisode);
+}
+
+/** Find a live channel by its tvgId (for catch-up URL building) */
+export function getContentByTvgId(tvgId: string): ContentItem | null {
+  const db = getDb();
+  const row = db
+    .prepare('SELECT * FROM content WHERE tvg_id = ? AND type = ? LIMIT 1')
+    .get(tvgId, 'live') as ContentRow | undefined;
+  return row ? rowToContent(row) : null;
 }

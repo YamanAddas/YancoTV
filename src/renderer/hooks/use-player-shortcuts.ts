@@ -7,11 +7,14 @@ const VOLUME_STEP = 5;
 /**
  * Global keyboard shortcuts for playback control.
  *
- * Space     — play/pause toggle
- * Left/Right — seek back/forward 10s
- * Up/Down   — volume up/down 5%
- * M         — mute toggle (sets volume to 0 or restores)
- * Escape    — stop playback
+ * Space       — play/pause toggle
+ * Left/Right  — seek back/forward 10s
+ * Up/Down     — volume up/down 5%
+ * M           — mute toggle
+ * F           — toggle fullscreen
+ * A           — cycle aspect ratio (auto → 16:9 → 4:3 → 21:9 → fill)
+ * S           — cycle playback speed (0.5 → 0.75 → 1 → 1.25 → 1.5 → 2)
+ * Escape      — stop playback
  */
 export function usePlayerShortcuts(): void {
   useEffect(() => {
@@ -62,7 +65,25 @@ export function usePlayerShortcuts(): void {
         case 'm':
         case 'M':
           e.preventDefault();
-          state.setVolume(state.volume > 0 ? 0 : 100);
+          state.toggleMute();
+          break;
+
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          state.toggleFullscreen();
+          break;
+
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          state.cycleAspectRatio();
+          break;
+
+        case 's':
+        case 'S':
+          e.preventDefault();
+          state.cycleSpeed();
           break;
 
         case 'Escape':

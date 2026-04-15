@@ -1,0 +1,167 @@
+import { useState, useEffect } from 'react';
+
+// ---------------------------------------------------------------------------
+// About — app version, system info, database stats, credits
+// ---------------------------------------------------------------------------
+
+interface DbStatus {
+  channelCount?: number;
+  movieCount?: number;
+  seriesCount?: number;
+  sourceCount?: number;
+  dbSizeMB?: number;
+}
+
+export function AboutSettings() {
+  const [version, setVersion] = useState('...');
+  const [dbStatus, setDbStatus] = useState<DbStatus>({});
+  const [epgStats, setEpgStats] = useState<{
+    programmeCount?: number;
+    channelCount?: number;
+  }>({});
+
+  useEffect(() => {
+    window.api.app.getVersion().then((v: string) => setVersion(v));
+    window.api.db.status().then((s: DbStatus) => setDbStatus(s));
+    window.api.epg.getStats().then(
+      (s: { programmeCount?: number; channelCount?: number }) =>
+        setEpgStats(s),
+    );
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-surface-100">About</h2>
+        <p className="mt-1 text-sm text-surface-500">
+          Application information and diagnostics
+        </p>
+      </div>
+
+      {/* App info */}
+      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10">
+            <svg
+              className="h-8 w-8 text-accent"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-surface-100">YancoTV</h3>
+            <p className="text-sm text-surface-400">Version {version}</p>
+            <p className="mt-0.5 text-xs text-surface-500">
+              Custom IPTV media application
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Database stats */}
+      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
+          Database
+        </h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard
+            label="Sources"
+            value={dbStatus.sourceCount?.toLocaleString() ?? '—'}
+          />
+          <StatCard
+            label="Live Channels"
+            value={dbStatus.channelCount?.toLocaleString() ?? '—'}
+          />
+          <StatCard
+            label="Movies"
+            value={dbStatus.movieCount?.toLocaleString() ?? '—'}
+          />
+          <StatCard
+            label="Series"
+            value={dbStatus.seriesCount?.toLocaleString() ?? '—'}
+          />
+          <StatCard
+            label="EPG Programmes"
+            value={epgStats.programmeCount?.toLocaleString() ?? '—'}
+          />
+          <StatCard
+            label="EPG Channels"
+            value={epgStats.channelCount?.toLocaleString() ?? '—'}
+          />
+        </div>
+        {dbStatus.dbSizeMB !== undefined && (
+          <p className="mt-3 text-xs text-surface-500">
+            Database size: {dbStatus.dbSizeMB.toFixed(1)} MB
+          </p>
+        )}
+      </section>
+
+      {/* System info */}
+      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
+          System
+        </h3>
+        <div className="space-y-1.5 text-sm">
+          <InfoRow label="Platform" value={navigator.platform} />
+          <InfoRow label="User Agent" value={navigator.userAgent} />
+          <InfoRow
+            label="Screen"
+            value={`${window.screen.width} x ${window.screen.height}`}
+          />
+          <InfoRow label="Language" value={navigator.language} />
+        </div>
+      </section>
+
+      {/* Tech stack */}
+      <section className="rounded-xl border border-surface-800 bg-surface-900 p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-500">
+          Built With
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {[
+            'Electron',
+            'React',
+            'TypeScript',
+            'Tailwind CSS',
+            'SQLite',
+            'mpv',
+            'Vite',
+          ].map((tech) => (
+            <span
+              key={tech}
+              className="rounded-full border border-surface-700 bg-surface-800 px-3 py-1 text-xs font-medium text-surface-300"
+            >
+              {tech}
+            </span>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-surface-800 bg-surface-950/50 px-4 py-3 text-center">
+      <p className="text-xs text-surface-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-surface-200">{value}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-3 rounded px-2 py-1">
+      <span className="w-24 flex-shrink-0 text-surface-500">{label}</span>
+      <span className="min-w-0 break-all text-surface-300">{value}</span>
+    </div>
+  );
+}

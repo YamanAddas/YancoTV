@@ -61,6 +61,60 @@ const api = {
     getSettings: () => ipcRenderer.invoke(IpcChannels.EPG_GET_SETTINGS),
   },
 
+  timeshift: {
+    activate: () => ipcRenderer.invoke(IpcChannels.TIMESHIFT_ACTIVATE),
+    deactivate: () => ipcRenderer.invoke(IpcChannels.TIMESHIFT_DEACTIVATE),
+    getState: () => ipcRenderer.invoke(IpcChannels.TIMESHIFT_GET_STATE),
+    onStateChange: (callback: (state: unknown) => void) => {
+      const handler = (_event: IpcRendererEvent, state: unknown) => callback(state);
+      ipcRenderer.on(IpcChannels.TIMESHIFT_STATE, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.TIMESHIFT_STATE, handler);
+      };
+    },
+  },
+
+  catchup: {
+    getUrl: (tvgId: string, programmeStart: number, programmeDuration: number) =>
+      ipcRenderer.invoke(IpcChannels.CATCHUP_GET_URL, tvgId, programmeStart, programmeDuration),
+    checkSupport: (tvgId: string) =>
+      ipcRenderer.invoke(IpcChannels.CATCHUP_CHECK_SUPPORT, tvgId),
+  },
+
+  settings: {
+    getAll: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET_ALL),
+    set: (key: string, value: string) =>
+      ipcRenderer.invoke(IpcChannels.SETTINGS_SET, key, value),
+    setMany: (entries: Record<string, string>) =>
+      ipcRenderer.invoke(IpcChannels.SETTINGS_SET_MANY, entries),
+  },
+
+  parental: {
+    getSettings: () => ipcRenderer.invoke(IpcChannels.PARENTAL_GET_SETTINGS),
+    setPin: (pin: string) => ipcRenderer.invoke(IpcChannels.PARENTAL_SET_PIN, pin),
+    verifyPin: (pin: string) => ipcRenderer.invoke(IpcChannels.PARENTAL_VERIFY_PIN, pin),
+    removePin: () => ipcRenderer.invoke(IpcChannels.PARENTAL_REMOVE_PIN),
+    updateSetting: (key: string, value: boolean) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_UPDATE_SETTING, key, value),
+    lockChannel: (contentId: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_LOCK_CHANNEL, contentId),
+    unlockChannel: (contentId: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_UNLOCK_CHANNEL, contentId),
+    getLockedIds: () => ipcRenderer.invoke(IpcChannels.PARENTAL_GET_LOCKED_IDS),
+    isLocked: (contentId: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_IS_LOCKED, contentId),
+    hideChannel: (contentId: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_HIDE_CHANNEL, contentId),
+    unhideChannel: (contentId: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_UNHIDE_CHANNEL, contentId),
+    getHiddenIds: () => ipcRenderer.invoke(IpcChannels.PARENTAL_GET_HIDDEN_IDS),
+    setOverride: (override: { contentId: string; customName?: string; customLogoUrl?: string; customNumber?: number; customGroup?: string }) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_SET_OVERRIDE, override),
+    removeOverride: (contentId: string) =>
+      ipcRenderer.invoke(IpcChannels.PARENTAL_REMOVE_OVERRIDE, contentId),
+    getOverrides: () => ipcRenderer.invoke(IpcChannels.PARENTAL_GET_OVERRIDES),
+  },
+
   player: {
     play: (url: string, title?: string, startPosition?: number) =>
       ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition),
@@ -69,6 +123,13 @@ const api = {
     stop: () => ipcRenderer.invoke(IpcChannels.PLAYER_STOP),
     seek: (seconds: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SEEK, seconds),
     setVolume: (level: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_VOLUME, level),
+    toggleMute: () => ipcRenderer.invoke(IpcChannels.PLAYER_TOGGLE_MUTE),
+    setSpeed: (speed: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_SPEED, speed),
+    setAspectRatio: (ratio: string) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_ASPECT_RATIO, ratio),
+    toggleFullscreen: () => ipcRenderer.invoke(IpcChannels.PLAYER_TOGGLE_FULLSCREEN),
+    getTracks: () => ipcRenderer.invoke(IpcChannels.PLAYER_GET_TRACKS),
+    setSubtitleTrack: (id: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_SUBTITLE_TRACK, id),
+    setAudioTrack: (id: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_AUDIO_TRACK, id),
     state: () => ipcRenderer.invoke(IpcChannels.PLAYER_STATE),
 
     onStateChange: (callback: (state: unknown) => void) => {

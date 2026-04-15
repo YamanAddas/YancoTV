@@ -9,6 +9,12 @@ export interface M3uEntry {
   tvgLogo: string;
   streamUrl: string;
   rawAttributes: string;
+  /** Catch-up type: "default", "flussonic", "xc", "shift", "append" */
+  catchupType?: string;
+  /** URL template for catch-up playback */
+  catchupSource?: string;
+  /** Catch-up archive window in hours */
+  catchupDays?: number;
 }
 
 export interface M3uParseResult {
@@ -112,6 +118,14 @@ function parseExtinfLine(line: string): Partial<M3uEntry> {
   entry.tvgLogo = extractAttribute(line, 'tvg-logo');
   entry.groupTitle = extractAttribute(line, 'group-title');
   entry.rawAttributes = afterPrefix;
+
+  // Extract catch-up attributes (used by some M3U providers)
+  const catchupType = extractAttribute(line, 'catchup') || extractAttribute(line, 'catchup-type');
+  if (catchupType) entry.catchupType = catchupType;
+  const catchupSource = extractAttribute(line, 'catchup-source');
+  if (catchupSource) entry.catchupSource = catchupSource;
+  const catchupDays = extractAttribute(line, 'catchup-days') || extractAttribute(line, 'tvg-rec');
+  if (catchupDays) entry.catchupDays = parseInt(catchupDays, 10) || undefined;
 
   // Extract title — everything after the last comma
   const lastCommaIndex = line.lastIndexOf(',');
