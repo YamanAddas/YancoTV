@@ -74,7 +74,7 @@ function ContentCard({
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 focus:outline-none focus:ring-2 focus:ring-accent/50"
+      className="group flex w-full flex-col overflow-hidden rounded-lg border border-surface-800 bg-surface-900 text-left transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 focus:outline-none focus:ring-2 focus:ring-accent/50"
     >
       <div className="relative aspect-video w-full overflow-hidden bg-surface-800">
         {item.logoUrl ? (
@@ -144,13 +144,20 @@ export function HorizontalContentRow({
   if (items.length === 0) return null;
 
   return (
-    /* Outer div is the scroll viewport */
-    <div className="overflow-x-auto pb-2">
-      {/* Inner div is w-max so it is always exactly as wide as all cards —
-          this is what makes overflow-x-auto actually trigger scrolling */}
-      <div className="flex w-max gap-3">
+    // Scroll viewport — clips and scrolls its oversized child horizontally.
+    // Inline styles used deliberately: these utility classes are only used
+    // here so Tailwind's JIT scanner may not generate them.
+    <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+      {/*
+        Inner container must be exactly as wide as all cards combined.
+        width: max-content achieves this: the flex layout naturally sizes
+        to fit all children in one row, and max-content locks that in so
+        the outer div has something real to scroll over.
+      */}
+      <div style={{ display: 'flex', gap: '12px', width: 'max-content' }}>
         {items.map((item) => (
-          <div key={item.id} className="w-40">
+          // Fixed 160 px wide slot — ContentCard fills it via w-full on the button
+          <div key={item.id} style={{ width: '160px', flexShrink: 0 }}>
             <ContentCard
               item={item}
               onClick={() => onItemClick(item)}
