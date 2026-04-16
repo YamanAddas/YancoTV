@@ -79,6 +79,50 @@ describe('XtreamClient', () => {
         'http://provider.com/series/user1/pass1/789.mkv',
       );
     });
+
+    it('defaults to ts for live when no extension provided', () => {
+      expect(client.buildStreamUrl(100, 'live')).toContain('.ts');
+    });
+
+    it('defaults to mp4 for movie when no extension provided', () => {
+      expect(client.buildStreamUrl(100, 'movie')).toContain('.mp4');
+    });
+
+    it('defaults to mp4 for series when no extension provided', () => {
+      expect(client.buildStreamUrl(100, 'series')).toContain('.mp4');
+    });
+
+    it('falls back to default extension when empty string is provided', () => {
+      expect(client.buildStreamUrl(100, 'movie', '')).toBe(
+        'http://provider.com/movie/user1/pass1/100.mp4',
+      );
+    });
+
+    it('falls back to default extension when whitespace-only string is provided', () => {
+      expect(client.buildStreamUrl(100, 'movie', '  ')).toBe(
+        'http://provider.com/movie/user1/pass1/100.mp4',
+      );
+    });
+
+    it('falls back to default extension for live when empty string is provided', () => {
+      expect(client.buildStreamUrl(100, 'live', '')).toBe(
+        'http://provider.com/live/user1/pass1/100.ts',
+      );
+    });
+
+    it('trims whitespace from extension', () => {
+      expect(client.buildStreamUrl(100, 'movie', ' mkv ')).toBe(
+        'http://provider.com/movie/user1/pass1/100.mkv',
+      );
+    });
+
+    it('handles all valid Xtream container extensions', () => {
+      const extensions = ['mp4', 'mkv', 'avi', 'ts', 'flv'];
+      for (const ext of extensions) {
+        const url = client.buildStreamUrl(100, 'movie', ext);
+        expect(url).toMatch(new RegExp(`\\.${ext}$`));
+      }
+    });
   });
 
   describe('authenticate', () => {

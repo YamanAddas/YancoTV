@@ -20,6 +20,30 @@ let mainWindow: BrowserWindow | null = null;
 
 const isDev = !app.isPackaged;
 
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow;
+}
+
+/**
+ * Get the native window handle (HWND on Windows) as a decimal string.
+ * Used to embed mpv as a child window via --wid.
+ */
+export function getMainWindowHandle(): string | null {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  try {
+    const handle = mainWindow.getNativeWindowHandle();
+    if (process.platform === 'win32') {
+      // 64-bit Windows: HWND is pointer-sized, read as BigUInt64
+      return handle.readBigUInt64LE(0).toString();
+    }
+    // Linux/macOS: X11 Window ID or NSView pointer (32-bit)
+    return handle.readUInt32LE(0).toString();
+  } catch (err) {
+    log.error('Failed to get native window handle:', err);
+    return null;
+  }
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: DEFAULT_WINDOW_WIDTH,
@@ -35,6 +59,7 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      backgroundThrottling: false,
     },
   });
 
@@ -71,15 +96,32 @@ function createWindow(): void {
 app.whenReady().then(() => {
   log.info('App ready, initializing...');
 
-  // Enforce Content Security Policy at the session level (cannot be bypassed by renderer)
+  // --- CORS bypass for IPTV streams ---
+  // Strip the Origin header from outgoing requests to external URLs.
+  // This prevents Chromium from applying CORS checks entirely — the
+  // request looks same-origin to the browser. Safe in a desktop app.
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = { ...details.requestHeaders };
+    // Only strip Origin for external requests (not localhost/self)
+    if (details.url.startsWith('http') && !details.url.includes('localhost')) {
+      delete headers['Origin'];
+      delete headers['origin'];
+    }
+    callback({ requestHeaders: headers });
+  });
+
+  // CSP + CORS response headers
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const csp = isDev
-      ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' ws://localhost:*; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'"
-      : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self'; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'";
+      ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; media-src 'self' https: http: blob:; connect-src 'self' https: http: ws://localhost:*; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; worker-src 'self' blob:"
+      : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; media-src 'self' https: http: blob:; connect-src 'self' https: http:; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; worker-src 'self' blob:";
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [csp],
+        'Access-Control-Allow-Origin': ['*'],
+        'Access-Control-Allow-Headers': ['Range, Content-Type'],
+        'Access-Control-Expose-Headers': ['Content-Range, Content-Length'],
       },
     });
   });

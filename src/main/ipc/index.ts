@@ -1,10 +1,12 @@
-import { ipcMain, app, dialog, BrowserWindow } from 'electron';
+import { ipcMain, app, dialog } from 'electron';
 import log from 'electron-log/main';
 import { IpcChannels } from '../../shared/ipc-channels';
 import { addSourceInputSchema, updateSourceInputSchema } from '../../shared/schemas/source';
 import { getDb } from '../services/db';
 import { getAllSources, addSource, updateSource, removeSource, reorderSources, getSourceById, getSourceCredentials } from '../services/source-manager';
 import { syncSource } from '../services/source-sync';
+import { getMainWindow } from '../index';
+import { findMpvPath } from '../player/mpv-path';
 import {
   getContentByType,
   getCategories,
@@ -32,6 +34,7 @@ import {
 import {
   getRecentlyWatched,
   getLastPosition,
+  getPositionsBatch,
   recordWatch,
   updatePosition,
   removeHistoryEntry,
@@ -79,27 +82,33 @@ import type { PlayerState } from '../player/player.interface';
 
 let player: MpvPlayer | null = null;
 
+/** Send to the main renderer window only (skip the player child window). */
+function sendToMainRenderer(channel: string, ...args: unknown[]): void {
+  const main = getMainWindow();
+  if (main && !main.isDestroyed()) {
+    main.webContents.send(channel, ...args);
+  }
+}
+
 function getPlayer(): MpvPlayer {
   if (!player) {
     player = new MpvPlayer();
 
-    // Forward player events to all renderer windows
+    // Forward player events to the main renderer window
     player.on('state-change', (state: PlayerState) => {
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.webContents.send(IpcChannels.PLAYER_STATE_CHANGED, state);
-      }
+      sendToMainRenderer(IpcChannels.PLAYER_STATE_CHANGED, state);
     });
 
     player.on('time-update', (position: number) => {
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.webContents.send(IpcChannels.PLAYER_TIME_UPDATE, position);
-      }
+      sendToMainRenderer(IpcChannels.PLAYER_TIME_UPDATE, position);
+    });
+
+    player.on('subtitle-text', (text: string) => {
+      sendToMainRenderer(IpcChannels.PLAYER_SUBTITLE_TEXT, text);
     });
 
     player.on('error', (err: Error) => {
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.webContents.send(IpcChannels.PLAYER_ERROR, err.message);
-      }
+      sendToMainRenderer(IpcChannels.PLAYER_ERROR, err.message);
     });
   }
   return player;
@@ -383,6 +392,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.HISTORY_GET_POSITION, (_event, contentId: string, episodeId?: string) => {
     if (!contentId || typeof contentId !== 'string') return null;
     return getLastPosition(contentId, typeof episodeId === 'string' ? episodeId : undefined);
+  });
+
+  ipcMain.handle(IpcChannels.HISTORY_GET_POSITIONS_BATCH, (_event, contentId: string, episodeIds: string[]) => {
+    if (!contentId || typeof contentId !== 'string') return {};
+    if (!Array.isArray(episodeIds)) return {};
+    return getPositionsBatch(contentId, episodeIds);
   });
 
   ipcMain.handle(IpcChannels.HISTORY_RECORD, (_event, contentId: string, episodeId?: string) => {
@@ -817,6 +832,78 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.PLAYER_STATE, () => {
     return getPlayer().getState();
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_TOGGLE_SUBTITLES, async () => {
+    try {
+      await getPlayer().toggleSubtitles();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_GET_MEDIA_INFO, () => {
+    return getPlayer().getMediaInfo();
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_LOAD_SUBTITLE_FILE, async () => {
+    const main = getMainWindow();
+    if (!main) return { ok: false, error: 'No main window' };
+
+    const result = await dialog.showOpenDialog(main, {
+      title: 'Load Subtitle File',
+      filters: [
+        { name: 'Subtitle Files', extensions: ['srt', 'ass', 'ssa', 'vtt', 'sub', 'idx'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, error: 'cancelled' };
+    }
+
+    // Return the file path to the renderer.
+    // The HTML5 player handles subtitle loading via <track> element.
+    // Full subtitle rendering (SRT/ASS parsing) is planned for Sprint 15.
+    return { ok: true, path: result.filePaths[0] };
+  });
+
+  // Fullscreen — managed by Electron main window
+  ipcMain.handle(IpcChannels.PLAYER_SET_FULLSCREEN, (_event, fullscreen: boolean) => {
+    const main = getMainWindow();
+    if (!main) return { ok: false };
+    main.setFullScreen(fullscreen);
+    return { ok: true, fullscreen: main.isFullScreen() };
+  });
+
+  // Window controls (custom titlebar)
+  ipcMain.handle(IpcChannels.WINDOW_MINIMIZE, () => {
+    getMainWindow()?.minimize();
+  });
+
+  ipcMain.handle(IpcChannels.WINDOW_MAXIMIZE, () => {
+    const main = getMainWindow();
+    if (!main) return;
+    if (main.isMaximized()) {
+      main.unmaximize();
+    } else {
+      main.maximize();
+    }
+  });
+
+  ipcMain.handle(IpcChannels.WINDOW_CLOSE, () => {
+    getMainWindow()?.close();
+  });
+
+  ipcMain.handle(IpcChannels.WINDOW_IS_MAXIMIZED, () => {
+    return getMainWindow()?.isMaximized() ?? false;
+  });
+
+  // mpv availability check
+  ipcMain.handle(IpcChannels.PLAYER_CHECK_MPV, () => {
+    return { available: findMpvPath() !== null };
   });
 
   log.info('IPC handlers registered');

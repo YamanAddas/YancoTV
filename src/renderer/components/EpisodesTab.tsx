@@ -37,22 +37,16 @@ export function EpisodesTab({ episodes, contentId, onEpisodePlay }: EpisodesTabP
     }
   }, [seasons]);
 
-  // Fetch watch positions for all episodes
+  // Fetch watch positions for all episodes in one batch IPC call
   useEffect(() => {
     if (!window.api || episodes.length === 0) return;
 
-    const fetchPositions = async () => {
-      const positions: Record<string, { positionSeconds: number; durationSeconds?: number }> = {};
-      for (const ep of episodes) {
-        const pos = await window.api.history.getPosition(contentId, ep.id);
-        if (pos && pos.positionSeconds > 0) {
-          positions[ep.id] = pos;
-        }
-      }
-      setEpisodePositions(positions);
-    };
-
-    fetchPositions();
+    const episodeIds = episodes.map((ep) => ep.id);
+    window.api.history.getPositionsBatch(contentId, episodeIds).then(
+      (positions: Record<string, { positionSeconds: number; durationSeconds?: number }>) => {
+        setEpisodePositions(positions ?? {});
+      },
+    );
   }, [episodes, contentId]);
 
   const currentSeasonEpisodes = useMemo(() => {

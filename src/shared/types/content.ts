@@ -59,3 +59,21 @@ export interface ContentDetail {
   episodes: Episode[];
   watchPosition?: { positionSeconds: number; durationSeconds?: number };
 }
+
+/** Watch history entry with joined content data */
+export interface HistoryEntry {
+  id: string;
+  contentId: string;
+  episodeId?: string;
+  positionSeconds: number;
+  durationSeconds?: number;
+  watchedAt: number;
+  content: ContentItem;
+}
+
+/** Favorite entry with joined content data */
+export interface FavoriteEntry {
+  favoriteId: string;
+  addedAt: number;
+  content: ContentItem;
+}

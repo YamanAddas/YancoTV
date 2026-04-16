@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { getDb } from './db';
-import type { ContentItem, ContentType } from '../../shared/types';
+import type { ContentType, FavoriteEntry } from '../../shared/types';
+export type { FavoriteEntry } from '../../shared/types';
 
 interface FavoriteWithContent {
   id: string;
@@ -17,12 +18,6 @@ interface FavoriteWithContent {
   metadata_json: string | null;
   sort_order: number;
   created_at: number;
-}
-
-export interface FavoriteEntry {
-  favoriteId: string;
-  addedAt: number;
-  content: ContentItem;
 }
 
 function rowToFavorite(row: FavoriteWithContent): FavoriteEntry {

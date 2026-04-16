@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { HorizontalContentRow, type ContentCardData } from '../components/ContentGrid';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
@@ -24,6 +24,7 @@ export function SearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const navigate = useNavigate();
   const play = usePlayerStore((s) => s.play);
   const toggle = useFavoritesStore((s) => s.toggle);
   const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
@@ -56,9 +57,19 @@ export function SearchPage() {
 
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
+      // Series parents have no stream URL — navigate to detail page
+      if (item.type === 'series') {
+        navigate(`/series/${item.id}`);
+        return;
+      }
+      // Movies also benefit from the detail page for metadata
+      if (item.type === 'movie') {
+        navigate(`/movies/${item.id}`);
+        return;
+      }
       play(item.streamUrl, item.cleanTitle || item.title, item.id);
     },
-    [play],
+    [play, navigate],
   );
 
   const handleFavoriteToggle = useCallback(

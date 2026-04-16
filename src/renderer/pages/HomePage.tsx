@@ -2,8 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
-import type { FavoriteEntry } from '../../main/services/favorites-store';
-import type { HistoryEntry } from '../../main/services/history-store';
+import type { FavoriteEntry, HistoryEntry } from '../../shared/types';
 
 interface ContentCounts {
   live: number;
@@ -52,13 +51,22 @@ export function HomePage() {
 
   const handlePlayFavorite = useCallback(
     (fav: FavoriteEntry) => {
+      // Series/movie parents — navigate to detail page instead of playing empty URL
+      if (fav.content.type === 'series') {
+        navigate(`/series/${fav.content.id}`);
+        return;
+      }
+      if (fav.content.type === 'movie') {
+        navigate(`/movies/${fav.content.id}`);
+        return;
+      }
       play(
         fav.content.streamUrl,
         fav.content.cleanTitle || fav.content.title,
         fav.content.id,
       );
     },
-    [play],
+    [play, navigate],
   );
 
   return (

@@ -1,9 +1,24 @@
 export interface PlayOptions {
   startPosition?: number;
   subtitleFile?: string;
+  /** Native window handle (HWND) to embed mpv into via --wid */
+  wid?: string;
 }
 
 export type AspectRatio = 'auto' | '16:9' | '4:3' | '21:9' | 'fill';
+
+export type PlayerMode = 'idle' | 'theater' | 'browse' | 'multiview';
+
+export interface MediaInfo {
+  videoCodec?: string;
+  audioCodec?: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  bitrate?: number;
+  pixelFormat?: string;
+  hwdec?: string;
+}
 
 export interface PlayerState {
   status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error';
@@ -17,6 +32,7 @@ export interface PlayerState {
   currentUrl?: string;
   subtitleTracks: SubtitleTrack[];
   audioTracks: AudioTrack[];
+  mediaInfo?: MediaInfo;
 }
 
 export interface SubtitleTrack {
@@ -36,6 +52,7 @@ export interface AudioTrack {
 export type PlayerEventMap = {
   'state-change': (state: PlayerState) => void;
   'time-update': (position: number) => void;
+  'subtitle-text': (text: string) => void;
   error: (error: Error) => void;
 };
 
@@ -51,9 +68,11 @@ export interface IPlayer {
   setAspectRatio(ratio: AspectRatio): Promise<void>;
   toggleFullscreen(): Promise<void>;
   getState(): PlayerState;
+  getMediaInfo(): MediaInfo;
 
   getSubtitleTracks(): SubtitleTrack[];
   setSubtitleTrack(id: number): Promise<void>;
+  toggleSubtitles(): Promise<void>;
   addSubtitleFile(path: string): Promise<void>;
   getAudioTracks(): AudioTrack[];
   setAudioTrack(id: number): Promise<void>;

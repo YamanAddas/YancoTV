@@ -46,6 +46,8 @@ const api = {
     getRecent: (limit?: number) => ipcRenderer.invoke(IpcChannels.HISTORY_GET_RECENT, limit),
     getPosition: (contentId: string, episodeId?: string) =>
       ipcRenderer.invoke(IpcChannels.HISTORY_GET_POSITION, contentId, episodeId),
+    getPositionsBatch: (contentId: string, episodeIds: string[]) =>
+      ipcRenderer.invoke(IpcChannels.HISTORY_GET_POSITIONS_BATCH, contentId, episodeIds),
     record: (contentId: string, episodeId?: string) =>
       ipcRenderer.invoke(IpcChannels.HISTORY_RECORD, contentId, episodeId),
     updatePosition: (historyId: string, positionSeconds: number, durationSeconds?: number) =>
@@ -132,6 +134,7 @@ const api = {
   },
 
   player: {
+    checkMpv: () => ipcRenderer.invoke(IpcChannels.PLAYER_CHECK_MPV),
     play: (url: string, title?: string, startPosition?: number) =>
       ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition),
     pause: () => ipcRenderer.invoke(IpcChannels.PLAYER_PAUSE),
@@ -143,9 +146,13 @@ const api = {
     setSpeed: (speed: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_SPEED, speed),
     setAspectRatio: (ratio: string) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_ASPECT_RATIO, ratio),
     toggleFullscreen: () => ipcRenderer.invoke(IpcChannels.PLAYER_TOGGLE_FULLSCREEN),
+    setFullscreen: (fullscreen: boolean) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_FULLSCREEN, fullscreen),
     getTracks: () => ipcRenderer.invoke(IpcChannels.PLAYER_GET_TRACKS),
     setSubtitleTrack: (id: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_SUBTITLE_TRACK, id),
+    toggleSubtitles: () => ipcRenderer.invoke(IpcChannels.PLAYER_TOGGLE_SUBTITLES),
     setAudioTrack: (id: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_AUDIO_TRACK, id),
+    getMediaInfo: () => ipcRenderer.invoke(IpcChannels.PLAYER_GET_MEDIA_INFO),
+    loadSubtitleFile: () => ipcRenderer.invoke(IpcChannels.PLAYER_LOAD_SUBTITLE_FILE),
     state: () => ipcRenderer.invoke(IpcChannels.PLAYER_STATE),
 
     onStateChange: (callback: (state: unknown) => void) => {
@@ -171,6 +178,15 @@ const api = {
         ipcRenderer.removeListener(IpcChannels.PLAYER_ERROR, handler);
       };
     },
+
+    onSubtitleText: (callback: (text: string) => void) => {
+      const handler = (_event: IpcRendererEvent, text: string) => callback(text);
+      ipcRenderer.on(IpcChannels.PLAYER_SUBTITLE_TEXT, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_SUBTITLE_TEXT, handler);
+      };
+    },
+
   },
 
   groupPrefs: {
@@ -199,6 +215,13 @@ const api = {
 
   app: {
     getVersion: () => ipcRenderer.invoke(IpcChannels.APP_GET_VERSION),
+  },
+
+  window: {
+    minimize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MINIMIZE),
+    maximize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MAXIMIZE),
+    close: () => ipcRenderer.invoke(IpcChannels.WINDOW_CLOSE),
+    isMaximized: () => ipcRenderer.invoke(IpcChannels.WINDOW_IS_MAXIMIZED),
   },
 };
 

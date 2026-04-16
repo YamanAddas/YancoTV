@@ -348,7 +348,7 @@ export class XtreamClient {
         director: String(info.director ?? ''),
         genre: String(info.genre ?? info.category_name ?? ''),
         releaseDate: String(info.releasedate ?? info.release_date ?? info.releaseDate ?? ''),
-        rating: String(info.rating ?? info.rating_5based ? `${info.rating_5based}/5` : info.rating ?? ''),
+        rating: String(info.rating ?? (info.rating_5based ? `${info.rating_5based}/5` : '')),
         duration: String(info.duration ?? info.duration_secs ?? ''),
         cover: String(info.movie_image ?? info.cover_big ?? info.cover ?? ''),
       },
@@ -362,7 +362,9 @@ export class XtreamClient {
 
   /** Build a playback URL for a stream */
   buildStreamUrl(streamId: number, type: 'live' | 'movie' | 'series', extension?: string): string {
-    const ext = extension ?? (type === 'live' ? 'ts' : 'mp4');
+    const defaultExt = type === 'live' ? 'ts' : 'mp4';
+    // Guard against empty/whitespace extension from the API
+    const ext = extension?.trim() || defaultExt;
     const typePath = type === 'live' ? 'live' : type === 'movie' ? 'movie' : 'series';
     return `${this.baseUrl}/${typePath}/${this.username}/${this.password}/${streamId}.${ext}`;
   }

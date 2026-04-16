@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { EmptyState } from '../components/EmptyState';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
-import type { FavoriteEntry } from '../../main/services/favorites-store';
+import type { FavoriteEntry } from '../../shared/types';
 
 export function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const navigate = useNavigate();
   const play = usePlayerStore((s) => s.play);
   const toggle = useFavoritesStore((s) => s.toggle);
   const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
@@ -46,9 +48,14 @@ export function FavoritesPage() {
 
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
+      // Series parents have no stream URL — navigate to detail page instead
+      if (item.type === 'series') {
+        navigate(`/series/${item.id}`);
+        return;
+      }
       play(item.streamUrl, item.cleanTitle || item.title, item.id);
     },
-    [play],
+    [play, navigate],
   );
 
   const handleFavoriteToggle = useCallback(

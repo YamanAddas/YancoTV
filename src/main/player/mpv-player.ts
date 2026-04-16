@@ -6,6 +6,7 @@ import type {
   PlayOptions,
   PlayerState,
   PlayerEventMap,
+  MediaInfo,
   SubtitleTrack,
   AudioTrack,
   AspectRatio,
@@ -38,6 +39,7 @@ export class MpvPlayer implements IPlayer {
   private pipeName: string;
   private mpvPath: string | null = null;
   private state: PlayerState = defaultState();
+  private media: MediaInfo = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private listeners: { [K in keyof PlayerEventMap]?: Set<any> } = {};
   private destroyed = false;
@@ -102,6 +104,7 @@ export class MpvPlayer implements IPlayer {
       aspectRatio: this.state.aspectRatio,
     };
     this.state.status = 'stopped';
+    this.media = {};
     this.emitEvent('state-change', this.state);
   }
 
@@ -120,7 +123,11 @@ export class MpvPlayer implements IPlayer {
   }
 
   getState(): PlayerState {
-    return { ...this.state };
+    return { ...this.state, mediaInfo: { ...this.media } };
+  }
+
+  getMediaInfo(): MediaInfo {
+    return { ...this.media };
   }
 
   async toggleMute(): Promise<void> {
@@ -172,6 +179,11 @@ export class MpvPlayer implements IPlayer {
     await this.ipc!.command(['set_property', 'sid', id]);
   }
 
+  async toggleSubtitles(): Promise<void> {
+    this.ensureConnected();
+    await this.ipc!.command(['cycle', 'sub-visibility']);
+  }
+
   async addSubtitleFile(filePath: string): Promise<void> {
     this.ensureConnected();
     await this.ipc!.command(['sub-add', filePath]);
@@ -215,24 +227,37 @@ export class MpvPlayer implements IPlayer {
       this.process = null;
     }
     this.state = defaultState();
+    this.media = {};
     this.listeners = {};
   }
 
   // --- Private ---
 
   private async spawnMpv(url: string, options?: PlayOptions): Promise<void> {
+    // Generate a fresh pipe name for each spawn to avoid stale pipe conflicts
+    // after a crash (Bug 10 fix)
+    this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
+
     const args = [
       url,
       `--input-ipc-server=\\\\.\\pipe\\${this.pipeName}`,
       '--no-terminal',
       '--keep-open=yes',
       '--idle=once',
-      '--force-window=yes',
-      '--title=YancoTV Player',
       `--volume=${this.state.volume}`,
+      // Hardware decoding for performance
+      '--hwdec=auto',
+      // Enable mpv's built-in on-screen controller for user controls
+      '--osc=yes',
       // Enable timeshift buffering (cache for live rewind/pause)
       ...getTimeshiftMpvArgs(),
     ];
+
+    // mpv runs in its own borderless window with built-in OSC controls.
+    // The Electron main window minimizes during playback and restores on stop.
+    args.push('--force-window=yes');
+    args.push('--title=YancoTV Player');
+    args.push('--border=no');
 
     if (options?.startPosition && options.startPosition > 0) {
       args.push(`--start=${options.startPosition}`);
@@ -261,6 +286,7 @@ export class MpvPlayer implements IPlayer {
       log.info(`mpv process exited with code ${code}`);
       if (!this.destroyed) {
         this.state = defaultState();
+        this.media = {};
         this.emitEvent('state-change', this.state);
       }
       this.ipc?.destroy();
@@ -338,6 +364,16 @@ export class MpvPlayer implements IPlayer {
     await this.ipc.observeProperty('speed');
     await this.ipc.observeProperty('fullscreen');
     await this.ipc.observeProperty('track-list');
+    // Subtitle text observation (for future translation pipeline)
+    await this.ipc.observeProperty('sub-text');
+    // Media info properties
+    await this.ipc.observeProperty('video-codec');
+    await this.ipc.observeProperty('audio-codec-name');
+    await this.ipc.observeProperty('width');
+    await this.ipc.observeProperty('height');
+    await this.ipc.observeProperty('estimated-vf-fps');
+    await this.ipc.observeProperty('video-bitrate');
+    await this.ipc.observeProperty('hwdec-current');
   }
 
   private handlePropertyChange(name: string, data: unknown): void {
@@ -399,6 +435,33 @@ export class MpvPlayer implements IPlayer {
           this.parseTrackList(data);
           this.emitEvent('state-change', this.state);
         }
+        break;
+      case 'sub-text':
+        if (typeof data === 'string' && data.length > 0) {
+          this.emitEvent('subtitle-text', data);
+        }
+        break;
+      // Media info properties
+      case 'video-codec':
+        if (typeof data === 'string') this.media.videoCodec = data;
+        break;
+      case 'audio-codec-name':
+        if (typeof data === 'string') this.media.audioCodec = data;
+        break;
+      case 'width':
+        if (typeof data === 'number') this.media.width = data;
+        break;
+      case 'height':
+        if (typeof data === 'number') this.media.height = data;
+        break;
+      case 'estimated-vf-fps':
+        if (typeof data === 'number') this.media.fps = Math.round(data * 100) / 100;
+        break;
+      case 'video-bitrate':
+        if (typeof data === 'number') this.media.bitrate = Math.round(data / 1000); // kbps
+        break;
+      case 'hwdec-current':
+        if (typeof data === 'string') this.media.hwdec = data;
         break;
     }
   }

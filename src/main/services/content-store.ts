@@ -471,8 +471,10 @@ export function storeXtreamEpisodes(
     for (const [seasonNum, eps] of Object.entries(episodes)) {
       for (const ep of eps) {
         const season = ep.info.season ?? (parseInt(seasonNum, 10) || null);
+        const episodeId = parseInt(ep.id, 10);
+        if (!episodeId || isNaN(episodeId)) continue; // skip episodes with invalid IDs
         const streamUrl = client.buildStreamUrl(
-          parseInt(ep.id, 10),
+          episodeId,
           'series',
           ep.containerExtension,
         );
@@ -509,20 +511,21 @@ function parseDuration(duration: string): number | null {
 
 // --- Sort helpers ---
 
-function sortClause(sort: SortOption): string {
+function sortClause(sort: SortOption, tableAlias?: string): string {
+  const p = tableAlias ? `${tableAlias}.` : '';
   switch (sort) {
     case 'provider':
-      return 'ORDER BY sort_order ASC';
+      return `ORDER BY ${p}sort_order ASC`;
     case 'name-asc':
-      return 'ORDER BY COALESCE(clean_title, title) COLLATE NOCASE ASC';
+      return `ORDER BY COALESCE(${p}clean_title, ${p}title) COLLATE NOCASE ASC`;
     case 'name-desc':
-      return 'ORDER BY COALESCE(clean_title, title) COLLATE NOCASE DESC';
+      return `ORDER BY COALESCE(${p}clean_title, ${p}title) COLLATE NOCASE DESC`;
     case 'recent':
-      return 'ORDER BY created_at DESC, sort_order ASC';
+      return `ORDER BY ${p}created_at DESC, ${p}sort_order ASC`;
     case 'group':
-      return 'ORDER BY group_name COLLATE NOCASE ASC, COALESCE(clean_title, title) COLLATE NOCASE ASC';
+      return `ORDER BY ${p}group_name COLLATE NOCASE ASC, COALESCE(${p}clean_title, ${p}title) COLLATE NOCASE ASC`;
     default:
-      return 'ORDER BY sort_order ASC';
+      return `ORDER BY ${p}sort_order ASC`;
   }
 }
 
@@ -601,39 +604,52 @@ export function searchContent(query: string): ContentItem[] {
   const andQuery = buildFtsQueryAnd(query);
   const orQuery = buildFtsQueryOr(query);
 
-  const ftsStmt = db.prepare(
-    `SELECT c.* FROM content c
-     WHERE c.type = ? AND c.id IN (
-       SELECT content_id FROM content_fts WHERE content_fts MATCH ?
-       ORDER BY rank LIMIT ?
-     )
-     ORDER BY COALESCE(c.clean_title, c.title) COLLATE NOCASE`,
-  );
-
-  const likeStmt = db.prepare(
-    `SELECT * FROM content
-     WHERE type = ? AND (title LIKE ? OR clean_title LIKE ? OR group_name LIKE ?)
-     ORDER BY COALESCE(clean_title, title) COLLATE NOCASE
-     LIMIT ?`,
-  );
+  // Prepare FTS statement lazily — it may fail if FTS5 table doesn't exist
+  let ftsAvailable = true;
+  try {
+    // Test that the FTS table exists by preparing a statement against it.
+    // If it doesn't exist (e.g. in tests), we skip FTS entirely.
+    db.prepare('SELECT 1 FROM content_fts LIMIT 0');
+  } catch {
+    ftsAvailable = false;
+  }
 
   for (const type of types) {
     try {
+      if (!ftsAvailable) throw new Error('FTS unavailable');
+
       // 1. Try AND: every word must appear
-      let rows = ftsStmt.all(type, andQuery, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
+      let rows = db.prepare(
+        `SELECT c.* FROM content c
+         WHERE c.type = ? AND c.id IN (
+           SELECT content_id FROM content_fts WHERE content_fts MATCH ?
+           ORDER BY rank LIMIT ?
+         )
+         ORDER BY COALESCE(c.clean_title, c.title) COLLATE NOCASE`,
+      ).all(type, andQuery, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
 
       // 2. OR fallback: at least one word must appear
       if (rows.length === 0 && orQuery) {
-        rows = ftsStmt.all(type, orQuery, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
+        rows = db.prepare(
+          `SELECT c.* FROM content c
+           WHERE c.type = ? AND c.id IN (
+             SELECT content_id FROM content_fts WHERE content_fts MATCH ?
+             ORDER BY rank LIMIT ?
+           )
+           ORDER BY COALESCE(c.clean_title, c.title) COLLATE NOCASE`,
+        ).all(type, orQuery, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
       }
 
       allResults.push(...rows.map(rowToContent));
     } catch {
       // 3. FTS unavailable / corrupt query — fall back to LIKE
       const pattern = `%${query.trim()}%`;
-      const rows = likeStmt.all(
-        type, pattern, pattern, pattern, SEARCH_LIMIT_PER_TYPE,
-      ) as ContentRow[];
+      const rows = db.prepare(
+        `SELECT * FROM content
+         WHERE type = ? AND (title LIKE ? OR clean_title LIKE ? OR group_name LIKE ?)
+         ORDER BY COALESCE(clean_title, title) COLLATE NOCASE
+         LIMIT ?`,
+      ).all(type, pattern, pattern, pattern, SEARCH_LIMIT_PER_TYPE) as ContentRow[];
       allResults.push(...rows.map(rowToContent));
     }
   }
@@ -900,15 +916,17 @@ export function getContentByTypeMerged(
   sort: SortOption = 'provider',
 ): ContentItem[] {
   const db = getDb();
-  const order = sortClause(sort);
+  // Use table alias 'c' so column references are unambiguous in the JOIN
+  const order = sortClause(sort, 'c');
 
-  // Fetch all content for this type, ordered by source priority first
+  // Fetch all content for this type, ordered by source priority first,
+  // then by the user-chosen sort within each source priority level.
   const rows = db
     .prepare(
       `SELECT c.* FROM content c
        JOIN sources s ON c.source_id = s.id
        WHERE c.type = ?
-       ORDER BY s.priority ASC, c.${order.replace('ORDER BY ', '')}`,
+       ORDER BY s.priority ASC, ${order.replace('ORDER BY ', '')}`,
     )
     .all(type) as ContentRow[];
 

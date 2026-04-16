@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { getDb } from './db';
-import type { ContentItem, ContentType } from '../../shared/types';
+import type { ContentType, HistoryEntry } from '../../shared/types';
+export type { HistoryEntry } from '../../shared/types';
 
 interface HistoryRow {
   id: string;
@@ -20,16 +21,6 @@ interface HistoryRow {
   metadata_json: string | null;
   sort_order: number;
   created_at: number;
-}
-
-export interface HistoryEntry {
-  id: string;
-  contentId: string;
-  episodeId?: string;
-  positionSeconds: number;
-  durationSeconds?: number;
-  watchedAt: number;
-  content: ContentItem;
 }
 
 function rowToEntry(row: HistoryRow): HistoryEntry {
@@ -114,6 +105,44 @@ export function getLastPosition(
     positionSeconds: row.position_seconds,
     durationSeconds: row.duration_seconds ?? undefined,
   };
+}
+
+/** Fetch watch positions for all episodes of a given content in one query. */
+export function getPositionsBatch(
+  contentId: string,
+  episodeIds: string[],
+): Record<string, { positionSeconds: number; durationSeconds?: number }> {
+  if (episodeIds.length === 0) return {};
+  const db = getDb();
+  // Use a subquery to get the latest position per episode
+  const placeholders = episodeIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(
+      `SELECT episode_id, position_seconds, duration_seconds
+       FROM watch_history
+       WHERE content_id = ? AND episode_id IN (${placeholders})
+         AND watched_at = (
+           SELECT MAX(wh2.watched_at) FROM watch_history wh2
+           WHERE wh2.content_id = watch_history.content_id
+             AND wh2.episode_id = watch_history.episode_id
+         )`,
+    )
+    .all(contentId, ...episodeIds) as Array<{
+    episode_id: string;
+    position_seconds: number;
+    duration_seconds: number | null;
+  }>;
+
+  const result: Record<string, { positionSeconds: number; durationSeconds?: number }> = {};
+  for (const row of rows) {
+    if (row.position_seconds > 0) {
+      result[row.episode_id] = {
+        positionSeconds: row.position_seconds,
+        durationSeconds: row.duration_seconds ?? undefined,
+      };
+    }
+  }
+  return result;
 }
 
 export function recordWatch(contentId: string, episodeId?: string): string {

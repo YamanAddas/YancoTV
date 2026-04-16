@@ -35,13 +35,18 @@ export const IpcChannels = {
   PLAYER_TOGGLE_FULLSCREEN: 'player:toggleFullscreen',
   PLAYER_GET_TRACKS: 'player:getTracks',
   PLAYER_SET_SUBTITLE_TRACK: 'player:setSubtitleTrack',
+  PLAYER_TOGGLE_SUBTITLES: 'player:toggleSubtitles',
   PLAYER_SET_AUDIO_TRACK: 'player:setAudioTrack',
   PLAYER_STATE: 'player:state',
+  PLAYER_GET_MEDIA_INFO: 'player:getMediaInfo',
+  PLAYER_LOAD_SUBTITLE_FILE: 'player:loadSubtitleFile',
+  PLAYER_SET_FULLSCREEN: 'player:setFullscreen',
 
   // Player events (main → renderer)
   PLAYER_STATE_CHANGED: 'player:stateChanged',
   PLAYER_TIME_UPDATE: 'player:timeUpdate',
   PLAYER_ERROR: 'player:error',
+  PLAYER_SUBTITLE_TEXT: 'player:subtitleText',
 
   // Favorites
   FAVORITES_GET_ALL: 'favorites:getAll',
@@ -54,6 +59,7 @@ export const IpcChannels = {
   HISTORY_RECORD: 'history:record',
   HISTORY_UPDATE_POSITION: 'history:updatePosition',
   HISTORY_GET_POSITION: 'history:getPosition',
+  HISTORY_GET_POSITIONS_BATCH: 'history:getPositionsBatch',
   HISTORY_REMOVE: 'history:remove',
   HISTORY_CLEAR: 'history:clear',
 
@@ -115,6 +121,15 @@ export const IpcChannels = {
 
   // App
   APP_GET_VERSION: 'app:getVersion',
+
+  // Window controls (custom titlebar)
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_MAXIMIZE: 'window:maximize',
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_IS_MAXIMIZED: 'window:isMaximized',
+
+  // Player — mpv availability check
+  PLAYER_CHECK_MPV: 'player:checkMpv',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

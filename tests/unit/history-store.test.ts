@@ -16,6 +16,7 @@ vi.mock('uuid', () => ({
 import {
   getRecentlyWatched,
   getLastPosition,
+  getPositionsBatch,
   recordWatch,
   updatePosition,
   removeHistoryEntry,
@@ -127,5 +128,66 @@ describe('History Store', () => {
     expect(entry.content.title).toBe('Channel One');
     expect(entry.content.type).toBe('live');
     expect(entry.content.sourceId).toBe('src-1');
+  });
+
+  describe('getPositionsBatch', () => {
+    beforeEach(() => {
+      // Insert a series content and episodes for batch tests
+      insertTestContent(testDb, { id: 'series-1', title: 'Series One', type: 'series' });
+      testDb.prepare(
+        `INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url)
+         VALUES ('ep-1', 'series-1', 1, 1, 'Pilot', 'http://stream.com/ep1')`,
+      ).run();
+      testDb.prepare(
+        `INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url)
+         VALUES ('ep-2', 'series-1', 1, 2, 'Second', 'http://stream.com/ep2')`,
+      ).run();
+      testDb.prepare(
+        `INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url)
+         VALUES ('ep-3', 'series-1', 1, 3, 'Third', 'http://stream.com/ep3')`,
+      ).run();
+    });
+
+    it('returns empty for no episodes', () => {
+      const result = getPositionsBatch('series-1', []);
+      expect(result).toEqual({});
+    });
+
+    it('returns positions for watched episodes', () => {
+      const h1 = recordWatch('series-1', 'ep-1');
+      updatePosition(h1, 300, 1800);
+      const h2 = recordWatch('series-1', 'ep-2');
+      updatePosition(h2, 600, 1800);
+
+      const result = getPositionsBatch('series-1', ['ep-1', 'ep-2', 'ep-3']);
+      expect(result['ep-1']).toEqual({ positionSeconds: 300, durationSeconds: 1800 });
+      expect(result['ep-2']).toEqual({ positionSeconds: 600, durationSeconds: 1800 });
+      expect(result['ep-3']).toBeUndefined();
+    });
+
+    it('skips episodes with position 0', () => {
+      recordWatch('series-1', 'ep-1'); // position stays at 0
+      const h2 = recordWatch('series-1', 'ep-2');
+      updatePosition(h2, 120, 1800);
+
+      const result = getPositionsBatch('series-1', ['ep-1', 'ep-2']);
+      expect(result['ep-1']).toBeUndefined();
+      expect(result['ep-2']).toEqual({ positionSeconds: 120, durationSeconds: 1800 });
+    });
+
+    it('returns latest position when multiple entries exist', () => {
+      // Insert two history entries for the same episode with explicit timestamps
+      testDb.prepare(
+        `INSERT INTO watch_history (id, content_id, episode_id, position_seconds, duration_seconds, watched_at)
+         VALUES ('batch-old', 'series-1', 'ep-1', 200, 1800, 1000)`,
+      ).run();
+      testDb.prepare(
+        `INSERT INTO watch_history (id, content_id, episode_id, position_seconds, duration_seconds, watched_at)
+         VALUES ('batch-new', 'series-1', 'ep-1', 900, 1800, 2000)`,
+      ).run();
+
+      const result = getPositionsBatch('series-1', ['ep-1']);
+      expect(result['ep-1']).toEqual({ positionSeconds: 900, durationSeconds: 1800 });
+    });
   });
 });
