@@ -26,3 +26,34 @@ export interface Episode {
   streamUrl: string;
   duration?: number;
 }
+
+/** Parsed metadata from the metadata_json column */
+export interface ContentMetadata {
+  // Xtream series / Stalker series
+  plot?: string;
+  cast?: string;
+  director?: string;
+  genre?: string;
+  releaseDate?: string;
+  rating?: string;
+  // Xtream VOD
+  description?: string;
+  // Xtream IDs (for catch-up / episode fetch)
+  seriesId?: number;
+  streamId?: number;
+  // Stalker IDs
+  stalkerId?: string;
+  // Catch-up / archive
+  tvArchive?: number;
+  tvArchiveDuration?: number;
+  catchupType?: string;
+  catchupSource?: string;
+}
+
+/** Enriched content detail returned by content:getDetail */
+export interface ContentDetail {
+  item: ContentItem;
+  metadata: ContentMetadata;
+  episodes: Episode[];
+  watchPosition?: { positionSeconds: number; durationSeconds?: number };
+}

@@ -32,6 +32,8 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.CONTENT_GET_CATEGORIES).toBe('content:getCategories');
     expect(IpcChannels.CONTENT_SEARCH).toBe('content:search');
     expect(IpcChannels.CONTENT_GET_EPISODES).toBe('content:getEpisodes');
+    expect(IpcChannels.CONTENT_GET_DETAIL).toBe('content:getDetail');
+    expect(IpcChannels.CONTENT_GET_RELATED).toBe('content:getRelated');
   });
 
   it('has all expected player channels', () => {
@@ -100,7 +102,7 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.PARENTAL_GET_OVERRIDES).toBe('parental:getOverrides');
   });
 
-  it('exports exactly 76 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(76);
+  it('exports exactly 78 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(78);
   });
 });

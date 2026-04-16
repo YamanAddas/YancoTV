@@ -29,6 +29,10 @@ const api = {
     search: (query: string) => ipcRenderer.invoke(IpcChannels.CONTENT_SEARCH, query),
     getEpisodes: (contentId: string) =>
       ipcRenderer.invoke(IpcChannels.CONTENT_GET_EPISODES, contentId),
+    getDetail: (id: string) =>
+      ipcRenderer.invoke(IpcChannels.CONTENT_GET_DETAIL, id),
+    getRelated: (id: string) =>
+      ipcRenderer.invoke(IpcChannels.CONTENT_GET_RELATED, id),
   },
 
   favorites: {

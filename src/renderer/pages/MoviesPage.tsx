@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
-import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 
 export function MoviesPage() {
@@ -53,15 +53,15 @@ export function MoviesPage() {
     return movies.filter((m) => m.groupName === selectedCategory);
   }, [movies, selectedCategory]);
 
-  const play = usePlayerStore((s) => s.play);
+  const navigate = useNavigate();
   const toggle = useFavoritesStore((s) => s.toggle);
   const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
 
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
-      play(item.streamUrl, item.cleanTitle || item.title, item.id);
+      navigate(`/movies/${item.id}`);
     },
-    [play],
+    [navigate],
   );
 
   const handleFavoriteToggle = useCallback(

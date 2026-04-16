@@ -19,6 +19,8 @@ export const IpcChannels = {
   CONTENT_GET_CATEGORIES: 'content:getCategories',
   CONTENT_SEARCH: 'content:search',
   CONTENT_GET_EPISODES: 'content:getEpisodes',
+  CONTENT_GET_DETAIL: 'content:getDetail',
+  CONTENT_GET_RELATED: 'content:getRelated',
 
   // Player control
   PLAYER_PLAY: 'player:play',

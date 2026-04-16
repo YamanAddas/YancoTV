@@ -11,6 +11,8 @@ import {
   searchContent,
   getContentCountByType,
   getEpisodes,
+  getContentById,
+  getRelatedContent,
 } from '../services/content-store';
 import {
   getFavorites,
@@ -226,6 +228,37 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.CONTENT_GET_EPISODES, (_event, contentId: string) => {
     if (!contentId || typeof contentId !== 'string') return [];
     return getEpisodes(contentId);
+  });
+
+  ipcMain.handle(IpcChannels.CONTENT_GET_DETAIL, (_event, id: string) => {
+    if (!id || typeof id !== 'string') return null;
+    const item = getContentById(id);
+    if (!item) return null;
+
+    // Parse metadata_json
+    let metadata = {};
+    if (item.metadataJson) {
+      try {
+        metadata = JSON.parse(item.metadataJson);
+      } catch {
+        // Ignore invalid JSON
+      }
+    }
+
+    // Get episodes for series
+    const episodes = item.type === 'series' ? getEpisodes(id) : [];
+
+    // Get watch position
+    const watchPosition = getLastPosition(id);
+
+    return { item, metadata, episodes, watchPosition: watchPosition ?? undefined };
+  });
+
+  ipcMain.handle(IpcChannels.CONTENT_GET_RELATED, (_event, id: string) => {
+    if (!id || typeof id !== 'string') return { sameGroup: [], sameSource: [] };
+    const item = getContentById(id);
+    if (!item) return { sameGroup: [], sameSource: [] };
+    return getRelatedContent(id, item.groupName, item.sourceId);
   });
 
   // Favorites

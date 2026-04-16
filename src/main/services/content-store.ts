@@ -661,6 +661,53 @@ export function getEpisodes(contentId: string): Episode[] {
   return rows.map(rowToEpisode);
 }
 
+/** Find content by ID */
+export function getContentById(id: string): ContentItem | null {
+  const db = getDb();
+  const row = db
+    .prepare('SELECT * FROM content WHERE id = ?')
+    .get(id) as ContentRow | undefined;
+  return row ? rowToContent(row) : null;
+}
+
+/** Get related content: same group + same source (different group), capped at 20 each */
+export function getRelatedContent(
+  id: string,
+  groupName?: string,
+  sourceId?: string,
+): { sameGroup: ContentItem[]; sameSource: ContentItem[] } {
+  const db = getDb();
+  const sameGroup: ContentItem[] = [];
+  const sameSource: ContentItem[] = [];
+
+  if (groupName) {
+    const rows = db
+      .prepare(
+        `SELECT * FROM content
+         WHERE group_name = ? AND id != ? AND type IN ('movie', 'series')
+         ORDER BY COALESCE(clean_title, title) COLLATE NOCASE ASC
+         LIMIT 20`,
+      )
+      .all(groupName, id) as ContentRow[];
+    sameGroup.push(...rows.map(rowToContent));
+  }
+
+  if (sourceId) {
+    const rows = db
+      .prepare(
+        `SELECT * FROM content
+         WHERE source_id = ? AND id != ? AND type IN ('movie', 'series')
+           AND (group_name IS NULL OR group_name != ?)
+         ORDER BY COALESCE(clean_title, title) COLLATE NOCASE ASC
+         LIMIT 20`,
+      )
+      .all(sourceId, id, groupName ?? '') as ContentRow[];
+    sameSource.push(...rows.map(rowToContent));
+  }
+
+  return { sameGroup, sameSource };
+}
+
 /** Find a live channel by its tvgId (for catch-up URL building) */
 export function getContentByTvgId(tvgId: string): ContentItem | null {
   const db = getDb();

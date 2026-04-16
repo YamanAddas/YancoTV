@@ -10,6 +10,7 @@ import { SeriesPage } from './pages/SeriesPage';
 import { SearchPage } from './pages/SearchPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ContentDetailPage } from './pages/ContentDetailPage';
 import { useSettingsStore } from './stores/settings-store';
 
 const queryClient = new QueryClient({
@@ -64,7 +65,9 @@ function AppInner() {
         <Route path="/live" element={<LiveTvPage />} />
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/movies" element={<MoviesPage />} />
+        <Route path="/movies/:id" element={<ContentDetailPage />} />
         <Route path="/series" element={<SeriesPage />} />
+        <Route path="/series/:id" element={<ContentDetailPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
