@@ -367,6 +367,9 @@ export async function storeXtreamContent(
             stream.containerExtension,
           );
 
+          const vodMetadata: Record<string, unknown> = { streamId: stream.streamId };
+          if (stream.rating) vodMetadata.rating = stream.rating;
+
           insertContent.run(
             randomUUID(),
             sourceId,
@@ -377,7 +380,7 @@ export async function storeXtreamContent(
             url,
             stream.streamIcon || null,
             null,
-            stream.rating ? JSON.stringify({ rating: stream.rating }) : null,
+            JSON.stringify(vodMetadata),
             sortOrder++,
             now,
           );

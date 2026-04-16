@@ -280,6 +280,41 @@ export function registerIpcHandlers(): void {
       }
     }
 
+    // On-demand fetch: Xtream movie with streamId but sparse metadata
+    if (item.type === 'movie' && !metadata.plot) {
+      // Get streamId from metadata or parse from URL (/movie/user/pass/{id}.ext)
+      let vodId = metadata.streamId as number | undefined;
+      if (!vodId && item.streamUrl) {
+        const match = item.streamUrl.match(/\/movie\/[^/]+\/[^/]+\/(\d+)\./);
+        if (match) vodId = parseInt(match[1], 10);
+      }
+
+      if (vodId) {
+        try {
+          const source = getSourceById(item.sourceId);
+          if (source?.type === 'xtream' && source.url) {
+            const creds = getSourceCredentials(item.sourceId);
+            if (creds) {
+              const client = new XtreamClient(source.url, creds.username, creds.password);
+              const result = await client.getVodInfo(vodId);
+              if (result.ok) {
+                const info = result.value;
+                if (info.plot) metadata.plot = info.plot;
+                if (info.cast) metadata.cast = info.cast;
+                if (info.director) metadata.director = info.director;
+                if (info.genre) metadata.genre = info.genre;
+                if (info.releaseDate) metadata.releaseDate = info.releaseDate;
+                if (info.rating && info.rating !== '0') metadata.rating = info.rating;
+                if (info.duration) metadata.duration = info.duration;
+              }
+            }
+          }
+        } catch (err) {
+          log.error('Failed to fetch Xtream VOD info on demand:', err);
+        }
+      }
+    }
+
     // Get watch position
     const watchPosition = getLastPosition(id);
 

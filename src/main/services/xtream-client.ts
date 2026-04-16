@@ -105,6 +105,18 @@ export interface XtreamSeriesDetail {
   };
 }
 
+export interface XtreamVodDetail {
+  name: string;
+  plot: string;
+  cast: string;
+  director: string;
+  genre: string;
+  releaseDate: string;
+  rating: string;
+  duration: string;
+  cover: string;
+}
+
 // --- Constants ---
 
 const MAX_RESPONSE_SIZE = 150 * 1024 * 1024; // 150 MB guard
@@ -315,6 +327,30 @@ export class XtreamClient {
           releaseDate: String(info.releaseDate ?? info.release_date ?? ''),
           rating: String(info.rating ?? ''),
         },
+      },
+    };
+  }
+
+  /** Fetch full details for a single VOD movie */
+  async getVodInfo(vodId: number): Promise<Result<XtreamVodDetail>> {
+    const data = await this.request(`get_vod_info&vod_id=${vodId}`);
+    if (!data.ok) return data;
+
+    const raw = data.value;
+    const info = raw.info ?? raw.movie_data ?? {};
+
+    return {
+      ok: true,
+      value: {
+        name: String(info.name ?? info.title ?? ''),
+        plot: String(info.plot ?? info.description ?? ''),
+        cast: String(info.cast ?? info.actors ?? ''),
+        director: String(info.director ?? ''),
+        genre: String(info.genre ?? info.category_name ?? ''),
+        releaseDate: String(info.releasedate ?? info.release_date ?? info.releaseDate ?? ''),
+        rating: String(info.rating ?? info.rating_5based ? `${info.rating_5based}/5` : info.rating ?? ''),
+        duration: String(info.duration ?? info.duration_secs ?? ''),
+        cover: String(info.movie_image ?? info.cover_big ?? info.cover ?? ''),
       },
     };
   }

@@ -43,6 +43,8 @@ export interface ContentMetadata {
   streamId?: number;
   // Stalker IDs
   stalkerId?: string;
+  // VOD duration (from Xtream get_vod_info)
+  duration?: string;
   // Catch-up / archive
   tvArchive?: number;
   tvArchiveDuration?: number;

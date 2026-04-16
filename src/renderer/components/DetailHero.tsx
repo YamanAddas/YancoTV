@@ -44,6 +44,9 @@ export function DetailHero({
   if (item.groupName && metaItems.length < 4) {
     metaItems.push(item.groupName);
   }
+  if (metadata.duration && !isSeries) {
+    metaItems.push(formatHeroDuration(metadata.duration));
+  }
   if (isSeries && episodes.length > 0) {
     const seasonCount = new Set(episodes.map((e) => e.seasonNumber ?? 1)).size;
     metaItems.push(`${seasonCount} Season${seasonCount !== 1 ? 's' : ''}`);
@@ -248,4 +251,24 @@ export function DetailHero({
       </div>
     </div>
   );
+}
+
+function formatHeroDuration(duration: string): string {
+  // Handle HH:MM:SS
+  const parts = duration.split(':');
+  if (parts.length === 3) {
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (!isNaN(h) && !isNaN(m)) {
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+  }
+  // Handle plain seconds
+  const secs = parseInt(duration, 10);
+  if (!isNaN(secs) && secs > 0) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  return duration;
 }
