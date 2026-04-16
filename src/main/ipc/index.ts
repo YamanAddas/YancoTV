@@ -3,7 +3,7 @@ import log from 'electron-log/main';
 import { IpcChannels } from '../../shared/ipc-channels';
 import { addSourceInputSchema, updateSourceInputSchema } from '../../shared/schemas/source';
 import { getDb } from '../services/db';
-import { getAllSources, addSource, updateSource, removeSource, reorderSources } from '../services/source-manager';
+import { getAllSources, addSource, updateSource, removeSource, reorderSources, getSourceById, getSourceCredentials } from '../services/source-manager';
 import { syncSource } from '../services/source-sync';
 import {
   getContentByType,
@@ -13,7 +13,9 @@ import {
   getEpisodes,
   getContentById,
   getRelatedContent,
+  storeXtreamEpisodes,
 } from '../services/content-store';
+import { XtreamClient } from '../services/xtream-client';
 import {
   getFavorites,
   getFavoriteIds,
@@ -230,13 +232,14 @@ export function registerIpcHandlers(): void {
     return getEpisodes(contentId);
   });
 
-  ipcMain.handle(IpcChannels.CONTENT_GET_DETAIL, (_event, id: string) => {
+  ipcMain.handle(IpcChannels.CONTENT_GET_DETAIL, async (_event, id: string) => {
     if (!id || typeof id !== 'string') return null;
     const item = getContentById(id);
     if (!item) return null;
 
     // Parse metadata_json
-    let metadata = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let metadata: Record<string, any> = {};
     if (item.metadataJson) {
       try {
         metadata = JSON.parse(item.metadataJson);
@@ -246,7 +249,36 @@ export function registerIpcHandlers(): void {
     }
 
     // Get episodes for series
-    const episodes = item.type === 'series' ? getEpisodes(id) : [];
+    let episodes = item.type === 'series' ? getEpisodes(id) : [];
+
+    // On-demand fetch: Xtream series with seriesId but no episodes in DB
+    if (item.type === 'series' && episodes.length === 0 && metadata.seriesId) {
+      try {
+        const source = getSourceById(item.sourceId);
+        if (source?.type === 'xtream' && source.url) {
+          const creds = getSourceCredentials(item.sourceId);
+          if (creds) {
+            const client = new XtreamClient(source.url, creds.username, creds.password);
+            const result = await client.getSeriesInfo(metadata.seriesId);
+            if (result.ok) {
+              storeXtreamEpisodes(id, client, result.value.episodes);
+              episodes = getEpisodes(id);
+
+              // Enrich metadata from series info if sparse
+              const info = result.value.info;
+              if (!metadata.plot && info.plot) metadata.plot = info.plot;
+              if (!metadata.cast && info.cast) metadata.cast = info.cast;
+              if (!metadata.director && info.director) metadata.director = info.director;
+              if (!metadata.genre && info.genre) metadata.genre = info.genre;
+              if (!metadata.rating && info.rating) metadata.rating = info.rating;
+              if (!metadata.releaseDate && info.releaseDate) metadata.releaseDate = info.releaseDate;
+            }
+          }
+        }
+      } catch (err) {
+        log.error('Failed to fetch Xtream episodes on demand:', err);
+      }
+    }
 
     // Get watch position
     const watchPosition = getLastPosition(id);
@@ -258,7 +290,7 @@ export function registerIpcHandlers(): void {
     if (!id || typeof id !== 'string') return { sameGroup: [], sameSource: [] };
     const item = getContentById(id);
     if (!item) return { sameGroup: [], sameSource: [] };
-    return getRelatedContent(id, item.groupName, item.sourceId);
+    return getRelatedContent(id, item.groupName, item.sourceId, item.type);
   });
 
   // Favorites

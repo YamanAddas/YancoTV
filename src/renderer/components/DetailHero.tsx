@@ -26,34 +26,40 @@ export function DetailHero({
   const [imgError, setImgError] = useState(false);
   const showImage = item.logoUrl && !imgError;
   const letter = (item.cleanTitle || item.title).charAt(0).toUpperCase();
+  const isSeries = item.type === 'series';
 
-  // Build metadata badges
-  const badges: string[] = [];
+  // Build metadata line items
+  const metaItems: string[] = [];
   if (metadata.releaseDate) {
     const year = metadata.releaseDate.match(/\d{4}/)?.[0];
-    if (year) badges.push(year);
+    if (year) metaItems.push(year);
+  }
+  if (metadata.rating) {
+    metaItems.push(`★ ${metadata.rating}${!metadata.rating.includes('/') ? '/10' : ''}`);
   }
   if (metadata.genre) {
-    // Take first 2 genres
     const genres = metadata.genre.split(/[,/]/).map((g) => g.trim()).filter(Boolean);
-    badges.push(...genres.slice(0, 2));
+    metaItems.push(...genres.slice(0, 2));
   }
-  if (item.groupName && badges.length < 3) {
-    badges.push(item.groupName);
+  if (item.groupName && metaItems.length < 4) {
+    metaItems.push(item.groupName);
+  }
+  if (isSeries && episodes.length > 0) {
+    const seasonCount = new Set(episodes.map((e) => e.seasonNumber ?? 1)).size;
+    metaItems.push(`${seasonCount} Season${seasonCount !== 1 ? 's' : ''}`);
+    metaItems.push(`${episodes.length} Episode${episodes.length !== 1 ? 's' : ''}`);
   }
 
-  // Build resume label
+  // Short description for the hero (series info or short movie description)
+  const description = metadata.plot || metadata.description;
+  const showHeroDescription = isSeries && description;
+
+  // Resume state
   let playLabel = 'Play';
   if (watchPosition && watchPosition.positionSeconds > 30) {
-    if (item.type === 'series' && episodes.length > 0) {
-      playLabel = 'Resume';
-    } else {
-      const mins = Math.floor(watchPosition.positionSeconds / 60);
-      playLabel = `Resume at ${mins}m`;
-    }
+    const mins = Math.floor(watchPosition.positionSeconds / 60);
+    playLabel = `Resume at ${mins}m`;
   }
-
-  // Progress percentage for resume button
   const progressPct =
     watchPosition?.durationSeconds && watchPosition.durationSeconds > 0
       ? Math.min((watchPosition.positionSeconds / watchPosition.durationSeconds) * 100, 100)
@@ -79,7 +85,6 @@ export function DetailHero({
         ) : (
           <div className="h-full w-full bg-gradient-to-b from-surface-900 to-surface-950" />
         )}
-        {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface-950/60 to-surface-950" />
         <div className="absolute inset-0 bg-gradient-to-r from-surface-950/80 via-transparent to-transparent" />
       </motion.div>
@@ -122,7 +127,6 @@ export function DetailHero({
                 <span className="text-4xl font-bold text-surface-500">{letter}</span>
               </div>
             )}
-            {/* Glass shine */}
             <div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -143,45 +147,48 @@ export function DetailHero({
             {item.cleanTitle || item.title}
           </motion.h1>
 
-          {/* Metadata badges */}
-          {badges.length > 0 && (
+          {/* Metadata line */}
+          {metaItems.length > 0 && (
             <motion.div
-              className="mt-3 flex flex-wrap gap-2"
+              className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-surface-400"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.15 }}
             >
-              {badges.map((badge, i) => (
-                <motion.span
-                  key={badge}
-                  className="rounded-md bg-surface-800/60 px-2.5 py-1 text-xs font-medium text-surface-300"
-                  style={{
-                    clipPath: 'polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%)',
-                    padding: '4px 14px',
-                  }}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, delay: 0.2 + i * 0.08 }}
-                >
-                  {badge}
-                </motion.span>
+              {metaItems.map((item, i) => (
+                <span key={i} className="flex items-center gap-1.5">
+                  {i > 0 && <span className="text-surface-600">·</span>}
+                  <span className={item.startsWith('★') ? 'text-accent font-medium' : ''}>
+                    {item}
+                  </span>
+                </span>
               ))}
             </motion.div>
           )}
 
-          {/* Rating */}
-          {metadata.rating && (
-            <motion.div
-              className="mt-2 flex items-center gap-1.5"
+          {/* Short description in hero (for series, or short movie descriptions) */}
+          {showHeroDescription && (
+            <motion.p
+              className="mt-3 line-clamp-3 max-w-xl text-sm leading-relaxed text-surface-400"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.25 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
             >
-              <span className="text-accent">&#9733;</span>
-              <span className="text-sm font-medium text-accent">
-                {metadata.rating}
-                {!metadata.rating.includes('/') && ' / 10'}
-              </span>
+              {description}
+            </motion.p>
+          )}
+
+          {/* Cast / Director quick line */}
+          {isSeries && (metadata.cast || metadata.director) && (
+            <motion.div
+              className="mt-2 max-w-xl text-xs text-surface-500"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.22 }}
+            >
+              {metadata.director && <span>Dir. {metadata.director}</span>}
+              {metadata.director && metadata.cast && <span> · </span>}
+              {metadata.cast && <span className="line-clamp-1">Cast: {metadata.cast}</span>}
             </motion.div>
           )}
 
@@ -190,7 +197,7 @@ export function DetailHero({
             className="mt-4 flex items-center gap-3"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
+            transition={{ duration: 0.3, delay: 0.25 }}
           >
             {/* Play button */}
             <button
@@ -205,13 +212,9 @@ export function DetailHero({
                 <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
               </svg>
               {playLabel}
-              {/* Resume progress bar */}
               {progressPct > 0 && (
                 <div className="absolute bottom-0 left-0 h-0.5 bg-surface-950/30" style={{ width: '100%' }}>
-                  <div
-                    className="h-full bg-surface-950/60"
-                    style={{ width: `${progressPct}%` }}
-                  />
+                  <div className="h-full bg-surface-950/60" style={{ width: `${progressPct}%` }} />
                 </div>
               )}
             </button>

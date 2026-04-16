@@ -670,25 +670,27 @@ export function getContentById(id: string): ContentItem | null {
   return row ? rowToContent(row) : null;
 }
 
-/** Get related content: same group + same source (different group), capped at 20 each */
+/** Get related content: same group (same type) + same source different group (same type) */
 export function getRelatedContent(
   id: string,
   groupName?: string,
   sourceId?: string,
+  contentType?: ContentType,
 ): { sameGroup: ContentItem[]; sameSource: ContentItem[] } {
   const db = getDb();
   const sameGroup: ContentItem[] = [];
   const sameSource: ContentItem[] = [];
+  const type = contentType ?? 'movie';
 
   if (groupName) {
     const rows = db
       .prepare(
         `SELECT * FROM content
-         WHERE group_name = ? AND id != ? AND type IN ('movie', 'series')
+         WHERE group_name = ? AND id != ? AND type = ?
          ORDER BY COALESCE(clean_title, title) COLLATE NOCASE ASC
          LIMIT 20`,
       )
-      .all(groupName, id) as ContentRow[];
+      .all(groupName, id, type) as ContentRow[];
     sameGroup.push(...rows.map(rowToContent));
   }
 
@@ -696,12 +698,12 @@ export function getRelatedContent(
     const rows = db
       .prepare(
         `SELECT * FROM content
-         WHERE source_id = ? AND id != ? AND type IN ('movie', 'series')
+         WHERE source_id = ? AND id != ? AND type = ?
            AND (group_name IS NULL OR group_name != ?)
-         ORDER BY COALESCE(clean_title, title) COLLATE NOCASE ASC
+         ORDER BY RANDOM()
          LIMIT 20`,
       )
-      .all(sourceId, id, groupName ?? '') as ContentRow[];
+      .all(sourceId, id, type, groupName ?? '') as ContentRow[];
     sameSource.push(...rows.map(rowToContent));
   }
 

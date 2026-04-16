@@ -1,16 +1,13 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { DetailHero } from '../components/DetailHero';
-import { DetailTabs } from '../components/DetailTabs';
 import { EpisodesTab } from '../components/EpisodesTab';
 import { InfoTab } from '../components/InfoTab';
 import { RelatedTab } from '../components/RelatedTab';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import type { ContentDetail, ContentItem, ContentMetadata, Episode } from '../../shared/types';
-
-type TabId = 'episodes' | 'info' | 'related';
 
 export function ContentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +19,6 @@ export function ContentDetailPage() {
     sameSource: [],
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabId>('episodes');
 
   const play = usePlayerStore((s) => s.play);
   const toggle = useFavoritesStore((s) => s.toggle);
@@ -40,22 +36,6 @@ export function ContentDetailPage() {
       setDetail(detailData);
       setRelated(relatedData ?? { sameGroup: [], sameSource: [] });
       setIsLoading(false);
-
-      // Set initial active tab based on content type and data
-      if (detailData) {
-        const meta = detailData.metadata as ContentMetadata;
-        const isSeries = detailData.item.type === 'series';
-        const hasEpisodes = detailData.episodes.length > 0;
-        const hasInfo = !!(meta.plot || meta.cast || meta.director || meta.genre || meta.description);
-
-        if (isSeries && hasEpisodes) {
-          setActiveTab('episodes');
-        } else if (hasInfo) {
-          setActiveTab('info');
-        } else {
-          setActiveTab('related');
-        }
-      }
     });
   }, [id]);
 
@@ -64,27 +44,11 @@ export function ContentDetailPage() {
     return detail.metadata as ContentMetadata;
   }, [detail]);
 
-  const availableTabs = useMemo<TabId[]>(() => {
-    if (!detail) return [];
-    const tabs: TabId[] = [];
-    const isSeries = detail.item.type === 'series';
-    const hasEpisodes = detail.episodes.length > 0;
-    const hasInfo = !!(metadata.plot || metadata.cast || metadata.director || metadata.genre || metadata.description);
-    const hasRelated = related.sameGroup.length > 0 || related.sameSource.length > 0;
-
-    if (isSeries && hasEpisodes) tabs.push('episodes');
-    if (hasInfo) tabs.push('info');
-    if (hasRelated) tabs.push('related');
-
-    return tabs;
-  }, [detail, metadata, related]);
-
   const handlePlay = useCallback(() => {
     if (!detail) return;
     const { item, episodes } = detail;
 
     if (item.type === 'series' && episodes.length > 0) {
-      // Play first episode (or resume episode)
       const ep = episodes[0];
       const title = ep.title || `S${ep.seasonNumber ?? 1}E${ep.episodeNumber ?? 1}`;
       const showName = item.cleanTitle || item.title;
@@ -140,7 +104,8 @@ export function ContentDetailPage() {
 
   const { item, episodes, watchPosition } = detail;
   const favorite = isFavorite(item.id);
-  const showTabs = availableTabs.length > 1;
+  const hasRelated = related.sameGroup.length > 0 || related.sameSource.length > 0;
+  const isSeries = item.type === 'series';
 
   return (
     <motion.div
@@ -149,7 +114,7 @@ export function ContentDetailPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Hero Section */}
+      {/* Hero — shared between movies and series */}
       <DetailHero
         item={item}
         metadata={metadata}
@@ -161,92 +126,95 @@ export function ContentDetailPage() {
         onFavoriteToggle={() => toggle(item.id)}
       />
 
-      {/* Tab Bar */}
-      {showTabs && (
-        <DetailTabs
-          tabs={availableTabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          contentType={item.type}
-        />
-      )}
-
-      {/* Tab Content */}
-      <div className="flex-1 px-6 pb-8">
-        <AnimatePresence mode="wait">
-          {activeTab === 'episodes' && availableTabs.includes('episodes') && (
-            <motion.div
-              key="episodes"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              <EpisodesTab
-                episodes={episodes}
-                contentId={item.id}
-                onEpisodePlay={handleEpisodePlay}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === 'info' && availableTabs.includes('info') && (
-            <motion.div
-              key="info"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              <InfoTab metadata={metadata} />
-            </motion.div>
-          )}
-
-          {activeTab === 'related' && availableTabs.includes('related') && (
-            <motion.div
-              key="related"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              <RelatedTab
-                sameGroup={related.sameGroup}
-                sameSource={related.sameSource}
-                groupName={item.groupName}
-                onItemClick={handleRelatedClick}
-              />
-            </motion.div>
-          )}
-
-          {/* If no tabs available and single tab content */}
-          {!showTabs && availableTabs.length === 1 && (
-            <motion.div
-              key={availableTabs[0]}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {availableTabs[0] === 'episodes' && (
+      <div className="flex-1 space-y-8 px-6 pb-8">
+        {isSeries ? (
+          /* ── SERIES LAYOUT ─────────────────────────────────────── */
+          <>
+            {/* Episodes — always visible, the main content */}
+            {episodes.length > 0 && (
+              <motion.section
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.1 }}
+              >
+                <h2 className="mb-3 text-lg font-semibold text-surface-100">Episodes</h2>
                 <EpisodesTab
                   episodes={episodes}
                   contentId={item.id}
                   onEpisodePlay={handleEpisodePlay}
                 />
-              )}
-              {availableTabs[0] === 'info' && <InfoTab metadata={metadata} />}
-              {availableTabs[0] === 'related' && (
+              </motion.section>
+            )}
+
+            {/* Episodes loading state for Xtream series */}
+            {episodes.length === 0 && (
+              <div className="rounded-xl border border-dashed border-surface-700 bg-surface-900/50 py-10 text-center">
+                <p className="text-sm text-surface-500">No episodes available</p>
+              </div>
+            )}
+
+            {/* Related series */}
+            {hasRelated && (
+              <motion.section
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.2 }}
+              >
                 <RelatedTab
                   sameGroup={related.sameGroup}
                   sameSource={related.sameSource}
                   groupName={item.groupName}
                   onItemClick={handleRelatedClick}
                 />
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.section>
+            )}
+          </>
+        ) : (
+          /* ── MOVIE LAYOUT ──────────────────────────────────────── */
+          <>
+            {/* Inline info — no tabs, just show what exists */}
+            <MovieInfo metadata={metadata} />
+
+            {/* More Like This */}
+            {hasRelated && (
+              <motion.section
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.15 }}
+              >
+                <RelatedTab
+                  sameGroup={related.sameGroup}
+                  sameSource={related.sameSource}
+                  groupName={item.groupName}
+                  onItemClick={handleRelatedClick}
+                />
+              </motion.section>
+            )}
+          </>
+        )}
       </div>
     </motion.div>
+  );
+}
+
+/** Inline movie info section — renders only fields that have data */
+function MovieInfo({ metadata }: { metadata: ContentMetadata }) {
+  const description = metadata.plot || metadata.description;
+  const cast = metadata.cast;
+  const director = metadata.director;
+  const genre = metadata.genre;
+  const releaseDate = metadata.releaseDate;
+  const hasAny = !!(description || cast || director || genre || releaseDate);
+
+  if (!hasAny) return null;
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: 0.1 }}
+    >
+      <InfoTab metadata={metadata} />
+    </motion.section>
   );
 }
