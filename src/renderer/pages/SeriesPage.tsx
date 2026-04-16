@@ -106,6 +106,7 @@ export function SeriesPage() {
           categories={categories}
           selected={selectedCategory}
           onSelect={setSelectedCategory}
+          contentType="series"
           isLoading={isLoading}
           categoryCounts={categoryCounts}
           totalCount={series.length}

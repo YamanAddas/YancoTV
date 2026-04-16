@@ -101,6 +101,12 @@ export const IpcChannels = {
   PARENTAL_REMOVE_OVERRIDE: 'parental:removeOverride',
   PARENTAL_GET_OVERRIDES: 'parental:getOverrides',
 
+  // Group Preferences
+  GROUP_PREFS_GET: 'groups:getPrefs',
+  GROUP_PREFS_SET: 'groups:setPrefs',
+  GROUP_PREFS_REMOVE: 'groups:removePrefs',
+  GROUP_PREFS_REORDER: 'groups:reorder',
+
   // Database
   DB_STATUS: 'db:status',
 

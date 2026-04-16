@@ -23,6 +23,13 @@ import {
   removeFavorite,
 } from '../services/favorites-store';
 import {
+  getGroupPreferences as getGroupPreferencesAll,
+  setGroupPreference as setGroupPref,
+  removeGroupPreference as removeGroupPref,
+  reorderGroups as reorderGroupPrefs,
+  type SetGroupPreferenceInput as SetGroupPrefInput,
+} from '../services/group-preferences-store';
+import {
   getRecentlyWatched,
   getLastPosition,
   recordWatch,
@@ -111,6 +118,23 @@ export function registerIpcHandlers(): void {
   // App
   ipcMain.handle(IpcChannels.APP_GET_VERSION, () => {
     return app.getVersion();
+  });
+
+  // Group Preferences
+  ipcMain.handle(IpcChannels.GROUP_PREFS_GET, (_event, contentType: string) => {
+    return getGroupPreferencesAll(contentType);
+  });
+
+  ipcMain.handle(IpcChannels.GROUP_PREFS_SET, (_event, input: unknown) => {
+    return setGroupPref(input as SetGroupPrefInput);
+  });
+
+  ipcMain.handle(IpcChannels.GROUP_PREFS_REMOVE, (_event, contentType: string, groupKey: string) => {
+    removeGroupPref(contentType, groupKey);
+  });
+
+  ipcMain.handle(IpcChannels.GROUP_PREFS_REORDER, (_event, contentType: string, orderedKeys: string[]) => {
+    reorderGroupPrefs(contentType, orderedKeys);
   });
 
   // Database status

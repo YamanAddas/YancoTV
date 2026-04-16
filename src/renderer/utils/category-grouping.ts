@@ -1,20 +1,124 @@
 /**
- * Auto-groups a flat list of category names into a two-level hierarchy
- * by detecting common prefix patterns (e.g. "AR | Sports", "AR | News" → group "AR").
+ * Smart category grouping — organizes raw IPTV group names under
+ * auto-detected language/country headers.
  *
- * Works with any IPTV list — no hardcoded prefixes. Detects the separator
- * pattern used in the category names and clusters accordingly.
+ * Group names are shown in FULL (never stripped or shortened).
+ * The only intelligence is detecting which language section each group
+ * belongs to, using prefix codes and Unicode script detection.
  */
 
-// Separators to try, in priority order (most specific first).
-const SEPARATORS = [' | ', ' - ', ' / ', ' : ', '| ', '- '];
+import { parseAllGroups } from './group-parser';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface SmartChild {
+  /** Full original group_name — used as display label AND for content filtering */
+  originalGroupName: string;
+}
+
+export interface SmartSection {
+  /** Unique key for the section (e.g. "ar", "us") */
+  key: string;
+  /** Display label (e.g. "Arabic", "English") */
+  label: string;
+  /** Flag emoji */
+  icon: string | null;
+  /** Groups in this section — full original names */
+  children: SmartChild[];
+}
+
+export interface SmartGroupedCategories {
+  /** Language/country sections */
+  sections: SmartSection[];
+  /** Groups that couldn't be assigned to a language */
+  ungrouped: SmartChild[];
+}
+
+// ---------------------------------------------------------------------------
+// Main grouping function
+// ---------------------------------------------------------------------------
+
+export function groupCategoriesSmart(categories: string[]): SmartGroupedCategories {
+  if (!categories || categories.length === 0) {
+    return { sections: [], ungrouped: [] };
+  }
+
+  // Parse all group names for language detection
+  const parsed = parseAllGroups(categories);
+
+  // Build section map: sectionKey → { label, icon, children[] }
+  const sectionMap = new Map<string, { label: string; icon: string | null; children: SmartChild[] }>();
+  const ungrouped: SmartChild[] = [];
+
+  for (const [originalName, pg] of parsed) {
+    const sectionKey = pg.country?.toLowerCase() ?? pg.language?.toLowerCase() ?? null;
+
+    if (!sectionKey) {
+      ungrouped.push({ originalGroupName: originalName });
+      continue;
+    }
+
+    let section = sectionMap.get(sectionKey);
+    if (!section) {
+      section = {
+        label: pg.language || pg.country || sectionKey,
+        icon: pg.country
+          ? getFlagFromParsed(pg.country)
+          : null,
+        children: [],
+      };
+      sectionMap.set(sectionKey, section);
+    }
+    section.children.push({ originalGroupName: originalName });
+  }
+
+  // Build sections array — only sections with 2+ children get their own section
+  // Single-child sections get merged into ungrouped
+  const sections: SmartSection[] = [];
+
+  for (const [key, data] of sectionMap) {
+    if (data.children.length >= 2) {
+      // Sort children alphabetically by original name
+      data.children.sort((a, b) => a.originalGroupName.localeCompare(b.originalGroupName));
+      sections.push({
+        key,
+        label: data.label,
+        icon: data.icon,
+        children: data.children,
+      });
+    } else {
+      // Single item — don't create a section for it
+      ungrouped.push(...data.children);
+    }
+  }
+
+  // Sort sections alphabetically
+  sections.sort((a, b) => a.label.localeCompare(b.label));
+  // Sort ungrouped alphabetically
+  ungrouped.sort((a, b) => a.originalGroupName.localeCompare(b.originalGroupName));
+
+  return { sections, ungrouped };
+}
+
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
+
+import { getCountryFlag } from './group-parser';
+
+function getFlagFromParsed(countryCode: string): string | null {
+  return getCountryFlag(countryCode);
+}
+
+// ---------------------------------------------------------------------------
+// Legacy types (kept so old imports don't break during transition)
+// ---------------------------------------------------------------------------
 
 export interface CategoryGroup {
-  /** The shared prefix (e.g. "AR", "US", "Arabic") */
   prefix: string;
-  /** Original full category names belonging to this group */
   children: string[];
-  /** Stripped display labels (suffix after separator) */
   childLabels: string[];
 }
 
@@ -23,73 +127,46 @@ export interface GroupedCategories {
   ungrouped: string[];
 }
 
-interface ParsedCategory {
-  original: string;
-  prefix: string;
-  suffix: string;
-}
-
-function tryParse(category: string): ParsedCategory | null {
-  for (const sep of SEPARATORS) {
-    const idx = category.indexOf(sep);
-    if (idx > 0) {
-      const prefix = category.slice(0, idx).trim();
-      const suffix = category.slice(idx + sep.length).trim();
-      if (prefix.length > 0 && suffix.length > 0) {
-        return { original: category, prefix, suffix };
+/** @deprecated Use groupCategoriesSmart instead */
+export function groupCategories(categories: string[]): GroupedCategories {
+  const SEPARATORS = [' | ', ' - ', ' / ', ' : ', '| ', '- '];
+  function tryParse(cat: string) {
+    for (const sep of SEPARATORS) {
+      const idx = cat.indexOf(sep);
+      if (idx > 0) {
+        const prefix = cat.slice(0, idx).trim();
+        const suffix = cat.slice(idx + sep.length).trim();
+        if (prefix && suffix) return { original: cat, prefix, suffix };
       }
     }
+    return null;
   }
-  return null;
-}
 
-export function groupCategories(categories: string[]): GroupedCategories {
-  // Parse each category to detect prefix/suffix
-  const parsed: ParsedCategory[] = [];
+  const parsed: { original: string; prefix: string; suffix: string }[] = [];
   const noParse: string[] = [];
-
   for (const cat of categories) {
     if (!cat) continue;
-    const result = tryParse(cat);
-    if (result) {
-      parsed.push(result);
-    } else {
-      noParse.push(cat);
-    }
+    const r = tryParse(cat);
+    if (r) parsed.push(r); else noParse.push(cat);
   }
 
-  // Group by prefix — only form a super-group when 2+ categories share it
-  const prefixMap = new Map<string, ParsedCategory[]>();
+  const prefixMap = new Map<string, typeof parsed>();
   for (const p of parsed) {
-    const existing = prefixMap.get(p.prefix);
-    if (existing) {
-      existing.push(p);
-    } else {
-      prefixMap.set(p.prefix, [p]);
-    }
+    const arr = prefixMap.get(p.prefix);
+    if (arr) arr.push(p); else prefixMap.set(p.prefix, [p]);
   }
 
   const groups: CategoryGroup[] = [];
-  const ungrouped: string[] = [...noParse];
-
+  const ungrouped = [...noParse];
   for (const [prefix, members] of prefixMap) {
     if (members.length >= 2) {
-      // Sort children alphabetically by suffix
       members.sort((a, b) => a.suffix.localeCompare(b.suffix));
-      groups.push({
-        prefix,
-        children: members.map((m) => m.original),
-        childLabels: members.map((m) => m.suffix),
-      });
+      groups.push({ prefix, children: members.map(m => m.original), childLabels: members.map(m => m.suffix) });
     } else {
-      // Single-member prefix — keep flat
       ungrouped.push(members[0].original);
     }
   }
-
-  // Sort groups by prefix, ungrouped alphabetically
   groups.sort((a, b) => a.prefix.localeCompare(b.prefix));
   ungrouped.sort((a, b) => a.localeCompare(b));
-
   return { groups, ungrouped };
 }

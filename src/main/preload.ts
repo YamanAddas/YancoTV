@@ -173,6 +173,22 @@ const api = {
     },
   },
 
+  groupPrefs: {
+    get: (contentType: string) => ipcRenderer.invoke(IpcChannels.GROUP_PREFS_GET, contentType),
+    set: (input: {
+      contentType: string;
+      groupKey: string;
+      sortOrder?: number;
+      isHidden?: boolean;
+      isPinned?: boolean;
+      customName?: string | null;
+    }) => ipcRenderer.invoke(IpcChannels.GROUP_PREFS_SET, input),
+    remove: (contentType: string, groupKey: string) =>
+      ipcRenderer.invoke(IpcChannels.GROUP_PREFS_REMOVE, contentType, groupKey),
+    reorder: (contentType: string, orderedKeys: string[]) =>
+      ipcRenderer.invoke(IpcChannels.GROUP_PREFS_REORDER, contentType, orderedKeys),
+  },
+
   dialog: {
     openM3uFile: () => ipcRenderer.invoke(IpcChannels.DIALOG_OPEN_M3U_FILE),
   },

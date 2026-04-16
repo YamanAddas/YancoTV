@@ -201,6 +201,7 @@ export function LiveTvPage() {
           categories={categories}
           selected={selectedCategory}
           onSelect={setSelectedCategory}
+          contentType="live"
           isLoading={isLoading}
           categoryCounts={categoryCounts}
           totalCount={visibleChannels.length}

@@ -105,6 +105,7 @@ export function MoviesPage() {
           categories={categories}
           selected={selectedCategory}
           onSelect={setSelectedCategory}
+          contentType="movie"
           isLoading={isLoading}
           categoryCounts={categoryCounts}
           totalCount={movies.length}
