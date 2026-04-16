@@ -15,6 +15,10 @@ interface Source {
   filePath?: string;
   lastSynced?: number;
   isActive: boolean;
+  priority: number;
+  channelCount: number;
+  lastSyncError?: string;
+  autoSyncInterval: number;
 }
 
 export function PlaylistSettings() {

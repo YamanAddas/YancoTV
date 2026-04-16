@@ -4,17 +4,23 @@
  */
 import Database from 'better-sqlite3';
 
-/** SQL matching the production migrations (001 + 003 + 005), minus FTS5 */
+/** SQL matching the production migrations (001 + 003 + 005 + 007), minus FTS5 */
 const SCHEMA_SQL = `
--- 001-initial-schema
+-- 001-initial-schema + 004 + 007-source-management-enhancements
 CREATE TABLE sources (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('m3u_url', 'm3u_file', 'xtream')),
+  type TEXT NOT NULL,
   url TEXT,
   file_path TEXT,
+  epg_url TEXT,
   username_encrypted BLOB,
   password_encrypted BLOB,
+  mac_address_encrypted BLOB,
+  priority INTEGER NOT NULL DEFAULT 0,
+  channel_count INTEGER NOT NULL DEFAULT 0,
+  last_sync_error TEXT,
+  auto_sync_interval INTEGER NOT NULL DEFAULT 0,
   last_synced INTEGER,
   is_active INTEGER DEFAULT 1,
   created_at INTEGER NOT NULL,
@@ -80,7 +86,6 @@ CREATE INDEX idx_favorites_content ON favorites(content_id);
 ALTER TABLE content ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 
 -- 004-epg-enhancements
-ALTER TABLE sources ADD COLUMN epg_url TEXT;
 ALTER TABLE epg_programmes ADD COLUMN icon_url TEXT;
 ALTER TABLE epg_programmes ADD COLUMN source_id TEXT REFERENCES sources(id) ON DELETE CASCADE;
 

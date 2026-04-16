@@ -5,8 +5,10 @@ const api = {
   sources: {
     getAll: () => ipcRenderer.invoke(IpcChannels.SOURCES_GET_ALL),
     add: (input: unknown) => ipcRenderer.invoke(IpcChannels.SOURCES_ADD, input),
+    update: (input: unknown) => ipcRenderer.invoke(IpcChannels.SOURCES_UPDATE, input),
     remove: (id: string) => ipcRenderer.invoke(IpcChannels.SOURCES_REMOVE, id),
     sync: (id: string) => ipcRenderer.invoke(IpcChannels.SOURCES_SYNC, id),
+    reorder: (orderedIds: string[]) => ipcRenderer.invoke(IpcChannels.SOURCES_REORDER, orderedIds),
     onSyncProgress: (callback: (sourceId: string, progress: { phase: string; current: number; total: number }) => void) => {
       const handler = (_event: IpcRendererEvent, sourceId: string, progress: { phase: string; current: number; total: number }) =>
         callback(sourceId, progress);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-type SourceType = 'm3u_url' | 'm3u_file' | 'xtream';
+type SourceType = 'm3u_url' | 'm3u_file' | 'xtream' | 'stalker';
 
 interface AddSourceFormProps {
   onSourceAdded: () => void;
@@ -14,6 +14,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
   const [filePath, setFilePath] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [macAddress, setMacAddress] = useState('');
   const [epgUrl, setEpgUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -37,6 +38,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
     setFilePath('');
     setUsername('');
     setPassword('');
+    setMacAddress('');
     setEpgUrl('');
     setError('');
     setSuccess('');
@@ -66,6 +68,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
         ...(sourceType === 'm3u_url' && { url }),
         ...(sourceType === 'm3u_file' && { filePath }),
         ...(sourceType === 'xtream' && { url, username, password }),
+        ...(sourceType === 'stalker' && { url, macAddress }),
         ...(epgUrl.trim() && { epgUrl: epgUrl.trim() }),
       };
 
@@ -126,6 +129,7 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
           ['m3u_url', 'M3U URL'],
           ['m3u_file', 'M3U File'],
           ['xtream', 'Xtream'],
+          ['stalker', 'Stalker'],
         ] as const).map(([type, label]) => (
           <button
             key={type}
@@ -178,6 +182,13 @@ export function AddSourceForm({ onSourceAdded }: AddSourceFormProps) {
             <Input label="Server URL" value={url} onChange={setUrl} placeholder="http://provider.example.com:8080" required />
             <Input label="Username" value={username} onChange={setUsername} required />
             <Input label="Password" value={password} onChange={setPassword} type="password" required />
+          </>
+        )}
+
+        {sourceType === 'stalker' && (
+          <>
+            <Input label="Portal URL" value={url} onChange={setUrl} placeholder="http://portal.example.com/stalker_portal" required />
+            <Input label="MAC Address" value={macAddress} onChange={setMacAddress} placeholder="00:1A:79:XX:XX:XX" required />
           </>
         )}
 

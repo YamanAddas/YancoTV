@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-export const sourceTypeSchema = z.enum(['m3u_url', 'm3u_file', 'xtream']);
+export const sourceTypeSchema = z.enum(['m3u_url', 'm3u_file', 'xtream', 'stalker']);
+
+const MAC_REGEX = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 
 export const addSourceInputSchema = z
   .object({
@@ -10,6 +12,7 @@ export const addSourceInputSchema = z
     filePath: z.string().optional(),
     username: z.string().optional(),
     password: z.string().optional(),
+    macAddress: z.string().optional(),
     epgUrl: z.string().url().optional().or(z.literal('')),
   })
   .superRefine((data, ctx) => {
@@ -50,6 +53,44 @@ export const addSourceInputSchema = z
         });
       }
     }
+    if (data.type === 'stalker') {
+      if (!data.url) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Portal URL is required for Stalker sources',
+          path: ['url'],
+        });
+      }
+      if (!data.macAddress) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'MAC address is required for Stalker sources',
+          path: ['macAddress'],
+        });
+      } else if (!MAC_REGEX.test(data.macAddress)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'MAC address must be in format XX:XX:XX:XX:XX:XX',
+          path: ['macAddress'],
+        });
+      }
+    }
   });
 
 export type AddSourceInput = z.infer<typeof addSourceInputSchema>;
+
+export const updateSourceInputSchema = z.object({
+  id: z.string().min(1, 'Source ID is required'),
+  name: z.string().min(1).max(100).optional(),
+  url: z.string().url().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  macAddress: z
+    .string()
+    .regex(MAC_REGEX, 'MAC address must be in format XX:XX:XX:XX:XX:XX')
+    .optional(),
+  epgUrl: z.string().url().optional().or(z.literal('')),
+  autoSyncInterval: z.number().int().min(0).max(720).optional(),
+});
+
+export type UpdateSourceInput = z.infer<typeof updateSourceInputSchema>;

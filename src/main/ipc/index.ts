@@ -1,9 +1,9 @@
 import { ipcMain, app, dialog, BrowserWindow } from 'electron';
 import log from 'electron-log/main';
 import { IpcChannels } from '../../shared/ipc-channels';
-import { addSourceInputSchema } from '../../shared/schemas/source';
+import { addSourceInputSchema, updateSourceInputSchema } from '../../shared/schemas/source';
 import { getDb } from '../services/db';
-import { getAllSources, addSource, removeSource } from '../services/source-manager';
+import { getAllSources, addSource, updateSource, removeSource, reorderSources } from '../services/source-manager';
 import { syncSource } from '../services/source-sync';
 import {
   getContentByType,
@@ -166,6 +166,25 @@ export function registerIpcHandlers(): void {
     return result.ok
       ? { ok: true, count: result.value }
       : { ok: false, error: result.error.message };
+  });
+
+  ipcMain.handle(IpcChannels.SOURCES_UPDATE, (_event, input: unknown) => {
+    const parsed = updateSourceInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues.map((i) => i.message).join(', ') };
+    }
+    const result = updateSource(parsed.data);
+    return result.ok
+      ? { ok: true, source: result.value }
+      : { ok: false, error: result.error.message };
+  });
+
+  ipcMain.handle(IpcChannels.SOURCES_REORDER, (_event, orderedIds: unknown) => {
+    if (!Array.isArray(orderedIds) || !orderedIds.every((id) => typeof id === 'string')) {
+      return { ok: false, error: 'Invalid ordered IDs array' };
+    }
+    const result = reorderSources(orderedIds as string[]);
+    return result.ok ? { ok: true } : { ok: false, error: result.error.message };
   });
 
   // File picker for M3U files

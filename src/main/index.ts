@@ -11,6 +11,7 @@ import {
 import { initDatabase, closeDatabase } from './services/db';
 import { registerIpcHandlers, destroyPlayer } from './ipc';
 import { startAutoRefresh, stopAutoRefresh } from './services/epg-service';
+import { startAutoSync, stopAutoSync } from './services/source-sync';
 
 log.initialize();
 log.info(`${APP_NAME} starting...`);
@@ -86,6 +87,7 @@ app.whenReady().then(() => {
   initDatabase();
   registerIpcHandlers();
   startAutoRefresh(12); // Refresh EPG every 12 hours
+  startAutoSync(); // Check for sources needing re-sync every 5 minutes
   createWindow();
 
   app.on('activate', () => {
@@ -97,6 +99,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopAutoRefresh();
+  stopAutoSync();
   destroyPlayer();
   closeDatabase();
   app.quit();

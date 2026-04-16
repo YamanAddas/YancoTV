@@ -12,6 +12,12 @@ import type {
   XtreamClient,
   XtreamSeriesEpisode,
 } from './xtream-client';
+import type {
+  StalkerClient,
+  StalkerChannel,
+  StalkerVodItem,
+  StalkerSeriesItem,
+} from './stalker-client';
 
 // --- Constants ---
 
@@ -533,6 +539,13 @@ export function getContentByType(
       .all(type, sourceId) as ContentRow[];
     return rows.map(rowToContent);
   }
+
+  // Multi-source: check if there are multiple sources
+  const sourceCount = db.prepare('SELECT COUNT(*) as cnt FROM sources').get() as { cnt: number };
+  if (sourceCount.cnt > 1) {
+    return getContentByTypeMerged(type, sort);
+  }
+
   const rows = db
     .prepare(`SELECT * FROM content WHERE type = ? ${order}`)
     .all(type) as ContentRow[];
@@ -655,4 +668,207 @@ export function getContentByTvgId(tvgId: string): ContentItem | null {
     .prepare('SELECT * FROM content WHERE tvg_id = ? AND type = ? LIMIT 1')
     .get(tvgId, 'live') as ContentRow | undefined;
   return row ? rowToContent(row) : null;
+}
+
+// --- Stalker storage ---
+
+export async function storeStalkerContent(
+  sourceId: string,
+  client: StalkerClient,
+  liveChannels: { channels: StalkerChannel[]; categories: Map<string, string> },
+  vodItems: { items: StalkerVodItem[]; categories: Map<string, string> },
+  seriesList: { series: StalkerSeriesItem[]; categories: Map<string, string> },
+  onProgress?: ProgressCallback,
+): Promise<number> {
+  const db = getDb();
+  const now = Date.now();
+
+  const totalItems =
+    liveChannels.channels.length +
+    vodItems.items.length +
+    seriesList.series.length;
+
+  dropFtsTriggers();
+
+  try {
+    // Clear existing content for this source
+    onProgress?.({ phase: 'deleting', current: 0, total: totalItems });
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.prepare('DELETE FROM episodes WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)').run(sourceId);
+    db.prepare('DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)').run(sourceId);
+    db.prepare('DELETE FROM content WHERE source_id = ?').run(sourceId);
+    db.exec('PRAGMA foreign_keys = ON');
+
+    const insertContent = db.prepare(
+      `INSERT INTO content (id, source_id, type, title, clean_title, group_name, stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    let inserted = 0;
+    let sortOrder = 0;
+
+    // Insert live channels
+    for (let i = 0; i < liveChannels.channels.length; i += BATCH_SIZE) {
+      const chunk = liveChannels.channels.slice(i, i + BATCH_SIZE);
+
+      const insertBatch = db.transaction(() => {
+        for (const ch of chunk) {
+          const category = liveChannels.categories.get(ch.tvGenreId) ?? '';
+          const group = category.trim();
+          const streamUrl = client.buildStreamUrl(ch.cmd);
+
+          const metadata =
+            ch.tvArchive > 0
+              ? JSON.stringify({
+                  stalkerId: ch.id,
+                  tvArchive: ch.tvArchive,
+                  tvArchiveDuration: ch.tvArchiveDuration,
+                })
+              : ch.id
+                ? JSON.stringify({ stalkerId: ch.id })
+                : null;
+
+          insertContent.run(
+            randomUUID(),
+            sourceId,
+            'live',
+            ch.name,
+            cleanTitle(ch.name),
+            group || null,
+            streamUrl,
+            ch.logo || null,
+            ch.epgId || null,
+            metadata,
+            sortOrder++,
+            now,
+          );
+        }
+      });
+
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalItems });
+      await yieldToEventLoop();
+    }
+
+    // Insert VOD items
+    for (let i = 0; i < vodItems.items.length; i += BATCH_SIZE) {
+      const chunk = vodItems.items.slice(i, i + BATCH_SIZE);
+
+      const insertBatch = db.transaction(() => {
+        for (const vod of chunk) {
+          const category = vodItems.categories.get(vod.categoryId) ?? '';
+          const group = category.trim();
+          const streamUrl = client.buildStreamUrl(vod.cmd);
+
+          insertContent.run(
+            randomUUID(),
+            sourceId,
+            'movie',
+            vod.name,
+            cleanTitle(vod.name),
+            group || null,
+            streamUrl,
+            vod.logo || null,
+            null,
+            vod.description ? JSON.stringify({ description: vod.description }) : null,
+            sortOrder++,
+            now,
+          );
+        }
+      });
+
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalItems });
+      await yieldToEventLoop();
+    }
+
+    // Insert series
+    for (let i = 0; i < seriesList.series.length; i += BATCH_SIZE) {
+      const chunk = seriesList.series.slice(i, i + BATCH_SIZE);
+
+      const insertBatch = db.transaction(() => {
+        for (const series of chunk) {
+          const category = seriesList.categories.get(series.categoryId) ?? '';
+          const group = category.trim();
+
+          const metadata = JSON.stringify({
+            stalkerId: series.id,
+            plot: series.plot || undefined,
+            genre: series.genre || undefined,
+          });
+
+          insertContent.run(
+            randomUUID(),
+            sourceId,
+            'series',
+            series.name,
+            cleanTitle(series.name),
+            group || null,
+            '', // No direct stream URL for series parent
+            series.cover || null,
+            null,
+            metadata,
+            sortOrder++,
+            now,
+          );
+        }
+      });
+
+      insertBatch();
+      inserted += chunk.length;
+      onProgress?.({ phase: 'inserting', current: inserted, total: totalItems });
+      await yieldToEventLoop();
+    }
+
+    // Rebuild FTS index
+    onProgress?.({ phase: 'indexing', current: 0, total: 1 });
+    rebuildFtsIndex(sourceId);
+    onProgress?.({ phase: 'done', current: totalItems, total: totalItems });
+
+    log.info(
+      `Stored ${totalItems} Stalker entries for source ${sourceId} (${liveChannels.channels.length} live, ${vodItems.items.length} VOD, ${seriesList.series.length} series)`,
+    );
+    return totalItems;
+  } finally {
+    restoreFtsTriggers();
+  }
+}
+
+// --- Multi-source merge with dedup ---
+
+/**
+ * Get content across all sources with deduplication by stream_url.
+ * When multiple sources have the same stream URL, the one from the
+ * highest-priority source (lowest priority number) wins.
+ */
+export function getContentByTypeMerged(
+  type: ContentType,
+  sort: SortOption = 'provider',
+): ContentItem[] {
+  const db = getDb();
+  const order = sortClause(sort);
+
+  // Fetch all content for this type, ordered by source priority first
+  const rows = db
+    .prepare(
+      `SELECT c.* FROM content c
+       JOIN sources s ON c.source_id = s.id
+       WHERE c.type = ?
+       ORDER BY s.priority ASC, c.${order.replace('ORDER BY ', '')}`,
+    )
+    .all(type) as ContentRow[];
+
+  // Dedup: first occurrence wins (from lowest-priority-number source)
+  const seen = new Set<string>();
+  const deduped: ContentItem[] = [];
+  for (const row of rows) {
+    const key = row.stream_url;
+    // Skip dedup for empty stream URLs (series parents)
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    deduped.push(rowToContent(row));
+  }
+  return deduped;
 }

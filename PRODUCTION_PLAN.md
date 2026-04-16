@@ -15,7 +15,7 @@
 
 **Goal:** Build every feature needed to match and surpass TiviMate, OTT Navigator, and Smarters — on Windows desktop.
 
-### Sprints 1–6 — COMPLETED
+### Sprints 1–10 — COMPLETED
 
 | Sprint | What Was Shipped |
 |--------|-----------------|
@@ -25,89 +25,12 @@
 | 4 — Browsing UI | Sidebar nav, Live TV / Movies / Series pages, virtualized grids, category filtering |
 | 5 — Playback | IPlayer abstraction, MpvPlayer, controls UI, keyboard shortcuts, mpv bundling |
 | 6 — Search, Favorites & History | FTS5 search, favorites toggle, watch history, resume playback |
+| 7 — EPG | XMLTV parser (async/streaming/gzip), now/next display, EPG grid page, auto-refresh, per-source + global EPG URLs, EPG settings UI |
+| 8 — Player Enhancements | Aspect ratio cycling, playback speed, subtitle/audio track selection, external subtitle loading, channel up/down surfing, player overlay controls |
+| 9 — Catch-Up & Timeshift | Catch-up detection (Xtream + M3U), catch-up URL builder, timeshift service (pause/rewind live TV), timeshift controls |
+| 10 — Parental Controls | PIN setup (SHA-256 hashed), channel lock/hide, channel name/logo/group overrides, parental settings UI, settings persistence |
 
----
-
-### Sprint 7 — EPG (Electronic Program Guide)
-
-**Objective:** Full programme guide for live TV — the single biggest missing feature.
-
-| # | Task | Details |
-|---|------|---------|
-| 7.1 | XMLTV parser | Parse XMLTV/gzip format: channels, programmes, start/stop times, titles, descriptions, categories, icons |
-| 7.2 | EPG data service | Fetch EPG from URL (configured per source or globally), decompress gzip, store in `epg_programmes` table |
-| 7.3 | EPG ↔ channel mapping | Match EPG channels to live TV content via `tvg-id` field |
-| 7.4 | Now/Next display | Show current + next programme info on Live TV channel grid items and channel list |
-| 7.5 | EPG grid view | Full programme guide page: horizontal time axis, vertical channel list, scrollable in both directions |
-| 7.6 | EPG detail popup | Click a programme cell → show title, description, start/end time, category, duration |
-| 7.7 | EPG auto-refresh | Background refresh on configurable interval (default 12h). Show last update time in settings |
-| 7.8 | EPG settings UI | Add EPG URL field to source config. Global EPG URL fallback. Refresh interval selector |
-| 7.9 | Multiple EPG sources | Support one EPG URL per source + a global fallback EPG URL. Merge data from all sources |
-| 7.10 | EPG IPC + channels | `epg:getCurrent`, `epg:getGuide`, `epg:refresh`, `epg:getForChannel` IPC handlers |
-
-**Deliverable:** Live TV shows "now/next" on every mapped channel. Full EPG grid available as a dedicated page. Auto-refreshes.
-
----
-
-### Sprint 8 — Player Enhancements
-
-**Objective:** Bring player controls up to par with TiviMate — aspect ratio, speed, track selection, channel surfing.
-
-| # | Task | Details |
-|---|------|---------|
-| 8.1 | Aspect ratio toggle | Cycle through: original, 16:9, 4:3, fill, fit. Send `video-aspect-override` to mpv |
-| 8.2 | Playback speed control | 0.25x–4x speed. Send `speed` property to mpv. Show current speed indicator |
-| 8.3 | Mute button UI | Mute/unmute toggle button in player overlay (keyboard M already works) |
-| 8.4 | Fullscreen button UI | Fullscreen toggle button in player overlay (keyboard F already works) |
-| 8.5 | Subtitle track selector | Panel listing available subtitle tracks. Select/disable. Wire to `IPlayer.setSubtitleTrack()` |
-| 8.6 | Audio track selector | Panel listing available audio tracks. Select track. Wire to `IPlayer.setAudioTrack()` |
-| 8.7 | External subtitle loading | "Load subtitle file" button → file picker → `.srt`, `.vtt`, `.ass` → `IPlayer.addSubtitleFile()` |
-| 8.8 | Subtitle appearance | Font size, color, background opacity settings. Send as mpv `sub-*` properties |
-| 8.9 | Channel up/down | Next/previous channel in current filtered list. Page Up / Page Down keys |
-| 8.10 | Channel info overlay | Press Enter/OK during playback → show channel name, logo, now/next EPG info (auto-hide after 5s) |
-| 8.11 | Volume OSD | Visual volume indicator on screen when adjusting (auto-fade) |
-
-**Deliverable:** Full player controls matching desktop media players. Subtitle/audio track switching works. Channel surfing with up/down keys.
-
----
-
-### Sprint 9 — Catch-Up & Timeshift
-
-**Objective:** Watch past programmes and pause/rewind live TV.
-
-| # | Task | Details |
-|---|------|---------|
-| 9.1 | Catch-up detection | Parse Xtream `timeshift` field and M3U `catchup` / `catchup-days` tags. Flag channels that support catch-up |
-| 9.2 | Catch-up URL builder | Build catch-up stream URLs based on provider format (Xtream API `timeshift.php`, append-style, shift-style) |
-| 9.3 | Catch-up playback | Click a past programme in EPG → play catch-up stream. Seek within the programme |
-| 9.4 | Catch-up indicator | Visual badge on channels that support catch-up. "Watch from start" option on currently airing shows |
-| 9.5 | Catch-up in EPG grid | Past programmes on catch-up channels are clickable (non-catch-up channels grey out past items) |
-| 9.6 | Timeshift service | Local live stream buffering via ffmpeg. Configurable buffer duration (default 30 min) |
-| 9.7 | Timeshift controls | Pause, rewind, fast-forward live TV. "Go live" button to jump back to real-time |
-| 9.8 | Timeshift buffer config | Settings: enable/disable timeshift, buffer duration, buffer storage path |
-
-**Deliverable:** Users can watch past programmes on supported channels. Can pause and rewind live TV.
-
----
-
-### Sprint 10 — Parental Controls & Channel Management
-
-**Objective:** PIN protection and user control over channel organization.
-
-| # | Task | Details |
-|---|------|---------|
-| 10.1 | PIN setup | Settings: set/change/remove 4-digit PIN. Store hashed in DB (not plaintext) |
-| 10.2 | App lock | Optional: require PIN on app launch |
-| 10.3 | Category lock | Lock entire categories/groups behind PIN. PIN prompt when accessing locked category |
-| 10.4 | Channel lock | Lock individual channels behind PIN |
-| 10.5 | Hidden channels | Hide channels/groups from browse views entirely (different from locked — invisible, not just gated) |
-| 10.6 | Custom channel groups | Create user-defined groups. Drag channels into custom groups |
-| 10.7 | Manual channel sort | Reorder channels within a group by drag-and-drop or move up/down |
-| 10.8 | Channel numbers | Assign numbers to channels. Quick-tune by typing number |
-| 10.9 | Channel name/logo override | Edit channel display name or override logo URL per channel |
-| 10.10 | Parental controls IPC | `parental:verifyPin`, `parental:setPin`, `parental:lockChannel`, `parental:hideChannel` |
-
-**Deliverable:** Parents can lock content behind PIN. Users can customize channel order, groups, names, and visibility.
+**Also shipped alongside Sprints 7–10:** Full keyboard navigation across all menus, category grouping, channel artwork, redesigned Live TV list/grid views with hex capsule rows, 8-tab settings page (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About), settings key-value store, 19 unit test files.
 
 ---
 
@@ -224,23 +147,28 @@
 
 ---
 
-### Sprint 17 — Settings & Configuration
+### Sprint 17 — Settings & Configuration (PARTIALLY COMPLETE)
 
 **Objective:** Comprehensive settings page covering all configurable aspects of the app.
 
+**Already done (shipped with Sprints 7–10):**
+- 17.1 Settings architecture — Key-value store in SQLite (`settings-service.ts`), typed getter/setter IPC (`settings:*`), Zustand store (`settings-store.ts`)
+- 17.2 General settings — `GeneralSettings.tsx` component
+- 17.3 Playback settings — `PlaybackSettings.tsx` component
+- 17.4 EPG settings — `EpgSettings.tsx` component
+- 17.8 Parental settings — `ParentalSettings.tsx` component
+- 17.9 Network settings — `NetworkSettings.tsx` component
+- 17.11 Settings persistence — Settings persisted via SQLite key-value store
+- Settings page with 8 tabs (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About)
+
+**Remaining tasks:**
+
 | # | Task | Details |
 |---|------|---------|
-| 17.1 | Settings architecture | Key-value settings store in SQLite. Typed getter/setter IPC. Settings Zustand store |
-| 17.2 | General settings | Default source, language/locale, start page preference |
-| 17.3 | Playback settings | Default volume, resume threshold, auto-play, buffer size, aspect ratio default |
-| 17.4 | EPG settings | Global EPG URL, refresh interval, guide days to show |
-| 17.5 | Recording settings | Storage path, file format, max concurrent recordings |
-| 17.6 | Download settings | Save directory, concurrent downloads, preferred quality |
-| 17.7 | Subtitle settings | Default languages, auto-search toggle, OpenSubtitles API key, appearance |
-| 17.8 | Parental settings | PIN management (already built in Sprint 10, surface here) |
-| 17.9 | Network settings | Proxy config, User-Agent override, connection timeout, retry count |
+| 17.5 | Recording settings | Storage path, file format, max concurrent recordings (depends on Sprint 12) |
+| 17.6 | Download settings | Save directory, concurrent downloads, preferred quality (depends on Sprint 13) |
+| 17.7 | Subtitle settings | Default languages, auto-search toggle, OpenSubtitles API key, appearance (depends on Sprint 15) |
 | 17.10 | Advanced settings | mpv path override, data directory, debug logging toggle, hardware acceleration |
-| 17.11 | Settings persistence | Remember window size/position, last viewed page, sidebar state |
 
 **Deliverable:** All app configuration accessible from one organized settings page. Persisted across restarts.
 
@@ -287,9 +215,16 @@
 
 ---
 
-### Sprint 20 — Network Configuration & Keyboard Navigation
+### Sprint 20 — Network Configuration & Keyboard Navigation (PARTIALLY COMPLETE)
 
 **Objective:** Stream reliability settings and full keyboard accessibility.
+
+**Already done (shipped with Sprints 7–10):**
+- 20.6 Full keyboard navigation — Arrow/Tab/Enter navigation across all views with visible focus indicators
+- Shortcuts reference page (`ShortcutsSettings.tsx`)
+- Network settings UI (`NetworkSettings.tsx`)
+
+**Remaining tasks:**
 
 | # | Task | Details |
 |---|------|---------|
@@ -298,7 +233,6 @@
 | 20.3 | Auto-reconnect | On stream drop: auto-retry with exponential backoff (1s, 2s, 4s, max 30s). Reconnect indicator |
 | 20.4 | User-Agent override | Per-source custom User-Agent string. Some providers require specific UA |
 | 20.5 | Proxy support | HTTP/SOCKS5 proxy config in settings. Applied to all network requests + mpv streams |
-| 20.6 | Full keyboard navigation | Arrow/Tab/Enter navigation across all views. Visible focus indicators |
 | 20.7 | Customizable shortcuts | Settings page for rebinding keyboard shortcuts. Default presets |
 | 20.8 | Gamepad support | Basic D-pad/gamepad input mapping (prep for future TV mode) |
 
@@ -382,23 +316,23 @@ No new backend work — purely frontend/visual.
 
 ## Milestone Summary
 
-| Milestone | What You Get | Sprints |
-|-----------|-------------|---------|
-| **M1 — Skeleton** | App launches, navigates, DB works | Sprint 1 |
-| **M2 — Sources** | Add M3U/Xtream sources, content parsed | Sprints 2–3 |
-| **M3 — Browse** | Full browsing UI with categories | Sprint 4 |
-| **M4 — Watch** | Playback works for all content types | Sprint 5 |
-| **M5 — Daily Use** | Search, favorites, history | Sprint 6 |
-| **M6 — Guide** | EPG grid, now/next, enhanced player | Sprints 7–8 |
-| **M7 — Power Features** | Catch-up, timeshift, parental controls, channel management | Sprints 9–10 |
-| **M8 — All Sources** | Stalker Portal, source editing, sync progress | Sprint 11 |
-| **M9 — Media Manager** | Recording + downloading = full media management | Sprints 12–13 |
-| **M10 — Premium** | Rich metadata, subtitles, multi-view | Sprints 14–16 |
-| **M11 — Polished** | Settings, system features, search UX, network config | Sprints 17–20 |
-| **M12 — Ship It** | Stabilized, tested, release-ready | Sprint 21 |
-| **M13 — Redesigned** | Fresh UI with all features | Phase 3 |
-| **M14 — TV** | Android TV app | Phase 4 |
-| **M15 — Smart** | AI subtitles, content matching | Phase 5 |
+| Milestone | What You Get | Sprints | Status |
+|-----------|-------------|---------|--------|
+| **M1 — Skeleton** | App launches, navigates, DB works | Sprint 1 | DONE |
+| **M2 — Sources** | Add M3U/Xtream sources, content parsed | Sprints 2–3 | DONE |
+| **M3 — Browse** | Full browsing UI with categories | Sprint 4 | DONE |
+| **M4 — Watch** | Playback works for all content types | Sprint 5 | DONE |
+| **M5 — Daily Use** | Search, favorites, history | Sprint 6 | DONE |
+| **M6 — Guide** | EPG grid, now/next, enhanced player | Sprints 7–8 | DONE |
+| **M7 — Power Features** | Catch-up, timeshift, parental controls, channel management | Sprints 9–10 | DONE |
+| **M8 — All Sources** | Stalker Portal, source editing, sync progress | Sprint 11 | — |
+| **M9 — Media Manager** | Recording + downloading = full media management | Sprints 12–13 | — |
+| **M10 — Premium** | Rich metadata, subtitles, multi-view | Sprints 14–16 | — |
+| **M11 — Polished** | Settings, system features, search UX, network config | Sprints 17–20 | Partial |
+| **M12 — Ship It** | Stabilized, tested, release-ready | Sprint 21 | — |
+| **M13 — Redesigned** | Fresh UI with all features | Phase 3 | — |
+| **M14 — TV** | Android TV app | Phase 4 | — |
+| **M15 — Smart** | AI subtitles, content matching | Phase 5 | — |
 
 ---
 

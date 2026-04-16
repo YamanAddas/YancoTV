@@ -5,10 +5,20 @@ import type { IncomingMessage } from 'http';
 import { BrowserWindow } from 'electron';
 import log from 'electron-log/main';
 import { parseM3u } from './m3u-parser';
-import { storeM3uEntries, storeXtreamContent } from './content-store';
+import { storeM3uEntries, storeXtreamContent, storeStalkerContent } from './content-store';
 import type { SyncProgress } from './content-store';
-import { getSourceById, updateSourceSyncTime, getSourceCredentials, updateSourceEpgUrl } from './source-manager';
+import {
+  getSourceById,
+  getAllSources,
+  updateSourceSyncTime,
+  getSourceCredentials,
+  getSourceMacAddress,
+  updateSourceEpgUrl,
+  updateSourceHealth,
+} from './source-manager';
 import { XtreamClient } from './xtream-client';
+import { StalkerClient } from './stalker-client';
+import { getSetting } from './settings-service';
 import { IpcChannels } from '../../shared/ipc-channels';
 import type { Result } from '../../shared/types/result';
 
@@ -17,6 +27,8 @@ import type { Result } from '../../shared/types/result';
 const MAX_M3U_SIZE = 200 * 1024 * 1024; // 200 MB — reject files larger than this
 const FETCH_TIMEOUT = 90_000; // 90 seconds for large M3U downloads
 const XTREAM_STREAM_DELAY = 300; // ms between sequential Xtream stream requests
+const STALKER_REQUEST_DELAY = 500; // ms between sequential Stalker requests
+const AUTO_SYNC_CHECK_INTERVAL = 5 * 60_000; // Check every 5 minutes
 
 // --- Active sync tracking (prevents concurrent syncs on the same source) ---
 
@@ -96,20 +108,31 @@ export async function syncSource(sourceId: string): Promise<Result<number>> {
       }
     } else if (source.type === 'xtream') {
       count = await syncXtreamSource(sourceId, onProgress);
+    } else if (source.type === 'stalker') {
+      count = await syncStalkerSource(sourceId, onProgress);
     } else {
       return { ok: false, error: new Error(`Unknown source type: ${source.type}`) };
     }
 
     try {
       updateSourceSyncTime(sourceId);
+      updateSourceHealth(sourceId, count);
     } catch (err) {
-      log.warn('Failed to update source sync time:', err);
+      log.warn('Failed to update source sync time/health:', err);
     }
 
     log.info(`Synced source ${source.name}: ${count} entries`);
     return { ok: true, value: count };
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
     log.error(`Failed to sync source ${sourceId}:`, error);
+
+    try {
+      updateSourceHealth(sourceId, 0, errorMsg);
+    } catch {
+      // Ignore health update failures
+    }
+
     return { ok: false, error: error instanceof Error ? error : new Error(String(error)) };
   } finally {
     activeSyncs.delete(sourceId);
@@ -186,6 +209,114 @@ async function syncXtreamSource(
   return count;
 }
 
+// --- Stalker sync ---
+
+async function syncStalkerSource(
+  sourceId: string,
+  onProgress: (p: SyncProgress) => void,
+): Promise<number> {
+  const source = getSourceById(sourceId);
+  if (!source?.url) {
+    throw new Error('Stalker source has no portal URL');
+  }
+
+  const macAddress = getSourceMacAddress(sourceId);
+  if (!macAddress) {
+    throw new Error('Stalker source has no MAC address');
+  }
+
+  const client = new StalkerClient(source.url, macAddress);
+
+  // Authenticate
+  log.info(`Authenticating with Stalker Portal: ${source.url}`);
+  const authResult = await client.authenticate();
+  if (!authResult.ok) {
+    throw authResult.error;
+  }
+  log.info(`Stalker auth OK — portal: ${authResult.value.portalUrl}`);
+
+  // Fetch categories
+  log.info('Fetching Stalker categories...');
+  const [liveCats, vodCats, seriesCats] = await Promise.all([
+    client.getLiveCategories(),
+    client.getVodCategories(),
+    client.getSeriesCategories(),
+  ]);
+
+  // Fetch content sequentially to avoid overwhelming the portal
+  log.info('Fetching Stalker live channels...');
+  const liveChannels = await client.getLiveChannels();
+  await sleep(STALKER_REQUEST_DELAY);
+
+  log.info('Fetching Stalker VOD items...');
+  const vodItems = await client.getVodItems();
+  await sleep(STALKER_REQUEST_DELAY);
+
+  log.info('Fetching Stalker series...');
+  const seriesList = await client.getSeriesList();
+
+  // Build category ID -> name maps
+  const liveCategoryMap = buildStalkerCategoryMap(liveCats.ok ? liveCats.value : []);
+  const vodCategoryMap = buildStalkerCategoryMap(vodCats.ok ? vodCats.value : []);
+  const seriesCategoryMap = buildStalkerCategoryMap(seriesCats.ok ? seriesCats.value : []);
+
+  const count = await storeStalkerContent(
+    sourceId,
+    client,
+    { channels: liveChannels.ok ? liveChannels.value : [], categories: liveCategoryMap },
+    { items: vodItems.ok ? vodItems.value : [], categories: vodCategoryMap },
+    { series: seriesList.ok ? seriesList.value : [], categories: seriesCategoryMap },
+    onProgress,
+  );
+
+  return count;
+}
+
+// --- Auto-sync ---
+
+let autoSyncTimer: ReturnType<typeof setInterval> | null = null;
+
+export function startAutoSync(): void {
+  if (autoSyncTimer) return;
+
+  autoSyncTimer = setInterval(async () => {
+    try {
+      const sources = getAllSources();
+      const globalInterval = parseInt(getSetting('playlist_auto_sync_interval') ?? '0', 10);
+
+      for (const source of sources) {
+        if (activeSyncs.has(source.id)) continue;
+
+        const interval = source.autoSyncInterval > 0
+          ? source.autoSyncInterval
+          : globalInterval;
+
+        if (interval <= 0) continue;
+
+        const intervalMs = interval * 3600_000; // hours to ms
+        const lastSynced = source.lastSynced ?? 0;
+
+        if (Date.now() - lastSynced >= intervalMs) {
+          log.info(`Auto-syncing source: ${source.name} (interval: ${interval}h)`);
+          await syncSource(source.id);
+        }
+      }
+    } catch (err) {
+      log.error('Auto-sync check failed:', err);
+    }
+  }, AUTO_SYNC_CHECK_INTERVAL);
+
+  log.info('Auto-sync started (checking every 5 minutes)');
+}
+
+export function stopAutoSync(): void {
+  if (autoSyncTimer) {
+    clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+    log.info('Auto-sync stopped');
+  }
+}
+
 // --- Helpers ---
 
 function buildCategoryMap(
@@ -194,6 +325,16 @@ function buildCategoryMap(
   const map = new Map<string, string>();
   for (const cat of categories) {
     map.set(cat.categoryId, cat.categoryName);
+  }
+  return map;
+}
+
+function buildStalkerCategoryMap(
+  categories: Array<{ id: string; title: string }>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const cat of categories) {
+    map.set(cat.id, cat.title);
   }
   return map;
 }
