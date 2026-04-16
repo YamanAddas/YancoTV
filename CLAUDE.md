@@ -53,8 +53,9 @@ YancoTV/
 │   │   │   └── index.ts             # All IPC handler registration (sources, content, player, etc.)
 │   │   ├── services/                # Backend business logic
 │   │   │   ├── db.ts                # SQLite init, WAL mode, migration runner, FTS5 management
-│   │   │   ├── source-manager.ts    # Source CRUD, credential encryption, Zod validation
-│   │   │   ├── source-sync.ts       # Sync orchestration (M3U/Xtream), progress broadcasting
+│   │   │   ├── source-manager.ts    # Source CRUD, editing, reorder, health, credential encryption
+│   │   │   ├── source-sync.ts       # Sync orchestration (M3U/Xtream/Stalker), auto-sync timer
+│   │   │   ├── stalker-client.ts    # Stalker/Ministra Portal API (MAC auth, paginated fetch)
 │   │   │   ├── m3u-parser.ts        # Streaming M3U parser (BOM, attributes, catchup tags)
 │   │   │   ├── xtream-client.ts     # Xtream Codes API client (auth, streams, series, URLs)
 │   │   │   ├── content-classifier.ts # Classify entries into live/movie/series via heuristics
@@ -75,7 +76,8 @@ YancoTV/
 │   │   │       ├── 003-sort-order.sql
 │   │   │       ├── 004-epg-enhancements.sql
 │   │   │       ├── 005-parental-controls.sql
-│   │   │       └── 006-epg-indexes.sql
+│   │   │       ├── 006-epg-indexes.sql
+│   │   │       └── 007-source-management-enhancements.sql
 │   │   └── player/
 │   │       ├── player.interface.ts   # IPlayer abstraction (play, pause, seek, tracks, events)
 │   │       ├── mpv-player.ts         # mpv implementation (spawn, control, events, tracks)
@@ -198,7 +200,9 @@ pnpm audit            # Security audit
 - **Sprints 1–6:** DONE (foundation, sources, Xtream, browsing UI, playback, search/favorites/history)
 - **Sprint 7:** DONE (EPG — XMLTV parser, now/next, guide grid, auto-refresh, settings)
 - **Sprints 8–10:** DONE (player enhancements, catch-up/timeshift, parental controls, settings persistence)
-- **Sprint 11+:** NOT STARTED (Stalker Portal, recording, downloading, metadata, subtitles, multi-view, etc.)
+- **Sprint 11:** DONE (Stalker Portal client, source editing, drag-and-drop reorder, multi-source merge/dedup, health indicators, auto-sync)
+- **Sprint 11B:** IN PROGRESS (Content Detail Pages — cinematic movie/series info pages with metadata, episodes, related content)
+- **Sprint 12+:** NOT STARTED (recording, downloading, metadata enrichment, subtitles, multi-view, etc.)
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
@@ -206,7 +210,7 @@ See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
 These are listed in PRODUCTION_PLAN.md but do not exist in code yet:
 
-- `stalker-client.ts` — Stalker/Ministra Portal API (Sprint 11)
+- `ContentDetailPage.tsx` — Cinematic movie/series detail page (Sprint 11B, in progress)
 - `recording-service.ts` — ffmpeg-based live recording + scheduler (Sprint 12)
 - `download-manager.ts` — Queue-based VOD download manager (Sprint 13)
 - `metadata-service.ts` — TMDb API integration (Sprint 14)

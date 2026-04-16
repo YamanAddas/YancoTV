@@ -15,7 +15,7 @@
 
 **Goal:** Build every feature needed to match and surpass TiviMate, OTT Navigator, and Smarters — on Windows desktop.
 
-### Sprints 1–10 — COMPLETED
+### Sprints 1–11 — COMPLETED
 
 | Sprint | What Was Shipped |
 |--------|-----------------|
@@ -29,28 +29,101 @@
 | 8 — Player Enhancements | Aspect ratio cycling, playback speed, subtitle/audio track selection, external subtitle loading, channel up/down surfing, player overlay controls |
 | 9 — Catch-Up & Timeshift | Catch-up detection (Xtream + M3U), catch-up URL builder, timeshift service (pause/rewind live TV), timeshift controls |
 | 10 — Parental Controls | PIN setup (SHA-256 hashed), channel lock/hide, channel name/logo/group overrides, parental settings UI, settings persistence |
+| 11 — Source Management Enhancements | Stalker Portal client (MAC auth, paginated fetch), source editing (inline rename/URL/credentials), drag-and-drop priority reorder, multi-source merge with dedup by stream_url, source health indicators (channel count, sync errors), auto-sync timer, migration 007 |
 
-**Also shipped alongside Sprints 7–10:** Full keyboard navigation across all menus, category grouping, channel artwork, redesigned Live TV list/grid views with hex capsule rows, 8-tab settings page (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About), settings key-value store, 19 unit test files.
+**Also shipped alongside Sprints 7–11:** Full keyboard navigation across all menus, category grouping, channel artwork, redesigned Live TV list/grid views with hex capsule rows, 8-tab settings page (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About), settings key-value store, 19 unit test files.
 
 ---
 
-### Sprint 11 — Source Management Enhancements
+### Sprint 11B — Content Detail Pages (Movie & Series Info)
 
-**Objective:** Stalker Portal support, source editing, and sync UX.
+**Objective:** Replace direct-play-on-click with a cinematic detail page for movies and series. Display all available metadata (plot, cast, genre, rating, episodes) from Xtream/Stalker/M3U sources. Design: hybrid of Netflix/Max hero layout + Disney+ conditional tabs + YancoTV hex identity.
+
+#### Design Specification
+
+**Page type:** Full scroll page at `/movies/:id` and `/series/:id`. Shared `ContentDetailPage` component handles both.
+
+**Section 1 — Cinematic Hero (top ~45% of viewport)**
+
+- Full-width backdrop: poster image scaled to cover, blurred (20px), darkened to 30% opacity
+- If no poster: solid gradient (surface-950 → surface-900) with faint hex grid pattern overlay
+- Bottom gradient overlay: transparent → surface-950 over the bottom 60% of the backdrop
+- Top-left: ghost "← Back to Movies/Series" button (preserves grid scroll position via browser history)
+- Content area (overlaid on gradient):
+  - **Poster**: 240×360 tall image with hex clip-path (rounded-hex shape, larger version of HexCard). Subtle accent-colored glow border (shadow-glow-sm). Fallback: dark surface-800 hex with first letter of title centered
+  - **Title**: Large bold text (text-3xl, text-surface-50), right of poster
+  - **Metadata hex badges**: Horizontal row of hex-cut pills (capsule with angled hex ends, bg-surface-800/60, border-accent/10). Each badge shows one metadata field: year, rating label, duration, genre. Only rendered if data exists
+  - **Rating**: Star icon + number (e.g. "★ 7.8 / 10") in accent color, displayed below badges
+  - **Action buttons**: hex-cut shaped buttons below the metadata
+    - **Play**: Filled accent button with glow. If watch history exists → "Resume S1:E4" with mini progress bar inside button
+    - **Favorite**: Outline button, filled when active
+
+**Section 2 — Sticky Tab Bar**
+
+- Tabs: small hex icon (⬡) before each label, accent-colored active tab with hex-shaped underline bar
+- Sticky when scrolled past hero: bg-surface-950/80 + backdrop-blur
+- Tab visibility rules (conditional — tabs without data are hidden):
+  - **Movie (rich metadata)**: `Info · Related`
+  - **Movie (sparse/M3U)**: `Related` only (or no tab bar at all)
+  - **Series (rich metadata)**: `Episodes · Info · Related`
+  - **Series (sparse/M3U)**: `Episodes · Related`
+- If only one tab: skip tab bar entirely, render content directly
+
+**Section 3a — Episodes Tab (series only)**
+
+- Season selector: hex-cut pill dropdown `[Season 1 ▾]` with styled dropdown (surface-800 bg, accent border, episode count per season)
+- Episode cards: rounded-xl, border-accent/5, bg-surface-900/30
+  - Left: episode number in hex badge (small hex shape, accent-tinted, bold number)
+  - Center: episode title (bold, surface-100) + description (surface-400, 1-2 lines, truncated). Fallback: "Episode {n}" if no title
+  - Right: duration ("45m" or "1h 23m", surface-500)
+  - Bottom: accent-colored progress bar if partially watched (from watch_history)
+  - Hover: subtle lift (translate-y-0.5), glow border (border-accent/20), play icon appears
+  - Currently playing: hex badge pulses with accent glow, persistent accent left-border
+
+**Section 3b — Info Tab**
+
+- Description: text-surface-300, max 4 lines with "Show more" expand
+- Info card: rounded-xl, border-accent/5, bg-surface-900/30, p-6
+- Sections (only rendered if data exists — never show empty fields):
+  - Cast: label with hex icon prefix (⬡), comma-separated actor names
+  - Director: label with hex icon prefix
+  - Genre: hex-cut pill tags (clickable — filters Related tab)
+  - Release date/year
+
+**Section 3c — Related Tab**
+
+- Two horizontal rows of HexCard (poster size, reusing existing component):
+  - "From {group_name}" — same category
+  - "From same source" — same source_id, different group
+- Clicking a related card navigates to that item's detail page
+
+**Animations (Motion / framer-motion)**
+
+- Hero backdrop fades in (300ms), poster slides up from below (400ms spring), metadata badges stagger left-to-right (100ms delay each)
+- Tab switch: content cross-fades (200ms)
+- Episode card hover: 150ms lift + glow transition
+- Play button: subtle persistent accent glow pulse (CSS animation)
+- Back navigation: page slides out right, grid slides back from left
+
+**Graceful degradation:** The design scales from rich (Xtream with full TMDb-like metadata) to sparse (M3U with just title + poster). At minimum: hex poster + title + play button + related grid. Still looks clean.
+
+#### Implementation Tasks
 
 | # | Task | Details |
 |---|------|---------|
-| 11.1 | Stalker Portal client | MAC-based authentication. Fetch categories, channels, VOD, series via Stalker/Ministra API |
-| 11.2 | Stalker response mapping | Map Stalker JSON to unified content types (same as M3U/Xtream) |
-| 11.3 | Source editing | Edit existing source: rename, update URL/credentials, change EPG URL |
-| 11.4 | Source sync progress UI | Real-time progress bar during sync: "Fetching channels… 1,200 / 5,000" |
-| 11.5 | Source re-sync | Manual re-sync button per source. Auto-sync on configurable interval |
-| 11.6 | Multi-source merge view | "All Sources" view that merges content across sources, with dedup by stream URL |
-| 11.7 | Source priority ordering | Drag-and-drop source order. Higher priority source wins during dedup |
-| 11.8 | Source health indicator | Show source status: last sync time, channel count, errors during sync |
-| 11.9 | Source type in add form | Add Stalker Portal option to the "Add Source" form (alongside M3U URL, M3U file, Xtream) |
+| 11B.1 | Content metadata IPC | New IPC channel `content:getDetail` — returns ContentItem with parsed metadata_json fields (plot, cast, director, genre, rating, releaseDate) as typed object, plus watch history position. New IPC channel `content:getRelated` — returns items from same group_name and same source |
+| 11B.2 | Content detail types | Extend shared types: `ContentDetail` interface with parsed metadata fields. `ContentMetadata` type for the parsed metadata_json blob. Update `Episode` type if needed |
+| 11B.3 | ContentDetailPage component | Shared page component for `/movies/:id` and `/series/:id`. Fetches content detail + episodes (series) + related content via React Query. Manages tab state |
+| 11B.4 | Hero section component | `DetailHero` — backdrop with blur/gradient, hex-framed poster, title, metadata badges, rating, action buttons. Handles missing data gracefully |
+| 11B.5 | Tab bar component | `DetailTabs` — conditional tabs with hex-styled active indicator, sticky scroll behavior with frosted glass bg |
+| 11B.6 | Episodes tab component | `EpisodesTab` — season selector dropdown, episode card list with hex number badges, progress bars from watch history, play-on-click |
+| 11B.7 | Info tab component | `InfoTab` — description with expand/collapse, cast, director, genre pills, release year. Only renders sections that have data |
+| 11B.8 | Related tab component | `RelatedTab` — two HexCard carousels (same group, same source). Click navigates to detail page |
+| 11B.9 | Route wiring | Add `/movies/:id` and `/series/:id` routes in App.tsx. Update MoviesPage and SeriesPage to navigate to detail on card click instead of playing directly. Series removes inline episode modal |
+| 11B.10 | Animations | Motion enter/exit transitions for hero, tabs, episode cards. CSS glow pulse for play button |
+| 11B.11 | Keyboard navigation | Arrow keys navigate episode list, Enter plays, Escape goes back, Tab cycles between sections |
 
-**Deliverable:** All 3 major IPTV protocols supported (M3U, Xtream, Stalker). Sources editable. Sync shows progress.
+**Deliverable:** Clicking a movie or series opens a cinematic detail page with all available metadata, episode browser, and related content. Premium streaming app feel with YancoTV hex identity.
 
 ---
 
@@ -96,20 +169,21 @@
 
 ### Sprint 14 — Metadata Enrichment
 
-**Objective:** TMDb integration for rich movie/series info — posters, descriptions, ratings.
+**Objective:** TMDb integration for richer movie/series info — enhanced posters, backdrops, descriptions, ratings.
+
+Note: The content detail page UI was built in Sprint 11B using provider metadata (Xtream/Stalker). This sprint enriches that data with TMDb.
 
 | # | Task | Details |
 |---|------|---------|
 | 14.1 | TMDb API client | Search movies/shows by cleaned title + optional year. Fetch details, images, cast, genres |
 | 14.2 | Metadata matching engine | Fuzzy title matching with confidence scoring. Auto-match above threshold, flag low-confidence for review |
-| 14.3 | Poster display | Replace provider logos with TMDb posters where matched. Graceful fallback to logo |
-| 14.4 | Content detail page | New page for movies/shows: poster, backdrop, description, genres, rating, year, cast, episodes |
-| 14.5 | Manual match correction | "Wrong match? Search again" — user can search TMDb manually and link correct entry |
-| 14.6 | Metadata cache | Cache TMDb results in `metadata_json` column. Avoid repeated API calls |
-| 14.7 | Batch matching | Background job: auto-match unmatched movies/series after source sync. Rate-limited |
-| 14.8 | TMDb API key config | Settings field for user's TMDb API key |
+| 14.3 | Poster/backdrop display | Replace provider logos with TMDb posters and backdrops on detail page. Graceful fallback to provider logo |
+| 14.4 | Manual match correction | "Wrong match? Search again" — user can search TMDb manually and link correct entry |
+| 14.5 | Metadata cache | Cache TMDb results in `metadata_json` column. Avoid repeated API calls |
+| 14.6 | Batch matching | Background job: auto-match unmatched movies/series after source sync. Rate-limited |
+| 14.7 | TMDb API key config | Settings field for user's TMDb API key |
 
-**Deliverable:** Movies and series show rich metadata — posters, descriptions, ratings, genres, cast info.
+**Deliverable:** Detail pages enriched with TMDb posters, backdrops, cast photos, and extended descriptions.
 
 ---
 
@@ -325,9 +399,10 @@ No new backend work — purely frontend/visual.
 | **M5 — Daily Use** | Search, favorites, history | Sprint 6 | DONE |
 | **M6 — Guide** | EPG grid, now/next, enhanced player | Sprints 7–8 | DONE |
 | **M7 — Power Features** | Catch-up, timeshift, parental controls, channel management | Sprints 9–10 | DONE |
-| **M8 — All Sources** | Stalker Portal, source editing, sync progress | Sprint 11 | — |
+| **M8 — All Sources** | Stalker Portal, source editing, sync progress, health indicators | Sprint 11 | DONE |
+| **M8B — Content Detail** | Cinematic movie/series detail pages with metadata, episodes, related | Sprint 11B | — |
 | **M9 — Media Manager** | Recording + downloading = full media management | Sprints 12–13 | — |
-| **M10 — Premium** | Rich metadata, subtitles, multi-view | Sprints 14–16 | — |
+| **M10 — Premium** | TMDb enrichment, subtitles, multi-view | Sprints 14–16 | — |
 | **M11 — Polished** | Settings, system features, search UX, network config | Sprints 17–20 | Partial |
 | **M12 — Ship It** | Stabilized, tested, release-ready | Sprint 21 | — |
 | **M13 — Redesigned** | Fresh UI with all features | Phase 3 | — |

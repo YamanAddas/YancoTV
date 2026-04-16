@@ -34,7 +34,7 @@ The main process owns all privileged operations:
 - **File system** — Reading local M3U files
 - **Player control** — Spawning and communicating with mpv child process via named pipes
 - **Credential storage** — Electron safeStorage for encrypting Xtream credentials
-- **Background jobs** — EPG auto-refresh timer
+- **Background jobs** — EPG auto-refresh timer, source auto-sync timer
 
 The renderer NEVER accesses these directly. Everything goes through IPC.
 
@@ -144,7 +144,8 @@ interface IPlayer {
 |---------|------|---------|
 | Database | `db.ts` | SQLite init, WAL mode, migrations, FTS5 index management |
 | Source Manager | `source-manager.ts` | CRUD for IPTV sources, credential encryption, Zod validation |
-| Source Sync | `source-sync.ts` | Sync orchestration (M3U/Xtream), progress broadcasting, concurrent sync prevention |
+| Source Sync | `source-sync.ts` | Sync orchestration (M3U/Xtream/Stalker), progress broadcasting, auto-sync timer, health tracking |
+| Stalker Client | `stalker-client.ts` | Stalker/Ministra Portal API (MAC-based auth, paginated fetch, stream URL building) |
 | M3U Parser | `m3u-parser.ts` | Streaming M3U/M3U8 parser (BOM, attributes, catchup tags, EPG URL extraction) |
 | Xtream Client | `xtream-client.ts` | Xtream Codes API (auth, live/VOD/series streams, URL building) |
 | Content Classifier | `content-classifier.ts` | Classify M3U entries into live/movie/series via heuristics |
@@ -164,7 +165,6 @@ interface IPlayer {
 
 | Service | File | Sprint | Purpose |
 |---------|------|--------|---------|
-| Stalker Client | `stalker-client.ts` | 11 | Stalker/Ministra Portal API (MAC-based auth) |
 | Recording Service | `recording-service.ts` | 12 | ffmpeg-based live recording + scheduler |
 | Download Manager | `download-manager.ts` | 13 | Queue-based VOD download manager |
 | Metadata Service | `metadata-service.ts` | 14 | TMDb API integration, title matching |
@@ -174,24 +174,30 @@ interface IPlayer {
 
 ## Database Schema (SQLite)
 
-The schema is managed through 6 migration files. Below reflects what is actually deployed.
+The schema is managed through 7 migration files. Below reflects what is actually deployed.
 
 ### Core Tables
 
 ```sql
--- IPTV sources (M3U URLs, local files, Xtream credentials)
+-- IPTV sources (M3U URLs, local files, Xtream credentials, Stalker portals)
+-- NOTE: Original CHECK(type IN ('m3u_url','m3u_file','xtream')) cannot be altered in SQLite.
+-- Stalker inserts bypass it via PRAGMA ignore_check_constraints in source-manager.ts.
 CREATE TABLE sources (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('m3u_url', 'm3u_file', 'xtream')),
+  type TEXT NOT NULL,  -- 'm3u_url', 'm3u_file', 'xtream', 'stalker'
   url TEXT,
   file_path TEXT,
   username_encrypted BLOB,
   password_encrypted BLOB,
+  mac_address_encrypted BLOB,  -- Sprint 11: Stalker MAC address
   epg_url TEXT,
+  priority INTEGER NOT NULL DEFAULT 0,  -- Sprint 11: source ordering for dedup
+  channel_count INTEGER NOT NULL DEFAULT 0,  -- Sprint 11: health tracking
+  last_sync_error TEXT,  -- Sprint 11: last sync error message
+  auto_sync_interval INTEGER NOT NULL DEFAULT 0,  -- Sprint 11: per-source sync interval (hours)
   last_synced INTEGER,
   is_active INTEGER DEFAULT 1,
-  sort_order INTEGER DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -287,6 +293,7 @@ CREATE VIRTUAL TABLE content_fts USING fts5(
 -- Triggers keep content_fts in sync with content table
 
 -- Key indexes
+CREATE INDEX idx_sources_priority ON sources(priority ASC);
 CREATE INDEX idx_content_source ON content(source_id);
 CREATE INDEX idx_content_type ON content(type);
 CREATE INDEX idx_content_group ON content(group_name);
@@ -323,7 +330,7 @@ Heuristic-based:
 
 All channels defined in `src/shared/ipc-channels.ts`:
 
-- `sources:*` — Source management (getAll, add, remove, sync, syncProgress)
+- `sources:*` — Source management (getAll, add, remove, update, reorder, sync, syncProgress)
 - `content:*` — Content browsing (getLive, getMovies, getSeries, getCategories, search, getEpisodes)
 - `player:*` — Playback control (play, pause, resume, stop, seek, setVolume, toggleMute, setSpeed, setAspectRatio, toggleFullscreen, getTracks, setSubtitleTrack, setAudioTrack, state)
 - `player:*Changed/timeUpdate/error` — Main->renderer push events
