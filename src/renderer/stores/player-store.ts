@@ -3,6 +3,7 @@ import { getVideoElement } from '../components/player/video-ref';
 
 export type PlayerMode = 'idle' | 'theater';
 export type PlayerBackend = 'mpv' | 'html5' | 'none';
+export type SettingsTab = 'subtitles' | 'audio' | 'video' | 'speed' | 'info';
 
 export interface SubtitleTrack {
   id: number;
@@ -40,6 +41,9 @@ export interface PlayerStoreState {
   speed: number;
   aspectRatio: string;
   fullscreen: boolean;
+  subtitleDelay: number;
+  audioDelay: number;
+  videoZoom: number;
   subtitleTracks: SubtitleTrack[];
   audioTracks: AudioTrack[];
   mediaInfo: MediaInfo;
@@ -50,6 +54,10 @@ export interface PlayerStoreState {
   currentHistoryId?: string;
   error?: string;
   showSettings: boolean;
+  /** Which tab opens when the settings panel toggles on (gear = 'info' by default). */
+  settingsTab: SettingsTab;
+  /** Compact aspect-ratio popover, separate from the full settings panel. */
+  showAspectMenu: boolean;
   controlsVisible: boolean;
   /** Used by VideoPlayer (html5 backend) to know the start position */
   _startPosition?: number;
@@ -70,17 +78,30 @@ interface PlayerStoreActions {
   toggleFullscreen: () => void;
   toggleSubtitles: () => void;
   loadSubtitleFile: () => Promise<void>;
+  setSubtitleTrack: (id: number) => void;
+  setAudioTrack: (id: number) => void;
+  setSubtitleDelay: (seconds: number) => void;
+  adjustSubtitleDelay: (deltaSeconds: number) => void;
+  setAudioDelay: (seconds: number) => void;
+  adjustAudioDelay: (deltaSeconds: number) => void;
+  setVideoZoom: (factor: number) => void;
+  adjustVideoZoom: (delta: number) => void;
+  takeScreenshot: () => Promise<string | null>;
   setError: (error: string | undefined) => void;
   setMode: (mode: PlayerMode) => void;
   setShowSettings: (show: boolean) => void;
+  /** Open the settings panel directly on a specific tab. */
+  openSettings: (tab: SettingsTab) => void;
   toggleSettings: () => void;
+  toggleAspectMenu: () => void;
+  setShowAspectMenu: (show: boolean) => void;
   setControlsVisible: (visible: boolean) => void;
 }
 
 export type PlayerStore = PlayerStoreState & PlayerStoreActions;
 
 const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const ASPECT_RATIOS = ['auto', '16:9', '4:3', '21:9', 'fill'];
+const ASPECT_RATIOS = ['auto', '16:9', '4:3', '21:9', '2.35:1', '1:1', 'fill'];
 
 export const usePlayerStore = create<PlayerStore>((set, get) => ({
   // State
@@ -94,6 +115,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   speed: 1,
   aspectRatio: 'auto',
   fullscreen: false,
+  subtitleDelay: 0,
+  audioDelay: 0,
+  videoZoom: 1,
   subtitleTracks: [],
   audioTracks: [],
   mediaInfo: {},
@@ -104,6 +128,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   currentHistoryId: undefined,
   error: undefined,
   showSettings: false,
+  settingsTab: 'info',
+  showAspectMenu: false,
   controlsVisible: true,
   _startPosition: undefined,
 
@@ -211,8 +237,12 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       duration: 0,
       subtitleTracks: [],
       audioTracks: [],
+      subtitleDelay: 0,
+      audioDelay: 0,
+      videoZoom: 1,
       mediaInfo: {},
       showSettings: false,
+      showAspectMenu: false,
       fullscreen: false,
       _startPosition: undefined,
     });
@@ -322,13 +352,84 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   loadSubtitleFile: async () => {
     if (!window.api) return;
+    // The main-process handler calls sub-add directly once the user picks a
+    // file, so we don't need a second IPC round-trip from the renderer.
     await window.api.player.loadSubtitleFile();
+  },
+
+  setSubtitleTrack: (id: number) => {
+    if (get().backend === 'mpv') {
+      window.api?.player.setSubtitleTrack(id).catch(() => {});
+    }
+  },
+
+  setAudioTrack: (id: number) => {
+    if (get().backend === 'mpv') {
+      window.api?.player.setAudioTrack(id).catch(() => {});
+    }
+  },
+
+  setSubtitleDelay: (seconds: number) => {
+    const clamped = Math.max(-60, Math.min(60, Math.round(seconds * 100) / 100));
+    if (get().backend === 'mpv') {
+      window.api?.player.setSubtitleDelay(clamped).catch(() => {});
+    }
+    set({ subtitleDelay: clamped });
+  },
+
+  adjustSubtitleDelay: (deltaSeconds: number) => {
+    const current = get().subtitleDelay;
+    get().setSubtitleDelay(current + deltaSeconds);
+  },
+
+  setAudioDelay: (seconds: number) => {
+    const clamped = Math.max(-10, Math.min(10, Math.round(seconds * 100) / 100));
+    if (get().backend === 'mpv') {
+      window.api?.player.setAudioDelay(clamped).catch(() => {});
+    }
+    set({ audioDelay: clamped });
+  },
+
+  adjustAudioDelay: (deltaSeconds: number) => {
+    const current = get().audioDelay;
+    get().setAudioDelay(current + deltaSeconds);
+  },
+
+  setVideoZoom: (factor: number) => {
+    const clamped = Math.max(0.5, Math.min(3, Math.round(factor * 100) / 100));
+    if (get().backend === 'mpv') {
+      window.api?.player.setVideoZoom(clamped).catch(() => {});
+    }
+    set({ videoZoom: clamped });
+  },
+
+  adjustVideoZoom: (delta: number) => {
+    const current = get().videoZoom;
+    get().setVideoZoom(current + delta);
+  },
+
+  takeScreenshot: async () => {
+    if (!window.api || get().backend !== 'mpv') return null;
+    const res = await window.api.player.takeScreenshot().catch(() => null);
+    return res?.ok ? res.path ?? null : null;
   },
 
   setError: (error: string | undefined) => set({ error }),
   setMode: (mode: PlayerMode) => set({ mode }),
   setShowSettings: (show: boolean) => set({ showSettings: show }),
-  toggleSettings: () => set((s) => ({ showSettings: !s.showSettings })),
+  openSettings: (tab) =>
+    set((s) => {
+      // Clicking the same control that opened the panel toggles it closed.
+      if (s.showSettings && s.settingsTab === tab) {
+        return { showSettings: false, showAspectMenu: false };
+      }
+      return { showSettings: true, settingsTab: tab, showAspectMenu: false };
+    }),
+  toggleSettings: () =>
+    set((s) => ({ showSettings: !s.showSettings, showAspectMenu: false })),
+  toggleAspectMenu: () =>
+    set((s) => ({ showAspectMenu: !s.showAspectMenu, showSettings: false })),
+  setShowAspectMenu: (show) => set({ showAspectMenu: show }),
   setControlsVisible: (visible: boolean) => set({ controlsVisible: visible }),
 }));
 
@@ -358,6 +459,9 @@ export function initPlayerEventListeners(): () => void {
     speed?: number;
     aspectRatio?: string;
     fullscreen?: boolean;
+    subtitleDelay?: number;
+    audioDelay?: number;
+    videoZoom?: number;
     subtitleTracks?: SubtitleTrack[];
     audioTracks?: AudioTrack[];
     mediaInfo?: MediaInfo;
@@ -382,6 +486,9 @@ export function initPlayerEventListeners(): () => void {
     if (typeof mpvState.muted === 'boolean') update.muted = mpvState.muted;
     if (typeof mpvState.speed === 'number') update.speed = mpvState.speed;
     if (typeof mpvState.fullscreen === 'boolean') update.fullscreen = mpvState.fullscreen;
+    if (typeof mpvState.subtitleDelay === 'number') update.subtitleDelay = mpvState.subtitleDelay;
+    if (typeof mpvState.audioDelay === 'number') update.audioDelay = mpvState.audioDelay;
+    if (typeof mpvState.videoZoom === 'number') update.videoZoom = mpvState.videoZoom;
     if (mpvState.subtitleTracks) update.subtitleTracks = mpvState.subtitleTracks;
     if (mpvState.audioTracks) update.audioTracks = mpvState.audioTracks;
     if (mpvState.mediaInfo) update.mediaInfo = mpvState.mediaInfo as MediaInfo;

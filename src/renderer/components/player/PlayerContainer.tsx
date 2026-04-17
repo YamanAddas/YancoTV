@@ -3,6 +3,7 @@ import { usePlayerStore } from '../../stores/player-store';
 import { VideoPlayer } from './VideoPlayer';
 import { TheaterControls } from './TheaterControls';
 import { SettingsPanel } from './SettingsPanel';
+import { AspectMenu } from './AspectMenu';
 
 const CONTROLS_HIDE_DELAY = 3000;
 
@@ -17,9 +18,11 @@ export function PlayerContainer() {
   const mode = usePlayerStore((s) => s.mode);
   const backend = usePlayerStore((s) => s.backend);
   const showSettings = usePlayerStore((s) => s.showSettings);
+  const showAspectMenu = usePlayerStore((s) => s.showAspectMenu);
   const controlsVisible = usePlayerStore((s) => s.controlsVisible);
   const setControlsVisible = usePlayerStore((s) => s.setControlsVisible);
   const setShowSettings = usePlayerStore((s) => s.setShowSettings);
+  const setShowAspectMenu = usePlayerStore((s) => s.setShowAspectMenu);
 
   const isActive = status === 'playing' || status === 'paused' || status === 'buffering';
 
@@ -29,7 +32,11 @@ export function PlayerContainer() {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
       const state = usePlayerStore.getState();
-      if (state.status === 'playing' && !state.showSettings) {
+      if (
+        state.status === 'playing' &&
+        !state.showSettings &&
+        !state.showAspectMenu
+      ) {
         setControlsVisible(false);
       }
     }, CONTROLS_HIDE_DELAY);
@@ -125,6 +132,11 @@ export function PlayerContainer() {
       {/* Settings panel */}
       {showSettings && (
         <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* Compact aspect-ratio popover (separate from the full settings panel) */}
+      {showAspectMenu && (
+        <AspectMenu onClose={() => setShowAspectMenu(false)} />
       )}
     </div>
   );

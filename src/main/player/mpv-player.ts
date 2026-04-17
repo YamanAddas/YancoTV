@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { app } from 'electron';
 import log from 'electron-log/main';
 import type {
   IPlayer,
@@ -28,6 +31,9 @@ function defaultState(): PlayerState {
     speed: 1,
     aspectRatio: 'auto',
     fullscreen: false,
+    subtitleDelay: 0,
+    audioDelay: 0,
+    videoZoom: 1,
     subtitleTracks: [],
     audioTracks: [],
   };
@@ -43,10 +49,12 @@ export class MpvPlayer implements IPlayer {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private listeners: { [K in keyof PlayerEventMap]?: Set<any> } = {};
   private destroyed = false;
+  private screenshotDir: string;
 
   constructor() {
     this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
     this.mpvPath = findMpvPath();
+    this.screenshotDir = path.join(app.getPath('pictures'), 'YancoTV');
   }
 
   async play(url: string, options?: PlayOptions): Promise<void> {
@@ -196,6 +204,44 @@ export class MpvPlayer implements IPlayer {
   async setAudioTrack(id: number): Promise<void> {
     this.ensureConnected();
     await this.ipc!.command(['set_property', 'aid', id]);
+  }
+
+  async setSubtitleDelay(seconds: number): Promise<void> {
+    const clamped = Math.max(-60, Math.min(60, seconds));
+    if (this.ipc?.isConnected()) {
+      await this.ipc.command(['set_property', 'sub-delay', clamped]);
+    }
+    this.state.subtitleDelay = clamped;
+    this.emitEvent('state-change', this.state);
+  }
+
+  async setAudioDelay(seconds: number): Promise<void> {
+    const clamped = Math.max(-10, Math.min(10, seconds));
+    if (this.ipc?.isConnected()) {
+      await this.ipc.command(['set_property', 'audio-delay', clamped]);
+    }
+    this.state.audioDelay = clamped;
+    this.emitEvent('state-change', this.state);
+  }
+
+  async setVideoZoom(factor: number): Promise<void> {
+    const clamped = Math.max(0.5, Math.min(3, factor));
+    // mpv's `video-zoom` is a log2 scale: 0 = 1x, 1 = 2x, -1 = 0.5x.
+    const logZoom = Math.log2(clamped);
+    if (this.ipc?.isConnected()) {
+      await this.ipc.command(['set_property', 'video-zoom', logZoom]);
+    }
+    this.state.videoZoom = clamped;
+    this.emitEvent('state-change', this.state);
+  }
+
+  async takeScreenshot(): Promise<string> {
+    this.ensureConnected();
+    await fs.promises.mkdir(this.screenshotDir, { recursive: true });
+    const filename = `yancotv-${Date.now()}.png`;
+    const outPath = path.join(this.screenshotDir, filename);
+    await this.ipc!.command(['screenshot-to-file', outPath, 'video']);
+    return outPath;
   }
 
   on<K extends keyof PlayerEventMap>(event: K, handler: PlayerEventMap[K]): void {
@@ -383,6 +429,9 @@ export class MpvPlayer implements IPlayer {
     await this.ipc.observeProperty('estimated-vf-fps');
     await this.ipc.observeProperty('video-bitrate');
     await this.ipc.observeProperty('hwdec-current');
+    await this.ipc.observeProperty('sub-delay');
+    await this.ipc.observeProperty('audio-delay');
+    await this.ipc.observeProperty('video-zoom');
   }
 
   private handlePropertyChange(name: string, data: unknown): void {
@@ -471,6 +520,22 @@ export class MpvPlayer implements IPlayer {
         break;
       case 'hwdec-current':
         if (typeof data === 'string') this.media.hwdec = data;
+        break;
+      case 'sub-delay':
+        if (typeof data === 'number') {
+          this.state.subtitleDelay = Math.round(data * 100) / 100;
+        }
+        break;
+      case 'audio-delay':
+        if (typeof data === 'number') {
+          this.state.audioDelay = Math.round(data * 100) / 100;
+        }
+        break;
+      case 'video-zoom':
+        if (typeof data === 'number') {
+          // mpv stores log2 zoom; convert back to plain factor.
+          this.state.videoZoom = Math.round(Math.pow(2, data) * 100) / 100;
+        }
         break;
     }
   }

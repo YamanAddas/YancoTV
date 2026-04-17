@@ -40,7 +40,16 @@ export const IpcChannels = {
   PLAYER_STATE: 'player:state',
   PLAYER_GET_MEDIA_INFO: 'player:getMediaInfo',
   PLAYER_LOAD_SUBTITLE_FILE: 'player:loadSubtitleFile',
+  PLAYER_ADD_SUBTITLE_PATH: 'player:addSubtitlePath',
+  PLAYER_SET_SUBTITLE_DELAY: 'player:setSubtitleDelay',
+  PLAYER_SET_AUDIO_DELAY: 'player:setAudioDelay',
+  PLAYER_SET_VIDEO_ZOOM: 'player:setVideoZoom',
+  PLAYER_TAKE_SCREENSHOT: 'player:takeScreenshot',
   PLAYER_SET_FULLSCREEN: 'player:setFullscreen',
+
+  // Subtitle provider — OpenSubtitles
+  SUBTITLES_SEARCH: 'subtitles:search',
+  SUBTITLES_DOWNLOAD_AND_LOAD: 'subtitles:downloadAndLoad',
 
   // Player events (main → renderer)
   PLAYER_STATE_CHANGED: 'player:stateChanged',

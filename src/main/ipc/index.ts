@@ -81,6 +81,7 @@ import {
 import type { ChannelOverride } from '../services/parental-service';
 import { MpvPlayer } from '../player/mpv-player';
 import type { PlayerState } from '../player/player.interface';
+import { searchSubtitles, downloadSubtitle } from '../services/opensubtitles-client';
 
 let player: MpvPlayer | null = null;
 
@@ -909,10 +910,112 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: 'cancelled' };
     }
 
-    // Return the file path to the renderer.
-    // The HTML5 player handles subtitle loading via <track> element.
-    // Full subtitle rendering (SRT/ASS parsing) is planned for Sprint 15.
-    return { ok: true, path: result.filePaths[0] };
+    const chosen = result.filePaths[0];
+    // Load into mpv immediately so the user doesn't have to take a second step.
+    try {
+      await getPlayer().addSubtitleFile(chosen);
+    } catch (err) {
+      log.warn('sub-add failed for picker result:', err);
+      // Still return path — html5 backend uses it via <track>.
+    }
+    return { ok: true, path: chosen };
+  });
+
+  // Load an arbitrary subtitle path into mpv (used by OpenSubtitles flow).
+  ipcMain.handle(IpcChannels.PLAYER_ADD_SUBTITLE_PATH, async (_event, subtitlePath: string) => {
+    if (!subtitlePath || typeof subtitlePath !== 'string') {
+      return { ok: false, error: 'Invalid subtitle path' };
+    }
+    try {
+      await getPlayer().addSubtitleFile(subtitlePath);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_SUBTITLE_DELAY, async (_event, seconds: number) => {
+    if (typeof seconds !== 'number' || !isFinite(seconds)) {
+      return { ok: false, error: 'Invalid delay' };
+    }
+    try {
+      await getPlayer().setSubtitleDelay(seconds);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_AUDIO_DELAY, async (_event, seconds: number) => {
+    if (typeof seconds !== 'number' || !isFinite(seconds)) {
+      return { ok: false, error: 'Invalid delay' };
+    }
+    try {
+      await getPlayer().setAudioDelay(seconds);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_SET_VIDEO_ZOOM, async (_event, factor: number) => {
+    if (typeof factor !== 'number' || !isFinite(factor) || factor <= 0) {
+      return { ok: false, error: 'Invalid zoom' };
+    }
+    try {
+      await getPlayer().setVideoZoom(factor);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_TAKE_SCREENSHOT, async () => {
+    try {
+      const outPath = await getPlayer().takeScreenshot();
+      return { ok: true, path: outPath };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  // OpenSubtitles search + download + load
+  ipcMain.handle(
+    IpcChannels.SUBTITLES_SEARCH,
+    async (_event, params: Record<string, unknown>) => {
+      try {
+        const results = await searchSubtitles({
+          query: typeof params.query === 'string' ? params.query : undefined,
+          imdb_id: typeof params.imdb_id === 'string' ? params.imdb_id : undefined,
+          tmdb_id: typeof params.tmdb_id === 'number' ? params.tmdb_id : undefined,
+          season: typeof params.season === 'number' ? params.season : undefined,
+          episode: typeof params.episode === 'number' ? params.episode : undefined,
+          languages: typeof params.languages === 'string' ? params.languages : undefined,
+          moviehash: typeof params.moviehash === 'string' ? params.moviehash : undefined,
+          type: params.type as 'movie' | 'episode' | 'all' | undefined,
+        });
+        return { ok: true, results };
+      } catch (err) {
+        return { ok: false, error: String((err as Error).message) };
+      }
+    },
+  );
+
+  ipcMain.handle(IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD, async (_event, fileId: number) => {
+    if (typeof fileId !== 'number') {
+      return { ok: false, error: 'Invalid file id' };
+    }
+    try {
+      const { path: subPath, remaining } = await downloadSubtitle(fileId);
+      try {
+        await getPlayer().addSubtitleFile(subPath);
+      } catch (err) {
+        log.warn('sub-add after OpenSubtitles download failed:', err);
+      }
+      return { ok: true, path: subPath, remaining };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
   });
 
   // Fullscreen — managed by Electron main window

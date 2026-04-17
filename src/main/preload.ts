@@ -153,6 +153,15 @@ const api = {
     setAudioTrack: (id: number) => ipcRenderer.invoke(IpcChannels.PLAYER_SET_AUDIO_TRACK, id),
     getMediaInfo: () => ipcRenderer.invoke(IpcChannels.PLAYER_GET_MEDIA_INFO),
     loadSubtitleFile: () => ipcRenderer.invoke(IpcChannels.PLAYER_LOAD_SUBTITLE_FILE),
+    addSubtitlePath: (path: string) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_ADD_SUBTITLE_PATH, path),
+    setSubtitleDelay: (seconds: number) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_SET_SUBTITLE_DELAY, seconds),
+    setAudioDelay: (seconds: number) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_SET_AUDIO_DELAY, seconds),
+    setVideoZoom: (factor: number) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_SET_VIDEO_ZOOM, factor),
+    takeScreenshot: () => ipcRenderer.invoke(IpcChannels.PLAYER_TAKE_SCREENSHOT),
     state: () => ipcRenderer.invoke(IpcChannels.PLAYER_STATE),
 
     // Theater overlay — show/hide the transparent controls window that sits
@@ -202,6 +211,21 @@ const api = {
       };
     },
 
+  },
+
+  subtitles: {
+    search: (params: {
+      query?: string;
+      imdb_id?: string;
+      tmdb_id?: number;
+      season?: number;
+      episode?: number;
+      languages?: string;
+      moviehash?: string;
+      type?: 'movie' | 'episode' | 'all';
+    }) => ipcRenderer.invoke(IpcChannels.SUBTITLES_SEARCH, params),
+    downloadAndLoad: (fileId: number) =>
+      ipcRenderer.invoke(IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD, fileId),
   },
 
   groupPrefs: {

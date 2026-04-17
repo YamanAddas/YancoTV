@@ -5,7 +5,7 @@ export interface PlayOptions {
   wid?: string;
 }
 
-export type AspectRatio = 'auto' | '16:9' | '4:3' | '21:9' | 'fill';
+export type AspectRatio = 'auto' | '16:9' | '4:3' | '21:9' | '2.35:1' | '1:1' | 'fill';
 
 export type PlayerMode = 'idle' | 'theater' | 'browse' | 'multiview';
 
@@ -29,6 +29,12 @@ export interface PlayerState {
   speed: number;
   aspectRatio: AspectRatio;
   fullscreen: boolean;
+  /** Subtitle timing offset in seconds (positive = subs appear later) */
+  subtitleDelay: number;
+  /** Audio timing offset in seconds (positive = audio plays later) */
+  audioDelay: number;
+  /** Video zoom factor. 1 = fit, >1 = zoomed in, <1 = zoomed out */
+  videoZoom: number;
   currentUrl?: string;
   subtitleTracks: SubtitleTrack[];
   audioTracks: AudioTrack[];
@@ -76,6 +82,15 @@ export interface IPlayer {
   addSubtitleFile(path: string): Promise<void>;
   getAudioTracks(): AudioTrack[];
   setAudioTrack(id: number): Promise<void>;
+
+  /** Subtitle timing offset (seconds). Applies to the active subtitle track. */
+  setSubtitleDelay(seconds: number): Promise<void>;
+  /** Audio timing offset (seconds). Use to fix lip-sync. */
+  setAudioDelay(seconds: number): Promise<void>;
+  /** Zoom factor. 1 = no zoom, 1.5 = 50% zoomed in, etc. */
+  setVideoZoom(factor: number): Promise<void>;
+  /** Save a screenshot of the current frame; returns the file path. */
+  takeScreenshot(): Promise<string>;
 
   on<K extends keyof PlayerEventMap>(event: K, handler: PlayerEventMap[K]): void;
   off<K extends keyof PlayerEventMap>(event: K, handler: PlayerEventMap[K]): void;
