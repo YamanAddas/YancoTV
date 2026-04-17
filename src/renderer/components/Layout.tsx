@@ -8,7 +8,12 @@ export function Layout() {
   usePlayerShortcuts();
 
   const mode = usePlayerStore((s) => s.mode);
+  const backend = usePlayerStore((s) => s.backend);
   const isTheater = mode === 'theater';
+  // When mpv is the active backend, the video is drawn by mpv embedded into
+  // this main window's HWND (via --wid) and the controls live in a separate
+  // transparent overlay BrowserWindow. The main window renders nothing extra.
+  const renderPlayerContainer = backend !== 'mpv';
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-space">
@@ -47,8 +52,10 @@ export function Layout() {
         )}
       </div>
 
-      {/* Player — overlays the entire window in theater mode */}
-      <PlayerContainer />
+      {/* Player — overlays the entire window in theater mode (html5 backend only;
+          mpv backend renders video via --wid into the main HWND and controls
+          in a separate transparent overlay BrowserWindow). */}
+      {renderPlayerContainer && <PlayerContainer />}
     </div>
   );
 }

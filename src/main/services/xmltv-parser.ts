@@ -271,17 +271,115 @@ function extractAttrFromTag(
   return extractAttrFast(body.slice(idx + open.length, tagEnd), attrName);
 }
 
-/** Decode common XML character entities. Fast-path when no '&' present. */
+/**
+ * Common HTML named entities that appear in real-world EPG feeds beyond the
+ * five XML-defined ones. Not exhaustive — this covers the practical set
+ * (whitespace, dashes, quotes, accents, common symbols). Unknown entities
+ * are left intact so the raw text doesn't get corrupted.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+  // XML-defined
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  // Whitespace & punctuation
+  nbsp: '\u00A0',
+  ensp: '\u2002',
+  emsp: '\u2003',
+  thinsp: '\u2009',
+  ndash: '\u2013',
+  mdash: '\u2014',
+  hellip: '\u2026',
+  lsquo: '\u2018',
+  rsquo: '\u2019',
+  ldquo: '\u201C',
+  rdquo: '\u201D',
+  laquo: '\u00AB',
+  raquo: '\u00BB',
+  middot: '\u00B7',
+  bull: '\u2022',
+  // Symbols
+  copy: '\u00A9',
+  reg: '\u00AE',
+  trade: '\u2122',
+  deg: '\u00B0',
+  plusmn: '\u00B1',
+  times: '\u00D7',
+  divide: '\u00F7',
+  pound: '\u00A3',
+  euro: '\u20AC',
+  yen: '\u00A5',
+  cent: '\u00A2',
+  sect: '\u00A7',
+  para: '\u00B6',
+  // Common Latin-1 accents (most others fall through unchanged)
+  agrave: '\u00E0',
+  aacute: '\u00E1',
+  acirc: '\u00E2',
+  atilde: '\u00E3',
+  auml: '\u00E4',
+  aring: '\u00E5',
+  aelig: '\u00E6',
+  ccedil: '\u00E7',
+  egrave: '\u00E8',
+  eacute: '\u00E9',
+  ecirc: '\u00EA',
+  euml: '\u00EB',
+  igrave: '\u00EC',
+  iacute: '\u00ED',
+  icirc: '\u00EE',
+  iuml: '\u00EF',
+  ntilde: '\u00F1',
+  ograve: '\u00F2',
+  oacute: '\u00F3',
+  ocirc: '\u00F4',
+  otilde: '\u00F5',
+  ouml: '\u00F6',
+  oslash: '\u00F8',
+  ugrave: '\u00F9',
+  uacute: '\u00FA',
+  ucirc: '\u00FB',
+  uuml: '\u00FC',
+  yacute: '\u00FD',
+  szlig: '\u00DF',
+  Agrave: '\u00C0',
+  Aacute: '\u00C1',
+  Acirc: '\u00C2',
+  Atilde: '\u00C3',
+  Auml: '\u00C4',
+  Aring: '\u00C5',
+  AElig: '\u00C6',
+  Ccedil: '\u00C7',
+  Egrave: '\u00C8',
+  Eacute: '\u00C9',
+  Ecirc: '\u00CA',
+  Euml: '\u00CB',
+  Ntilde: '\u00D1',
+  Oacute: '\u00D3',
+  Ouml: '\u00D6',
+  Uuml: '\u00DC',
+};
+
+/** Decode XML/HTML character entities. Fast-path when no '&' present.
+ *  Handles named entities (&amp; &nbsp; …), decimal (&#160;), and hex (&#xA0;).
+ *  Unknown named entities pass through unchanged. */
 function decodeXmlEntities(str: string): string {
   if (!str.includes('&')) return str;
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
-      String.fromCharCode(parseInt(hex, 16)),
-    );
+  return str.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, ref: string) => {
+    if (ref[0] === '#') {
+      const code = ref[1] === 'x' || ref[1] === 'X'
+        ? parseInt(ref.slice(2), 16)
+        : parseInt(ref.slice(1), 10);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10FFFF) return match;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return match;
+      }
+    }
+    const named = NAMED_ENTITIES[ref];
+    return named !== undefined ? named : match;
+  });
 }

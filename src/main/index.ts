@@ -12,6 +12,13 @@ import { initDatabase, closeDatabase } from './services/db';
 import { registerIpcHandlers, destroyPlayer } from './ipc';
 import { startAutoRefresh, stopAutoRefresh } from './services/epg-service';
 import { startAutoSync, stopAutoSync } from './services/source-sync';
+import { createOverlayWindow, destroyOverlay, getOverlayWindow } from './player/overlay-window';
+import {
+  createVideoWindow,
+  destroyVideoWindow,
+  getVideoWindow,
+  getVideoWindowHandle,
+} from './player/video-window';
 
 log.initialize();
 log.info(`${APP_NAME} starting...`);
@@ -23,6 +30,12 @@ const isDev = !app.isPackaged;
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
+
+/** Accessor re-exported for IPC handlers that need to push events to the overlay. */
+export { getOverlayWindow };
+
+/** Accessor re-exported for IPC handlers that need to embed mpv into the video window. */
+export { getVideoWindow, getVideoWindowHandle };
 
 /**
  * Get the native window handle (HWND on Windows) as a decimal string.
@@ -65,9 +78,17 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show();
+    // Create the video stage window first (mpv embeds here) and the controls
+    // overlay on top of it. Both are children of main and hidden until play.
+    if (mainWindow) {
+      createVideoWindow(mainWindow);
+      createOverlayWindow(mainWindow);
+    }
   });
 
   mainWindow.on('closed', () => {
+    destroyOverlay();
+    destroyVideoWindow();
     mainWindow = null;
   });
 
@@ -143,6 +164,8 @@ app.on('window-all-closed', () => {
   stopAutoRefresh();
   stopAutoSync();
   destroyPlayer();
+  destroyOverlay();
+  destroyVideoWindow();
   closeDatabase();
   app.quit();
 });

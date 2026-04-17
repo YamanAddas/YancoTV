@@ -102,7 +102,7 @@ describe('IPC Wiring Consistency', () => {
     expect(IpcChannels.PARENTAL_GET_OVERRIDES).toBe('parental:getOverrides');
   });
 
-  it('exports exactly 93 channels', () => {
-    expect(Object.keys(IpcChannels)).toHaveLength(93);
+  it('exports exactly 97 channels', () => {
+    expect(Object.keys(IpcChannels)).toHaveLength(97);
   });
 });

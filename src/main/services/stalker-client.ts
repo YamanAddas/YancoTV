@@ -128,6 +128,8 @@ export class StalkerClient {
 
   async getLiveChannels(): Promise<Result<StalkerChannel[]>> {
     const allChannels: StalkerChannel[] = [];
+    let totalItems = 0;
+    let lastPageReached = 0;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const data = await this.request('itv', 'get_all_channels', { p: String(page) });
@@ -151,8 +153,15 @@ export class StalkerClient {
         });
       }
 
-      const totalItems = Number(js?.total_items) || allChannels.length;
+      totalItems = Number(js?.total_items) || allChannels.length;
+      lastPageReached = page;
       if (allChannels.length >= totalItems) break;
+    }
+
+    if (lastPageReached === MAX_PAGES && allChannels.length < totalItems) {
+      log.warn(
+        `Stalker getLiveChannels: hit MAX_PAGES (${MAX_PAGES}) cap before fetching all channels — got ${allChannels.length} of ${totalItems}. Increase MAX_PAGES if portal is legitimate.`,
+      );
     }
 
     return { ok: true, value: allChannels };
@@ -176,6 +185,8 @@ export class StalkerClient {
 
   async getVodItems(): Promise<Result<StalkerVodItem[]>> {
     const allItems: StalkerVodItem[] = [];
+    let totalItems = 0;
+    let lastPageReached = 0;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const data = await this.request('vod', 'get_ordered_list', {
@@ -199,8 +210,15 @@ export class StalkerClient {
         });
       }
 
-      const totalItems = Number(js?.total_items) || allItems.length;
+      totalItems = Number(js?.total_items) || allItems.length;
+      lastPageReached = page;
       if (allItems.length >= totalItems) break;
+    }
+
+    if (lastPageReached === MAX_PAGES && allItems.length < totalItems) {
+      log.warn(
+        `Stalker getVodItems: hit MAX_PAGES (${MAX_PAGES}) cap — got ${allItems.length} of ${totalItems}.`,
+      );
     }
 
     return { ok: true, value: allItems };
@@ -224,6 +242,8 @@ export class StalkerClient {
 
   async getSeriesList(): Promise<Result<StalkerSeriesItem[]>> {
     const allSeries: StalkerSeriesItem[] = [];
+    let totalItems = 0;
+    let lastPageReached = 0;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const data = await this.request('series', 'get_ordered_list', {
@@ -247,8 +267,15 @@ export class StalkerClient {
         });
       }
 
-      const totalItems = Number(js?.total_items) || allSeries.length;
+      totalItems = Number(js?.total_items) || allSeries.length;
+      lastPageReached = page;
       if (allSeries.length >= totalItems) break;
+    }
+
+    if (lastPageReached === MAX_PAGES && allSeries.length < totalItems) {
+      log.warn(
+        `Stalker getSeriesList: hit MAX_PAGES (${MAX_PAGES}) cap — got ${allSeries.length} of ${totalItems}.`,
+      );
     }
 
     return { ok: true, value: allSeries };

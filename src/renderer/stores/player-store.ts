@@ -405,15 +405,18 @@ export function initPlayerEventListeners(): () => void {
   cleanups.push(unsubError);
 
   // --- History position updates (both backends) ---
-  let lastHistoryUpdateAt = 0;
+  // Track the last update per historyId so switching content rapidly doesn't
+  // cause us to skip the first save on the new item.
+  const lastHistoryUpdateAt = new Map<string, number>();
 
   const interval = setInterval(() => {
     const { currentHistoryId, duration, status, backend, position } = usePlayerStore.getState();
     if (!currentHistoryId || status !== 'playing') return;
 
     const now = Date.now();
-    if (now - lastHistoryUpdateAt < 10_000) return;
-    lastHistoryUpdateAt = now;
+    const last = lastHistoryUpdateAt.get(currentHistoryId) ?? 0;
+    if (now - last < 10_000) return;
+    lastHistoryUpdateAt.set(currentHistoryId, now);
 
     // For mpv, position comes from the store (fed by IPC push).
     // For html5, read from the video element for accuracy.
@@ -428,8 +431,20 @@ export function initPlayerEventListeners(): () => void {
       Math.floor(pos),
       duration > 0 ? Math.floor(duration) : undefined,
     );
+
+    // Garbage-collect entries we'll never see again so the map doesn't grow
+    // unbounded over a long session.
+    if (lastHistoryUpdateAt.size > 100) {
+      const cutoff = now - 60 * 60_000; // 1 hour
+      for (const [id, t] of lastHistoryUpdateAt) {
+        if (t < cutoff && id !== currentHistoryId) lastHistoryUpdateAt.delete(id);
+      }
+    }
   }, 5_000);
-  cleanups.push(() => clearInterval(interval));
+  cleanups.push(() => {
+    clearInterval(interval);
+    lastHistoryUpdateAt.clear();
+  });
 
   const cleanup = () => {
     for (const fn of cleanups) fn();

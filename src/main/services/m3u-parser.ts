@@ -32,6 +32,11 @@ export interface M3uParseResult {
  */
 export function parseM3u(content: string): M3uParseResult {
   const entries: M3uEntry[] = [];
+  // Track URLs we've already added so duplicates from the same playlist
+  // don't get classified twice. Titled entries take precedence over bare
+  // URL entries (a titled entry inserted later wins by replacing the bare).
+  const urlIndex = new Map<string, number>(); // streamUrl -> index in entries
+  let duplicates = 0;
   let epgUrl: string | undefined;
 
   // Strip BOM marker if present
@@ -41,6 +46,22 @@ export function parseM3u(content: string): M3uParseResult {
   const lines = cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
   let currentEntry: Partial<M3uEntry> | null = null;
+
+  const addOrReplace = (entry: M3uEntry, hasTitle: boolean) => {
+    const existingIdx = urlIndex.get(entry.streamUrl);
+    if (existingIdx === undefined) {
+      urlIndex.set(entry.streamUrl, entries.length);
+      entries.push(entry);
+      return;
+    }
+    duplicates++;
+    const existing = entries[existingIdx];
+    // If the existing entry is a bare URL (no title) and the new one has
+    // a real title, upgrade. Otherwise drop the duplicate.
+    if (hasTitle && !existing.title) {
+      entries[existingIdx] = entry;
+    }
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -72,34 +93,46 @@ export function parseM3u(content: string): M3uParseResult {
 
     // This is a URL line — pair it with the current EXTINF entry
     if (currentEntry) {
-      currentEntry.streamUrl = line;
-      entries.push({
-        duration: currentEntry.duration ?? -1,
-        title: currentEntry.title ?? '',
-        groupTitle: currentEntry.groupTitle ?? '',
-        tvgId: currentEntry.tvgId ?? '',
-        tvgName: currentEntry.tvgName ?? '',
-        tvgLogo: currentEntry.tvgLogo ?? '',
-        streamUrl: line,
-        rawAttributes: currentEntry.rawAttributes ?? '',
-      });
+      addOrReplace(
+        {
+          duration: currentEntry.duration ?? -1,
+          title: currentEntry.title ?? '',
+          groupTitle: currentEntry.groupTitle ?? '',
+          tvgId: currentEntry.tvgId ?? '',
+          tvgName: currentEntry.tvgName ?? '',
+          tvgLogo: currentEntry.tvgLogo ?? '',
+          streamUrl: line,
+          rawAttributes: currentEntry.rawAttributes ?? '',
+          catchupType: currentEntry.catchupType,
+          catchupSource: currentEntry.catchupSource,
+          catchupDays: currentEntry.catchupDays,
+        },
+        Boolean(currentEntry.title),
+      );
       currentEntry = null;
     } else {
       // URL without preceding EXTINF — create a bare entry
-      entries.push({
-        duration: -1,
-        title: extractTitleFromUrl(line),
-        groupTitle: '',
-        tvgId: '',
-        tvgName: '',
-        tvgLogo: '',
-        streamUrl: line,
-        rawAttributes: '',
-      });
+      addOrReplace(
+        {
+          duration: -1,
+          title: extractTitleFromUrl(line),
+          groupTitle: '',
+          tvgId: '',
+          tvgName: '',
+          tvgLogo: '',
+          streamUrl: line,
+          rawAttributes: '',
+        },
+        false,
+      );
     }
   }
 
-  log.info(`Parsed ${entries.length} entries from M3U`);
+  if (duplicates > 0) {
+    log.warn(`Parsed M3U: ${entries.length} unique entries (${duplicates} duplicate URLs collapsed)`);
+  } else {
+    log.info(`Parsed ${entries.length} entries from M3U`);
+  }
   return { entries, epgUrl };
 }
 

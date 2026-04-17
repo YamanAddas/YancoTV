@@ -5,8 +5,10 @@ import { addSourceInputSchema, updateSourceInputSchema } from '../../shared/sche
 import { getDb } from '../services/db';
 import { getAllSources, addSource, updateSource, removeSource, reorderSources, getSourceById, getSourceCredentials } from '../services/source-manager';
 import { syncSource } from '../services/source-sync';
-import { getMainWindow } from '../index';
+import { getMainWindow, getOverlayWindow, getVideoWindowHandle } from '../index';
 import { findMpvPath } from '../player/mpv-path';
+import { showOverlay, hideOverlay } from '../player/overlay-window';
+import { showVideoWindow, hideVideoWindow } from '../player/video-window';
 import {
   getContentByType,
   getCategories,
@@ -82,11 +84,19 @@ import type { PlayerState } from '../player/player.interface';
 
 let player: MpvPlayer | null = null;
 
-/** Send to the main renderer window only (skip the player child window). */
-function sendToMainRenderer(channel: string, ...args: unknown[]): void {
+/**
+ * Send a player event to every renderer that might be displaying player UI:
+ * the main window and the transparent controls overlay. Both subscribe to the
+ * same channels and keep their own Zustand stores in sync.
+ */
+function sendToPlayerRenderers(channel: string, ...args: unknown[]): void {
   const main = getMainWindow();
   if (main && !main.isDestroyed()) {
     main.webContents.send(channel, ...args);
+  }
+  const overlay = getOverlayWindow();
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.webContents.send(channel, ...args);
   }
 }
 
@@ -96,19 +106,19 @@ function getPlayer(): MpvPlayer {
 
     // Forward player events to the main renderer window
     player.on('state-change', (state: PlayerState) => {
-      sendToMainRenderer(IpcChannels.PLAYER_STATE_CHANGED, state);
+      sendToPlayerRenderers(IpcChannels.PLAYER_STATE_CHANGED, state);
     });
 
     player.on('time-update', (position: number) => {
-      sendToMainRenderer(IpcChannels.PLAYER_TIME_UPDATE, position);
+      sendToPlayerRenderers(IpcChannels.PLAYER_TIME_UPDATE, position);
     });
 
     player.on('subtitle-text', (text: string) => {
-      sendToMainRenderer(IpcChannels.PLAYER_SUBTITLE_TEXT, text);
+      sendToPlayerRenderers(IpcChannels.PLAYER_SUBTITLE_TEXT, text);
     });
 
     player.on('error', (err: Error) => {
-      sendToMainRenderer(IpcChannels.PLAYER_ERROR, err.message);
+      sendToPlayerRenderers(IpcChannels.PLAYER_ERROR, err.message);
     });
   }
   return player;
@@ -697,12 +707,44 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: 'Invalid URL' };
     }
     try {
-      await getPlayer().play(url, typeof startPosition === 'number' ? { startPosition } : undefined);
+      // Embed mpv into the dedicated video-stage BrowserWindow (not main).
+      // The main window's Chromium compositor would cover mpv's child surface;
+      // a separate transparent child window sidesteps that z-order trap. The
+      // video window must be visible (shown) before we pass its HWND to mpv
+      // so mpv's surface attaches to a window that's actually on screen.
+      showVideoWindow();
+      const wid = getVideoWindowHandle() ?? undefined;
+      const opts: { startPosition?: number; wid?: string } = {};
+      if (typeof startPosition === 'number') opts.startPosition = startPosition;
+      if (wid) opts.wid = wid;
+      await getPlayer().play(url, Object.keys(opts).length > 0 ? opts : undefined);
+      if (opts.wid) {
+        showOverlay();
+        sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN);
+      } else {
+        // No handle — fall back to mpv's own standalone window. Hide the
+        // video stage we optimistically showed.
+        hideVideoWindow();
+      }
       return { ok: true };
     } catch (err) {
+      hideVideoWindow();
       log.error('Player play error:', err);
       return { ok: false, error: String((err as Error).message) };
     }
+  });
+
+  // Theater overlay — shown when mpv is embedded in the main window
+  ipcMain.handle(IpcChannels.PLAYER_OVERLAY_SHOW, () => {
+    showOverlay();
+    sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN);
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_OVERLAY_HIDE, () => {
+    hideOverlay();
+    sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
+    return { ok: true };
   });
 
   ipcMain.handle(IpcChannels.PLAYER_PAUSE, async () => {
@@ -726,6 +768,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.PLAYER_STOP, async () => {
     try {
       await getPlayer().stop();
+      hideOverlay();
+      hideVideoWindow();
+      sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
       return { ok: true };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };

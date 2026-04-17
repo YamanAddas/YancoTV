@@ -238,6 +238,8 @@ export class MpvPlayer implements IPlayer {
     // after a crash (Bug 10 fix)
     this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
 
+    const embedded = typeof options?.wid === 'string' && options.wid.length > 0;
+
     const args = [
       url,
       `--input-ipc-server=\\\\.\\pipe\\${this.pipeName}`,
@@ -247,17 +249,24 @@ export class MpvPlayer implements IPlayer {
       `--volume=${this.state.volume}`,
       // Hardware decoding for performance
       '--hwdec=auto',
-      // Enable mpv's built-in on-screen controller for user controls
-      '--osc=yes',
+      // Embedded mode: our React overlay draws controls, disable mpv's OSC.
+      // Standalone mode: show mpv's built-in OSC.
+      embedded ? '--osc=no' : '--osc=yes',
       // Enable timeshift buffering (cache for live rewind/pause)
       ...getTimeshiftMpvArgs(),
     ];
 
-    // mpv runs in its own borderless window with built-in OSC controls.
-    // The Electron main window minimizes during playback and restores on stop.
-    args.push('--force-window=yes');
-    args.push('--title=YancoTV Player');
-    args.push('--border=no');
+    if (embedded) {
+      // Embed into the provided HWND (Electron main window). mpv creates a
+      // child HWND that fills the parent's client area and composites its
+      // video surface above any HTML content in that window.
+      args.push(`--wid=${options!.wid}`);
+    } else {
+      // Standalone: mpv runs in its own borderless window with OSC controls.
+      args.push('--force-window=yes');
+      args.push('--title=YancoTV Player');
+      args.push('--border=no');
+    }
 
     if (options?.startPosition && options.startPosition > 0) {
       args.push(`--start=${options.startPosition}`);

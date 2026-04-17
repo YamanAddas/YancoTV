@@ -155,6 +155,21 @@ const api = {
     loadSubtitleFile: () => ipcRenderer.invoke(IpcChannels.PLAYER_LOAD_SUBTITLE_FILE),
     state: () => ipcRenderer.invoke(IpcChannels.PLAYER_STATE),
 
+    // Theater overlay — show/hide the transparent controls window that sits
+    // on top of the embedded mpv video in the main window.
+    overlayShow: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_SHOW),
+    overlayHide: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_HIDE),
+    onOverlayShown: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
+    },
+    onOverlayHidden: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on(IpcChannels.PLAYER_OVERLAY_HIDDEN, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_HIDDEN, handler);
+    },
+
     onStateChange: (callback: (state: unknown) => void) => {
       const handler = (_event: IpcRendererEvent, state: unknown) => callback(state);
       ipcRenderer.on(IpcChannels.PLAYER_STATE_CHANGED, handler);

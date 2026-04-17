@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YancoTV Player</title>
+    <style>
+      /* Transparent body — the mpv video shows through behind this overlay.
+         Only controls + gradients are visible, the rest is click-through-free
+         (the overlay captures all input so keyboard shortcuts and mouse
+         interactions work, but the background is transparent to the eye). */
+      html,
+      body,
+      #root {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent !important;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body class="text-surface-100 antialiased">
+    <div id="root"></div>
+    <script type="module" src="./overlay.tsx"></script>
+  </body>
+</html>

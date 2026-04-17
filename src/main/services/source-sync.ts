@@ -118,7 +118,17 @@ export async function syncSource(sourceId: string): Promise<Result<number>> {
       updateSourceSyncTime(sourceId);
       updateSourceHealth(sourceId, count);
     } catch (err) {
-      log.warn('Failed to update source sync time/health:', err);
+      // Sync data was already written; only the source row metadata failed.
+      // Log loudly (not warn) and broadcast so the UI can show the stale
+      // health indicator instead of silently misleading the user.
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`Sync of ${source.name} succeeded but health metadata update failed: ${msg}`);
+      broadcastProgress(sourceId, {
+        phase: 'error',
+        current: count,
+        total: count,
+        message: `Synced ${count} entries but failed to update sync metadata: ${msg}`,
+      });
     }
 
     log.info(`Synced source ${source.name}: ${count} entries`);
@@ -129,8 +139,12 @@ export async function syncSource(sourceId: string): Promise<Result<number>> {
 
     try {
       updateSourceHealth(sourceId, 0, errorMsg);
-    } catch {
-      // Ignore health update failures
+    } catch (healthErr) {
+      log.error(
+        `Failed to record sync error in source health (will not surface to UI): ${
+          healthErr instanceof Error ? healthErr.message : String(healthErr)
+        }`,
+      );
     }
 
     return { ok: false, error: error instanceof Error ? error : new Error(String(error)) };

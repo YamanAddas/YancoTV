@@ -102,7 +102,6 @@ YancoTV/
 │   │   ├── components/
 │   │   │   ├── Layout.tsx            # Page wrapper with sidebar/header
 │   │   │   ├── Sidebar.tsx           # Navigation menu
-│   │   │   ├── PlayerOverlay.tsx     # Embedded mpv window controls
 │   │   │   ├── ContentGrid.tsx       # Virtualized grid for 10K+ items
 │   │   │   ├── HexCard.tsx           # Content card with title, logo, badges
 │   │   │   ├── ChannelHexRow.tsx     # Hex card row with animation

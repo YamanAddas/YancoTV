@@ -94,3 +94,34 @@ export const updateSourceInputSchema = z.object({
 });
 
 export type UpdateSourceInput = z.infer<typeof updateSourceInputSchema>;
+
+// ---------------------------------------------------------------------------
+// IPC input schemas (general — not source-specific but kept here so all
+// boundary validation lives in one folder for now).
+// ---------------------------------------------------------------------------
+
+export const reorderIdsSchema = z.array(z.string().min(1)).max(1000);
+
+export const groupPrefSetSchema = z.object({
+  contentType: z.string().min(1).max(50),
+  groupKey: z.string().min(1).max(500),
+  sortOrder: z.number().int().min(0).max(100000).optional(),
+  isHidden: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  customName: z.string().max(200).nullable().optional(),
+});
+export type GroupPrefSetInput = z.infer<typeof groupPrefSetSchema>;
+
+export const groupPrefReorderSchema = z.object({
+  contentType: z.string().min(1).max(50),
+  orderedKeys: z.array(z.string().min(1)).max(1000),
+});
+
+export const channelOverrideSchema = z.object({
+  contentId: z.string().min(1).max(200),
+  customName: z.string().max(200).optional(),
+  customLogoUrl: z.string().url().max(2000).optional().or(z.literal('')),
+  customNumber: z.number().int().min(0).max(100000).optional(),
+  customGroup: z.string().max(200).optional(),
+});
+export type ChannelOverrideInput = z.infer<typeof channelOverrideSchema>;

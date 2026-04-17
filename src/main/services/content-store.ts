@@ -83,9 +83,11 @@ function rowToEpisode(row: EpisodeRow): Episode {
 // --- Progress callback ---
 
 export interface SyncProgress {
-  phase: 'deleting' | 'inserting' | 'indexing' | 'done';
+  phase: 'deleting' | 'inserting' | 'indexing' | 'done' | 'error';
   current: number;
   total: number;
+  /** Optional human-readable message — used for non-fatal warnings and errors */
+  message?: string;
 }
 
 export type ProgressCallback = (progress: SyncProgress) => void;

@@ -130,6 +130,16 @@ export const IpcChannels = {
 
   // Player — mpv availability check
   PLAYER_CHECK_MPV: 'player:checkMpv',
+
+  // Embedded player — main window hosts mpv, overlay window hosts controls
+  /** Renderer (main window) → main: begin theater/embedded-mpv mode (show overlay) */
+  PLAYER_OVERLAY_SHOW: 'player:overlayShow',
+  /** Renderer (main window) → main: exit theater mode (hide overlay, restore main UI) */
+  PLAYER_OVERLAY_HIDE: 'player:overlayHide',
+  /** main → overlay renderer: broadcast that theater mode just started */
+  PLAYER_OVERLAY_SHOWN: 'player:overlayShown',
+  /** main → overlay renderer: broadcast that theater mode just ended */
+  PLAYER_OVERLAY_HIDDEN: 'player:overlayHidden',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

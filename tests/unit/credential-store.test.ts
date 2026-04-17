@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -9,7 +9,7 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('electron-log/main', () => ({
-  default: { warn: vi.fn(), info: vi.fn() },
+  default: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 
 import { safeStorage } from 'electron';
@@ -21,8 +21,18 @@ import {
 const mockSafeStorage = vi.mocked(safeStorage);
 
 describe('Credential Store', () => {
+  const ORIGINAL_OPT_IN = process.env.YANCOTV_ALLOW_PLAINTEXT_CREDENTIALS;
+
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_OPT_IN === undefined) {
+      delete process.env.YANCOTV_ALLOW_PLAINTEXT_CREDENTIALS;
+    } else {
+      process.env.YANCOTV_ALLOW_PLAINTEXT_CREDENTIALS = ORIGINAL_OPT_IN;
+    }
   });
 
   describe('encryptCredential', () => {
@@ -38,8 +48,19 @@ describe('Credential Store', () => {
       expect(result).toBe(encrypted);
     });
 
-    it('falls back to plain Buffer when encryption is not available', () => {
+    it('throws when encryption is unavailable and plaintext opt-in is not set', () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
+      delete process.env.YANCOTV_ALLOW_PLAINTEXT_CREDENTIALS;
+
+      expect(() => encryptCredential('my-secret')).toThrow(
+        /Credential encryption unavailable/,
+      );
+      expect(mockSafeStorage.encryptString).not.toHaveBeenCalled();
+    });
+
+    it('falls back to plain Buffer when opt-in env var is set', () => {
+      mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
+      process.env.YANCOTV_ALLOW_PLAINTEXT_CREDENTIALS = '1';
 
       const result = encryptCredential('my-secret');
 
@@ -61,6 +82,18 @@ describe('Credential Store', () => {
       expect(result).toBe('my-secret');
     });
 
+    it('falls back to plaintext decode when safeStorage decrypt throws (legacy data)', () => {
+      mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
+      mockSafeStorage.decryptString.mockImplementation(() => {
+        throw new Error('not encrypted');
+      });
+      const plainBuffer = Buffer.from('legacy-secret', 'utf-8');
+
+      const result = decryptCredential(plainBuffer);
+
+      expect(result).toBe('legacy-secret');
+    });
+
     it('falls back to Buffer.toString when encryption is not available', () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
       const plainBuffer = Buffer.from('my-secret', 'utf-8');
@@ -73,8 +106,9 @@ describe('Credential Store', () => {
   });
 
   describe('round-trip', () => {
-    it('encrypt then decrypt returns original string when encryption is not available', () => {
+    it('encrypt then decrypt returns original string with opt-in plaintext', () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
+      process.env.YANCOTV_ALLOW_PLAINTEXT_CREDENTIALS = '1';
 
       const original = 'super-secret-password-123!@#';
       const encrypted = encryptCredential(original);

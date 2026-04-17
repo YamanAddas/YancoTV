@@ -15,6 +15,14 @@ export default defineConfig({
     outDir: '../../dist/renderer',
     emptyOutDir: true,
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        // Main browsing UI + fallback html5 player
+        main: path.resolve(__dirname, 'src/renderer/index.html'),
+        // Transparent controls overlay rendered above embedded mpv
+        overlay: path.resolve(__dirname, 'src/renderer/overlay.html'),
+      },
+    },
   },
   server: {
     port: 5173,

@@ -86,8 +86,24 @@ function runMigrations(database: Database.Database): void {
 
     log.info(`Applying migration: ${file}`);
     const dir = dirs.find((d) => fs.existsSync(d))!;
-    const sql = fs.readFileSync(path.join(dir, file), 'utf-8');
-    applyMigration(file, sql);
+    const filePath = path.join(dir, file);
+    let sql: string;
+    try {
+      sql = fs.readFileSync(filePath, 'utf-8');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to read migration ${file} at ${filePath}: ${msg}`);
+    }
+    try {
+      applyMigration(file, sql);
+    } catch (err) {
+      // better-sqlite3 transactions auto-rollback on throw, so DB state is
+      // unchanged. Re-throw with the offending file name so the user can
+      // identify which migration is broken.
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`Migration ${file} failed and was rolled back: ${msg}`);
+      throw new Error(`Migration ${file} failed (rolled back): ${msg}`);
+    }
     log.info(`Migration applied: ${file}`);
   }
 }
@@ -123,24 +139,40 @@ export function restoreFtsTriggers(): void {
   `);
 }
 
-/** Rebuild FTS index from scratch for a specific source (or all content) */
+/** Rebuild FTS index from scratch for a specific source (or all content).
+ *  Wrapped in a transaction so concurrent readers see either the old index
+ *  or the new one — never a half-deleted state. */
 export function rebuildFtsIndex(sourceId?: string): void {
   const database = getDb();
-  if (sourceId) {
-    // Only add entries for the given source
-    database.prepare(`
-      INSERT INTO content_fts (content_id, title, clean_title, group_name)
-      SELECT id, title, clean_title, group_name FROM content WHERE source_id = ?
-    `).run(sourceId);
-  } else {
-    // Full rebuild
-    database.exec("DELETE FROM content_fts");
-    database.exec(`
-      INSERT INTO content_fts (content_id, title, clean_title, group_name)
-      SELECT id, title, clean_title, group_name FROM content
-    `);
-  }
-  // Optimize the FTS index segments
+
+  const rebuild = database.transaction(() => {
+    if (sourceId) {
+      // Replace just this source's rows in the index (delete-then-insert).
+      database
+        .prepare(
+          `DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)`,
+        )
+        .run(sourceId);
+      database
+        .prepare(
+          `INSERT INTO content_fts (content_id, title, clean_title, group_name)
+           SELECT id, title, clean_title, group_name FROM content WHERE source_id = ?`,
+        )
+        .run(sourceId);
+    } else {
+      // Full rebuild
+      database.exec('DELETE FROM content_fts');
+      database.exec(`
+        INSERT INTO content_fts (content_id, title, clean_title, group_name)
+        SELECT id, title, clean_title, group_name FROM content
+      `);
+    }
+  });
+
+  rebuild();
+
+  // Optimize the FTS index segments (outside the transaction — it's a
+  // maintenance op, not data).
   database.exec("INSERT INTO content_fts(content_fts) VALUES('optimize')");
 }
 
