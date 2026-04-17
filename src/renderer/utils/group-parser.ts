@@ -747,8 +747,12 @@ export function getLanguageName(countryCode: string): string | null {
  *   "AR"                  → "Arabic"
  *   "Channel IN 4K"       → "Channel IN 4K"   (no delimiter, left alone)
  */
+const PRETTIFY_CACHE = new Map<string, string>();
+
 export function prettifyGroupName(raw: string | null | undefined): string {
   if (!raw) return '';
+  const cached = PRETTIFY_CACHE.get(raw);
+  if (cached !== undefined) return cached;
   // Capture a segment surrounded by strong delimiters or string boundaries.
   // We deliberately keep it case-sensitive for the 2–3 letter codes (AR, EN)
   // to avoid matching common English words. Longer names (ARABIC, ENGLISH)
@@ -771,5 +775,7 @@ export function prettifyGroupName(raw: string | null | undefined): string {
       return `${pre}${info.language}`;
     },
   );
+  if (PRETTIFY_CACHE.size > 5000) PRETTIFY_CACHE.clear();
+  PRETTIFY_CACHE.set(raw, out);
   return out;
 }
