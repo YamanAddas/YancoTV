@@ -32,6 +32,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
   const setVolume = usePlayerStore((s) => s.setVolume);
   const toggleMute = usePlayerStore((s) => s.toggleMute);
   const toggleFullscreen = usePlayerStore((s) => s.toggleFullscreen);
+  const enterPip = usePlayerStore((s) => s.enterPip);
   const toggleSettings = usePlayerStore((s) => s.toggleSettings);
   const openSettings = usePlayerStore((s) => s.openSettings);
   const toggleAspectMenu = usePlayerStore((s) => s.toggleAspectMenu);
@@ -376,6 +377,11 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
               />
             </div>
 
+            {/* Picture-in-picture */}
+            <ControlButton onClick={() => void enterPip()} title="Picture-in-picture">
+              <PipIcon />
+            </ControlButton>
+
             {/* Fullscreen */}
             <ControlButton onClick={toggleFullscreen} title={fullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)'}>
               {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
@@ -509,6 +515,15 @@ function VolumeMutedIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.531v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+    </svg>
+  );
+}
+
+function PipIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <rect x="13" y="12" width="6" height="5" rx="1" fill="currentColor" />
     </svg>
   );
 }

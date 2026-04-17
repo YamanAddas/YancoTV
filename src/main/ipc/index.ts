@@ -8,7 +8,12 @@ import { syncSource } from '../services/source-sync';
 import { getMainWindow, getOverlayWindow, getVideoWindowHandle } from '../index';
 import { findMpvPath } from '../player/mpv-path';
 import { showOverlay, hideOverlay } from '../player/overlay-window';
-import { showVideoWindow, hideVideoWindow } from '../player/video-window';
+import {
+  showVideoWindow,
+  hideVideoWindow,
+  enterPip as enterPipWindow,
+  exitPip as exitPipWindow,
+} from '../player/video-window';
 import {
   getContentByType,
   getCategories,
@@ -910,6 +915,23 @@ export function registerIpcHandlers(): void {
     return { ok: true };
   });
 
+  // Picture-in-picture — shrink video to a floating corner thumbnail so the
+  // user can browse the main UI while playback continues. Overlay controls are
+  // hidden in PIP; the renderer owns its own minimal exit control.
+  ipcMain.handle(IpcChannels.PLAYER_ENTER_PIP, () => {
+    enterPipWindow();
+    hideOverlay();
+    sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.PLAYER_EXIT_PIP, () => {
+    exitPipWindow();
+    showOverlay();
+    sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
+    return { ok: true };
+  });
+
   ipcMain.handle(IpcChannels.PLAYER_PAUSE, async () => {
     try {
       await getPlayer().pause();
@@ -931,6 +953,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.PLAYER_STOP, async () => {
     try {
       await getPlayer().stop();
+      // Reset PIP state before hiding the video window — otherwise the next
+      // playback would inherit pipActive=true and skip parent-bounds sync.
+      exitPipWindow();
       hideOverlay();
       hideVideoWindow();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);

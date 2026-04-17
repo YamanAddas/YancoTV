@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getVideoElement } from '../components/player/video-ref';
 
-export type PlayerMode = 'idle' | 'theater';
+export type PlayerMode = 'idle' | 'theater' | 'pip';
 export type PlayerBackend = 'mpv' | 'html5' | 'none';
 export type SettingsTab = 'subtitles' | 'audio' | 'video' | 'speed' | 'info';
 
@@ -89,6 +89,8 @@ interface PlayerStoreActions {
   takeScreenshot: () => Promise<string | null>;
   setError: (error: string | undefined) => void;
   setMode: (mode: PlayerMode) => void;
+  enterPip: () => Promise<void>;
+  exitPip: () => Promise<void>;
   setShowSettings: (show: boolean) => void;
   /** Open the settings panel directly on a specific tab. */
   openSettings: (tab: SettingsTab) => void;
@@ -416,6 +418,27 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   setError: (error: string | undefined) => set({ error }),
   setMode: (mode: PlayerMode) => set({ mode }),
+
+  enterPip: async () => {
+    const { mode, backend } = get();
+    if (mode !== 'theater' || backend !== 'mpv') return;
+    try {
+      const res = await window.api?.player.enterPip();
+      if (res?.ok) set({ mode: 'pip', showSettings: false, showAspectMenu: false });
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  exitPip: async () => {
+    if (get().mode !== 'pip') return;
+    try {
+      const res = await window.api?.player.exitPip();
+      if (res?.ok) set({ mode: 'theater' });
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
   setShowSettings: (show: boolean) => set({ showSettings: show }),
   openSettings: (tab) =>
     set((s) => {

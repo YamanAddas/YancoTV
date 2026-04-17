@@ -168,6 +168,8 @@ const api = {
     // on top of the embedded mpv video in the main window.
     overlayShow: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_SHOW),
     overlayHide: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_HIDE),
+    enterPip: () => ipcRenderer.invoke(IpcChannels.PLAYER_ENTER_PIP),
+    exitPip: () => ipcRenderer.invoke(IpcChannels.PLAYER_EXIT_PIP),
     onOverlayShown: (
       callback: (media?: { url?: string; title?: string; contentId?: string }) => void,
     ) => {

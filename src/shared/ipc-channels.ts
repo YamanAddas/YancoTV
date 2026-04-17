@@ -185,6 +185,12 @@ export const IpcChannels = {
   PLAYER_OVERLAY_SHOWN: 'player:overlayShown',
   /** main → overlay renderer: broadcast that theater mode just ended */
   PLAYER_OVERLAY_HIDDEN: 'player:overlayHidden',
+
+  // Picture-in-picture — video window floats in corner while user browses
+  /** Renderer → main: shrink video to floating corner, hide overlay */
+  PLAYER_ENTER_PIP: 'player:enterPip',
+  /** Renderer → main: restore video to theater layout, show overlay */
+  PLAYER_EXIT_PIP: 'player:exitPip',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
