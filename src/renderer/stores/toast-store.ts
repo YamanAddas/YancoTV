@@ -6,7 +6,8 @@ export interface Toast {
   id: string;
   kind: ToastKind;
   message: string;
-  action?: { label: string; href: string };
+  /** Either `href` (route link) or `onClick` (arbitrary callback) — never both. */
+  action?: { label: string; href: string } | { label: string; onClick: () => void };
   expiresAt: number;
 }
 

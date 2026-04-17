@@ -2,6 +2,16 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../stores/settings-store';
+import { usePlayerStore } from '../stores/player-store';
+import type { ContentItem } from '../../shared/types';
+
+const SUGGEST_LIMIT = 6;
+const SUGGEST_DEBOUNCE_MS = 200;
+const TYPE_ICON: Record<'live' | 'movie' | 'series', string> = {
+  live: '📡',
+  movie: '🎬',
+  series: '📺',
+};
 
 const navItems = [
   { path: '/home', label: 'Home', icon: 'home' },
@@ -49,22 +59,115 @@ function useClock() {
 export function Sidebar() {
   const [expanded, setExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<ContentItem[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(-1);
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeqRef = useRef(0);
   const navigate = useNavigate();
+  const play = usePlayerStore((s) => s.play);
   const showClock = useSettingsStore((s) => s.getBool('ui_show_clock'));
   const time = useClock();
+
+  const resetSuggestions = useCallback(() => {
+    setSuggestions([]);
+    setSelectedIdx(-1);
+    setSuggestOpen(false);
+  }, []);
+
+  const runFullSearch = useCallback(
+    (q: string) => {
+      const trimmed = q.trim();
+      if (!trimmed) return;
+      navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+      setSearchQuery('');
+      resetSuggestions();
+      inputRef.current?.blur();
+    },
+    [navigate, resetSuggestions],
+  );
+
+  const handleSuggestionPick = useCallback(
+    (item: ContentItem) => {
+      if (item.type === 'series') {
+        navigate(`/series/${item.id}`);
+      } else if (item.type === 'movie') {
+        navigate(`/movies/${item.id}`);
+      } else {
+        play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, item.type);
+      }
+      setSearchQuery('');
+      resetSuggestions();
+      inputRef.current?.blur();
+    },
+    [navigate, play, resetSuggestions],
+  );
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (searchQuery.trim()) {
-        navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-        setSearchQuery('');
-        inputRef.current?.blur();
+      // If user arrowed to a suggestion, pick it instead of running a full search.
+      if (selectedIdx >= 0 && suggestions[selectedIdx]) {
+        handleSuggestionPick(suggestions[selectedIdx]);
+        return;
       }
+      runFullSearch(searchQuery);
     },
-    [searchQuery, navigate],
+    [searchQuery, selectedIdx, suggestions, handleSuggestionPick, runFullSearch],
   );
+
+  // Debounced autocomplete fetch. Sequence guard avoids stale async
+  // responses clobbering a newer query result.
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = searchQuery.trim();
+    if (!q || !window.api) {
+      resetSuggestions();
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      const seq = ++searchSeqRef.current;
+      try {
+        const data = (await window.api.content.search(q)) as ContentItem[];
+        if (seq !== searchSeqRef.current) return;
+        setSuggestions(data.slice(0, SUGGEST_LIMIT));
+        setSelectedIdx(-1);
+        setSuggestOpen(true);
+      } catch {
+        if (seq !== searchSeqRef.current) return;
+        resetSuggestions();
+      }
+    }, SUGGEST_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery, resetSuggestions]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suggestOpen || suggestions.length === 0) {
+      if (e.key === 'Escape' && searchQuery) {
+        setSearchQuery('');
+        resetSuggestions();
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIdx((idx) => (idx + 1) % suggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIdx((idx) => (idx <= 0 ? suggestions.length - 1 : idx - 1));
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (selectedIdx >= 0) {
+        setSelectedIdx(-1);
+      } else {
+        setSuggestOpen(false);
+        setSearchQuery('');
+      }
+    }
+  };
 
   // Ctrl+F to focus search
   useEffect(() => {
@@ -143,7 +246,7 @@ export function Sidebar() {
           >
             <div className="relative">
               <svg
-                className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500"
+                className="absolute left-2.5 top-2.5 h-4 w-4 text-surface-500"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -157,8 +260,80 @@ export function Sidebar() {
                 placeholder="Search... (Ctrl+F)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0) setSuggestOpen(true);
+                }}
+                onBlur={() => {
+                  // Delay so mousedown on a suggestion registers before close.
+                  setTimeout(() => setSuggestOpen(false), 120);
+                }}
+                aria-autocomplete="list"
+                aria-expanded={suggestOpen && suggestions.length > 0}
+                aria-controls="sidebar-search-suggestions"
+                aria-activedescendant={
+                  selectedIdx >= 0 ? `sidebar-search-suggestion-${selectedIdx}` : undefined
+                }
+                role="combobox"
                 className="w-full rounded-lg border border-surface-700/50 bg-surface-800/40 py-2 pl-8 pr-3 text-sm text-surface-200 placeholder-surface-500 outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
               />
+              <AnimatePresence>
+                {suggestOpen && suggestions.length > 0 && (
+                  <motion.ul
+                    id="sidebar-search-suggestions"
+                    role="listbox"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-surface-700/60 bg-surface-900/95 shadow-xl backdrop-blur"
+                  >
+                    {suggestions.map((item, idx) => {
+                      const selected = idx === selectedIdx;
+                      const title = item.cleanTitle || item.title;
+                      return (
+                        <li
+                          key={item.id}
+                          id={`sidebar-search-suggestion-${idx}`}
+                          role="option"
+                          aria-selected={selected}
+                          onMouseDown={(e) => {
+                            // Prevent input blur so click registers.
+                            e.preventDefault();
+                            handleSuggestionPick(item);
+                          }}
+                          onMouseEnter={() => setSelectedIdx(idx)}
+                          className={`flex cursor-pointer items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                            selected
+                              ? 'bg-accent/15 text-accent'
+                              : 'text-surface-200 hover:bg-surface-700/40'
+                          }`}
+                        >
+                          <span aria-hidden className="flex-shrink-0 text-base leading-none">
+                            {TYPE_ICON[item.type]}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{title}</span>
+                          {item.groupName && (
+                            <span className="hidden truncate text-xs text-surface-500 sm:inline">
+                              {item.groupName}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                    <li
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        runFullSearch(searchQuery);
+                      }}
+                      className="flex cursor-pointer items-center gap-2 border-t border-surface-700/50 bg-surface-800/40 px-3 py-2 text-xs text-surface-400 transition-colors hover:bg-surface-700/40 hover:text-accent"
+                    >
+                      <span aria-hidden>↵</span>
+                      <span>See all results for &ldquo;{searchQuery.trim()}&rdquo;</span>
+                    </li>
+                  </motion.ul>
+                )}
+              </AnimatePresence>
             </div>
           </motion.form>
         )}

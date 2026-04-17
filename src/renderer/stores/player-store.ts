@@ -29,6 +29,17 @@ export interface MediaInfo {
   hwdec?: string;
 }
 
+export interface ZapTarget {
+  /** Content id of the channel the user has scrolled to (not yet tuned). */
+  contentId: string;
+  title: string;
+  logoUrl?: string;
+  streamUrl: string;
+  /** Position in the channel list (for "3 of 215" hint). */
+  index: number;
+  total: number;
+}
+
 export interface PlayerStoreState {
   status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error';
   mode: PlayerMode;
@@ -51,6 +62,8 @@ export interface PlayerStoreState {
   currentTitle?: string;
   currentContentId?: string;
   currentEpisodeId?: string;
+  /** What kind of content is currently playing — used by features (e.g. channel zapping) that only apply to live. */
+  currentContentType?: 'live' | 'movie' | 'series';
   currentHistoryId?: string;
   error?: string;
   showSettings: boolean;
@@ -61,6 +74,8 @@ export interface PlayerStoreState {
   controlsVisible: boolean;
   /** Used by VideoPlayer (html5 backend) to know the start position */
   _startPosition?: number;
+  /** Ephemeral preview of the channel the user is zapping to (PageUp/Down). Null when no zap is in progress. */
+  zapTarget: ZapTarget | null;
 }
 
 interface PlayerStoreActions {
@@ -131,6 +146,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   currentTitle: undefined,
   currentContentId: undefined,
   currentEpisodeId: undefined,
+  currentContentType: undefined,
   currentHistoryId: undefined,
   error: undefined,
   showSettings: false,
@@ -138,6 +154,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   showAspectMenu: false,
   controlsVisible: true,
   _startPosition: undefined,
+  zapTarget: null,
 
   // --- Actions ---
 
@@ -186,11 +203,13 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         currentTitle: title,
         currentContentId: contentId,
         currentEpisodeId: episodeId,
+        currentContentType: contentType,
         error: undefined,
         showSettings: false,
         mediaInfo: {},
         position: 0,
         duration: 0,
+        zapTarget: null,
       });
       try {
         const result = await window.api.player.play(url, title, startPosition, contentId, episodeId);
@@ -209,12 +228,14 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         currentTitle: title,
         currentContentId: contentId,
         currentEpisodeId: episodeId,
+        currentContentType: contentType,
         error: undefined,
         showSettings: false,
         mediaInfo: {},
         position: 0,
         duration: 0,
         _startPosition: startPosition,
+        zapTarget: null,
       });
     }
   },
@@ -252,6 +273,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       currentTitle: undefined,
       currentContentId: undefined,
       currentEpisodeId: undefined,
+      currentContentType: undefined,
       currentHistoryId: undefined,
       position: 0,
       duration: 0,
@@ -265,6 +287,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       showAspectMenu: false,
       fullscreen: false,
       _startPosition: undefined,
+      zapTarget: null,
     });
 
     if (fullscreen && window.api) {

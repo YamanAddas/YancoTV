@@ -2,11 +2,14 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { PlayerContainer } from './player/PlayerContainer';
 import { Toaster } from './Toaster';
+import { ZapOverlay } from './ZapOverlay';
 import { usePlayerShortcuts } from '../hooks/use-player-shortcuts';
+import { useChannelZap } from '../hooks/use-channel-zap';
 import { usePlayerStore } from '../stores/player-store';
 
 export function Layout() {
   usePlayerShortcuts();
+  useChannelZap();
 
   const mode = usePlayerStore((s) => s.mode);
   const backend = usePlayerStore((s) => s.backend);
@@ -60,6 +63,9 @@ export function Layout() {
 
       {/* Ephemeral toasts (download-started, etc.) */}
       {!isTheater && <Toaster />}
+
+      {/* Channel zap preview — shown in theater mode when PageUp/Down is pressed */}
+      <ZapOverlay />
     </div>
   );
 }

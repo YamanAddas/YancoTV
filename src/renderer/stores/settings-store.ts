@@ -18,6 +18,7 @@ const DEFAULTS: Record<string, string> = {
   ui_remember_last_channel: '1',
   ui_show_clock: '0',
   ui_list_style: 'grid',
+  ui_reminder_auto_tune: '0',
 
   // Desktop integration
   general_minimize_to_tray: '0',

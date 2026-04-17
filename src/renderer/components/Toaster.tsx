@@ -26,7 +26,7 @@ export function Toaster() {
             className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-xl backdrop-blur ${KIND_STYLES[t.kind]}`}
           >
             <span className="flex-1 leading-snug">{t.message}</span>
-            {t.action && (
+            {t.action && 'href' in t.action && (
               <Link
                 to={t.action.href}
                 onClick={() => dismiss(t.id)}
@@ -34,6 +34,18 @@ export function Toaster() {
               >
                 {t.action.label}
               </Link>
+            )}
+            {t.action && 'onClick' in t.action && (
+              <button
+                onClick={() => {
+                  const action = t.action;
+                  if (action && 'onClick' in action) action.onClick();
+                  dismiss(t.id);
+                }}
+                className="shrink-0 rounded-md border border-current/30 px-2 py-1 text-xs font-medium opacity-90 transition-opacity hover:opacity-100"
+              >
+                {t.action.label}
+              </button>
             )}
             <button
               onClick={() => dismiss(t.id)}

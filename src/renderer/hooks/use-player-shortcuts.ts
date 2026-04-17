@@ -25,6 +25,7 @@ const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
  * Backspace      — reset speed to 1x
  * Escape         — exit theater mode / close settings / stop
  * L              — tune to previously watched live channel (global, 19.5)
+ * PageUp/PageDown — channel zapping: preview next/prev live channel, commit after 2s (19.4, handled by useChannelZap)
  */
 export function usePlayerShortcuts(): void {
   useEffect(() => {

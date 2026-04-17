@@ -14,6 +14,7 @@ import { getSetting } from './services/settings-service';
 import { registerIpcHandlers, destroyPlayer } from './ipc';
 import { startAutoRefresh, stopAutoRefresh } from './services/epg-service';
 import { startAutoSync, stopAutoSync } from './services/source-sync';
+import { startReminderService, stopReminderService } from './services/reminder-service';
 import { reconcileOnStartup as reconcileRecordings, stopAllOnQuit as stopAllRecordings } from './services/recording-service';
 import { reconcileOnStartup as reconcileDownloads, stopAllOnQuit as stopAllDownloads } from './services/download-service';
 import { createOverlayWindow, destroyOverlay, getOverlayWindow } from './player/overlay-window';
@@ -229,6 +230,7 @@ app.whenReady().then(() => {
   registerIpcHandlers();
   startAutoRefresh(12); // Refresh EPG every 12 hours
   startAutoSync(); // Check for sources needing re-sync every 5 minutes
+  startReminderService(); // Scan for reminders coming due; fire within ~1s accuracy
   createWindow();
 
   app.on('activate', () => {
@@ -247,6 +249,7 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   stopAutoRefresh();
   stopAutoSync();
+  stopReminderService();
   stopAllRecordings();
   stopAllDownloads();
   destroyPlayer();

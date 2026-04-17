@@ -126,6 +126,14 @@ import {
   clearTmdbCache,
   enrichMetadata as enrichTmdbMetadata,
 } from '../services/tmdb-service';
+import {
+  listReminders,
+  listActiveReminders,
+  setReminder,
+  removeReminder,
+  removeReminderForProgramme,
+  type SetReminderInput,
+} from '../services/reminder-service';
 
 let player: MpvPlayer | null = null;
 
@@ -1594,6 +1602,64 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.TMDB_CLEAR_CACHE, () => {
     clearTmdbCache();
     return { ok: true };
+  });
+
+  // -------------------------------------------------------------------------
+  // Programme reminders
+  // -------------------------------------------------------------------------
+
+  ipcMain.handle(IpcChannels.REMINDERS_LIST, () => {
+    try {
+      return { ok: true, reminders: listReminders() };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.REMINDERS_LIST_ACTIVE, () => {
+    try {
+      return { ok: true, reminders: listActiveReminders() };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.REMINDERS_SET, (_event, input: SetReminderInput) => {
+    if (
+      !input ||
+      typeof input.programmeId !== 'string' || !input.programmeId ||
+      typeof input.channelTvgId !== 'string' || !input.channelTvgId ||
+      typeof input.title !== 'string' || !input.title ||
+      typeof input.startTime !== 'number' ||
+      typeof input.endTime !== 'number'
+    ) {
+      return { ok: false, error: 'programmeId, channelTvgId, title, startTime, endTime required' };
+    }
+    try {
+      const reminder = setReminder({
+        programmeId: input.programmeId,
+        channelTvgId: input.channelTvgId,
+        title: input.title,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        leadSeconds: typeof input.leadSeconds === 'number' ? input.leadSeconds : undefined,
+      });
+      return { ok: true, reminder };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.REMINDERS_REMOVE, (_event, id: string) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+    return { ok: removeReminder(id) };
+  });
+
+  ipcMain.handle(IpcChannels.REMINDERS_REMOVE_FOR_PROGRAMME, (_event, programmeId: string) => {
+    if (typeof programmeId !== 'string' || !programmeId) {
+      return { ok: false, error: 'programmeId required' };
+    }
+    return { ok: removeReminderForProgramme(programmeId) };
   });
 
   log.info('IPC handlers registered');

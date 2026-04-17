@@ -274,6 +274,50 @@ const api = {
     status: () => ipcRenderer.invoke(IpcChannels.DB_STATUS),
   },
 
+  reminders: {
+    list: () => ipcRenderer.invoke(IpcChannels.REMINDERS_LIST),
+    listActive: () => ipcRenderer.invoke(IpcChannels.REMINDERS_LIST_ACTIVE),
+    set: (input: {
+      programmeId: string;
+      channelTvgId: string;
+      title: string;
+      startTime: number;
+      endTime: number;
+      leadSeconds?: number;
+    }) => ipcRenderer.invoke(IpcChannels.REMINDERS_SET, input),
+    remove: (id: string) => ipcRenderer.invoke(IpcChannels.REMINDERS_REMOVE, id),
+    removeForProgramme: (programmeId: string) =>
+      ipcRenderer.invoke(IpcChannels.REMINDERS_REMOVE_FOR_PROGRAMME, programmeId),
+    onFired: (
+      callback: (reminder: {
+        id: string;
+        programmeId: string;
+        channelTvgId: string;
+        title: string;
+        startTime: number;
+        endTime: number;
+        leadSeconds: number;
+        fireAt: number;
+      }) => void,
+    ) => {
+      const handler = (
+        _e: IpcRendererEvent,
+        reminder: {
+          id: string;
+          programmeId: string;
+          channelTvgId: string;
+          title: string;
+          startTime: number;
+          endTime: number;
+          leadSeconds: number;
+          fireAt: number;
+        },
+      ) => callback(reminder);
+      ipcRenderer.on(IpcChannels.REMINDERS_FIRED, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.REMINDERS_FIRED, handler);
+    },
+  },
+
   download: {
     enqueue: (input: { contentId?: string; episodeId?: string; title: string; streamUrl: string }) =>
       ipcRenderer.invoke(IpcChannels.DOWNLOAD_ENQUEUE, input),

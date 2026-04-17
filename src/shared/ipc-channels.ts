@@ -158,6 +158,15 @@ export const IpcChannels = {
   /** main → renderer push: status change (completed, failed, cancelled) */
   RECORDING_STATUS: 'recording:status',
 
+  // Programme reminders — schedule a toast (and optional auto-tune) for a future EPG programme
+  REMINDERS_LIST: 'reminders:list',
+  REMINDERS_LIST_ACTIVE: 'reminders:listActive',
+  REMINDERS_SET: 'reminders:set',
+  REMINDERS_REMOVE: 'reminders:remove',
+  REMINDERS_REMOVE_FOR_PROGRAMME: 'reminders:removeForProgramme',
+  /** main → renderer push: a reminder just fired */
+  REMINDERS_FIRED: 'reminders:fired',
+
   // Database
   DB_STATUS: 'db:status',
 

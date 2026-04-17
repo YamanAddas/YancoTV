@@ -438,6 +438,56 @@ function ProgrammeDetail({
     error?: string;
   }>({ loading: false, available: false, archiveHours: 0 });
 
+  const [reminderId, setReminderId] = useState<string | null>(null);
+  const [reminderBusy, setReminderBusy] = useState(false);
+
+  // Check whether this programme already has a reminder set
+  useEffect(() => {
+    if (!isFuture || !window.api?.reminders) {
+      setReminderId(null);
+      return;
+    }
+    let cancelled = false;
+    window.api.reminders.listActive().then((res) => {
+      if (cancelled) return;
+      if (res?.ok) {
+        const match = res.reminders.find((r) => r.programmeId === programme.id);
+        setReminderId(match?.id ?? null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFuture, programme.id]);
+
+  const handleSetReminder = useCallback(async () => {
+    if (!window.api?.reminders || reminderBusy) return;
+    setReminderBusy(true);
+    try {
+      const res = await window.api.reminders.set({
+        programmeId: programme.id,
+        channelTvgId: programme.channelTvgId,
+        title: `${channel.name} — ${programme.title}`,
+        startTime: programme.startTime,
+        endTime: programme.endTime,
+      });
+      if (res?.ok) setReminderId(res.reminder.id);
+    } finally {
+      setReminderBusy(false);
+    }
+  }, [programme.id, programme.channelTvgId, programme.title, programme.startTime, programme.endTime, channel.name, reminderBusy]);
+
+  const handleRemoveReminder = useCallback(async () => {
+    if (!window.api?.reminders || !reminderId || reminderBusy) return;
+    setReminderBusy(true);
+    try {
+      const res = await window.api.reminders.remove(reminderId);
+      if (res?.ok) setReminderId(null);
+    } finally {
+      setReminderBusy(false);
+    }
+  }, [reminderId, reminderBusy]);
+
   // Check catch-up availability for past programmes
   useEffect(() => {
     if (!isPast || !window.api?.catchup) return;
@@ -588,9 +638,34 @@ function ProgrammeDetail({
           )}
 
           {isFuture && (
-            <p className="rounded-lg bg-surface-800 px-4 py-2.5 text-center text-sm text-surface-500">
-              Starts in {formatTimeSince(programme.startTime - nowSecs)}
-            </p>
+            <>
+              <p className="rounded-lg bg-surface-800 px-4 py-2.5 text-center text-sm text-surface-500">
+                Starts in {formatTimeSince(programme.startTime - nowSecs)}
+              </p>
+              {reminderId ? (
+                <button
+                  onClick={handleRemoveReminder}
+                  disabled={reminderBusy}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-50"
+                >
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 22a2.5 2.5 0 002.5-2.5h-5A2.5 2.5 0 0012 22zm7-6v-5a7 7 0 10-14 0v5l-2 2v1h18v-1l-2-2z" />
+                  </svg>
+                  Reminder set — click to cancel
+                </button>
+              ) : (
+                <button
+                  onClick={handleSetReminder}
+                  disabled={reminderBusy}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent shadow-glow-sm px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover hover:shadow-glow disabled:opacity-50"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  Remind me when it starts
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

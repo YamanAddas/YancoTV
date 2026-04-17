@@ -265,6 +265,16 @@ export function GeneralSettings() {
             onChange={(v) => setBool('ui_show_clock', v)}
           />
         </SettingRow>
+
+        <SettingRow
+          label="Auto-tune on reminder"
+          description="When a programme reminder fires, switch to that channel automatically"
+        >
+          <Toggle
+            checked={getBool('ui_reminder_auto_tune')}
+            onChange={(v) => setBool('ui_reminder_auto_tune', v)}
+          />
+        </SettingRow>
       </div>
     </div>
   );
