@@ -1,16 +1,11 @@
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow } from 'electron';
 import log from 'electron-log/main';
 
 let videoWin: BrowserWindow | null = null;
 let parent: BrowserWindow | null = null;
 let syncScheduled = false;
 let isActive = false;
-let pipActive = false;
 let parentListeners: Array<{ event: string; handler: (...args: unknown[]) => void }> = [];
-
-const PIP_WIDTH = 480;
-const PIP_HEIGHT = 270;
-const PIP_INSET = 24;
 
 /**
  * The "video stage" window — a transparent, frameless BrowserWindow that
@@ -179,56 +174,10 @@ export function getVideoWindowHandle(): string | null {
 function syncBounds(): void {
   if (!videoWin || videoWin.isDestroyed()) return;
   if (!parent || parent.isDestroyed()) return;
-  // In PIP mode the video floats free — don't mirror parent bounds, or we'd
-  // immediately re-inflate to full size on the next resize event.
-  if (pipActive) return;
   try {
     const bounds = parent.getContentBounds();
     videoWin.setBounds(bounds);
   } catch (err) {
     log.error('Failed to sync video window bounds:', err);
   }
-}
-
-/**
- * Shrink the video window to a floating corner thumbnail and promote it to
- * always-on-top so it stays visible while the user browses the main UI.
- * No-op if already in PIP or the window isn't active.
- */
-export function enterPip(): void {
-  if (!videoWin || videoWin.isDestroyed()) return;
-  if (!parent || parent.isDestroyed()) return;
-  if (pipActive) return;
-
-  pipActive = true;
-  try {
-    // Anchor to the display containing the parent window so PIP doesn't jump
-    // to the primary monitor when the app is on a secondary screen.
-    const parentBounds = parent.getBounds();
-    const display = screen.getDisplayMatching(parentBounds);
-    const work = display.workArea;
-    const x = work.x + work.width - PIP_WIDTH - PIP_INSET;
-    const y = work.y + work.height - PIP_HEIGHT - PIP_INSET;
-    videoWin.setBounds({ x, y, width: PIP_WIDTH, height: PIP_HEIGHT });
-    videoWin.setAlwaysOnTop(true, 'floating');
-  } catch (err) {
-    log.error('Failed to enter PIP:', err);
-  }
-}
-
-/** Return from PIP to the theater layout (mirrors parent bounds again). */
-export function exitPip(): void {
-  if (!videoWin || videoWin.isDestroyed()) return;
-  if (!pipActive) return;
-  pipActive = false;
-  try {
-    videoWin.setAlwaysOnTop(false);
-  } catch (err) {
-    log.error('Failed to clear alwaysOnTop on PIP exit:', err);
-  }
-  syncBounds();
-}
-
-export function isPipActive(): boolean {
-  return pipActive;
 }

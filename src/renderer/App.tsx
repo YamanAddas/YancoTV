@@ -13,7 +13,6 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ContentDetailPage } from './pages/ContentDetailPage';
 import { RecordingsPage } from './pages/RecordingsPage';
 import { DownloadsPage } from './pages/DownloadsPage';
-import { PipBadge } from './components/player/PipBadge';
 import { useSettingsStore } from './stores/settings-store';
 
 const queryClient = new QueryClient({
@@ -73,10 +72,8 @@ function AppInner() {
   const startRoute = START_PAGE_ROUTES[startPageSetting] ?? '/live';
 
   return (
-    <>
-      <PipBadge />
-      <Routes>
-        <Route element={<Layout />}>
+    <Routes>
+      <Route element={<Layout />}>
         {/* '/' redirects to the configured start page */}
         <Route path="/" element={<Navigate to={startRoute} replace />} />
         <Route path="/home" element={<HomePage />} />
@@ -92,9 +89,8 @@ function AppInner() {
         <Route path="/downloads" element={<DownloadsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to={startRoute} replace />} />
-        </Route>
-      </Routes>
-    </>
+      </Route>
+    </Routes>
   );
 }
 
