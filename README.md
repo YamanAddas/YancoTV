@@ -32,7 +32,6 @@ Built to match and surpass apps like TiviMate — but on Windows desktop.
 - Downloading (VOD content for offline playback)
 - TMDb metadata enrichment (posters, descriptions, ratings, cast)
 - OpenSubtitles integration (auto-search, download, apply)
-- Multi-view / PIP (watch while browsing, split-screen)
 - Backup and restore (export/import all user data)
 - System tray, auto-update, notifications
 - Gamepad support
@@ -69,8 +68,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for process architecture, data flow, IPC 
 ## Project Status
 
 Phase 1 — Windows Feature Complete
-- Sprints 1–10 done (foundation through parental controls + settings)
-- Sprints 11–20 remaining (Stalker, recording, downloads, metadata, subtitles, multi-view, etc.)
+- Sprints 1–15 done (foundation through OpenSubtitles)
+- Sprint 16 (multi-view/PIP) dropped from this version
+- Sprints 17–21 remaining (settings polish, system features, search/channel UX, network, stabilization)
 - Phase 2: Stabilization & Release
 - Phase 3: UI Redesign
 - Phase 4: Android TV

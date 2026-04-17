@@ -19,6 +19,11 @@ const DEFAULTS: Record<string, string> = {
   ui_show_clock: '0',
   ui_list_style: 'grid',
 
+  // Desktop integration
+  general_minimize_to_tray: '0',
+  general_close_to_tray: '0',
+  general_launch_on_startup: '0',
+
   // Playback
   playback_default_volume: '80',
   playback_buffer_size: 'auto',
@@ -49,11 +54,17 @@ const DEFAULTS: Record<string, string> = {
 
   // Recording
   recording_max_duration_minutes: '240',
+  recording_max_concurrent: '3',
+  recording_directory: '',
 
   // Downloads
   download_max_concurrent: '2',
   download_max_file_size_gb: '50',
   download_allow_private_ips: '0',
+  download_directory: '',
+  download_fetch_assets: '1',
+  download_extract_subtitles: '1',
+  download_preferred_quality: 'auto',
 
   // TMDb metadata
   tmdb_enabled: '0',
@@ -61,6 +72,15 @@ const DEFAULTS: Record<string, string> = {
 
   // OpenSubtitles
   'opensubtitles.autoSearch': '0',
+
+  // Subtitle appearance (mpv overrides)
+  subtitle_scale: '1.0',
+  subtitle_color: '#FFFFFF',
+  subtitle_back_opacity: '50',
+
+  // Advanced
+  advanced_mpv_path: '',
+  advanced_debug_logging: '0',
 };
 
 interface SettingsState {

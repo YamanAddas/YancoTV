@@ -190,6 +190,32 @@ export function GeneralSettings() {
 
       <div className="space-y-2">
         <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
+          Desktop integration
+        </h3>
+
+        <SettingRow
+          label="Minimize to tray"
+          description="Minimize button hides the window to the system tray"
+        >
+          <Toggle
+            checked={getBool('general_minimize_to_tray')}
+            onChange={(v) => setBool('general_minimize_to_tray', v)}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Close to tray"
+          description="Closing the window keeps the app running in the tray. Quit from the tray menu to fully exit."
+        >
+          <Toggle
+            checked={getBool('general_close_to_tray')}
+            onChange={(v) => setBool('general_close_to_tray', v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
           Interface
         </h3>
 

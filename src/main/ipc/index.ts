@@ -1,4 +1,4 @@
-import { ipcMain, app, dialog } from 'electron';
+import { ipcMain, app, dialog, shell } from 'electron';
 import log from 'electron-log/main';
 import { IpcChannels } from '../../shared/ipc-channels';
 import { addSourceInputSchema, updateSourceInputSchema } from '../../shared/schemas/source';
@@ -97,6 +97,7 @@ import {
   deleteRecording,
   openRecordingsFolder,
   checkFfmpegAvailable,
+  getRecordingsDirectory,
 } from '../services/recording-service';
 import type { StartRecordingInput } from '../../shared/types/recording';
 import {
@@ -107,6 +108,7 @@ import {
   removeDownload,
   listDownloads,
   openDownloadsFolder,
+  getDownloadsDirectory,
 } from '../services/download-service';
 import type { EnqueueDownloadInput } from '../../shared/types/download';
 import {
@@ -255,6 +257,66 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.APP_GET_VERSION, () => {
     return app.getVersion();
   });
+
+  ipcMain.handle(IpcChannels.APP_GET_PATHS, () => {
+    return {
+      userData: app.getPath('userData'),
+      logs: app.getPath('logs'),
+      recordings: getRecordingsDirectory(),
+      downloads: getDownloadsDirectory(),
+    };
+  });
+
+  ipcMain.handle(IpcChannels.APP_OPEN_DATA_DIR, async () => {
+    const dir = app.getPath('userData');
+    const err = await shell.openPath(dir);
+    return err ? { ok: false, error: err } : { ok: true };
+  });
+
+  // Generic directory picker — used by settings (recording dir, download dir, etc.).
+  // Accepts an optional `purpose` key so we can label the dialog; the caller
+  // decides how to persist the chosen path.
+  ipcMain.handle(
+    IpcChannels.DIALOG_PICK_DIRECTORY,
+    async (_event, opts?: { title?: string; defaultPath?: string }) => {
+      const main = getMainWindow();
+      const dialogOpts = {
+        title: opts?.title ?? 'Choose folder',
+        defaultPath: opts?.defaultPath,
+        properties: ['openDirectory', 'createDirectory'] as Array<'openDirectory' | 'createDirectory'>,
+      };
+      const result = main
+        ? await dialog.showOpenDialog(main, dialogOpts)
+        : await dialog.showOpenDialog(dialogOpts);
+      if (result.canceled || result.filePaths.length === 0) {
+        return { ok: false, cancelled: true };
+      }
+      return { ok: true, path: result.filePaths[0] };
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannels.DIALOG_PICK_FILE,
+    async (
+      _event,
+      opts?: { title?: string; defaultPath?: string; filters?: { name: string; extensions: string[] }[] },
+    ) => {
+      const main = getMainWindow();
+      const dialogOpts = {
+        title: opts?.title ?? 'Choose file',
+        defaultPath: opts?.defaultPath,
+        filters: opts?.filters,
+        properties: ['openFile'] as Array<'openFile'>,
+      };
+      const result = main
+        ? await dialog.showOpenDialog(main, dialogOpts)
+        : await dialog.showOpenDialog(dialogOpts);
+      if (result.canceled || result.filePaths.length === 0) {
+        return { ok: false, cancelled: true };
+      }
+      return { ok: true, path: result.filePaths[0] };
+    },
+  );
 
   // Group Preferences
   ipcMain.handle(IpcChannels.GROUP_PREFS_GET, (_event, contentType: string) => {

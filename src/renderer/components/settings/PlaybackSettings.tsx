@@ -1,81 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
+import {
+  PageHeading,
+  SectionHeading,
+  SettingRow,
+  Select,
+  Toggle,
+  LoadingSpinner,
+} from './primitives';
 
 // ---------------------------------------------------------------------------
-// Playback Settings — volume, buffer, aspect ratio, speed, hardware accel
+// Playback Settings — audio/video defaults, buffering, resume behavior
+//
+// Recording / downloads / subtitles / advanced each have their own tab now.
+// This page sticks to what happens during playback itself.
 // ---------------------------------------------------------------------------
-
-function SettingRow({
-  label,
-  description,
-  children,
-}: {
-  label: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-surface-200">{label}</p>
-        {description && (
-          <p className="mt-0.5 text-xs text-surface-500">{description}</p>
-        )}
-      </div>
-      <div className="flex-shrink-0">{children}</div>
-    </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-        checked ? 'bg-accent shadow-glow-sm' : 'bg-surface-600'
-      }`}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
-        }`}
-      />
-    </button>
-  );
-}
-
-function Select({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 export function PlaybackSettings() {
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
@@ -84,43 +23,26 @@ export function PlaybackSettings() {
     load();
   }, [load]);
 
-  if (!loaded) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-      </div>
-    );
-  }
+  if (!loaded) return <LoadingSpinner />;
 
   const defaultVolume = parseInt(get('playback_default_volume'), 10) || 80;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-surface-100">Playback</h2>
-        <p className="mt-1 text-sm text-surface-500">
-          Video and audio playback preferences
-        </p>
-      </div>
+      <PageHeading title="Playback" subtitle="Video and audio defaults" />
 
       <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Audio
-        </h3>
+        <SectionHeading>Audio</SectionHeading>
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-surface-200">
-                Default volume
-              </p>
+              <p className="text-sm font-medium text-surface-200">Default volume</p>
               <p className="mt-0.5 text-xs text-surface-500">
                 Volume level when the app starts ({defaultVolume}%)
               </p>
             </div>
-            <span className="text-sm font-medium text-surface-300">
-              {defaultVolume}%
-            </span>
+            <span className="text-sm font-medium text-surface-300">{defaultVolume}%</span>
           </div>
           <input
             type="range"
@@ -154,9 +76,7 @@ export function PlaybackSettings() {
       </div>
 
       <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Video
-        </h3>
+        <SectionHeading>Video</SectionHeading>
 
         <SettingRow
           label="Aspect ratio"
@@ -171,16 +91,6 @@ export function PlaybackSettings() {
               { value: '4:3', label: '4:3' },
               { value: 'fill', label: 'Fill Screen' },
             ]}
-          />
-        </SettingRow>
-
-        <SettingRow
-          label="Hardware acceleration"
-          description="Use GPU for video decoding (recommended)"
-        >
-          <Toggle
-            checked={getBool('playback_hw_accel')}
-            onChange={(v) => setBool('playback_hw_accel', v)}
           />
         </SettingRow>
 
@@ -219,9 +129,7 @@ export function PlaybackSettings() {
       </div>
 
       <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Buffering
-        </h3>
+        <SectionHeading>Buffering</SectionHeading>
 
         <SettingRow
           label="Buffer size"
@@ -242,50 +150,7 @@ export function PlaybackSettings() {
       </div>
 
       <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Subtitles
-        </h3>
-
-        <SettingRow
-          label="Subtitle language"
-          description="Auto-select subtitle track when available"
-        >
-          <Select
-            value={get('playback_subtitle_lang')}
-            onChange={(v) => set('playback_subtitle_lang', v)}
-            options={[
-              { value: 'off', label: 'Off' },
-              { value: 'en', label: 'English' },
-              { value: 'es', label: 'Spanish' },
-              { value: 'fr', label: 'French' },
-              { value: 'de', label: 'German' },
-              { value: 'ar', label: 'Arabic' },
-              { value: 'pt', label: 'Portuguese' },
-              { value: 'tr', label: 'Turkish' },
-              { value: 'it', label: 'Italian' },
-              { value: 'nl', label: 'Dutch' },
-              { value: 'ru', label: 'Russian' },
-            ]}
-          />
-        </SettingRow>
-
-        <SettingRow
-          label="Auto-search OpenSubtitles"
-          description="Automatically find and load subtitles when playback starts"
-        >
-          <Toggle
-            checked={getBool('opensubtitles.autoSearch')}
-            onChange={(v) => setBool('opensubtitles.autoSearch', v)}
-          />
-        </SettingRow>
-
-        <OpenSubtitlesCredentials />
-      </div>
-
-      <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Behaviour
-        </h3>
+        <SectionHeading>Behaviour</SectionHeading>
 
         <SettingRow
           label="Resume playback"
@@ -297,198 +162,6 @@ export function PlaybackSettings() {
           />
         </SettingRow>
       </div>
-
-      <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Recording
-        </h3>
-
-        <SettingRow
-          label="Maximum recording length"
-          description="Automatically stop recording after this many hours (prevents runaway disk use)"
-        >
-          <Select
-            value={get('recording_max_duration_minutes')}
-            onChange={(v) => set('recording_max_duration_minutes', v)}
-            options={[
-              { value: '0', label: 'No limit' },
-              { value: '60', label: '1 hour' },
-              { value: '120', label: '2 hours' },
-              { value: '180', label: '3 hours' },
-              { value: '240', label: '4 hours' },
-              { value: '360', label: '6 hours' },
-              { value: '480', label: '8 hours' },
-              { value: '720', label: '12 hours' },
-            ]}
-          />
-        </SettingRow>
-      </div>
-
-      <div className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
-          Downloads
-        </h3>
-
-        <SettingRow
-          label="Concurrent downloads"
-          description="How many files can download at the same time"
-        >
-          <Select
-            value={get('download_max_concurrent')}
-            onChange={(v) => set('download_max_concurrent', v)}
-            options={[
-              { value: '1', label: '1' },
-              { value: '2', label: '2' },
-              { value: '3', label: '3' },
-              { value: '4', label: '4' },
-              { value: '6', label: '6' },
-              { value: '8', label: '8' },
-            ]}
-          />
-        </SettingRow>
-
-        <SettingRow
-          label="Maximum file size"
-          description="Refuse downloads that advertise a larger size (guards against runaway disks)"
-        >
-          <Select
-            value={get('download_max_file_size_gb')}
-            onChange={(v) => set('download_max_file_size_gb', v)}
-            options={[
-              { value: '5', label: '5 GB' },
-              { value: '10', label: '10 GB' },
-              { value: '25', label: '25 GB' },
-              { value: '50', label: '50 GB' },
-              { value: '100', label: '100 GB' },
-              { value: '0', label: 'No limit' },
-            ]}
-          />
-        </SettingRow>
-
-        <SettingRow
-          label="Allow private network addresses"
-          description="Permit downloads from LAN / loopback hosts. Leave off unless you know why you need it."
-        >
-          <Toggle
-            checked={getBool('download_allow_private_ips')}
-            onChange={(v) => setBool('download_allow_private_ips', v)}
-          />
-        </SettingRow>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// OpenSubtitles credentials section
-// ---------------------------------------------------------------------------
-
-function OpenSubtitlesCredentials() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [status, setStatus] = useState<'idle' | 'saving' | 'clearing' | 'saved' | 'error'>('idle');
-  const [message, setMessage] = useState<string | null>(null);
-  const [cacheStats, setCacheStats] = useState<{ count: number } | null>(null);
-
-  useEffect(() => {
-    window.api?.subtitles.getCacheStats().then((r: { ok: boolean; count?: number }) => {
-      if (r?.ok) setCacheStats({ count: r.count ?? 0 });
-    });
-  }, []);
-
-  const save = async () => {
-    if (!username.trim() || !password) {
-      setMessage('Enter both username and password.');
-      setStatus('error');
-      return;
-    }
-    setStatus('saving');
-    setMessage(null);
-    const res = await window.api?.subtitles.setCredentials(username.trim(), password);
-    if (res?.ok) {
-      setStatus('saved');
-      setMessage('Credentials saved. Your download quota is now linked to your account.');
-      setPassword('');
-    } else {
-      setStatus('error');
-      setMessage(res?.error ?? 'Failed to save credentials.');
-    }
-  };
-
-  const clear = async () => {
-    setStatus('clearing');
-    await window.api?.subtitles.clearCredentials();
-    setUsername('');
-    setPassword('');
-    setStatus('idle');
-    setMessage('Credentials removed. Anonymous downloads will be used.');
-  };
-
-  const clearCache = async () => {
-    await window.api?.subtitles.clearCache();
-    setCacheStats({ count: 0 });
-  };
-
-  return (
-    <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
-      <div>
-        <p className="text-sm font-medium text-surface-200">OpenSubtitles account</p>
-        <p className="mt-0.5 text-xs text-surface-500">
-          Optional — raises your daily download limit. Anonymous users get 5/day.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Username"
-          autoComplete="off"
-          className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent focus:outline-none"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          autoComplete="new-password"
-          onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
-          className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent focus:outline-none"
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          onClick={save}
-          disabled={status === 'saving'}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-surface-950 transition-colors hover:bg-accent-hover disabled:opacity-50"
-        >
-          {status === 'saving' ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          onClick={clear}
-          disabled={status === 'clearing'}
-          className="rounded-lg border border-surface-700 px-3 py-1.5 text-xs text-surface-400 transition-colors hover:border-surface-500 hover:text-surface-200 disabled:opacity-50"
-        >
-          Clear
-        </button>
-        {cacheStats !== null && (
-          <button
-            onClick={clearCache}
-            className="ml-auto text-xs text-surface-500 hover:text-surface-300 transition-colors"
-            title="Clear subtitle cache"
-          >
-            Clear cache ({cacheStats.count})
-          </button>
-        )}
-      </div>
-
-      {message && (
-        <p className={`text-xs ${status === 'error' ? 'text-red-400' : 'text-accent'}`}>
-          {message}
-        </p>
-      )}
     </div>
   );
 }

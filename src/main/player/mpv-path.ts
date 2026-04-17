@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import log from 'electron-log/main';
+import { getSetting } from '../services/settings-service';
+
+const SETTING_KEY_MPV_PATH = 'advanced_mpv_path';
 
 const WINDOWS_SEARCH_PATHS = [
   // Bundled with the app (dev mode — project root)
@@ -25,6 +28,24 @@ const WINDOWS_SEARCH_PATHS = [
  * 3. System PATH
  */
 export function findMpvPath(): string | null {
+  // User-configured override from Settings → Advanced. Takes precedence over
+  // bundled/auto-discovered mpv so power users can pin a specific build.
+  // Wrapped in try/catch because findMpvPath may run before the DB is opened
+  // (and is called directly from tests that don't initialize the DB).
+  let override: string | null = null;
+  try {
+    override = getSetting(SETTING_KEY_MPV_PATH);
+  } catch {
+    // DB not initialized — skip override and fall through to auto-discovery.
+  }
+  if (override && override.trim().length > 0) {
+    if (fs.existsSync(override)) {
+      log.info(`mpv override in use: ${override}`);
+      return override;
+    }
+    log.warn(`Configured mpv override does not exist: ${override} — falling back to auto-discovery`);
+  }
+
   // Check known paths
   for (const pathFn of WINDOWS_SEARCH_PATHS) {
     const p = pathFn();

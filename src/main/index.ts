@@ -9,6 +9,7 @@ import {
   MIN_WINDOW_WIDTH,
 } from '../shared/constants';
 import { initDatabase, closeDatabase } from './services/db';
+import { getSetting } from './services/settings-service';
 import { registerIpcHandlers, destroyPlayer } from './ipc';
 import { startAutoRefresh, stopAutoRefresh } from './services/epg-service';
 import { startAutoSync, stopAutoSync } from './services/source-sync';
@@ -21,6 +22,14 @@ import {
   getVideoWindow,
   getVideoWindowHandle,
 } from './player/video-window';
+import {
+  createTray,
+  destroyTray,
+  isAppQuitting,
+  markAppQuitting,
+  shouldCloseToTray,
+  shouldMinimizeToTray,
+} from './services/tray-service';
 
 log.initialize();
 log.info(`${APP_NAME} starting...`);
@@ -92,6 +101,25 @@ function createWindow(): void {
     if (mainWindow) {
       createVideoWindow(mainWindow);
       createOverlayWindow(mainWindow);
+      createTray(mainWindow);
+    }
+  });
+
+  // Minimize → tray: Electron's 'minimize' event is non-preventable — minimize
+  // has already happened by the time it fires. We react by hiding the window,
+  // which removes it from the taskbar; the tray icon is the way back.
+  mainWindow.on('minimize', () => {
+    if (shouldMinimizeToTray() && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.hide();
+    }
+  });
+
+  // Close → tray: keep the app running in the background when the user clicks
+  // the red X. The tray's "Quit" menu still exits cleanly.
+  mainWindow.on('close', (event) => {
+    if (!isAppQuitting() && shouldCloseToTray() && mainWindow) {
+      event.preventDefault();
+      mainWindow.hide();
     }
   });
 
@@ -157,6 +185,13 @@ app.whenReady().then(() => {
   });
 
   initDatabase();
+
+  // Honor Settings → Advanced → Debug logging. Default level is 'info';
+  // flipping debug on turns on the full verbose trail in both file + console.
+  const debugLogging = getSetting('advanced_debug_logging') === '1';
+  log.transports.file.level = debugLogging ? 'debug' : 'info';
+  log.transports.console.level = debugLogging ? 'debug' : 'info';
+
   reconcileRecordings();
   reconcileDownloads();
   registerIpcHandlers();
@@ -171,6 +206,12 @@ app.whenReady().then(() => {
   });
 });
 
+// Any time `app.quit()` is initiated (tray menu, platform quit, etc.) mark the
+// flag so the main window's close handler stops intercepting.
+app.on('before-quit', () => {
+  markAppQuitting();
+});
+
 app.on('window-all-closed', () => {
   stopAutoRefresh();
   stopAutoSync();
@@ -179,6 +220,7 @@ app.on('window-all-closed', () => {
   destroyPlayer();
   destroyOverlay();
   destroyVideoWindow();
+  destroyTray();
   closeDatabase();
   app.quit();
 });

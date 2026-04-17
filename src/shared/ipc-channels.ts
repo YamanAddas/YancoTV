@@ -163,9 +163,13 @@ export const IpcChannels = {
 
   // Dialog
   DIALOG_OPEN_M3U_FILE: 'dialog:openM3uFile',
+  DIALOG_PICK_DIRECTORY: 'dialog:pickDirectory',
+  DIALOG_PICK_FILE: 'dialog:pickFile',
 
-  // App
+  // App paths / admin
   APP_GET_VERSION: 'app:getVersion',
+  APP_OPEN_DATA_DIR: 'app:openDataDir',
+  APP_GET_PATHS: 'app:getPaths',
 
   // Window controls (custom titlebar)
   WINDOW_MINIMIZE: 'window:minimize',

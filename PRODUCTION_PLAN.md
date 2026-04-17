@@ -208,20 +208,9 @@ Note: The content detail page UI was built in Sprint 11B using provider metadata
 
 ---
 
-### Sprint 16 — Multi-View & PIP
+### Sprint 16 — Multi-View & PIP — DROPPED FROM THIS VERSION
 
-**Objective:** Watch multiple channels simultaneously — desktop advantage over mobile IPTV apps.
-
-| # | Task | Details |
-|---|------|---------|
-| 16.1 | PIP mode | Minimize current playback to floating corner window. Browse/search while watching |
-| 16.2 | PIP controls | Resize, reposition, close PIP. Click to expand back to full player |
-| 16.3 | Split-screen 2-up | Side-by-side two channels. Independent audio selection (which channel's audio plays) |
-| 16.4 | Split-screen 4-up | 2x2 grid of four channels. Click one to select audio source |
-| 16.5 | Multi-view layout picker | UI to select layout: single, PIP, 2-split, 4-grid |
-| 16.6 | Quick-add to multi-view | "Add to multi-view" option on channel items |
-
-**Deliverable:** PIP mode for browsing while watching. Split-screen for 2 or 4 simultaneous channels.
+Cut from Phase 1 scope. Not shipping in this version. May be revisited in a later release.
 
 ---
 
@@ -406,7 +395,7 @@ No new backend work — purely frontend/visual.
 | **M8 — All Sources** | Stalker Portal, source editing, sync progress, health indicators | Sprint 11 | DONE |
 | **M8B — Content Detail** | Cinematic movie/series detail pages with metadata, episodes, related | Sprint 11B | — |
 | **M9 — Media Manager** | Recording + downloading = full media management | Sprints 12–13 | — |
-| **M10 — Premium** | TMDb enrichment, subtitles, multi-view | Sprints 14–16 | — |
+| **M10 — Premium** | TMDb enrichment, subtitles | Sprints 14–15 | DONE |
 | **M11 — Polished** | Settings, system features, search UX, network config | Sprints 17–20 | Partial |
 | **M12 — Ship It** | Stabilized, tested, release-ready | Sprint 21 | — |
 | **M13 — Redesigned** | Fresh UI with all features | Phase 3 | — |
@@ -425,7 +414,7 @@ No new backend work — purely frontend/visual.
 | Catch-up | Yes | Yes |
 | Timeshift | Yes | Yes |
 | Recording | Yes + scheduled | Yes + scheduled from EPG |
-| Multi-view | Up to 9 | PIP + 2/4 split |
+| Multi-view | Up to 9 | Not in this version |
 | Parental controls | PIN lock | PIN lock + hidden channels |
 | Downloads | No | **Yes — VOD download manager** |
 | Metadata | Provider-only | **TMDb enrichment — posters, ratings, cast** |
@@ -451,7 +440,6 @@ No new backend work — purely frontend/visual.
 | Timeshift buffer disk usage | Configurable buffer size, auto-cleanup, storage warnings |
 | TMDb rate limiting | Cache aggressively, batch requests, respect rate limits, queue background matching |
 | ffmpeg recording reliability | Monitor ffmpeg process health, auto-restart on crash, validate output files |
-| Multi-view performance | Limit to 4 simultaneous streams, monitor CPU/GPU/memory, quality auto-adjust |
 | Provider metadata is garbage | Title cleaner handles 80% of cases. TMDb matching handles the rest |
 | Electron app size | Tree-shake renderer, lazy-load pages. mpv + ffmpeg add ~100MB — acceptable |
 | Security vulnerabilities | Hardened from day one. No shortcuts. Security audit in Sprint 21 |

@@ -205,7 +205,8 @@ pnpm audit            # Security audit
 - **Sprint 13:** DONE (download service with retry/resume, asset bundling — poster/backdrop/.nfo/subtitles, DownloadsPage)
 - **Sprint 14:** DONE (TMDb API client + enrichment service, SQLite cache, MetadataSettings tab)
 - **Sprint 15:** DONE (OpenSubtitles client, auto-search on playback, in-player search UI, SQLite-backed cache, safeStorage credentials)
-- **Sprint 16+:** NOT STARTED (multi-view/PIP, system features, etc.)
+- **Sprint 16:** DROPPED from this version (multi-view/PIP cut from scope)
+- **Sprints 17–21:** NOT STARTED (settings polish, system features, search/channel UX, network config, stabilization) — done in separate sessions, one sprint per session
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 

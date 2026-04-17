@@ -26,6 +26,14 @@ import hexFrameSrc from '../assets/hex-frames/hex-frame.svg';
 import hexFrameLockedSrc from '../assets/hex-frames/hex-frame-locked.svg';
 import type { NowNextMap } from '../../shared/types/epg';
 
+/**
+ * Maximum items the reorder path will render non-virtualized. Over this size
+ * the list falls back to the virtualized view (drag disabled) to keep paint
+ * time reasonable. Callers (e.g. LiveTvPage) use this to show a hint when a
+ * filter selection is too broad to reorder.
+ */
+export const REORDER_ITEM_CAP = 15000;
+
 export interface ContentCardData {
   id: string;
   title: string;
@@ -129,9 +137,10 @@ export function ContentGrid({
   if (isLoading) return <SkeletonGrid cardStyle={cardStyle} />;
   if (items.length === 0) return null;
 
-  // Reorderable — non-virtualized, covers both list and grid views.
-  // Gated to ≤ 3000 items so the non-virtualized DOM stays manageable.
-  if (reorderable && onReorder && items.length <= 3000 && viewMode !== 'compact') {
+  // Reorderable — non-virtualized, covers both list and grid views. Capped
+  // so the DOM doesn't balloon past what the browser can paint smoothly; over
+  // the cap we fall back to the virtualized view (drag disabled).
+  if (reorderable && onReorder && items.length <= REORDER_ITEM_CAP && viewMode !== 'compact') {
     return (
       <ReorderableChannels
         items={items}

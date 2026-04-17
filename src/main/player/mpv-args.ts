@@ -87,3 +87,46 @@ export function getVodPlaybackArgs(): string[] {
 export function getPlaybackArgs(opts: { isLive: boolean; liveBufferSeconds?: number }): string[] {
   return opts.isLive ? getLivePlaybackArgs(opts.liveBufferSeconds) : getVodPlaybackArgs();
 }
+
+/**
+ * Subtitle appearance — applied to both external sub files and embedded tracks.
+ * All inputs are raw setting strings (or null/undefined if never set); this
+ * function is responsible for normalization and validation so a bad value
+ * from the DB doesn't wedge mpv startup.
+ *
+ * Supported settings:
+ *   • subtitle_scale       — number, 0.5..3.0 (mpv `--sub-scale`)
+ *   • subtitle_color       — hex like "#FFFFFF" (mpv `--sub-color`)
+ *   • subtitle_back_opacity — 0..100 % (mpv `--sub-back-color`, 0 = transparent)
+ */
+export function getSubtitleAppearanceArgs(opts: {
+  scale?: string | null;
+  color?: string | null;
+  backOpacity?: string | null;
+}): string[] {
+  const args: string[] = [];
+
+  if (opts.scale != null && opts.scale !== '') {
+    const n = Number(opts.scale);
+    if (Number.isFinite(n) && n >= 0.5 && n <= 3.0) {
+      args.push(`--sub-scale=${n}`);
+    }
+  }
+
+  if (opts.color && /^#[0-9a-fA-F]{6}$/.test(opts.color)) {
+    args.push(`--sub-color=${opts.color}`);
+  }
+
+  if (opts.backOpacity != null && opts.backOpacity !== '') {
+    const pct = Number(opts.backOpacity);
+    if (Number.isFinite(pct) && pct >= 0 && pct <= 100) {
+      // mpv's sub-back-color alpha: 0 = opaque, 255 = transparent.
+      // We invert so "100% opacity" in the UI → alpha 0 in mpv.
+      const alpha = Math.round(255 * (1 - pct / 100));
+      const hex = alpha.toString(16).padStart(2, '0').toUpperCase();
+      args.push(`--sub-back-color=#${hex}000000`);
+    }
+  }
+
+  return args;
+}

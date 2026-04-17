@@ -261,6 +261,13 @@ const api = {
 
   dialog: {
     openM3uFile: () => ipcRenderer.invoke(IpcChannels.DIALOG_OPEN_M3U_FILE),
+    pickDirectory: (opts?: { title?: string; defaultPath?: string }) =>
+      ipcRenderer.invoke(IpcChannels.DIALOG_PICK_DIRECTORY, opts),
+    pickFile: (opts?: {
+      title?: string;
+      defaultPath?: string;
+      filters?: { name: string; extensions: string[] }[];
+    }) => ipcRenderer.invoke(IpcChannels.DIALOG_PICK_FILE, opts),
   },
 
   db: {
@@ -350,6 +357,14 @@ const api = {
 
   app: {
     getVersion: () => ipcRenderer.invoke(IpcChannels.APP_GET_VERSION),
+    getPaths: (): Promise<{
+      userData: string;
+      logs: string;
+      recordings: string;
+      downloads: string;
+    }> => ipcRenderer.invoke(IpcChannels.APP_GET_PATHS),
+    openDataDir: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.APP_OPEN_DATA_DIR),
   },
 
   window: {

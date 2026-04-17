@@ -47,6 +47,8 @@ function rowToRecording(row: RecordingRow): Recording {
 
 const SETTING_KEY_DIR = 'recording_directory';
 const SETTING_KEY_MAX_DURATION = 'recording_max_duration_minutes';
+const SETTING_KEY_MAX_CONCURRENT = 'recording_max_concurrent';
+const DEFAULT_MAX_CONCURRENT = 3;
 const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
 
 function getMaxDurationSeconds(): number {
@@ -54,6 +56,18 @@ function getMaxDurationSeconds(): number {
   const minutes = raw ? parseInt(raw, 10) : 240;
   if (!Number.isFinite(minutes) || minutes <= 0) return 0;
   return minutes * 60;
+}
+
+function getMaxConcurrent(): number {
+  const raw = getSetting(SETTING_KEY_MAX_CONCURRENT);
+  const n = raw ? parseInt(raw, 10) : DEFAULT_MAX_CONCURRENT;
+  if (!Number.isFinite(n) || n < 1) return 1;
+  if (n > 10) return 10;
+  return n;
+}
+
+export function getActiveRecordingCount(): number {
+  return activeProcesses.size;
 }
 
 export function getRecordingsDirectory(): string {
@@ -100,6 +114,14 @@ export function startRecording(
 ): { ok: true; id: string } | { ok: false; error: string } {
   const ffmpeg = findFfmpegPath();
   if (!ffmpeg) return { ok: false, error: 'ffmpeg not found on this system' };
+
+  const maxConcurrent = getMaxConcurrent();
+  if (activeProcesses.size >= maxConcurrent) {
+    return {
+      ok: false,
+      error: `Already recording ${activeProcesses.size}/${maxConcurrent}. Stop a recording or raise the limit in Settings → Recording.`,
+    };
+  }
 
   const dir = getRecordingsDirectory();
   try {

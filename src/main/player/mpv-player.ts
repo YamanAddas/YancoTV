@@ -16,7 +16,8 @@ import type {
 } from './player.interface';
 import { MpvIpc } from './mpv-ipc';
 import { findMpvPath } from './mpv-path';
-import { getPlaybackArgs } from './mpv-args';
+import { getPlaybackArgs, getSubtitleAppearanceArgs } from './mpv-args';
+import { getSetting } from '../services/settings-service';
 
 const CONNECT_RETRY_DELAY = 300;
 const CONNECT_MAX_RETRIES = 20; // 20 * 300ms = 6 seconds — enough for cold mpv starts
@@ -284,7 +285,20 @@ export class MpvPlayer implements IPlayer {
     // after a crash (Bug 10 fix)
     this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
 
+    // Re-resolve mpv path so a Settings → Advanced override takes effect on
+    // the next stream (instead of needing an app restart).
+    const resolvedMpv = findMpvPath();
+    if (resolvedMpv) this.mpvPath = resolvedMpv;
+    if (!this.mpvPath) {
+      throw new Error(
+        'mpv not found. Install mpv and ensure it is in your PATH or set a custom path in Settings → Advanced.',
+      );
+    }
+
     const embedded = typeof options?.wid === 'string' && options.wid.length > 0;
+
+    // Settings → Playback → Hardware acceleration. Default on.
+    const hwAccel = getSetting('playback_hw_accel') !== '0';
 
     const args = [
       url,
@@ -293,14 +307,19 @@ export class MpvPlayer implements IPlayer {
       '--keep-open=yes',
       '--idle=once',
       `--volume=${this.state.volume}`,
-      // Hardware decoding for performance
-      '--hwdec=auto',
+      hwAccel ? '--hwdec=auto' : '--hwdec=no',
       // Embedded mode: our React overlay draws controls, disable mpv's OSC.
       // Standalone mode: show mpv's built-in OSC.
       embedded ? '--osc=no' : '--osc=yes',
       // Cache / network tuning — differs for live vs VOD so playback is
       // smooth instead of stuttering when the upstream server burps.
       ...getPlaybackArgs({ isLive: options?.isLive ?? false }),
+      // User-configurable subtitle appearance (scale, color, background).
+      ...getSubtitleAppearanceArgs({
+        scale: getSetting('subtitle_scale'),
+        color: getSetting('subtitle_color'),
+        backOpacity: getSetting('subtitle_back_opacity'),
+      }),
     ];
 
     if (embedded) {

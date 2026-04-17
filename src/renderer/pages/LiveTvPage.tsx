@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
+import { ContentGrid, REORDER_ITEM_CAP, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
 import { SourceSwitcher } from '../components/SourceSwitcher';
@@ -281,14 +281,25 @@ export function LiveTvPage() {
       </div>
 
       {reorderMode && (
-        <div className="mb-3 flex items-center justify-between rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
-          <span className="font-display uppercase tracking-widest-plus">
-            Reorder mode — drag any card to move it
-          </span>
-          <span className="font-mono text-[10px] text-accent/70">
-            {typeof selectedCategory === 'string' ? `in "${selectedCategory}"` : 'global order'}
-          </span>
-        </div>
+        filtered.length > REORDER_ITEM_CAP ? (
+          <div className="mb-3 flex items-center justify-between rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            <span className="font-display uppercase tracking-widest-plus">
+              Too many channels to reorder ({filtered.length.toLocaleString()}). Pick a category to narrow the list.
+            </span>
+            <span className="font-mono text-[10px] text-amber-300/70">
+              cap {REORDER_ITEM_CAP.toLocaleString()}
+            </span>
+          </div>
+        ) : (
+          <div className="mb-3 flex items-center justify-between rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
+            <span className="font-display uppercase tracking-widest-plus">
+              Reorder mode — drag any card to move it
+            </span>
+            <span className="font-mono text-[10px] text-accent/70">
+              {typeof selectedCategory === 'string' ? `in "${selectedCategory}"` : 'global order'}
+            </span>
+          </div>
+        )
       )}
 
       <div className="flex min-h-0 flex-1 gap-4">
