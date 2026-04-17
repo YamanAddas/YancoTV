@@ -122,6 +122,18 @@ export const IpcChannels = {
   GROUP_PREFS_REMOVE: 'groups:removePrefs',
   GROUP_PREFS_REORDER: 'groups:reorder',
 
+  // Recordings (ffmpeg-based live recording)
+  RECORDING_START: 'recording:start',
+  RECORDING_STOP: 'recording:stop',
+  RECORDING_LIST: 'recording:list',
+  RECORDING_DELETE: 'recording:delete',
+  RECORDING_OPEN_FOLDER: 'recording:openFolder',
+  RECORDING_CHECK_FFMPEG: 'recording:checkFfmpeg',
+  /** main → renderer push: progress updates for a recording */
+  RECORDING_PROGRESS: 'recording:progress',
+  /** main → renderer push: status change (completed, failed, cancelled) */
+  RECORDING_STATUS: 'recording:status',
+
   // Database
   DB_STATUS: 'db:status',
 

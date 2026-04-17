@@ -29,6 +29,7 @@ interface ContentGridProps {
   nowNextMap?: NowNextMap;
   onLockToggle?: (item: ContentCardData) => void;
   onHideChannel?: (item: ContentCardData) => void;
+  onRecord?: (item: ContentCardData) => void;
   /** Override list style — defaults to the global ui_list_style setting */
   viewMode?: 'grid' | 'list' | 'compact';
   /** 'channel' = compact hex rows (Live TV); 'poster' = tall hex artwork cards (Movies/Series) */
@@ -45,6 +46,7 @@ export function ContentGrid({
   nowNextMap,
   onLockToggle,
   onHideChannel,
+  onRecord,
   viewMode: viewModeProp,
   cardStyle = 'channel',
 }: ContentGridProps) {
@@ -69,11 +71,12 @@ export function ContentGrid({
           nowNext={nowNext}
           onLockToggle={onLockToggle ? () => onLockToggle(item) : undefined}
           onHideChannel={onHideChannel ? () => onHideChannel(item) : undefined}
+          onRecord={onRecord ? () => onRecord(item) : undefined}
           cardStyle={cardStyle}
         />
       );
     },
-    [items, onItemClick, onFavoriteToggle, favoriteIds, lockedIds, nowNextMap, showLogos, onLockToggle, onHideChannel, cardStyle],
+    [items, onItemClick, onFavoriteToggle, favoriteIds, lockedIds, nowNextMap, showLogos, onLockToggle, onHideChannel, onRecord, cardStyle],
   );
 
   // One stable callback for list/compact row rendering
@@ -91,10 +94,11 @@ export function ContentGrid({
         nowNext,
         onLockToggle: onLockToggle ? () => onLockToggle(item) : undefined,
         onHideChannel: onHideChannel ? () => onHideChannel(item) : undefined,
+        onRecord: onRecord ? () => onRecord(item) : undefined,
       };
       return viewMode === 'compact' ? <CompactRow {...props} /> : <ListRow {...props} />;
     },
-    [items, viewMode, onItemClick, onFavoriteToggle, favoriteIds, lockedIds, nowNextMap, showLogos, onLockToggle, onHideChannel],
+    [items, viewMode, onItemClick, onFavoriteToggle, favoriteIds, lockedIds, nowNextMap, showLogos, onLockToggle, onHideChannel, onRecord],
   );
   // ── End hooks ─────────────────────────────────────────────────────────────
 
@@ -140,6 +144,7 @@ interface CardProps {
   nowNext?: { now?: { title?: string }; next?: { title?: string } };
   onLockToggle?: () => void;
   onHideChannel?: () => void;
+  onRecord?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,18 +161,19 @@ function HexGridItem({
   nowNext,
   onLockToggle,
   onHideChannel,
+  onRecord,
   cardStyle = 'channel',
 }: CardProps & { cardStyle?: 'channel' | 'poster' }) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      if (!onLockToggle && !onHideChannel && !onFavoriteToggle) return;
+      if (!onLockToggle && !onHideChannel && !onFavoriteToggle && !onRecord) return;
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY });
     },
-    [onLockToggle, onHideChannel, onFavoriteToggle],
+    [onLockToggle, onHideChannel, onFavoriteToggle, onRecord],
   );
 
   useEffect(() => {
@@ -220,6 +226,7 @@ function HexGridItem({
           onFavoriteToggle={onFavoriteToggle ? () => { onFavoriteToggle(); setContextMenu(null); } : undefined}
           onLockToggle={onLockToggle ? () => { onLockToggle(); setContextMenu(null); } : undefined}
           onHideChannel={onHideChannel ? () => { onHideChannel(); setContextMenu(null); } : undefined}
+          onRecord={onRecord ? () => { onRecord(); setContextMenu(null); } : undefined}
         />
       )}
     </>
@@ -311,17 +318,18 @@ function ListRow({
   nowNext,
   onLockToggle,
   onHideChannel,
+  onRecord,
 }: CardProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      if (!onLockToggle && !onHideChannel && !onFavoriteToggle) return;
+      if (!onLockToggle && !onHideChannel && !onFavoriteToggle && !onRecord) return;
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY });
     },
-    [onLockToggle, onHideChannel, onFavoriteToggle],
+    [onLockToggle, onHideChannel, onFavoriteToggle, onRecord],
   );
 
   useEffect(() => {
@@ -360,6 +368,7 @@ function ListRow({
           onFavoriteToggle={onFavoriteToggle ? () => { onFavoriteToggle(); setContextMenu(null); } : undefined}
           onLockToggle={onLockToggle ? () => { onLockToggle(); setContextMenu(null); } : undefined}
           onHideChannel={onHideChannel ? () => { onHideChannel(); setContextMenu(null); } : undefined}
+          onRecord={onRecord ? () => { onRecord(); setContextMenu(null); } : undefined}
         />
       )}
     </>
@@ -379,17 +388,18 @@ function CompactRow({
   nowNext,
   onLockToggle,
   onHideChannel,
+  onRecord,
 }: CardProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      if (!onLockToggle && !onHideChannel && !onFavoriteToggle) return;
+      if (!onLockToggle && !onHideChannel && !onFavoriteToggle && !onRecord) return;
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY });
     },
-    [onLockToggle, onHideChannel, onFavoriteToggle],
+    [onLockToggle, onHideChannel, onFavoriteToggle, onRecord],
   );
 
   useEffect(() => {
@@ -450,6 +460,7 @@ function CompactRow({
           onFavoriteToggle={onFavoriteToggle ? () => { onFavoriteToggle(); setContextMenu(null); } : undefined}
           onLockToggle={onLockToggle ? () => { onLockToggle(); setContextMenu(null); } : undefined}
           onHideChannel={onHideChannel ? () => { onHideChannel(); setContextMenu(null); } : undefined}
+          onRecord={onRecord ? () => { onRecord(); setContextMenu(null); } : undefined}
         />
       )}
     </>
@@ -468,6 +479,7 @@ function ContextMenu({
   onFavoriteToggle,
   onLockToggle,
   onHideChannel,
+  onRecord,
 }: {
   x: number;
   y: number;
@@ -476,6 +488,7 @@ function ContextMenu({
   onFavoriteToggle?: () => void;
   onLockToggle?: () => void;
   onHideChannel?: () => void;
+  onRecord?: () => void;
 }) {
   return (
     <div
@@ -489,6 +502,13 @@ function ContextMenu({
           label={isFavorite ? 'Remove Favorite' : 'Add Favorite'}
         />
       )}
+      {onRecord && (
+        <ContextMenuItem
+          onClick={onRecord}
+          icon={<RecordIcon />}
+          label="Record"
+        />
+      )}
       {onLockToggle && (
         <ContextMenuItem
           onClick={onLockToggle}
@@ -500,6 +520,14 @@ function ContextMenu({
         <ContextMenuItem onClick={onHideChannel} icon={<EyeOffIcon />} label="Hide Channel" danger />
       )}
     </div>
+  );
+}
+
+function RecordIcon() {
+  return (
+    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="6" />
+    </svg>
   );
 }
 

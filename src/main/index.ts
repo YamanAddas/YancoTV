@@ -12,6 +12,7 @@ import { initDatabase, closeDatabase } from './services/db';
 import { registerIpcHandlers, destroyPlayer } from './ipc';
 import { startAutoRefresh, stopAutoRefresh } from './services/epg-service';
 import { startAutoSync, stopAutoSync } from './services/source-sync';
+import { reconcileOnStartup as reconcileRecordings, stopAllOnQuit as stopAllRecordings } from './services/recording-service';
 import { createOverlayWindow, destroyOverlay, getOverlayWindow } from './player/overlay-window';
 import {
   createVideoWindow,
@@ -155,6 +156,7 @@ app.whenReady().then(() => {
   });
 
   initDatabase();
+  reconcileRecordings();
   registerIpcHandlers();
   startAutoRefresh(12); // Refresh EPG every 12 hours
   startAutoSync(); // Check for sources needing re-sync every 5 minutes
@@ -170,6 +172,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   stopAutoRefresh();
   stopAutoSync();
+  stopAllRecordings();
   destroyPlayer();
   destroyOverlay();
   destroyVideoWindow();

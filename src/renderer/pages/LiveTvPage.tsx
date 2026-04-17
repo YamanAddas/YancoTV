@@ -170,6 +170,18 @@ export function LiveTvPage() {
     [hideChannel],
   );
 
+  const handleRecord = useCallback(async (item: ContentCardData) => {
+    const res = await window.api.recording.start({
+      contentId: item.id,
+      title: item.cleanTitle || item.title,
+      streamUrl: item.streamUrl,
+    });
+    if (!res.ok) {
+      // eslint-disable-next-line no-alert
+      alert(`Could not start recording: ${res.error}`);
+    }
+  }, []);
+
   if (!isLoading && !parentalLoaded) {
     // Still loading parental settings — show spinner briefly
     return null;
@@ -225,6 +237,7 @@ export function LiveTvPage() {
             nowNextMap={nowNextMap}
             onLockToggle={handleLockToggle}
             onHideChannel={handleHideChannel}
+            onRecord={handleRecord}
           />
         </div>
       </div>

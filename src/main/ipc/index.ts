@@ -82,6 +82,15 @@ import type { ChannelOverride } from '../services/parental-service';
 import { MpvPlayer } from '../player/mpv-player';
 import type { PlayerState } from '../player/player.interface';
 import { searchSubtitles, downloadSubtitle } from '../services/opensubtitles-client';
+import {
+  startRecording,
+  stopRecording,
+  listRecordings,
+  deleteRecording,
+  openRecordingsFolder,
+  checkFfmpegAvailable,
+} from '../services/recording-service';
+import type { StartRecordingInput } from '../../shared/types/recording';
 
 let player: MpvPlayer | null = null;
 
@@ -1052,6 +1061,50 @@ export function registerIpcHandlers(): void {
   // mpv availability check
   ipcMain.handle(IpcChannels.PLAYER_CHECK_MPV, () => {
     return { available: findMpvPath() !== null };
+  });
+
+  // Recordings
+  ipcMain.handle(IpcChannels.RECORDING_START, (_event, input: StartRecordingInput) => {
+    if (
+      !input ||
+      typeof input.title !== 'string' ||
+      typeof input.streamUrl !== 'string' ||
+      !input.title ||
+      !input.streamUrl
+    ) {
+      return { ok: false, error: 'title and streamUrl are required' };
+    }
+    return startRecording({
+      title: input.title,
+      streamUrl: input.streamUrl,
+      contentId: typeof input.contentId === 'string' ? input.contentId : undefined,
+    });
+  });
+
+  ipcMain.handle(IpcChannels.RECORDING_STOP, (_event, id: string) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+    return stopRecording(id);
+  });
+
+  ipcMain.handle(IpcChannels.RECORDING_LIST, () => {
+    return listRecordings();
+  });
+
+  ipcMain.handle(
+    IpcChannels.RECORDING_DELETE,
+    (_event, id: string, deleteFile: boolean) => {
+      if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+      return deleteRecording(id, !!deleteFile);
+    },
+  );
+
+  ipcMain.handle(IpcChannels.RECORDING_OPEN_FOLDER, () => {
+    openRecordingsFolder();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.RECORDING_CHECK_FFMPEG, () => {
+    return { available: checkFfmpegAvailable() };
   });
 
   log.info('IPC handlers registered');

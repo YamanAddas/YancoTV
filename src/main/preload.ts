@@ -252,6 +252,32 @@ const api = {
     status: () => ipcRenderer.invoke(IpcChannels.DB_STATUS),
   },
 
+  recording: {
+    start: (input: { contentId?: string; title: string; streamUrl: string }) =>
+      ipcRenderer.invoke(IpcChannels.RECORDING_START, input),
+    stop: (id: string) => ipcRenderer.invoke(IpcChannels.RECORDING_STOP, id),
+    list: () => ipcRenderer.invoke(IpcChannels.RECORDING_LIST),
+    remove: (id: string, deleteFile: boolean) =>
+      ipcRenderer.invoke(IpcChannels.RECORDING_DELETE, id, deleteFile),
+    openFolder: () => ipcRenderer.invoke(IpcChannels.RECORDING_OPEN_FOLDER),
+    checkFfmpeg: () => ipcRenderer.invoke(IpcChannels.RECORDING_CHECK_FFMPEG),
+    onProgress: (
+      callback: (p: { id: string; durationSeconds: number; fileSizeBytes: number }) => void,
+    ) => {
+      const handler = (
+        _e: IpcRendererEvent,
+        p: { id: string; durationSeconds: number; fileSizeBytes: number },
+      ) => callback(p);
+      ipcRenderer.on(IpcChannels.RECORDING_PROGRESS, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.RECORDING_PROGRESS, handler);
+    },
+    onStatus: (callback: (p: { id: string; status: string }) => void) => {
+      const handler = (_e: IpcRendererEvent, p: { id: string; status: string }) => callback(p);
+      ipcRenderer.on(IpcChannels.RECORDING_STATUS, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.RECORDING_STATUS, handler);
+    },
+  },
+
   app: {
     getVersion: () => ipcRenderer.invoke(IpcChannels.APP_GET_VERSION),
   },
