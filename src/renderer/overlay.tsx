@@ -14,24 +14,24 @@ import './styles/global.css';
 function OverlayApp() {
   usePlayerShortcuts();
 
-  // The overlay window is shown/hidden by the main process. Those events
-  // drive theater mode here — we don't flip mode based on anything else.
+  // The overlay is shown/hidden by the main process whenever a stream starts
+  // or stops. Re-seed mode='theater' on every show so the PlayerContainer
+  // gate always renders when we're visible — the shared player-store's stop()
+  // action flips mode to 'idle' when mpv idles between streams, which would
+  // otherwise leave the overlay blank on the *next* playback.
   useEffect(() => {
     if (!window.api) return;
     const offShown = window.api.player.onOverlayShown(() => {
       usePlayerStore.setState({ mode: 'theater', backend: 'mpv' });
     });
-    const offHidden = window.api.player.onOverlayHidden(() => {
-      usePlayerStore.setState({ mode: 'idle' });
-    });
-    return () => {
-      offShown();
-      offHidden();
-    };
+    return offShown;
   }, []);
 
   return <PlayerContainer />;
 }
+
+// Seed synchronously for the first-run case before any IPC events flow.
+usePlayerStore.setState({ mode: 'theater', backend: 'mpv' });
 
 async function init() {
   if (window.api) {
@@ -42,7 +42,6 @@ async function init() {
       usePlayerStore.setState({ backend: 'mpv' });
     }
   }
-  // Forward mpv IPC events to this window's store so controls reflect state.
   initPlayerEventListeners();
 }
 

@@ -91,10 +91,10 @@ let player: MpvPlayer | null = null;
  */
 function sendToPlayerRenderers(channel: string, ...args: unknown[]): void {
   const main = getMainWindow();
+  const overlay = getOverlayWindow();
   if (main && !main.isDestroyed()) {
     main.webContents.send(channel, ...args);
   }
-  const overlay = getOverlayWindow();
   if (overlay && !overlay.isDestroyed()) {
     overlay.webContents.send(channel, ...args);
   }

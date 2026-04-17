@@ -6,6 +6,7 @@ let overlay: BrowserWindow | null = null;
 let parent: BrowserWindow | null = null;
 let syncScheduled = false;
 let isOverlayActive = false;
+let parentListeners: Array<{ event: string; handler: (...args: unknown[]) => void }> = [];
 
 const isDev = !app.isPackaged;
 
@@ -39,7 +40,11 @@ export function createOverlayWindow(parentWindow: BrowserWindow): BrowserWindow 
     show: false,
     backgroundColor: '#00000000',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      // overlay-window.js lives in dist/main/main/player/, but preload.js is
+      // one level up at dist/main/main/preload.js. Without the `..` the preload
+      // silently fails to load → window.api exists (Electron stubs it) but no
+      // ipcRenderer listeners fire, so the overlay never sees player events.
+      preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -75,24 +80,33 @@ export function createOverlayWindow(parentWindow: BrowserWindow): BrowserWindow 
     });
   };
 
-  parentWindow.on('move', scheduleSync);
-  parentWindow.on('resize', scheduleSync);
-  parentWindow.on('maximize', scheduleSync);
-  parentWindow.on('unmaximize', scheduleSync);
-  parentWindow.on('enter-full-screen', scheduleSync);
-  parentWindow.on('leave-full-screen', scheduleSync);
-  parentWindow.on('show', () => {
+  const onShow = () => {
     if (overlay && overlay.isVisible()) scheduleSync();
-  });
-  parentWindow.on('minimize', () => {
+  };
+  const onMinimize = () => {
     if (overlay && !overlay.isDestroyed()) overlay.hide();
-  });
-  parentWindow.on('restore', () => {
+  };
+  const onRestore = () => {
     if (overlay && !overlay.isDestroyed() && isOverlayActive) {
       overlay.show();
       scheduleSync();
     }
-  });
+  };
+
+  parentListeners = [
+    { event: 'move', handler: scheduleSync },
+    { event: 'resize', handler: scheduleSync },
+    { event: 'maximize', handler: scheduleSync },
+    { event: 'unmaximize', handler: scheduleSync },
+    { event: 'enter-full-screen', handler: scheduleSync },
+    { event: 'leave-full-screen', handler: scheduleSync },
+    { event: 'show', handler: onShow },
+    { event: 'minimize', handler: onMinimize },
+    { event: 'restore', handler: onRestore },
+  ];
+  for (const { event, handler } of parentListeners) {
+    parentWindow.on(event as Parameters<BrowserWindow['on']>[0], handler);
+  }
 
   return overlay;
 }
@@ -114,6 +128,12 @@ export function hideOverlay(): void {
 }
 
 export function destroyOverlay(): void {
+  if (parent && !parent.isDestroyed()) {
+    for (const { event, handler } of parentListeners) {
+      parent.removeListener(event as Parameters<BrowserWindow['on']>[0], handler);
+    }
+  }
+  parentListeners = [];
   if (overlay && !overlay.isDestroyed()) {
     overlay.destroy();
   }

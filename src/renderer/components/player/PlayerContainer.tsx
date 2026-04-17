@@ -54,16 +54,22 @@ export function PlayerContainer() {
 
   if (mode !== 'theater') return null;
 
+  // mpv backend renders video in a separate child window below this overlay —
+  // the container must stay fully transparent so the video is visible. The
+  // html5 backend paints its own <video> element and benefits from a black
+  // backdrop to hide letterboxing.
+  const isMpv = backend === 'mpv';
+
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-40 bg-black"
+      className={`absolute inset-0 z-40 ${isMpv ? '' : 'bg-black'}`}
       onMouseMove={resetHideTimer}
       style={{ cursor: controlsVisible ? 'default' : 'none' }}
     >
       {/* mpv backend: video plays in its own window. This container shows status/controls.
           html5 backend: VideoPlayer renders the HTML5 video element here. */}
-      {backend !== 'mpv' && <VideoPlayer />}
+      {!isMpv && <VideoPlayer />}
 
       {/* Click-to-pause / double-click-fullscreen overlay */}
       <div

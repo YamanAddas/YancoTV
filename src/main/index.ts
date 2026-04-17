@@ -44,17 +44,24 @@ export { getVideoWindow, getVideoWindowHandle };
 export function getMainWindowHandle(): string | null {
   if (!mainWindow || mainWindow.isDestroyed()) return null;
   try {
-    const handle = mainWindow.getNativeWindowHandle();
-    if (process.platform === 'win32') {
-      // 64-bit Windows: HWND is pointer-sized, read as BigUInt64
-      return handle.readBigUInt64LE(0).toString();
-    }
-    // Linux/macOS: X11 Window ID or NSView pointer (32-bit)
-    return handle.readUInt32LE(0).toString();
+    return readHandleBuffer(mainWindow.getNativeWindowHandle());
   } catch (err) {
     log.error('Failed to get native window handle:', err);
     return null;
   }
+}
+
+function readHandleBuffer(buf: Buffer): string | null {
+  // On 64-bit Windows, HWND is 8 bytes. On 32-bit Windows/Linux/macOS, 4 bytes.
+  // Electron sometimes returns a shorter buffer than the platform pointer
+  // width — read by actual length, not platform assumption.
+  if (process.platform === 'win32' && buf.length >= 8) {
+    return buf.readBigUInt64LE(0).toString();
+  }
+  if (buf.length >= 4) {
+    return buf.readUInt32LE(0).toString();
+  }
+  return null;
 }
 
 function createWindow(): void {

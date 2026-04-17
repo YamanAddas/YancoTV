@@ -8,11 +8,19 @@ import log from 'electron-log/main';
  * mpv protocol: send `{"command": [...]}\n`, receive JSON lines back.
  * Property observations arrive as `{"event": "property-change", "name": ..., "data": ...}`.
  */
+const DEFAULT_COMMAND_TIMEOUT_MS = 10_000;
+
+interface PendingRequest {
+  resolve: (v: unknown) => void;
+  reject: (e: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class MpvIpc extends EventEmitter {
   private socket: net.Socket | null = null;
   private buffer = '';
   private requestId = 0;
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private pending = new Map<number, PendingRequest>();
   private connected = false;
 
   constructor(private pipeName: string) {
@@ -76,7 +84,7 @@ export class MpvIpc extends EventEmitter {
    * Send a command to mpv and wait for the response.
    * Example: command(['loadfile', url]) or command(['set_property', 'pause', true])
    */
-  command(args: unknown[]): Promise<unknown> {
+  command(args: unknown[], timeoutMs: number = DEFAULT_COMMAND_TIMEOUT_MS): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.socket || !this.connected) {
         reject(new Error('mpv IPC not connected'));
@@ -84,12 +92,21 @@ export class MpvIpc extends EventEmitter {
       }
 
       const id = ++this.requestId;
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        if (this.pending.delete(id)) {
+          reject(new Error(`mpv command timed out after ${timeoutMs}ms: ${JSON.stringify(args)}`));
+        }
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
 
       const msg = JSON.stringify({ command: args, request_id: id }) + '\n';
       this.socket.write(msg, (err) => {
         if (err) {
-          this.pending.delete(id);
+          const entry = this.pending.get(id);
+          if (entry) {
+            clearTimeout(entry.timer);
+            this.pending.delete(id);
+          }
           reject(err);
         }
       });
@@ -140,6 +157,7 @@ export class MpvIpc extends EventEmitter {
     if ('request_id' in msg && typeof msg.request_id === 'number') {
       const pending = this.pending.get(msg.request_id);
       if (pending) {
+        clearTimeout(pending.timer);
         this.pending.delete(msg.request_id);
         if (msg.error === 'success') {
           pending.resolve(msg.data);
@@ -165,6 +183,7 @@ export class MpvIpc extends EventEmitter {
 
   private rejectAllPending(reason: string): void {
     for (const [id, p] of this.pending) {
+      clearTimeout(p.timer);
       p.reject(new Error(reason));
       this.pending.delete(id);
     }

@@ -5,6 +5,7 @@ let videoWin: BrowserWindow | null = null;
 let parent: BrowserWindow | null = null;
 let syncScheduled = false;
 let isActive = false;
+let parentListeners: Array<{ event: string; handler: (...args: unknown[]) => void }> = [];
 
 /**
  * The "video stage" window — a transparent, frameless BrowserWindow that
@@ -85,24 +86,33 @@ export function createVideoWindow(parentWindow: BrowserWindow): BrowserWindow {
     });
   };
 
-  parentWindow.on('move', scheduleSync);
-  parentWindow.on('resize', scheduleSync);
-  parentWindow.on('maximize', scheduleSync);
-  parentWindow.on('unmaximize', scheduleSync);
-  parentWindow.on('enter-full-screen', scheduleSync);
-  parentWindow.on('leave-full-screen', scheduleSync);
-  parentWindow.on('show', () => {
+  const onShow = () => {
     if (videoWin && videoWin.isVisible()) scheduleSync();
-  });
-  parentWindow.on('minimize', () => {
+  };
+  const onMinimize = () => {
     if (videoWin && !videoWin.isDestroyed()) videoWin.hide();
-  });
-  parentWindow.on('restore', () => {
+  };
+  const onRestore = () => {
     if (videoWin && !videoWin.isDestroyed() && isActive) {
       videoWin.showInactive();
       scheduleSync();
     }
-  });
+  };
+
+  parentListeners = [
+    { event: 'move', handler: scheduleSync },
+    { event: 'resize', handler: scheduleSync },
+    { event: 'maximize', handler: scheduleSync },
+    { event: 'unmaximize', handler: scheduleSync },
+    { event: 'enter-full-screen', handler: scheduleSync },
+    { event: 'leave-full-screen', handler: scheduleSync },
+    { event: 'show', handler: onShow },
+    { event: 'minimize', handler: onMinimize },
+    { event: 'restore', handler: onRestore },
+  ];
+  for (const { event, handler } of parentListeners) {
+    parentWindow.on(event as Parameters<BrowserWindow['on']>[0], handler);
+  }
 
   return videoWin;
 }
@@ -121,6 +131,12 @@ export function hideVideoWindow(): void {
 }
 
 export function destroyVideoWindow(): void {
+  if (parent && !parent.isDestroyed()) {
+    for (const { event, handler } of parentListeners) {
+      parent.removeListener(event as Parameters<BrowserWindow['on']>[0], handler);
+    }
+  }
+  parentListeners = [];
   if (videoWin && !videoWin.isDestroyed()) {
     videoWin.destroy();
   }
@@ -141,11 +157,14 @@ export function getVideoWindow(): BrowserWindow | null {
 export function getVideoWindowHandle(): string | null {
   if (!videoWin || videoWin.isDestroyed()) return null;
   try {
-    const handle = videoWin.getNativeWindowHandle();
-    if (process.platform === 'win32') {
-      return handle.readBigUInt64LE(0).toString();
+    const buf = videoWin.getNativeWindowHandle();
+    if (process.platform === 'win32' && buf.length >= 8) {
+      return buf.readBigUInt64LE(0).toString();
     }
-    return handle.readUInt32LE(0).toString();
+    if (buf.length >= 4) {
+      return buf.readUInt32LE(0).toString();
+    }
+    return null;
   } catch (err) {
     log.error('Failed to get video window handle:', err);
     return null;
