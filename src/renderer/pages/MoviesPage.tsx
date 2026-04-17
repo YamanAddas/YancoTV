@@ -83,7 +83,7 @@ export function MoviesPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Movies</h2>
+          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">Movies</h2>
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
         </div>
         <EmptyState
@@ -97,14 +97,16 @@ export function MoviesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100 text-glow-sm">Movies</h2>
+      <div className="mb-4 flex items-baseline justify-between">
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">Movies</h2>
+          <span className="font-mono text-[11px] uppercase tracking-widest-plus text-surface-500 tabular-nums">
+            {filtered.length.toLocaleString()} titles
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <SortDropdown value={sortBy} onChange={setSortBy} />
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
-          <span className="text-sm text-surface-500">
-            {filtered.length.toLocaleString()} movie{filtered.length !== 1 ? 's' : ''}
-          </span>
         </div>
       </div>
 
@@ -126,6 +128,7 @@ export function MoviesPage() {
             favoriteIds={favoriteIds}
             isLoading={isLoading}
             cardStyle="poster"
+            viewMode="grid"
           />
         </div>
       </div>

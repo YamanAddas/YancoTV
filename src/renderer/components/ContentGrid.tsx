@@ -1,7 +1,25 @@
 import { VirtuosoGrid, Virtuoso } from 'react-virtuoso';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useSettingsStore } from '../stores/settings-store';
 import { HexCard } from './HexCard';
+import { PosterCard } from './PosterCard';
 import { ChannelHexRow } from './ChannelHexRow';
 import { prettifyGroupName } from '../utils/group-parser';
 import hexFrameSrc from '../assets/hex-frames/hex-frame.svg';
@@ -34,6 +52,10 @@ interface ContentGridProps {
   viewMode?: 'grid' | 'list' | 'compact';
   /** 'channel' = compact hex rows (Live TV); 'poster' = tall hex artwork cards (Movies/Series) */
   cardStyle?: 'channel' | 'poster';
+  /** When true, list view becomes non-virtualized and drag-reorderable */
+  reorderable?: boolean;
+  /** Called when user drops a row; receives the new ordered list of ids */
+  onReorder?: (ids: string[]) => void;
 }
 
 export function ContentGrid({
@@ -49,6 +71,8 @@ export function ContentGrid({
   onRecord,
   viewMode: viewModeProp,
   cardStyle = 'channel',
+  reorderable = false,
+  onReorder,
 }: ContentGridProps) {
   // ── All hooks must be called unconditionally ──────────────────────────────
   const settingsViewMode = useSettingsStore((s) => s.get('ui_list_style')) as 'grid' | 'list' | 'compact';
@@ -105,9 +129,31 @@ export function ContentGrid({
   if (isLoading) return <SkeletonGrid cardStyle={cardStyle} />;
   if (items.length === 0) return null;
 
+  // Reorderable — non-virtualized, covers both list and grid views.
+  // Gated to ≤ 3000 items so the non-virtualized DOM stays manageable.
+  if (reorderable && onReorder && items.length <= 3000 && viewMode !== 'compact') {
+    return (
+      <ReorderableChannels
+        items={items}
+        viewMode={viewMode}
+        cardStyle={cardStyle}
+        onItemClick={onItemClick}
+        onFavoriteToggle={onFavoriteToggle}
+        favoriteIds={favoriteIds}
+        lockedIds={lockedIds}
+        nowNextMap={nowNextMap}
+        showLogos={showLogos}
+        onLockToggle={onLockToggle}
+        onHideChannel={onHideChannel}
+        onRecord={onRecord}
+        onReorder={onReorder}
+      />
+    );
+  }
+
   if (viewMode === 'grid') {
-    const listCls = cardStyle === 'poster' ? 'hex-grid' : 'hex-card-grid';
-    const itemCls = cardStyle === 'poster' ? 'hex-grid-item' : 'hex-card-grid-item';
+    const listCls = cardStyle === 'poster' ? 'poster-grid' : 'hex-card-grid';
+    const itemCls = cardStyle === 'poster' ? 'poster-grid-item' : 'hex-card-grid-item';
     return (
       <VirtuosoGrid
         totalCount={items.length}
@@ -127,6 +173,224 @@ export function ContentGrid({
       itemContent={rowItemContent}
       style={{ height: '100%' }}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ReorderableChannelList — non-virtualized list with drag handles
+// ---------------------------------------------------------------------------
+
+interface ReorderableProps {
+  items: ContentCardData[];
+  viewMode: 'grid' | 'list' | 'compact';
+  cardStyle: 'channel' | 'poster';
+  onItemClick: (item: ContentCardData) => void;
+  onFavoriteToggle?: (item: ContentCardData) => void;
+  favoriteIds?: Set<string>;
+  lockedIds?: Set<string>;
+  nowNextMap?: NowNextMap;
+  showLogos: boolean;
+  onLockToggle?: (item: ContentCardData) => void;
+  onHideChannel?: (item: ContentCardData) => void;
+  onRecord?: (item: ContentCardData) => void;
+  onReorder: (ids: string[]) => void;
+}
+
+function ReorderableChannels({
+  items,
+  viewMode,
+  cardStyle,
+  onItemClick,
+  onFavoriteToggle,
+  favoriteIds,
+  lockedIds,
+  nowNextMap,
+  showLogos,
+  onLockToggle,
+  onHideChannel,
+  onRecord,
+  onReorder,
+}: ReorderableProps) {
+  // Reorder is an explicit mode (toggle in UI), so drag activates immediately
+  // on any movement. Clicks still work because dnd-kit suppresses click when
+  // distance >= activation threshold.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const ids = items.map((i) => i.id);
+      const oldIdx = ids.indexOf(active.id as string);
+      const newIdx = ids.indexOf(over.id as string);
+      if (oldIdx === -1 || newIdx === -1) return;
+      const next = [...ids];
+      next.splice(oldIdx, 1);
+      next.splice(newIdx, 0, active.id as string);
+      onReorder(next);
+    },
+    [items, onReorder],
+  );
+
+  const itemIds = items.map((i) => i.id);
+
+  if (viewMode === 'list') {
+    return (
+      <div className="h-full overflow-y-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1 px-1 pb-4">
+              {items.map((item) => {
+                const nowNext = item.tvgId && nowNextMap ? nowNextMap[item.tvgId] : undefined;
+                return (
+                  <SortableChannelRow
+                    key={item.id}
+                    item={item}
+                    onClick={() => onItemClick(item)}
+                    onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
+                    isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
+                    isLocked={lockedIds ? lockedIds.has(item.id) : false}
+                    showLogo={showLogos}
+                    nowNext={nowNext}
+                    onLockToggle={onLockToggle ? () => onLockToggle(item) : undefined}
+                    onHideChannel={onHideChannel ? () => onHideChannel(item) : undefined}
+                    onRecord={onRecord ? () => onRecord(item) : undefined}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </div>
+    );
+  }
+
+  // Grid view (channel hex rows or poster cards)
+  const listCls = cardStyle === 'poster' ? 'poster-grid' : 'hex-card-grid';
+  const itemCls = cardStyle === 'poster' ? 'poster-grid-item' : 'hex-card-grid-item';
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={itemIds} strategy={rectSortingStrategy}>
+          <div className={listCls}>
+            {items.map((item) => {
+              const nowNext = item.tvgId && nowNextMap ? nowNextMap[item.tvgId] : undefined;
+              return (
+                <SortableGridItem key={item.id} id={item.id} className={itemCls}>
+                  <HexGridItem
+                    item={item}
+                    onClick={() => onItemClick(item)}
+                    onFavoriteToggle={onFavoriteToggle ? () => onFavoriteToggle(item) : undefined}
+                    isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}
+                    isLocked={lockedIds ? lockedIds.has(item.id) : false}
+                    showLogo={showLogos}
+                    nowNext={nowNext}
+                    onLockToggle={onLockToggle ? () => onLockToggle(item) : undefined}
+                    onHideChannel={onHideChannel ? () => onHideChannel(item) : undefined}
+                    onRecord={onRecord ? () => onRecord(item) : undefined}
+                    cardStyle={cardStyle}
+                  />
+                </SortableGridItem>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+}
+
+function SortableGridItem({
+  id,
+  className,
+  children,
+}: {
+  id: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 30 : undefined,
+    touchAction: 'manipulation',
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`relative cursor-grab select-none active:cursor-grabbing ${className}`}
+    >
+      {/* Blocks clicks on the inner hex so drag is the only thing that fires */}
+      <div aria-hidden className="absolute inset-0 z-10" />
+      {children}
+      {/* Always-visible grip badge in reorder mode */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-md bg-accent/20 text-accent shadow-sm backdrop-blur-sm"
+      >
+        <svg className="h-3 w-3" viewBox="0 0 10 16" fill="currentColor">
+          <circle cx="3" cy="2" r="1.2" />
+          <circle cx="7" cy="2" r="1.2" />
+          <circle cx="3" cy="6" r="1.2" />
+          <circle cx="7" cy="6" r="1.2" />
+          <circle cx="3" cy="10" r="1.2" />
+          <circle cx="7" cy="10" r="1.2" />
+          <circle cx="3" cy="14" r="1.2" />
+          <circle cx="7" cy="14" r="1.2" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function SortableChannelRow(props: CardProps) {
+  const { item } = props;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 30 : 'auto' as string | number,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="group/row flex items-stretch gap-1">
+      <button
+        {...attributes}
+        {...listeners}
+        tabIndex={-1}
+        className="flex w-4 flex-shrink-0 cursor-grab items-center justify-center text-surface-600 opacity-0 transition-opacity group-hover/row:opacity-100 active:cursor-grabbing"
+        title="Drag to reorder"
+      >
+        <svg className="h-3 w-3" viewBox="0 0 10 16" fill="currentColor">
+          <circle cx="3" cy="2" r="1.2" />
+          <circle cx="7" cy="2" r="1.2" />
+          <circle cx="3" cy="6" r="1.2" />
+          <circle cx="7" cy="6" r="1.2" />
+          <circle cx="3" cy="10" r="1.2" />
+          <circle cx="7" cy="10" r="1.2" />
+          <circle cx="3" cy="14" r="1.2" />
+          <circle cx="7" cy="14" r="1.2" />
+        </svg>
+      </button>
+      <div className="min-w-0 flex-1">
+        <ListRow {...props} />
+      </div>
+    </div>
   );
 }
 
@@ -188,14 +452,11 @@ function HexGridItem({
   return (
     <>
       {cardStyle === 'poster' ? (
-        <HexCard
+        <PosterCard
           title={item.cleanTitle || item.title}
-          subtitle={prettifyGroupName(item.groupName)}
           imageUrl={showLogo ? item.logoUrl : undefined}
-          fallbackLetter={(item.cleanTitle || item.title).charAt(0).toUpperCase()}
           isFavorite={isFavorite}
           isLocked={isLocked}
-          nowPlaying={nowTitle}
           onClick={onClick}
           onFavoriteToggle={onFavoriteToggle}
           onContextMenu={handleContextMenu}
@@ -653,17 +914,16 @@ function EyeOffIcon() {
 function SkeletonGrid({ cardStyle = 'channel' }: { cardStyle?: 'channel' | 'poster' }) {
   if (cardStyle === 'poster') {
     return (
-      <div className="hex-grid">
+      <div className="poster-grid">
         {Array.from({ length: 18 }).map((_, i) => (
-          <div key={i} className="hex-grid-item">
-            <div className="relative w-full animate-pulse" style={{ aspectRatio: '200 / 230' }}>
+          <div key={i} className="poster-grid-item">
+            <div className="w-full">
               <div
-                className="absolute inset-[7%]"
-                style={{
-                  clipPath: 'polygon(50% 3.5%, 94% 26%, 94% 74%, 50% 96.5%, 6% 74%, 6% 26%)',
-                  background: 'rgba(var(--surface-800), 0.4)',
-                }}
+                className="animate-pulse rounded-md bg-surface-800/40"
+                style={{ aspectRatio: '2 / 3' }}
               />
+              <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-surface-800/30" />
+              <div className="mt-1.5 h-2.5 w-1/3 animate-pulse rounded bg-surface-800/20" />
             </div>
           </div>
         ))}

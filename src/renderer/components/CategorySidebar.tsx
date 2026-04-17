@@ -89,12 +89,80 @@ function CountBadge({ count, active }: { count?: number; active: boolean }) {
   if (count == null) return null;
   return (
     <span
-      className={`ml-auto flex-shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${
-        active ? 'bg-accent/15 text-accent' : 'bg-surface-700/40 text-surface-500'
+      className={`ml-auto flex-shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums tracking-tight ${
+        active ? 'bg-accent/15 text-accent' : 'bg-surface-700/30 text-surface-500'
       }`}
     >
       {count.toLocaleString()}
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SortableChild — a draggable child group row inside a section
+// ---------------------------------------------------------------------------
+
+function SortableChild({
+  originalGroupName,
+  active,
+  count,
+  onSelect,
+}: {
+  originalGroupName: string;
+  active: boolean;
+  count?: number;
+  onSelect: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `child:${originalGroupName}` });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 40 : 'auto' as string | number,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="group/child flex items-center">
+      {/* Drag handle — visible on hover */}
+      <button
+        {...attributes}
+        {...listeners}
+        tabIndex={-1}
+        className="flex h-7 w-4 flex-shrink-0 cursor-grab items-center justify-center text-surface-600 opacity-0 transition-opacity group-hover/child:opacity-100 active:cursor-grabbing"
+        title="Drag to reorder"
+      >
+        <svg className="h-2.5 w-2.5" viewBox="0 0 10 16" fill="currentColor">
+          <circle cx="3" cy="4" r="1" />
+          <circle cx="7" cy="4" r="1" />
+          <circle cx="3" cy="8" r="1" />
+          <circle cx="7" cy="8" r="1" />
+          <circle cx="3" cy="12" r="1" />
+          <circle cx="7" cy="12" r="1" />
+        </svg>
+      </button>
+
+      <button
+        onClick={onSelect}
+        className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-accent/30 ${
+          active
+            ? 'bg-accent/10 text-accent shadow-glow-sm'
+            : 'text-surface-400 hover:bg-surface-700/30 hover:text-surface-200'
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate" title={originalGroupName}>
+          {prettifyGroupName(originalGroupName)}
+        </span>
+        <CountBadge count={count} active={active} />
+      </button>
+    </div>
   );
 }
 
@@ -203,7 +271,7 @@ function SortableSection({
         <button
           onClick={onSelectSection}
           onContextMenu={onContextMenu}
-          className={`flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-3 text-left text-[13px] font-semibold transition-colors focus:outline-none focus:ring-1 focus:ring-accent/30 rounded ${
+          className={`flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-3 text-left font-display text-[13px] font-semibold tracking-wide transition-colors focus:outline-none focus:ring-1 focus:ring-accent/30 rounded ${
             active
               ? 'text-accent'
               : hasActive
@@ -217,7 +285,7 @@ function SortableSection({
         </button>
       </div>
 
-      {/* Children — full original group names */}
+      {/* Children — full original group names, draggable within section */}
       <AnimatePresence initial={false}>
         {isExpanded && (
           <motion.div
@@ -227,30 +295,21 @@ function SortableSection({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pl-6">
-              {section.children.map((child) => {
-                const childActive = isChildActive(selected, child.originalGroupName);
-                const count = categoryCounts?.[child.originalGroupName];
-                return (
-                  <button
+            <div className="ml-4 border-l border-surface-700/30 pl-2">
+              <SortableContext
+                items={section.children.map((c) => `child:${c.originalGroupName}`)}
+                strategy={verticalListSortingStrategy}
+              >
+                {section.children.map((child) => (
+                  <SortableChild
                     key={child.originalGroupName}
-                    onClick={() => onSelectChild(child.originalGroupName)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-accent/30 ${
-                      childActive
-                        ? 'bg-accent/10 text-accent shadow-glow-sm'
-                        : 'text-surface-400 hover:bg-surface-700/30 hover:text-surface-200'
-                    }`}
-                  >
-                    <span
-                      className="min-w-0 flex-1 truncate"
-                      title={child.originalGroupName}
-                    >
-                      {prettifyGroupName(child.originalGroupName)}
-                    </span>
-                    <CountBadge count={count} active={childActive} />
-                  </button>
-                );
-              })}
+                    originalGroupName={child.originalGroupName}
+                    active={isChildActive(selected, child.originalGroupName)}
+                    count={categoryCounts?.[child.originalGroupName]}
+                    onSelect={() => onSelectChild(child.originalGroupName)}
+                  />
+                ))}
+              </SortableContext>
             </div>
           </motion.div>
         )}
@@ -335,17 +394,46 @@ export function CategorySidebar({
       const { active, over } = event;
       if (!over || active.id === over.id) return;
 
+      const activeId = active.id as string;
+      const overId = over.id as string;
+
+      // Child reorder: both ids start with "child:" and belong to same section
+      if (activeId.startsWith('child:') && overId.startsWith('child:')) {
+        const activeName = activeId.slice(6);
+        const overName = overId.slice(6);
+
+        // Find the section that contains both children
+        const allSections = [...grouped.pinned, ...grouped.sections];
+        const section = allSections.find((s) =>
+          s.children.some((c) => c.originalGroupName === activeName) &&
+          s.children.some((c) => c.originalGroupName === overName),
+        );
+        if (!section) return;
+
+        const names = section.children.map((c) => c.originalGroupName);
+        const oldIndex = names.indexOf(activeName);
+        const newIndex = names.indexOf(overName);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const newNames = [...names];
+        newNames.splice(oldIndex, 1);
+        newNames.splice(newIndex, 0, activeName);
+        onReorder(newNames);
+        return;
+      }
+
+      // Section reorder (existing behaviour)
       const allKeys = [
         ...grouped.pinned.map((s) => s.key),
         ...grouped.sections.map((s) => s.key),
       ];
-      const oldIndex = allKeys.indexOf(active.id as string);
-      const newIndex = allKeys.indexOf(over.id as string);
+      const oldIndex = allKeys.indexOf(activeId);
+      const newIndex = allKeys.indexOf(overId);
       if (oldIndex === -1 || newIndex === -1) return;
 
       const newKeys = [...allKeys];
       newKeys.splice(oldIndex, 1);
-      newKeys.splice(newIndex, 0, active.id as string);
+      newKeys.splice(newIndex, 0, activeId);
       onReorder(newKeys);
     },
     [grouped, onReorder],
@@ -482,7 +570,7 @@ export function CategorySidebar({
             {/* All */}
             <button
               onClick={() => onSelect(null)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] font-semibold transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-accent/30 ${
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-display text-[13px] font-semibold tracking-wide transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-accent/30 ${
                 selected === null
                   ? 'bg-accent/10 text-accent shadow-glow-sm'
                   : 'text-surface-300 hover:bg-surface-700/30 hover:text-surface-100'
@@ -506,7 +594,7 @@ export function CategorySidebar({
                 {/* Pinned */}
                 {filteredGrouped.pinned.length > 0 && (
                   <>
-                    <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+                    <div className="mb-1 px-2 font-display text-[10px] font-semibold uppercase tracking-widest-plus text-surface-500">
                       Pinned
                     </div>
                     {filteredGrouped.pinned.map(renderSection)}
@@ -526,7 +614,7 @@ export function CategorySidebar({
             {filteredGrouped.ungrouped.length > 0 && (
               <>
                 {hasSections && (
-                  <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
+                  <div className="mb-1 px-2 font-display text-[10px] font-semibold uppercase tracking-widest-plus text-surface-500">
                     Other
                   </div>
                 )}

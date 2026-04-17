@@ -9,6 +9,7 @@ import { PinModal } from '../components/PinModal';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useParentalStore } from '../stores/parental-store';
+import { useSettingsStore } from '../stores/settings-store';
 import { useNowNextBatch } from '../hooks/use-epg';
 
 const EMPTY_ITEMS: ContentCardData[] = [];
@@ -99,14 +100,54 @@ export function LiveTvPage() {
     return counts;
   }, [visibleChannels]);
 
+  // Channel order is stored in settings as JSON. Per-group when a single group is
+  // selected, otherwise a global key scoped by source+sort.
+  const channelOrderKey =
+    typeof selectedCategory === 'string'
+      ? `channel_order:${selectedCategory}`
+      : `channel_order:__all__:${selectedSource ?? 'merged'}:${sortBy}`;
+  const channelOrderRaw = useSettingsStore((s) => s.data[channelOrderKey]);
+  const setSetting = useSettingsStore((s) => s.set);
+
+  // Explicit reorder-mode toggle. When on, drag is active; click still plays.
+  const [reorderMode, setReorderMode] = useState(false);
+
   const filtered = useMemo(() => {
-    if (!selectedCategory) return visibleChannels;
-    if (Array.isArray(selectedCategory)) {
+    let result: ContentCardData[];
+    if (!selectedCategory) {
+      result = visibleChannels;
+    } else if (Array.isArray(selectedCategory)) {
       const set = new Set(selectedCategory);
-      return visibleChannels.filter((ch) => ch.groupName != null && set.has(ch.groupName));
+      result = visibleChannels.filter((ch) => ch.groupName != null && set.has(ch.groupName));
+    } else {
+      result = visibleChannels.filter((ch) => ch.groupName === selectedCategory);
     }
-    return visibleChannels.filter((ch) => ch.groupName === selectedCategory);
-  }, [visibleChannels, selectedCategory]);
+
+    // Apply saved order if present — always applies, per-group or global scope
+    if (channelOrderRaw) {
+      try {
+        const orderedIds: string[] = JSON.parse(channelOrderRaw);
+        const rank = new Map<string, number>();
+        orderedIds.forEach((id, i) => rank.set(id, i));
+        result = [...result].sort((a, b) => {
+          const ra = rank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+          const rb = rank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+          return ra - rb;
+        });
+      } catch {
+        // Ignore bad JSON — fall back to natural order
+      }
+    }
+
+    return result;
+  }, [visibleChannels, selectedCategory, channelOrderRaw]);
+
+  const handleReorder = useCallback(
+    (ids: string[]) => {
+      void setSetting(channelOrderKey, JSON.stringify(ids));
+    },
+    [channelOrderKey, setSetting],
+  );
 
   // Collect tvg IDs from visible channels for EPG now/next lookup
   const tvgIds = useMemo(
@@ -191,7 +232,7 @@ export function LiveTvPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-surface-100">Live TV</h2>
+          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">Live TV</h2>
           <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
         </div>
         <EmptyState
@@ -205,16 +246,50 @@ export function LiveTvPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-surface-100">Live TV</h2>
-        <div className="flex items-center gap-3">
-          <SortDropdown value={sortBy} onChange={setSortBy} />
-          <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
-          <span className="text-sm text-surface-500">
-            {filtered.length.toLocaleString()} channel{filtered.length !== 1 ? 's' : ''}
+      <div className="mb-4 flex items-baseline justify-between">
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-serif text-4xl italic tracking-tight text-surface-100">Live TV</h2>
+          <span className="font-mono text-[11px] uppercase tracking-widest-plus text-surface-500 tabular-nums">
+            {filtered.length.toLocaleString()} channels
           </span>
         </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setReorderMode((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-display text-[11px] uppercase tracking-widest-plus transition-colors ${
+              reorderMode
+                ? 'bg-accent/20 text-accent'
+                : 'bg-surface-800/40 text-surface-400 hover:bg-surface-700/50 hover:text-surface-200'
+            }`}
+            title={reorderMode ? 'Exit reorder mode' : 'Reorder channels'}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 10 16" fill="currentColor">
+              <circle cx="3" cy="2" r="1.2" />
+              <circle cx="7" cy="2" r="1.2" />
+              <circle cx="3" cy="6" r="1.2" />
+              <circle cx="7" cy="6" r="1.2" />
+              <circle cx="3" cy="10" r="1.2" />
+              <circle cx="7" cy="10" r="1.2" />
+              <circle cx="3" cy="14" r="1.2" />
+              <circle cx="7" cy="14" r="1.2" />
+            </svg>
+            {reorderMode ? 'Done' : 'Reorder'}
+          </button>
+          <SortDropdown value={sortBy} onChange={setSortBy} />
+          <SourceSwitcher selected={selectedSource} onSelect={setSelectedSource} />
+        </div>
       </div>
+
+      {reorderMode && (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
+          <span className="font-display uppercase tracking-widest-plus">
+            Reorder mode — drag any card to move it
+          </span>
+          <span className="font-mono text-[10px] text-accent/70">
+            {typeof selectedCategory === 'string' ? `in "${selectedCategory}"` : 'global order'}
+          </span>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 gap-4">
         <CategorySidebar
@@ -238,6 +313,8 @@ export function LiveTvPage() {
             onLockToggle={handleLockToggle}
             onHideChannel={handleHideChannel}
             onRecord={handleRecord}
+            reorderable={reorderMode}
+            onReorder={handleReorder}
           />
         </div>
       </div>

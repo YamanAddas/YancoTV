@@ -146,6 +146,19 @@
     justify-content: center;
   }
 
+  /* ── Poster grid — wider 2:3 posters for movies & series ────────────── */
+  .poster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 24px 18px;
+    padding: 8px 4px 16px;
+  }
+  .poster-grid-item {
+    width: 100%;
+    display: flex;
+    justify-content: stretch;
+  }
+
   /* ── Hex card grid — responsive multi-column layout for hex row cards ── */
   .hex-card-grid {
     display: grid;

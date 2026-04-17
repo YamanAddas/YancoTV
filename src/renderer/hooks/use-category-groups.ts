@@ -70,12 +70,23 @@ export function useCategoryGroups(
     const pinned: EnhancedSection[] = [];
     const sections: EnhancedSection[] = [];
 
+    // Sort child groups by user-set sort order, then alphabetically
+    const childSortFn = (a: SmartChild, b: SmartChild) => {
+      const orderA = preferences.get(a.originalGroupName)?.sortOrder ?? 999_999;
+      const orderB = preferences.get(b.originalGroupName)?.sortOrder ?? 999_999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.originalGroupName.localeCompare(b.originalGroupName);
+    };
+
     for (const section of rawGrouped.sections) {
       const pref = preferences.get(section.key);
       if (pref?.isHidden) continue;
 
+      const sortedChildren = [...section.children].sort(childSortFn);
+
       const enhanced: EnhancedSection = {
         ...section,
+        children: sortedChildren,
         isPinned: pref?.isPinned ?? false,
         customName: pref?.customName ?? null,
       };
@@ -87,22 +98,21 @@ export function useCategoryGroups(
       }
     }
 
-    // Sort by user sort order, then alphabetically
-    const sortFn = (a: EnhancedSection, b: EnhancedSection) => {
-      const orderA = preferences.get(a.key)?.sortOrder ?? 999;
-      const orderB = preferences.get(b.key)?.sortOrder ?? 999;
+    // Sort sections by user sort order, then alphabetically
+    const sectionSortFn = (a: EnhancedSection, b: EnhancedSection) => {
+      const orderA = preferences.get(a.key)?.sortOrder ?? 999_999;
+      const orderB = preferences.get(b.key)?.sortOrder ?? 999_999;
       if (orderA !== orderB) return orderA - orderB;
       return a.label.localeCompare(b.label);
     };
 
-    pinned.sort(sortFn);
-    sections.sort(sortFn);
+    pinned.sort(sectionSortFn);
+    sections.sort(sectionSortFn);
 
-    // Filter hidden ungrouped
-    const ungrouped = rawGrouped.ungrouped.filter((item) => {
-      const pref = preferences.get(item.originalGroupName);
-      return !pref?.isHidden;
-    });
+    // Filter hidden ungrouped, then sort by user order
+    const ungrouped = rawGrouped.ungrouped
+      .filter((item) => !preferences.get(item.originalGroupName)?.isHidden)
+      .sort(childSortFn);
 
     return { pinned, sections, ungrouped };
   }, [rawGrouped, preferences]);
