@@ -206,7 +206,11 @@ pnpm audit            # Security audit
 - **Sprint 14:** DONE (TMDb API client + enrichment service, SQLite cache, MetadataSettings tab)
 - **Sprint 15:** DONE (OpenSubtitles client, auto-search on playback, in-player search UI, SQLite-backed cache, safeStorage credentials)
 - **Sprint 16:** DROPPED from this version (multi-view/PIP cut from scope)
-- **Sprints 17–21:** NOT STARTED (settings polish, system features, search/channel UX, network config, stabilization) — done in separate sessions, one sprint per session
+- **Sprint 17:** DONE (settings polish — recording/download/subtitle/advanced tabs, full Settings page with 8 tabs)
+- **Sprint 18:** DONE (system tray, auto-update check, backup export/import, crash handler, about dialog, app icon)
+- **Sprint 19:** DONE (search filters/history/autocomplete, channel zapping, last-channel recall, recent strip, reminders, toasts)
+- **Sprint 20:** DONE (buffer/timeout/auto-reconnect, per-source UA override, proxy support, customizable shortcuts, gamepad input)
+- **Sprint 21:** IN PROGRESS (stabilization — error handling audit, perf/memory, tests, installer polish, security audit)
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
@@ -214,11 +218,8 @@ See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
 These are listed in PRODUCTION_PLAN.md but do not exist in code yet:
 
-- `backup-service.ts` — Export/import user data (Sprint 18)
-- `notification-service.ts` — In-app toasts + programme reminders (Sprint 19)
-- E2E tests with Playwright (Sprint 21)
+- E2E tests with Playwright (Sprint 21.4)
 - `docs/` directory
-- `src/assets/icon.ico` — App icon for electron-builder (referenced in `electron-builder.yml` but missing)
 
 ## Architecture Rules
 

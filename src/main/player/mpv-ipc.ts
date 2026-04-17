@@ -9,6 +9,10 @@ import log from 'electron-log/main';
  * Property observations arrive as `{"event": "property-change", "name": ..., "data": ...}`.
  */
 const DEFAULT_COMMAND_TIMEOUT_MS = 10_000;
+// Cap the incoming buffer to defend against an mpv that streams data without
+// newlines (malformed output, crashed pipe). Without this, a stuck stream
+// would grow `buffer` unbounded and leak memory in the main process.
+const MAX_BUFFER_BYTES = 1 * 1024 * 1024; // 1 MB
 
 interface PendingRequest {
   resolve: (v: unknown) => void;
@@ -135,6 +139,14 @@ export class MpvIpc extends EventEmitter {
 
   private onData(chunk: Buffer): void {
     this.buffer += chunk.toString('utf8');
+
+    if (this.buffer.length > MAX_BUFFER_BYTES) {
+      log.warn(
+        `mpv IPC: buffer exceeded ${MAX_BUFFER_BYTES} bytes without newline; dropping`,
+      );
+      this.buffer = '';
+      return;
+    }
 
     let newlineIdx: number;
     while ((newlineIdx = this.buffer.indexOf('\n')) !== -1) {

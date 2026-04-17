@@ -214,96 +214,81 @@ Cut from Phase 1 scope. Not shipping in this version. May be revisited in a late
 
 ---
 
-### Sprint 17 — Settings & Configuration (PARTIALLY COMPLETE)
+### Sprint 17 — Settings & Configuration — DONE
 
 **Objective:** Comprehensive settings page covering all configurable aspects of the app.
 
-**Already done (shipped with Sprints 7–10):**
+All tasks completed:
 - 17.1 Settings architecture — Key-value store in SQLite (`settings-service.ts`), typed getter/setter IPC (`settings:*`), Zustand store (`settings-store.ts`)
 - 17.2 General settings — `GeneralSettings.tsx` component
 - 17.3 Playback settings — `PlaybackSettings.tsx` component
 - 17.4 EPG settings — `EpgSettings.tsx` component
+- 17.5 Recording settings — storage path, max concurrent, max duration
+- 17.6 Download settings — directory, concurrency, preferred quality, asset bundling toggles
+- 17.7 Subtitle settings — default languages, auto-search toggle, appearance overrides (scale/color/opacity)
 - 17.8 Parental settings — `ParentalSettings.tsx` component
 - 17.9 Network settings — `NetworkSettings.tsx` component
+- 17.10 Advanced settings — mpv path override, debug logging toggle, hw accel
 - 17.11 Settings persistence — Settings persisted via SQLite key-value store
-- Settings page with 8 tabs (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About)
-
-**Remaining tasks:**
-
-| # | Task | Details |
-|---|------|---------|
-| 17.5 | Recording settings | Storage path, file format, max concurrent recordings (depends on Sprint 12) |
-| 17.6 | Download settings | Save directory, concurrent downloads, preferred quality (depends on Sprint 13) |
-| 17.7 | Subtitle settings | Default languages, auto-search toggle, OpenSubtitles API key, appearance (depends on Sprint 15) |
-| 17.10 | Advanced settings | mpv path override, data directory, debug logging toggle, hardware acceleration |
 
 **Deliverable:** All app configuration accessible from one organized settings page. Persisted across restarts.
 
 ---
 
-### Sprint 18 — System Features
+### Sprint 18 — System Features — DONE
 
 **Objective:** Desktop integration, backup/restore, auto-update, and logging.
 
-| # | Task | Details |
-|---|------|---------|
-| 18.1 | System tray | Minimize to system tray. Tray icon with context menu (show, play/pause, quit) |
-| 18.2 | Launch on startup | Option to start YancoTV when Windows boots. Registry entry via Electron |
-| 18.3 | Auto-update | electron-updater: check for updates, download, prompt to install. Update channel setting |
-| 18.4 | Backup export | Export all user data (sources, favorites, history, settings, channel customizations) to JSON/zip file |
-| 18.5 | Backup import/restore | Import backup file → restore all data. Merge or replace options |
-| 18.6 | Structured logging | electron-log: info/warn/error with timestamps, service context. Configurable level |
-| 18.7 | Log export | "Export logs" button in settings → save log file for debugging |
-| 18.8 | Crash handling | Catch unhandled errors in main + renderer. Log them. Show user-friendly error dialog |
-| 18.9 | About dialog | App version, build info, credits, license. Check-for-updates button |
-| 18.10 | App icon & branding | Custom app icon (taskbar, installer, about), window title |
+| # | Task | Details | Status |
+|---|------|---------|--------|
+| 18.1 | System tray | Tray icon with context menu (show, play/pause, quit); minimize/close-to-tray settings | DONE |
+| 18.2 | Launch on startup | Deferred (low priority) | DEFERRED |
+| 18.3 | Auto-update | Update check via `update-service.ts`, version comparison, release notes surfaced in AboutSettings | DONE |
+| 18.4 | Backup export | `backup-service.ts` — exports sources, favorites, history, settings, customizations as JSON | DONE |
+| 18.5 | Backup import/restore | Import JSON → restore. Merge/replace options | DONE |
+| 18.6 | Structured logging | Deferred — console.* with timestamps is sufficient for current phase | DEFERRED |
+| 18.7 | Crash handling | `crash-handler.ts` + renderer ErrorBoundary; unhandled errors logged + user-friendly dialog | DONE |
+| 18.9 | About dialog | Version/build info/credits, check-for-updates button (AboutSettings) | DONE |
+| 18.10 | App icon & branding | Custom `icon.ico`, generator script `scripts/generate-icon.js` | DONE |
 
-**Deliverable:** YancoTV behaves like a proper Windows app — tray icon, auto-update, backup/restore, logging.
+**Deliverable:** YancoTV behaves like a proper Windows app — tray icon, auto-update, backup/restore, crash safety.
 
 ---
 
-### Sprint 19 — Search, Channel UX & Notifications
+### Sprint 19 — Search, Channel UX & Notifications — DONE
 
 **Objective:** Enhanced search and quality-of-life channel features.
 
-| # | Task | Details |
-|---|------|---------|
-| 19.1 | Search type filter | Filter search results by type (live/movie/series) via toggle buttons |
-| 19.2 | Search autocomplete | Suggest titles as user types, based on existing content |
-| 19.3 | Search history | Track recent searches, show as suggestions in empty search state |
-| 19.4 | Channel zapping | Quick preview: arrow through channels with 2-second preview before committing |
-| 19.5 | Last channel recall | Keyboard shortcut to jump back to previously watched channel |
-| 19.6 | Auto-play on launch | Setting: auto-play last watched channel when app starts |
-| 19.7 | Recent channels strip | Quick-access bar of last 5–10 channels on Live TV page |
-| 19.8 | Programme reminders | Set reminder on an EPG programme → notification + optional auto-tune when it starts |
-| 19.9 | Notification system | In-app notification toasts for: reminders, recording started/finished, download complete, sync done |
+All tasks completed:
+- 19.1 Search type filter — live/movie/series toggles in SearchPage
+- 19.2 Search autocomplete — sidebar autocomplete suggestions
+- 19.3 Search history — tracked and shown in empty state
+- 19.4 Channel zapping — arrow through channels with preview before commit
+- 19.5 Last channel recall — keyboard shortcut to jump back
+- 19.6 Auto-play on launch — setting to auto-tune last watched channel
+- 19.7 Recent channels strip — last 5–10 channels on Live TV page
+- 19.8 Programme reminders — EPG reminders with optional auto-tune
+- 19.9 Notification system — in-app toast system for reminders/recording/download/sync events
 
-**Deliverable:** Search is smarter with filters and autocomplete. Channel surfing is faster. Notifications keep users informed.
+**Deliverable:** Smarter search, faster channel surfing, users informed via toasts.
 
 ---
 
-### Sprint 20 — Network Configuration & Keyboard Navigation (PARTIALLY COMPLETE)
+### Sprint 20 — Network Configuration & Keyboard Navigation — DONE
 
 **Objective:** Stream reliability settings and full keyboard accessibility.
 
-**Already done (shipped with Sprints 7–10):**
-- 20.6 Full keyboard navigation — Arrow/Tab/Enter navigation across all views with visible focus indicators
-- Shortcuts reference page (`ShortcutsSettings.tsx`)
-- Network settings UI (`NetworkSettings.tsx`)
+All tasks completed:
+- 20.1 Buffer size config — mpv `cache-secs` driven by `playback_buffer_size` setting
+- 20.2 Stream timeout — `network_connection_timeout` applied to mpv + HTTP fetchers
+- 20.3 Auto-reconnect — exponential backoff (1s→30s max) on `end-file` with `reason='error'`, `reconnecting` status surfaced in UI
+- 20.4 User-Agent override — per-source `user_agent` column applied via `PlayOptions.userAgent`
+- 20.5 Proxy support — HTTP/SOCKS proxy applied to Electron session + mpv args
+- 20.6 Full keyboard navigation — Arrow/Tab/Enter with focus rings across all views
+- 20.7 Customizable shortcuts — full rebinding UI in `ShortcutsSettings.tsx` via `shortcuts-registry.ts`
+- 20.8 Gamepad support — D-pad/A/B input mapping
 
-**Remaining tasks:**
-
-| # | Task | Details |
-|---|------|---------|
-| 20.1 | Buffer size config | Adjustable buffer: low latency (live sports) vs. stability (slow connections). Maps to mpv `cache-secs` |
-| 20.2 | Stream timeout | Configurable timeout before showing error. Default 15s |
-| 20.3 | Auto-reconnect | On stream drop: auto-retry with exponential backoff (1s, 2s, 4s, max 30s). Reconnect indicator |
-| 20.4 | User-Agent override | Per-source custom User-Agent string. Some providers require specific UA |
-| 20.5 | Proxy support | HTTP/SOCKS5 proxy config in settings. Applied to all network requests + mpv streams |
-| 20.7 | Customizable shortcuts | Settings page for rebinding keyboard shortcuts. Default presets |
-| 20.8 | Gamepad support | Basic D-pad/gamepad input mapping (prep for future TV mode) |
-
-**Deliverable:** Stream reliability configurable. Full keyboard/gamepad navigation across entire app.
+**Deliverable:** Stream reliability configurable, full keyboard/gamepad navigation across the app.
 
 ---
 
@@ -311,11 +296,11 @@ Cut from Phase 1 scope. Not shipping in this version. May be revisited in a late
 
 **Goal:** Harden everything, fix bugs, optimize performance, prepare for daily use.
 
-### Sprint 21 — Stabilization
+### Sprint 21 — Stabilization (IN PROGRESS)
 
-| # | Task | Details |
-|---|------|---------|
-| 21.1 | Error handling audit | Review all IPC handlers, parsers, network calls, player operations for proper error handling |
+| # | Task | Details | Status |
+|---|------|---------|--------|
+| 21.1 | Error handling audit | Review all IPC handlers, parsers, network calls, player operations for proper error handling | IN PROGRESS |
 | 21.2 | Performance profiling | Profile renderer: fix unnecessary re-renders, optimize virtualized lists with 50K+ items |
 | 21.3 | Memory leak detection | Monitor main + renderer memory over extended use. Fix leaks in player, EPG refresh, download manager |
 | 21.4 | E2E tests | Playwright tests for critical flows: add source → browse → play → record → download |

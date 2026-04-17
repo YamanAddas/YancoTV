@@ -451,19 +451,53 @@ export function registerIpcHandlers(): void {
 
   // Group Preferences
   ipcMain.handle(IpcChannels.GROUP_PREFS_GET, (_event, contentType: string) => {
-    return getGroupPreferencesAll(contentType);
+    try {
+      if (typeof contentType !== 'string' || !contentType) return [];
+      return getGroupPreferencesAll(contentType);
+    } catch (err) {
+      log.error('GROUP_PREFS_GET failed:', err);
+      return [];
+    }
   });
 
   ipcMain.handle(IpcChannels.GROUP_PREFS_SET, (_event, input: unknown) => {
-    return setGroupPref(input as SetGroupPrefInput);
+    if (!input || typeof input !== 'object') {
+      throw new Error('Invalid group preference input');
+    }
+    const typed = input as SetGroupPrefInput;
+    if (typeof typed.contentType !== 'string' || typeof typed.groupKey !== 'string') {
+      throw new Error('contentType and groupKey are required');
+    }
+    return setGroupPref(typed);
   });
 
   ipcMain.handle(IpcChannels.GROUP_PREFS_REMOVE, (_event, contentType: string, groupKey: string) => {
-    removeGroupPref(contentType, groupKey);
+    try {
+      if (typeof contentType !== 'string' || typeof groupKey !== 'string') {
+        return { ok: false, error: 'Invalid arguments' };
+      }
+      removeGroupPref(contentType, groupKey);
+      return { ok: true };
+    } catch (err) {
+      log.error('GROUP_PREFS_REMOVE failed:', err);
+      return { ok: false, error: String((err as Error).message) };
+    }
   });
 
   ipcMain.handle(IpcChannels.GROUP_PREFS_REORDER, (_event, contentType: string, orderedKeys: string[]) => {
-    reorderGroupPrefs(contentType, orderedKeys);
+    try {
+      if (typeof contentType !== 'string' || !Array.isArray(orderedKeys)) {
+        return { ok: false, error: 'Invalid arguments' };
+      }
+      if (orderedKeys.some((k) => typeof k !== 'string')) {
+        return { ok: false, error: 'orderedKeys must be strings' };
+      }
+      reorderGroupPrefs(contentType, orderedKeys);
+      return { ok: true };
+    } catch (err) {
+      log.error('GROUP_PREFS_REORDER failed:', err);
+      return { ok: false, error: String((err as Error).message) };
+    }
   });
 
   // Database status
@@ -888,6 +922,17 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.SETTINGS_SET_MANY, (_event, entries: Record<string, string>) => {
     if (!entries || typeof entries !== 'object') return { ok: false, error: 'Invalid entries' };
+    // Mirror the SETTINGS_SET guard: don't let setMany bypass dedicated handlers
+    // (parental controls, internal EPG state). Also enforce string types for
+    // every value since setSettings is unvalidated downstream.
+    const blockedPrefixes = ['parental_', 'epg_last_refreshed'];
+    for (const [key, value] of Object.entries(entries)) {
+      if (!key) return { ok: false, error: 'Keys must be non-empty strings' };
+      if (typeof value !== 'string') return { ok: false, error: `Value for "${key}" must be a string` };
+      if (blockedPrefixes.some((p) => key.startsWith(p))) {
+        return { ok: false, error: `Use the dedicated API for "${key}"` };
+      }
+    }
     try {
       setSettings(entries);
       return { ok: true };

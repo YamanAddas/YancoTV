@@ -16,6 +16,27 @@ import { decryptCredential } from './credential-store';
 
 const API_BASE = 'https://api.opensubtitles.com/api/v1';
 const DEFAULT_API_KEY = 'sC5mcEdjFTLY5lWPr14tYsk69Bc7QkXh';
+const REQUEST_TIMEOUT_MS = 15_000;
+const DOWNLOAD_TIMEOUT_MS = 45_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit & { timeoutMs?: number } = {},
+): Promise<Response> {
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...rest } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...rest, signal: controller.signal });
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError') {
+      throw new OpenSubtitlesError(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface OsSearchParams {
   query?: string;
@@ -134,7 +155,7 @@ async function getUserToken(): Promise<string | null> {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/login`, {
+    const res = await fetchWithTimeout(`${API_BASE}/login`, {
       method: 'POST',
       headers: baseHeaders(),
       body: JSON.stringify({ username, password }),
@@ -167,7 +188,7 @@ export async function searchSubtitles(params: OsSearchParams): Promise<OsSubtitl
   if (params.type && params.type !== 'all') qs.set('type', params.type);
 
   const url = `${API_BASE}/subtitles?${qs.toString()}`;
-  const res = await fetch(url, { headers: await authHeaders() });
+  const res = await fetchWithTimeout(url, { headers: await authHeaders() });
   if (!res.ok) {
     throw new OpenSubtitlesError(
       `Search failed: ${res.status} ${res.statusText}`,
@@ -183,7 +204,7 @@ export async function searchSubtitles(params: OsSearchParams): Promise<OsSubtitl
  * Returns the local file path that can be passed to `mpv sub-add`.
  */
 export async function downloadSubtitle(fileId: number): Promise<{ path: string; remaining: number }> {
-  const dlRes = await fetch(`${API_BASE}/download`, {
+  const dlRes = await fetchWithTimeout(`${API_BASE}/download`, {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify({ file_id: fileId }),
@@ -200,7 +221,7 @@ export async function downloadSubtitle(fileId: number): Promise<{ path: string; 
     throw new OpenSubtitlesError('Download response missing link');
   }
 
-  const fileRes = await fetch(dl.link);
+  const fileRes = await fetchWithTimeout(dl.link, { timeoutMs: DOWNLOAD_TIMEOUT_MS });
   if (!fileRes.ok) {
     throw new OpenSubtitlesError(
       `Subtitle file download failed: ${fileRes.status}`,

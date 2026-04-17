@@ -2,6 +2,8 @@ import { app } from 'electron';
 import log from 'electron-log/main';
 import { UPDATE_MANIFEST_URL } from '../../shared/constants';
 
+const UPDATE_FETCH_TIMEOUT_MS = 10_000;
+
 // ---------------------------------------------------------------------------
 // Update check — manually triggered from Settings → About.
 //
@@ -59,9 +61,12 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
     return { ok: false, status: 'not-configured' };
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPDATE_FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(UPDATE_MANIFEST_URL, {
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
     if (!res.ok) {
       return { ok: false, status: 'error', error: `Update server returned ${res.status}` };
@@ -85,11 +90,18 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
     return { ok: true, status: 'up-to-date', currentVersion };
   } catch (err) {
     log.warn('[update-check] failed:', err);
+    const isAbort = (err as { name?: string })?.name === 'AbortError';
     return {
       ok: false,
       status: 'error',
-      error: err instanceof Error ? err.message : String(err),
+      error: isAbort
+        ? `Update check timed out after ${UPDATE_FETCH_TIMEOUT_MS}ms`
+        : err instanceof Error
+        ? err.message
+        : String(err),
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
