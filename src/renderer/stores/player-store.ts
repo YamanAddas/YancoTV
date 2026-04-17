@@ -173,7 +173,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         duration: 0,
       });
       try {
-        const result = await window.api.player.play(url, title, startPosition, contentId);
+        const result = await window.api.player.play(url, title, startPosition, contentId, episodeId);
         if (result && !result.ok) {
           set({ status: 'error', error: result.error || 'Failed to start playback' });
         }

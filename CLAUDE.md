@@ -11,7 +11,7 @@ YancoTV is a custom IPTV media application. Windows-first desktop app built with
 - **State:** Zustand 5
 - **Database:** SQLite via better-sqlite3 (synchronous, WAL mode)
 - **Playback:** mpv (via child process, behind IPlayer abstraction, JSON-RPC over named pipes)
-- **Media tools:** ffmpeg (recording, downloading, subtitle extraction — planned)
+- **Media tools:** ffmpeg (recording, downloading, subtitle extraction)
 - **Package manager:** pnpm (enforced via preinstall hook)
 - **Bundler:** Vite 6 (renderer), esbuild (preload), tsc (main)
 - **Packaging:** electron-builder (NSIS + portable)
@@ -200,8 +200,12 @@ pnpm audit            # Security audit
 - **Sprint 7:** DONE (EPG — XMLTV parser, now/next, guide grid, auto-refresh, settings)
 - **Sprints 8–10:** DONE (player enhancements, catch-up/timeshift, parental controls, settings persistence)
 - **Sprint 11:** DONE (Stalker Portal client, source editing, drag-and-drop reorder, multi-source merge/dedup, health indicators, auto-sync)
-- **Sprint 11B:** IN PROGRESS (Content Detail Pages — cinematic movie/series info pages with metadata, episodes, related content)
-- **Sprint 12+:** NOT STARTED (recording, downloading, metadata enrichment, subtitles, multi-view, etc.)
+- **Sprint 11B:** DONE (cinematic content detail pages — hero, tabs, episodes, info, related, animations)
+- **Sprint 12:** DONE (ffmpeg recording, scheduled recording, recordings page, system tray indicator)
+- **Sprint 13:** DONE (download service with retry/resume, asset bundling — poster/backdrop/.nfo/subtitles, DownloadsPage)
+- **Sprint 14:** DONE (TMDb API client + enrichment service, SQLite cache, MetadataSettings tab)
+- **Sprint 15:** IN PROGRESS (OpenSubtitles — 15.6 embedded extraction done in Sprint 13, 15.1–15.5 TODO)
+- **Sprint 16+:** NOT STARTED (multi-view/PIP, system features, etc.)
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
@@ -209,11 +213,7 @@ See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
 These are listed in PRODUCTION_PLAN.md but do not exist in code yet:
 
-- `ContentDetailPage.tsx` — Cinematic movie/series detail page (Sprint 11B, in progress)
-- `recording-service.ts` — ffmpeg-based live recording + scheduler (Sprint 12)
-- `download-manager.ts` — Queue-based VOD download manager (Sprint 13)
-- `metadata-service.ts` — TMDb API integration (Sprint 14)
-- `subtitle-service.ts` — OpenSubtitles API + subtitle management (Sprint 15)
+- `subtitle-service.ts` — OpenSubtitles API + subtitle management (Sprint 15, in progress)
 - `backup-service.ts` — Export/import user data (Sprint 18)
 - `notification-service.ts` — In-app toasts + programme reminders (Sprint 19)
 - E2E tests with Playwright (Sprint 21)

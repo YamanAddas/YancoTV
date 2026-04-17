@@ -50,6 +50,10 @@ export const IpcChannels = {
   // Subtitle provider — OpenSubtitles
   SUBTITLES_SEARCH: 'subtitles:search',
   SUBTITLES_DOWNLOAD_AND_LOAD: 'subtitles:downloadAndLoad',
+  SUBTITLES_SET_CREDENTIALS: 'subtitles:setCredentials',
+  SUBTITLES_CLEAR_CREDENTIALS: 'subtitles:clearCredentials',
+  SUBTITLES_GET_CACHE_STATS: 'subtitles:getCacheStats',
+  SUBTITLES_CLEAR_CACHE: 'subtitles:clearCache',
 
   // Player events (main → renderer)
   PLAYER_STATE_CHANGED: 'player:stateChanged',

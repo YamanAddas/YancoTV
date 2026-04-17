@@ -4,6 +4,7 @@ import path from 'path';
 import log from 'electron-log/main';
 import { APP_NAME, APP_VERSION } from '../../shared/constants';
 import { getSetting } from './settings-service';
+import { decryptCredential } from './credential-store';
 
 /**
  * OpenSubtitles REST API v1 client — https://opensubtitles.stoplight.io/
@@ -119,8 +120,14 @@ async function authHeaders(): Promise<Record<string, string>> {
  */
 async function getUserToken(): Promise<string | null> {
   const username = getSetting('opensubtitles.username');
-  const password = getSetting('opensubtitles.password');
-  if (!username || !password) return null;
+  const encPw = getSetting('opensubtitles.password_enc');
+  if (!username || !encPw) return null;
+  let password: string;
+  try {
+    password = decryptCredential(Buffer.from(encPw, 'base64'));
+  } catch {
+    return null;
+  }
 
   if (cachedToken && Date.now() < cachedTokenExpiry) {
     return cachedToken;

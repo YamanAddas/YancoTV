@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
 
 // ---------------------------------------------------------------------------
@@ -261,9 +261,25 @@ export function PlaybackSettings() {
               { value: 'de', label: 'German' },
               { value: 'ar', label: 'Arabic' },
               { value: 'pt', label: 'Portuguese' },
+              { value: 'tr', label: 'Turkish' },
+              { value: 'it', label: 'Italian' },
+              { value: 'nl', label: 'Dutch' },
+              { value: 'ru', label: 'Russian' },
             ]}
           />
         </SettingRow>
+
+        <SettingRow
+          label="Auto-search OpenSubtitles"
+          description="Automatically find and load subtitles when playback starts"
+        >
+          <Toggle
+            checked={getBool('opensubtitles.autoSearch')}
+            onChange={(v) => setBool('opensubtitles.autoSearch', v)}
+          />
+        </SettingRow>
+
+        <OpenSubtitlesCredentials />
       </div>
 
       <div className="space-y-2">
@@ -359,6 +375,120 @@ export function PlaybackSettings() {
           />
         </SettingRow>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OpenSubtitles credentials section
+// ---------------------------------------------------------------------------
+
+function OpenSubtitlesCredentials() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving' | 'clearing' | 'saved' | 'error'>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+  const [cacheStats, setCacheStats] = useState<{ count: number } | null>(null);
+
+  useEffect(() => {
+    window.api?.subtitles.getCacheStats().then((r: { ok: boolean; count?: number }) => {
+      if (r?.ok) setCacheStats({ count: r.count ?? 0 });
+    });
+  }, []);
+
+  const save = async () => {
+    if (!username.trim() || !password) {
+      setMessage('Enter both username and password.');
+      setStatus('error');
+      return;
+    }
+    setStatus('saving');
+    setMessage(null);
+    const res = await window.api?.subtitles.setCredentials(username.trim(), password);
+    if (res?.ok) {
+      setStatus('saved');
+      setMessage('Credentials saved. Your download quota is now linked to your account.');
+      setPassword('');
+    } else {
+      setStatus('error');
+      setMessage(res?.error ?? 'Failed to save credentials.');
+    }
+  };
+
+  const clear = async () => {
+    setStatus('clearing');
+    await window.api?.subtitles.clearCredentials();
+    setUsername('');
+    setPassword('');
+    setStatus('idle');
+    setMessage('Credentials removed. Anonymous downloads will be used.');
+  };
+
+  const clearCache = async () => {
+    await window.api?.subtitles.clearCache();
+    setCacheStats({ count: 0 });
+  };
+
+  return (
+    <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
+      <div>
+        <p className="text-sm font-medium text-surface-200">OpenSubtitles account</p>
+        <p className="mt-0.5 text-xs text-surface-500">
+          Optional — raises your daily download limit. Anonymous users get 5/day.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Username"
+          autoComplete="off"
+          className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent focus:outline-none"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          autoComplete="new-password"
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
+          className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent focus:outline-none"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={save}
+          disabled={status === 'saving'}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-surface-950 transition-colors hover:bg-accent-hover disabled:opacity-50"
+        >
+          {status === 'saving' ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          onClick={clear}
+          disabled={status === 'clearing'}
+          className="rounded-lg border border-surface-700 px-3 py-1.5 text-xs text-surface-400 transition-colors hover:border-surface-500 hover:text-surface-200 disabled:opacity-50"
+        >
+          Clear
+        </button>
+        {cacheStats !== null && (
+          <button
+            onClick={clearCache}
+            className="ml-auto text-xs text-surface-500 hover:text-surface-300 transition-colors"
+            title="Clear subtitle cache"
+          >
+            Clear cache ({cacheStats.count})
+          </button>
+        )}
+      </div>
+
+      {message && (
+        <p className={`text-xs ${status === 'error' ? 'text-red-400' : 'text-accent'}`}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }

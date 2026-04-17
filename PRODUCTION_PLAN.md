@@ -15,7 +15,7 @@
 
 **Goal:** Build every feature needed to match and surpass TiviMate, OTT Navigator, and Smarters — on Windows desktop.
 
-### Sprints 1–11 — COMPLETED
+### Sprints 1–14 — COMPLETED
 
 | Sprint | What Was Shipped |
 |--------|-----------------|
@@ -30,12 +30,16 @@
 | 9 — Catch-Up & Timeshift | Catch-up detection (Xtream + M3U), catch-up URL builder, timeshift service (pause/rewind live TV), timeshift controls |
 | 10 — Parental Controls | PIN setup (SHA-256 hashed), channel lock/hide, channel name/logo/group overrides, parental settings UI, settings persistence |
 | 11 — Source Management Enhancements | Stalker Portal client (MAC auth, paginated fetch), source editing (inline rename/URL/credentials), drag-and-drop priority reorder, multi-source merge with dedup by stream_url, source health indicators (channel count, sync errors), auto-sync timer, migration 007 |
+| 11B — Content Detail Pages | Cinematic hero layout (backdrop blur, hex poster, metadata badges), tab bar (Episodes/Info/Related), season selector, episode cards with progress, InfoTab, RelatedTab HexCard carousels, route wiring for /movies/:id and /series/:id, Motion animations |
+| 12 — Recording | ffmpeg-based live recording (start/stop/status), record button in player, recordings page, scheduled recording from EPG, scheduler service, system tray indicator, recording settings, storage usage |
+| 13 — Downloading | Download service with progress-aware retry (UND_ERR_SOCKET recovery), asset bundling (poster/backdrop/.nfo/subtitles), nfo-writer (Kodi-compatible XML), subtitle-extractor (ffmpeg embedded track extraction), DownloadsPage UI, download IPC wiring, migration 010 |
+| 14 — Metadata Enrichment | TMDb v3 API client (search, details, cast, images, self-throttled), SQLite cache (migration 011), enrichment service merges TMDb onto ContentMetadata, encrypted API key via safeStorage, MetadataSettings tab, wired into content:getDetail IPC |
 
-**Also shipped alongside Sprints 7–11:** Full keyboard navigation across all menus, category grouping, channel artwork, redesigned Live TV list/grid views with hex capsule rows, 8-tab settings page (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About), settings key-value store, 19 unit test files.
+**Also shipped:** Full keyboard navigation, category grouping, channel artwork, redesigned Live TV hex rows, 8-tab settings page, settings persistence, mpv live vs VOD cache split with auto-reconnect, 38 unit test files (626 tests).
 
 ---
 
-### Sprint 11B — Content Detail Pages (Movie & Series Info)
+### Sprint 11B — Content Detail Pages — DONE
 
 **Objective:** Replace direct-play-on-click with a cinematic detail page for movies and series. Display all available metadata (plot, cast, genre, rating, episodes) from Xtream/Stalker/M3U sources. Design: hybrid of Netflix/Max hero layout + Disney+ conditional tabs + YancoTV hex identity.
 
@@ -127,7 +131,7 @@
 
 ---
 
-### Sprint 12 — Recording
+### Sprint 12 — Recording — DONE
 
 **Objective:** Record live TV to local storage, with scheduled recording from EPG.
 
@@ -147,7 +151,7 @@
 
 ---
 
-### Sprint 13 — Downloading
+### Sprint 13 — Downloading — DONE
 
 **Objective:** Download VOD content for offline playback.
 
@@ -167,7 +171,7 @@
 
 ---
 
-### Sprint 14 — Metadata Enrichment
+### Sprint 14 — Metadata Enrichment — DONE
 
 **Objective:** TMDb integration for richer movie/series info — enhanced posters, backdrops, descriptions, ratings.
 
@@ -187,18 +191,20 @@ Note: The content detail page UI was built in Sprint 11B using provider metadata
 
 ---
 
-### Sprint 15 — Subtitles (Advanced)
+### Sprint 15 — Subtitles (Advanced) — IN PROGRESS
 
 **Objective:** OpenSubtitles integration and subtitle preference management.
 
-| # | Task | Details |
-|---|------|---------|
-| 15.1 | OpenSubtitles API client | Search subtitles by title, year, season/episode, language. Download subtitle files |
-| 15.2 | Auto-search on playback | When a movie/episode starts, auto-search for subtitles in preferred language |
-| 15.3 | Subtitle search UI | "Search subtitles" button in player → results list → download + apply |
-| 15.4 | Subtitle preferences | Default subtitle language(s) (e.g. EN, AR). Auto-apply setting. Subtitle directory |
-| 15.5 | Subtitle cache | Cache downloaded subtitles locally, mapped to content ID. Re-use on replay |
-| 15.6 | Embedded subtitle extraction | Extract embedded subs from streams via ffmpeg when available |
+Note: 15.6 (embedded subtitle extraction) was completed in Sprint 13 as part of asset bundling.
+
+| # | Task | Details | Status |
+|---|------|---------|--------|
+| 15.1 | OpenSubtitles API client | Search subtitles by title, year, season/episode, language. Download subtitle files | TODO |
+| 15.2 | Auto-search on playback | When a movie/episode starts, auto-search for subtitles in preferred language | TODO |
+| 15.3 | Subtitle search UI | "Search subtitles" button in player → results list → download + apply | TODO |
+| 15.4 | Subtitle preferences | Default subtitle language(s) (e.g. EN, AR). Auto-apply setting. Subtitle directory | TODO |
+| 15.5 | Subtitle cache | Cache downloaded subtitles locally, mapped to content ID. Re-use on replay | TODO |
+| 15.6 | Embedded subtitle extraction | Extract embedded subs from streams via ffmpeg when available | DONE (Sprint 13) |
 
 **Deliverable:** Subtitles auto-searched and applied. Users can search/download from OpenSubtitles. Preferences remembered.
 

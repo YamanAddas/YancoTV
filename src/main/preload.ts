@@ -135,8 +135,8 @@ const api = {
 
   player: {
     checkMpv: () => ipcRenderer.invoke(IpcChannels.PLAYER_CHECK_MPV),
-    play: (url: string, title?: string, startPosition?: number, contentId?: string) =>
-      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition, contentId),
+    play: (url: string, title?: string, startPosition?: number, contentId?: string, episodeId?: string) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition, contentId, episodeId),
     pause: () => ipcRenderer.invoke(IpcChannels.PLAYER_PAUSE),
     resume: () => ipcRenderer.invoke(IpcChannels.PLAYER_RESUME),
     stop: () => ipcRenderer.invoke(IpcChannels.PLAYER_STOP),
@@ -231,6 +231,14 @@ const api = {
     }) => ipcRenderer.invoke(IpcChannels.SUBTITLES_SEARCH, params),
     downloadAndLoad: (fileId: number) =>
       ipcRenderer.invoke(IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD, fileId),
+    setCredentials: (username: string, password: string) =>
+      ipcRenderer.invoke(IpcChannels.SUBTITLES_SET_CREDENTIALS, username, password),
+    clearCredentials: () =>
+      ipcRenderer.invoke(IpcChannels.SUBTITLES_CLEAR_CREDENTIALS),
+    getCacheStats: () =>
+      ipcRenderer.invoke(IpcChannels.SUBTITLES_GET_CACHE_STATS),
+    clearCache: () =>
+      ipcRenderer.invoke(IpcChannels.SUBTITLES_CLEAR_CACHE),
   },
 
   groupPrefs: {

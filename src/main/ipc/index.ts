@@ -58,6 +58,7 @@ import {
 } from '../services/timeshift-service';
 import {
   getAllSettings,
+  getSetting,
   setSetting,
   setSettings,
 } from '../services/settings-service';
@@ -81,7 +82,14 @@ import {
 import type { ChannelOverride } from '../services/parental-service';
 import { MpvPlayer } from '../player/mpv-player';
 import type { PlayerState } from '../player/player.interface';
-import { searchSubtitles, downloadSubtitle } from '../services/opensubtitles-client';
+import { searchSubtitles, downloadSubtitle, invalidateToken as invalidateOsToken } from '../services/opensubtitles-client';
+import { encryptCredential } from '../services/credential-store';
+import {
+  getCachedSubtitle,
+  cacheSubtitle,
+  getSubtitleCacheStats,
+  clearSubtitleCache,
+} from '../services/subtitle-cache-service';
 import {
   startRecording,
   stopRecording,
@@ -158,6 +166,85 @@ export function destroyPlayer(): void {
   if (player) {
     player.destroy().catch((err) => log.error('Player destroy error:', err));
     player = null;
+  }
+}
+
+/**
+ * Auto-search OpenSubtitles for the preferred language and silently load the
+ * top result. Skipped if auto-search is disabled, the language pref is 'off',
+ * a cached subtitle already exists, or any error occurs.
+ */
+async function autoSearchSubtitles(
+  contentId: string,
+  title?: string,
+  episodeId?: string,
+): Promise<void> {
+  const autoSearch = getSetting('opensubtitles.autoSearch');
+  if (autoSearch !== '1') return;
+
+  const lang = getSetting('playback_subtitle_lang');
+  if (!lang || lang === 'off') return;
+
+  // Look up episode context from the DB so we can pass season/episode
+  let season: number | undefined;
+  let episode: number | undefined;
+  let tmdbId: number | undefined;
+  try {
+    const item = getContentById(contentId);
+    if (!item) return;
+    if (item.type === 'live') return; // Live TV never needs subtitle auto-search
+
+    const meta = item.metadataJson ? (JSON.parse(item.metadataJson) as Record<string, unknown>) : {};
+    if (typeof meta.tmdbId === 'number') tmdbId = meta.tmdbId;
+
+    // For episodes, parse S/E from metadata
+    if (typeof meta.season === 'number') season = meta.season;
+    if (typeof meta.episode === 'number') episode = meta.episode;
+  } catch {
+    // non-fatal
+  }
+
+  // Check cache first — skip search if we already have a valid file
+  const cached = getCachedSubtitle(contentId, lang, episodeId);
+  if (cached) {
+    try {
+      await getPlayer().addSubtitleFile(cached.filePath);
+      log.info(`[subtitle-auto] loaded cached subtitle: ${cached.filePath}`);
+    } catch (err) {
+      log.warn('[subtitle-auto] cached sub-add failed:', err);
+    }
+    return;
+  }
+
+  // Search OpenSubtitles
+  try {
+    const cleanedTitle = title ?? '';
+    const results = await searchSubtitles({
+      query: cleanedTitle,
+      tmdb_id: tmdbId,
+      season,
+      episode,
+      languages: lang,
+      type: season !== undefined ? 'episode' : 'movie',
+    });
+    const best = results[0];
+    if (!best) {
+      log.info(`[subtitle-auto] no results for "${cleanedTitle}" (${lang})`);
+      return;
+    }
+    const fileId = best.attributes?.files?.[0]?.file_id;
+    if (!fileId) return;
+
+    const { path: subPath } = await downloadSubtitle(fileId);
+    try {
+      await getPlayer().addSubtitleFile(subPath);
+      log.info(`[subtitle-auto] auto-loaded subtitle for "${cleanedTitle}" (${lang})`);
+    } catch (err) {
+      log.warn('[subtitle-auto] sub-add failed:', err);
+    }
+    cacheSubtitle({ contentId, episodeId, language: lang, filePath: subPath, fileId });
+  } catch (err) {
+    log.info('[subtitle-auto] search/download failed (non-fatal):', err);
   }
 }
 
@@ -753,6 +840,7 @@ export function registerIpcHandlers(): void {
       title?: string,
       startPosition?: number,
       contentId?: string,
+      episodeId?: string,
     ) => {
       if (!url || typeof url !== 'string') {
         return { ok: false, error: 'Invalid URL' };
@@ -795,6 +883,10 @@ export function registerIpcHandlers(): void {
           // No handle — fall back to mpv's own standalone window. Hide the
           // video stage we optimistically showed.
           hideVideoWindow();
+        }
+        // Auto-search subtitles when enabled (fire-and-forget)
+        if (!isLive && contentId) {
+          void autoSearchSubtitles(contentId, title, episodeId).catch(() => {});
         }
         return { ok: true };
       } catch (err) {
@@ -1071,18 +1163,79 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  ipcMain.handle(IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD, async (_event, fileId: number) => {
-    if (typeof fileId !== 'number') {
-      return { ok: false, error: 'Invalid file id' };
-    }
-    try {
-      const { path: subPath, remaining } = await downloadSubtitle(fileId);
-      try {
-        await getPlayer().addSubtitleFile(subPath);
-      } catch (err) {
-        log.warn('sub-add after OpenSubtitles download failed:', err);
+  ipcMain.handle(
+    IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD,
+    async (_event, fileId: number, opts?: { contentId?: string; episodeId?: string; language?: string }) => {
+      if (typeof fileId !== 'number') {
+        return { ok: false, error: 'Invalid file id' };
       }
-      return { ok: true, path: subPath, remaining };
+      try {
+        const { path: subPath, remaining } = await downloadSubtitle(fileId);
+        try {
+          await getPlayer().addSubtitleFile(subPath);
+        } catch (err) {
+          log.warn('sub-add after OpenSubtitles download failed:', err);
+        }
+        // Cache the downloaded subtitle so replay skips re-download
+        if (opts?.contentId && opts?.language) {
+          try {
+            cacheSubtitle({
+              contentId: opts.contentId,
+              episodeId: opts.episodeId,
+              language: opts.language,
+              filePath: subPath,
+              fileId,
+            });
+          } catch (err) {
+            log.warn('subtitle cache write failed (non-fatal):', err);
+          }
+        }
+        return { ok: true, path: subPath, remaining };
+      } catch (err) {
+        return { ok: false, error: String((err as Error).message) };
+      }
+    },
+  );
+
+  // OpenSubtitles credentials (stored encrypted via safeStorage)
+  ipcMain.handle(
+    IpcChannels.SUBTITLES_SET_CREDENTIALS,
+    (_event, username: unknown, password: unknown) => {
+      if (typeof username !== 'string' || typeof password !== 'string') {
+        return { ok: false, error: 'Invalid credentials' };
+      }
+      try {
+        setSetting('opensubtitles.username', username.trim());
+        // Encrypt password — same pattern as TMDb API key
+        const encPw = encryptCredential(password).toString('base64');
+        setSetting('opensubtitles.password_enc', encPw);
+        invalidateOsToken();
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: String((err as Error).message) };
+      }
+    },
+  );
+
+  ipcMain.handle(IpcChannels.SUBTITLES_CLEAR_CREDENTIALS, () => {
+    setSetting('opensubtitles.username', '');
+    setSetting('opensubtitles.password_enc', '');
+    invalidateOsToken();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.SUBTITLES_GET_CACHE_STATS, () => {
+    try {
+      return { ok: true, ...getSubtitleCacheStats() };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.SUBTITLES_CLEAR_CACHE, () => {
+    try {
+      clearSubtitleCache();
+      return { ok: true };
     } catch (err) {
       return { ok: false, error: String((err as Error).message) };
     }

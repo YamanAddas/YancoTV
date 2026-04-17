@@ -58,6 +58,9 @@ const DEFAULTS: Record<string, string> = {
   // TMDb metadata
   tmdb_enabled: '0',
   tmdb_language: 'en-US',
+
+  // OpenSubtitles
+  'opensubtitles.autoSearch': '0',
 };
 
 interface SettingsState {

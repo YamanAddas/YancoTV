@@ -156,6 +156,23 @@ CREATE TABLE IF NOT EXISTS tmdb_cache (
   miss          INTEGER NOT NULL DEFAULT 0,
   fetched_at    INTEGER NOT NULL
 );
+
+-- 012-subtitle-cache
+CREATE TABLE IF NOT EXISTS subtitle_cache (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  content_id  TEXT    NOT NULL,
+  episode_id  TEXT,
+  language    TEXT    NOT NULL,
+  file_path   TEXT    NOT NULL,
+  file_id     INTEGER,
+  created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subtitle_cache_unique
+  ON subtitle_cache(content_id, COALESCE(episode_id, ''), language);
+
+CREATE INDEX IF NOT EXISTS idx_subtitle_cache_lookup
+  ON subtitle_cache(content_id, language);
 `;
 
 export function createTestDb(): Database.Database {
