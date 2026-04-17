@@ -7,9 +7,15 @@ interface EpisodesTabProps {
   episodes: Episode[];
   contentId: string;
   onEpisodePlay: (episode: Episode) => void;
+  onEpisodeDownload?: (episode: Episode) => void;
 }
 
-export function EpisodesTab({ episodes, contentId, onEpisodePlay }: EpisodesTabProps) {
+export function EpisodesTab({
+  episodes,
+  contentId,
+  onEpisodePlay,
+  onEpisodeDownload,
+}: EpisodesTabProps) {
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [episodePositions, setEpisodePositions] = useState<
     Record<string, { positionSeconds: number; durationSeconds?: number }>
@@ -102,11 +108,11 @@ export function EpisodesTab({ episodes, contentId, onEpisodePlay }: EpisodesTabP
               : 0;
 
           return (
+            <div key={ep.id} className="group/row relative flex items-stretch gap-1.5">
             <motion.button
-              key={ep.id}
               onClick={() => onEpisodePlay(ep)}
               onKeyDown={(e) => handleKeyDown(e, ep)}
-              className={`group relative flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-glow-sm ${
+              className={`group relative flex flex-1 items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-glow-sm ${
                 isPlaying
                   ? 'border-accent/30 bg-accent/5 shadow-glow-sm'
                   : 'border-accent/5 bg-surface-900/30 hover:border-accent/20'
@@ -167,6 +173,34 @@ export function EpisodesTab({ episodes, contentId, onEpisodePlay }: EpisodesTabP
                 </div>
               )}
             </motion.button>
+
+            {/* Download button — sibling so it doesn't bubble into the row click */}
+            {onEpisodeDownload && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEpisodeDownload(ep);
+                }}
+                className="flex w-11 flex-shrink-0 items-center justify-center rounded-xl border border-accent/5 bg-surface-900/30 text-surface-500 opacity-0 transition-all hover:border-accent/30 hover:bg-surface-800/60 hover:text-accent group-hover/row:opacity-100"
+                title="Download this episode"
+                aria-label="Download episode"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"
+                  />
+                </svg>
+              </button>
+            )}
+            </div>
           );
         })}
       </div>

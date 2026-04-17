@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { PlayerContainer } from './player/PlayerContainer';
+import { Toaster } from './Toaster';
 import { usePlayerShortcuts } from '../hooks/use-player-shortcuts';
 import { usePlayerStore } from '../stores/player-store';
 
@@ -56,6 +57,9 @@ export function Layout() {
           mpv backend renders video via --wid into the main HWND and controls
           in a separate transparent overlay BrowserWindow). */}
       {renderPlayerContainer && <PlayerContainer />}
+
+      {/* Ephemeral toasts (download-started, etc.) */}
+      {!isTheater && <Toaster />}
     </div>
   );
 }

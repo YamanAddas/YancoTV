@@ -49,6 +49,15 @@ const DEFAULTS: Record<string, string> = {
 
   // Recording
   recording_max_duration_minutes: '240',
+
+  // Downloads
+  download_max_concurrent: '2',
+  download_max_file_size_gb: '50',
+  download_allow_private_ips: '0',
+
+  // TMDb metadata
+  tmdb_enabled: '0',
+  tmdb_language: 'en-US',
 };
 
 interface SettingsState {

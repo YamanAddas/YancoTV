@@ -11,6 +11,7 @@ interface DetailHeroProps {
   onBack: () => void;
   onPlay: () => void;
   onFavoriteToggle: () => void;
+  onDownload?: () => void;
 }
 
 export function DetailHero({
@@ -22,9 +23,13 @@ export function DetailHero({
   onBack,
   onPlay,
   onFavoriteToggle,
+  onDownload,
 }: DetailHeroProps) {
   const [imgError, setImgError] = useState(false);
-  const showImage = item.logoUrl && !imgError;
+  const posterSrc = metadata.tmdbPosterUrl || item.logoUrl;
+  const backdropSrc = metadata.tmdbBackdropUrl || item.logoUrl;
+  const showImage = !!posterSrc && !imgError;
+  const showBackdrop = !!backdropSrc && !imgError;
   const letter = (item.cleanTitle || item.title).charAt(0).toUpperCase();
   const isSeries = item.type === 'series';
 
@@ -77,12 +82,16 @@ export function DetailHero({
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        {showImage ? (
+        {showBackdrop ? (
           <img
-            src={item.logoUrl}
+            src={backdropSrc}
             alt=""
             className="h-full w-full object-cover"
-            style={{ filter: 'blur(20px) brightness(0.3)', transform: 'scale(1.1)' }}
+            style={
+              metadata.tmdbBackdropUrl
+                ? { filter: 'brightness(0.35)' }
+                : { filter: 'blur(20px) brightness(0.3)', transform: 'scale(1.1)' }
+            }
             onError={() => setImgError(true)}
           />
         ) : (
@@ -120,7 +129,7 @@ export function DetailHero({
           >
             {showImage ? (
               <img
-                src={item.logoUrl}
+                src={posterSrc}
                 alt={item.title}
                 className="h-full w-full object-cover"
                 onError={() => setImgError(true)}
@@ -149,6 +158,18 @@ export function DetailHero({
           >
             {item.cleanTitle || item.title}
           </motion.h1>
+
+          {/* TMDb tagline */}
+          {metadata.tmdbTagline && (
+            <motion.p
+              className="mt-1 max-w-xl text-sm italic text-surface-400"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.12 }}
+            >
+              {metadata.tmdbTagline}
+            </motion.p>
+          )}
 
           {/* Metadata line */}
           {metaItems.length > 0 && (
@@ -221,6 +242,30 @@ export function DetailHero({
                 </div>
               )}
             </button>
+
+            {/* Download button (movies only — series gets per-episode downloads) */}
+            {onDownload && (
+              <button
+                onClick={onDownload}
+                className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-800/40 px-4 py-2.5 text-sm font-medium text-surface-300 transition-all hover:border-accent/40 hover:text-accent"
+                title="Download to disk"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"
+                  />
+                </svg>
+                Download
+              </button>
+            )}
 
             {/* Favorite button */}
             <button

@@ -11,6 +11,7 @@ const navItems = [
   { path: '/series', label: 'Series', icon: 'layers' },
   { path: '/favorites', label: 'Favorites', icon: 'heart' },
   { path: '/recordings', label: 'Recordings', icon: 'record' },
+  { path: '/downloads', label: 'Downloads', icon: 'download' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -30,6 +31,8 @@ const iconMap: Record<string, string> = {
     'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 10.607z',
   record:
     'M12 19a7 7 0 100-14 7 7 0 000 14zm0-3a4 4 0 110-8 4 4 0 010 8z',
+  download:
+    'M12 4v12m0 0l-4-4m4 4l4-4M4 20h16',
 };
 
 function useClock() {

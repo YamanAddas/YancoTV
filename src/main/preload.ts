@@ -257,6 +257,61 @@ const api = {
     status: () => ipcRenderer.invoke(IpcChannels.DB_STATUS),
   },
 
+  download: {
+    enqueue: (input: { contentId?: string; episodeId?: string; title: string; streamUrl: string }) =>
+      ipcRenderer.invoke(IpcChannels.DOWNLOAD_ENQUEUE, input),
+    pause: (id: string) => ipcRenderer.invoke(IpcChannels.DOWNLOAD_PAUSE, id),
+    resume: (id: string) => ipcRenderer.invoke(IpcChannels.DOWNLOAD_RESUME, id),
+    cancel: (id: string) => ipcRenderer.invoke(IpcChannels.DOWNLOAD_CANCEL, id),
+    remove: (id: string, deleteFile: boolean) =>
+      ipcRenderer.invoke(IpcChannels.DOWNLOAD_REMOVE, id, deleteFile),
+    list: () => ipcRenderer.invoke(IpcChannels.DOWNLOAD_LIST),
+    openFolder: () => ipcRenderer.invoke(IpcChannels.DOWNLOAD_OPEN_FOLDER),
+    onProgress: (
+      callback: (p: {
+        id: string;
+        bytesDownloaded: number;
+        bytesTotal?: number;
+        bytesPerSecond: number;
+      }) => void,
+    ) => {
+      const handler = (
+        _e: IpcRendererEvent,
+        p: {
+          id: string;
+          bytesDownloaded: number;
+          bytesTotal?: number;
+          bytesPerSecond: number;
+        },
+      ) => callback(p);
+      ipcRenderer.on(IpcChannels.DOWNLOAD_PROGRESS, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.DOWNLOAD_PROGRESS, handler);
+    },
+    onStatus: (
+      callback: (p: { id: string; status: string; error?: string }) => void,
+    ) => {
+      const handler = (
+        _e: IpcRendererEvent,
+        p: { id: string; status: string; error?: string },
+      ) => callback(p);
+      ipcRenderer.on(IpcChannels.DOWNLOAD_STATUS, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.DOWNLOAD_STATUS, handler);
+    },
+  },
+
+  tmdb: {
+    getStatus: (): Promise<{ enabled: boolean; hasApiKey: boolean; language: string }> =>
+      ipcRenderer.invoke(IpcChannels.TMDB_GET_STATUS),
+    setApiKey: (apiKey: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.TMDB_SET_API_KEY, apiKey),
+    clearApiKey: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.TMDB_CLEAR_API_KEY),
+    testApiKey: (apiKey: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.TMDB_TEST_API_KEY, apiKey),
+    clearCache: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.TMDB_CLEAR_CACHE),
+  },
+
   recording: {
     start: (input: { contentId?: string; title: string; streamUrl: string }) =>
       ipcRenderer.invoke(IpcChannels.RECORDING_START, input),

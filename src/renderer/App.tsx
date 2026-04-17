@@ -12,6 +12,7 @@ import { FavoritesPage } from './pages/FavoritesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ContentDetailPage } from './pages/ContentDetailPage';
 import { RecordingsPage } from './pages/RecordingsPage';
+import { DownloadsPage } from './pages/DownloadsPage';
 import { useSettingsStore } from './stores/settings-store';
 
 const queryClient = new QueryClient({
@@ -85,6 +86,7 @@ function AppInner() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/recordings" element={<RecordingsPage />} />
+        <Route path="/downloads" element={<DownloadsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to={startRoute} replace />} />
       </Route>

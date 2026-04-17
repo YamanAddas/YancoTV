@@ -7,6 +7,7 @@ import { InfoTab } from '../components/InfoTab';
 import { RelatedTab } from '../components/RelatedTab';
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useToastStore } from '../stores/toast-store';
 import type { ContentDetail, ContentItem, ContentMetadata, Episode } from '../../shared/types';
 
 export function ContentDetailPage() {
@@ -23,6 +24,7 @@ export function ContentDetailPage() {
   const play = usePlayerStore((s) => s.play);
   const toggle = useFavoritesStore((s) => s.toggle);
   const isFavorite = useFavoritesStore((s) => s.isFavorite);
+  const pushToast = useToastStore((s) => s.push);
 
   // Fetch detail + related
   useEffect(() => {
@@ -66,6 +68,72 @@ export function ContentDetailPage() {
       play(episode.streamUrl, `${showName} - ${title}`, detail.item.id, episode.id);
     },
     [detail, play],
+  );
+
+  const handleDownload = useCallback(async () => {
+    if (!detail) return;
+    const { item } = detail;
+    const title = item.cleanTitle || item.title;
+    // Push an optimistic toast immediately — the enqueue round-trip is
+    // ~instant but users still benefit from the visual confirmation.
+    pushToast({
+      kind: 'info',
+      message: `Starting download: ${title}`,
+      durationMs: 2000,
+    });
+    const res = await window.api.download.enqueue({
+      title,
+      streamUrl: item.streamUrl,
+      contentId: item.id,
+    });
+    if (!res.ok) {
+      pushToast({
+        kind: 'error',
+        message: `Could not start download: ${res.error}`,
+        durationMs: 5000,
+      });
+      return;
+    }
+    pushToast({
+      kind: 'success',
+      message: `Added to downloads: ${title}`,
+      action: { label: 'View', href: '/downloads' },
+    });
+  }, [detail, pushToast]);
+
+  const handleEpisodeDownload = useCallback(
+    async (episode: Episode) => {
+      if (!detail) return;
+      const showName = detail.item.cleanTitle || detail.item.title;
+      const epLabel =
+        episode.title || `S${episode.seasonNumber ?? 1}E${episode.episodeNumber ?? '?'}`;
+      const label = `${showName} - ${epLabel}`;
+      pushToast({
+        kind: 'info',
+        message: `Starting download: ${label}`,
+        durationMs: 2000,
+      });
+      const res = await window.api.download.enqueue({
+        title: label,
+        streamUrl: episode.streamUrl,
+        contentId: detail.item.id,
+        episodeId: episode.id,
+      });
+      if (!res.ok) {
+        pushToast({
+          kind: 'error',
+          message: `Could not start download: ${res.error}`,
+          durationMs: 5000,
+        });
+        return;
+      }
+      pushToast({
+        kind: 'success',
+        message: `Added to downloads: ${label}`,
+        action: { label: 'View', href: '/downloads' },
+      });
+    },
+    [detail, pushToast],
   );
 
   const handleBack = useCallback(() => {
@@ -124,6 +192,7 @@ export function ContentDetailPage() {
         onBack={handleBack}
         onPlay={handlePlay}
         onFavoriteToggle={() => toggle(item.id)}
+        onDownload={item.type === 'movie' ? handleDownload : undefined}
       />
 
       <div className="flex-1 space-y-8 px-6 pb-8">
@@ -142,6 +211,7 @@ export function ContentDetailPage() {
                   episodes={episodes}
                   contentId={item.id}
                   onEpisodePlay={handleEpisodePlay}
+                  onEpisodeDownload={handleEpisodeDownload}
                 />
               </motion.section>
             )}

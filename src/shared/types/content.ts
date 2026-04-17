@@ -50,6 +50,13 @@ export interface ContentMetadata {
   tvArchiveDuration?: number;
   catchupType?: string;
   catchupSource?: string;
+  // TMDb enrichment
+  tmdbId?: number;
+  tmdbType?: 'movie' | 'tv';
+  tmdbPosterUrl?: string;
+  tmdbBackdropUrl?: string;
+  tmdbTagline?: string;
+  tmdbEnrichedAt?: number;
 }
 
 /** Enriched content detail returned by content:getDetail */

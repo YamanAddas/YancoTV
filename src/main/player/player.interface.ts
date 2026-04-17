@@ -3,6 +3,12 @@ export interface PlayOptions {
   subtitleFile?: string;
   /** Native window handle (HWND) to embed mpv into via --wid */
   wid?: string;
+  /**
+   * True for live streams (IPTV channels). Controls mpv cache tuning:
+   *   • live → large timeshift buffer for rewind + tolerant of network jitter
+   *   • VOD  → moderate forward cache + pause-on-underrun (smoother playback)
+   */
+  isLive?: boolean;
 }
 
 export type AspectRatio = 'auto' | '16:9' | '4:3' | '21:9' | '2.35:1' | '1:1' | 'fill';

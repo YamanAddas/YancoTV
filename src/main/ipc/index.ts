@@ -91,6 +91,26 @@ import {
   checkFfmpegAvailable,
 } from '../services/recording-service';
 import type { StartRecordingInput } from '../../shared/types/recording';
+import {
+  enqueueDownload,
+  pauseDownload,
+  resumeDownload,
+  cancelDownload,
+  removeDownload,
+  listDownloads,
+  openDownloadsFolder,
+} from '../services/download-service';
+import type { EnqueueDownloadInput } from '../../shared/types/download';
+import {
+  isTmdbEnabled,
+  hasTmdbApiKey,
+  getTmdbLanguage,
+  setTmdbApiKey,
+  clearTmdbApiKey,
+  testTmdbApiKey,
+  clearTmdbCache,
+  enrichMetadata as enrichTmdbMetadata,
+} from '../services/tmdb-service';
 
 let player: MpvPlayer | null = null;
 
@@ -366,6 +386,14 @@ export function registerIpcHandlers(): void {
           log.error('Failed to fetch Xtream VOD info on demand:', err);
         }
       }
+    }
+
+    // TMDb enrichment — overlays poster/backdrop/tagline and fills any
+    // missing textual fields. No-op when disabled or unkeyed.
+    try {
+      metadata = await enrichTmdbMetadata(item, metadata as never);
+    } catch (err) {
+      log.warn('TMDb enrichment failed:', err);
     }
 
     // Get watch position
@@ -737,10 +765,24 @@ export function registerIpcHandlers(): void {
         // so mpv's surface attaches to a window that's actually on screen.
         showVideoWindow();
         const wid = getVideoWindowHandle() ?? undefined;
-        const opts: { startPosition?: number; wid?: string } = {};
+        // Infer live vs VOD from the content record so mpv gets the right cache
+        // profile: live wants a big rewind buffer + frame-drop on underrun,
+        // VOD wants a modest forward cache + clean rebuffer on underrun.
+        // Live streams that aren't in the DB (e.g. manual URLs) fall through
+        // to the VOD profile, which is the safer default.
+        let isLive = false;
+        if (contentId) {
+          try {
+            const item = getContentById(contentId);
+            if (item?.type === 'live') isLive = true;
+          } catch {
+            // non-fatal — treat as VOD
+          }
+        }
+        const opts: { startPosition?: number; wid?: string; isLive?: boolean } = { isLive };
         if (typeof startPosition === 'number') opts.startPosition = startPosition;
         if (wid) opts.wid = wid;
-        await getPlayer().play(url, Object.keys(opts).length > 0 ? opts : undefined);
+        await getPlayer().play(url, opts);
         currentMedia = {
           url,
           title: typeof title === 'string' ? title : undefined,
@@ -1124,6 +1166,96 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.RECORDING_CHECK_FFMPEG, () => {
     return { available: checkFfmpegAvailable() };
+  });
+
+  // Downloads
+  ipcMain.handle(IpcChannels.DOWNLOAD_ENQUEUE, (_event, input: EnqueueDownloadInput) => {
+    if (
+      !input ||
+      typeof input.title !== 'string' ||
+      typeof input.streamUrl !== 'string' ||
+      !input.title ||
+      !input.streamUrl
+    ) {
+      return { ok: false, error: 'title and streamUrl are required' };
+    }
+    return enqueueDownload({
+      title: input.title,
+      streamUrl: input.streamUrl,
+      contentId: typeof input.contentId === 'string' ? input.contentId : undefined,
+      episodeId: typeof input.episodeId === 'string' ? input.episodeId : undefined,
+    });
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_PAUSE, (_event, id: string) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+    return pauseDownload(id);
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_RESUME, (_event, id: string) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+    return resumeDownload(id);
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_CANCEL, (_event, id: string) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+    return cancelDownload(id);
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_REMOVE, (_event, id: string, deleteFile: boolean) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id required' };
+    return removeDownload(id, !!deleteFile);
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_LIST, () => {
+    return listDownloads();
+  });
+
+  ipcMain.handle(IpcChannels.DOWNLOAD_OPEN_FOLDER, () => {
+    openDownloadsFolder();
+    return { ok: true };
+  });
+
+  // -------------------------------------------------------------------------
+  // TMDb metadata enrichment
+  // -------------------------------------------------------------------------
+
+  ipcMain.handle(IpcChannels.TMDB_GET_STATUS, () => {
+    return {
+      enabled: isTmdbEnabled(),
+      hasApiKey: hasTmdbApiKey(),
+      language: getTmdbLanguage(),
+    };
+  });
+
+  ipcMain.handle(IpcChannels.TMDB_SET_API_KEY, (_event, apiKey: unknown) => {
+    if (typeof apiKey !== 'string' || !apiKey.trim()) {
+      return { ok: false, error: 'API key is required' };
+    }
+    try {
+      setTmdbApiKey(apiKey);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle(IpcChannels.TMDB_CLEAR_API_KEY, () => {
+    clearTmdbApiKey();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IpcChannels.TMDB_TEST_API_KEY, async (_event, apiKey: unknown) => {
+    if (typeof apiKey !== 'string' || !apiKey.trim()) {
+      return { ok: false, error: 'API key is required' };
+    }
+    const valid = await testTmdbApiKey(apiKey);
+    return { ok: valid, error: valid ? undefined : 'TMDb rejected the key' };
+  });
+
+  ipcMain.handle(IpcChannels.TMDB_CLEAR_CACHE, () => {
+    clearTmdbCache();
+    return { ok: true };
   });
 
   log.info('IPC handlers registered');

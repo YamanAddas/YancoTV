@@ -16,7 +16,7 @@ import type {
 } from './player.interface';
 import { MpvIpc } from './mpv-ipc';
 import { findMpvPath } from './mpv-path';
-import { getTimeshiftMpvArgs } from '../services/timeshift-service';
+import { getPlaybackArgs } from './mpv-args';
 
 const CONNECT_RETRY_DELAY = 300;
 const CONNECT_MAX_RETRIES = 20; // 20 * 300ms = 6 seconds — enough for cold mpv starts
@@ -298,8 +298,9 @@ export class MpvPlayer implements IPlayer {
       // Embedded mode: our React overlay draws controls, disable mpv's OSC.
       // Standalone mode: show mpv's built-in OSC.
       embedded ? '--osc=no' : '--osc=yes',
-      // Enable timeshift buffering (cache for live rewind/pause)
-      ...getTimeshiftMpvArgs(),
+      // Cache / network tuning — differs for live vs VOD so playback is
+      // smooth instead of stuttering when the upstream server burps.
+      ...getPlaybackArgs({ isLive: options?.isLive ?? false }),
     ];
 
     if (embedded) {

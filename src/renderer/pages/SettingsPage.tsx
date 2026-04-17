@@ -5,6 +5,7 @@ import { EpgSettings } from '../components/settings/EpgSettings';
 import { PlaybackSettings } from '../components/settings/PlaybackSettings';
 import { ParentalSettings } from '../components/settings/ParentalSettings';
 import { NetworkSettings } from '../components/settings/NetworkSettings';
+import { MetadataSettings } from '../components/settings/MetadataSettings';
 import { ShortcutsSettings } from '../components/settings/ShortcutsSettings';
 import { AboutSettings } from '../components/settings/AboutSettings';
 
@@ -19,6 +20,7 @@ type SettingsCategory =
   | 'playback'
   | 'parental'
   | 'network'
+  | 'metadata'
   | 'shortcuts'
   | 'about';
 
@@ -35,6 +37,7 @@ const categories: CategoryDef[] = [
   { id: 'playback', label: 'Playback', icon: 'M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { id: 'parental', label: 'Parental Controls', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
   { id: 'network', label: 'Network', icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9' },
+  { id: 'metadata', label: 'Metadata', icon: 'M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm4 2h8m-8 4h8m-8 4h4' },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
   { id: 'about', label: 'About', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
@@ -89,6 +92,7 @@ export function SettingsPage() {
         {activeCategory === 'playback' && <PlaybackSettings />}
         {activeCategory === 'parental' && <ParentalSettings />}
         {activeCategory === 'network' && <NetworkSettings />}
+        {activeCategory === 'metadata' && <MetadataSettings />}
         {activeCategory === 'shortcuts' && <ShortcutsSettings />}
         {activeCategory === 'about' && <AboutSettings />}
       </div>

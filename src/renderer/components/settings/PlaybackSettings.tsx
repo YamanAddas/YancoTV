@@ -307,6 +307,58 @@ export function PlaybackSettings() {
           />
         </SettingRow>
       </div>
+
+      <div className="space-y-2">
+        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
+          Downloads
+        </h3>
+
+        <SettingRow
+          label="Concurrent downloads"
+          description="How many files can download at the same time"
+        >
+          <Select
+            value={get('download_max_concurrent')}
+            onChange={(v) => set('download_max_concurrent', v)}
+            options={[
+              { value: '1', label: '1' },
+              { value: '2', label: '2' },
+              { value: '3', label: '3' },
+              { value: '4', label: '4' },
+              { value: '6', label: '6' },
+              { value: '8', label: '8' },
+            ]}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Maximum file size"
+          description="Refuse downloads that advertise a larger size (guards against runaway disks)"
+        >
+          <Select
+            value={get('download_max_file_size_gb')}
+            onChange={(v) => set('download_max_file_size_gb', v)}
+            options={[
+              { value: '5', label: '5 GB' },
+              { value: '10', label: '10 GB' },
+              { value: '25', label: '25 GB' },
+              { value: '50', label: '50 GB' },
+              { value: '100', label: '100 GB' },
+              { value: '0', label: 'No limit' },
+            ]}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Allow private network addresses"
+          description="Permit downloads from LAN / loopback hosts. Leave off unless you know why you need it."
+        >
+          <Toggle
+            checked={getBool('download_allow_private_ips')}
+            onChange={(v) => setBool('download_allow_private_ips', v)}
+          />
+        </SettingRow>
+      </div>
     </div>
   );
 }

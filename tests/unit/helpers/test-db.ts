@@ -128,6 +128,34 @@ CREATE TABLE IF NOT EXISTS group_preferences (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_group_prefs_type_key
   ON group_preferences(content_type, group_key);
+
+-- 010-downloads
+CREATE TABLE IF NOT EXISTS downloads (
+  id TEXT PRIMARY KEY,
+  content_id TEXT,
+  episode_id TEXT,
+  title TEXT NOT NULL,
+  stream_url TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('queued', 'downloading', 'paused', 'completed', 'failed', 'cancelled')),
+  queued_at INTEGER NOT NULL,
+  started_at INTEGER,
+  completed_at INTEGER,
+  bytes_downloaded INTEGER NOT NULL DEFAULT 0,
+  bytes_total INTEGER,
+  error TEXT,
+  resumable INTEGER NOT NULL DEFAULT 0
+);
+
+-- 011-tmdb-cache
+CREATE TABLE IF NOT EXISTS tmdb_cache (
+  content_id    TEXT PRIMARY KEY,
+  tmdb_id       INTEGER,
+  tmdb_type     TEXT CHECK(tmdb_type IN ('movie', 'tv')),
+  payload_json  TEXT,
+  miss          INTEGER NOT NULL DEFAULT 0,
+  fetched_at    INTEGER NOT NULL
+);
 `;
 
 export function createTestDb(): Database.Database {

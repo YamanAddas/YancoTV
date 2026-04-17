@@ -122,6 +122,26 @@ export const IpcChannels = {
   GROUP_PREFS_REMOVE: 'groups:removePrefs',
   GROUP_PREFS_REORDER: 'groups:reorder',
 
+  // Downloads (HTTP-streaming VOD download manager)
+  DOWNLOAD_ENQUEUE: 'download:enqueue',
+  DOWNLOAD_PAUSE: 'download:pause',
+  DOWNLOAD_RESUME: 'download:resume',
+  DOWNLOAD_CANCEL: 'download:cancel',
+  DOWNLOAD_REMOVE: 'download:remove',
+  DOWNLOAD_LIST: 'download:list',
+  DOWNLOAD_OPEN_FOLDER: 'download:openFolder',
+  /** main → renderer push: live progress updates for a download */
+  DOWNLOAD_PROGRESS: 'download:progress',
+  /** main → renderer push: status change (queued → downloading → completed/failed) */
+  DOWNLOAD_STATUS: 'download:status',
+
+  // TMDb metadata enrichment
+  TMDB_GET_STATUS: 'tmdb:getStatus',
+  TMDB_SET_API_KEY: 'tmdb:setApiKey',
+  TMDB_CLEAR_API_KEY: 'tmdb:clearApiKey',
+  TMDB_TEST_API_KEY: 'tmdb:testApiKey',
+  TMDB_CLEAR_CACHE: 'tmdb:clearCache',
+
   // Recordings (ffmpeg-based live recording)
   RECORDING_START: 'recording:start',
   RECORDING_STOP: 'recording:stop',
