@@ -14,6 +14,7 @@ CREATE TABLE sources (
   url TEXT,
   file_path TEXT,
   epg_url TEXT,
+  user_agent TEXT,
   username_encrypted BLOB,
   password_encrypted BLOB,
   mac_address_encrypted BLOB,

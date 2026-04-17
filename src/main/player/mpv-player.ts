@@ -323,8 +323,9 @@ export class MpvPlayer implements IPlayer {
         })(),
       }),
       // User-configurable network layer: user-agent, proxy, IPv4 preference.
+      // Per-call UA (source override) beats the global setting.
       ...getNetworkArgs({
-        userAgent: getSetting('network_user_agent'),
+        userAgent: options?.userAgent?.trim() || getSetting('network_user_agent'),
         proxyEnabled: getSetting('network_proxy_enabled') === '1',
         proxyType: getSetting('network_proxy_type'),
         proxyHost: getSetting('network_proxy_host'),

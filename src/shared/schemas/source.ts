@@ -14,6 +14,7 @@ export const addSourceInputSchema = z
     password: z.string().optional(),
     macAddress: z.string().optional(),
     epgUrl: z.string().url().optional().or(z.literal('')),
+    userAgent: z.string().max(500).optional().or(z.literal('')),
   })
   .superRefine((data, ctx) => {
     if (data.type === 'm3u_url' && !data.url) {
@@ -90,6 +91,7 @@ export const updateSourceInputSchema = z.object({
     .regex(MAC_REGEX, 'MAC address must be in format XX:XX:XX:XX:XX:XX')
     .optional(),
   epgUrl: z.string().url().optional().or(z.literal('')),
+  userAgent: z.string().max(500).optional().or(z.literal('')),
   autoSyncInterval: z.number().int().min(0).max(720).optional(),
 });
 

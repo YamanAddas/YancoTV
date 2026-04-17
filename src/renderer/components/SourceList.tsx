@@ -6,6 +6,7 @@ interface Source {
   type: string;
   url?: string;
   filePath?: string;
+  userAgent?: string;
   lastSynced?: number;
   isActive: boolean;
   priority: number;
@@ -117,6 +118,7 @@ function SourceItem({
   const [editName, setEditName] = useState(source.name);
   const [editUrl, setEditUrl] = useState(source.url ?? '');
   const [editEpgUrl, setEditEpgUrl] = useState('');
+  const [editUserAgent, setEditUserAgent] = useState(source.userAgent ?? '');
   const [editError, setEditError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -164,6 +166,7 @@ function SourceItem({
     setEditName(source.name);
     setEditUrl(source.url ?? '');
     setEditEpgUrl('');
+    setEditUserAgent(source.userAgent ?? '');
     setEditError('');
     setEditing(true);
   };
@@ -177,6 +180,9 @@ function SourceItem({
       if (editName !== source.name) input.name = editName;
       if (editUrl !== (source.url ?? '')) input.url = editUrl;
       if (editEpgUrl.trim()) input.epgUrl = editEpgUrl.trim();
+      if (editUserAgent !== (source.userAgent ?? '')) {
+        input.userAgent = editUserAgent;
+      }
 
       const result = await window.api.sources.update(input);
       if (result.ok) {
@@ -259,6 +265,13 @@ function SourceItem({
             value={editEpgUrl}
             onChange={(e) => setEditEpgUrl(e.target.value)}
             placeholder="EPG URL (leave empty to keep current)"
+            className="w-full rounded-md border border-surface-700/50 bg-surface-800/60 px-2.5 py-1.5 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none"
+          />
+          <input
+            type="text"
+            value={editUserAgent}
+            onChange={(e) => setEditUserAgent(e.target.value)}
+            placeholder="Custom User-Agent (optional — overrides global)"
             className="w-full rounded-md border border-surface-700/50 bg-surface-800/60 px-2.5 py-1.5 text-sm text-surface-200 placeholder-surface-500 focus:border-accent/50 focus:outline-none"
           />
           {editError && (

@@ -9,6 +9,12 @@ export interface PlayOptions {
    *   • VOD  → moderate forward cache + pause-on-underrun (smoother playback)
    */
   isLive?: boolean;
+  /**
+   * Per-call User-Agent override. Set from the owning source's `user_agent`
+   * column so providers that require a specific UA play correctly. Takes
+   * precedence over the global `network_user_agent` setting.
+   */
+  userAgent?: string;
 }
 
 export type AspectRatio = 'auto' | '16:9' | '4:3' | '21:9' | '2.35:1' | '1:1' | 'fill';

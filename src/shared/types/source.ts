@@ -7,6 +7,8 @@ export interface Source {
   url?: string;
   filePath?: string;
   epgUrl?: string;
+  /** Optional per-source HTTP User-Agent. Applied to mpv playback. */
+  userAgent?: string;
   lastSynced?: number;
   isActive: boolean;
   priority: number;
@@ -26,6 +28,7 @@ export interface AddSourceInput {
   password?: string;
   macAddress?: string;
   epgUrl?: string;
+  userAgent?: string;
 }
 
 export interface UpdateSourceInput {
@@ -36,5 +39,6 @@ export interface UpdateSourceInput {
   password?: string;
   macAddress?: string;
   epgUrl?: string;
+  userAgent?: string;
   autoSyncInterval?: number;
 }

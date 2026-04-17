@@ -1052,17 +1052,31 @@ export function registerIpcHandlers(): void {
         // Live streams that aren't in the DB (e.g. manual URLs) fall through
         // to the VOD profile, which is the safer default.
         let isLive = false;
+        let userAgent: string | undefined;
         if (contentId) {
           try {
             const item = getContentById(contentId);
             if (item?.type === 'live') isLive = true;
+            // Per-source UA override takes precedence over the global
+            // network_user_agent. Applied via PlayOptions so mpv gets the
+            // right --user-agent at spawn.
+            if (item?.sourceId) {
+              const src = getSourceById(item.sourceId);
+              if (src?.userAgent) userAgent = src.userAgent;
+            }
           } catch {
             // non-fatal — treat as VOD
           }
         }
-        const opts: { startPosition?: number; wid?: string; isLive?: boolean } = { isLive };
+        const opts: {
+          startPosition?: number;
+          wid?: string;
+          isLive?: boolean;
+          userAgent?: string;
+        } = { isLive };
         if (typeof startPosition === 'number') opts.startPosition = startPosition;
         if (wid) opts.wid = wid;
+        if (userAgent) opts.userAgent = userAgent;
         await getPlayer().play(url, opts);
         currentMedia = {
           url,

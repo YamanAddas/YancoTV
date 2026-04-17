@@ -81,6 +81,9 @@ const DEFAULTS: Record<string, string> = {
   // Advanced
   advanced_mpv_path: '',
   advanced_debug_logging: '0',
+
+  // Keyboard shortcuts (JSON map action → key). Empty = defaults.
+  shortcuts_bindings: '',
 };
 
 interface SettingsState {

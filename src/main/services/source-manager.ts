@@ -12,6 +12,7 @@ interface SourceRow {
   url: string | null;
   file_path: string | null;
   epg_url: string | null;
+  user_agent: string | null;
   username_encrypted: Buffer | null;
   password_encrypted: Buffer | null;
   mac_address_encrypted: Buffer | null;
@@ -33,6 +34,7 @@ function rowToSource(row: SourceRow): Source {
     url: row.url ?? undefined,
     filePath: row.file_path ?? undefined,
     epgUrl: row.epg_url ?? undefined,
+    userAgent: row.user_agent ?? undefined,
     lastSynced: row.last_synced ?? undefined,
     isActive: row.is_active === 1,
     priority: row.priority,
@@ -87,8 +89,8 @@ export function addSource(input: AddSourceInput): Result<Source> {
 
     try {
       db.prepare(
-        `INSERT INTO sources (id, name, type, url, file_path, epg_url, username_encrypted, password_encrypted, mac_address_encrypted, priority, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        `INSERT INTO sources (id, name, type, url, file_path, epg_url, user_agent, username_encrypted, password_encrypted, mac_address_encrypted, priority, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       ).run(
         id,
         input.name,
@@ -96,6 +98,7 @@ export function addSource(input: AddSourceInput): Result<Source> {
         input.url ?? null,
         input.filePath ?? null,
         input.epgUrl ?? null,
+        input.userAgent?.trim() || null,
         usernameEncrypted,
         passwordEncrypted,
         macAddressEncrypted,
@@ -145,6 +148,10 @@ export function updateSource(input: UpdateSourceInput): Result<Source> {
     if (input.epgUrl !== undefined) {
       sets.push('epg_url = ?');
       values.push(input.epgUrl || null);
+    }
+    if (input.userAgent !== undefined) {
+      sets.push('user_agent = ?');
+      values.push(input.userAgent.trim() || null);
     }
     if (input.autoSyncInterval !== undefined) {
       sets.push('auto_sync_interval = ?');
