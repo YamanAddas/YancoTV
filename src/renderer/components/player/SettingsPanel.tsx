@@ -46,12 +46,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         onClose();
       }
     };
+    // Use `click` (not `mousedown`) so the trigger button's onClick runs first.
+    // Otherwise mousedown closes the panel, then the button's click toggles it
+    // back open — making the button feel like it never closes.
     const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handler);
+      document.addEventListener('click', handler);
     }, 100);
     return () => {
       clearTimeout(timer);
-      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('click', handler);
     };
   }, [onClose]);
 
