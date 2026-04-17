@@ -14,6 +14,9 @@ import { ContentDetailPage } from './pages/ContentDetailPage';
 import { RecordingsPage } from './pages/RecordingsPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { useSettingsStore } from './stores/settings-store';
+import { useNotifications } from './hooks/use-notifications';
+import { useRecentChannelsStore } from './stores/recent-channels-store';
+import { usePlayerStore } from './stores/player-store';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,12 +41,35 @@ const START_PAGE_ROUTES: Record<string, string> = {
 function AppInner() {
   const { load, get } = useSettingsStore();
   const qc = useQueryClient();
+  useNotifications();
 
-  // Load settings once on mount, then keep theme in sync
+  // Load settings once on mount, then keep theme in sync. When
+  // "Remember last channel" is on (19.6) and the user actually has a recent
+  // live channel, auto-play it after settings finish loading so the app opens
+  // into whatever they were last watching.
   useEffect(() => {
-    load().then(() => {
-      const theme = useSettingsStore.getState().get('ui_theme');
-      document.documentElement.setAttribute('data-theme', theme || 'dark');
+    load().then(async () => {
+      const settings = useSettingsStore.getState();
+      document.documentElement.setAttribute('data-theme', settings.get('ui_theme') || 'dark');
+
+      if (settings.get('ui_remember_last_channel') !== '1') return;
+      const lastId = useRecentChannelsStore.getState().mostRecent();
+      if (!lastId || !window.api) return;
+      try {
+        const detail = await window.api.content.getDetail(lastId);
+        const item = detail?.item;
+        if (item?.streamUrl) {
+          usePlayerStore.getState().play(
+            item.streamUrl,
+            item.cleanTitle || item.title,
+            item.id,
+            undefined,
+            'live',
+          );
+        }
+      } catch {
+        // Channel deleted or source removed — silently skip.
+      }
     });
   }, [load]);
 

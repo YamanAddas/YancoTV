@@ -64,7 +64,13 @@ export interface PlayerStoreState {
 }
 
 interface PlayerStoreActions {
-  play: (url: string, title?: string, contentId?: string, episodeId?: string) => Promise<void>;
+  play: (
+    url: string,
+    title?: string,
+    contentId?: string,
+    episodeId?: string,
+    contentType?: 'live' | 'movie' | 'series',
+  ) => Promise<void>;
   pause: () => void;
   resume: () => void;
   stop: () => void;
@@ -135,9 +141,23 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   // --- Actions ---
 
-  play: async (url: string, title?: string, contentId?: string, episodeId?: string) => {
+  play: async (
+    url: string,
+    title?: string,
+    contentId?: string,
+    episodeId?: string,
+    contentType?: 'live' | 'movie' | 'series',
+  ) => {
     if (!window.api) return;
     const { backend } = get();
+
+    // Track recently-played live channels for the "recent strip", last-channel
+    // recall shortcut, and auto-play-on-launch. Movies/series use watch history
+    // instead, so we only record the live case here.
+    if (contentType === 'live' && contentId) {
+      const { useRecentChannelsStore } = await import('./recent-channels-store');
+      useRecentChannelsStore.getState().record(contentId);
+    }
 
     let startPosition: number | undefined;
 

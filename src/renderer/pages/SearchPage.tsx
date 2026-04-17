@@ -4,6 +4,12 @@ import { HorizontalContentRow, type ContentCardData } from '../components/Conten
 import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import type { ContentItem } from '../../shared/types';
+import {
+  getSearchHistory,
+  recordSearch,
+  removeFromHistory,
+  clearSearchHistory,
+} from '../utils/search-history';
 
 function toCardData(item: ContentItem): ContentCardData {
   return {
@@ -17,11 +23,27 @@ function toCardData(item: ContentItem): ContentCardData {
   };
 }
 
+type TypeFilter = 'all' | 'live' | 'movie' | 'series';
+
+const FILTER_OPTIONS: { value: TypeFilter; label: string; icon: string }[] = [
+  { value: 'all', label: 'All', icon: '✦' },
+  { value: 'live', label: 'Live', icon: '📡' },
+  { value: 'movie', label: 'Movies', icon: '🎬' },
+  { value: 'series', label: 'Series', icon: '📺' },
+];
+
+function parseTypeFilter(value: string | null): TypeFilter {
+  if (value === 'live' || value === 'movie' || value === 'series') return value;
+  return 'all';
+}
+
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(parseTypeFilter(searchParams.get('type')));
   const [results, setResults] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [history, setHistory] = useState<string[]>(() => getSearchHistory());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigate = useNavigate();
@@ -38,11 +60,35 @@ export function SearchPage() {
     const data: ContentItem[] = await window.api.content.search(q.trim());
     setResults(data);
     setIsLoading(false);
+    // Only record once we have actual results — avoids history entries for
+    // typos that never matched anything.
+    if (data.length > 0) {
+      recordSearch(q);
+      setHistory(getSearchHistory());
+    }
   }, []);
+
+  const handleHistoryPick = (q: string) => {
+    setQuery(q);
+    const params: Record<string, string> = { q };
+    if (typeFilter !== 'all') params.type = typeFilter;
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleHistoryRemove = (q: string) => {
+    removeFromHistory(q);
+    setHistory(getSearchHistory());
+  };
+
+  const handleClearHistory = () => {
+    clearSearchHistory();
+    setHistory([]);
+  };
 
   useEffect(() => {
     const q = searchParams.get('q') ?? '';
     setQuery(q);
+    setTypeFilter(parseTypeFilter(searchParams.get('type')));
     doSearch(q);
   }, [searchParams, doSearch]);
 
@@ -51,8 +97,19 @@ export function SearchPage() {
     setQuery(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setSearchParams(q.trim() ? { q } : {}, { replace: true });
+      const params: Record<string, string> = {};
+      if (q.trim()) params.q = q;
+      if (typeFilter !== 'all') params.type = typeFilter;
+      setSearchParams(params, { replace: true });
     }, 300);
+  };
+
+  const handleFilterChange = (next: TypeFilter) => {
+    setTypeFilter(next);
+    const params: Record<string, string> = {};
+    if (query.trim()) params.q = query;
+    if (next !== 'all') params.type = next;
+    setSearchParams(params, { replace: true });
   };
 
   const handleItemClick = useCallback(
@@ -67,7 +124,7 @@ export function SearchPage() {
         navigate(`/movies/${item.id}`);
         return;
       }
-      play(item.streamUrl, item.cleanTitle || item.title, item.id);
+      play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, item.type);
     },
     [play, navigate],
   );
@@ -90,6 +147,11 @@ export function SearchPage() {
   const movies = allMovies.slice(0, ZONE_DISPLAY_CAP);
   const series = allSeries.slice(0, ZONE_DISPLAY_CAP);
 
+  const visibleCount =
+    (typeFilter === 'all' || typeFilter === 'live' ? allLive.length : 0) +
+    (typeFilter === 'all' || typeFilter === 'movie' ? allMovies.length : 0) +
+    (typeFilter === 'all' || typeFilter === 'series' ? allSeries.length : 0);
+
   return (
     <div className="space-y-6">
       <div>
@@ -105,6 +167,27 @@ export function SearchPage() {
             className="w-full rounded-xl border border-accent/5 bg-surface-800 py-3 pl-10 pr-4 text-surface-100 placeholder-surface-500 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
           />
         </div>
+        <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label="Filter by content type">
+          {FILTER_OPTIONS.map((opt) => {
+            const selected = typeFilter === opt.value;
+            return (
+              <button
+                key={opt.value}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => handleFilterChange(opt.value)}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  selected
+                    ? 'border-accent bg-accent/15 text-accent'
+                    : 'border-surface-700 bg-surface-800 text-surface-400 hover:border-surface-600 hover:text-surface-200'
+                }`}
+              >
+                <span aria-hidden>{opt.icon}</span>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {isLoading && (
@@ -117,20 +200,63 @@ export function SearchPage() {
         </div>
       )}
 
-      {!query.trim() && !isLoading && (
+      {!query.trim() && !isLoading && history.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-surface-500">
           <SearchIcon className="mb-4 h-12 w-12 opacity-30" />
           <p className="text-sm">Type to search your content library</p>
         </div>
       )}
 
-      {query.trim() && !isLoading && results.length === 0 && (
+      {!query.trim() && !isLoading && history.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-surface-400">
+              Recent searches
+            </h3>
+            <button
+              onClick={handleClearHistory}
+              className="text-xs text-surface-500 transition-colors hover:text-surface-300"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {history.map((h) => (
+              <span
+                key={h}
+                className="group flex items-center gap-1 rounded-full border border-surface-700 bg-surface-800 pl-3 pr-1 text-sm text-surface-200"
+              >
+                <button
+                  onClick={() => handleHistoryPick(h)}
+                  className="py-1.5 transition-colors hover:text-accent"
+                >
+                  {h}
+                </button>
+                <button
+                  onClick={() => handleHistoryRemove(h)}
+                  aria-label={`Remove ${h} from history`}
+                  className="rounded-full p-1 text-surface-500 opacity-60 transition-opacity hover:bg-surface-700 hover:text-surface-200 hover:opacity-100"
+                >
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M3 3 L13 13 M13 3 L3 13" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {query.trim() && !isLoading && visibleCount === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-surface-500">
-          <p className="text-sm">No results for &ldquo;{query}&rdquo;</p>
+          <p className="text-sm">
+            No {typeFilter === 'all' ? '' : `${typeFilter === 'movie' ? 'movie' : typeFilter} `}
+            results for &ldquo;{query}&rdquo;
+          </p>
         </div>
       )}
 
-      {!isLoading && live.length > 0 && (
+      {!isLoading && (typeFilter === 'all' || typeFilter === 'live') && live.length > 0 && (
         <section>
           <ZoneHeader icon="📡" label="Live TV" total={allLive.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow
@@ -142,7 +268,7 @@ export function SearchPage() {
         </section>
       )}
 
-      {!isLoading && movies.length > 0 && (
+      {!isLoading && (typeFilter === 'all' || typeFilter === 'movie') && movies.length > 0 && (
         <section>
           <ZoneHeader icon="🎬" label="Movies" total={allMovies.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow
@@ -154,7 +280,7 @@ export function SearchPage() {
         </section>
       )}
 
-      {!isLoading && series.length > 0 && (
+      {!isLoading && (typeFilter === 'all' || typeFilter === 'series') && series.length > 0 && (
         <section>
           <ZoneHeader icon="📺" label="Series" total={allSeries.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow

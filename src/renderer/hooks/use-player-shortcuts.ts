@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { usePlayerStore } from '../stores/player-store';
 import { getVideoElement } from '../components/player/video-ref';
+import { useRecentChannelsStore } from '../stores/recent-channels-store';
 
 const SEEK_STEP = 10; // seconds
 const SEEK_STEP_LARGE = 30; // seconds (Shift+Arrow)
@@ -23,6 +24,7 @@ const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
  * [ / ]          — decrease / increase speed
  * Backspace      — reset speed to 1x
  * Escape         — exit theater mode / close settings / stop
+ * L              — tune to previously watched live channel (global, 19.5)
  */
 export function usePlayerShortcuts(): void {
   useEffect(() => {
@@ -34,6 +36,29 @@ export function usePlayerShortcuts(): void {
       const state = usePlayerStore.getState();
       const isActive = state.status === 'playing' || state.status === 'paused' || state.status === 'buffering';
       const isTheater = state.mode === 'theater';
+
+      // L — last-channel recall. Works globally (not gated by isActive) so a
+      // user can jump back to live from any page. We look up the previous
+      // entry in the recent-channels ring; if the currently-playing channel
+      // is at the head, previous() gives us the one before it.
+      if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const targetId = useRecentChannelsStore.getState().previous();
+        if (targetId && window.api) {
+          e.preventDefault();
+          (async () => {
+            try {
+              const detail = await window.api.content.getDetail(targetId);
+              const item = detail?.item;
+              if (item?.streamUrl) {
+                state.play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, 'live');
+              }
+            } catch {
+              // No detail → silently no-op; the channel may have been removed.
+            }
+          })();
+          return;
+        }
+      }
 
       // Escape always works in theater mode (even on error)
       if (e.key === 'Escape' && isTheater) {

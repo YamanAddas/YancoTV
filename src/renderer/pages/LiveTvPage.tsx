@@ -10,6 +10,7 @@ import { usePlayerStore } from '../stores/player-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useParentalStore } from '../stores/parental-store';
 import { useSettingsStore } from '../stores/settings-store';
+import { useRecentChannelsStore } from '../stores/recent-channels-store';
 import { useNowNextBatch } from '../hooks/use-epg';
 
 const EMPTY_ITEMS: ContentCardData[] = [];
@@ -160,6 +161,22 @@ export function LiveTvPage() {
   const toggle = useFavoritesStore((s) => s.toggle);
   const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
 
+  // Recent channels strip (19.7). Look up each recorded ID in the loaded
+  // channel list, preserving recency order. Keeps at most 8 so the strip
+  // doesn't crowd the main grid.
+  const recentIds = useRecentChannelsStore((s) => s.ids);
+  const recentChannels = useMemo(() => {
+    if (recentIds.length === 0 || visibleChannels.length === 0) return [] as ContentCardData[];
+    const byId = new Map(visibleChannels.map((c) => [c.id, c] as const));
+    const out: ContentCardData[] = [];
+    for (const id of recentIds) {
+      const ch = byId.get(id);
+      if (ch) out.push(ch);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [recentIds, visibleChannels]);
+
   const handleItemClick = useCallback(
     (item: ContentCardData) => {
       // If channel is locked, prompt for PIN before playing
@@ -167,7 +184,7 @@ export function LiveTvPage() {
         setPinModalTarget(item);
         return;
       }
-      play(item.streamUrl, item.cleanTitle || item.title, item.id);
+      play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, 'live');
     },
     [play, lockedIds, parentalSettings.pinEnabled],
   );
@@ -179,6 +196,8 @@ export function LiveTvPage() {
           pinModalTarget.streamUrl,
           pinModalTarget.cleanTitle || pinModalTarget.title,
           pinModalTarget.id,
+          undefined,
+          'live',
         );
       }
       setPinModalTarget(null);
@@ -300,6 +319,45 @@ export function LiveTvPage() {
             </span>
           </div>
         )
+      )}
+
+      {!reorderMode && recentChannels.length > 0 && (
+        <div className="mb-4">
+          <div className="mb-2 flex items-center gap-2">
+            <h3 className="font-display text-[11px] uppercase tracking-widest-plus text-surface-400">
+              Recently watched
+            </h3>
+            <span className="rounded-full bg-surface-800/60 px-2 py-0.5 font-mono text-[10px] tabular-nums text-surface-500">
+              {recentChannels.length}
+            </span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {recentChannels.map((ch) => (
+              <button
+                key={ch.id}
+                onClick={() => handleItemClick(ch)}
+                className="group flex shrink-0 items-center gap-2 rounded-lg border border-surface-700 bg-surface-800/60 px-3 py-2 text-left transition-colors hover:border-accent/50 hover:bg-surface-700/60"
+                title={ch.cleanTitle || ch.title}
+              >
+                {ch.logoUrl ? (
+                  <img
+                    src={ch.logoUrl}
+                    alt=""
+                    className="h-8 w-8 shrink-0 rounded object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-surface-700 text-[10px] font-bold text-surface-400">
+                    {(ch.cleanTitle || ch.title)?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                )}
+                <span className="max-w-[140px] truncate text-xs font-medium text-surface-200 group-hover:text-accent">
+                  {ch.cleanTitle || ch.title}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="flex min-h-0 flex-1 gap-4">

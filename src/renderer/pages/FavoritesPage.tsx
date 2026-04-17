@@ -53,7 +53,7 @@ export function FavoritesPage() {
         navigate(`/series/${item.id}`);
         return;
       }
-      play(item.streamUrl, item.cleanTitle || item.title, item.id);
+      play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, item.type);
     },
     [play, navigate],
   );
