@@ -24,6 +24,16 @@ const LIVE_BUFFER_BITRATE_BPS = 2 * 1024 * 1024; // 2 MB/s average bitrate estim
 const VOD_FORWARD_CACHE_BYTES = 256 * 1024 * 1024; // 256 MiB forward buffer
 const VOD_READAHEAD_SECS = 30; // try to keep 30 s demuxed ahead
 
+// Buffer presets for `playback_buffer_size` setting (Sprint 20.1). These
+// tune mpv's forward demux read target — lower = lower latency on live, higher
+// = more stability on flaky connections. 'auto' leaves mpv's defaults in play.
+const BUFFER_PRESETS: Record<string, { readaheadSecs: number } | null> = {
+  auto: null,
+  low: { readaheadSecs: 3 },
+  medium: { readaheadSecs: 10 },
+  high: { readaheadSecs: 60 },
+};
+
 // Universal transport hardening for lavf-based streams (http/https/hls).
 // Encoding matters: commas inside the option value have to be escaped with
 // backslashes because mpv uses commas as the option-list separator.
@@ -36,28 +46,42 @@ const LAVF_RECONNECT_OPTS = [
   'reconnect_delay_max=5',
 ].join(',');
 
-function universalStreamingArgs(): string[] {
+const DEFAULT_NETWORK_TIMEOUT_SECS = 30;
+
+function universalStreamingArgs(timeoutSecs: number = DEFAULT_NETWORK_TIMEOUT_SECS): string[] {
   return [
     '--cache=yes',
-    // 30s before we give up on a stalled request (default: 60s is too long
-    // and makes startup on flaky servers feel broken).
-    '--network-timeout=30',
+    // Caller-configurable network timeout. Default 30s — well below mpv's 60s
+    // default, which feels broken on flaky IPTV servers at startup.
+    `--network-timeout=${timeoutSecs}`,
     // Auto-reconnect on mid-stream drops — the fix for IPTV "stream dies
     // after 2 minutes" problems that aren't actually client-side bugs.
     `--stream-lavf-o=${LAVF_RECONNECT_OPTS}`,
   ];
 }
 
+export interface PlaybackArgsOptions {
+  isLive: boolean;
+  liveBufferSeconds?: number;
+  /** One of: 'auto' | 'low' | 'medium' | 'high'. Unknown values fall back to auto. */
+  bufferPreset?: string | null;
+  /** Network timeout in seconds; overrides the default 30s. */
+  networkTimeoutSecs?: number;
+}
+
 /**
  * Args for live TV playback, with timeshift rewind buffer.
  */
-export function getLivePlaybackArgs(bufferSeconds?: number): string[] {
-  const secs = bufferSeconds ?? LIVE_BUFFER_SECONDS_DEFAULT;
+export function getLivePlaybackArgs(opts: PlaybackArgsOptions): string[] {
+  const secs = opts.liveBufferSeconds ?? LIVE_BUFFER_SECONDS_DEFAULT;
   const bufferBytes = secs * LIVE_BUFFER_BITRATE_BPS;
+  const preset = opts.bufferPreset ? BUFFER_PRESETS[opts.bufferPreset] : null;
+  const readaheadArgs = preset ? [`--demuxer-readahead-secs=${preset.readaheadSecs}`] : [];
   return [
-    ...universalStreamingArgs(),
+    ...universalStreamingArgs(opts.networkTimeoutSecs),
     `--demuxer-max-bytes=${bufferBytes}`,
     `--demuxer-max-back-bytes=${bufferBytes}`,
+    ...readaheadArgs,
     // Don't pause-for-rebuffer on every micro-hiccup — mpv drops frames to
     // stay at the live edge. But do hold briefly (1s) when cache truly
     // empties, which lets IPTV edge hand-offs recover without a visible
@@ -70,11 +94,13 @@ export function getLivePlaybackArgs(bufferSeconds?: number): string[] {
 /**
  * Args for VOD (movies/series) playback. Smaller cache, pause-on-underrun.
  */
-export function getVodPlaybackArgs(): string[] {
+export function getVodPlaybackArgs(opts: PlaybackArgsOptions): string[] {
+  const preset = opts.bufferPreset ? BUFFER_PRESETS[opts.bufferPreset] : null;
+  const readaheadSecs = preset?.readaheadSecs ?? VOD_READAHEAD_SECS;
   return [
-    ...universalStreamingArgs(),
+    ...universalStreamingArgs(opts.networkTimeoutSecs),
     `--demuxer-max-bytes=${VOD_FORWARD_CACHE_BYTES}`,
-    `--demuxer-readahead-secs=${VOD_READAHEAD_SECS}`,
+    `--demuxer-readahead-secs=${readaheadSecs}`,
     // Clean rebuffer on underrun — much smoother-looking than stutter.
     '--cache-pause=yes',
     '--cache-pause-wait=0.5',
@@ -84,8 +110,55 @@ export function getVodPlaybackArgs(): string[] {
 /**
  * Pick the right arg set for the stream type. Exported for testing.
  */
-export function getPlaybackArgs(opts: { isLive: boolean; liveBufferSeconds?: number }): string[] {
-  return opts.isLive ? getLivePlaybackArgs(opts.liveBufferSeconds) : getVodPlaybackArgs();
+export function getPlaybackArgs(opts: PlaybackArgsOptions): string[] {
+  return opts.isLive ? getLivePlaybackArgs(opts) : getVodPlaybackArgs(opts);
+}
+
+export interface NetworkArgsOptions {
+  /** Custom User-Agent (from per-source override, then global setting). */
+  userAgent?: string | null;
+  /** Whether proxy is enabled. */
+  proxyEnabled?: boolean;
+  /** 'http' | 'https' | 'socks5' — unknown types are ignored. */
+  proxyType?: string | null;
+  proxyHost?: string | null;
+  proxyPort?: string | null;
+  /** If true, pass `--ytdl-raw-options=force-ipv4=` and `--network-timeout` remains. */
+  preferIpv4?: boolean;
+}
+
+/**
+ * Network-layer args — user-agent, proxy, IPv4 preference. Emitted only if
+ * the underlying setting has a usable value, so "empty" = mpv's default.
+ * Sprint 20.4 / 20.5.
+ */
+export function getNetworkArgs(opts: NetworkArgsOptions): string[] {
+  const args: string[] = [];
+
+  const ua = opts.userAgent?.trim();
+  if (ua) {
+    args.push(`--user-agent=${ua}`);
+  }
+
+  if (opts.proxyEnabled) {
+    const type = (opts.proxyType ?? '').toLowerCase();
+    const host = (opts.proxyHost ?? '').trim();
+    const port = (opts.proxyPort ?? '').trim();
+    const validType = type === 'http' || type === 'https' || type === 'socks5';
+    if (validType && host && /^\d+$/.test(port)) {
+      // mpv's `--http-proxy` accepts http:// and socks5:// URLs. Form:
+      //   http://host:port   |   socks5://host:port
+      const scheme = type === 'socks5' ? 'socks5' : type;
+      args.push(`--http-proxy=${scheme}://${host}:${port}`);
+    }
+  }
+
+  if (opts.preferIpv4) {
+    // Exposed to lavf (the stream stack ffmpeg uses under the hood).
+    args.push('--stream-lavf-o-append=force_ipv4=1');
+  }
+
+  return args;
 }
 
 /**

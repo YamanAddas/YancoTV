@@ -152,6 +152,22 @@ export function NetworkSettings() {
         </h3>
         <div className="space-y-2">
           <SettingRow
+            label="Stream buffer"
+            description="Low = less latency on live sports. High = more stability on slow connections"
+          >
+            <select
+              value={get('playback_buffer_size')}
+              onChange={(e) => set('playback_buffer_size', e.target.value)}
+              className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
+            >
+              <option value="auto">Auto</option>
+              <option value="low">Low (live sports)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High (slow connections)</option>
+            </select>
+          </SettingRow>
+
+          <SettingRow
             label="Connection timeout"
             description="Seconds to wait before a stream connection is considered failed"
           >
@@ -161,6 +177,7 @@ export function NetworkSettings() {
               className="rounded-lg border border-surface-700/50 bg-surface-800/40 px-3 py-1.5 text-sm text-surface-200 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
             >
               <option value="10">10 seconds</option>
+              <option value="15">15 seconds</option>
               <option value="20">20 seconds</option>
               <option value="30">30 seconds</option>
               <option value="60">60 seconds</option>

@@ -4,24 +4,115 @@ import {
   getLivePlaybackArgs,
   getVodPlaybackArgs,
   getSubtitleAppearanceArgs,
+  getNetworkArgs,
 } from '../../src/main/player/mpv-args';
 
 describe('mpv-args — playback', () => {
   it('chooses live args when isLive', () => {
     const args = getPlaybackArgs({ isLive: true });
-    expect(args).toEqual(getLivePlaybackArgs());
+    expect(args).toEqual(getLivePlaybackArgs({ isLive: true }));
   });
 
   it('chooses VOD args when not live', () => {
     const args = getPlaybackArgs({ isLive: false });
-    expect(args).toEqual(getVodPlaybackArgs());
+    expect(args).toEqual(getVodPlaybackArgs({ isLive: false }));
   });
 
   it('honors a custom live buffer size', () => {
-    const args = getLivePlaybackArgs(60);
+    const args = getLivePlaybackArgs({ isLive: true, liveBufferSeconds: 60 });
     const bytes = 60 * 2 * 1024 * 1024;
     expect(args).toContain(`--demuxer-max-bytes=${bytes}`);
     expect(args).toContain(`--demuxer-max-back-bytes=${bytes}`);
+  });
+
+  it('applies buffer preset readahead for live', () => {
+    const args = getLivePlaybackArgs({ isLive: true, bufferPreset: 'low' });
+    expect(args).toContain('--demuxer-readahead-secs=3');
+  });
+
+  it('applies buffer preset readahead for VOD', () => {
+    const args = getVodPlaybackArgs({ isLive: false, bufferPreset: 'high' });
+    expect(args).toContain('--demuxer-readahead-secs=60');
+  });
+
+  it('uses VOD default readahead when preset is auto or unset', () => {
+    const args = getVodPlaybackArgs({ isLive: false, bufferPreset: 'auto' });
+    expect(args).toContain('--demuxer-readahead-secs=30');
+  });
+
+  it('honors a custom network timeout', () => {
+    const args = getPlaybackArgs({ isLive: false, networkTimeoutSecs: 45 });
+    expect(args).toContain('--network-timeout=45');
+  });
+
+  it('falls back to default network timeout', () => {
+    const args = getPlaybackArgs({ isLive: false });
+    expect(args).toContain('--network-timeout=30');
+  });
+});
+
+describe('mpv-args — network', () => {
+  it('emits nothing when everything is empty', () => {
+    expect(getNetworkArgs({})).toEqual([]);
+  });
+
+  it('emits --user-agent when provided', () => {
+    expect(getNetworkArgs({ userAgent: 'MyAgent/1.0' })).toEqual([
+      '--user-agent=MyAgent/1.0',
+    ]);
+  });
+
+  it('trims and skips whitespace-only user agents', () => {
+    expect(getNetworkArgs({ userAgent: '   ' })).toEqual([]);
+  });
+
+  it('builds http proxy url', () => {
+    const args = getNetworkArgs({
+      proxyEnabled: true,
+      proxyType: 'http',
+      proxyHost: 'proxy.example.com',
+      proxyPort: '8080',
+    });
+    expect(args).toContain('--http-proxy=http://proxy.example.com:8080');
+  });
+
+  it('builds socks5 proxy url', () => {
+    const args = getNetworkArgs({
+      proxyEnabled: true,
+      proxyType: 'socks5',
+      proxyHost: '10.0.0.1',
+      proxyPort: '1080',
+    });
+    expect(args).toContain('--http-proxy=socks5://10.0.0.1:1080');
+  });
+
+  it('rejects proxy config when disabled', () => {
+    expect(
+      getNetworkArgs({
+        proxyEnabled: false,
+        proxyType: 'http',
+        proxyHost: 'host',
+        proxyPort: '8080',
+      }),
+    ).toEqual([]);
+  });
+
+  it('rejects proxy with invalid type or missing port', () => {
+    expect(
+      getNetworkArgs({ proxyEnabled: true, proxyType: 'bogus', proxyHost: 'h', proxyPort: '80' }),
+    ).toEqual([]);
+    expect(
+      getNetworkArgs({ proxyEnabled: true, proxyType: 'http', proxyHost: 'h', proxyPort: 'abc' }),
+    ).toEqual([]);
+    expect(
+      getNetworkArgs({ proxyEnabled: true, proxyType: 'http', proxyHost: '', proxyPort: '80' }),
+    ).toEqual([]);
+  });
+
+  it('emits IPv4 preference', () => {
+    expect(getNetworkArgs({ preferIpv4: true })).toContain(
+      '--stream-lavf-o-append=force_ipv4=1',
+    );
   });
 });
 

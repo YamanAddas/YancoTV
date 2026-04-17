@@ -16,7 +16,7 @@ import type {
 } from './player.interface';
 import { MpvIpc } from './mpv-ipc';
 import { findMpvPath } from './mpv-path';
-import { getPlaybackArgs, getSubtitleAppearanceArgs } from './mpv-args';
+import { getPlaybackArgs, getSubtitleAppearanceArgs, getNetworkArgs } from './mpv-args';
 import { getSetting } from '../services/settings-service';
 
 const CONNECT_RETRY_DELAY = 300;
@@ -313,7 +313,24 @@ export class MpvPlayer implements IPlayer {
       embedded ? '--osc=no' : '--osc=yes',
       // Cache / network tuning — differs for live vs VOD so playback is
       // smooth instead of stuttering when the upstream server burps.
-      ...getPlaybackArgs({ isLive: options?.isLive ?? false }),
+      ...getPlaybackArgs({
+        isLive: options?.isLive ?? false,
+        bufferPreset: getSetting('playback_buffer_size'),
+        networkTimeoutSecs: (() => {
+          const raw = getSetting('network_connection_timeout');
+          const n = raw ? Number(raw) : NaN;
+          return Number.isFinite(n) && n > 0 ? n : undefined;
+        })(),
+      }),
+      // User-configurable network layer: user-agent, proxy, IPv4 preference.
+      ...getNetworkArgs({
+        userAgent: getSetting('network_user_agent'),
+        proxyEnabled: getSetting('network_proxy_enabled') === '1',
+        proxyType: getSetting('network_proxy_type'),
+        proxyHost: getSetting('network_proxy_host'),
+        proxyPort: getSetting('network_proxy_port'),
+        preferIpv4: getSetting('network_prefer_ipv4') === '1',
+      }),
       // User-configurable subtitle appearance (scale, color, background).
       ...getSubtitleAppearanceArgs({
         scale: getSetting('subtitle_scale'),

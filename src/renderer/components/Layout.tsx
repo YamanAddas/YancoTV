@@ -5,11 +5,13 @@ import { Toaster } from './Toaster';
 import { ZapOverlay } from './ZapOverlay';
 import { usePlayerShortcuts } from '../hooks/use-player-shortcuts';
 import { useChannelZap } from '../hooks/use-channel-zap';
+import { useGamepad } from '../hooks/use-gamepad';
 import { usePlayerStore } from '../stores/player-store';
 
 export function Layout() {
   usePlayerShortcuts();
   useChannelZap();
+  useGamepad();
 
   const mode = usePlayerStore((s) => s.mode);
   const backend = usePlayerStore((s) => s.backend);

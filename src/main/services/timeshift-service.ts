@@ -41,7 +41,7 @@ const DEFAULT_BUFFER_SECONDS = 30 * 60;
  *   the stutter caused by the old `--cache-pause=no` on VOD streams.
  */
 export function getTimeshiftMpvArgs(bufferSeconds?: number): string[] {
-  return getLivePlaybackArgs(bufferSeconds);
+  return getLivePlaybackArgs({ isLive: true, liveBufferSeconds: bufferSeconds });
 }
 
 /**
