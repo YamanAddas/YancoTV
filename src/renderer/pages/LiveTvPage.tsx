@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
@@ -10,13 +11,13 @@ import { useFavoritesStore } from '../stores/favorites-store';
 import { useParentalStore } from '../stores/parental-store';
 import { useNowNextBatch } from '../hooks/use-epg';
 
+const EMPTY_ITEMS: ContentCardData[] = [];
+const EMPTY_CATS: string[] = [];
+
 export function LiveTvPage() {
-  const [channels, setChannels] = useState<ContentCardData[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
-  const [isLoading, setIsLoading] = useState(true);
 
   // Parental controls
   const parentalSettings = useParentalStore((s) => s.settings);
@@ -36,23 +37,30 @@ export function LiveTvPage() {
   }, [parentalLoad]);
 
   useEffect(() => {
-    if (!window.api) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
     setSelectedCategory(null);
-
-    Promise.all([
-      window.api.content.getLive(selectedSource ?? undefined, sortBy),
-      window.api.content.getCategories('live'),
-    ]).then(([liveData, cats]) => {
-      setChannels(liveData);
-      setCategories(cats);
-      setIsLoading(false);
-    });
   }, [selectedSource, sortBy]);
+
+  const channelsQuery = useQuery({
+    queryKey: ['content', 'live', selectedSource, sortBy],
+    queryFn: () => window.api.content.getLive(selectedSource ?? undefined, sortBy),
+    enabled: !!window.api,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const catsQuery = useQuery({
+    queryKey: ['categories', 'live'],
+    queryFn: () => window.api.content.getCategories('live'),
+    enabled: !!window.api,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const channels = channelsQuery.data ?? EMPTY_ITEMS;
+  const categories = catsQuery.data ?? EMPTY_CATS;
+  const isLoading =
+    (channelsQuery.isLoading || catsQuery.isLoading) &&
+    (!channelsQuery.data || !catsQuery.data);
 
   // Filter hidden channels and optionally adult content
   const visibleChannels = useMemo(() => {

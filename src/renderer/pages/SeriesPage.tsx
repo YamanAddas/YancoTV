@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ContentGrid, type ContentCardData } from '../components/ContentGrid';
 import { CategorySidebar } from '../components/CategorySidebar';
 import { EmptyState } from '../components/EmptyState';
@@ -7,32 +8,38 @@ import { SourceSwitcher } from '../components/SourceSwitcher';
 import { SortDropdown, type SortOption } from '../components/SortDropdown';
 import { useFavoritesStore } from '../stores/favorites-store';
 
+const EMPTY_ITEMS: ContentCardData[] = [];
+const EMPTY_CATS: string[] = [];
+
 export function SeriesPage() {
-  const [series, setSeries] = useState<ContentCardData[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | string[] | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('provider');
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!window.api) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
     setSelectedCategory(null);
-
-    Promise.all([
-      window.api.content.getSeries(selectedSource ?? undefined, sortBy),
-      window.api.content.getCategories('series'),
-    ]).then(([seriesData, cats]) => {
-      setSeries(seriesData);
-      setCategories(cats);
-      setIsLoading(false);
-    });
   }, [selectedSource, sortBy]);
+
+  const seriesQuery = useQuery({
+    queryKey: ['content', 'series', selectedSource, sortBy],
+    queryFn: () => window.api.content.getSeries(selectedSource ?? undefined, sortBy),
+    enabled: !!window.api,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const catsQuery = useQuery({
+    queryKey: ['categories', 'series'],
+    queryFn: () => window.api.content.getCategories('series'),
+    enabled: !!window.api,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const series = seriesQuery.data ?? EMPTY_ITEMS;
+  const categories = catsQuery.data ?? EMPTY_CATS;
+  const isLoading =
+    (seriesQuery.isLoading || catsQuery.isLoading) && (!seriesQuery.data || !catsQuery.data);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};

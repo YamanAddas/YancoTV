@@ -107,7 +107,7 @@ export function ContentGrid({
     return (
       <VirtuosoGrid
         totalCount={items.length}
-        overscan={200}
+        overscan={600}
         listClassName={listCls}
         itemClassName={itemCls}
         itemContent={gridItemContent}

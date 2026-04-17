@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { LiveTvPage } from './pages/LiveTvPage';
@@ -35,6 +35,7 @@ const START_PAGE_ROUTES: Record<string, string> = {
 
 function AppInner() {
   const { load, get } = useSettingsStore();
+  const qc = useQueryClient();
 
   // Load settings once on mount, then keep theme in sync
   useEffect(() => {
@@ -43,6 +44,18 @@ function AppInner() {
       document.documentElement.setAttribute('data-theme', theme || 'dark');
     });
   }, [load]);
+
+  // Invalidate cached content when any source finishes syncing, so the
+  // next visit to Live / Movies / Series sees fresh data.
+  useEffect(() => {
+    if (!window.api?.sources?.onSyncProgress) return;
+    return window.api.sources.onSyncProgress((_sourceId, prog) => {
+      if (prog?.phase === 'done') {
+        qc.invalidateQueries({ queryKey: ['content'] });
+        qc.invalidateQueries({ queryKey: ['categories'] });
+      }
+    });
+  }, [qc]);
 
   // Subscribe to theme changes so the setting takes effect immediately
   useEffect(() => {
