@@ -204,7 +204,7 @@ pnpm audit            # Security audit
 - **Sprint 12:** DONE (ffmpeg recording, scheduled recording, recordings page, system tray indicator)
 - **Sprint 13:** DONE (download service with retry/resume, asset bundling — poster/backdrop/.nfo/subtitles, DownloadsPage)
 - **Sprint 14:** DONE (TMDb API client + enrichment service, SQLite cache, MetadataSettings tab)
-- **Sprint 15:** IN PROGRESS (OpenSubtitles — 15.6 embedded extraction done in Sprint 13, 15.1–15.5 TODO)
+- **Sprint 15:** DONE (OpenSubtitles client, auto-search on playback, in-player search UI, SQLite-backed cache, safeStorage credentials)
 - **Sprint 16+:** NOT STARTED (multi-view/PIP, system features, etc.)
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
@@ -213,7 +213,6 @@ See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
 These are listed in PRODUCTION_PLAN.md but do not exist in code yet:
 
-- `subtitle-service.ts` — OpenSubtitles API + subtitle management (Sprint 15, in progress)
 - `backup-service.ts` — Export/import user data (Sprint 18)
 - `notification-service.ts` — In-app toasts + programme reminders (Sprint 19)
 - E2E tests with Playwright (Sprint 21)

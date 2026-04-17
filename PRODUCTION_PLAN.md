@@ -191,20 +191,18 @@ Note: The content detail page UI was built in Sprint 11B using provider metadata
 
 ---
 
-### Sprint 15 — Subtitles (Advanced) — IN PROGRESS
+### Sprint 15 — Subtitles (Advanced) — DONE
 
 **Objective:** OpenSubtitles integration and subtitle preference management.
 
-Note: 15.6 (embedded subtitle extraction) was completed in Sprint 13 as part of asset bundling.
-
 | # | Task | Details | Status |
 |---|------|---------|--------|
-| 15.1 | OpenSubtitles API client | Search subtitles by title, year, season/episode, language. Download subtitle files | TODO |
-| 15.2 | Auto-search on playback | When a movie/episode starts, auto-search for subtitles in preferred language | TODO |
-| 15.3 | Subtitle search UI | "Search subtitles" button in player → results list → download + apply | TODO |
-| 15.4 | Subtitle preferences | Default subtitle language(s) (e.g. EN, AR). Auto-apply setting. Subtitle directory | TODO |
-| 15.5 | Subtitle cache | Cache downloaded subtitles locally, mapped to content ID. Re-use on replay | TODO |
-| 15.6 | Embedded subtitle extraction | Extract embedded subs from streams via ffmpeg when available | DONE (Sprint 13) |
+| 15.1 | OpenSubtitles API client | REST v1 client w/ JWT auth, anonymous fallback, safeStorage-encrypted credentials | DONE |
+| 15.2 | Auto-search on playback | `autoSearchSubtitles` fires on PLAYER_PLAY for VOD when `opensubtitles.autoSearch` enabled | DONE |
+| 15.3 | Subtitle search UI | In-player SubtitlesTab → OpenSubtitles section with search/results/download | DONE |
+| 15.4 | Subtitle preferences | PlaybackSettings: default language, auto-search toggle, credentials, cache clear | DONE |
+| 15.5 | Subtitle cache | SQLite-backed `subtitle_cache` keyed by (content_id, episode_id, language); stale-file purge | DONE |
+| 15.6 | Embedded subtitle extraction | ffmpeg extraction in Sprint 13 asset bundler | DONE (Sprint 13) |
 
 **Deliverable:** Subtitles auto-searched and applied. Users can search/download from OpenSubtitles. Preferences remembered.
 

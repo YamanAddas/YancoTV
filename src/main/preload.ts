@@ -229,8 +229,10 @@ const api = {
       moviehash?: string;
       type?: 'movie' | 'episode' | 'all';
     }) => ipcRenderer.invoke(IpcChannels.SUBTITLES_SEARCH, params),
-    downloadAndLoad: (fileId: number) =>
-      ipcRenderer.invoke(IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD, fileId),
+    downloadAndLoad: (
+      fileId: number,
+      opts?: { contentId?: string; episodeId?: string; language?: string },
+    ) => ipcRenderer.invoke(IpcChannels.SUBTITLES_DOWNLOAD_AND_LOAD, fileId, opts),
     setCredentials: (username: string, password: string) =>
       ipcRenderer.invoke(IpcChannels.SUBTITLES_SET_CREDENTIALS, username, password),
     clearCredentials: () =>

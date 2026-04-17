@@ -245,6 +245,8 @@ const LANGUAGE_OPTIONS: Array<{ code: string; label: string }> = [
 
 function OpenSubtitlesSection() {
   const currentTitle = usePlayerStore((s) => s.currentTitle);
+  const currentContentId = usePlayerStore((s) => s.currentContentId);
+  const currentEpisodeId = usePlayerStore((s) => s.currentEpisodeId);
 
   // Parse the current title once — same cleaner used for UI chips and
   // the initial query prefill. Year/season/episode get passed to the API
@@ -315,7 +317,11 @@ function OpenSubtitlesSection() {
     setError(null);
     setQuotaMessage(null);
     try {
-      const res = await window.api?.subtitles.downloadAndLoad(fileId);
+      const res = await window.api?.subtitles.downloadAndLoad(fileId, {
+        contentId: currentContentId,
+        episodeId: currentEpisodeId,
+        language,
+      });
       if (!res?.ok) {
         setError(res?.error || 'Download failed');
       } else {
