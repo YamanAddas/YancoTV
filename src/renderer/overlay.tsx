@@ -21,8 +21,14 @@ function OverlayApp() {
   // otherwise leave the overlay blank on the *next* playback.
   useEffect(() => {
     if (!window.api) return;
-    const offShown = window.api.player.onOverlayShown(() => {
-      usePlayerStore.setState({ mode: 'theater', backend: 'mpv' });
+    const offShown = window.api.player.onOverlayShown((media) => {
+      usePlayerStore.setState({
+        mode: 'theater',
+        backend: 'mpv',
+        currentUrl: media?.url,
+        currentTitle: media?.title,
+        currentContentId: media?.contentId,
+      });
     });
     return offShown;
   }, []);

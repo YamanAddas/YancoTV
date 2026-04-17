@@ -712,42 +712,61 @@ export function registerIpcHandlers(): void {
   });
 
   // Player
-  ipcMain.handle(IpcChannels.PLAYER_PLAY, async (_event, url: string, _title?: string, startPosition?: number) => {
-    if (!url || typeof url !== 'string') {
-      return { ok: false, error: 'Invalid URL' };
-    }
-    try {
-      // Embed mpv into the dedicated video-stage BrowserWindow (not main).
-      // The main window's Chromium compositor would cover mpv's child surface;
-      // a separate transparent child window sidesteps that z-order trap. The
-      // video window must be visible (shown) before we pass its HWND to mpv
-      // so mpv's surface attaches to a window that's actually on screen.
-      showVideoWindow();
-      const wid = getVideoWindowHandle() ?? undefined;
-      const opts: { startPosition?: number; wid?: string } = {};
-      if (typeof startPosition === 'number') opts.startPosition = startPosition;
-      if (wid) opts.wid = wid;
-      await getPlayer().play(url, Object.keys(opts).length > 0 ? opts : undefined);
-      if (opts.wid) {
-        showOverlay();
-        sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN);
-      } else {
-        // No handle — fall back to mpv's own standalone window. Hide the
-        // video stage we optimistically showed.
-        hideVideoWindow();
+  // Track what's currently playing so the overlay (separate BrowserWindow with
+  // its own JS context and store) can be told about the active stream without
+  // having to piece it together from mpv events.
+  let currentMedia: { url: string; title?: string; contentId?: string } | undefined;
+
+  ipcMain.handle(
+    IpcChannels.PLAYER_PLAY,
+    async (
+      _event,
+      url: string,
+      title?: string,
+      startPosition?: number,
+      contentId?: string,
+    ) => {
+      if (!url || typeof url !== 'string') {
+        return { ok: false, error: 'Invalid URL' };
       }
-      return { ok: true };
-    } catch (err) {
-      hideVideoWindow();
-      log.error('Player play error:', err);
-      return { ok: false, error: String((err as Error).message) };
-    }
-  });
+      try {
+        // Embed mpv into the dedicated video-stage BrowserWindow (not main).
+        // The main window's Chromium compositor would cover mpv's child surface;
+        // a separate transparent child window sidesteps that z-order trap. The
+        // video window must be visible (shown) before we pass its HWND to mpv
+        // so mpv's surface attaches to a window that's actually on screen.
+        showVideoWindow();
+        const wid = getVideoWindowHandle() ?? undefined;
+        const opts: { startPosition?: number; wid?: string } = {};
+        if (typeof startPosition === 'number') opts.startPosition = startPosition;
+        if (wid) opts.wid = wid;
+        await getPlayer().play(url, Object.keys(opts).length > 0 ? opts : undefined);
+        currentMedia = {
+          url,
+          title: typeof title === 'string' ? title : undefined,
+          contentId: typeof contentId === 'string' ? contentId : undefined,
+        };
+        if (opts.wid) {
+          showOverlay();
+          sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
+        } else {
+          // No handle — fall back to mpv's own standalone window. Hide the
+          // video stage we optimistically showed.
+          hideVideoWindow();
+        }
+        return { ok: true };
+      } catch (err) {
+        hideVideoWindow();
+        log.error('Player play error:', err);
+        return { ok: false, error: String((err as Error).message) };
+      }
+    },
+  );
 
   // Theater overlay — shown when mpv is embedded in the main window
   ipcMain.handle(IpcChannels.PLAYER_OVERLAY_SHOW, () => {
     showOverlay();
-    sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN);
+    sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
     return { ok: true };
   });
 

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
 
 interface TheaterControlsProps {
@@ -39,6 +39,72 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
 
   const seekBarRef = useRef<HTMLInputElement>(null);
   const volumeBarRef = useRef<HTMLInputElement>(null);
+
+  const currentUrl = usePlayerStore((s) => s.currentUrl);
+  const currentContentId = usePlayerStore((s) => s.currentContentId);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [recordingBusy, setRecordingBusy] = useState(false);
+  const [recordingProgress, setRecordingProgress] = useState<{
+    durationSeconds: number;
+    fileSizeBytes: number;
+  } | null>(null);
+
+  // Reset when the stream changes.
+  useEffect(() => {
+    setRecordingId(null);
+    setRecordingProgress(null);
+  }, [currentUrl]);
+
+  // Subscribe to recording status so external stops/failures clear the button.
+  useEffect(() => {
+    if (!window.api?.recording?.onStatus) return;
+    return window.api.recording.onStatus((rec) => {
+      if (recordingId && rec.id === recordingId && rec.status !== 'recording') {
+        setRecordingId(null);
+        setRecordingProgress(null);
+      }
+    });
+  }, [recordingId]);
+
+  // Live progress — update the REC badge with elapsed time + current size.
+  useEffect(() => {
+    if (!recordingId || !window.api?.recording?.onProgress) return;
+    return window.api.recording.onProgress((p) => {
+      if (p.id === recordingId) {
+        setRecordingProgress({
+          durationSeconds: p.durationSeconds,
+          fileSizeBytes: p.fileSizeBytes,
+        });
+      }
+    });
+  }, [recordingId]);
+
+  const handleToggleRecord = useCallback(async () => {
+    if (recordingBusy) return;
+    onInteraction();
+    setRecordingBusy(true);
+    try {
+      if (recordingId) {
+        await window.api.recording.stop(recordingId);
+        setRecordingId(null);
+      } else {
+        if (!currentUrl) return;
+        const res = await window.api.recording.start({
+          contentId: currentContentId,
+          title: currentTitle || 'Recording',
+          streamUrl: currentUrl,
+        });
+        if (res.ok) {
+          setRecordingId(res.id);
+        } else {
+          // eslint-disable-next-line no-alert
+          alert(`Could not start recording: ${res.error}`);
+        }
+      }
+    } finally {
+      setRecordingBusy(false);
+    }
+  }, [recordingBusy, recordingId, currentUrl, currentContentId, currentTitle, onInteraction]);
 
   const isLive = (!duration || !isFinite(duration) || duration === 0) && status === 'playing';
   const isVod = duration > 0 && isFinite(duration);
@@ -114,6 +180,20 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
               <p className="truncate text-sm text-red-400">{error}</p>
             )}
           </div>
+          {recordingId && (
+            <span className="flex items-center gap-1.5 rounded-full bg-red-600/95 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-lg">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+              REC
+              {recordingProgress && (
+                <span className="font-semibold normal-case tabular-nums tracking-normal text-white/90">
+                  {formatDuration(recordingProgress.durationSeconds)}
+                  {recordingProgress.fileSizeBytes > 0 && (
+                    <> · {formatBytes(recordingProgress.fileSizeBytes)}</>
+                  )}
+                </span>
+              )}
+            </span>
+          )}
           {isLive && (
             <span className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-lg">
               <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
@@ -252,6 +332,26 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
               <CameraIcon />
             </ControlButton>
 
+            {/* Record — works for any live/VOD stream */}
+            <button
+              onClick={handleToggleRecord}
+              disabled={recordingBusy || !currentUrl}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${
+                recordingId
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+              }`}
+              title={recordingId ? 'Stop recording' : 'Record'}
+            >
+              {recordingId ? (
+                <span className="flex items-center justify-center">
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
+                </span>
+              ) : (
+                <RecordIcon />
+              )}
+            </button>
+
             {/* Settings gear — full panel, defaults to Info tab */}
             <ControlButton onClick={toggleSettings} title="Settings (G)">
               <SettingsIcon />
@@ -329,6 +429,28 @@ function formatTime(seconds: number): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   if (h > 0) return `${h}:${pad(m)}:${pad(sec)}`;
   return `${m}:${pad(sec)}`;
+}
+
+function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(sec)}`;
+  return `${pad(m)}:${pad(sec)}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let val = bytes;
+  let i = 0;
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024;
+    i++;
+  }
+  return `${val.toFixed(val < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -445,6 +567,15 @@ function CameraIcon() {
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+    </svg>
+  );
+}
+
+function RecordIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" fill="currentColor" />
     </svg>
   );
 }

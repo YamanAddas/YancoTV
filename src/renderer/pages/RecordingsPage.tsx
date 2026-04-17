@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from '../components/EmptyState';
+import { usePlayerStore } from '../stores/player-store';
 import type { Recording } from '../../shared/types/recording';
 
 function formatDuration(seconds?: number): string {
@@ -91,6 +92,15 @@ export function RecordingsPage() {
     window.api.recording.openFolder();
   }, []);
 
+  const play = usePlayerStore((s) => s.play);
+  const handlePlay = useCallback(
+    (rec: Recording) => {
+      if (rec.status !== 'completed' || !rec.filePath) return;
+      play(rec.filePath, rec.title, `recording:${rec.id}`);
+    },
+    [play],
+  );
+
   const sorted = useMemo(
     () => [...recordings].sort((a, b) => b.startedAt - a.startedAt),
     [recordings],
@@ -149,7 +159,26 @@ export function RecordingsPage() {
                     key={r.id}
                     className="border-b border-surface-700/20 last:border-b-0 hover:bg-surface-800/40"
                   >
-                    <td className="px-4 py-3 font-medium text-surface-100">{r.title}</td>
+                    <td className="px-4 py-3 font-medium text-surface-100">
+                      {r.status === 'completed' ? (
+                        <button
+                          onClick={() => handlePlay(r)}
+                          className="inline-flex items-center gap-2 text-left hover:text-accent"
+                          title="Play recording"
+                        >
+                          <svg
+                            className="h-3.5 w-3.5 flex-shrink-0 text-accent/80"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                          </svg>
+                          <span className="truncate">{r.title}</span>
+                        </button>
+                      ) : (
+                        r.title
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${STATUS_COLOR[r.status]}`}

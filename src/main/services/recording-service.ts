@@ -46,7 +46,15 @@ function rowToRecording(row: RecordingRow): Recording {
 }
 
 const SETTING_KEY_DIR = 'recording_directory';
+const SETTING_KEY_MAX_DURATION = 'recording_max_duration_minutes';
 const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
+
+function getMaxDurationSeconds(): number {
+  const raw = getSetting(SETTING_KEY_MAX_DURATION);
+  const minutes = raw ? parseInt(raw, 10) : 240;
+  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+  return minutes * 60;
+}
 
 export function getRecordingsDirectory(): string {
   const saved = getSetting(SETTING_KEY_DIR);
@@ -144,6 +152,9 @@ export function startRecording(
 
   activeProcesses.set(id, proc);
 
+  const maxDurationSeconds = getMaxDurationSeconds();
+  let autoStopped = false;
+
   let stderrBuf = '';
   proc.stderr.on('data', (chunk: Buffer) => {
     stderrBuf += chunk.toString();
@@ -156,6 +167,23 @@ export function startRecording(
         durationSeconds: progress.durationSeconds ?? 0,
         fileSizeBytes: progress.fileSizeBytes ?? 0,
       } satisfies RecordingProgress);
+
+      // Auto-stop when the configured cap is reached. Let the row land as
+      // 'completed' (not 'cancelled') since this is the user's intended limit.
+      if (
+        !autoStopped &&
+        maxDurationSeconds > 0 &&
+        (progress.durationSeconds ?? 0) >= maxDurationSeconds
+      ) {
+        autoStopped = true;
+        log.info(`Recording ${id} hit duration cap (${maxDurationSeconds}s), stopping`);
+        try {
+          proc.stdin.write('q');
+          proc.stdin.end();
+        } catch {
+          // ignored
+        }
+      }
     }
   });
 

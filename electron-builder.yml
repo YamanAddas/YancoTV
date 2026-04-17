@@ -6,6 +6,9 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - node_modules/ffmpeg-static/**/*
+asarUnpack:
+  - node_modules/ffmpeg-static/ffmpeg*
 extraResources:
   - from: mpv/
     to: mpv/

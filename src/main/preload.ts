@@ -135,8 +135,8 @@ const api = {
 
   player: {
     checkMpv: () => ipcRenderer.invoke(IpcChannels.PLAYER_CHECK_MPV),
-    play: (url: string, title?: string, startPosition?: number) =>
-      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition),
+    play: (url: string, title?: string, startPosition?: number, contentId?: string) =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_PLAY, url, title, startPosition, contentId),
     pause: () => ipcRenderer.invoke(IpcChannels.PLAYER_PAUSE),
     resume: () => ipcRenderer.invoke(IpcChannels.PLAYER_RESUME),
     stop: () => ipcRenderer.invoke(IpcChannels.PLAYER_STOP),
@@ -168,8 +168,13 @@ const api = {
     // on top of the embedded mpv video in the main window.
     overlayShow: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_SHOW),
     overlayHide: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_HIDE),
-    onOverlayShown: (callback: () => void) => {
-      const handler = () => callback();
+    onOverlayShown: (
+      callback: (media?: { url?: string; title?: string; contentId?: string }) => void,
+    ) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        media?: { url?: string; title?: string; contentId?: string },
+      ) => callback(media);
       ipcRenderer.on(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
       return () => ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
     },

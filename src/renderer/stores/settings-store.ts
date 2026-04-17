@@ -46,6 +46,9 @@ const DEFAULTS: Record<string, string> = {
 
   // EPG auto-refresh
   epg_refresh_interval: '12',
+
+  // Recording
+  recording_max_duration_minutes: '240',
 };
 
 interface SettingsState {

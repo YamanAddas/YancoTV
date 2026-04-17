@@ -281,6 +281,32 @@ export function PlaybackSettings() {
           />
         </SettingRow>
       </div>
+
+      <div className="space-y-2">
+        <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-surface-500">
+          Recording
+        </h3>
+
+        <SettingRow
+          label="Maximum recording length"
+          description="Automatically stop recording after this many hours (prevents runaway disk use)"
+        >
+          <Select
+            value={get('recording_max_duration_minutes')}
+            onChange={(v) => set('recording_max_duration_minutes', v)}
+            options={[
+              { value: '0', label: 'No limit' },
+              { value: '60', label: '1 hour' },
+              { value: '120', label: '2 hours' },
+              { value: '180', label: '3 hours' },
+              { value: '240', label: '4 hours' },
+              { value: '360', label: '6 hours' },
+              { value: '480', label: '8 hours' },
+              { value: '720', label: '12 hours' },
+            ]}
+          />
+        </SettingRow>
+      </div>
     </div>
   );
 }
