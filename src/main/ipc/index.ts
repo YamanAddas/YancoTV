@@ -1,4 +1,6 @@
 import { ipcMain, app, dialog, shell } from 'electron';
+import path from 'path';
+import fs from 'fs';
 import log from 'electron-log/main';
 import { IpcChannels } from '../../shared/ipc-channels';
 import { addSourceInputSchema, updateSourceInputSchema } from '../../shared/schemas/source';
@@ -111,6 +113,9 @@ import {
   getDownloadsDirectory,
 } from '../services/download-service';
 import type { EnqueueDownloadInput } from '../../shared/types/download';
+import { exportBackupToFile, importBackupFromFile, defaultBackupFilename, type ImportMode } from '../services/backup-service';
+import { logRendererCrash, type CrashReport } from '../services/crash-handler';
+import { checkForUpdates } from '../services/update-service';
 import {
   isTmdbEnabled,
   hasTmdbApiKey,
@@ -271,6 +276,124 @@ export function registerIpcHandlers(): void {
     const dir = app.getPath('userData');
     const err = await shell.openPath(dir);
     return err ? { ok: false, error: err } : { ok: true };
+  });
+
+  // Launch on startup — Windows login item. OS is the source of truth, so the
+  // renderer reads/writes via these handlers rather than through the DB.
+  ipcMain.handle(IpcChannels.APP_GET_LAUNCH_ON_STARTUP, () => {
+    try {
+      return app.getLoginItemSettings().openAtLogin;
+    } catch (err) {
+      log.error('Failed to read login item settings:', err);
+      return false;
+    }
+  });
+
+  ipcMain.handle(IpcChannels.APP_SET_LAUNCH_ON_STARTUP, (_event, enabled: boolean) => {
+    try {
+      app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+      return { ok: true };
+    } catch (err) {
+      log.error('Failed to set login item settings:', err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // Backup export — prompts the user for a target JSON path, then writes a
+  // full snapshot of sources, favorites, history, settings, parental rules,
+  // and group preferences. Renderer only provides the trigger.
+  ipcMain.handle(IpcChannels.BACKUP_EXPORT, async () => {
+    const main = getMainWindow();
+    const defaultPath = path.join(app.getPath('documents'), defaultBackupFilename());
+    const dialogOpts = {
+      title: 'Export YancoTV Backup',
+      defaultPath,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    };
+    const result = main
+      ? await dialog.showSaveDialog(main, dialogOpts)
+      : await dialog.showSaveDialog(dialogOpts);
+    if (result.canceled || !result.filePath) {
+      return { ok: false, cancelled: true };
+    }
+    return exportBackupToFile(result.filePath);
+  });
+
+  // Backup import — prompts for a JSON file, validates it, and applies the
+  // snapshot inside a transaction. The renderer chooses merge vs replace.
+  ipcMain.handle(IpcChannels.BACKUP_IMPORT, async (_event, mode: ImportMode) => {
+    if (mode !== 'merge' && mode !== 'replace') {
+      return { ok: false, error: 'Invalid import mode' };
+    }
+    const main = getMainWindow();
+    const dialogOpts = {
+      title: 'Import YancoTV Backup',
+      properties: ['openFile'] as Array<'openFile'>,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    };
+    const result = main
+      ? await dialog.showOpenDialog(main, dialogOpts)
+      : await dialog.showOpenDialog(dialogOpts);
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, cancelled: true };
+    }
+    return importBackupFromFile(result.filePaths[0], mode);
+  });
+
+  // Export the current log file so the user can attach it to a bug report.
+  // electron-log owns the authoritative path; we just copy whatever file it's
+  // actively writing to. Using copyFileSync (not a stream) keeps the snapshot
+  // atomic enough that a concurrent log write won't land mid-file.
+  ipcMain.handle(IpcChannels.APP_EXPORT_LOGS, async () => {
+    let sourcePath: string;
+    try {
+      sourcePath = log.transports.file.getFile().path;
+    } catch (err) {
+      return { ok: false, error: `Could not locate log file: ${err instanceof Error ? err.message : String(err)}` };
+    }
+    if (!fs.existsSync(sourcePath)) {
+      return { ok: false, error: 'Log file does not exist yet' };
+    }
+    const main = getMainWindow();
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const defaultPath = path.join(app.getPath('documents'), `yancotv-log-${ts}.log`);
+    const dialogOpts = {
+      title: 'Export YancoTV Log',
+      defaultPath,
+      filters: [{ name: 'Log file', extensions: ['log'] }],
+    };
+    const result = main
+      ? await dialog.showSaveDialog(main, dialogOpts)
+      : await dialog.showSaveDialog(dialogOpts);
+    if (result.canceled || !result.filePath) {
+      return { ok: false, cancelled: true };
+    }
+    try {
+      fs.copyFileSync(sourcePath, result.filePath);
+      const bytes = fs.statSync(result.filePath).size;
+      return { ok: true, path: result.filePath, bytes };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  // Manual update check — hits UPDATE_MANIFEST_URL and compares versions.
+  // Shape matches UpdateCheckResult; renderer just switches on `status`.
+  ipcMain.handle(IpcChannels.APP_CHECK_FOR_UPDATES, async () => {
+    return checkForUpdates();
+  });
+
+  // Crash report from the renderer — folded into the main log file so the
+  // user-facing "Export logs…" button captures JS errors from both sides.
+  // Never throws: the renderer is already in a failure path when it calls us.
+  ipcMain.handle(IpcChannels.CRASH_REPORT, (_event, report: unknown) => {
+    try {
+      if (!report || typeof report !== 'object') return { ok: false };
+      logRendererCrash(report as CrashReport);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
   });
 
   // Generic directory picker — used by settings (recording dir, download dir, etc.).

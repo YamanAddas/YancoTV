@@ -3,7 +3,12 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { usePlayerStore, initPlayerEventListeners } from './stores/player-store';
 import { useFavoritesStore } from './stores/favorites-store';
+import { installRendererCrashHandlers } from './crash-handler';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/global.css';
+
+// Install first so any failure during init() below is captured.
+installRendererCrashHandlers();
 
 // --- Async initialization ---
 async function init() {
@@ -31,6 +36,8 @@ if (!root) throw new Error('Root element not found');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

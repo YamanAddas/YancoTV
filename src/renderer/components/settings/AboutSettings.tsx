@@ -12,6 +12,14 @@ interface DbStatus {
   dbSizeMB?: number;
 }
 
+type UpdateState =
+  | { kind: 'idle' }
+  | { kind: 'busy' }
+  | { kind: 'up-to-date'; currentVersion: string }
+  | { kind: 'update-available'; latestVersion: string; url?: string; notes?: string }
+  | { kind: 'not-configured' }
+  | { kind: 'error'; error: string };
+
 export function AboutSettings() {
   const [version, setVersion] = useState('...');
   const [dbStatus, setDbStatus] = useState<DbStatus>({});
@@ -19,6 +27,7 @@ export function AboutSettings() {
     programmeCount?: number;
     channelCount?: number;
   }>({});
+  const [updateState, setUpdateState] = useState<UpdateState>({ kind: 'idle' });
 
   useEffect(() => {
     if (!window.api) return;
@@ -29,6 +38,29 @@ export function AboutSettings() {
         setEpgStats(s),
     );
   }, []);
+
+  async function checkForUpdates() {
+    setUpdateState({ kind: 'busy' });
+    const res = await window.api?.app.checkForUpdates();
+    if (!res) {
+      setUpdateState({ kind: 'error', error: 'Update check API unavailable' });
+      return;
+    }
+    if (res.ok && res.status === 'up-to-date') {
+      setUpdateState({ kind: 'up-to-date', currentVersion: res.currentVersion });
+    } else if (res.ok && res.status === 'update-available') {
+      setUpdateState({
+        kind: 'update-available',
+        latestVersion: res.latestVersion,
+        url: res.url,
+        notes: res.notes,
+      });
+    } else if (!res.ok && res.status === 'not-configured') {
+      setUpdateState({ kind: 'not-configured' });
+    } else {
+      setUpdateState({ kind: 'error', error: (res as { error?: string }).error ?? 'Update check failed' });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -68,6 +100,20 @@ export function AboutSettings() {
             <p className="mt-0.5 text-xs text-surface-500">
               Custom IPTV media application
             </p>
+          </div>
+        </div>
+
+        <div className="mt-4 border-t border-surface-800/60 pt-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={checkForUpdates}
+              disabled={updateState.kind === 'busy'}
+              className="rounded-lg border border-surface-700/60 bg-surface-800/50 px-3 py-1.5 text-sm font-medium text-surface-200 transition hover:border-accent/40 hover:text-surface-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {updateState.kind === 'busy' ? 'Checking…' : 'Check for updates'}
+            </button>
+            <UpdateStatusLine state={updateState} />
           </div>
         </div>
       </section>
@@ -152,6 +198,38 @@ export function AboutSettings() {
       </section>
     </div>
   );
+}
+
+function UpdateStatusLine({ state }: { state: UpdateState }) {
+  if (state.kind === 'idle' || state.kind === 'busy') return null;
+  if (state.kind === 'up-to-date') {
+    return (
+      <span className="text-xs text-emerald-300">You're on the latest version.</span>
+    );
+  }
+  if (state.kind === 'update-available') {
+    return (
+      <span className="text-xs text-amber-300">
+        Update available: v{state.latestVersion}
+        {state.url && (
+          <>
+            {' — '}
+            <a href={state.url} target="_blank" rel="noreferrer" className="underline">
+              Download
+            </a>
+          </>
+        )}
+      </span>
+    );
+  }
+  if (state.kind === 'not-configured') {
+    return (
+      <span className="text-xs text-surface-500">
+        Automatic update checks will be enabled in a later release.
+      </span>
+    );
+  }
+  return <span className="text-xs text-red-400">{state.error}</span>;
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {

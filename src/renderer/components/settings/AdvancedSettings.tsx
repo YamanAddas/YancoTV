@@ -17,9 +17,43 @@ import {
 // casual user scrolls past them. Changes requiring a restart say so.
 // ---------------------------------------------------------------------------
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function AdvancedSettings() {
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
   const [paths, setPaths] = useState<{ userData: string; logs: string } | null>(null);
+  const [backupStatus, setBackupStatus] = useState<
+    { kind: 'idle' } | { kind: 'busy' } | { kind: 'ok'; path: string; bytes: number } | { kind: 'error'; error: string }
+  >({ kind: 'idle' });
+  const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [importStatus, setImportStatus] = useState<
+    | { kind: 'idle' }
+    | { kind: 'busy' }
+    | {
+        kind: 'ok';
+        stats: {
+          sourcesImported: number;
+          favoritesImported: number;
+          favoritesSkipped: number;
+          historyImported: number;
+          historySkipped: number;
+          settingsImported: number;
+          lockedImported: number;
+          hiddenImported: number;
+          overridesImported: number;
+          groupPrefsImported: number;
+        };
+        warnings: string[];
+      }
+    | { kind: 'error'; error: string }
+  >({ kind: 'idle' });
+  const [logExportStatus, setLogExportStatus] = useState<
+    { kind: 'idle' } | { kind: 'busy' } | { kind: 'ok'; path: string; bytes: number } | { kind: 'error'; error: string }
+  >({ kind: 'idle' });
 
   useEffect(() => {
     load();
@@ -27,6 +61,48 @@ export function AdvancedSettings() {
       if (p) setPaths({ userData: p.userData, logs: p.logs });
     });
   }, [load]);
+
+  async function exportBackup() {
+    setBackupStatus({ kind: 'busy' });
+    const res = await window.api?.backup.export();
+    if (!res) {
+      setBackupStatus({ kind: 'error', error: 'Backup API unavailable' });
+      return;
+    }
+    if (!res.ok) {
+      if ('cancelled' in res && res.cancelled) {
+        setBackupStatus({ kind: 'idle' });
+        return;
+      }
+      setBackupStatus({ kind: 'error', error: res.error ?? 'Export failed' });
+      return;
+    }
+    setBackupStatus({ kind: 'ok', path: res.path, bytes: res.bytes });
+  }
+
+  async function importBackup() {
+    if (importMode === 'replace') {
+      const confirmed = window.confirm(
+        'Replace mode will wipe all current sources, favorites, history, settings, parental rules, and group preferences before restoring from the backup. This cannot be undone.\n\nContinue?',
+      );
+      if (!confirmed) return;
+    }
+    setImportStatus({ kind: 'busy' });
+    const res = await window.api?.backup.import(importMode);
+    if (!res) {
+      setImportStatus({ kind: 'error', error: 'Backup API unavailable' });
+      return;
+    }
+    if (!res.ok) {
+      if ('cancelled' in res && res.cancelled) {
+        setImportStatus({ kind: 'idle' });
+        return;
+      }
+      setImportStatus({ kind: 'error', error: res.error ?? 'Import failed' });
+      return;
+    }
+    setImportStatus({ kind: 'ok', stats: res.stats, warnings: res.warnings });
+  }
 
   async function pickMpv() {
     const res = await window.api?.dialog.pickFile({
@@ -47,6 +123,24 @@ export function AdvancedSettings() {
 
   async function openDataDir() {
     await window.api?.app.openDataDir();
+  }
+
+  async function exportLogs() {
+    setLogExportStatus({ kind: 'busy' });
+    const res = await window.api?.app.exportLogs();
+    if (!res) {
+      setLogExportStatus({ kind: 'error', error: 'Log export API unavailable' });
+      return;
+    }
+    if (!res.ok) {
+      if ('cancelled' in res && res.cancelled) {
+        setLogExportStatus({ kind: 'idle' });
+        return;
+      }
+      setLogExportStatus({ kind: 'error', error: res.error ?? 'Log export failed' });
+      return;
+    }
+    setLogExportStatus({ kind: 'ok', path: res.path, bytes: res.bytes });
   }
 
   if (!loaded) return <LoadingSpinner />;
@@ -96,6 +190,99 @@ export function AdvancedSettings() {
       </div>
 
       <div className="space-y-2">
+        <SectionHeading>Backup</SectionHeading>
+
+        <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-surface-200">Export backup</p>
+            <p className="mt-0.5 text-xs text-surface-500">
+              Save your sources, favorites, watch history, settings, parental
+              rules, and group preferences to a single JSON file. Credentials
+              are exported in plaintext — keep the file private.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <PrimaryButton onClick={exportBackup} disabled={backupStatus.kind === 'busy'}>
+              {backupStatus.kind === 'busy' ? 'Exporting…' : 'Export…'}
+            </PrimaryButton>
+            {backupStatus.kind === 'ok' && (
+              <span className="truncate text-xs text-surface-400" title={backupStatus.path}>
+                Saved {formatBytes(backupStatus.bytes)} — {backupStatus.path}
+              </span>
+            )}
+            {backupStatus.kind === 'error' && (
+              <span className="text-xs text-red-400">{backupStatus.error}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-surface-200">Restore backup</p>
+            <p className="mt-0.5 text-xs text-surface-500">
+              Load a previously exported backup. Favorites and history are
+              re-linked to your current sources by stream URL — any that can't
+              be matched will be skipped until you re-sync.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-surface-300">
+              <input
+                type="radio"
+                name="import-mode"
+                value="merge"
+                checked={importMode === 'merge'}
+                onChange={() => setImportMode('merge')}
+                className="accent-accent"
+              />
+              <span>
+                <span className="font-medium text-surface-200">Merge</span>
+                {' — keep existing, add/update from backup'}
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-surface-300">
+              <input
+                type="radio"
+                name="import-mode"
+                value="replace"
+                checked={importMode === 'replace'}
+                onChange={() => setImportMode('replace')}
+                className="accent-accent"
+              />
+              <span>
+                <span className="font-medium text-surface-200">Replace</span>
+                {' — wipe current data first'}
+              </span>
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PrimaryButton onClick={importBackup} disabled={importStatus.kind === 'busy'}>
+              {importStatus.kind === 'busy' ? 'Importing…' : 'Import…'}
+            </PrimaryButton>
+            {importStatus.kind === 'error' && (
+              <span className="text-xs text-red-400">{importStatus.error}</span>
+            )}
+          </div>
+          {importStatus.kind === 'ok' && (
+            <div className="space-y-1 text-xs text-surface-400">
+              <p>
+                Imported {importStatus.stats.sourcesImported} sources,{' '}
+                {importStatus.stats.settingsImported} settings,{' '}
+                {importStatus.stats.groupPrefsImported} group preferences,{' '}
+                {importStatus.stats.favoritesImported} favorites,{' '}
+                {importStatus.stats.historyImported} history entries.
+              </p>
+              {importStatus.warnings.map((w, i) => (
+                <p key={i} className="text-amber-300">
+                  {w}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
         <SectionHeading>Diagnostics</SectionHeading>
 
         <SettingRow
@@ -107,6 +294,29 @@ export function AdvancedSettings() {
             onChange={(v) => setBool('advanced_debug_logging', v)}
           />
         </SettingRow>
+
+        <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-surface-200">Export log file</p>
+            <p className="mt-0.5 text-xs text-surface-500">
+              Save a snapshot of the current log for bug reports. The live log
+              keeps running — this is just a copy.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <PrimaryButton onClick={exportLogs} disabled={logExportStatus.kind === 'busy'}>
+              {logExportStatus.kind === 'busy' ? 'Exporting…' : 'Export logs…'}
+            </PrimaryButton>
+            {logExportStatus.kind === 'ok' && (
+              <span className="truncate text-xs text-surface-400" title={logExportStatus.path}>
+                Saved {formatBytes(logExportStatus.bytes)} — {logExportStatus.path}
+              </span>
+            )}
+            {logExportStatus.kind === 'error' && (
+              <span className="text-xs text-red-400">{logExportStatus.error}</span>
+            )}
+          </div>
+        </div>
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">
           <div>

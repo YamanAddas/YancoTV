@@ -170,6 +170,21 @@ export const IpcChannels = {
   APP_GET_VERSION: 'app:getVersion',
   APP_OPEN_DATA_DIR: 'app:openDataDir',
   APP_GET_PATHS: 'app:getPaths',
+  APP_GET_LAUNCH_ON_STARTUP: 'app:getLaunchOnStartup',
+  APP_SET_LAUNCH_ON_STARTUP: 'app:setLaunchOnStartup',
+
+  // Backup / restore (user data → single JSON file)
+  BACKUP_EXPORT: 'backup:export',
+  BACKUP_IMPORT: 'backup:import',
+
+  // Logs
+  APP_EXPORT_LOGS: 'app:exportLogs',
+
+  // Crash reporting — renderer → main, piped into the main log file
+  CRASH_REPORT: 'crash:report',
+
+  // Manual update check (the About tab button). Full auto-update lives on 18.3.
+  APP_CHECK_FOR_UPDATES: 'app:checkForUpdates',
 
   // Window controls (custom titlebar)
   WINDOW_MINIMIZE: 'window:minimize',

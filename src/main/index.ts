@@ -1,5 +1,6 @@
 import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import log from 'electron-log/main';
 import {
   APP_NAME,
@@ -30,9 +31,14 @@ import {
   shouldCloseToTray,
   shouldMinimizeToTray,
 } from './services/tray-service';
+import { installMainCrashHandlers } from './services/crash-handler';
 
 log.initialize();
 log.info(`${APP_NAME} starting...`);
+
+// Install crash handlers as early as possible so any failure during app
+// bootstrap lands in the log file instead of a silent exit.
+installMainCrashHandlers(() => mainWindow);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -62,6 +68,25 @@ export function getMainWindowHandle(): string | null {
   }
 }
 
+/**
+ * Resolve the app icon for BrowserWindow. Prefers `.ico` on Windows (renders
+ * crisply at taskbar/titlebar sizes); falls back to `.png` on other platforms
+ * or if the ico is missing. In packaged builds electron-builder copies
+ * `src/assets/` via the `files` glob; in dev we read from the project root.
+ */
+function resolveAppIconPath(): string | undefined {
+  const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  const candidates = [
+    path.join(app.getAppPath(), 'src', 'assets', file),
+    path.join(process.resourcesPath ?? '', file),
+  ];
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  log.warn('App icon not found at any expected path');
+  return undefined;
+}
+
 function readHandleBuffer(buf: Buffer): string | null {
   // On 64-bit Windows, HWND is 8 bytes. On 32-bit Windows/Linux/macOS, 4 bytes.
   // Electron sometimes returns a shorter buffer than the platform pointer
@@ -82,6 +107,7 @@ function createWindow(): void {
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
     title: APP_NAME,
+    icon: resolveAppIconPath(),
     backgroundColor: '#0f172a',
     show: false,
     webPreferences: {
@@ -153,6 +179,12 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   log.info('App ready, initializing...');
+
+  // Windows groups taskbar entries by AppUserModelID. Without this, dev runs
+  // appear under Electron's default ID instead of YancoTV's icon/label.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.yancotv.app');
+  }
 
   // --- CORS bypass for IPTV streams ---
   // Strip the Origin header from outgoing requests to external URLs.

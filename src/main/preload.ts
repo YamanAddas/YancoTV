@@ -365,6 +365,62 @@ const api = {
     }> => ipcRenderer.invoke(IpcChannels.APP_GET_PATHS),
     openDataDir: (): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IpcChannels.APP_OPEN_DATA_DIR),
+    getLaunchOnStartup: (): Promise<boolean> =>
+      ipcRenderer.invoke(IpcChannels.APP_GET_LAUNCH_ON_STARTUP),
+    setLaunchOnStartup: (enabled: boolean): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.APP_SET_LAUNCH_ON_STARTUP, enabled),
+    exportLogs: (): Promise<
+      { ok: true; path: string; bytes: number } | { ok: false; cancelled?: boolean; error?: string }
+    > => ipcRenderer.invoke(IpcChannels.APP_EXPORT_LOGS),
+    reportCrash: (report: {
+      message: string;
+      stack?: string;
+      source?: string;
+      line?: number;
+      col?: number;
+      kind?: 'error' | 'unhandledrejection' | 'react';
+    }): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.CRASH_REPORT, report),
+    checkForUpdates: (): Promise<
+      | { ok: true; status: 'up-to-date'; currentVersion: string }
+      | {
+          ok: true;
+          status: 'update-available';
+          currentVersion: string;
+          latestVersion: string;
+          url?: string;
+          notes?: string;
+        }
+      | { ok: false; status: 'not-configured' }
+      | { ok: false; status: 'error'; error: string }
+    > => ipcRenderer.invoke(IpcChannels.APP_CHECK_FOR_UPDATES),
+  },
+
+  backup: {
+    export: (): Promise<
+      { ok: true; path: string; bytes: number } | { ok: false; cancelled?: boolean; error?: string }
+    > => ipcRenderer.invoke(IpcChannels.BACKUP_EXPORT),
+    import: (
+      mode: 'merge' | 'replace',
+    ): Promise<
+      | {
+          ok: true;
+          stats: {
+            sourcesImported: number;
+            favoritesImported: number;
+            favoritesSkipped: number;
+            historyImported: number;
+            historySkipped: number;
+            settingsImported: number;
+            lockedImported: number;
+            hiddenImported: number;
+            overridesImported: number;
+            groupPrefsImported: number;
+          };
+          warnings: string[];
+        }
+      | { ok: false; cancelled?: boolean; error?: string }
+    > => ipcRenderer.invoke(IpcChannels.BACKUP_IMPORT, mode),
   },
 
   window: {

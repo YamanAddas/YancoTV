@@ -22,7 +22,6 @@ const DEFAULTS: Record<string, string> = {
   // Desktop integration
   general_minimize_to_tray: '0',
   general_close_to_tray: '0',
-  general_launch_on_startup: '0',
 
   // Playback
   playback_default_volume: '80',

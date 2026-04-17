@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../../stores/settings-store';
 
 // ---------------------------------------------------------------------------
@@ -79,10 +79,37 @@ function Select({
 
 export function GeneralSettings() {
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
+  const [launchOnStartup, setLaunchOnStartup] = useState<boolean | null>(null);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Launch-on-startup state lives in the OS login-item registry, not our DB —
+  // read it via IPC on mount and again whenever the settings panel is opened.
+  useEffect(() => {
+    let cancelled = false;
+    window.api.app
+      .getLaunchOnStartup()
+      .then((enabled) => {
+        if (!cancelled) setLaunchOnStartup(enabled);
+      })
+      .catch(() => {
+        if (!cancelled) setLaunchOnStartup(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLaunchOnStartupChange = async (next: boolean) => {
+    setLaunchOnStartup(next); // optimistic
+    const result = await window.api.app.setLaunchOnStartup(next);
+    if (!result.ok) {
+      // roll back on failure
+      setLaunchOnStartup(!next);
+    }
+  };
 
   if (!loaded) {
     return (
@@ -210,6 +237,16 @@ export function GeneralSettings() {
           <Toggle
             checked={getBool('general_close_to_tray')}
             onChange={(v) => setBool('general_close_to_tray', v)}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Launch on startup"
+          description="Start YancoTV automatically when you sign in to Windows"
+        >
+          <Toggle
+            checked={launchOnStartup ?? false}
+            onChange={handleLaunchOnStartupChange}
           />
         </SettingRow>
       </div>
