@@ -33,7 +33,7 @@ export interface MediaInfo {
 }
 
 export interface PlayerState {
-  status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error';
+  status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error' | 'reconnecting';
   position: number;
   duration: number;
   volume: number;
@@ -51,6 +51,10 @@ export interface PlayerState {
   subtitleTracks: SubtitleTrack[];
   audioTracks: AudioTrack[];
   mediaInfo?: MediaInfo;
+  /** Current reconnect attempt (1-based). Only set while status === 'reconnecting'. */
+  reconnectAttempt?: number;
+  /** Max reconnect attempts for the current stream. */
+  reconnectMaxAttempts?: number;
 }
 
 export interface SubtitleTrack {

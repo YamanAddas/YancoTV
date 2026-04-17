@@ -22,6 +22,16 @@ import { getSetting } from '../services/settings-service';
 const CONNECT_RETRY_DELAY = 300;
 const CONNECT_MAX_RETRIES = 20; // 20 * 300ms = 6 seconds — enough for cold mpv starts
 
+// Auto-reconnect (Sprint 20.3). Exponential backoff capped at 30s.
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30_000;
+const RECONNECT_DEFAULT_MAX_ATTEMPTS = 3;
+
+function reconnectDelay(attempt: number): number {
+  // attempt 1 → 1s, 2 → 2s, 3 → 4s, 4 → 8s, 5 → 16s, 6+ → 30s
+  return Math.min(RECONNECT_MAX_DELAY_MS, RECONNECT_BASE_DELAY_MS * 2 ** (attempt - 1));
+}
+
 function defaultState(): PlayerState {
   return {
     status: 'idle',
@@ -51,6 +61,11 @@ export class MpvPlayer implements IPlayer {
   private listeners: { [K in keyof PlayerEventMap]?: Set<any> } = {};
   private destroyed = false;
   private screenshotDir: string;
+  // Auto-reconnect state (Sprint 20.3). Tracks the last stream so we can retry
+  // after a drop, and the backoff timer so user actions can cancel it.
+  private lastPlayContext: { url: string; options?: PlayOptions } | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempt = 0;
 
   constructor() {
     this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
@@ -64,6 +79,14 @@ export class MpvPlayer implements IPlayer {
         'mpv not found. Install mpv and ensure it is in your PATH or place mpv.exe in the app directory.',
       );
     }
+
+    // Any user-initiated play cancels a pending reconnect from a previous
+    // stream (different URL or the same one after the user hit retry).
+    this.cancelReconnect();
+    this.lastPlayContext = { url, options };
+    this.reconnectAttempt = 0;
+    this.state.reconnectAttempt = undefined;
+    this.state.reconnectMaxAttempts = undefined;
 
     // If mpv is already running, just load the new file
     if (this.process && this.ipc?.isConnected()) {
@@ -95,6 +118,10 @@ export class MpvPlayer implements IPlayer {
   }
 
   async stop(): Promise<void> {
+    // User-initiated stop cancels any pending reconnect.
+    this.cancelReconnect();
+    this.lastPlayContext = null;
+
     if (!this.ipc?.isConnected()) {
       this.state = defaultState();
       this.emitEvent('state-change', this.state);
@@ -258,6 +285,8 @@ export class MpvPlayer implements IPlayer {
 
   async destroy(): Promise<void> {
     this.destroyed = true;
+    this.cancelReconnect();
+    this.lastPlayContext = null;
     if (this.ipc) {
       try {
         if (this.ipc.isConnected()) {
@@ -377,14 +406,18 @@ export class MpvPlayer implements IPlayer {
 
     this.process.on('exit', (code) => {
       log.info(`mpv process exited with code ${code}`);
-      if (!this.destroyed) {
-        this.state = defaultState();
-        this.media = {};
-        this.emitEvent('state-change', this.state);
-      }
       this.ipc?.destroy();
       this.ipc = null;
       this.process = null;
+      if (this.destroyed) return;
+      // If a reconnect is already pending/scheduled from the end-file event,
+      // don't stomp the 'reconnecting' status by resetting to default.
+      if (this.reconnectTimer || this.state.status === 'reconnecting') {
+        return;
+      }
+      this.state = defaultState();
+      this.media = {};
+      this.emitEvent('state-change', this.state);
     });
 
     this.state.currentUrl = url;
@@ -611,9 +644,18 @@ export class MpvPlayer implements IPlayer {
     switch (msg.event) {
       case 'file-loaded':
         this.state.status = 'playing';
+        // A successful load after a reconnect attempt clears the counter.
+        this.reconnectAttempt = 0;
+        this.state.reconnectAttempt = undefined;
+        this.state.reconnectMaxAttempts = undefined;
         this.emitEvent('state-change', this.state);
         break;
       case 'end-file':
+        // Attempt auto-reconnect for unexpected drops. `stop` is user-initiated
+        // and must never trigger a retry.
+        if (msg.reason !== 'stop' && msg.reason !== 'quit' && this.maybeScheduleReconnect()) {
+          break;
+        }
         if (msg.reason === 'error') {
           this.state.status = 'error';
           this.emitEvent('error', new Error('Stream playback failed'));
@@ -622,6 +664,85 @@ export class MpvPlayer implements IPlayer {
         }
         this.emitEvent('state-change', this.state);
         break;
+    }
+  }
+
+  /**
+   * Decide whether to schedule an auto-reconnect after an `end-file` event.
+   * Returns true if a reconnect was scheduled (caller should skip the normal
+   * stopped/error transition).
+   */
+  private maybeScheduleReconnect(): boolean {
+    if (this.destroyed) return false;
+    if (!this.lastPlayContext) return false;
+
+    const max = this.resolveMaxAttempts();
+    if (max <= 0) return false;
+    if (this.reconnectAttempt >= max) {
+      log.warn(`Auto-reconnect: giving up after ${this.reconnectAttempt} attempts`);
+      return false;
+    }
+
+    this.reconnectAttempt += 1;
+    const delay = reconnectDelay(this.reconnectAttempt);
+    log.info(
+      `Auto-reconnect: attempt ${this.reconnectAttempt}/${max} scheduled in ${delay}ms`,
+    );
+
+    this.state.status = 'reconnecting';
+    this.state.reconnectAttempt = this.reconnectAttempt;
+    this.state.reconnectMaxAttempts = max;
+    this.emitEvent('state-change', this.state);
+
+    this.cancelReconnect();
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.runReconnect().catch((err) => {
+        log.error('Auto-reconnect attempt failed:', err);
+        // If the retry itself threw, give the next end-file (or exit handler)
+        // a chance to cycle the reconnect. If mpv is gone, fall through to
+        // error state.
+        if (!this.process) {
+          this.state.status = 'error';
+          this.state.reconnectAttempt = undefined;
+          this.state.reconnectMaxAttempts = undefined;
+          this.emitEvent('error', err instanceof Error ? err : new Error(String(err)));
+          this.emitEvent('state-change', this.state);
+        }
+      });
+    }, delay);
+
+    return true;
+  }
+
+  private async runReconnect(): Promise<void> {
+    const ctx = this.lastPlayContext;
+    if (!ctx || this.destroyed) return;
+
+    // Reuse the existing mpv process if still connected (loadfile is cheap);
+    // otherwise respawn. We don't call `play()` because it resets the
+    // reconnect counter.
+    if (this.process && this.ipc?.isConnected()) {
+      await this.ipc.command(['loadfile', ctx.url, 'replace']);
+      this.state.currentUrl = ctx.url;
+      return;
+    }
+
+    await this.spawnMpv(ctx.url, ctx.options);
+  }
+
+  private resolveMaxAttempts(): number {
+    const raw = getSetting('network_retry_attempts');
+    if (raw === null || raw === undefined) return RECONNECT_DEFAULT_MAX_ATTEMPTS;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return RECONNECT_DEFAULT_MAX_ATTEMPTS;
+    return Math.floor(n);
+  }
+
+  private cancelReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
   }
 

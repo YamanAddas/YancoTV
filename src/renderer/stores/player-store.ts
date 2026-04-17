@@ -41,7 +41,11 @@ export interface ZapTarget {
 }
 
 export interface PlayerStoreState {
-  status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error';
+  status: 'idle' | 'playing' | 'paused' | 'buffering' | 'stopped' | 'error' | 'reconnecting';
+  /** Current reconnect attempt (1-based). Set while status === 'reconnecting'. */
+  reconnectAttempt?: number;
+  /** Max reconnect attempts for the current stream. */
+  reconnectMaxAttempts?: number;
   mode: PlayerMode;
   /** Which playback engine is active: mpv (full codec support) or html5 (fallback) */
   backend: PlayerBackend;
@@ -509,6 +513,8 @@ export function initPlayerEventListeners(): () => void {
     audioTracks?: AudioTrack[];
     mediaInfo?: MediaInfo;
     currentUrl?: string;
+    reconnectAttempt?: number;
+    reconnectMaxAttempts?: number;
   }) => {
     const { backend, mode } = usePlayerStore.getState();
     if (backend !== 'mpv') return;
@@ -523,6 +529,10 @@ export function initPlayerEventListeners(): () => void {
         return;
       }
     }
+    // Reconnect counters: forward even when undefined so the UI can clear the
+    // banner once the stream comes back.
+    update.reconnectAttempt = mpvState.reconnectAttempt;
+    update.reconnectMaxAttempts = mpvState.reconnectMaxAttempts;
     if (typeof mpvState.position === 'number') update.position = mpvState.position;
     if (typeof mpvState.duration === 'number') update.duration = mpvState.duration;
     if (typeof mpvState.volume === 'number') update.volume = mpvState.volume;

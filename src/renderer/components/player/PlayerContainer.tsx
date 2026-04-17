@@ -20,11 +20,17 @@ export function PlayerContainer() {
   const showSettings = usePlayerStore((s) => s.showSettings);
   const showAspectMenu = usePlayerStore((s) => s.showAspectMenu);
   const controlsVisible = usePlayerStore((s) => s.controlsVisible);
+  const reconnectAttempt = usePlayerStore((s) => s.reconnectAttempt);
+  const reconnectMaxAttempts = usePlayerStore((s) => s.reconnectMaxAttempts);
   const setControlsVisible = usePlayerStore((s) => s.setControlsVisible);
   const setShowSettings = usePlayerStore((s) => s.setShowSettings);
   const setShowAspectMenu = usePlayerStore((s) => s.setShowAspectMenu);
 
-  const isActive = status === 'playing' || status === 'paused' || status === 'buffering';
+  const isActive =
+    status === 'playing' ||
+    status === 'paused' ||
+    status === 'buffering' ||
+    status === 'reconnecting';
 
   // Auto-hide controls after inactivity
   const resetHideTimer = useCallback(() => {
@@ -102,6 +108,28 @@ export function PlayerContainer() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Reconnect overlay — after an unexpected stream drop. */}
+      {status === 'reconnecting' && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 rounded-xl bg-surface-950/70 px-6 py-5 backdrop-blur-sm">
+            <svg className="h-10 w-10 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <div className="text-center">
+              <div className="text-sm font-medium text-amber-200">
+                Reconnecting…
+              </div>
+              {reconnectAttempt && reconnectMaxAttempts ? (
+                <div className="mt-0.5 text-xs text-surface-400">
+                  Attempt {reconnectAttempt} of {reconnectMaxAttempts}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
