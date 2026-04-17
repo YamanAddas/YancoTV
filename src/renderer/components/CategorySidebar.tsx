@@ -26,6 +26,7 @@ import { useCategoryGroups, type EnhancedSection } from '../hooks/use-category-g
 import { GroupContextMenu, type ContextMenuAction } from './GroupContextMenu';
 import type { ContentType } from '../../shared/types';
 import type { SmartChild } from '../utils/category-grouping';
+import { prettifyGroupName } from '../utils/group-parser';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -240,7 +241,12 @@ function SortableSection({
                         : 'text-surface-400 hover:bg-surface-700/30 hover:text-surface-200'
                     }`}
                   >
-                    <span className="min-w-0 flex-1 truncate">{child.originalGroupName}</span>
+                    <span
+                      className="min-w-0 flex-1 truncate"
+                      title={child.originalGroupName}
+                    >
+                      {prettifyGroupName(child.originalGroupName)}
+                    </span>
                     <CountBadge count={count} active={childActive} />
                   </button>
                 );

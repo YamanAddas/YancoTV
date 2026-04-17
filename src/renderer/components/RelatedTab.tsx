@@ -1,5 +1,6 @@
 import { HexCard } from './HexCard';
 import type { ContentItem } from '../../shared/types';
+import { prettifyGroupName } from '../utils/group-parser';
 
 interface RelatedTabProps {
   sameGroup: ContentItem[];
@@ -17,7 +18,7 @@ export function RelatedTab({ sameGroup, sameSource, groupName, onItemClick }: Re
       {sameGroup.length > 0 && (
         <div>
           <h3 className="mb-3 text-lg font-semibold text-surface-100">
-            More {groupName ? `in ${groupName}` : 'Like This'}
+            More {groupName ? `in ${prettifyGroupName(groupName)}` : 'Like This'}
           </h3>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
             {sameGroup.slice(0, 12).map((item) => {

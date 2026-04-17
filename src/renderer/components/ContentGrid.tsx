@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../stores/settings-store';
 import { HexCard } from './HexCard';
 import { ChannelHexRow } from './ChannelHexRow';
+import { prettifyGroupName } from '../utils/group-parser';
 import hexFrameSrc from '../assets/hex-frames/hex-frame.svg';
 import hexFrameLockedSrc from '../assets/hex-frames/hex-frame-locked.svg';
 import type { NowNextMap } from '../../shared/types/epg';
@@ -183,7 +184,7 @@ function HexGridItem({
       {cardStyle === 'poster' ? (
         <HexCard
           title={item.cleanTitle || item.title}
-          subtitle={item.groupName}
+          subtitle={prettifyGroupName(item.groupName)}
           imageUrl={showLogo ? item.logoUrl : undefined}
           fallbackLetter={(item.cleanTitle || item.title).charAt(0).toUpperCase()}
           isFavorite={isFavorite}
@@ -197,7 +198,7 @@ function HexGridItem({
         <ChannelHexRow
           title={item.title}
           cleanTitle={item.cleanTitle}
-          groupName={item.groupName}
+          groupName={prettifyGroupName(item.groupName)}
           logoUrl={item.logoUrl}
           isFavorite={isFavorite}
           isLocked={isLocked}
@@ -338,7 +339,7 @@ function ListRow({
       <ChannelHexRow
         title={item.title}
         cleanTitle={item.cleanTitle}
-        groupName={item.groupName}
+        groupName={prettifyGroupName(item.groupName)}
         logoUrl={item.logoUrl}
         isFavorite={isFavorite}
         isLocked={isLocked}
@@ -414,8 +415,11 @@ function CompactRow({
         </p>
 
         {item.groupName && (
-          <span className="hidden flex-shrink-0 text-xs text-surface-600 md:inline">
-            {item.groupName}
+          <span
+            className="hidden flex-shrink-0 text-xs text-surface-600 md:inline"
+            title={item.groupName}
+          >
+            {prettifyGroupName(item.groupName)}
           </span>
         )}
 
@@ -564,7 +568,7 @@ export function HorizontalContentRow({
           <div key={item.id} className="w-[120px] flex-shrink-0">
             <HexCard
               title={item.cleanTitle || item.title}
-              subtitle={item.groupName}
+              subtitle={prettifyGroupName(item.groupName)}
               imageUrl={showLogos ? item.logoUrl : undefined}
               fallbackLetter={(item.cleanTitle || item.title).charAt(0).toUpperCase()}
               isFavorite={favoriteIds ? favoriteIds.has(item.id) : false}

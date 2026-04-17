@@ -734,3 +734,42 @@ export function getLanguageName(countryCode: string): string | null {
   }
   return null;
 }
+
+/**
+ * Expand language/country codes inside a raw group name to full names.
+ *
+ * Only replaces codes that are delimited segments (surrounded by `|`, `-`,
+ * `:`, `/`, or string boundaries) so we don't accidentally rewrite "IN" in
+ * "Channel IN 4K". Examples:
+ *   "AR | Movies"         → "Arabic | Movies"
+ *   "Movies | EN"         → "Movies | English"
+ *   "VIP - TR - Series"   → "VIP - Turkish - Series"
+ *   "AR"                  → "Arabic"
+ *   "Channel IN 4K"       → "Channel IN 4K"   (no delimiter, left alone)
+ */
+export function prettifyGroupName(raw: string | null | undefined): string {
+  if (!raw) return '';
+  // Capture a segment surrounded by strong delimiters or string boundaries.
+  // We deliberately keep it case-sensitive for the 2–3 letter codes (AR, EN)
+  // to avoid matching common English words. Longer names (ARABIC, ENGLISH)
+  // also get normalized via a case-insensitive second pass below.
+  let out = raw.replace(
+    /(^|[|\-:/]\s*)([A-Z]{2,3})(?=\s*(?:[|\-:/]|$))/g,
+    (full, pre: string, token: string) => {
+      const info = COUNTRY_LANGUAGE_MAP.get(token);
+      return info ? `${pre}${info.language}` : full;
+    },
+  );
+  // Second pass: longer tokens (ARABIC, ENGLISH, TÜRK, ...) in any case.
+  // Skip replacement only when the token is *exactly* the language name
+  // already — so "Arabic" stays but "arabic" or "ARABIC" becomes "Arabic".
+  out = out.replace(
+    /(^|[|\-:/]\s*)([A-Za-zÀ-ÿ]{4,})(?=\s*(?:[|\-:/]|$))/g,
+    (full, pre: string, token: string) => {
+      const info = COUNTRY_LANGUAGE_MAP.get(token.toUpperCase());
+      if (!info || info.language === token) return full;
+      return `${pre}${info.language}`;
+    },
+  );
+  return out;
+}
