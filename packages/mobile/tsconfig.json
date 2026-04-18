@@ -1,5 +1,5 @@
 {
-  "extends": "@react-native/typescript-config/tsconfig.json",
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true,
@@ -9,11 +9,25 @@
     "jsx": "react-native",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@yancotv/core": ["../core/src/index.ts"],
-      "@yancotv/core/*": ["../core/src/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "@yancotv/core": [
+        "../core/src/index.ts"
+      ],
+      "@yancotv/core/*": [
+        "../core/src/*"
+      ]
     }
   },
-  "include": ["src/**/*", "App.tsx", "index.js"],
-  "exclude": ["node_modules", "android", "ios"]
+  "include": [
+    "src/**/*",
+    "App.tsx",
+    "index.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios"
+  ]
 }

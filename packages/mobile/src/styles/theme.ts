@@ -1,0 +1,16 @@
+export const colors = {
+  brand: '#e11d48',
+  brandDark: '#881337',
+  brandLight: '#fb7185',
+  surface900: '#0a0a0f',
+  surface800: '#14141b',
+  surface700: '#1e1e2a',
+  surface600: '#2a2a3a',
+  surface500: '#3a3a4e',
+  surface400: '#6b6b80',
+  focus: '#fbbf24',
+  white: '#ffffff',
+  muted: '#9ca3af',
+  red400: '#f87171',
+  red300: '#fca5a5',
+};

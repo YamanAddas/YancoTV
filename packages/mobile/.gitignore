@@ -40,3 +40,7 @@ yarn-error.log
 
 # NativeWind / Tailwind
 .tailwindcss-cache/
+
+# Sentry auth token (keep out of git!)
+android/sentry.properties
+ios/sentry.properties

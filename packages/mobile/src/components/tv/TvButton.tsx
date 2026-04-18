@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from 'react';
-import { Text, View, Animated, Pressable } from 'react-native';
+import { Text, View, Animated, Pressable, StyleSheet } from 'react-native';
+import { colors } from '../../styles/theme';
 
 interface TvButtonProps {
   label: string;
@@ -34,18 +35,50 @@ export function TvButton({ label, onSelect, autoFocus, active }: TvButtonProps) 
       onPress={onSelect}
     >
       <Animated.View
-        style={{ transform: [{ scale }] }}
-        className={`relative rounded-2xl px-8 py-4 ${active ? 'bg-brand' : 'bg-surface-700'}`}
+        style={[
+          styles.button,
+          active ? styles.buttonActive : styles.buttonInactive,
+          { transform: [{ scale }] },
+        ]}
       >
         <Animated.View
-          style={{ opacity: borderOpacity }}
-          className="absolute inset-0 rounded-2xl border-2 border-focus"
+          style={[styles.focusRing, { opacity: borderOpacity }]}
           pointerEvents="none"
         />
         <View>
-          <Text className="text-lg font-semibold text-white">{label}</Text>
+          <Text style={styles.label}>{label}</Text>
         </View>
       </Animated.View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  button: {
+    position: 'relative',
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+  },
+  buttonActive: {
+    backgroundColor: colors.brand,
+  },
+  buttonInactive: {
+    backgroundColor: colors.surface700,
+  },
+  focusRing: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.focus,
+  },
+  label: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.white,
+  },
+});
