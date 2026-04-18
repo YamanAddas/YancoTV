@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ScreenRouter } from './src/navigation/ScreenRouter';
 import { useSourcesStore } from './src/stores/sources-store';
 import { Sentry } from './src/sentry';
+import { runDbSmoke, type DbSmokeResult } from './src/db/smoke';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,18 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
   const hydrated = useSourcesStore((s) => s.hydrated);
   const hydrate = useSourcesStore((s) => s.hydrate);
   const [hydrateError, setHydrateError] = useState<string | null>(null);
+  const [dbSmoke, setDbSmoke] = useState<DbSmokeResult | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    runDbSmoke()
+      .then((r) => setDbSmoke(r))
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : String(e);
+        setDbError(msg);
+        Sentry.captureException(e);
+      });
+  }, []);
 
   useEffect(() => {
     hydrate().catch((e: unknown) => {
@@ -74,6 +87,16 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
       Sentry.captureException(e);
     });
   }, [hydrate]);
+
+  if (dbError) {
+    return (
+      <ScrollView style={bootStyles.errorScroll}>
+        <StatusBar barStyle="light-content" backgroundColor="#1a0000" />
+        <Text style={bootStyles.errorTitle}>op-sqlite smoke failed</Text>
+        <Text style={bootStyles.errorStack}>{dbError}</Text>
+      </ScrollView>
+    );
+  }
 
   if (hydrateError) {
     return (
@@ -85,12 +108,19 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!hydrated) {
+  if (!hydrated || !dbSmoke) {
     return (
       <View style={bootStyles.loadingRoot}>
         <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
         <ActivityIndicator size="large" color="#fbbf24" />
-        <Text style={bootStyles.loadingText}>Loading (BUILD 2)…</Text>
+        <Text style={bootStyles.loadingText}>
+          {dbSmoke ? 'Loading (BUILD 2)…' : 'Opening database…'}
+        </Text>
+        {dbSmoke && (
+          <Text style={bootStyles.loadingText}>
+            sqlite {dbSmoke.version} @ {dbSmoke.path}
+          </Text>
+        )}
       </View>
     );
   }
