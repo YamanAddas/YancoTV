@@ -67,7 +67,11 @@ installMainCrashHandlers(() => mainWindow);
 
 let mainWindow: BrowserWindow | null = null;
 
-const isDev = !app.isPackaged;
+// E2E runs launch dist/main/main/index.js directly (not a packaged bundle),
+// so app.isPackaged is false and the renderer would try to load from the
+// Vite dev server. Treat NODE_ENV=test as "load from disk" so Playwright
+// sees the built YancoTV renderer, not whatever else is on :5173.
+const isDev = !app.isPackaged && process.env.NODE_ENV !== 'test';
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;

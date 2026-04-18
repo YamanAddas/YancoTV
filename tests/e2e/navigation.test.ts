@@ -44,10 +44,14 @@ test('navigate to Series page', async () => {
 });
 
 test('navigate to Search page', async () => {
-  await page.click('text=/Search/i');
-  await expect(page.locator('input[type="search"], input[placeholder*="Search"]').first()).toBeVisible({
-    timeout: 5000,
+  // Search has no sidebar nav link — it's reached by submitting the sidebar's
+  // search input or via the hash route directly.
+  await page.evaluate(() => {
+    window.location.hash = '#/search';
   });
+  await expect(
+    page.locator('input[type="search"], input[placeholder*="Search"]').first(),
+  ).toBeVisible({ timeout: 5000 });
 });
 
 test('navigate to Favorites page', async () => {
@@ -73,9 +77,13 @@ test('no console errors during navigation', async () => {
     }
   });
 
-  // Navigate through all pages quickly
-  for (const label of ['Live', 'Movies', 'Series', 'Search', 'Favorites', 'Settings']) {
-    await page.click(`text=/${label}/i`);
+  // Navigate via URL hash — "Search" has no sidebar link, and hash routing
+  // avoids depending on i18n-sensitive label text.
+  const routes = ['#/live', '#/movies', '#/series', '#/search', '#/favorites', '#/settings'];
+  for (const hash of routes) {
+    await page.evaluate((h) => {
+      window.location.hash = h;
+    }, hash);
     await page.waitForTimeout(300);
   }
 

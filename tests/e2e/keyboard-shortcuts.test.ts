@@ -29,31 +29,31 @@ test.afterAll(async () => {
   await app.close();
 });
 
-test('F11 toggles fullscreen', async () => {
-  const wasFull = await app.evaluate(({ BrowserWindow }) => {
-    return BrowserWindow.getAllWindows()[0]?.isFullScreen() ?? false;
-  });
+test('F11 is a no-op when nothing is playing', async () => {
+  // In YancoTV, F11 only toggles fullscreen when playback is active
+  // (see use-player-shortcuts.ts — the handler guards on `isActive`).
+  // Without a stream, F11 is deliberately inert. Verify that the main
+  // window state doesn't change — catches regressions that would
+  // accidentally fullscreen the chrome/UI outside of playback.
+  const readMainFull = () =>
+    app.evaluate(({ BrowserWindow }) => {
+      const main =
+        BrowserWindow.getAllWindows().find((w) => !w.getParentWindow()) ??
+        BrowserWindow.getAllWindows()[0];
+      return main?.isFullScreen() ?? false;
+    });
 
+  const before = await readMainFull();
   await page.keyboard.press('F11');
   await page.waitForTimeout(500);
+  const after = await readMainFull();
 
-  const isFullNow = await app.evaluate(({ BrowserWindow }) => {
-    return BrowserWindow.getAllWindows()[0]?.isFullScreen() ?? false;
-  });
-
-  // Should have toggled
-  expect(isFullNow).not.toBe(wasFull);
-
-  // Restore
-  if (isFullNow) {
-    await page.keyboard.press('F11');
-    await page.waitForTimeout(500);
-  }
+  expect(after).toBe(before);
 });
 
 test('keyboard does not interfere with search input', async () => {
-  await page.click('text=/Search/i');
-  await page.waitForTimeout(300);
+  // The sidebar has a search input (role=combobox) — there is no separate
+  // "Search" nav link. Focus the input directly instead of clicking a link.
   const input = page.locator('input[type="search"], input[placeholder*="Search"]').first();
   await input.focus();
   await input.fill('');

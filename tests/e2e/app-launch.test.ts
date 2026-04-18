@@ -35,10 +35,10 @@ test('app window is visible', async () => {
 });
 
 test('window title contains YancoTV', async () => {
-  const title = await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    return win?.getTitle() ?? '';
-  });
+  // Use page.title() (the main window's document.title) instead of
+  // BrowserWindow.getAllWindows()[0].getTitle() — once the overlay and
+  // video child windows exist, [0] is no longer guaranteed to be main.
+  const title = await page.title();
   expect(title).toContain('YancoTV');
 });
 

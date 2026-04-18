@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../stores/settings-store';
 import { usePlayerStore } from '../stores/player-store';
 import type { ContentItem } from '../../shared/types';
+import { APP_VERSION } from '../../shared/constants';
 
 const SUGGEST_LIMIT = 6;
 const SUGGEST_DEBOUNCE_MS = 200;
@@ -413,7 +414,7 @@ export function Sidebar() {
               {showClock && (
                 <p className="mb-1 text-sm font-medium tabular-nums text-surface-300">{time}</p>
               )}
-              <p className="text-xs text-surface-600">v0.1.0</p>
+              <p className="text-xs text-surface-600">v{APP_VERSION}</p>
             </motion.div>
           ) : (
             <motion.div

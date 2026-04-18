@@ -9,3 +9,5 @@ release/
 *.log
 .claude/
 mpv/
+playwright-report/
+test-results/

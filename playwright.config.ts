@@ -8,7 +8,8 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
+  // Cold Electron launch + 14 migrations + service init easily overruns 30s.
+  timeout: 60_000,
   expect: {
     timeout: 10_000,
   },

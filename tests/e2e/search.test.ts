@@ -27,33 +27,42 @@ test.afterAll(async () => {
   await app.close();
 });
 
+// There are two search inputs once on the /search page: the sidebar's
+// autocomplete and the page's own input. Scope to <main> so tests don't
+// accidentally target the sidebar and get the wrong placeholder/state.
+const PAGE_SEARCH_INPUT = 'main input[type="search"]';
+
 test('search page has input field', async () => {
-  await page.click('text=/Search/i');
+  // Search has no sidebar nav link — navigate via hash route.
+  await page.evaluate(() => {
+    window.location.hash = '#/search';
+  });
   await page.waitForTimeout(300);
-  const input = page.locator('input[type="search"], input[placeholder*="Search"]').first();
+  const input = page.locator(PAGE_SEARCH_INPUT).first();
   await expect(input).toBeVisible({ timeout: 5000 });
 });
 
 test('search input accepts text', async () => {
-  const input = page.locator('input[type="search"], input[placeholder*="Search"]').first();
+  const input = page.locator(PAGE_SEARCH_INPUT).first();
   await input.fill('test query');
   const value = await input.inputValue();
   expect(value).toBe('test query');
 });
 
 test('empty search shows prompt', async () => {
-  const input = page.locator('input[type="search"], input[placeholder*="Search"]').first();
+  const input = page.locator(PAGE_SEARCH_INPUT).first();
   await input.clear();
   await page.waitForTimeout(500);
-  // Should show "Type to search" or similar
-  const prompt = page.locator('text=/Type to search|Search your content/i').first();
+  // SearchPage renders "Type to search your content library" for empty query.
+  const prompt = page.locator('text=/Type to search/i').first();
   await expect(prompt).toBeVisible({ timeout: 5000 });
 });
 
 test('search for nonexistent content shows no results', async () => {
-  const input = page.locator('input[type="search"], input[placeholder*="Search"]').first();
+  const input = page.locator(PAGE_SEARCH_INPUT).first();
   await input.fill('xyznonexistent12345');
   await page.waitForTimeout(1000);
-  const noResults = page.locator('text=/No results/i').first();
+  // SearchPage renders: No results for "…"
+  const noResults = page.locator('text=/No\\s*.*results for/i').first();
   await expect(noResults).toBeVisible({ timeout: 5000 });
 });
