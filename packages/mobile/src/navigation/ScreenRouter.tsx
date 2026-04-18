@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavStore } from '../stores/nav-store';
+import { AppLayout } from '../components/layout/AppLayout';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SourcesScreen } from '../screens/SourcesScreen';
 import { ChannelListScreen } from '../screens/ChannelListScreen';
@@ -9,22 +10,36 @@ import { PlayerScreen } from '../screens/PlayerScreen';
 export function ScreenRouter() {
   const screen = useNavStore((s) => s.screen);
 
+  if (screen === 'player') {
+    return (
+      <AppLayout bare>
+        <PlayerScreen />
+      </AppLayout>
+    );
+  }
+
+  let content: React.ReactNode;
   switch (screen) {
     case 'sources':
-      return <SourcesScreen />;
+      content = <SourcesScreen />;
+      break;
     case 'detail':
-      return <ChannelDetailScreen />;
-    case 'player':
-      return <PlayerScreen />;
+      content = <ChannelDetailScreen />;
+      break;
     case 'live':
-      return <ChannelListScreen type="live" title="Live TV" />;
+      content = <ChannelListScreen type="live" title="Live TV" />;
+      break;
     case 'movies':
-      return <ChannelListScreen type="movie" title="Movies" />;
+      content = <ChannelListScreen type="movie" title="Movies" />;
+      break;
     case 'series':
-      return <ChannelListScreen type="series" title="Series" />;
+      content = <ChannelListScreen type="series" title="Series" />;
+      break;
     case 'settings':
     case 'home':
     default:
-      return <HomeScreen />;
+      content = <HomeScreen />;
   }
+
+  return <AppLayout>{content}</AppLayout>;
 }

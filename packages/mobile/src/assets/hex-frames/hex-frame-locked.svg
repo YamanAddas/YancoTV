@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 230" fill="none">
+  <defs>
+    <filter id="glowL" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="b2"/>
+      <feMerge>
+        <feMergeNode in="b2"/>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Amber gradient -->
+    <linearGradient id="outerGradL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFBB33" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#FF9900" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#FFBB33" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="bevelGradL" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFDD88" stop-opacity="0.25"/>
+      <stop offset="30%" stop-color="#FFAA00" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#221100" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="innerFillL" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1a1208" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#0a0804" stop-opacity="0.95"/>
+    </radialGradient>
+    <clipPath id="hexClipL">
+      <polygon points="100,10 186,61 186,169 100,220 14,169 14,61"/>
+    </clipPath>
+  </defs>
+
+  <!-- Glow -->
+  <polygon
+    points="100,8 188,60 188,170 100,222 12,170 12,60"
+    stroke="url(#outerGradL)"
+    stroke-width="1.5"
+    fill="none"
+    filter="url(#glowL)"
+    opacity="0.35"
+  />
+
+  <!-- Dark fill -->
+  <polygon
+    points="100,12 185,62 185,168 100,218 15,168 15,62"
+    fill="url(#innerFillL)"
+  />
+
+  <!-- Bevel -->
+  <polygon
+    points="100,12 185,62 185,168 100,218 15,168 15,62"
+    fill="url(#bevelGradL)"
+  />
+
+  <!-- Outer border -->
+  <polygon
+    points="100,8 188,60 188,170 100,222 12,170 12,60"
+    stroke="url(#outerGradL)"
+    stroke-width="1.5"
+    fill="none"
+  />
+
+  <!-- Inner border -->
+  <polygon
+    points="100,14 183,64 183,166 100,216 17,166 17,64"
+    stroke="url(#outerGradL)"
+    stroke-width="0.4"
+    fill="none"
+    opacity="0.2"
+  />
+
+  <!-- Corner accents -->
+  <line x1="100" y1="8" x2="142" y2="33" stroke="#FFBB33" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <line x1="100" y1="8" x2="58" y2="33" stroke="#FFBB33" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Lock icon — centered, prominent -->
+  <g transform="translate(100,115)" opacity="0.25">
+    <rect x="-14" y="-5" width="28" height="20" rx="3.5" stroke="#FFBB33" stroke-width="2.2" fill="none"/>
+    <path d="M-8,-5 L-8,-12 A8,8 0 0,1 8,-12 L8,-5" stroke="#FFBB33" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <circle cx="0" cy="6" r="3" fill="#FFBB33"/>
+    <line x1="0" y1="6" x2="0" y2="11" stroke="#FFBB33" stroke-width="2"/>
+  </g>
+
+  <!-- Side diamonds -->
+  <polygon points="192,115 188,112 184,115 188,118" fill="#FFAA00" opacity="0.2"/>
+  <polygon points="8,115 12,112 16,115 12,118" fill="#FFAA00" opacity="0.2"/>
+</svg>

@@ -1,23 +1,21 @@
 import React, { useState } from 'react';
 import {
-  View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
+  View,
 } from 'react-native';
-import { TvButton } from '../components/tv/TvButton';
-import { useNavStore } from '../stores/nav-store';
+import { PageHeader } from '../components/layout/PageHeader';
 import { useSourcesStore } from '../stores/sources-store';
-import { colors } from '../styles/theme';
+import { colors, radii, spacing } from '../styles/theme';
 
 type Tab = 'm3u' | 'xtream' | 'stalker';
 
 const MAC_RE = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 
 export function SourcesScreen() {
-  const navigate = useNavStore((s) => s.navigate);
   const sources = useSourcesStore((s) => s.sources);
   const syncStatus = useSourcesStore((s) => s.syncStatus);
   const syncMessage = useSourcesStore((s) => s.syncMessage);
@@ -27,7 +25,7 @@ export function SourcesScreen() {
   const removeSource = useSourcesStore((s) => s.removeSource);
   const resync = useSourcesStore((s) => s.resync);
 
-  const [tab, setTab] = useState<Tab>('m3u');
+  const [tab, setTab] = useState<Tab>('xtream');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [username, setUsername] = useState('');
@@ -84,93 +82,103 @@ export function SourcesScreen() {
     tab === 'm3u' ? canAddM3u : tab === 'xtream' ? canAddXtream : canAddStalker;
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={colors.surface900} />
-
-      <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>Sources</Text>
-        <TvButton label="Back" onSelect={() => navigate('home')} />
-      </View>
+    <ScrollView contentContainerStyle={styles.content}>
+      <PageHeader
+        eyebrow="Playlists"
+        title="Sources"
+        subtitle="Connect your IPTV provider"
+      />
 
       <View style={styles.card}>
         <View style={styles.tabs}>
-          <TvButton label="M3U" onSelect={() => setTab('m3u')} active={tab === 'm3u'} autoFocus />
-          <TvButton
-            label="Xtream"
-            onSelect={() => setTab('xtream')}
-            active={tab === 'xtream'}
-          />
-          <TvButton
-            label="Stalker"
-            onSelect={() => setTab('stalker')}
-            active={tab === 'stalker'}
-          />
+          {(['m3u', 'xtream', 'stalker'] as Tab[]).map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => setTab(t)}
+              style={({ focused }) => [
+                styles.tabBtn,
+                tab === t && styles.tabBtnActive,
+                focused && tab !== t && styles.tabBtnFocus,
+              ]}
+            >
+              <Text
+                style={[styles.tabText, tab === t && styles.tabTextActive]}
+              >
+                {t === 'm3u' ? 'M3U' : t === 'xtream' ? 'Xtream' : 'Stalker'}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
-        <Text style={styles.inputLabel}>Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="My provider"
-          placeholderTextColor={colors.surface500}
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <Field label="Name">
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="My provider"
+            placeholderTextColor={colors.surface500}
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </Field>
 
-        <Text style={styles.inputLabel}>
-          {tab === 'm3u' ? 'M3U URL' : tab === 'xtream' ? 'Server URL' : 'Portal URL'}
-        </Text>
-        <TextInput
-          value={url}
-          onChangeText={setUrl}
-          placeholder={
+        <Field
+          label={
             tab === 'm3u'
-              ? 'http://example.com/playlist.m3u'
+              ? 'M3U URL'
               : tab === 'xtream'
-                ? 'http://portal.example.com:8080'
-                : 'http://portal.example.com/c/'
+                ? 'Server URL'
+                : 'Portal URL'
           }
-          placeholderTextColor={colors.surface500}
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-        />
+        >
+          <TextInput
+            value={url}
+            onChangeText={setUrl}
+            placeholder={
+              tab === 'm3u'
+                ? 'http://example.com/playlist.m3u'
+                : tab === 'xtream'
+                  ? 'http://portal.example.com:8080'
+                  : 'http://portal.example.com/c/'
+            }
+            placeholderTextColor={colors.surface500}
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+        </Field>
 
         {tab === 'xtream' && (
           <>
-            <Text style={styles.inputLabel}>Username</Text>
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              placeholder="username"
-              placeholderTextColor={colors.surface500}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="password"
-              placeholderTextColor={colors.surface500}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-            />
+            <Field label="Username">
+              <TextInput
+                value={username}
+                onChangeText={setUsername}
+                placeholder="username"
+                placeholderTextColor={colors.surface500}
+                style={styles.input}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </Field>
+            <Field label="Password">
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="password"
+                placeholderTextColor={colors.surface500}
+                style={styles.input}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+              />
+            </Field>
           </>
         )}
 
         {tab === 'stalker' && (
-          <>
-            <Text style={styles.inputLabel}>MAC Address</Text>
+          <Field label="MAC Address">
             <TextInput
               value={macAddress}
               onChangeText={setMacAddress}
@@ -180,27 +188,43 @@ export function SourcesScreen() {
               autoCapitalize="characters"
               autoCorrect={false}
             />
-          </>
+          </Field>
         )}
 
-        <View style={styles.addRow}>
-          <TvButton label="Add & Sync" onSelect={handleAdd} active={canAdd} />
-        </View>
+        <Pressable
+          onPress={handleAdd}
+          disabled={!canAdd}
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            !canAdd && styles.primaryBtnDisabled,
+            pressed && canAdd && { opacity: 0.85 },
+          ]}
+        >
+          <Text
+            style={[
+              styles.primaryBtnText,
+              !canAdd && styles.primaryBtnTextDisabled,
+            ]}
+          >
+            Add & Sync
+          </Text>
+        </Pressable>
 
-        {syncStatus !== 'idle' && (
+        {syncStatus !== 'idle' && syncMessage ? (
           <Text
             style={[
               styles.syncMsg,
               syncStatus === 'error' ? styles.syncMsgError : styles.syncMsgNormal,
             ]}
           >
+            {syncStatus === 'fetching' ? '⟳ ' : syncStatus === 'error' ? '✕ ' : '✓ '}
             {syncMessage}
           </Text>
-        )}
+        ) : null}
       </View>
 
       <Text style={styles.listHeader}>
-        Sources ({sources.length})
+        Saved ({sources.length})
       </Text>
 
       {sources.length === 0 ? (
@@ -211,21 +235,23 @@ export function SourcesScreen() {
             <View style={styles.sourceInfo}>
               <View style={styles.sourceTitleRow}>
                 <Text style={styles.sourceName}>{src.name}</Text>
-                <Text style={styles.sourceBadge}>
-                  {src.type === 'm3u_url'
-                    ? 'M3U'
-                    : src.type === 'xtream'
-                      ? 'Xtream'
-                      : 'Stalker'}
-                </Text>
+                <View style={styles.sourceBadge}>
+                  <Text style={styles.sourceBadgeText}>
+                    {src.type === 'm3u_url'
+                      ? 'M3U'
+                      : src.type === 'xtream'
+                        ? 'XTREAM'
+                        : 'STALKER'}
+                  </Text>
+                </View>
               </View>
               <Text style={styles.sourceUrl} numberOfLines={1}>
                 {src.url}
               </Text>
               <Text style={styles.sourceMeta}>
-                {src.channelCount} items
+                {src.channelCount.toLocaleString()} items
                 {src.lastSynced
-                  ? ` • synced ${new Date(src.lastSynced).toLocaleTimeString()}`
+                  ? ` · ${new Date(src.lastSynced).toLocaleTimeString()}`
                   : ''}
               </Text>
               {src.lastError && (
@@ -233,8 +259,12 @@ export function SourcesScreen() {
               )}
             </View>
             <View style={styles.sourceActions}>
-              <TvButton label="Resync" onSelect={() => void resync(src.id)} />
-              <TvButton label="Remove" onSelect={() => void removeSource(src.id)} />
+              <SmallBtn label="Resync" onPress={() => void resync(src.id)} />
+              <SmallBtn
+                label="Remove"
+                danger
+                onPress={() => void removeSource(src.id)}
+              />
             </View>
           </View>
         ))
@@ -243,81 +273,162 @@ export function SourcesScreen() {
   );
 }
 
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function SmallBtn({
+  label,
+  onPress,
+  danger,
+}: {
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed, focused }) => [
+        styles.smallBtn,
+        danger && styles.smallBtnDanger,
+        (pressed || focused) && styles.smallBtnFocus,
+      ]}
+    >
+      <Text style={[styles.smallBtnText, danger && styles.smallBtnTextDanger]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.surface900,
-  },
   content: {
-    padding: 48,
-  },
-  headerRow: {
-    marginBottom: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.white,
+    paddingBottom: spacing.xxl,
   },
   card: {
-    marginBottom: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface800,
-    padding: 24,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface900,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   tabs: {
-    marginBottom: 16,
     flexDirection: 'row',
-    gap: 12,
+    backgroundColor: colors.surface800,
+    borderRadius: radii.md,
+    padding: 4,
+    marginBottom: spacing.md,
   },
-  inputLabel: {
-    marginBottom: 8,
-    fontSize: 14,
-    color: colors.surface500,
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: radii.sm,
+  },
+  tabBtnActive: {
+    backgroundColor: colors.accent,
+  },
+  tabBtnFocus: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  tabText: {
+    color: colors.surface300,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  tabTextActive: {
+    color: colors.bg,
+  },
+  fieldLabel: {
+    color: colors.surface400,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 6,
   },
   input: {
-    marginBottom: 16,
-    borderRadius: 12,
-    backgroundColor: colors.surface700,
-    paddingHorizontal: 16,
+    backgroundColor: colors.surface800,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radii.md,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     color: colors.white,
-    fontSize: 16,
+    fontSize: 14,
   },
-  addRow: {
-    flexDirection: 'row',
-    gap: 12,
+  primaryBtn: {
+    marginTop: 4,
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    borderRadius: radii.md,
+    alignItems: 'center',
+  },
+  primaryBtnDisabled: {
+    backgroundColor: colors.surface700,
+  },
+  primaryBtnText: {
+    color: colors.bg,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  primaryBtnTextDisabled: {
+    color: colors.surface500,
   },
   syncMsg: {
-    marginTop: 16,
-    fontSize: 14,
+    marginTop: spacing.md,
+    fontSize: 13,
   },
   syncMsgError: {
     color: colors.red400,
   },
   syncMsgNormal: {
-    color: colors.surface400,
+    color: colors.accent,
   },
   listHeader: {
-    marginBottom: 16,
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.white,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.surface400,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   empty: {
+    marginHorizontal: spacing.xl,
     color: colors.surface500,
+    fontSize: 13,
+    paddingVertical: spacing.md,
   },
   sourceRow: {
-    marginBottom: 12,
-    borderRadius: 12,
-    backgroundColor: colors.surface800,
-    padding: 16,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm + 4,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface900,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.md,
   },
   sourceInfo: {
     flex: 1,
@@ -325,39 +436,66 @@ const styles = StyleSheet.create({
   sourceTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   sourceName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.white,
   },
   sourceBadge: {
-    marginLeft: 8,
-    borderRadius: 6,
-    backgroundColor: colors.surface600,
+    backgroundColor: 'rgba(0, 255, 170, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    fontSize: 12,
-    color: colors.surface400,
-    overflow: 'hidden',
+    borderRadius: radii.sm,
+  },
+  sourceBadgeText: {
+    fontSize: 9,
+    color: colors.accent,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   sourceUrl: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 11,
     color: colors.surface500,
   },
   sourceMeta: {
-    marginTop: 4,
-    fontSize: 12,
+    marginTop: 2,
+    fontSize: 11,
     color: colors.surface400,
   },
   sourceError: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 11,
     color: colors.red400,
   },
   sourceActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
+  },
+  smallBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surface800,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  smallBtnFocus: {
+    borderColor: colors.accent,
+  },
+  smallBtnDanger: {
+    backgroundColor: 'rgba(248, 113, 113, 0.08)',
+    borderColor: 'rgba(248, 113, 113, 0.3)',
+  },
+  smallBtnText: {
+    color: colors.surface200,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  smallBtnTextDanger: {
+    color: colors.red400,
   },
 });

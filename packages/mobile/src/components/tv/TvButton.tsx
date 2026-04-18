@@ -1,5 +1,5 @@
-import React, { useRef, useCallback } from 'react';
-import { Text, View, Animated, Pressable, StyleSheet } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { Text, View, Pressable, StyleSheet } from 'react-native';
 import { colors } from '../../styles/theme';
 
 interface TvButtonProps {
@@ -10,55 +10,42 @@ interface TvButtonProps {
 }
 
 export function TvButton({ label, onSelect, autoFocus, active }: TvButtonProps) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const borderOpacity = useRef(new Animated.Value(0)).current;
+  const [focused, setFocused] = useState(false);
+  const [pressed, setPressed] = useState(false);
 
-  const handleFocus = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1.08, useNativeDriver: true, speed: 14, bounciness: 8 }),
-      Animated.timing(borderOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
-    ]).start();
-  }, [scale, borderOpacity]);
-
-  const handleBlur = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 14 }),
-      Animated.timing(borderOpacity, { toValue: 0, duration: 120, useNativeDriver: true }),
-    ]).start();
-  }, [scale, borderOpacity]);
+  const handleFocus = useCallback(() => setFocused(true), []);
+  const handleBlur = useCallback(() => setFocused(false), []);
+  const handlePressIn = useCallback(() => setPressed(true), []);
+  const handlePressOut = useCallback(() => setPressed(false), []);
 
   return (
     <Pressable
       hasTVPreferredFocus={autoFocus}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onPress={onSelect}
+      style={({ pressed: p }) => [
+        styles.button,
+        active ? styles.buttonActive : styles.buttonInactive,
+        (focused || pressed || p) && styles.buttonFocused,
+      ]}
     >
-      <Animated.View
-        style={[
-          styles.button,
-          active ? styles.buttonActive : styles.buttonInactive,
-          { transform: [{ scale }] },
-        ]}
-      >
-        <Animated.View
-          style={[styles.focusRing, { opacity: borderOpacity }]}
-          pointerEvents="none"
-        />
-        <View>
-          <Text style={styles.label}>{label}</Text>
-        </View>
-      </Animated.View>
+      <View>
+        <Text style={styles.label}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    position: 'relative',
     borderRadius: 16,
     paddingHorizontal: 32,
     paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   buttonActive: {
     backgroundColor: colors.brand,
@@ -66,15 +53,9 @@ const styles = StyleSheet.create({
   buttonInactive: {
     backgroundColor: colors.surface700,
   },
-  focusRing: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 16,
-    borderWidth: 2,
+  buttonFocused: {
     borderColor: colors.focus,
+    backgroundColor: colors.surface600,
   },
   label: {
     fontSize: 18,

@@ -1,9 +1,15 @@
 import React from 'react';
-import { View, Text, Image, ScrollView, StatusBar, StyleSheet } from 'react-native';
-import { TvButton } from '../components/tv/TvButton';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useNavStore } from '../stores/nav-store';
 import { useSourcesStore } from '../stores/sources-store';
-import { colors } from '../styles/theme';
+import { colors, radii, spacing } from '../styles/theme';
 
 const TYPE_LABEL: Record<string, string> = {
   live: 'Live channel',
@@ -25,72 +31,89 @@ export function ChannelDetailScreen() {
   if (!channel) {
     return (
       <View style={styles.missing}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.surface900} />
         <Text style={styles.missingTitle}>Channel not found</Text>
-        <View style={styles.missingBtn}>
-          <TvButton label="Back" onSelect={back} autoFocus />
-        </View>
+        <Pressable
+          onPress={back}
+          style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}
+        >
+          <Text style={styles.primaryBtnText}>Back</Text>
+        </Pressable>
       </View>
     );
   }
 
   const canPlay = channel.streamUrl.length > 0;
-  const handlePlay = () => {
-    if (canPlay) openPlayer(channel.id);
-  };
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={colors.surface900} />
-
+    <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.heroRow}>
-        <View style={styles.heroLeft}>
-          {channel.logoUrl ? (
-            <Image
-              source={{ uri: channel.logoUrl }}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoPlaceholderText}>?</Text>
-            </View>
-          )}
-          <View style={styles.heroText}>
-            <Text style={styles.type}>
-              {TYPE_LABEL[channel.type] ?? channel.type}
-            </Text>
-            <Text style={styles.title} numberOfLines={2}>
-              {channel.title}
-            </Text>
-            {channel.groupName && (
-              <Text style={styles.group}>
-                {channel.groupName}
-              </Text>
-            )}
-          </View>
-        </View>
-        <TvButton label="Back" onSelect={back} />
+        <Pressable
+          onPress={back}
+          style={({ pressed, focused }) => [
+            styles.backBtn,
+            (pressed || focused) && styles.backBtnFocus,
+          ]}
+        >
+          <Text style={styles.backBtnText}>← Back</Text>
+        </Pressable>
       </View>
 
-      <View style={styles.actions}>
-        <TvButton
-          label={canPlay ? 'Play' : 'No stream URL'}
-          onSelect={handlePlay}
-          active={canPlay}
-          autoFocus
-        />
+      <View style={styles.hero}>
+        {channel.logoUrl ? (
+          <Image
+            source={{ uri: channel.logoUrl }}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={styles.logoPlaceholder}>
+            <Text style={styles.logoPlaceholderText}>
+              {channel.title.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.heroText}>
+          <Text style={styles.eyebrow}>
+            {TYPE_LABEL[channel.type] ?? channel.type}
+          </Text>
+          <Text style={styles.title} numberOfLines={3}>
+            {channel.title}
+          </Text>
+          {channel.groupName ? (
+            <Text style={styles.group}>{channel.groupName}</Text>
+          ) : null}
+
+          <View style={styles.actions}>
+            <Pressable
+              onPress={() => canPlay && openPlayer(channel.id)}
+              disabled={!canPlay}
+              style={({ pressed, focused }) => [
+                styles.primaryBtn,
+                !canPlay && styles.primaryBtnDisabled,
+                focused && canPlay && styles.primaryBtnFocus,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.primaryBtnText,
+                  !canPlay && styles.primaryBtnTextDisabled,
+                ]}
+              >
+                {canPlay ? '▶  Play' : 'No stream URL'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
 
       <View style={styles.detailsBox}>
         <Text style={styles.detailsHeader}>Details</Text>
         <DetailRow label="Source" value={source?.name ?? '—'} />
         <DetailRow label="Group" value={channel.groupName ?? '—'} />
-        <DetailRow label="tvg-id" value={channel.tvgId ?? '—'} />
-        <DetailRow label="Stream URL" value={channel.streamUrl} mono />
+        <DetailRow label="TVG-ID" value={channel.tvgId ?? '—'} />
+        <DetailRow label="Stream URL" value={channel.streamUrl || '—'} mono />
       </View>
     </ScrollView>
   );
@@ -119,107 +142,156 @@ function DetailRow({
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.surface900,
-  },
   content: {
-    padding: 48,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   missing: {
     flex: 1,
-    backgroundColor: colors.surface900,
-    padding: 48,
+    padding: spacing.xl,
+    alignItems: 'flex-start',
   },
   missingTitle: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
     fontSize: 24,
     fontWeight: '700',
     color: colors.white,
   },
-  missingBtn: {
-    width: 128,
-  },
   heroRow: {
-    marginBottom: 32,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    marginBottom: spacing.md,
   },
-  heroLeft: {
-    flex: 1,
+  backBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface800,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  backBtnFocus: {
+    borderColor: colors.accent,
+  },
+  backBtnText: {
+    color: colors.surface200,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hero: {
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface900,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    marginBottom: spacing.lg,
   },
   logo: {
-    marginRight: 24,
-    height: 96,
-    width: 96,
-    borderRadius: 12,
-    backgroundColor: colors.surface700,
+    height: 140,
+    width: 140,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface800,
   },
   logoPlaceholder: {
-    marginRight: 24,
-    height: 96,
-    width: 96,
-    borderRadius: 12,
-    backgroundColor: colors.surface700,
+    height: 140,
+    width: 140,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface800,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoPlaceholderText: {
-    fontSize: 30,
-    color: colors.surface400,
+    fontSize: 60,
+    color: colors.surface500,
+    fontWeight: '900',
+    fontStyle: 'italic',
   },
   heroText: {
     flex: 1,
   },
-  type: {
-    fontSize: 14,
+  eyebrow: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.focus,
   },
   title: {
-    marginTop: 4,
-    fontSize: 36,
+    marginTop: 6,
+    fontSize: 28,
     fontWeight: '800',
     color: colors.white,
+    lineHeight: 32,
   },
   group: {
-    marginTop: 4,
-    fontSize: 16,
+    marginTop: 6,
+    fontSize: 13,
     color: colors.surface400,
   },
   actions: {
-    marginBottom: 32,
+    marginTop: spacing.md,
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.sm,
+  },
+  primaryBtn: {
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+  },
+  primaryBtnDisabled: {
+    backgroundColor: colors.surface700,
+  },
+  primaryBtnFocus: {
+    shadowColor: colors.accent,
+    shadowOpacity: 0.7,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+  },
+  primaryBtnText: {
+    color: colors.bg,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  primaryBtnTextDisabled: {
+    color: colors.surface500,
   },
   detailsBox: {
-    borderRadius: 16,
-    backgroundColor: colors.surface800,
-    padding: 24,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface900,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   detailsHeader: {
-    marginBottom: 12,
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.white,
+    marginBottom: spacing.md,
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.surface400,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   detailRow: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   detailLabel: {
     marginBottom: 4,
-    fontSize: 12,
+    fontSize: 10,
     textTransform: 'uppercase',
     color: colors.surface500,
+    letterSpacing: 1,
+    fontWeight: '700',
   },
   detailValue: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.white,
   },
   detailValueMono: {
     fontFamily: 'monospace',
+    color: colors.surface300,
+    fontSize: 11,
   },
 });

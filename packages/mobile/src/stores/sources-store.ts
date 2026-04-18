@@ -8,12 +8,15 @@ import {
   type ContentType,
   type M3uEntry,
 } from '@yancotv/core';
-import { fetchHttpClient, fetchTextRaw } from '../http/fetch-http-client';
+import { fetchHttpClient, fetchTextRaw, pingHost } from '../http/fetch-http-client';
 import { asyncStorageKV } from '../storage/async-storage';
 import { getJson, setJson, type KVStore } from '../storage/kv-store';
 
 const KEY_SOURCES = 'yancotv.v1.sources';
-const KEY_CHANNELS = 'yancotv.v1.channels';
+// Channels are NOT persisted. On old devices (e.g. Pixel XL) a 10k-item JSON
+// blob overruns AsyncStorage's SQLite (SQLITE_FULL, code 12) and crashes the
+// app. Sources alone are tiny, so we keep those saved and re-sync on demand.
+const KEY_CHANNELS_LEGACY = 'yancotv.v1.channels';
 
 export type MobileSourceType = 'm3u_url' | 'xtream' | 'stalker';
 
@@ -98,11 +101,8 @@ function m3uEntryToItem(
   };
 }
 
-async function persist(sources: MobileSource[], channels: ContentItem[]) {
-  await Promise.all([
-    setJson(kv, KEY_SOURCES, sources),
-    setJson(kv, KEY_CHANNELS, channels),
-  ]);
+async function persistSources(sources: MobileSource[]) {
+  await setJson(kv, KEY_SOURCES, sources);
 }
 
 async function syncM3u(
@@ -122,6 +122,12 @@ async function syncXtream(
   source: XtreamSource,
   setMsg: (msg: string) => void,
 ): Promise<ContentItem[]> {
+  setMsg(`Reaching ${source.name}...`);
+  const ping = await pingHost(source.url);
+  if (!ping.ok) {
+    throw new Error(`Cannot reach server. ${ping.detail}`);
+  }
+
   const client = new XtreamClient(source.url, source.username, source.password, {
     http: fetchHttpClient,
   });
@@ -130,24 +136,20 @@ async function syncXtream(
   const auth = await client.authenticate();
   if (!auth.ok) throw auth.error;
 
-  setMsg('Fetching live channels...');
-  const liveResult = await client.getLiveStreams();
+  setMsg('Fetching everything in parallel...');
+  const [liveResult, vodResult, seriesResult, liveCats, vodCats, seriesCats] =
+    await Promise.all([
+      client.getLiveStreams(),
+      client.getVodStreams(),
+      client.getSeriesList(),
+      client.getLiveCategories(),
+      client.getVodCategories(),
+      client.getSeriesCategories(),
+    ]);
+
   if (!liveResult.ok) throw liveResult.error;
-
-  setMsg('Fetching movies...');
-  const vodResult = await client.getVodStreams();
   if (!vodResult.ok) throw vodResult.error;
-
-  setMsg('Fetching series...');
-  const seriesResult = await client.getSeriesList();
   if (!seriesResult.ok) throw seriesResult.error;
-
-  setMsg('Fetching categories...');
-  const [liveCats, vodCats, seriesCats] = await Promise.all([
-    client.getLiveCategories(),
-    client.getVodCategories(),
-    client.getSeriesCategories(),
-  ]);
 
   const catMap = new Map<string, string>();
   for (const r of [liveCats, vodCats, seriesCats]) {
@@ -223,28 +225,30 @@ async function syncStalker(
     http: fetchHttpClient,
   });
 
+  setMsg(`Reaching ${source.name}...`);
+  const ping = await pingHost(source.url);
+  if (!ping.ok) {
+    throw new Error(`Cannot reach server. ${ping.detail}`);
+  }
+
   setMsg('Authenticating with portal...');
   const auth = await client.authenticate();
   if (!auth.ok) throw auth.error;
 
-  setMsg('Fetching live channels...');
-  const liveResult = await client.getLiveChannels();
+  setMsg('Fetching everything in parallel...');
+  const [liveResult, vodResult, seriesResult, liveCats, vodCats, seriesCats] =
+    await Promise.all([
+      client.getLiveChannels(),
+      client.getVodItems(),
+      client.getSeriesList(),
+      client.getLiveCategories(),
+      client.getVodCategories(),
+      client.getSeriesCategories(),
+    ]);
+
   if (!liveResult.ok) throw liveResult.error;
-
-  setMsg('Fetching movies...');
-  const vodResult = await client.getVodItems();
   if (!vodResult.ok) throw vodResult.error;
-
-  setMsg('Fetching series...');
-  const seriesResult = await client.getSeriesList();
   if (!seriesResult.ok) throw seriesResult.error;
-
-  setMsg('Fetching categories...');
-  const [liveCats, vodCats, seriesCats] = await Promise.all([
-    client.getLiveCategories(),
-    client.getVodCategories(),
-    client.getSeriesCategories(),
-  ]);
 
   const catMap = new Map<string, string>();
   for (const r of [liveCats, vodCats, seriesCats]) {
@@ -316,15 +320,19 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
 
   hydrate: async () => {
     if (get().hydrated) return;
-    const [sources, channels] = await Promise.all([
-      getJson<MobileSource[]>(kv, KEY_SOURCES),
-      getJson<ContentItem[]>(kv, KEY_CHANNELS),
-    ]);
+    const sources = await getJson<MobileSource[]>(kv, KEY_SOURCES);
     set({
       sources: sources ?? [],
-      channels: channels ?? [],
+      channels: [],
       hydrated: true,
     });
+    // Best-effort cleanup of the legacy channels blob if an older build
+    // previously wrote one. Ignore failures.
+    try {
+      await kv.remove(KEY_CHANNELS_LEGACY);
+    } catch {
+      // noop
+    }
   },
 
   addM3uSource: async ({ name, url }) => {
@@ -337,7 +345,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       channelCount: 0,
     };
     set((s) => ({ sources: [...s.sources, source] }));
-    await persist(get().sources, get().channels);
+    await persistSources(get().sources);
     await get().resync(source.id);
   },
 
@@ -353,7 +361,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       channelCount: 0,
     };
     set((s) => ({ sources: [...s.sources, source] }));
-    await persist(get().sources, get().channels);
+    await persistSources(get().sources);
     await get().resync(source.id);
   },
 
@@ -368,7 +376,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       channelCount: 0,
     };
     set((s) => ({ sources: [...s.sources, source] }));
-    await persist(get().sources, get().channels);
+    await persistSources(get().sources);
     await get().resync(source.id);
   },
 
@@ -377,7 +385,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       sources: s.sources.filter((src) => src.id !== id),
       channels: s.channels.filter((ch) => ch.sourceId !== id),
     }));
-    await persist(get().sources, get().channels);
+    await persistSources(get().sources);
   },
 
   resync: async (id) => {
@@ -413,7 +421,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
         syncStatus: 'done',
         syncMessage: `Synced ${items.length} items`,
       }));
-      await persist(get().sources, get().channels);
+      await persistSources(get().sources);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       set((s) => ({
@@ -423,7 +431,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
         syncStatus: 'error',
         syncMessage: msg,
       }));
-      await persist(get().sources, get().channels);
+      await persistSources(get().sources);
     }
   },
 }));
