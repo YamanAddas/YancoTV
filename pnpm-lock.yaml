@@ -17,6 +17,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
+      '@yancotv/core':
+        specifier: workspace:*
+        version: link:packages/core
       better-sqlite3:
         specifier: ^12.9.0
         version: 12.9.0
@@ -150,6 +153,16 @@ importers:
       zustand:
         specifier: ^5.0.3
         version: 5.0.12(@types/react@18.3.28)(react@18.3.1)
+
+  packages/core:
+    dependencies:
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
 packages:
 

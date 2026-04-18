@@ -6,10 +6,10 @@ export {
   groupPrefSetSchema,
   groupPrefReorderSchema,
   channelOverrideSchema,
-} from '@yancotv/core';
+} from './source';
 export type {
   AddSourceInput,
   UpdateSourceInput,
   GroupPrefSetInput,
   ChannelOverrideInput,
-} from '@yancotv/core';
+} from './source';
