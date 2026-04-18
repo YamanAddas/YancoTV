@@ -306,7 +306,7 @@ All tasks completed:
 | 21.4 | E2E tests | Playwright tests for critical flows: add source → browse → play → record → download | |
 | 21.5 | Unit test coverage | Add tests for new services: reminder-service, crash-handler, opensubtitles-client (720 tests, +32 this sprint) | DONE |
 | 21.6 | Manual testing pass | Full test with multiple real IPTV sources (M3U, Xtream, Stalker). Edge cases and error recovery | |
-| 21.7 | Windows installer polish | electron-builder NSIS installer: desktop shortcut, start menu, uninstaller, file associations | |
+| 21.7 | Windows installer polish | electron-builder NSIS installer: desktop shortcut, start menu, uninstaller, file associations | DONE |
 | 21.8 | Portable build | Standalone .exe that runs without installation. Verify settings/DB portability | |
 | 21.9 | Security audit | Review CSP, IPC validation, credential storage, URL handling. Pen-test the preload bridge. Findings: parental PIN moved to salted scrypt + timing-safe compare + brute-force cooldown. All other categories verified clean | DONE |
 | 21.10 | Release prep | Version bumping, changelog, build pipeline verification, code signing (if available) | |

@@ -1,5 +1,6 @@
 appId: com.yancotv.app
 productName: YancoTV
+copyright: Copyright © 2026 Yaman
 directories:
   output: release
   buildResources: build
@@ -15,6 +16,15 @@ extraResources:
     to: mpv/
     filter:
       - "**/*"
+fileAssociations:
+  - ext: m3u
+    name: M3U Playlist
+    description: IPTV playlist
+    role: Viewer
+  - ext: m3u8
+    name: HLS Playlist
+    description: HTTP Live Streaming playlist
+    role: Viewer
 win:
   target:
     - target: nsis
@@ -22,10 +32,18 @@ win:
     - target: portable
       arch: x64
   icon: src/assets/icon.ico
+  publisherName: Yaman
+  artifactName: "${productName}-Setup-${version}.${ext}"
 nsis:
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  menuCategory: true
+  shortcutName: YancoTV
+  uninstallDisplayName: ${productName} ${version}
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
 portable:
   artifactName: "${productName}-${version}-portable.exe"

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Custom IPTV media application",
   "private": true,
+  "author": {
+    "name": "Yaman",
+    "email": "yamanaddas@gmail.com"
+  },
   "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "concurrently -k \"pnpm dev:vite\" \"pnpm dev:electron\"",
