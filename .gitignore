@@ -11,3 +11,13 @@ release/
 mpv/
 playwright-report/
 test-results/
+
+# Mobile APK outputs
+dist-apk/
+packages/mobile/android/app/build/
+packages/mobile/android/build/
+packages/mobile/android/.gradle/
+
+# Local working files (secrets, scratch)
+dont commit.txt
+/yancotv_logo.png
