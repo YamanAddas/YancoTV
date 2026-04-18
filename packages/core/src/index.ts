@@ -2,6 +2,9 @@ export * from './types';
 export * from './parsers';
 export * from './content';
 export * from './catchup';
+export * from './http';
+export * from './xtream';
+export * from './stalker';
 
 export { NOOP_LOGGER } from './logger';
 export type { Logger } from './logger';
