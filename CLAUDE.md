@@ -210,7 +210,7 @@ pnpm audit            # Security audit
 - **Sprint 18:** DONE (system tray, auto-update check, backup export/import, crash handler, about dialog, app icon)
 - **Sprint 19:** DONE (search filters/history/autocomplete, channel zapping, last-channel recall, recent strip, reminders, toasts)
 - **Sprint 20:** DONE (buffer/timeout/auto-reconnect, per-source UA override, proxy support, customizable shortcuts, gamepad input)
-- **Sprint 21:** IN PROGRESS (21.1, 21.2, 21.3, 21.4, 21.5, 21.7, 21.8, 21.9, 21.10 DONE — only 21.6 manual QA pending)
+- **Sprint 21:** 21.1–21.5 + 21.7–21.10 DONE. 21.6 checklist shipped at `tests/MANUAL_QA.md` — human execution against real IPTV sources pending before release sign-off.
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
