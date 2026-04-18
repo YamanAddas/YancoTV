@@ -21,6 +21,7 @@ import { getDb } from './db';
 import { parseXmltv } from './xmltv-parser';
 import type { XmltvProgramme } from './xmltv-parser';
 import { IpcChannels } from '../../shared/ipc-channels';
+import { APP_NAME, APP_VERSION } from '../../shared/constants';
 import type {
   EpgProgramme,
   NowNext,
@@ -564,7 +565,7 @@ function fetchEpgData(url: string): Promise<Buffer> {
       timeout: FETCH_TIMEOUT,
       headers: {
         'Accept-Encoding': 'gzip',
-        'User-Agent': 'YancoTV/0.1.0',
+        'User-Agent': `${APP_NAME}/${APP_VERSION}`,
       },
     };
 

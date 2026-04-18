@@ -149,9 +149,10 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
     }
   }, [isVod, duration, position, seek, onInteraction]);
 
-  const handleMinimize = useCallback(() => {
-    // TODO: Sprint 12B — switch to Browse Mode with mini-player
-    // For now, just stop playback
+  // The top-left "Back" button exits theater mode by stopping playback.
+  // A mini-player / PIP variant was planned (Sprint 12B / 16) but dropped
+  // in 0.2.0 — see CHANGELOG. "Back = stop" matches the button's label.
+  const handleBack = useCallback(() => {
     stop();
   }, [stop]);
 
@@ -166,7 +167,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
       <div className="bg-gradient-to-b from-black/70 to-transparent px-6 pb-12 pt-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={handleMinimize}
+            onClick={handleBack}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
             title="Back (Esc)"
           >

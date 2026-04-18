@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getVideoElement } from '../components/player/video-ref';
+import { useRecentChannelsStore } from './recent-channels-store';
 
 export type PlayerMode = 'idle' | 'theater';
 export type PlayerBackend = 'mpv' | 'html5' | 'none';
@@ -176,7 +177,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     // recall shortcut, and auto-play-on-launch. Movies/series use watch history
     // instead, so we only record the live case here.
     if (contentType === 'live' && contentId) {
-      const { useRecentChannelsStore } = await import('./recent-channels-store');
       useRecentChannelsStore.getState().record(contentId);
     }
 
