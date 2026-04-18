@@ -10,7 +10,7 @@ import {
 const STORAGE_KEY = 'yancotv.recent-channels';
 
 const localStorageAdapter: RecentChannelsAdapter = {
-  readInitial: () => {
+  read: async () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return [];
@@ -21,7 +21,7 @@ const localStorageAdapter: RecentChannelsAdapter = {
       return [];
     }
   },
-  write: (entries: string[]) => {
+  write: async (entries: string[]) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
     } catch {
@@ -31,3 +31,7 @@ const localStorageAdapter: RecentChannelsAdapter = {
 };
 
 export const useRecentChannelsStore = createRecentChannelsStore(localStorageAdapter);
+
+// Hydrate immediately — localStorage reads are synchronous under the hood so
+// this resolves before the first render settles.
+useRecentChannelsStore.getState().hydrate();
