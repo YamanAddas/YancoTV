@@ -6,7 +6,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { ClipPath, Defs, Polygon } from 'react-native-svg';
+import MaskedView from '@react-native-masked-view/masked-view';
+import Svg, { Polygon } from 'react-native-svg';
 import { SvgXml } from 'react-native-svg';
 import { colors } from '../../styles/theme';
 import {
@@ -26,7 +27,6 @@ interface Props {
   onPress: () => void;
 }
 
-// Simple scaled hex polygon points — used as a CSS clip-path replacement.
 function scalePoints(points: string, w: number, h: number): string {
   return points
     .split(' ')
@@ -37,13 +37,21 @@ function scalePoints(points: string, w: number, h: number): string {
     .join(' ');
 }
 
+function HexMask({ width, height }: { width: number; height: number }) {
+  const points = scalePoints(HEX_CLIP_POINTS, width, height);
+  return (
+    <Svg width={width} height={height}>
+      <Polygon points={points} fill="#000" />
+    </Svg>
+  );
+}
+
 export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
   const [focused, setFocused] = useState(false);
   const [imgError, setImgError] = useState(false);
   const height = Math.round(width / HEX_ASPECT);
   const showImage = !!imageUrl && !imgError;
   const letter = (title || '?').charAt(0).toUpperCase();
-  const clipPoints = scalePoints(HEX_CLIP_POINTS, width, height);
 
   return (
     <Pressable
@@ -55,26 +63,9 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
       style={({ pressed }) => [styles.root, pressed && styles.pressed]}
     >
       <View style={[styles.frame, { width, height }]}>
-        {/* Clipped content layer — image or fallback letter inside the hex */}
-        <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-          <Defs>
-            <ClipPath id="hexBody">
-              <Polygon points={clipPoints} />
-            </ClipPath>
-          </Defs>
-        </Svg>
-        <View
-          style={[
-            styles.contentClip,
-            {
-              width,
-              height,
-              // React Native iOS/Android do support clipPath via react-native-svg
-              // on <View> only through masking workarounds. Falling back to the
-              // frame SVG rendering over a rounded content box keeps things
-              // simple and still looks correct at typical card sizes.
-            },
-          ]}
+        <MaskedView
+          style={{ width, height }}
+          maskElement={<HexMask width={width} height={height} />}
         >
           {showImage ? (
             <Image
@@ -88,11 +79,9 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
               <Text style={styles.fallbackLetter}>{letter}</Text>
             </View>
           )}
-          {/* Bottom fade for legibility */}
           <View style={styles.bottomFade} pointerEvents="none" />
-        </View>
+        </MaskedView>
 
-        {/* Hex frame SVG overlay */}
         <SvgXml
           xml={focused ? HEX_FRAME_HOVER : HEX_FRAME_NORMAL}
           width={width}
@@ -127,17 +116,10 @@ const styles = StyleSheet.create({
   frame: {
     position: 'relative',
   },
-  // Inner content slightly inset so it does not bleed outside the hex border
-  contentClip: {
-    overflow: 'hidden',
-    // Approximate hex via borderRadius to avoid native clip-path — visually
-    // very close once the SVG frame sits on top.
-    borderRadius: 16,
-    backgroundColor: colors.surface900,
-  },
   image: {
     width: '100%',
     height: '100%',
+    backgroundColor: colors.surface900,
   },
   fallback: {
     flex: 1,
