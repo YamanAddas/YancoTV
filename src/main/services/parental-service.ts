@@ -1,14 +1,33 @@
-import { createHash } from 'crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import log from 'electron-log/main';
 import { getDb } from './db';
 
 // ---------------------------------------------------------------------------
 // Parental Controls Service
 //
-// PIN-based protection for content access. Uses SHA-256 hashing for PIN
-// storage (not bcrypt — PINs are short numeric codes, not passwords, and
-// we need synchronous verification for UX).
+// PIN-based protection for content access. New PINs are hashed with scrypt
+// and a per-PIN 16-byte random salt. Legacy unsalted SHA-256 hashes are still
+// accepted on verify and transparently upgraded to the salted format on the
+// next successful check. Verification is constant-time and rate-limited to
+// deter local brute-force attempts.
 // ---------------------------------------------------------------------------
+
+const SCRYPT_KEY_LEN = 64;
+const SCRYPT_SALT_BYTES = 16;
+// scrypt cost params tuned to ~20ms on a modern desktop — painful to brute
+// force 4-digit PINs, still fast enough to keep PIN entry snappy.
+const SCRYPT_N = 1 << 14;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+
+// Rate limit: allow FAIL_THRESHOLD misses in a row for free, then lock for an
+// exponentially-growing cooldown that doubles per further miss up to a cap.
+const FAIL_THRESHOLD = 5;
+const LOCKOUT_BASE_MS = 30_000;
+const LOCKOUT_MAX_MS = 5 * 60_000;
+
+let failedAttempts = 0;
+let lockoutUntil = 0;
 
 export interface ParentalSettings {
   /** Whether PIN protection is enabled */
@@ -33,8 +52,32 @@ export interface ChannelOverride {
 // PIN Management
 // ---------------------------------------------------------------------------
 
-function hashPin(pin: string): string {
+function legacyHash(pin: string): string {
   return createHash('sha256').update(pin).digest('hex');
+}
+
+function scryptHash(pin: string, salt: Buffer): Buffer {
+  return scryptSync(pin, salt, SCRYPT_KEY_LEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P });
+}
+
+function encodeScrypt(pin: string): string {
+  const salt = randomBytes(SCRYPT_SALT_BYTES);
+  const hash = scryptHash(pin, salt);
+  return `scrypt:${salt.toString('hex')}:${hash.toString('hex')}`;
+}
+
+function constantTimeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+function writePinHash(encoded: string): void {
+  const db = getDb();
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_hash', ?)").run(encoded);
 }
 
 /**
@@ -42,22 +85,87 @@ function hashPin(pin: string): string {
  */
 export function setPin(pin: string): void {
   const db = getDb();
-  const hash = hashPin(pin);
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_hash', ?)").run(hash);
+  writePinHash(encodeScrypt(pin));
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_enabled', '1')").run();
+  failedAttempts = 0;
+  lockoutUntil = 0;
   log.info('Parental PIN set');
 }
 
 /**
- * Verify a PIN against the stored hash.
+ * ms remaining on the current brute-force cooldown, or 0 if not locked.
+ */
+export function getPinLockoutMs(): number {
+  const remaining = lockoutUntil - Date.now();
+  return remaining > 0 ? remaining : 0;
+}
+
+/**
+ * Reset the in-memory failure counter and cooldown. Used by tests and after
+ * legitimate administrative actions (e.g. PIN removal).
+ */
+export function resetPinAttempts(): void {
+  failedAttempts = 0;
+  lockoutUntil = 0;
+}
+
+function registerFailure(): void {
+  failedAttempts += 1;
+  if (failedAttempts >= FAIL_THRESHOLD) {
+    const over = failedAttempts - FAIL_THRESHOLD;
+    const cooldown = Math.min(LOCKOUT_BASE_MS * 2 ** over, LOCKOUT_MAX_MS);
+    lockoutUntil = Date.now() + cooldown;
+  }
+}
+
+/**
+ * Verify a PIN against the stored hash. Returns false during a brute-force
+ * cooldown regardless of correctness. Legacy unsalted SHA-256 hashes are
+ * accepted once and upgraded to scrypt on the next successful check.
  */
 export function verifyPin(pin: string): boolean {
+  if (getPinLockoutMs() > 0) return false;
+
   const db = getDb();
   const row = db.prepare("SELECT value FROM settings WHERE key = 'parental_pin_hash'").get() as
     | { value: string }
     | undefined;
   if (!row) return false;
-  return row.value === hashPin(pin);
+
+  const stored = row.value;
+  let ok = false;
+  let legacy = false;
+
+  if (stored.startsWith('scrypt:')) {
+    const [, saltHex, hashHex] = stored.split(':');
+    if (saltHex && hashHex) {
+      const salt = Buffer.from(saltHex, 'hex');
+      const expected = Buffer.from(hashHex, 'hex');
+      const actual = scryptHash(pin, salt);
+      ok = actual.length === expected.length && timingSafeEqual(actual, expected);
+    }
+  } else if (/^[a-f0-9]{64}$/i.test(stored)) {
+    // Legacy unsalted SHA-256 — verify constant-time, then upgrade on success.
+    legacy = true;
+    ok = constantTimeEqualHex(stored, legacyHash(pin));
+  }
+
+  if (ok) {
+    failedAttempts = 0;
+    lockoutUntil = 0;
+    if (legacy) {
+      try {
+        writePinHash(encodeScrypt(pin));
+        log.info('Parental PIN upgraded to salted scrypt hash');
+      } catch (err) {
+        log.warn('Failed to upgrade parental PIN hash', err);
+      }
+    }
+    return true;
+  }
+
+  registerFailure();
+  return false;
 }
 
 /**
@@ -67,6 +175,8 @@ export function removePin(): void {
   const db = getDb();
   db.prepare("DELETE FROM settings WHERE key = 'parental_pin_hash'").run();
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_enabled', '0')").run();
+  failedAttempts = 0;
+  lockoutUntil = 0;
   log.info('Parental PIN removed');
 }
 
