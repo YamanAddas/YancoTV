@@ -173,7 +173,7 @@ YancoTV/
 │       ├── timeshift-service.test.ts
 │       ├── category-grouping.test.ts
 │       └── ipc-wiring.test.ts
-└── (no docs/ or tests/e2e/ directories yet)
+└── tests/e2e/                         # Playwright E2E: app-launch, navigation, search, settings, keyboard-shortcuts
 ```
 
 ## Commands
@@ -187,7 +187,7 @@ pnpm build:renderer   # Build renderer only
 pnpm package          # Build + create Windows installer (NSIS + portable)
 pnpm test             # Run unit tests (rebuilds better-sqlite3 ABI first)
 pnpm test:watch       # Run tests in watch mode
-pnpm test:e2e         # Run e2e tests (NOT YET SET UP — no Playwright config or test files)
+pnpm test:e2e         # Run Playwright E2E tests against the built app
 pnpm lint             # Lint all src/ files
 pnpm lint:fix         # Auto-fix lint issues
 pnpm format           # Format all src/ files with Prettier
@@ -210,7 +210,7 @@ pnpm audit            # Security audit
 - **Sprint 18:** DONE (system tray, auto-update check, backup export/import, crash handler, about dialog, app icon)
 - **Sprint 19:** DONE (search filters/history/autocomplete, channel zapping, last-channel recall, recent strip, reminders, toasts)
 - **Sprint 20:** DONE (buffer/timeout/auto-reconnect, per-source UA override, proxy support, customizable shortcuts, gamepad input)
-- **Sprint 21:** IN PROGRESS (stabilization — error handling audit, perf/memory, tests, installer polish, security audit)
+- **Sprint 21:** IN PROGRESS (21.1, 21.2, 21.3, 21.5, 21.7, 21.8, 21.9, 21.10 DONE — 21.4 E2E exists, 21.6 manual QA pending)
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
@@ -218,7 +218,6 @@ See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full roadmap.
 
 These are listed in PRODUCTION_PLAN.md but do not exist in code yet:
 
-- E2E tests with Playwright (Sprint 21.4)
 - `docs/` directory
 
 ## Architecture Rules
