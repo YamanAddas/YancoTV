@@ -19,9 +19,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "pako": "^2.1.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/pako": "^2.0.4",
     "typescript": "^5.7.3"
   }
 }

@@ -6,10 +6,12 @@
  * The main parse function is async and yields to the event loop every
  * 2 000 programmes so IPC handlers remain responsive throughout.
  *
- * Platform-agnostic: takes a plain XML string. The desktop side owns
- * gunzip/Buffer handling since core must not depend on Node `zlib`.
+ * Platform-agnostic: accepts plain XML strings OR gzipped byte arrays.
+ * Gzip is handled via `pako`, which works on Node, RN, and browsers, so
+ * desktop and mobile share the same entry point.
  */
 
+import { inflate, ungzip } from 'pako';
 import { NOOP_LOGGER, type Logger } from '../logger';
 
 // ---------------------------------------------------------------------------
@@ -65,6 +67,46 @@ export async function parseXmltvString(
 
   logger.info(`XMLTV parsed: ${channels.length} channels, ${programmes.length} programmes`);
   return { channels, programmes };
+}
+
+/**
+ * Unified entry point. Accepts a plain XML string, a gzipped byte array,
+ * or a plain-text byte array. Detects gzip via magic number (0x1F 0x8B)
+ * and decompresses via `pako` — works identically on Node, React Native,
+ * and browsers.
+ */
+export async function parseXmltv(
+  input: string | Uint8Array,
+  logger: Logger = NOOP_LOGGER,
+): Promise<XmltvResult> {
+  const xml = typeof input === 'string' ? input : await decodeXmltvBytes(input);
+  return parseXmltvString(xml, logger);
+}
+
+/**
+ * Decode an XMLTV byte array. Auto-detects gzip and raw deflate, falling
+ * back to UTF-8 text. Exposed for callers that want to pre-process bytes
+ * (e.g. fetch them once and re-decode for diagnostics).
+ */
+export async function decodeXmltvBytes(input: Uint8Array): Promise<string> {
+  if (isGzip(input)) {
+    return ungzip(input, { to: 'string' });
+  }
+  if (isZlib(input)) {
+    return inflate(input, { to: 'string' });
+  }
+  return new TextDecoder('utf-8').decode(input);
+}
+
+function isGzip(bytes: Uint8Array): boolean {
+  return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+}
+
+function isZlib(bytes: Uint8Array): boolean {
+  // zlib header: first byte 0x78, second byte one of 0x01/0x5e/0x9c/0xda
+  if (bytes.length < 2 || bytes[0] !== 0x78) return false;
+  const b1 = bytes[1];
+  return b1 === 0x01 || b1 === 0x5e || b1 === 0x9c || b1 === 0xda;
 }
 
 // ---------------------------------------------------------------------------
