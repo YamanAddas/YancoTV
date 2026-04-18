@@ -90,15 +90,16 @@ export function encodePinScryptSync(pin: string): string {
 }
 
 export function verifyPinAgainstHashSync(pin: string, stored: string): PinVerifyResult {
-  if (stored.startsWith('scrypt:')) {
-    const parsed = parseScrypt(stored);
+  const normalized = stored.trim();
+  if (normalized.startsWith('scrypt:')) {
+    const parsed = parseScrypt(normalized);
     if (!parsed) return { ok: false, legacy: false };
     const actual = scrypt(utf8ToBytes(pin), parsed.salt, SCRYPT_OPTS);
     return { ok: timingSafeEqualBytes(actual, parsed.expected), legacy: false };
   }
-  if (isLegacySha256(stored)) {
+  if (isLegacySha256(normalized)) {
     const actual = sha256(utf8ToBytes(pin));
-    const expected = hexToBytes(stored);
+    const expected = hexToBytes(normalized);
     return { ok: timingSafeEqualBytes(actual, expected), legacy: true };
   }
   return { ok: false, legacy: false };
@@ -119,15 +120,16 @@ export async function verifyPinAgainstHashAsync(
   pin: string,
   stored: string,
 ): Promise<PinVerifyResult> {
-  if (stored.startsWith('scrypt:')) {
-    const parsed = parseScrypt(stored);
+  const normalized = stored.trim();
+  if (normalized.startsWith('scrypt:')) {
+    const parsed = parseScrypt(normalized);
     if (!parsed) return { ok: false, legacy: false };
     const actual = await scryptAsync(utf8ToBytes(pin), parsed.salt, SCRYPT_OPTS);
     return { ok: timingSafeEqualBytes(actual, parsed.expected), legacy: false };
   }
-  if (isLegacySha256(stored)) {
+  if (isLegacySha256(normalized)) {
     const actual = sha256(utf8ToBytes(pin));
-    const expected = hexToBytes(stored);
+    const expected = hexToBytes(normalized);
     return { ok: timingSafeEqualBytes(actual, expected), legacy: true };
   }
   return { ok: false, legacy: false };

@@ -84,16 +84,27 @@ export async function parseXmltv(
 }
 
 /**
- * Decode an XMLTV byte array. Auto-detects gzip and raw deflate, falling
- * back to UTF-8 text. Exposed for callers that want to pre-process bytes
- * (e.g. fetch them once and re-decode for diagnostics).
+ * Decode an XMLTV byte array. Auto-detects gzip and zlib-wrapped deflate,
+ * falling back to UTF-8 text. Exposed for callers that want to pre-process
+ * bytes (e.g. fetch them once and re-decode for diagnostics).
+ *
+ * Caveat: multi-member gzip streams aren't supported. `pako.ungzip` decodes
+ * only the first member. Real-world XMLTV feeds ship as single-member gzip
+ * so this hasn't been an issue — if we ever see a multi-member feed we'll
+ * need to switch to `pako.Inflate` in streaming mode.
  */
 export async function decodeXmltvBytes(input: Uint8Array): Promise<string> {
   if (isGzip(input)) {
     return ungzip(input, { to: 'string' });
   }
   if (isZlib(input)) {
-    return inflate(input, { to: 'string' });
+    try {
+      return inflate(input, { to: 'string' });
+    } catch {
+      // Fall through to UTF-8 — the 0x78 prefix happens to match some plain
+      // UTF-8 text (e.g. starts with the letter 'x'), so only accept inflate
+      // if it actually works.
+    }
   }
   return new TextDecoder('utf-8').decode(input);
 }
@@ -103,10 +114,14 @@ function isGzip(bytes: Uint8Array): boolean {
 }
 
 function isZlib(bytes: Uint8Array): boolean {
-  // zlib header: first byte 0x78, second byte one of 0x01/0x5e/0x9c/0xda
+  // zlib header: first byte 0x78 (deflate, 32K window). Second byte carries
+  // the flag/check bits — rather than enumerating the four canonical values
+  // we accept any 0x78-prefixed buffer whose (byte0*256 + byte1) % 31 === 0,
+  // which is the official header checksum and catches every valid preset.
+  // decodeXmltvBytes still try/catches the inflate so a false positive on
+  // a plain-text 'x'-prefixed XMLTV file falls back to UTF-8 decoding.
   if (bytes.length < 2 || bytes[0] !== 0x78) return false;
-  const b1 = bytes[1];
-  return b1 === 0x01 || b1 === 0x5e || b1 === 0x9c || b1 === 0xda;
+  return ((bytes[0] << 8) | bytes[1]) % 31 === 0;
 }
 
 // ---------------------------------------------------------------------------
