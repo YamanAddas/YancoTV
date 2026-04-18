@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -53,6 +53,15 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
   const showImage = !!imageUrl && !imgError;
   const letter = (title || '?').charAt(0).toUpperCase();
 
+  // Reset the error flag when the URL changes — otherwise a card that once
+  // failed to load (e.g. an earlier TVG logo 404) stays stuck on the fallback
+  // letter even after the parent hands it a fresh, working URL.
+  useEffect(() => {
+    setImgError(false);
+  }, [imageUrl]);
+
+  const a11yLabel = subtitle ? `${title}, ${subtitle}` : title;
+
   return (
     <Pressable
       onPress={onPress}
@@ -60,6 +69,8 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
       onBlur={() => setFocused(false)}
       onHoverIn={() => setFocused(true)}
       onHoverOut={() => setFocused(false)}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
       style={({ pressed }) => [styles.root, pressed && styles.pressed]}
     >
       <View style={[styles.frame, { width, height }]}>

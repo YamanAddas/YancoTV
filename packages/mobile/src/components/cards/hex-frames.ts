@@ -1,6 +1,28 @@
-// Inline SVG strings for the three hex frame states. These are direct copies of
-// the desktop assets at src/renderer/assets/hex-frames/*.svg and are rendered
-// via react-native-svg's SvgXml so we don't need a metro SVG transformer.
+// Inline SVG strings for the hex frame states. Direct ports of the desktop
+// assets at src/renderer/assets/hex-frames/*.svg, rendered via
+// react-native-svg's SvgXml so we don't need a metro SVG transformer.
+//
+// Accent / teal / surface hex values are pulled from theme.ts via template
+// interpolation so a single palette change propagates everywhere. The
+// tertiary shades (deep-green bevel stops, interior fills) are artistic
+// accents not exposed in theme.ts — those stay inline and are documented
+// alongside the source desktop SVGs.
+
+import { colors } from '../../styles/theme';
+
+// Accent triangle stops — tuned against the desktop SVG by eye.
+const ACCENT_MID = '#00DDBB';        // between accent and teal
+const ACCENT_FAR = '#00BBDD';        // between teal and accent
+const ACCENT_FAR_H = '#00DDEE';      // hover variant
+const ACCENT_HIGHLIGHT = '#33FFD0';  // cyan accent (matches theme.cyan)
+const ACCENT_LIGHT = '#66FFCC';      // bevel top stop
+const ACCENT_LIGHT_H = '#88FFDD';    // hover bevel top stop
+const ACCENT_LIGHT_2 = '#66FFDD';    // hover corner gradient start
+const ACCENT_CORNER = '#44FFCC';     // normal corner gradient start
+const BEVEL_BOTTOM = '#003322';      // bevel fade-out (dark accent)
+const INNER_FILL_TOP_N = '#0a1a18';  // radial-fill top stop, normal
+const INNER_FILL_TOP_H = '#0c2220';  // radial-fill top stop, hover
+const INNER_FILL_BOT = '#040a0e';    // radial-fill bottom stop (both states)
 
 export const HEX_FRAME_NORMAL = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 230" fill="none">
   <defs>
@@ -16,23 +38,23 @@ export const HEX_FRAME_NORMAL = `<svg xmlns="http://www.w3.org/2000/svg" viewBox
       </feMerge>
     </filter>
     <linearGradient id="outerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00FFAA" stop-opacity="0.85"/>
-      <stop offset="35%" stop-color="#00DDBB" stop-opacity="0.5"/>
-      <stop offset="65%" stop-color="#00BBDD" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#00CCFF" stop-opacity="0.85"/>
+      <stop offset="0%" stop-color="${colors.accent}" stop-opacity="0.85"/>
+      <stop offset="35%" stop-color="${ACCENT_MID}" stop-opacity="0.5"/>
+      <stop offset="65%" stop-color="${ACCENT_FAR}" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="${colors.teal}" stop-opacity="0.85"/>
     </linearGradient>
     <linearGradient id="bevelGrad" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#66FFCC" stop-opacity="0.4"/>
-      <stop offset="30%" stop-color="#00FFAA" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#003322" stop-opacity="0"/>
+      <stop offset="0%" stop-color="${ACCENT_LIGHT}" stop-opacity="0.4"/>
+      <stop offset="30%" stop-color="${colors.accent}" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="${BEVEL_BOTTOM}" stop-opacity="0"/>
     </linearGradient>
     <radialGradient id="innerFill" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#0a1a18" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#040a0e" stop-opacity="0.95"/>
+      <stop offset="0%" stop-color="${INNER_FILL_TOP_N}" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="${INNER_FILL_BOT}" stop-opacity="0.95"/>
     </radialGradient>
     <linearGradient id="cornerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#44FFCC" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#00CCFF" stop-opacity="0.3"/>
+      <stop offset="0%" stop-color="${ACCENT_CORNER}" stop-opacity="1"/>
+      <stop offset="100%" stop-color="${colors.teal}" stop-opacity="0.3"/>
     </linearGradient>
   </defs>
   <polygon points="100,8 188,60 188,170 100,222 12,170 12,60" stroke="url(#outerGrad)" stroke-width="1.5" fill="none" filter="url(#glow)" opacity="0.45"/>
@@ -44,14 +66,14 @@ export const HEX_FRAME_NORMAL = `<svg xmlns="http://www.w3.org/2000/svg" viewBox
   <line x1="100" y1="8" x2="52" y2="36" stroke="url(#cornerGrad)" stroke-width="2.5" stroke-linecap="round"/>
   <line x1="100" y1="222" x2="145" y2="196" stroke="url(#cornerGrad)" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
   <line x1="100" y1="222" x2="55" y2="196" stroke="url(#cornerGrad)" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
-  <line x1="188" y1="90" x2="194" y2="90" stroke="#00FFAA" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
-  <line x1="188" y1="115" x2="196" y2="115" stroke="#00FFAA" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
-  <line x1="188" y1="140" x2="194" y2="140" stroke="#00FFAA" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
-  <line x1="12" y1="90" x2="6" y2="90" stroke="#00CCFF" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
-  <line x1="12" y1="115" x2="4" y2="115" stroke="#00CCFF" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
-  <line x1="12" y1="140" x2="6" y2="140" stroke="#00CCFF" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
-  <polygon points="192,115 188,112 184,115 188,118" fill="#00FFAA" opacity="0.3"/>
-  <polygon points="8,115 12,112 16,115 12,118" fill="#00CCFF" opacity="0.3"/>
+  <line x1="188" y1="90" x2="194" y2="90" stroke="${colors.accent}" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="188" y1="115" x2="196" y2="115" stroke="${colors.accent}" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
+  <line x1="188" y1="140" x2="194" y2="140" stroke="${colors.accent}" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="12" y1="90" x2="6" y2="90" stroke="${colors.teal}" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="12" y1="115" x2="4" y2="115" stroke="${colors.teal}" stroke-width="1.8" opacity="0.45" stroke-linecap="round"/>
+  <line x1="12" y1="140" x2="6" y2="140" stroke="${colors.teal}" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+  <polygon points="192,115 188,112 184,115 188,118" fill="${colors.accent}" opacity="0.3"/>
+  <polygon points="8,115 12,112 16,115 12,118" fill="${colors.teal}" opacity="0.3"/>
 </svg>`;
 
 export const HEX_FRAME_HOVER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 230" fill="none">
@@ -68,27 +90,27 @@ export const HEX_FRAME_HOVER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox=
       </feMerge>
     </filter>
     <linearGradient id="outerGradH" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#33FFBB" stop-opacity="1"/>
-      <stop offset="30%" stop-color="#00FFAA" stop-opacity="0.8"/>
-      <stop offset="70%" stop-color="#00DDEE" stop-opacity="0.8"/>
+      <stop offset="0%" stop-color="${colors.accentHover}" stop-opacity="1"/>
+      <stop offset="30%" stop-color="${colors.accent}" stop-opacity="0.8"/>
+      <stop offset="70%" stop-color="${ACCENT_FAR_H}" stop-opacity="0.8"/>
       <stop offset="100%" stop-color="#33DDFF" stop-opacity="1"/>
     </linearGradient>
     <linearGradient id="bevelGradH" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#88FFDD" stop-opacity="0.5"/>
-      <stop offset="25%" stop-color="#33FFBB" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#003322" stop-opacity="0"/>
+      <stop offset="0%" stop-color="${ACCENT_LIGHT_H}" stop-opacity="0.5"/>
+      <stop offset="25%" stop-color="${colors.accentHover}" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="${BEVEL_BOTTOM}" stop-opacity="0"/>
     </linearGradient>
     <radialGradient id="innerFillH" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#0c2220" stop-opacity="0.75"/>
-      <stop offset="100%" stop-color="#040a0e" stop-opacity="0.9"/>
+      <stop offset="0%" stop-color="${INNER_FILL_TOP_H}" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="${INNER_FILL_BOT}" stop-opacity="0.9"/>
     </radialGradient>
     <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00FFAA" stop-opacity="0"/>
-      <stop offset="50%" stop-color="#33FFCC" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#00CCFF" stop-opacity="0"/>
+      <stop offset="0%" stop-color="${colors.accent}" stop-opacity="0"/>
+      <stop offset="50%" stop-color="${ACCENT_HIGHLIGHT}" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="${colors.teal}" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="cornerGradH" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#66FFDD" stop-opacity="1"/>
+      <stop offset="0%" stop-color="${ACCENT_LIGHT_2}" stop-opacity="1"/>
       <stop offset="100%" stop-color="#33DDFF" stop-opacity="0.5"/>
     </linearGradient>
   </defs>
@@ -102,15 +124,15 @@ export const HEX_FRAME_HOVER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox=
   <line x1="100" y1="8" x2="48" y2="38" stroke="url(#cornerGradH)" stroke-width="3" stroke-linecap="round"/>
   <line x1="100" y1="222" x2="148" y2="195" stroke="url(#cornerGradH)" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
   <line x1="100" y1="222" x2="52" y2="195" stroke="url(#cornerGradH)" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
-  <line x1="188" y1="90" x2="195" y2="90" stroke="#33FFBB" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
-  <line x1="188" y1="115" x2="197" y2="115" stroke="#33FFBB" stroke-width="2" opacity="0.6" stroke-linecap="round"/>
-  <line x1="188" y1="140" x2="195" y2="140" stroke="#33FFBB" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <line x1="188" y1="90" x2="195" y2="90" stroke="${colors.accentHover}" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <line x1="188" y1="115" x2="197" y2="115" stroke="${colors.accentHover}" stroke-width="2" opacity="0.6" stroke-linecap="round"/>
+  <line x1="188" y1="140" x2="195" y2="140" stroke="${colors.accentHover}" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
   <line x1="12" y1="90" x2="5" y2="90" stroke="#33DDFF" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
   <line x1="12" y1="115" x2="3" y2="115" stroke="#33DDFF" stroke-width="2" opacity="0.6" stroke-linecap="round"/>
   <line x1="12" y1="140" x2="5" y2="140" stroke="#33DDFF" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
-  <polygon points="194,115 188,111 182,115 188,119" fill="#33FFBB" opacity="0.5"/>
+  <polygon points="194,115 188,111 182,115 188,119" fill="${colors.accentHover}" opacity="0.5"/>
   <polygon points="6,115 12,111 18,115 12,119" fill="#33DDFF" opacity="0.5"/>
-  <polygon points="100,4 104,8 100,12 96,8" fill="#66FFDD" opacity="0.4"/>
+  <polygon points="100,4 104,8 100,12 96,8" fill="${ACCENT_LIGHT_2}" opacity="0.4"/>
 </svg>`;
 
 // Clip-path polygon used over the inner image so it stays inside the hex body.
