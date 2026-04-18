@@ -3,8 +3,5 @@ module.exports = {
     '@react-native/babel-preset',
     ['nativewind/babel', { jsxImportSource: 'nativewind' }],
   ],
-  plugins: [
-    // Reanimated plugin MUST be last.
-    'react-native-reanimated/plugin',
-  ],
+  // react-native-reanimated re-added in Phase 4 after tvos compat verified
 };

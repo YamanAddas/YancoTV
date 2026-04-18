@@ -1,53 +1,44 @@
-import React from 'react';
-import { Text, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
-import { Focusable } from '../../focus/Focusable';
+import React, { useRef, useCallback } from 'react';
+import { Text, View, Animated, Pressable } from 'react-native';
 
 interface TvButtonProps {
   label: string;
   onSelect: () => void;
   autoFocus?: boolean;
+  active?: boolean;
 }
 
-/**
- * TV-optimized button: scales up + glows on D-pad focus.
- * Reanimated worklet keeps the animation on the UI thread (60fps).
- */
-export function TvButton({ label, onSelect, autoFocus }: TvButtonProps) {
-  const scale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0);
+export function TvButton({ label, onSelect, autoFocus, active }: TvButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const borderOpacity = useRef(new Animated.Value(0)).current;
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const handleFocus = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1.08, useNativeDriver: true, speed: 14, bounciness: 8 }),
+      Animated.timing(borderOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start();
+  }, [scale, borderOpacity]);
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
+  const handleBlur = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 14 }),
+      Animated.timing(borderOpacity, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]).start();
+  }, [scale, borderOpacity]);
 
   return (
-    <Focusable
+    <Pressable
       hasTVPreferredFocus={autoFocus}
-      onFocus={() => {
-        scale.value = withSpring(1.08, { damping: 14, stiffness: 180 });
-        glowOpacity.value = withSpring(1, { damping: 20 });
-      }}
-      onBlur={() => {
-        scale.value = withSpring(1);
-        glowOpacity.value = withSpring(0);
-      }}
-      onSelect={onSelect}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onPress={onSelect}
     >
       <Animated.View
-        style={animatedStyle}
-        className="relative rounded-2xl bg-surface-700 px-8 py-4"
+        style={{ transform: [{ scale }] }}
+        className={`relative rounded-2xl px-8 py-4 ${active ? 'bg-brand' : 'bg-surface-700'}`}
       >
         <Animated.View
-          style={glowStyle}
+          style={{ opacity: borderOpacity }}
           className="absolute inset-0 rounded-2xl border-2 border-focus"
           pointerEvents="none"
         />
@@ -55,6 +46,6 @@ export function TvButton({ label, onSelect, autoFocus }: TvButtonProps) {
           <Text className="text-lg font-semibold text-white">{label}</Text>
         </View>
       </Animated.View>
-    </Focusable>
+    </Pressable>
   );
 }

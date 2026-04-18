@@ -1,30 +1,5 @@
-import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { HomeScreen } from '../screens/HomeScreen';
-import { LiveTvScreen } from '../screens/LiveTvScreen';
-import { PlayerScreen } from '../screens/PlayerScreen';
+// Navigation stack added in Phase 2 once react-navigation + safe-area-context
+// are confirmed compatible with react-native-tvos 0.85.
+// HomeScreen is rendered directly from App.tsx for Phase 1.
 
-export type RootStackParamList = {
-  Home: undefined;
-  LiveTv: undefined;
-  Player: { streamUrl: string; title: string };
-};
-
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
-export function RootNavigator() {
-  return (
-    <Stack.Navigator
-      initialRouteName="Home"
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: '#0a0a0f' },
-        animation: 'fade',
-      }}
-    >
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="LiveTv" component={LiveTvScreen} />
-      <Stack.Screen name="Player" component={PlayerScreen} />
-    </Stack.Navigator>
-  );
-}
+export {};
