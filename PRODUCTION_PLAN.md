@@ -300,16 +300,16 @@ All tasks completed:
 
 | # | Task | Details | Status |
 |---|------|---------|--------|
-| 21.1 | Error handling audit | Review all IPC handlers, parsers, network calls, player operations for proper error handling | IN PROGRESS |
-| 21.2 | Performance profiling | Profile renderer: fix unnecessary re-renders, optimize virtualized lists with 50K+ items |
-| 21.3 | Memory leak detection | Monitor main + renderer memory over extended use. Fix leaks in player, EPG refresh, download manager |
-| 21.4 | E2E tests | Playwright tests for critical flows: add source → browse → play → record → download |
-| 21.5 | Unit test coverage | Add tests for new services: EPG parser, catch-up, recording, download manager, Stalker client |
-| 21.6 | Manual testing pass | Full test with multiple real IPTV sources (M3U, Xtream, Stalker). Edge cases and error recovery |
-| 21.7 | Windows installer polish | electron-builder NSIS installer: desktop shortcut, start menu, uninstaller, file associations |
-| 21.8 | Portable build | Standalone .exe that runs without installation. Verify settings/DB portability |
-| 21.9 | Security audit | Review CSP, IPC validation, credential storage, URL handling. Pen-test the preload bridge |
-| 21.10 | Release prep | Version bumping, changelog, build pipeline verification, code signing (if available) |
+| 21.1 | Error handling audit | Review all IPC handlers, parsers, network calls, player operations for proper error handling | DONE |
+| 21.2 | Performance profiling | Profile renderer: fix unnecessary re-renders, optimize virtualized lists with 50K+ items | |
+| 21.3 | Memory leak detection | Monitor main + renderer memory over extended use. Fix leaks in player, EPG refresh, download manager | |
+| 21.4 | E2E tests | Playwright tests for critical flows: add source → browse → play → record → download | |
+| 21.5 | Unit test coverage | Add tests for new services: reminder-service, crash-handler, opensubtitles-client (720 tests, +32 this sprint) | DONE |
+| 21.6 | Manual testing pass | Full test with multiple real IPTV sources (M3U, Xtream, Stalker). Edge cases and error recovery | |
+| 21.7 | Windows installer polish | electron-builder NSIS installer: desktop shortcut, start menu, uninstaller, file associations | |
+| 21.8 | Portable build | Standalone .exe that runs without installation. Verify settings/DB portability | |
+| 21.9 | Security audit | Review CSP, IPC validation, credential storage, URL handling. Pen-test the preload bridge | |
+| 21.10 | Release prep | Version bumping, changelog, build pipeline verification, code signing (if available) | |
 
 **Deliverable:** Stable, tested, installable Windows app. Ready for daily use.
 
