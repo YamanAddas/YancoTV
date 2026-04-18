@@ -13,12 +13,14 @@
     "./parsers": "./src/parsers/index.ts",
     "./clients": "./src/clients/index.ts",
     "./content": "./src/content/index.ts",
-    "./catchup": "./src/catchup/index.ts"
+    "./catchup": "./src/catchup/index.ts",
+    "./parental": "./src/parental/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@noble/hashes": "^2.2.0",
     "pako": "^2.1.0",
     "zod": "^3.24.2"
   },

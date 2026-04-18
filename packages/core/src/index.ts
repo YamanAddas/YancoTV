@@ -2,6 +2,7 @@ export * from './types';
 export * from './parsers';
 export * from './content';
 export * from './catchup';
+export * from './parental';
 export * from './http';
 export * from './xtream';
 export * from './stalker';

@@ -1,5 +1,8 @@
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import log from 'electron-log/main';
+import {
+  encodePinScryptSync,
+  verifyPinAgainstHashSync,
+} from '@yancotv/core';
 import { getDb } from './db';
 
 // ---------------------------------------------------------------------------
@@ -11,14 +14,6 @@ import { getDb } from './db';
 // next successful check. Verification is constant-time and rate-limited to
 // deter local brute-force attempts.
 // ---------------------------------------------------------------------------
-
-const SCRYPT_KEY_LEN = 64;
-const SCRYPT_SALT_BYTES = 16;
-// scrypt cost params tuned to ~20ms on a modern desktop — painful to brute
-// force 4-digit PINs, still fast enough to keep PIN entry snappy.
-const SCRYPT_N = 1 << 14;
-const SCRYPT_R = 8;
-const SCRYPT_P = 1;
 
 // Rate limit: allow FAIL_THRESHOLD misses in a row for free, then lock for an
 // exponentially-growing cooldown that doubles per further miss up to a cap.
@@ -52,29 +47,6 @@ export interface ChannelOverride {
 // PIN Management
 // ---------------------------------------------------------------------------
 
-function legacyHash(pin: string): string {
-  return createHash('sha256').update(pin).digest('hex');
-}
-
-function scryptHash(pin: string, salt: Buffer): Buffer {
-  return scryptSync(pin, salt, SCRYPT_KEY_LEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P });
-}
-
-function encodeScrypt(pin: string): string {
-  const salt = randomBytes(SCRYPT_SALT_BYTES);
-  const hash = scryptHash(pin, salt);
-  return `scrypt:${salt.toString('hex')}:${hash.toString('hex')}`;
-}
-
-function constantTimeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
-  } catch {
-    return false;
-  }
-}
-
 function writePinHash(encoded: string): void {
   const db = getDb();
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_hash', ?)").run(encoded);
@@ -85,7 +57,7 @@ function writePinHash(encoded: string): void {
  */
 export function setPin(pin: string): void {
   const db = getDb();
-  writePinHash(encodeScrypt(pin));
+  writePinHash(encodePinScryptSync(pin));
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('parental_pin_enabled', '1')").run();
   failedAttempts = 0;
   lockoutUntil = 0;
@@ -132,30 +104,14 @@ export function verifyPin(pin: string): boolean {
     | undefined;
   if (!row) return false;
 
-  const stored = row.value;
-  let ok = false;
-  let legacy = false;
-
-  if (stored.startsWith('scrypt:')) {
-    const [, saltHex, hashHex] = stored.split(':');
-    if (saltHex && hashHex) {
-      const salt = Buffer.from(saltHex, 'hex');
-      const expected = Buffer.from(hashHex, 'hex');
-      const actual = scryptHash(pin, salt);
-      ok = actual.length === expected.length && timingSafeEqual(actual, expected);
-    }
-  } else if (/^[a-f0-9]{64}$/i.test(stored)) {
-    // Legacy unsalted SHA-256 — verify constant-time, then upgrade on success.
-    legacy = true;
-    ok = constantTimeEqualHex(stored, legacyHash(pin));
-  }
+  const { ok, legacy } = verifyPinAgainstHashSync(pin, row.value);
 
   if (ok) {
     failedAttempts = 0;
     lockoutUntil = 0;
     if (legacy) {
       try {
-        writePinHash(encodeScrypt(pin));
+        writePinHash(encodePinScryptSync(pin));
         log.info('Parental PIN upgraded to salted scrypt hash');
       } catch (err) {
         log.warn('Failed to upgrade parental PIN hash', err);
