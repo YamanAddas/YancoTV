@@ -1,6 +1,38 @@
 # YancoTV — Architecture
 
-## System Overview
+## Two Apps, One Core
+
+YancoTV ships as two sibling apps driven by a shared TypeScript core.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        @yancotv/core                                 │
+│                                                                      │
+│  Types · Zod schemas · M3U parser · XMLTV parser · Xtream client     │
+│  Stalker client · Content classifier · Title cleaner · Catchup URLs  │
+│  HTTP client interface · Zustand store factories · Parental PIN      │
+│                                                                      │
+│  Pure TypeScript. No UI. No platform I/O. Only `zod` as dep.         │
+└───────────────┬──────────────────────────────────┬───────────────────┘
+                │                                  │
+    consumes    ▼                                  ▼    consumes
+┌───────────────────────────────┐   ┌──────────────────────────────────┐
+│  Electron Desktop (Windows)   │   │  React Native Mobile             │
+│                               │   │  (Android TV + Google TV +       │
+│  src/main  +  src/renderer    │   │   Fire TV + phone/tablet)        │
+│  better-sqlite3 · mpv · ffmpeg│   │  op-sqlite · ExoPlayer · Media3  │
+│                               │   │  react-native-keychain · Notifee │
+└───────────────────────────────┘   └──────────────────────────────────┘
+```
+
+**Why this shape:**
+- Every parser/client/classifier has one implementation, one test suite
+- Platform apps own their UI, persistence driver, player backend, and OS integration — and nothing else
+- New platform (iOS? web?) means a new consumer of the same core
+
+See [CLAUDE.md § The `@yancotv/core` Discipline](CLAUDE.md#the-yancotvcore-discipline) for the rules on what belongs in core.
+
+## Desktop System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -381,3 +413,262 @@ All channels defined in `src/shared/ipc-channels.ts`:
 - `src/renderer/utils/` — Utility functions
 - `src/shared/types/` — TypeScript interfaces/types used by both processes
 - `src/shared/schemas/` — Zod validation schemas
+
+---
+
+## Mobile System Overview
+
+The mobile app ships a single React Native APK that targets Android TV, Google TV, Fire TV, and Android phones/tablets. Unlike the desktop app, there is no process boundary between UI and services — everything runs inside the JS bundle plus native Android modules.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                 React Native APK (single bundle)             │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  JS Bundle (Hermes)                                    │  │
+│  │                                                        │  │
+│  │  React Native UI  +  Zustand stores  +  TanStack Query │  │
+│  │  React Navigation 7  (drawer on TV / tabs on phone)    │  │
+│  │                                                        │  │
+│  │  @yancotv/core: parsers · clients · classifier · types │  │
+│  │  fetch-http-client (XMLHttpRequest-based)              │  │
+│  └──────────┬───────────────────┬─────────────────┬───────┘  │
+│             │ JSI               │ bridge          │ bridge   │
+│             ▼                   ▼                 ▼          │
+│  ┌────────────────┐   ┌────────────────┐  ┌───────────────┐  │
+│  │  op-sqlite     │   │ExoPlayer/Media3│  │ Keystore      │  │
+│  │  (native)      │   │ (via RN-Video) │  │ (Keychain)    │  │
+│  │                │   │                │  │               │  │
+│  │  same schema   │   │  IPlayer parity│  │ credential    │  │
+│  │  as desktop    │   │  mirror        │  │ encryption    │  │
+│  └────────────────┘   └────────────────┘  └───────────────┘  │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Key differences vs. desktop:**
+- No IPC — the renderer-equivalent calls services directly through JSI and JS imports
+- Persistence driver is op-sqlite (JSI-based, synchronous-friendly) instead of better-sqlite3
+- Playback backend is Android's Media3/ExoPlayer via react-native-video 6 instead of an mpv child process
+- OS-level credential encryption goes through Android Keystore via react-native-keychain (no Electron safeStorage)
+- One navigator switches drawer (TV) vs. bottom tabs (phone) off `Platform.isTV`; UI components branch on the same flag
+
+## Mobile Process Model
+
+The React Native runtime is split across the JavaScript bundle (Hermes engine) and the native Android layer. Our code runs in four zones:
+
+| Zone | Owns | Example |
+|---|---|---|
+| JS: platform-agnostic (`@yancotv/core`) | Parsers, API clients, classifiers, Zod schemas, pure functions | `XtreamClient.getStreams()` |
+| JS: mobile-specific (`packages/mobile/src/`) | UI, navigation, stores, screens, React Native glue | `PlayerScreen.tsx` |
+| Native: third-party modules | op-sqlite, react-native-video, react-native-keychain, masked-view, Sentry | op-sqlite JSI bridge |
+| Native: Android platform (`android/app/src/main/`) | Manifest (Leanback + standard launcher), Gradle config, MainActivity | `AndroidManifest.xml` |
+
+There is NO separate "main process" — the JS bundle owns all business logic and orchestrates the native modules directly.
+
+## Mobile Data Flow
+
+### Adding a Source
+
+```
+User enters M3U URL or Xtream credentials (AddSourceForm)
+  → sources-store.addSource(input)
+    → Validates input with Zod schema (from @yancotv/core)
+    → fetch-http-client fetches M3U / calls Xtream API
+    → M3U parser or XtreamClient (from @yancotv/core) parses response
+    → content-classifier classifies entries (live / movie / series)
+    → title-cleaner normalizes titles
+    → op-sqlite inserts into content table (batched)
+    → react-native-keychain encrypts credentials and stores under key `source:<id>`
+    → Store emits state update → UI re-renders
+```
+
+### Playing a Stream
+
+```
+User clicks a channel (ChannelListScreen or Content Detail)
+  → player-store.play(url, title, contentId)
+    → history-store records start position (throttled)
+    → PlayerScreen mounts with route params
+    → react-native-video <Video> component opens stream
+      → ExoPlayer/Media3 handles HLS/DASH/MPEG-TS natively
+    → onProgress callback → history-store.updatePosition (throttled)
+    → onError → Sentry capture + user-visible toast
+```
+
+No IPC hop. No process boundary. The UI, the store, and the DB call all happen in the same JS runtime; only the video surface + persistence engine cross into native.
+
+## Mobile Services
+
+Everything the desktop does in `src/main/services/` has a mobile counterpart. Some live in `@yancotv/core` (shared), others in `packages/mobile/src/` (platform-specific).
+
+| Desktop service | Mobile counterpart | Location | Milestone |
+|---|---|---|---|
+| `m3u-parser.ts` | Same | `@yancotv/core` | Already extracted |
+| `xtream-client.ts` | Same | `@yancotv/core` | Already extracted |
+| `stalker-client.ts` | Same | `@yancotv/core` | Already extracted |
+| `content-classifier.ts` | Same | `@yancotv/core` | Already extracted |
+| `title-cleaner.ts` | Same | `@yancotv/core` | Already extracted |
+| `xmltv-parser.ts` | Same (streaming via byte chunks, no Node stream dep) | `@yancotv/core` | M1.4 |
+| `catchup-service.ts` | Same (pure URL builder) | `@yancotv/core` | M1.4 |
+| `parental-service.ts` | PIN hashing in core; DB ops mobile-local | `@yancotv/core` + `packages/mobile/src/db/` | M1.4 + M7.5 |
+| `db.ts` (better-sqlite3 init) | `packages/mobile/src/db/index.ts` (op-sqlite init + WAL) | mobile | M2 |
+| `content-store.ts` | `packages/mobile/src/db/content-repo.ts` | mobile | M4 |
+| `source-manager.ts` | `packages/mobile/src/stores/sources-store.ts` + repo | mobile | M1 + M4 |
+| `source-sync.ts` | `packages/mobile/src/services/source-sync.ts` | mobile | M4 |
+| `epg-service.ts` | `packages/mobile/src/services/epg-service.ts` | mobile | M6 |
+| `timeshift-service.ts` | `packages/mobile/src/services/timeshift-service.ts` | mobile | M6 (playback buffer config via react-native-video) |
+| `favorites-store.ts` | `packages/mobile/src/db/favorites-repo.ts` + store | mobile | M5 |
+| `history-store.ts` | `packages/mobile/src/db/history-repo.ts` + store | mobile | M4–M5 |
+| `credential-store.ts` (safeStorage) | `packages/mobile/src/services/keychain.ts` (react-native-keychain) | mobile | M7 |
+| `recording-service.ts` | **DROPPED v1** (Media3 can't drive arbitrary ffmpeg recording on-device without a large native module; deferred) | — | Post-release |
+| `download-manager.ts` | `packages/mobile/src/services/download-service.ts` (Media3 HLS download API) | mobile | Post-release |
+| `metadata-service.ts` (TMDb) | Same (pure HTTP) | `@yancotv/core` | M7 |
+| `subtitle-service.ts` | Same client; file I/O mobile-local (RNFS) | `@yancotv/core` + mobile | M7 |
+| `settings-service.ts` | `packages/mobile/src/db/settings-repo.ts` | mobile | M7 |
+
+## Mobile Player Abstraction
+
+The desktop `IPlayer` interface (see above) is mirrored on mobile. The mobile implementation (`packages/mobile/src/player/rn-video-player.ts`, M4) wraps react-native-video:
+
+```typescript
+// packages/mobile/src/player/rn-video-player.ts (M4)
+class RnVideoPlayer implements IPlayer {
+  play(url: string, options?: PlayOptions): Promise<void>;     // sets <Video source={url}>
+  pause(): Promise<void>;                                       // paused prop
+  seek(seconds: number): Promise<void>;                         // ref.seek()
+  setSubtitleTrack(id: number): Promise<void>;                  // selectedTextTrack prop
+  getAudioTracks(): AudioTrack[];                               // from onLoad event
+  setSpeed(speed: number): Promise<void>;                       // rate prop
+  // ...same contract as desktop
+}
+```
+
+Benefits:
+- Screens and stores never import react-native-video directly — they talk to `IPlayer`
+- Swapping backends (e.g. to a VLC-based player for broader codec support) is a one-file change
+- The existing desktop `player-store` logic ports over with only the `IPlayer` constructor wiring changed
+
+## Mobile Persistence Model
+
+Post-M2 the app has three storage tiers:
+
+```
+AsyncStorage (small keys only — 64MB cap configured in gradle.properties)
+  └── app:hydrated, app:last-screen, app:theme, ephemeral UI state
+
+op-sqlite @ yancotv-mobile.db (WAL mode, FTS5 enabled)
+  ├── sources             ── same schema as desktop (migration 001–007 mirrored)
+  ├── content             ── same schema, same FTS5 trigger pattern
+  ├── episodes
+  ├── favorites
+  ├── watch_history
+  ├── epg_programmes
+  ├── locked_channels, hidden_channels, channel_overrides
+  ├── settings
+  └── content_fts         ── FTS5 virtual table
+
+Android Keystore (via react-native-keychain)
+  └── source credentials  ── username / password / MAC keyed by `source:<id>`
+```
+
+**Schema mirroring rule:** the `packages/mobile/src/db/migrations/` folder contains byte-identical copies of `src/main/services/migrations/*.sql`. Any schema change ports to both folders in the same commit. There is no divergent-schema story — both apps read the same shape.
+
+**Why AsyncStorage stays in the picture:** it's the fastest hydration path for small Zustand state (which tab was active, whether the DB is ready). Content lists never touch it — historically, persisting 10K channels there triggered `SQLITE_FULL` until the 64MB cap was raised, and op-sqlite closes that door entirely.
+
+## Mobile State Management
+
+Same Zustand stores, same shapes as desktop — only the backing service differs:
+
+| Store | Desktop reads from | Mobile reads from |
+|---|---|---|
+| `sources-store` | IPC → `source-manager.ts` | Direct → `sources-repo.ts` + `keychain.ts` |
+| `player-store` | IPC → `IPlayer` in main | Direct → `RnVideoPlayer` (same `IPlayer` contract) |
+| `favorites-store` | IPC → `favorites-store.ts` in main | Direct → `favorites-repo.ts` |
+| `history-store` | IPC → `history-store.ts` in main | Direct → `history-repo.ts` |
+| `settings-store` | IPC → `settings-service.ts` | Direct → `settings-repo.ts` |
+| `parental-store` | IPC → `parental-service.ts` | Direct → `parental-repo.ts` + core PIN hashing |
+
+Action signatures match one-for-one (e.g. `play(url, title, contentId)` exists on both). Any new store action lands in both apps in the same PR — that's the discipline that keeps future core extraction cheap.
+
+Hydration lives in `App.tsx`'s hydration gate: AsyncStorage restores small keys first, op-sqlite opens on a background task, and the UI unblocks once both resolve. Long-lived content arrays are NEVER persisted to AsyncStorage — they're queried on demand.
+
+## Mobile Navigation
+
+React Navigation 7, installed in M3. The root navigator branches once on `Platform.isTV`:
+
+```
+                         RootNavigator
+                              │
+          ┌───────────────────┴───────────────────┐
+          ▼  isTV                            !isTV ▼
+   TvDrawerNavigator                  PhoneTabNavigator
+   ├── Home                           ├── Home
+   ├── Live TV                        ├── Browse (stack: Live/Movies/Series)
+   ├── Movies                         ├── Search
+   ├── Series                         ├── Favorites
+   ├── Search                         └── Settings
+   ├── Favorites
+   ├── Guide (EPG)
+   ├── Settings
+   └── (Player overlays as modal stack on both)
+```
+
+After M3 the ad-hoc `ScreenRouter.tsx` / `nav-store.ts` pattern is deleted. All navigation flows through React Navigation's `navigate()` / linking config / deep links. Phase 2's manual router was a scaffolding crutch — no new screens should reach for it.
+
+## Mobile Focus Model
+
+TV focus is handled by a single primitive — either a `<Focusable>` wrapper or `TVFocusGuideView` from `react-native-tvos`. Rules:
+
+- Every screen declares a first-focus element via `hasTVPreferredFocus` on mount
+- Every horizontal rail inside a vertical scroller wraps in `TVFocusGuideView` with `destinations={[...]}` so D-pad doesn't "fall through" the ScrollView edge
+- `useFocusEffect` restores focus when returning from navigation (React Navigation drops it by default)
+- `FlatList`/`FlashList` with `removeClippedSubviews=false` inside focusable rails — otherwise off-screen items lose their focus target on scroll
+
+No screen rolls its own focus logic — all TV-specific behavior goes through the shared primitive. Debugging focus? Enable the focus-overlay switch (added in M3.8) that outlines the currently-focused element in red.
+
+## Mobile Security Model
+
+| Concern | Mitigation |
+|---|---|
+| Credential storage | `react-native-keychain` backed by Android Keystore; no plaintext in SQLite or AsyncStorage |
+| HTTP traffic to IPTV providers | `android:usesCleartextTraffic="true"` because many providers are HTTP-only; acceptable because user supplies their own credentials for their own sources |
+| Untrusted playlist data | Same Zod validation layer as desktop (shared via `@yancotv/core`) |
+| Remote content loading | Streams go only to the ExoPlayer surface, never to a WebView |
+| PIN enforcement | Hashed via scrypt (shared core); DB-backed lock list; attempts rate-limited in-store |
+| Sentry | Breadcrumbs scrub URL params with known credential keys (`password`, `mac`, `token`) via the same redactor used by fetch-http-client |
+
+No Electron-specific concerns apply (no `contextIsolation`, no preload bridge to harden) — but the native-module surface adds its own risks: any third-party module added ships with native code that we can't fully audit. Every native dep landing in package.json needs a brief review of its permissions footprint in the Android manifest.
+
+## Mobile Build & Distribution
+
+```
+pnpm android                → local Gradle build (debug APK)
+cd android && ./gradlew assembleRelease   → signed release APK
+```
+
+Distribution targets (M9):
+- **Google Play** (phone + TV listings share one app; TV listing requires Leanback launcher intent-filter in manifest — already present)
+- **Fire TV app store** (Amazon Appstore — separate submission, same APK)
+- **Sideload** for users on TV boxes without a store (`adb install -r app-release.apk`)
+
+No EAS / no cloud build yet — local Gradle is sufficient through M8. EAS becomes attractive once we need per-device-class build variants (e.g. an ExoPlayer extension build for older Fire TV Stick hardware).
+
+## Cross-Platform Invariants
+
+Things that MUST stay identical between desktop and mobile:
+
+1. **Database schema** — byte-identical migration SQL in both apps
+2. **Core API surface** — `@yancotv/core` exports the same types, parsers, clients to both
+3. **Zustand store signatures** — action names and signatures match (e.g. `player.play(url, title, contentId)`)
+4. **Zod schemas** — input validation lives in core; both apps validate against the same rules
+5. **Parental PIN format** — scrypt params identical so a backup from desktop can restore on mobile (M9)
+6. **Settings keys** — same key names in `settings` table so export/import works across platforms
+
+Things that MAY diverge:
+- UI layouts (obviously — hex grid on desktop, bottom-tab phone view, D-pad-first TV drawer)
+- Player feature surface (mpv supports things ExoPlayer doesn't and vice versa — `IPlayer` exposes the intersection; extras are per-platform extensions)
+- Recording (desktop only, v1)
+- Background tasks (desktop uses setInterval; mobile wraps in JS-level timers and hands off to Notifee/Media3 for OS-level scheduling)
+
+When in doubt, push shared behavior into `@yancotv/core` and keep platform glue thin.

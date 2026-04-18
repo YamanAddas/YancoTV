@@ -1,76 +1,60 @@
 # @yancotv/mobile
 
-Android TV + Google TV + Fire TV + Android phone/tablet client for YancoTV, built on React Native TV.
+Android TV + Google TV + Fire TV + Android phone/tablet client for YancoTV, built on React Native TV. Single APK — TV and phone share one codebase and adapt at the navigator/component level.
 
-This is the Phase 1 scaffold. The JS/TS layer is ready. The native Android project is not yet generated — that's the first bootstrap step.
+**Mission:** feature parity with the [Electron desktop app](../../README.md), then surpass it on mobile-native capabilities (D-pad focus, picture-in-picture, Chromecast, voice search, home-launcher integration).
+
+## Documentation Map
+
+- **[PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md)** — Full roadmap, milestones M1→M9, parity matrix. The source of truth for what to build.
+- **[CLAUDE.md](CLAUDE.md)** — Mobile project guide for agents + contributors (architecture rules, tech choices, common tasks).
+- **[Root CLAUDE.md](../../CLAUDE.md)** — Monorepo-wide guide.
+- **[ARCHITECTURE.md](../../ARCHITECTURE.md)** — System architecture for both desktop and mobile.
+
+## Current State
+
+- Phase 0 (shared core extraction): Xtream + Stalker + M3U + classifier + types already in `@yancotv/core`
+- Phase 1 (scaffold + debug APK + release APK + Sentry): DONE
+- Phase 2 rewrite (theme, layout, hex cards, full player, all screens): **done but sitting uncommitted** — M1.1 lands it
+- M1 → M9 roadmap covers persistence, navigation, browse parity, search/favorites/history, EPG, settings/parental, TV polish, and distribution
+
+Current working APK supports: add M3U / Xtream / Stalker sources, browse channels, play video. Missing everything else (search, favorites, EPG, detail pages, resume, settings UI) until the milestones land.
 
 ## Prerequisites
 
 - **Node.js 20+**, **pnpm 9+**
-- **Java JDK 17** (for Android build)
-- **Android Studio** (SDK + platform tools)
-- **Android SDK Platform 34** or newer
+- **Java JDK 17** (Android build)
+- **Android Studio** + SDK Platform 34+ installed
+- `ANDROID_HOME` env var set, `adb` on PATH
 - Device or emulator:
   - Phone: any Android 8+ emulator
-  - TV: Android TV emulator or real Fire TV / Chromecast with Google TV
-- `ANDROID_HOME` env var set, `adb` on PATH
+  - TV: Android TV emulator, Fire TV Stick (4K / Cube / non-4K), NVIDIA Shield, or Chromecast with Google TV
 
-## Bootstrap (one-time)
-
-### 1. Install JS dependencies
-
-From the workspace root:
+## Install + Build
 
 ```bash
+# From workspace root
 pnpm install
+
+# From packages/mobile
+pnpm start            # Metro bundler on :8081
+
+# In another terminal
+pnpm android          # Build + install debug APK on connected device
 ```
 
-This resolves `@yancotv/core` as a workspace link and installs React Native TV and all mobile deps.
-
-### 2. Generate the native Android project
-
-The mobile package ships without `android/` — it needs to be generated against the installed `react-native-tvos` version to avoid version drift. Run:
+Release APK:
 
 ```bash
-cd packages/mobile
-npx @react-native-community/cli@latest init YancoTVMobileNative \
-  --version npm:react-native-tvos@0.76.1-0 \
-  --template react-native-template-typescript \
-  --skip-install \
-  --directory .native-bootstrap
+cd android && ./gradlew assembleRelease
+# Output: android/app/build/outputs/apk/release/app-release.apk
 ```
 
-Then copy only the `android/` directory out of `.native-bootstrap` into this package root and delete the rest:
+Sideload to a TV box over Wi-Fi:
 
 ```bash
-cp -r .native-bootstrap/android ./android
-rm -rf .native-bootstrap
-```
-
-Edit `android/app/build.gradle`:
-- Set `applicationId` to `com.yancotv.mobile`
-- Add `android.defaultConfig.minSdkVersion = 23` (Fire TV Stick compatibility)
-
-Edit `android/app/src/main/AndroidManifest.xml`:
-- Add `<uses-feature android:name="android.software.leanback" android:required="false" />`
-- Add `<uses-feature android:name="android.hardware.touchscreen" android:required="false" />`
-- Add the Leanback launcher intent filter to `MainActivity`:
-  ```xml
-  <intent-filter>
-    <action android:name="android.intent.action.MAIN" />
-    <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-  </intent-filter>
-  ```
-
-### 3. Run on a device
-
-```bash
-# Start Metro (from packages/mobile)
-pnpm start
-
-# In another terminal, build + install:
-pnpm android            # phone
-pnpm android:tv         # TV-focused launcher activity
+adb connect <tv-ip-address>:5555
+adb install -r app-release.apk
 ```
 
 ## Dev Commands
@@ -78,40 +62,51 @@ pnpm android:tv         # TV-focused launcher activity
 | Command | What it does |
 |---|---|
 | `pnpm start` | Start Metro bundler on port 8081 |
-| `pnpm android` | Build APK and install on connected device |
-| `pnpm typecheck` | TypeScript-only check (fast feedback loop) |
+| `pnpm start --reset-cache` | Start Metro with cleared cache (fixes weird resolution issues) |
+| `pnpm android` | Build debug APK + install on connected device |
+| `pnpm typecheck` | TypeScript-only check |
 | `pnpm lint` | ESLint over `src/` |
 | `pnpm test` | Jest unit tests |
 
-## Architecture
+## Architecture Summary
 
 ```
 src/
-├── navigation/          React Navigation stacks (Home → LiveTv → Player)
-├── screens/             Top-level route components
+├── navigation/      React Navigation 7 stacks (set up in M3)
+├── screens/         Top-level route components
 ├── components/
-│   ├── tv/              TV-optimized components (D-pad focus, scale-on-focus)
-│   └── phone/           Phone-optimized touch components (added in Phase 7)
-├── focus/               Focus primitive + spatial navigation helpers
-├── player/              react-native-video player (Phase 4)
-├── db/                  op-sqlite + migrations (Phase 1.3)
-├── services/            Platform glue: Keystore, notifications, etc.
-├── stores/              Zustand stores (Phase 2)
-└── styles/              NativeWind global.css
+│   ├── cards/       HexCard, ContentCard
+│   ├── layout/      AppLayout, Sidebar, PageHeader
+│   ├── tv/          TV-optimized (D-pad focus)
+│   └── phone/       Phone-optimized touch UX (M8)
+├── focus/           Focus primitive + spatial navigation
+├── player/          react-native-video wrapper
+├── db/              op-sqlite + migrations (M2)
+├── services/        Platform glue: Keystore, notifications, cast
+├── stores/          Zustand stores (mirror desktop shapes)
+├── http/            fetch-http-client (XMLHttpRequest-based)
+├── storage/         AsyncStorage wrappers (small keys only post-M2)
+└── styles/theme.ts  Ported from desktop palette
 ```
 
-## Shared Code
+All platform-agnostic business logic lives in [`@yancotv/core`](../core) — parsers, API clients, classifiers, types, schemas. Import from `@yancotv/core`, not from relative paths.
 
-All platform-agnostic business logic lives in [`@yancotv/core`](../core) — parsers, API clients, types, schemas. Import from `@yancotv/core`, not from `../../core/src/...`.
+## Milestone Map
 
-## Phase Status
+| Milestone | Scope | Status |
+|---|---|---|
+| M1 | Commit Phase 2 + finish core extraction | IN PROGRESS |
+| M2 | op-sqlite + migrations | PLANNED |
+| M3 | React Navigation + dual layout (TV drawer / phone tabs) | PLANNED |
+| M4 | Browse parity + Content Detail page + playback resume | PLANNED |
+| M5 | Search + Favorites + History | PLANNED |
+| M6 | EPG + Catch-up + Timeshift | PLANNED |
+| M7 | Settings (8 tabs) + Parental + Polish | PLANNED |
+| M8 | TV UX polish + Phone-native features (PIP, Cast, gestures) | PLANNED |
+| M9 | Distribution (Play Store / Fire TV / sideload) + QA | PLANNED |
 
-- ✅ 1.1 — RN TV JS scaffold (this commit)
-- ⏭️ 1.2 — Install deps, run first build, verify Hello World on Fire TV
-- ⏭️ 1.3 — op-sqlite integration
-- ⏭️ 1.4 — Zustand stores
-- ⏭️ 1.5 — react-native-video POC
-- ⏭️ 1.6 — Signed debug APK, real-device smoke test
-- ⏭️ 1.7 — Sentry + error boundary
+See [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md) for the full task breakdown per milestone.
 
-See [`PRODUCTION_PLAN_ANDROID.md`](../../PRODUCTION_PLAN_ANDROID.md) for the full roadmap.
+## License
+
+Private / Proprietary

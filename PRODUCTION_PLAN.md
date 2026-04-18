@@ -333,20 +333,46 @@ No new backend work — purely frontend/visual.
 
 ## Phase 4 — Cross-Platform
 
-**Goal:** Bring YancoTV to Android TV, then other platforms.
+**Goal:** Bring YancoTV to Android TV, Google TV, Fire TV, and Android phones/tablets with full desktop parity, then surpass on mobile-native capabilities.
 
-### Sprint 22 — Android TV App
+**This phase has its own dedicated roadmap — [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) — with milestones M1→M9, parity matrix, architecture rules, timeline, and decision log.**
 
-| # | Task | Details |
-|---|------|---------|
-| 22.1 | Android project setup | Kotlin, Jetpack Compose for TV, ExoPlayer |
-| 22.2 | Port parsing logic | Reimplement M3U parser, Xtream client, Stalker client in Kotlin (or shared KMP module) |
-| 22.3 | Room database | SQLite schema ported to Room, same structure |
-| 22.4 | TV navigation | D-pad focus management, leanback-style browsing |
-| 22.5 | ExoPlayer integration | Implement IPlayer contract with ExoPlayer |
-| 22.6 | TV-optimized UI | 10-foot UI, large text, focus indicators, remote-friendly |
-| 22.7 | Firestick optimization | Performance tuning for lower-powered devices |
-| 22.8 | APK build pipeline | Gradle build, signed APK output, sideload-ready |
+### Why a separate plan
+
+- The Android build is a sibling app, not an afterthought — full feature parity with desktop + mobile-native wins (D-pad, PIP, Cast, voice, launcher integration)
+- It has a different tech stack (React Native + `react-native-tvos` + op-sqlite + ExoPlayer/Media3) and different milestones (M1→M9 instead of Sprint numbering)
+- It shares a single APK for Android TV, Google TV, Fire TV, and Android phones/tablets — TV and phone UI branch on `Platform.isTV` at the navigator/component layer only
+- All platform-agnostic logic is already extracted to `@yancotv/core` (parsers, API clients, classifiers, types, Zod schemas)
+
+### Key framing decisions
+
+- **React Native, not Kotlin.** Rationale: reuse the `@yancotv/core` TypeScript investment. Kotlin rewrite would duplicate parsers, classifier, title-cleaner, clients — 725 passing tests worth of work. Decision locked in 2026-04-18.
+- **Single APK for TV + phone.** Manifest declares both `LEANBACK_LAUNCHER` and standard `LAUNCHER` intent-filters, `android.software.leanback required=false`, `android.hardware.touchscreen required=false`. UI adapts via `Platform.isTV`.
+- **op-sqlite, not Room.** Schema is byte-identical to desktop — migration SQL files copy verbatim from `src/main/services/migrations/` into `packages/mobile/src/db/migrations/`.
+- **react-native-video 6 (ExoPlayer/Media3) behind the same `IPlayer` interface as desktop.** Swap to a different backend later without touching screens or stores.
+
+### Current state (Phase 4)
+
+- Phase 0 (shared core extraction): DONE
+- Phase 1 (RN scaffold + debug/release APK + Sentry): DONE
+- Phase 2 rewrite (theme, layout, hex cards, full player, all screens): done but sitting uncommitted — M1.1 lands it
+- M2 → M9: planned, see [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md)
+
+### Milestones (headline)
+
+| Milestone | Scope |
+|---|---|
+| M1 | Commit Phase 2 + finish core extraction |
+| M2 | op-sqlite + migrations (same schema as desktop) |
+| M3 | React Navigation 7 + dual layout (TV drawer / phone tabs) |
+| M4 | Browse parity + Content Detail page + playback resume |
+| M5 | Search + Favorites + History |
+| M6 | EPG + Catch-up + Timeshift |
+| M7 | Settings (8 tabs) + Parental + Polish |
+| M8 | TV UX polish + Phone-native features (PIP, Cast, gestures, voice) |
+| M9 | Distribution (Play Store / Fire TV / sideload) + QA |
+
+See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full task breakdown per milestone, parity matrix, architecture rules, and timeline (~16 weeks to release with 25% buffer).
 
 ---
 
@@ -384,7 +410,7 @@ No new backend work — purely frontend/visual.
 | **M11 — Polished** | Settings, system features, search UX, network config | Sprints 17–20 | Partial |
 | **M12 — Ship It** | Stabilized, tested, release-ready | Sprint 21 | — |
 | **M13 — Redesigned** | Fresh UI with all features | Phase 3 | — |
-| **M14 — TV** | Android TV app | Phase 4 | — |
+| **M14 — TV + Phone** | Android TV + Google TV + Fire TV + phone/tablet (full parity) | Phase 4 → [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) M1–M9 | IN PROGRESS |
 | **M15 — Smart** | AI subtitles, content matching | Phase 5 | — |
 
 ---
