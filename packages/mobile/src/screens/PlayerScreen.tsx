@@ -8,17 +8,23 @@ import {
   Text,
   View,
 } from 'react-native';
-import Video, { type VideoRef } from 'react-native-video';
-
-function detectStreamType(url: string): 'm3u8' | 'mpd' | undefined {
-  const u = url.toLowerCase().split('?')[0];
-  if (u.includes('.m3u8')) return 'm3u8';
-  if (u.includes('.mpd')) return 'mpd';
-  return undefined;
-}
+import Video, { ViewType, type VideoRef } from 'react-native-video';
 import { TvButton } from '../components/tv/TvButton';
 import { useNavStore } from '../stores/nav-store';
 import { useSourcesStore } from '../stores/sources-store';
+
+// In react-native-video v6 the `type` prop only accepts these MIME hints.
+// For MPEG-TS (.ts) and file containers (.mp4/.mkv/.avi/.mov) we intentionally
+// return undefined — Media3's extractor chain sniffs the container and picks
+// the right decoder. Forcing `type` on a non-HLS/DASH stream misconfigures
+// the player and produces the classic black-with-audio symptom.
+function detectStreamType(url: string): 'm3u8' | 'mpd' | 'ism' | undefined {
+  const u = url.toLowerCase().split('?')[0];
+  if (u.includes('.m3u8')) return 'm3u8';
+  if (u.includes('.mpd')) return 'mpd';
+  if (u.includes('.ism')) return 'ism';
+  return undefined;
+}
 
 const CONTROLS_HIDE_MS = 4000;
 
@@ -32,8 +38,11 @@ export function PlayerScreen() {
   const videoRef = useRef<VideoRef>(null);
   const [buffering, setBuffering] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [firstFrameAt, setFirstFrameAt] = useState<number | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [tracksInfo, setTracksInfo] = useState<string>('');
+  const [useTextureFallback, setUseTextureFallback] = useState(false);
+  const loadStartRef = useRef<number>(0);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -94,12 +103,18 @@ export function PlayerScreen() {
         resizeMode="contain"
         paused={false}
         controls={false}
-        // TextureView plays nicer with React Native's view hierarchy on older
-        // Android devices — avoids SurfaceView z-order / blank-frame issues.
-        viewType={1}
+        // Default is SurfaceView (Media3-preferred: faster, lower battery).
+        // If playback errors out we flip to TextureView as a fallback — some
+        // older Fire TV / Android TV boxes have SurfaceView z-order bugs.
+        viewType={useTextureFallback ? ViewType.TEXTURE : ViewType.SURFACE}
+        // Default shutter is opaque black, which can mask frames after load
+        // on slower decoders. Transparent keeps the root View's background.
+        shutterColor="transparent"
         onLoadStart={() => {
+          loadStartRef.current = Date.now();
           setBuffering(true);
           setError(null);
+          setFirstFrameAt(null);
           setTracksInfo('');
         }}
         onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
@@ -107,17 +122,47 @@ export function PlayerScreen() {
           setBuffering(false);
           const videoTracks = (data as { videoTracks?: unknown[] }).videoTracks ?? [];
           const audioTracks = (data as { audioTracks?: unknown[] }).audioTracks ?? [];
-          setTracksInfo(`V:${videoTracks.length} A:${audioTracks.length}`);
+          const textTracks = (data as { textTracks?: unknown[] }).textTracks ?? [];
+          setTracksInfo(
+            `V:${videoTracks.length} A:${audioTracks.length} S:${textTracks.length}`,
+          );
+        }}
+        onReadyForDisplay={() => {
+          // First actual decoded frame reached the surface. If this never
+          // fires but onLoad did, we have audio-without-video — the usual
+          // surface/codec problem.
+          const elapsed = Date.now() - (loadStartRef.current || Date.now());
+          setFirstFrameAt(elapsed);
+          setBuffering(false);
         }}
         onError={(e) => {
-          const err = e?.error ?? {};
+          const err = (e?.error ?? {}) as {
+            errorString?: string;
+            errorException?: string;
+            localizedDescription?: string;
+            localizedFailureReason?: string;
+            errorCode?: string | number;
+          };
           const parts = [
             err.errorString,
+            err.errorException,
             err.localizedDescription,
             err.localizedFailureReason,
             err.errorCode ? `code=${err.errorCode}` : null,
           ].filter(Boolean);
-          setError(parts.join(' | ') || 'Playback failed');
+          const message = parts.join(' | ') || 'Playback failed';
+          // Auto-recover once by swapping the surface. Many "black screen /
+          // decoder init failed" cases on older Android TV boxes clear up on
+          // TextureView. If the fallback ALSO fails we show the error.
+          const codecLike = /decoder|codec|surface|mediacodec|no video track/i.test(
+            message,
+          );
+          if (!useTextureFallback && codecLike) {
+            setUseTextureFallback(true);
+            setBuffering(true);
+            return;
+          }
+          setError(message);
           setBuffering(false);
         }}
         bufferConfig={{
@@ -160,13 +205,22 @@ export function PlayerScreen() {
           <View style={styles.topBar} pointerEvents="none">
             <Text style={styles.channelName} numberOfLines={1}>
               {channel.title}
-              {tracksInfo ? ` · ${tracksInfo}` : ''}
             </Text>
             {channel.groupName ? (
               <Text style={styles.group} numberOfLines={1}>
                 {channel.groupName}
               </Text>
             ) : null}
+            <Text style={styles.diag} numberOfLines={1}>
+              {[
+                streamType ? `type=${streamType}` : 'type=auto',
+                useTextureFallback ? 'surface=texture' : 'surface=default',
+                tracksInfo || null,
+                firstFrameAt !== null ? `frame=${firstFrameAt}ms` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
           </View>
           <View style={styles.bottomBar}>
             <View style={styles.backBtn}>
@@ -223,6 +277,13 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontSize: 14,
     marginTop: 4,
+  },
+  diag: {
+    color: '#6b7280',
+    fontSize: 10,
+    marginTop: 6,
+    fontFamily: 'monospace',
+    letterSpacing: 0.3,
   },
   bottomBar: {
     position: 'absolute',

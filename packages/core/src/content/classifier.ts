@@ -11,6 +11,46 @@
 import type { ContentType } from '../types';
 import type { M3uEntry } from '../parsers';
 
+// Series group markers — kept broad so non-English providers land correctly.
+// Matches: "Series", "TV Shows", "Episodes", "Sezon", "Dizi" (TR), "Serial"
+// (many Slavic locales), "Sorozat" (HU), and multi-season pack labels.
+const SERIES_GROUP_PATTERNS = [
+  'series',
+  'serie',
+  'episode',
+  'tv show',
+  'tvshow',
+  'season',
+  'sezon',
+  'dizi',
+  'serial',
+  'sorozat',
+  'show',
+];
+
+// Movie/VOD group markers — covers English + common non-English tags and the
+// generic "VOD" bucket every Xtream provider ships.
+const MOVIE_GROUP_PATTERNS = [
+  'movie',
+  'vod',
+  'film',
+  'cinema',
+  'peliculas', // es
+  'pelicula',
+  'filme', // pt/de
+  'kino', // ru/de
+  'filmy', // pl
+  'on demand',
+  'ondemand',
+];
+
+function matchesAny(group: string, patterns: string[]): boolean {
+  for (const p of patterns) {
+    if (group.includes(p)) return true;
+  }
+  return false;
+}
+
 /** Classify an M3U entry into live, movie, or series */
 export function classifyEntry(entry: M3uEntry): ContentType {
   const group = entry.groupTitle.toLowerCase();
@@ -25,29 +65,18 @@ export function classifyEntry(entry: M3uEntry): ContentType {
     return 'series';
   }
 
-  // Group explicitly says series/episode
-  if (
-    group.includes('series') ||
-    group.includes('episode') ||
-    group.includes('tv show')
-  ) {
+  if (matchesAny(group, SERIES_GROUP_PATTERNS)) {
     return 'series';
   }
 
-  // URL has /series/ path
+  // URL has /series/ path (Xtream-style m3u_plus exports)
   if (url.includes('/series/')) {
     return 'series';
   }
 
   // --- Movie/VOD indicators ---
 
-  // Group explicitly says movie/vod/film
-  if (
-    group.includes('movie') ||
-    group.includes('vod') ||
-    group.includes('film') ||
-    group.includes('cinema')
-  ) {
+  if (matchesAny(group, MOVIE_GROUP_PATTERNS)) {
     return 'movie';
   }
 
@@ -56,14 +85,10 @@ export function classifyEntry(entry: M3uEntry): ContentType {
     return 'movie';
   }
 
-  // Video file extensions with positive duration (VOD content)
-  if (
-    url.endsWith('.mp4') ||
-    url.endsWith('.mkv') ||
-    url.endsWith('.avi') ||
-    url.endsWith('.mov')
-  ) {
-    // Check if title has series pattern — some series come as video files
+  // Video file extensions with positive duration (VOD content). Use a
+  // regex so query-strings and fragments don't block the match.
+  if (/\.(mp4|mkv|avi|mov|m4v|webm|flv|wmv)(\?|#|$)/i.test(url)) {
+    // Some series come as video files — S01E02 wins.
     if (/S\d{1,2}\s*E\d{1,3}/i.test(title)) return 'series';
     return 'movie';
   }

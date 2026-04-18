@@ -115,20 +115,30 @@ async function persistSources(sources: MobileSource[]) {
 async function syncM3u(
   source: M3uSource,
   setMsg: (msg: string) => void,
-): Promise<ContentItem[]> {
+): Promise<SyncResult> {
   setMsg(`Fetching ${source.name}...`);
   const text = await fetchTextRaw(source.url, { timeoutMs: 30_000 });
   setMsg('Parsing playlist...');
   const { entries } = parseM3u(text);
-  return entries.map((entry, i) =>
-    m3uEntryToItem(entry, source.id, i, classifyEntry(entry)),
-  );
+  const counts = { live: 0, movie: 0, series: 0 };
+  const items = entries.map((entry, i) => {
+    const type = classifyEntry(entry);
+    counts[type]++;
+    return m3uEntryToItem(entry, source.id, i, type);
+  });
+  return { items, counts, warnings: [] };
+}
+
+interface SyncResult {
+  items: ContentItem[];
+  counts: { live: number; movie: number; series: number };
+  warnings: string[];
 }
 
 async function syncXtream(
   source: XtreamSource,
   setMsg: (msg: string) => void,
-): Promise<ContentItem[]> {
+): Promise<SyncResult> {
   setMsg(`Reaching ${source.name}...`);
   const ping = await pingHost(source.url);
   if (!ping.ok) {
@@ -143,7 +153,7 @@ async function syncXtream(
   const auth = await client.authenticate();
   if (!auth.ok) throw auth.error;
 
-  setMsg('Fetching everything in parallel...');
+  setMsg('Fetching catalogs in parallel...');
   const [liveResult, vodResult, seriesResult, liveCats, vodCats, seriesCats] =
     await Promise.all([
       client.getLiveStreams(),
@@ -154,9 +164,19 @@ async function syncXtream(
       client.getSeriesCategories(),
     ]);
 
-  if (!liveResult.ok) throw liveResult.error;
-  if (!vodResult.ok) throw vodResult.error;
-  if (!seriesResult.ok) throw seriesResult.error;
+  // Per-endpoint resilience: a provider refusing VOD shouldn't wipe live.
+  // Capture each failure as a warning but keep whatever succeeded.
+  const warnings: string[] = [];
+  if (!liveResult.ok) warnings.push(`live: ${liveResult.error.message}`);
+  if (!vodResult.ok) warnings.push(`vod: ${vodResult.error.message}`);
+  if (!seriesResult.ok) warnings.push(`series: ${seriesResult.error.message}`);
+  if (!liveCats.ok) warnings.push(`live-cats: ${liveCats.error.message}`);
+  if (!vodCats.ok) warnings.push(`vod-cats: ${vodCats.error.message}`);
+  if (!seriesCats.ok) warnings.push(`series-cats: ${seriesCats.error.message}`);
+
+  if (!liveResult.ok && !vodResult.ok && !seriesResult.ok) {
+    throw new Error(`All catalog endpoints failed: ${warnings.join('; ')}`);
+  }
 
   const catMap = new Map<string, string>();
   for (const r of [liveCats, vodCats, seriesCats]) {
@@ -168,66 +188,85 @@ async function syncXtream(
   const now = Date.now();
   let sortOrder = 0;
   const items: ContentItem[] = [];
+  const counts = { live: 0, movie: 0, series: 0 };
 
-  for (const s of liveResult.value) {
-    items.push({
-      id: `${source.id}:live:${s.streamId}`,
-      sourceId: source.id,
-      type: 'live',
-      title: s.name,
-      groupName: catMap.get(s.categoryId),
-      streamUrl: client.buildStreamUrl(s.streamId, 'live'),
-      logoUrl: s.streamIcon || undefined,
-      tvgId: s.epgChannelId || undefined,
-      sortOrder: sortOrder++,
-      createdAt: now,
-    });
+  if (liveResult.ok) {
+    for (const s of liveResult.value) {
+      items.push({
+        id: `${source.id}:live:${s.streamId}`,
+        sourceId: source.id,
+        type: 'live',
+        title: s.name,
+        groupName: catMap.get(s.categoryId),
+        streamUrl: client.buildStreamUrl(s.streamId, 'live'),
+        logoUrl: s.streamIcon || undefined,
+        tvgId: s.epgChannelId || undefined,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        metadataJson: JSON.stringify({
+          streamId: s.streamId,
+          tvArchive: s.tvArchive,
+          tvArchiveDuration: s.tvArchiveDuration,
+        }),
+      });
+      counts.live++;
+    }
   }
 
-  for (const s of vodResult.value) {
-    items.push({
-      id: `${source.id}:movie:${s.streamId}`,
-      sourceId: source.id,
-      type: 'movie',
-      title: s.name,
-      groupName: catMap.get(s.categoryId),
-      streamUrl: client.buildStreamUrl(s.streamId, 'movie', s.containerExtension),
-      logoUrl: s.streamIcon || undefined,
-      sortOrder: sortOrder++,
-      createdAt: now,
-    });
+  if (vodResult.ok) {
+    for (const s of vodResult.value) {
+      items.push({
+        id: `${source.id}:movie:${s.streamId}`,
+        sourceId: source.id,
+        type: 'movie',
+        title: s.name,
+        groupName: catMap.get(s.categoryId),
+        streamUrl: client.buildStreamUrl(s.streamId, 'movie', s.containerExtension),
+        logoUrl: s.streamIcon || undefined,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        metadataJson: JSON.stringify({
+          streamId: s.streamId,
+          rating: s.rating,
+        }),
+      });
+      counts.movie++;
+    }
   }
 
-  for (const s of seriesResult.value) {
-    items.push({
-      id: `${source.id}:series:${s.seriesId}`,
-      sourceId: source.id,
-      type: 'series',
-      title: s.name,
-      groupName: catMap.get(s.categoryId),
-      streamUrl: '',
-      logoUrl: s.cover || undefined,
-      sortOrder: sortOrder++,
-      createdAt: now,
-      metadataJson: JSON.stringify({
-        seriesId: s.seriesId,
-        plot: s.plot,
-        cast: s.cast,
-        director: s.director,
-        genre: s.genre,
-        releaseDate: s.releaseDate,
-        rating: s.rating,
-      }),
-    });
+  if (seriesResult.ok) {
+    for (const s of seriesResult.value) {
+      items.push({
+        id: `${source.id}:series:${s.seriesId}`,
+        sourceId: source.id,
+        type: 'series',
+        title: s.name,
+        groupName: catMap.get(s.categoryId),
+        streamUrl: '',
+        logoUrl: s.cover || undefined,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        metadataJson: JSON.stringify({
+          seriesId: s.seriesId,
+          plot: s.plot,
+          cast: s.cast,
+          director: s.director,
+          genre: s.genre,
+          releaseDate: s.releaseDate,
+          rating: s.rating,
+        }),
+      });
+      counts.series++;
+    }
   }
 
-  return items;
+  return { items, counts, warnings };
 }
 
 async function syncStalker(
   source: StalkerSource,
   setMsg: (msg: string) => void,
-): Promise<ContentItem[]> {
+): Promise<SyncResult> {
   const client = new StalkerClient(source.url, source.macAddress, {
     http: fetchHttpClient,
   });
@@ -242,7 +281,7 @@ async function syncStalker(
   const auth = await client.authenticate();
   if (!auth.ok) throw auth.error;
 
-  setMsg('Fetching everything in parallel...');
+  setMsg('Fetching catalogs in parallel...');
   const [liveResult, vodResult, seriesResult, liveCats, vodCats, seriesCats] =
     await Promise.all([
       client.getLiveChannels(),
@@ -253,9 +292,17 @@ async function syncStalker(
       client.getSeriesCategories(),
     ]);
 
-  if (!liveResult.ok) throw liveResult.error;
-  if (!vodResult.ok) throw vodResult.error;
-  if (!seriesResult.ok) throw seriesResult.error;
+  const warnings: string[] = [];
+  if (!liveResult.ok) warnings.push(`live: ${liveResult.error.message}`);
+  if (!vodResult.ok) warnings.push(`vod: ${vodResult.error.message}`);
+  if (!seriesResult.ok) warnings.push(`series: ${seriesResult.error.message}`);
+  if (!liveCats.ok) warnings.push(`live-cats: ${liveCats.error.message}`);
+  if (!vodCats.ok) warnings.push(`vod-cats: ${vodCats.error.message}`);
+  if (!seriesCats.ok) warnings.push(`series-cats: ${seriesCats.error.message}`);
+
+  if (!liveResult.ok && !vodResult.ok && !seriesResult.ok) {
+    throw new Error(`All catalog endpoints failed: ${warnings.join('; ')}`);
+  }
 
   const catMap = new Map<string, string>();
   for (const r of [liveCats, vodCats, seriesCats]) {
@@ -267,56 +314,68 @@ async function syncStalker(
   const now = Date.now();
   let sortOrder = 0;
   const items: ContentItem[] = [];
+  const counts = { live: 0, movie: 0, series: 0 };
 
-  for (const ch of liveResult.value) {
-    items.push({
-      id: `${source.id}:live:${ch.id}`,
-      sourceId: source.id,
-      type: 'live',
-      title: ch.name,
-      groupName: catMap.get(ch.tvGenreId),
-      streamUrl: client.buildStreamUrl(ch.cmd),
-      logoUrl: ch.logo || undefined,
-      tvgId: ch.epgId || undefined,
-      sortOrder: sortOrder++,
-      createdAt: now,
-    });
+  if (liveResult.ok) {
+    for (const ch of liveResult.value) {
+      items.push({
+        id: `${source.id}:live:${ch.id}`,
+        sourceId: source.id,
+        type: 'live',
+        title: ch.name,
+        groupName: catMap.get(ch.tvGenreId),
+        streamUrl: client.buildStreamUrl(ch.cmd),
+        logoUrl: ch.logo || undefined,
+        tvgId: ch.epgId || undefined,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        metadataJson: JSON.stringify({ stalkerId: ch.id }),
+      });
+      counts.live++;
+    }
   }
 
-  for (const v of vodResult.value) {
-    items.push({
-      id: `${source.id}:movie:${v.id}`,
-      sourceId: source.id,
-      type: 'movie',
-      title: v.name,
-      groupName: catMap.get(v.categoryId),
-      streamUrl: client.buildStreamUrl(v.cmd),
-      logoUrl: v.logo || undefined,
-      sortOrder: sortOrder++,
-      createdAt: now,
-    });
+  if (vodResult.ok) {
+    for (const v of vodResult.value) {
+      items.push({
+        id: `${source.id}:movie:${v.id}`,
+        sourceId: source.id,
+        type: 'movie',
+        title: v.name,
+        groupName: catMap.get(v.categoryId),
+        streamUrl: client.buildStreamUrl(v.cmd),
+        logoUrl: v.logo || undefined,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        metadataJson: JSON.stringify({ stalkerId: v.id }),
+      });
+      counts.movie++;
+    }
   }
 
-  for (const s of seriesResult.value) {
-    items.push({
-      id: `${source.id}:series:${s.id}`,
-      sourceId: source.id,
-      type: 'series',
-      title: s.name,
-      groupName: catMap.get(s.categoryId),
-      streamUrl: '',
-      logoUrl: s.cover || undefined,
-      sortOrder: sortOrder++,
-      createdAt: now,
-      metadataJson: JSON.stringify({
-        seriesId: s.id,
-        plot: s.plot,
-        genre: s.genre,
-      }),
-    });
+  if (seriesResult.ok) {
+    for (const s of seriesResult.value) {
+      items.push({
+        id: `${source.id}:series:${s.id}`,
+        sourceId: source.id,
+        type: 'series',
+        title: s.name,
+        groupName: catMap.get(s.categoryId),
+        streamUrl: '',
+        logoUrl: s.cover || undefined,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        metadataJson: JSON.stringify({
+          stalkerId: s.id,
+          plot: s.plot,
+          genre: s.genre,
+        }),
+      });
+      counts.series++;
+    }
   }
 
-  return items;
+  return { items, counts, warnings };
 }
 
 export const useSourcesStore = create<SourcesState>((set, get) => ({
@@ -404,14 +463,20 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
     const setMsg = (msg: string) => set({ syncStatus: 'fetching', syncMessage: msg });
 
     try {
-      let items: ContentItem[];
+      let result: SyncResult;
       if (source.type === 'm3u_url') {
-        items = await syncM3u(source, setMsg);
+        result = await syncM3u(source, setMsg);
       } else if (source.type === 'xtream') {
-        items = await syncXtream(source, setMsg);
+        result = await syncXtream(source, setMsg);
       } else {
-        items = await syncStalker(source, setMsg);
+        result = await syncStalker(source, setMsg);
       }
+
+      const { items, counts, warnings } = result;
+      const countsStr = `${counts.live} live · ${counts.movie} movies · ${counts.series} series`;
+      const finalMsg = warnings.length
+        ? `${countsStr} (partial: ${warnings.length} endpoint issue${warnings.length === 1 ? '' : 's'})`
+        : `${countsStr}`;
 
       set((s) => ({
         channels: [...s.channels.filter((ch) => ch.sourceId !== id), ...items],
@@ -420,13 +485,16 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
             ? {
                 ...src,
                 lastSynced: Date.now(),
-                lastError: undefined,
+                // Surface per-endpoint issues even when the sync "succeeded".
+                // Without this, a provider silently dropping VOD looks identical
+                // to a provider with genuinely no VOD catalogue.
+                lastError: warnings.length ? warnings.join('; ') : undefined,
                 channelCount: items.length,
               }
             : src,
         ),
         syncStatus: 'done',
-        syncMessage: `Synced ${items.length} items`,
+        syncMessage: finalMsg,
       }));
       await persistSources(get().sources);
     } catch (err) {
