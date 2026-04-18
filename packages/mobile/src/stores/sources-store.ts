@@ -80,6 +80,11 @@ interface SourcesState {
   }) => Promise<void>;
   removeSource: (id: string) => Promise<void>;
   resync: (id: string) => Promise<void>;
+  // Merge a partial metadata patch into an in-memory channel. Used after a
+  // detail-screen fetch to hydrate plot/cast/subtitles/episodes without
+  // re-syncing the whole provider. Not persisted — enrichment is cheap to
+  // re-fetch, and AsyncStorage already chokes on large content payloads.
+  enrichContent: (id: string, patch: Record<string, unknown>) => void;
 }
 
 const kv: KVStore = asyncStorageKV;
@@ -444,6 +449,24 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
     set((s) => ({ sources: [...s.sources, source] }));
     await persistSources(get().sources);
     await get().resync(source.id);
+  },
+
+  enrichContent: (id, patch) => {
+    set((s) => ({
+      channels: s.channels.map((ch) => {
+        if (ch.id !== id) return ch;
+        let existing: Record<string, unknown> = {};
+        if (ch.metadataJson) {
+          try {
+            existing = JSON.parse(ch.metadataJson) as Record<string, unknown>;
+          } catch {
+            existing = {};
+          }
+        }
+        const merged = { ...existing, ...patch };
+        return { ...ch, metadataJson: JSON.stringify(merged) };
+      }),
+    }));
   },
 
   removeSource: async (id) => {

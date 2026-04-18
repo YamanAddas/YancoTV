@@ -101,6 +101,11 @@ export interface XtreamSeriesDetail {
   };
 }
 
+export interface XtreamSubtitle {
+  language: string;
+  url: string;
+}
+
 export interface XtreamVodDetail {
   name: string;
   plot: string;
@@ -111,11 +116,27 @@ export interface XtreamVodDetail {
   rating: string;
   duration: string;
   cover: string;
+  backdropUrl: string;
+  tagline: string;
+  youtubeTrailer: string;
+  subtitles: XtreamSubtitle[];
+  tmdbId: number | null;
 }
 
 const MAX_RESPONSE_BYTES = 150 * 1024 * 1024;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 8000];
+
+// Best-effort language sniff from a bare subtitle URL, e.g.
+// ".../movie_name.en.srt" or ".../subs/fr.vtt". Falls back to 'und'
+// (undefined/unknown) when nothing lines up so the player still shows
+// the track as a selectable option.
+function inferLangFromUrl(url: string): string {
+  const path = url.toLowerCase().split('?')[0];
+  const m = path.match(/[._/-]([a-z]{2,3})\.(?:srt|vtt|ass|ssa)$/i);
+  if (m) return m[1];
+  return 'und';
+}
 
 function isRetryableError(message: string): boolean {
   return (
@@ -346,6 +367,40 @@ export class XtreamClient {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = data.value as any;
     const info = raw?.info ?? raw?.movie_data ?? {};
+    const movieData = raw?.movie_data ?? {};
+
+    // Providers encode backdrops as:
+    //   backdrop_path: string  (single URL)
+    //   backdrop_path: string[]  (multiple)
+    //   backdropPath: string
+    const backdrop = info.backdrop_path ?? info.backdropPath ?? '';
+    const backdropUrl = Array.isArray(backdrop)
+      ? String(backdrop[0] ?? '')
+      : String(backdrop);
+
+    // Subtitles can be:
+    //   [{ lang, url }]   (preferred)
+    //   [{ language, url }]
+    //   ["http://.../en.srt"]  (bare URL list — lang inferred from filename)
+    const subs: XtreamSubtitle[] = [];
+    const rawSubs = info.subtitles ?? raw?.subtitles ?? [];
+    if (Array.isArray(rawSubs)) {
+      for (const s of rawSubs) {
+        if (typeof s === 'string' && s) {
+          subs.push({ language: inferLangFromUrl(s), url: s });
+        } else if (s && typeof s === 'object') {
+          const url = String(s.url ?? s.href ?? '');
+          if (!url) continue;
+          const language = String(
+            s.language ?? s.lang ?? s.locale ?? inferLangFromUrl(url),
+          );
+          subs.push({ language, url });
+        }
+      }
+    }
+
+    const tmdbRaw = info.tmdb_id ?? info.tmdb ?? movieData.tmdb_id ?? null;
+    const tmdbId = tmdbRaw ? Number(tmdbRaw) || null : null;
 
     return {
       ok: true,
@@ -359,6 +414,11 @@ export class XtreamClient {
         rating: String(info.rating ?? (info.rating_5based ? `${info.rating_5based}/5` : '')),
         duration: String(info.duration ?? info.duration_secs ?? ''),
         cover: String(info.movie_image ?? info.cover_big ?? info.cover ?? ''),
+        backdropUrl,
+        tagline: String(info.tagline ?? ''),
+        youtubeTrailer: String(info.youtube_trailer ?? info.youtubeTrailer ?? ''),
+        subtitles: subs,
+        tmdbId,
       },
     };
   }

@@ -1,14 +1,26 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
+  FlatList,
+  Modal,
   Pressable,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import Video, { ViewType, type VideoRef } from 'react-native-video';
+import Video, {
+  SelectedTrackType,
+  TextTrackType,
+  ViewType,
+  type OnAudioTracksData,
+  type OnTextTracksData,
+  type SelectedTrack,
+  type TextTracks,
+  type VideoRef,
+} from 'react-native-video';
+import type { ContentMetadata, SubtitleTrack } from '@yancotv/core';
 import { TvButton } from '../components/tv/TvButton';
 import { useNavStore } from '../stores/nav-store';
 import { useSourcesStore } from '../stores/sources-store';
@@ -26,13 +38,75 @@ function detectStreamType(url: string): 'm3u8' | 'mpd' | 'ism' | undefined {
   return undefined;
 }
 
+function subtitleMime(url: string): TextTrackType {
+  const u = url.toLowerCase().split('?')[0];
+  if (u.endsWith('.vtt')) return TextTrackType.VTT;
+  if (u.endsWith('.ttml') || u.endsWith('.dfxp') || u.endsWith('.xml')) {
+    return TextTrackType.TTML;
+  }
+  return TextTrackType.SUBRIP;
+}
+
+function parseMetadata(json: string | undefined): ContentMetadata {
+  if (!json) return {};
+  try {
+    return JSON.parse(json) as ContentMetadata;
+  } catch {
+    return {};
+  }
+}
+
+function buildTextTracks(subs: SubtitleTrack[] | undefined): TextTracks {
+  if (!subs || !subs.length) return [];
+  return subs.map((s, i) => ({
+    title: s.language || `Subtitle ${i + 1}`,
+    language: (s.language || 'und').slice(0, 2).toLowerCase() as TextTracks[number]['language'],
+    type: subtitleMime(s.url),
+    uri: s.url,
+  }));
+}
+
 const CONTROLS_HIDE_MS = 4000;
+const DEFAULT_TRACK: SelectedTrack = { type: SelectedTrackType.SYSTEM };
+const DEFAULT_AUDIO: SelectedTrack = { type: SelectedTrackType.SYSTEM };
 
 export function PlayerScreen() {
   const back = useNavStore((s) => s.back);
   const selectedId = useNavStore((s) => s.selectedChannelId);
+  const selectedEpisodeId = useNavStore((s) => s.selectedEpisodeId);
   const channel = useSourcesStore((s) =>
     s.channels.find((c) => c.id === selectedId),
+  );
+
+  const metadata = useMemo(() => parseMetadata(channel?.metadataJson), [
+    channel?.metadataJson,
+  ]);
+
+  // Resolve effective stream: episode (if series) or main item streamUrl.
+  const { streamUrl, displayTitle, displaySubtitle } = useMemo(() => {
+    if (!channel) {
+      return { streamUrl: undefined, displayTitle: '', displaySubtitle: '' };
+    }
+    if (selectedEpisodeId && metadata.episodes?.length) {
+      const ep = metadata.episodes.find((e) => e.id === selectedEpisodeId);
+      if (ep) {
+        return {
+          streamUrl: ep.streamUrl,
+          displayTitle: channel.title,
+          displaySubtitle: `S${ep.seasonNumber} E${ep.episodeNumber} · ${ep.title}`,
+        };
+      }
+    }
+    return {
+      streamUrl: channel.streamUrl,
+      displayTitle: channel.title,
+      displaySubtitle: channel.groupName || '',
+    };
+  }, [channel, selectedEpisodeId, metadata.episodes]);
+
+  const textTracks = useMemo<TextTracks>(
+    () => buildTextTracks(metadata.subtitles),
+    [metadata.subtitles],
   );
 
   const videoRef = useRef<VideoRef>(null);
@@ -40,18 +114,26 @@ export function PlayerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [firstFrameAt, setFirstFrameAt] = useState<number | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [tracksInfo, setTracksInfo] = useState<string>('');
   const [useTextureFallback, setUseTextureFallback] = useState(false);
+  const [audioTracks, setAudioTracks] = useState<OnAudioTracksData['audioTracks']>([]);
+  const [subTracks, setSubTracks] = useState<OnTextTracksData['textTracks']>([]);
+  const [selectedAudio, setSelectedAudio] = useState<SelectedTrack>(DEFAULT_AUDIO);
+  const [selectedText, setSelectedText] = useState<SelectedTrack>(DEFAULT_TRACK);
+  const [pickerOpen, setPickerOpen] = useState<null | 'audio' | 'subs'>(null);
   const loadStartRef = useRef<number>(0);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (pickerOpen) {
+        setPickerOpen(null);
+        return true;
+      }
       back();
       return true;
     });
     return () => sub.remove();
-  }, [back]);
+  }, [back, pickerOpen]);
 
   useEffect(() => {
     scheduleHide();
@@ -70,7 +152,7 @@ export function PlayerScreen() {
     scheduleHide();
   }
 
-  if (!channel || !channel.streamUrl) {
+  if (!channel || !streamUrl) {
     return (
       <View style={styles.centered}>
         <StatusBar barStyle="light-content" backgroundColor="#000" hidden />
@@ -82,7 +164,8 @@ export function PlayerScreen() {
     );
   }
 
-  const streamType = detectStreamType(channel.streamUrl);
+  const streamType = detectStreamType(streamUrl);
+  const tracksInfo = `A:${audioTracks.length} S:${subTracks.length + textTracks.length}`;
 
   return (
     // IMPORTANT: root is a plain View, not Pressable. Wrapping <Video> inside
@@ -95,42 +178,32 @@ export function PlayerScreen() {
       <Video
         ref={videoRef}
         source={{
-          uri: channel.streamUrl,
+          uri: streamUrl,
           ...(streamType ? { type: streamType } : {}),
           headers: { 'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20' },
+          textTracks: textTracks.length ? textTracks : undefined,
         }}
         style={StyleSheet.absoluteFill}
         resizeMode="contain"
         paused={false}
         controls={false}
-        // Default is SurfaceView (Media3-preferred: faster, lower battery).
-        // If playback errors out we flip to TextureView as a fallback — some
-        // older Fire TV / Android TV boxes have SurfaceView z-order bugs.
+        selectedAudioTrack={selectedAudio}
+        selectedTextTrack={selectedText}
         viewType={useTextureFallback ? ViewType.TEXTURE : ViewType.SURFACE}
-        // Default shutter is opaque black, which can mask frames after load
-        // on slower decoders. Transparent keeps the root View's background.
         shutterColor="transparent"
         onLoadStart={() => {
           loadStartRef.current = Date.now();
           setBuffering(true);
           setError(null);
           setFirstFrameAt(null);
-          setTracksInfo('');
+          setAudioTracks([]);
+          setSubTracks([]);
         }}
         onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-        onLoad={(data) => {
-          setBuffering(false);
-          const videoTracks = (data as { videoTracks?: unknown[] }).videoTracks ?? [];
-          const audioTracks = (data as { audioTracks?: unknown[] }).audioTracks ?? [];
-          const textTracks = (data as { textTracks?: unknown[] }).textTracks ?? [];
-          setTracksInfo(
-            `V:${videoTracks.length} A:${audioTracks.length} S:${textTracks.length}`,
-          );
-        }}
+        onLoad={() => setBuffering(false)}
+        onAudioTracks={(e) => setAudioTracks(e.audioTracks)}
+        onTextTracks={(e) => setSubTracks(e.textTracks)}
         onReadyForDisplay={() => {
-          // First actual decoded frame reached the surface. If this never
-          // fires but onLoad did, we have audio-without-video — the usual
-          // surface/codec problem.
           const elapsed = Date.now() - (loadStartRef.current || Date.now());
           setFirstFrameAt(elapsed);
           setBuffering(false);
@@ -151,9 +224,6 @@ export function PlayerScreen() {
             err.errorCode ? `code=${err.errorCode}` : null,
           ].filter(Boolean);
           const message = parts.join(' | ') || 'Playback failed';
-          // Auto-recover once by swapping the surface. Many "black screen /
-          // decoder init failed" cases on older Android TV boxes clear up on
-          // TextureView. If the fallback ALSO fails we show the error.
           const codecLike = /decoder|codec|surface|mediacodec|no video track/i.test(
             message,
           );
@@ -175,7 +245,6 @@ export function PlayerScreen() {
         progressUpdateInterval={1000}
       />
 
-      {/* Invisible tap catcher sibling — toggles controls without wrapping Video */}
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={showControls}
@@ -204,18 +273,18 @@ export function PlayerScreen() {
         <>
           <View style={styles.topBar} pointerEvents="none">
             <Text style={styles.channelName} numberOfLines={1}>
-              {channel.title}
+              {displayTitle}
             </Text>
-            {channel.groupName ? (
+            {displaySubtitle ? (
               <Text style={styles.group} numberOfLines={1}>
-                {channel.groupName}
+                {displaySubtitle}
               </Text>
             ) : null}
             <Text style={styles.diag} numberOfLines={1}>
               {[
                 streamType ? `type=${streamType}` : 'type=auto',
                 useTextureFallback ? 'surface=texture' : 'surface=default',
-                tracksInfo || null,
+                tracksInfo,
                 firstFrameAt !== null ? `frame=${firstFrameAt}ms` : null,
               ]
                 .filter(Boolean)
@@ -226,10 +295,135 @@ export function PlayerScreen() {
             <View style={styles.backBtn}>
               <TvButton label="Back" onSelect={back} autoFocus active />
             </View>
+            <View style={styles.spacer} />
+            {audioTracks.length > 1 ? (
+              <View style={styles.trackBtn}>
+                <TvButton
+                  label={`Audio (${audioTracks.length})`}
+                  onSelect={() => setPickerOpen('audio')}
+                />
+              </View>
+            ) : null}
+            {subTracks.length + textTracks.length > 0 ? (
+              <View style={styles.trackBtn}>
+                <TvButton
+                  label={`Subs (${subTracks.length + textTracks.length})`}
+                  onSelect={() => setPickerOpen('subs')}
+                />
+              </View>
+            ) : null}
           </View>
         </>
       ) : null}
+
+      <TrackPickerModal
+        open={pickerOpen}
+        audioTracks={audioTracks}
+        subTracks={subTracks}
+        selectedAudio={selectedAudio}
+        selectedText={selectedText}
+        onSelectAudio={(t) => {
+          setSelectedAudio(t);
+          setPickerOpen(null);
+        }}
+        onSelectText={(t) => {
+          setSelectedText(t);
+          setPickerOpen(null);
+        }}
+        onClose={() => setPickerOpen(null)}
+      />
     </View>
+  );
+}
+
+interface TrackPickerProps {
+  open: null | 'audio' | 'subs';
+  audioTracks: OnAudioTracksData['audioTracks'];
+  subTracks: OnTextTracksData['textTracks'];
+  selectedAudio: SelectedTrack;
+  selectedText: SelectedTrack;
+  onSelectAudio: (t: SelectedTrack) => void;
+  onSelectText: (t: SelectedTrack) => void;
+  onClose: () => void;
+}
+
+function TrackPickerModal({
+  open,
+  audioTracks,
+  subTracks,
+  selectedAudio,
+  selectedText,
+  onSelectAudio,
+  onSelectText,
+  onClose,
+}: TrackPickerProps) {
+  if (!open) return null;
+  const isAudio = open === 'audio';
+  const title = isAudio ? 'Audio track' : 'Subtitles';
+
+  type Row = { key: string; label: string; onPress: () => void; selected: boolean };
+  const rows: Row[] = [];
+
+  if (isAudio) {
+    audioTracks.forEach((t) => {
+      const label = [t.language, t.title].filter(Boolean).join(' · ') || `Track ${t.index + 1}`;
+      const selected =
+        selectedAudio.type === SelectedTrackType.INDEX && selectedAudio.value === t.index;
+      rows.push({
+        key: `a-${t.index}`,
+        label,
+        selected,
+        onPress: () => onSelectAudio({ type: SelectedTrackType.INDEX, value: t.index }),
+      });
+    });
+    if (!rows.length) {
+      rows.push({
+        key: 'a-sys',
+        label: 'System default',
+        selected: true,
+        onPress: () => onSelectAudio({ type: SelectedTrackType.SYSTEM }),
+      });
+    }
+  } else {
+    rows.push({
+      key: 's-off',
+      label: 'Off',
+      selected: selectedText.type === SelectedTrackType.DISABLED,
+      onPress: () => onSelectText({ type: SelectedTrackType.DISABLED }),
+    });
+    subTracks.forEach((t) => {
+      const label = [t.language, t.title].filter(Boolean).join(' · ') || `Subtitle ${t.index + 1}`;
+      const selected =
+        selectedText.type === SelectedTrackType.INDEX && selectedText.value === t.index;
+      rows.push({
+        key: `s-${t.index}`,
+        label,
+        selected,
+        onPress: () => onSelectText({ type: SelectedTrackType.INDEX, value: t.index }),
+      });
+    });
+  }
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <FlatList
+            data={rows}
+            keyExtractor={(r) => r.key}
+            renderItem={({ item }) => (
+              <TvButton
+                label={`${item.selected ? '●  ' : '○  '}${item.label}`}
+                onSelect={item.onPress}
+                active={item.selected}
+              />
+            )}
+            ItemSeparatorComponent={() => <View style={styles.modalSep} />}
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -295,6 +489,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
+  spacer: { flex: 1 },
+  backBtn: {
+    width: 160,
+  },
+  trackBtn: {
+    width: 200,
+    marginLeft: 12,
+  },
   errorBox: {
     position: 'absolute',
     top: 0,
@@ -318,7 +520,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  backBtn: {
-    width: 160,
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCard: {
+    width: 480,
+    maxHeight: '80%',
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  modalSep: {
+    height: 8,
   },
 });

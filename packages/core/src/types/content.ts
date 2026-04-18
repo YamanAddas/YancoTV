@@ -27,6 +27,20 @@ export interface Episode {
   duration?: number;
 }
 
+export interface SubtitleTrack {
+  language: string;
+  url: string;
+}
+
+export interface EpisodeInfo {
+  id: string;
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+  streamUrl: string;
+  duration?: string;
+}
+
 /** Parsed metadata from the metadata_json column */
 export interface ContentMetadata {
   // Xtream series / Stalker series
@@ -38,6 +52,10 @@ export interface ContentMetadata {
   rating?: string;
   // Xtream VOD
   description?: string;
+  tagline?: string;
+  youtubeTrailer?: string;
+  backdropUrl?: string;
+  subtitles?: SubtitleTrack[];
   // Xtream IDs (for catch-up / episode fetch)
   seriesId?: number;
   streamId?: number;
@@ -51,12 +69,17 @@ export interface ContentMetadata {
   catchupType?: string;
   catchupSource?: string;
   // TMDb enrichment
-  tmdbId?: number;
+  tmdbId?: number | null;
   tmdbType?: 'movie' | 'tv';
   tmdbPosterUrl?: string;
   tmdbBackdropUrl?: string;
   tmdbTagline?: string;
   tmdbEnrichedAt?: number;
+  // Flat flag set when a mobile detail fetch has hydrated this record,
+  // so subsequent detail-screen opens skip the round trip.
+  detailFetchedAt?: number;
+  // Series: episodes fetched lazily from Xtream get_series_info.
+  episodes?: EpisodeInfo[];
 }
 
 /** Enriched content detail returned by content:getDetail */

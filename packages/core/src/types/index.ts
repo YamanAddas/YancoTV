@@ -3,11 +3,13 @@ export type {
   ContentItem,
   ContentType,
   Episode,
+  EpisodeInfo,
   SortOption,
   ContentMetadata,
   ContentDetail,
   HistoryEntry,
   FavoriteEntry,
+  SubtitleTrack,
 } from './content';
 export type { Result } from './result';
 export type { Recording, RecordingStatus, StartRecordingInput, RecordingProgress } from './recording';

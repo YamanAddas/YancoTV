@@ -16,10 +16,16 @@ interface NavState {
   previousScreen: Screen;
   /** ID of the channel the user selected. Read by ChannelDetailScreen and PlayerScreen. */
   selectedChannelId?: string;
+  /**
+   * When a series episode is selected, the PlayerScreen picks its stream URL
+   * from metadata.episodes[].id === selectedEpisodeId. Falls back to the
+   * parent item's streamUrl for live/movie content.
+   */
+  selectedEpisodeId?: string;
 
   navigate: (screen: Screen) => void;
   openDetail: (channelId: string) => void;
-  openPlayer: (channelId: string) => void;
+  openPlayer: (channelId: string, episodeId?: string) => void;
   back: () => void;
 }
 
@@ -38,11 +44,12 @@ export const useNavStore = create<NavState>((set, get) => ({
       selectedChannelId: channelId,
     })),
 
-  openPlayer: (channelId) =>
+  openPlayer: (channelId, episodeId) =>
     set((s) => ({
       screen: 'player',
       previousScreen: s.screen,
       selectedChannelId: channelId,
+      selectedEpisodeId: episodeId,
     })),
 
   back: () => {
