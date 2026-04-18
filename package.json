@@ -95,5 +95,8 @@
       "esbuild",
       "ffmpeg-static"
     ]
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

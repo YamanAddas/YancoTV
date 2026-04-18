@@ -18,6 +18,13 @@ const KEY_SOURCES = 'yancotv.v1.sources';
 // app. Sources alone are tiny, so we keep those saved and re-sync on demand.
 const KEY_CHANNELS_LEGACY = 'yancotv.v1.channels';
 
+// NOTE: sources-store is deliberately NOT a core store factory (unlike
+// favorites/recent-channels). The Xtream/Stalker sync path pulls in
+// platform-specific HTTP plumbing, preflight ping, and a parser pipeline that
+// only makes sense on mobile for now. When desktop grows multi-source sync we
+// can revisit extracting the shape (sources CRUD + sync status) into core and
+// inject the sync function as a dependency.
+
 export type MobileSourceType = 'm3u_url' | 'xtream' | 'stalker';
 
 interface BaseSource {
