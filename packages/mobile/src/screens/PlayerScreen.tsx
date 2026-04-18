@@ -4,6 +4,7 @@ import {
   BackHandler,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -66,9 +67,15 @@ function buildTextTracks(subs: SubtitleTrack[] | undefined): TextTracks {
   }));
 }
 
-const CONTROLS_HIDE_MS = 4000;
+const CONTROLS_HIDE_MS = 5000;
 const DEFAULT_TRACK: SelectedTrack = { type: SelectedTrackType.SYSTEM };
 const DEFAULT_AUDIO: SelectedTrack = { type: SelectedTrackType.SYSTEM };
+
+// TV is the bigger problem child: SurfaceView z-order bugs are well-documented
+// on older Fire TV sticks and low-end Android TV boxes. TextureView is slightly
+// slower but renders inside the React view tree, so overlays never occlude it.
+// On phones SurfaceView is fine and cheaper.
+const DEFAULT_VIEW_TYPE = Platform.isTV ? ViewType.TEXTURE : ViewType.SURFACE;
 
 export function PlayerScreen() {
   const back = useNavStore((s) => s.back);
@@ -82,7 +89,6 @@ export function PlayerScreen() {
     channel?.metadataJson,
   ]);
 
-  // Resolve effective stream: episode (if series) or main item streamUrl.
   const { streamUrl, displayTitle, displaySubtitle } = useMemo(() => {
     if (!channel) {
       return { streamUrl: undefined, displayTitle: '', displaySubtitle: '' };
@@ -111,10 +117,11 @@ export function PlayerScreen() {
 
   const videoRef = useRef<VideoRef>(null);
   const [buffering, setBuffering] = useState(true);
+  const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [firstFrameAt, setFirstFrameAt] = useState<number | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [useTextureFallback, setUseTextureFallback] = useState(false);
+  const [viewTypeOverride, setViewTypeOverride] = useState<ViewType | null>(null);
   const [audioTracks, setAudioTracks] = useState<OnAudioTracksData['audioTracks']>([]);
   const [subTracks, setSubTracks] = useState<OnTextTracksData['textTracks']>([]);
   const [selectedAudio, setSelectedAudio] = useState<SelectedTrack>(DEFAULT_AUDIO);
@@ -152,6 +159,29 @@ export function PlayerScreen() {
     scheduleHide();
   }
 
+  // On Android TV, D-pad key presses don't fire onPress on the invisible
+  // tap catcher — we need the real TV event handler to wake the controls.
+  useEffect(() => {
+    if (!Platform.isTV) return;
+    type TVEvent = {
+      enable: (c: unknown, cb: () => void) => void;
+      disable: () => void;
+    };
+    let handler: TVEvent | null = null;
+    try {
+      const rn = require('react-native') as {
+        TVEventHandler?: new () => TVEvent;
+      };
+      if (rn.TVEventHandler) {
+        handler = new rn.TVEventHandler();
+        handler.enable(null, () => showControls());
+      }
+    } catch {
+      // no-op — non-TV build
+    }
+    return () => handler?.disable();
+  }, []);
+
   if (!channel || !streamUrl) {
     return (
       <View style={styles.centered}>
@@ -165,13 +195,10 @@ export function PlayerScreen() {
   }
 
   const streamType = detectStreamType(streamUrl);
+  const effectiveViewType = viewTypeOverride ?? DEFAULT_VIEW_TYPE;
   const tracksInfo = `A:${audioTracks.length} S:${subTracks.length + textTracks.length}`;
 
   return (
-    // IMPORTANT: root is a plain View, not Pressable. Wrapping <Video> inside
-    // a Pressable on Android causes the SurfaceView to be obscured, producing
-    // the "black video but audio plays" symptom. The tap-to-show-controls
-    // surface is a sibling overlay above the Video instead.
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#000" hidden />
 
@@ -185,11 +212,14 @@ export function PlayerScreen() {
         }}
         style={StyleSheet.absoluteFill}
         resizeMode="contain"
-        paused={false}
-        controls={false}
+        paused={paused}
+        // Native Media3 controls: play/pause, seek, subtitles, audio, speed.
+        // The user expects these — they're the "video controls inside the
+        // player" that React-side overlays can't fully replace.
+        controls
         selectedAudioTrack={selectedAudio}
         selectedTextTrack={selectedText}
-        viewType={useTextureFallback ? ViewType.TEXTURE : ViewType.SURFACE}
+        viewType={effectiveViewType}
         shutterColor="transparent"
         onLoadStart={() => {
           loadStartRef.current = Date.now();
@@ -224,11 +254,15 @@ export function PlayerScreen() {
             err.errorCode ? `code=${err.errorCode}` : null,
           ].filter(Boolean);
           const message = parts.join(' | ') || 'Playback failed';
+          // Flip the surface type once — if we started on TEXTURE and failed
+          // with a codec-like error, try SURFACE (and vice versa).
           const codecLike = /decoder|codec|surface|mediacodec|no video track/i.test(
             message,
           );
-          if (!useTextureFallback && codecLike) {
-            setUseTextureFallback(true);
+          if (!viewTypeOverride && codecLike) {
+            setViewTypeOverride(
+              effectiveViewType === ViewType.TEXTURE ? ViewType.SURFACE : ViewType.TEXTURE,
+            );
             setBuffering(true);
             return;
           }
@@ -245,12 +279,6 @@ export function PlayerScreen() {
         progressUpdateInterval={1000}
       />
 
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        onPress={showControls}
-        android_disableSound
-      />
-
       {buffering && !error ? (
         <View style={styles.overlayCenter} pointerEvents="none">
           <ActivityIndicator size="large" color="#fff" />
@@ -260,58 +288,81 @@ export function PlayerScreen() {
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorTitle}>Playback error</Text>
-          <Text style={styles.errorDetail} numberOfLines={3}>
+          <Text style={styles.errorDetail} numberOfLines={4}>
             {error}
           </Text>
-          <View style={styles.backBtn}>
-            <TvButton label="Back" onSelect={back} autoFocus active />
+          <View style={styles.errorActions}>
+            <View style={styles.backBtn}>
+              <TvButton label="Back" onSelect={back} autoFocus active />
+            </View>
+            <View style={styles.backBtn}>
+              <TvButton
+                label="Retry"
+                onSelect={() => {
+                  setError(null);
+                  setBuffering(true);
+                  setViewTypeOverride(
+                    effectiveViewType === ViewType.TEXTURE
+                      ? ViewType.SURFACE
+                      : ViewType.TEXTURE,
+                  );
+                }}
+              />
+            </View>
           </View>
         </View>
       ) : null}
 
       {controlsVisible && !error ? (
         <>
-          <View style={styles.topBar} pointerEvents="none">
-            <Text style={styles.channelName} numberOfLines={1}>
-              {displayTitle}
-            </Text>
-            {displaySubtitle ? (
-              <Text style={styles.group} numberOfLines={1}>
-                {displaySubtitle}
+          <View style={styles.topBar} pointerEvents="box-none">
+            <View style={styles.topBarText} pointerEvents="none">
+              <Text style={styles.channelName} numberOfLines={1}>
+                {displayTitle}
               </Text>
-            ) : null}
-            <Text style={styles.diag} numberOfLines={1}>
-              {[
-                streamType ? `type=${streamType}` : 'type=auto',
-                useTextureFallback ? 'surface=texture' : 'surface=default',
-                tracksInfo,
-                firstFrameAt !== null ? `frame=${firstFrameAt}ms` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          </View>
-          <View style={styles.bottomBar}>
-            <View style={styles.backBtn}>
-              <TvButton label="Back" onSelect={back} autoFocus active />
+              {displaySubtitle ? (
+                <Text style={styles.group} numberOfLines={1}>
+                  {displaySubtitle}
+                </Text>
+              ) : null}
+              <Text style={styles.diag} numberOfLines={1}>
+                {[
+                  streamType ? `type=${streamType}` : 'type=auto',
+                  `view=${effectiveViewType === ViewType.TEXTURE ? 'texture' : 'surface'}`,
+                  tracksInfo,
+                  firstFrameAt !== null ? `frame=${firstFrameAt}ms` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
             </View>
-            <View style={styles.spacer} />
-            {audioTracks.length > 1 ? (
-              <View style={styles.trackBtn}>
+            <View style={styles.topBarBtns}>
+              <View style={styles.backBtn}>
+                <TvButton label="Back" onSelect={back} active />
+              </View>
+              <View style={styles.backBtn}>
                 <TvButton
-                  label={`Audio (${audioTracks.length})`}
-                  onSelect={() => setPickerOpen('audio')}
+                  label={paused ? 'Play' : 'Pause'}
+                  onSelect={() => {
+                    setPaused((p) => !p);
+                    showControls();
+                  }}
                 />
               </View>
-            ) : null}
-            {subTracks.length + textTracks.length > 0 ? (
-              <View style={styles.trackBtn}>
-                <TvButton
-                  label={`Subs (${subTracks.length + textTracks.length})`}
-                  onSelect={() => setPickerOpen('subs')}
-                />
-              </View>
-            ) : null}
+              {audioTracks.length > 1 ? (
+                <View style={styles.backBtn}>
+                  <TvButton label={`Audio (${audioTracks.length})`} onSelect={() => setPickerOpen('audio')} />
+                </View>
+              ) : null}
+              {subTracks.length + textTracks.length > 0 ? (
+                <View style={styles.backBtn}>
+                  <TvButton
+                    label={`Subs (${subTracks.length + textTracks.length})`}
+                    onSelect={() => setPickerOpen('subs')}
+                  />
+                </View>
+              ) : null}
+            </View>
           </View>
         </>
       ) : null}
@@ -459,8 +510,18 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    padding: 24,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  topBarText: {
+    flex: 1,
+    marginRight: 16,
+  },
+  topBarBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   channelName: {
     color: '#fff',
@@ -479,23 +540,9 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     letterSpacing: 0.3,
   },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  spacer: { flex: 1 },
   backBtn: {
-    width: 160,
-  },
-  trackBtn: {
-    width: 200,
-    marginLeft: 12,
+    width: 140,
+    marginLeft: 8,
   },
   errorBox: {
     position: 'absolute',
@@ -519,6 +566,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  errorActions: {
+    flexDirection: 'row',
   },
   modalBackdrop: {
     flex: 1,
