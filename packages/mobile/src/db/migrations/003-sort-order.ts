@@ -1,0 +1,31 @@
+export const name = '003-sort-order.sql';
+
+export const sql = `
+-- Add sort_order column to preserve provider's original ordering
+
+ALTER TABLE content ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+
+CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);
+
+-- Drop FTS triggers before bulk update to avoid per-row overhead
+DROP TRIGGER IF EXISTS content_ai;
+DROP TRIGGER IF EXISTS content_ad;
+DROP TRIGGER IF EXISTS content_au;
+
+UPDATE content SET sort_order = rowid;
+
+CREATE TRIGGER content_ai AFTER INSERT ON content BEGIN
+  INSERT INTO content_fts (content_id, title, clean_title, group_name)
+  VALUES (new.id, new.title, new.clean_title, new.group_name);
+END;
+
+CREATE TRIGGER content_ad AFTER DELETE ON content BEGIN
+  DELETE FROM content_fts WHERE content_id = old.id;
+END;
+
+CREATE TRIGGER content_au AFTER UPDATE ON content BEGIN
+  DELETE FROM content_fts WHERE content_id = old.id;
+  INSERT INTO content_fts (content_id, title, clean_title, group_name)
+  VALUES (new.id, new.title, new.clean_title, new.group_name);
+END;
+`;

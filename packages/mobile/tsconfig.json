@@ -6,6 +6,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "lib": [
+      "es2022",
+      "dom"
+    ],
     "jsx": "react-native",
     "baseUrl": ".",
     "paths": {

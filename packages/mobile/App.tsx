@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ScreenRouter } from './src/navigation/ScreenRouter';
 import { useSourcesStore } from './src/stores/sources-store';
 import { Sentry } from './src/sentry';
-import { runDbSmoke, type DbSmokeResult } from './src/db/smoke';
+import { initDatabase, type InitDbResult } from './src/db/db';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,12 +67,12 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
   const hydrated = useSourcesStore((s) => s.hydrated);
   const hydrate = useSourcesStore((s) => s.hydrate);
   const [hydrateError, setHydrateError] = useState<string | null>(null);
-  const [dbSmoke, setDbSmoke] = useState<DbSmokeResult | null>(null);
+  const [dbInit, setDbInit] = useState<InitDbResult | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
-    runDbSmoke()
-      .then((r) => setDbSmoke(r))
+    initDatabase()
+      .then((r) => setDbInit(r))
       .catch((e: unknown) => {
         const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : String(e);
         setDbError(msg);
@@ -92,7 +92,7 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
     return (
       <ScrollView style={bootStyles.errorScroll}>
         <StatusBar barStyle="light-content" backgroundColor="#1a0000" />
-        <Text style={bootStyles.errorTitle}>op-sqlite smoke failed</Text>
+        <Text style={bootStyles.errorTitle}>Database init failed</Text>
         <Text style={bootStyles.errorStack}>{dbError}</Text>
       </ScrollView>
     );
@@ -108,17 +108,17 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!hydrated || !dbSmoke) {
+  if (!hydrated || !dbInit) {
     return (
       <View style={bootStyles.loadingRoot}>
         <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
         <ActivityIndicator size="large" color="#fbbf24" />
         <Text style={bootStyles.loadingText}>
-          {dbSmoke ? 'Loading (BUILD 2)…' : 'Opening database…'}
+          {dbInit ? 'Loading (BUILD 2)…' : 'Opening database…'}
         </Text>
-        {dbSmoke && (
+        {dbInit && (
           <Text style={bootStyles.loadingText}>
-            sqlite {dbSmoke.version} @ {dbSmoke.path}
+            sqlite {dbInit.version} · {dbInit.applied.length} migration(s) applied
           </Text>
         )}
       </View>
