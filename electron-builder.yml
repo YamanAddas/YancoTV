@@ -32,8 +32,9 @@ win:
     - target: portable
       arch: x64
   icon: src/assets/icon.ico
-  publisherName: Yaman
   artifactName: "${productName}-Setup-${version}.${ext}"
+  signtoolOptions:
+    publisherName: Yaman
 nsis:
   oneClick: false
   perMachine: false

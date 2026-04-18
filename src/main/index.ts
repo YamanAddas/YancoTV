@@ -34,8 +34,32 @@ import {
 } from './services/tray-service';
 import { installMainCrashHandlers } from './services/crash-handler';
 
+// electron-builder's portable target sets PORTABLE_EXECUTABLE_DIR to the
+// directory the user launched the .exe from. When present, redirect userData
+// and logs into a "YancoTV-Data" folder next to the exe so the build is
+// actually portable — no footprint in %APPDATA%, DB and credentials travel
+// with the exe. Must run BEFORE log.initialize() and before any other code
+// that resolves app.getPath('userData').
+const portableRoot = process.env.PORTABLE_EXECUTABLE_DIR;
+if (portableRoot) {
+  const dataDir = path.join(portableRoot, 'YancoTV-Data');
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    app.setPath('userData', dataDir);
+    app.setPath('logs', path.join(dataDir, 'logs'));
+  } catch (err) {
+    // If the user launched the portable exe from a read-only location, fall
+    // back to the default userData path rather than crashing — they'll get a
+    // non-portable install but the app still works.
+    console.error('Portable mode: failed to redirect userData, using default', err);
+  }
+}
+
 log.initialize();
 log.info(`${APP_NAME} starting...`);
+if (portableRoot) {
+  log.info(`Portable mode: userData = ${app.getPath('userData')}`);
+}
 
 // Install crash handlers as early as possible so any failure during app
 // bootstrap lands in the log file instead of a silent exit.

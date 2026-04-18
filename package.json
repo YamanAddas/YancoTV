@@ -1,6 +1,6 @@
 {
   "name": "yancotv",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Custom IPTV media application",
   "private": true,
   "author": {
@@ -12,8 +12,9 @@
     "dev": "concurrently -k \"pnpm dev:vite\" \"pnpm dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "tsc -p tsconfig.main.json && pnpm build:preload && wait-on http://localhost:5173 && electron .",
-    "build": "tsc -p tsconfig.main.json && pnpm build:preload && vite build",
-    "build:main": "tsc -p tsconfig.main.json && pnpm build:preload",
+    "build": "tsc -p tsconfig.main.json && pnpm copy:migrations && pnpm build:preload && vite build",
+    "build:main": "tsc -p tsconfig.main.json && pnpm copy:migrations && pnpm build:preload",
+    "copy:migrations": "node scripts/copy-migrations.js",
     "build:preload": "esbuild src/main/preload.ts --bundle --platform=node --outfile=dist/main/main/preload.js --external:electron --format=cjs",
     "build:renderer": "vite build",
     "package": "pnpm build && electron-builder",
