@@ -21,7 +21,7 @@ export function MoviesPage() {
     setSelectedCategory(null);
   }, [selectedSource, sortBy]);
 
-  const moviesQuery = useQuery({
+  const moviesQuery = useQuery<ContentCardData[]>({
     queryKey: ['content', 'movie', selectedSource, sortBy],
     queryFn: () => window.api.content.getMovies(selectedSource ?? undefined, sortBy),
     enabled: !!window.api,
@@ -29,7 +29,7 @@ export function MoviesPage() {
     placeholderData: (prev) => prev,
   });
 
-  const catsQuery = useQuery({
+  const catsQuery = useQuery<string[]>({
     queryKey: ['categories', 'movie'],
     queryFn: () => window.api.content.getCategories('movie'),
     enabled: !!window.api,

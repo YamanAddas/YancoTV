@@ -75,7 +75,9 @@ const api = {
         progress: { phase: string; programmeCount?: number; channelCount?: number; error?: string },
       ) => callback(progress);
       ipcRenderer.on(IpcChannels.EPG_REFRESH_PROGRESS, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.EPG_REFRESH_PROGRESS, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.EPG_REFRESH_PROGRESS, handler);
+      };
     },
   },
 
@@ -176,12 +178,16 @@ const api = {
         media?: { url?: string; title?: string; contentId?: string },
       ) => callback(media);
       ipcRenderer.on(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_SHOWN, handler);
+      };
     },
     onOverlayHidden: (callback: () => void) => {
       const handler = () => callback();
       ipcRenderer.on(IpcChannels.PLAYER_OVERLAY_HIDDEN, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_HIDDEN, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_HIDDEN, handler);
+      };
     },
 
     onStateChange: (callback: (state: unknown) => void) => {
@@ -314,7 +320,9 @@ const api = {
         },
       ) => callback(reminder);
       ipcRenderer.on(IpcChannels.REMINDERS_FIRED, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.REMINDERS_FIRED, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.REMINDERS_FIRED, handler);
+      };
     },
   },
 
@@ -346,7 +354,9 @@ const api = {
         },
       ) => callback(p);
       ipcRenderer.on(IpcChannels.DOWNLOAD_PROGRESS, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.DOWNLOAD_PROGRESS, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.DOWNLOAD_PROGRESS, handler);
+      };
     },
     onStatus: (
       callback: (p: { id: string; status: string; error?: string }) => void,
@@ -356,7 +366,9 @@ const api = {
         p: { id: string; status: string; error?: string },
       ) => callback(p);
       ipcRenderer.on(IpcChannels.DOWNLOAD_STATUS, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.DOWNLOAD_STATUS, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.DOWNLOAD_STATUS, handler);
+      };
     },
   },
 
@@ -390,12 +402,16 @@ const api = {
         p: { id: string; durationSeconds: number; fileSizeBytes: number },
       ) => callback(p);
       ipcRenderer.on(IpcChannels.RECORDING_PROGRESS, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.RECORDING_PROGRESS, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.RECORDING_PROGRESS, handler);
+      };
     },
     onStatus: (callback: (p: { id: string; status: string }) => void) => {
       const handler = (_e: IpcRendererEvent, p: { id: string; status: string }) => callback(p);
       ipcRenderer.on(IpcChannels.RECORDING_STATUS, handler);
-      return () => ipcRenderer.removeListener(IpcChannels.RECORDING_STATUS, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.RECORDING_STATUS, handler);
+      };
     },
   },
 

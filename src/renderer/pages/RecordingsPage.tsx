@@ -181,7 +181,7 @@ export function RecordingsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${STATUS_COLOR[r.status]}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${STATUS_COLOR[r.status as Recording['status']]}`}
                       >
                         {r.status === 'recording' && (
                           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />

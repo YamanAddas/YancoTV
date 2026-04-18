@@ -42,7 +42,7 @@ export function LiveTvPage() {
     setSelectedCategory(null);
   }, [selectedSource, sortBy]);
 
-  const channelsQuery = useQuery({
+  const channelsQuery = useQuery<ContentCardData[]>({
     queryKey: ['content', 'live', selectedSource, sortBy],
     queryFn: () => window.api.content.getLive(selectedSource ?? undefined, sortBy),
     enabled: !!window.api,
@@ -50,7 +50,7 @@ export function LiveTvPage() {
     placeholderData: (prev) => prev,
   });
 
-  const catsQuery = useQuery({
+  const catsQuery = useQuery<string[]>({
     queryKey: ['categories', 'live'],
     queryFn: () => window.api.content.getCategories('live'),
     enabled: !!window.api,

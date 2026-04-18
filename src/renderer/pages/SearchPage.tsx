@@ -124,7 +124,13 @@ export function SearchPage() {
         navigate(`/movies/${item.id}`);
         return;
       }
-      play(item.streamUrl, item.cleanTitle || item.title, item.id, undefined, item.type);
+      play(
+        item.streamUrl,
+        item.cleanTitle || item.title,
+        item.id,
+        undefined,
+        item.type as 'live' | 'movie' | 'series',
+      );
     },
     [play, navigate],
   );

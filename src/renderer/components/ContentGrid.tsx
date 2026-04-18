@@ -22,8 +22,6 @@ import { HexCard } from './HexCard';
 import { PosterCard } from './PosterCard';
 import { ChannelHexRow } from './ChannelHexRow';
 import { prettifyGroupName } from '../utils/group-parser';
-import hexFrameSrc from '../assets/hex-frames/hex-frame.svg';
-import hexFrameLockedSrc from '../assets/hex-frames/hex-frame-locked.svg';
 import type { NowNextMap } from '../../shared/types/epg';
 
 /**
@@ -500,77 +498,6 @@ function HexGridItem({
         />
       )}
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// HexThumb — pure visual hex (div, not button) for use inside other buttons
-// ---------------------------------------------------------------------------
-
-function HexThumb({
-  imageUrl,
-  letter,
-  isLocked,
-}: {
-  imageUrl?: string;
-  letter: string;
-  isLocked?: boolean;
-}) {
-  const [imgError, setImgError] = useState(false);
-  const showImage = imageUrl && !imgError;
-
-  return (
-    <div className="relative w-full" style={{ aspectRatio: '200 / 230' }}>
-      {/* Glow */}
-      <img
-        src={isLocked ? hexFrameLockedSrc : hexFrameSrc}
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute inset-[-12%] h-[124%] w-[124%]"
-        style={{ filter: 'blur(8px)', opacity: 0.25 }}
-      />
-      {/* Frame */}
-      <img
-        src={isLocked ? hexFrameLockedSrc : hexFrameSrc}
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute inset-0 h-full w-full"
-      />
-      {/* Content */}
-      <div className="absolute inset-[7%] clip-hex-tall overflow-hidden">
-        {showImage ? (
-          <img
-            src={imageUrl}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-surface-900/90">
-            <span className="text-xs font-bold text-surface-500">{letter}</span>
-          </div>
-        )}
-        {/* Vignette */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(0,0,0,0.55) 100%)' }}
-        />
-        {/* Glass shine */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: 'linear-gradient(170deg, rgba(255,255,255,0.08) 0%, transparent 35%)' }}
-        />
-        {isLocked && (
-          <div className="absolute inset-0 flex items-center justify-center bg-surface-950/60">
-            <svg className="h-4 w-4 text-amber-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

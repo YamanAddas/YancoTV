@@ -451,7 +451,7 @@ function ProgrammeDetail({
     window.api.reminders.listActive().then((res) => {
       if (cancelled) return;
       if (res?.ok) {
-        const match = res.reminders.find((r) => r.programmeId === programme.id);
+        const match = res.reminders.find((r: { id: string; programmeId: string }) => r.programmeId === programme.id);
         setReminderId(match?.id ?? null);
       }
     });

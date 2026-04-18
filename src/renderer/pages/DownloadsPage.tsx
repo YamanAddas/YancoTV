@@ -185,7 +185,7 @@ export function DownloadsPage() {
                         </span>
                       )}
                       <span
-                        className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-xs ${STATUS_COLOR[dl.status]}`}
+                        className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-xs ${STATUS_COLOR[dl.status as DownloadStatus]}`}
                       >
                         {dl.status}
                       </span>

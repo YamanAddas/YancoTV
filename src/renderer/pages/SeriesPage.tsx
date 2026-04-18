@@ -20,7 +20,7 @@ export function SeriesPage() {
     setSelectedCategory(null);
   }, [selectedSource, sortBy]);
 
-  const seriesQuery = useQuery({
+  const seriesQuery = useQuery<ContentCardData[]>({
     queryKey: ['content', 'series', selectedSource, sortBy],
     queryFn: () => window.api.content.getSeries(selectedSource ?? undefined, sortBy),
     enabled: !!window.api,
@@ -28,7 +28,7 @@ export function SeriesPage() {
     placeholderData: (prev) => prev,
   });
 
-  const catsQuery = useQuery({
+  const catsQuery = useQuery<string[]>({
     queryKey: ['categories', 'series'],
     queryFn: () => window.api.content.getCategories('series'),
     enabled: !!window.api,

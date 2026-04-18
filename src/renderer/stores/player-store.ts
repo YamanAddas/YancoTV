@@ -497,25 +497,26 @@ export function initPlayerEventListeners(): () => void {
   const cleanups: Array<() => void> = [];
 
   // --- Subscribe to mpv push events (active when backend=mpv) ---
-  const unsubState = window.api.player.onStateChange((mpvState: {
-    status?: string;
-    position?: number;
-    duration?: number;
-    volume?: number;
-    muted?: boolean;
-    speed?: number;
-    aspectRatio?: string;
-    fullscreen?: boolean;
-    subtitleDelay?: number;
-    audioDelay?: number;
-    videoZoom?: number;
-    subtitleTracks?: SubtitleTrack[];
-    audioTracks?: AudioTrack[];
-    mediaInfo?: MediaInfo;
-    currentUrl?: string;
-    reconnectAttempt?: number;
-    reconnectMaxAttempts?: number;
-  }) => {
+  const unsubState = window.api.player.onStateChange((raw: unknown) => {
+    const mpvState = raw as {
+      status?: string;
+      position?: number;
+      duration?: number;
+      volume?: number;
+      muted?: boolean;
+      speed?: number;
+      aspectRatio?: string;
+      fullscreen?: boolean;
+      subtitleDelay?: number;
+      audioDelay?: number;
+      videoZoom?: number;
+      subtitleTracks?: SubtitleTrack[];
+      audioTracks?: AudioTrack[];
+      mediaInfo?: MediaInfo;
+      currentUrl?: string;
+      reconnectAttempt?: number;
+      reconnectMaxAttempts?: number;
+    };
     const { backend, mode } = usePlayerStore.getState();
     if (backend !== 'mpv') return;
 
