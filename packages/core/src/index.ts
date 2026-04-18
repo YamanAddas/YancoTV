@@ -3,6 +3,7 @@ export * from './parsers';
 export * from './content';
 export * from './catchup';
 export * from './parental';
+export * from './stores';
 export * from './http';
 export * from './xtream';
 export * from './stalker';
