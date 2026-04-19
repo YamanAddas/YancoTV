@@ -5,5 +5,5 @@ export {
   verifyPinAgainstHashAsync,
   legacyPinSha256Hex,
   timingSafeEqualBytes,
-} from './pin';
-export type { PinVerifyResult } from './pin';
+} from './pin.js';
+export type { PinVerifyResult } from './pin.js';

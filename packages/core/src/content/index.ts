@@ -1,5 +1,5 @@
-export { cleanTitle, extractYear, extractSeasonEpisode, extractShowName } from './title-cleaner';
-export { classifyEntry, normalizeCategory } from './classifier';
+export { cleanTitle, extractYear, extractSeasonEpisode, extractShowName } from './title-cleaner.js';
+export { classifyEntry, normalizeCategory } from './classifier.js';
 export {
   parseGroupName,
   parseAllGroups,
@@ -8,16 +8,16 @@ export {
   prettifyGroupName,
   COUNTRY_LANGUAGE_MAP,
   CONTENT_TYPE_KEYWORDS,
-} from './grouping/group-parser';
-export type { ParsedGroup } from './grouping/group-parser';
+} from './grouping/group-parser.js';
+export type { ParsedGroup } from './grouping/group-parser.js';
 export {
   groupCategoriesSmart,
   groupCategories,
-} from './grouping/category-grouping';
+} from './grouping/category-grouping.js';
 export type {
   SmartChild,
   SmartSection,
   SmartGroupedCategories,
   CategoryGroup,
   GroupedCategories,
-} from './grouping/category-grouping';
+} from './grouping/category-grouping.js';

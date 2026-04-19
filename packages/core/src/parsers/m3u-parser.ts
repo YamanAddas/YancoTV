@@ -1,4 +1,4 @@
-import { NOOP_LOGGER, type Logger } from '../logger';
+import { NOOP_LOGGER, type Logger } from '../logger.js';
 
 export interface M3uEntry {
   duration: number;

@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import type { ContentItem, ContentMetadata } from '@yancotv/core';
 import { colors, radii, spacing } from '../../styles/theme';
+import { useFavoritesStore } from '../../stores/favorites-store';
 
 const TYPE_LABEL: Record<string, string> = {
   live: 'Live channel',
@@ -36,6 +37,12 @@ export function DetailHero({
   onPlay,
   subsCount = 0,
 }: Props) {
+  const favoriteIds = useFavoritesStore((s) => s.favoriteIds);
+  const toggleFavorite = useFavoritesStore((s) => s.toggle);
+  const isFavorite = favoriteIds.has(item.id);
+  const onToggleFavorite = () => {
+    void toggleFavorite(item.id);
+  };
   const backdrop = metadata.backdropUrl || item.logoUrl;
   const metaChips = [
     metadata.releaseDate ? yearOf(metadata.releaseDate) : null,
@@ -131,6 +138,24 @@ export function DetailHero({
               ]}
             >
               {primaryLabel}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onToggleFavorite}
+            accessibilityLabel={
+              isFavorite ? 'Remove from favorites' : 'Add to favorites'
+            }
+            style={({ pressed, focused }) => [
+              styles.favBtn,
+              isFavorite && styles.favBtnActive,
+              focused && styles.favBtnFocus,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Text
+              style={[styles.favBtnText, isFavorite && styles.favBtnTextActive]}
+            >
+              {isFavorite ? '\u2665  Saved' : '\u2661  Save'}
             </Text>
           </Pressable>
           {subsCount > 0 ? (
@@ -318,6 +343,34 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   primaryBtnTextDisabled: { color: colors.surface500 },
+  favBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface800,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  favBtnActive: {
+    backgroundColor: 'rgba(255, 80, 120, 0.12)',
+    borderColor: 'rgba(255, 80, 120, 0.5)',
+  },
+  favBtnFocus: {
+    shadowColor: colors.accent,
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+  },
+  favBtnText: {
+    color: colors.surface200,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  favBtnTextActive: {
+    color: '#ff91a4',
+  },
   subsBadge: {
     paddingHorizontal: 12,
     paddingVertical: 8,

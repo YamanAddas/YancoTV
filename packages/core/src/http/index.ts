@@ -1,2 +1,2 @@
-export type { HttpClient, HttpRequestOptions } from './types';
-export { HttpResponseError } from './types';
+export type { HttpClient, HttpRequestOptions } from './types.js';
+export { HttpResponseError } from './types.js';

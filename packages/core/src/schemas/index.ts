@@ -6,10 +6,10 @@ export {
   groupPrefSetSchema,
   groupPrefReorderSchema,
   channelOverrideSchema,
-} from './source';
+} from './source.js';
 export type {
   AddSourceInput,
   UpdateSourceInput,
   GroupPrefSetInput,
   ChannelOverrideInput,
-} from './source';
+} from './source.js';

@@ -21,6 +21,8 @@ import { LiveTvScreen } from '../screens/LiveTvScreen';
 import { MoviesScreen } from '../screens/MoviesScreen';
 import { SeriesScreen } from '../screens/SeriesScreen';
 import { SourcesScreen } from '../screens/SourcesScreen';
+import { SearchScreen } from '../screens/SearchScreen';
+import { FavoritesScreen } from '../screens/FavoritesScreen';
 import { ContentDetailScreen } from '../screens/ContentDetailScreen';
 import { PlayerScreen } from '../screens/PlayerScreen';
 import { TvDrawerContent } from './TvDrawerContent';
@@ -42,6 +44,8 @@ export type MainTabsParamList = {
   Live: undefined;
   Movies: undefined;
   Series: undefined;
+  Search: undefined;
+  Favorites: undefined;
   Sources: undefined;
 };
 
@@ -80,6 +84,8 @@ function TvDrawerShell() {
       <Drawer.Screen name="Live" component={LiveTvScreen} />
       <Drawer.Screen name="Movies" component={MoviesScreen} />
       <Drawer.Screen name="Series" component={SeriesScreen} />
+      <Drawer.Screen name="Search" component={SearchScreen} />
+      <Drawer.Screen name="Favorites" component={FavoritesScreen} />
       <Drawer.Screen name="Sources" component={SourcesScreen} />
     </Drawer.Navigator>
   );
@@ -120,6 +126,16 @@ function PhoneTabsShell() {
         options={{ tabBarLabel: 'Series' }}
       />
       <Tabs.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ tabBarLabel: 'Search' }}
+      />
+      <Tabs.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{ tabBarLabel: 'Favorites' }}
+      />
+      <Tabs.Screen
         name="Sources"
         component={SourcesScreen}
         options={{ tabBarLabel: 'Sources' }}
@@ -156,6 +172,8 @@ const linking: LinkingOptions<RootStackParamList> = {
           Live: 'live',
           Movies: 'movies',
           Series: 'series',
+          Search: 'search',
+          Favorites: 'favorites',
           Sources: 'sources',
         },
       },

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   FlatList,
   Pressable,
@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import type { ContentItem, ContentType } from '@yancotv/core';
+import type { ContentItem, ContentType, HistoryEntry } from '@yancotv/core';
 import {
   useNavigation,
   type CompositeNavigationProp,
@@ -17,6 +17,9 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { PageHeader } from '../components/layout/PageHeader';
 import { ContentCard } from '../components/cards/ContentCard';
 import { useSourcesStore } from '../stores/sources-store';
+import { useFavoritesStore } from '../stores/favorites-store';
+import { useHistoryStore } from '../stores/history-store';
+import { useRecentChannelsStore } from '../stores/recent-channels-store';
 import { colors, radii, spacing } from '../styles/theme';
 import type {
   MainTabsParamList,
@@ -43,6 +46,58 @@ const QUICK_LINKS: {
   { route: 'Sources', label: 'Sources', caption: 'Manage playlists', accent: '#3b82f6' },
 ];
 
+function ContinueWatchingRow({
+  items,
+  onResume,
+  onShowDetail,
+}: {
+  items: HistoryEntry[];
+  onResume: (entry: HistoryEntry) => void;
+  onShowDetail: (entry: HistoryEntry) => void;
+}) {
+  return (
+    <View style={styles.rowSection}>
+      <Text style={styles.rowTitle}>Continue watching</Text>
+      <FlatList
+        horizontal
+        data={items}
+        keyExtractor={(it) => it.id}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.rowList}
+        initialNumToRender={4}
+        windowSize={3}
+        maxToRenderPerBatch={3}
+        removeClippedSubviews
+        renderItem={({ item }) => {
+          const pct =
+            item.durationSeconds && item.durationSeconds > 0
+              ? Math.min(
+                  0.99,
+                  Math.max(0, item.positionSeconds / item.durationSeconds),
+                )
+              : 0;
+          return (
+            <View style={{ marginRight: 12 }}>
+              <ContentCard
+                title={item.content.title}
+                subtitle={
+                  item.episodeId ? 'Episode' : item.content.groupName
+                }
+                imageUrl={item.content.logoUrl}
+                variant={item.content.type === 'live' ? 'hex' : 'poster'}
+                width={item.content.type === 'live' ? 130 : 120}
+                onPress={() => onResume(item)}
+                onLongPress={() => onShowDetail(item)}
+                progress={pct > 0 ? pct : undefined}
+              />
+            </View>
+          );
+        }}
+      />
+    </View>
+  );
+}
+
 function RecentRow({ title, items, onPick }: {
   title: string;
   items: ContentItem[];
@@ -58,6 +113,10 @@ function RecentRow({ title, items, onPick }: {
         keyExtractor={(it) => it.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.rowList}
+        initialNumToRender={4}
+        windowSize={3}
+        maxToRenderPerBatch={3}
+        removeClippedSubviews
         renderItem={({ item }) => (
           <View style={{ marginRight: 12 }}>
             <ContentCard
@@ -81,6 +140,24 @@ export function HomeScreen() {
     navigation.navigate('Detail', { channelId });
   const channels = useSourcesStore((s) => s.channels);
   const sources = useSourcesStore((s) => s.sources);
+  const recentHistory = useHistoryStore((s) => s.recent);
+  const recentChannelIds = useRecentChannelsStore((s) => s.ids);
+
+  // updatePosition() writes directly to SQLite during playback without
+  // touching the Zustand `recent` array, so returning from the player would
+  // otherwise leave stale progress bars on this screen. Reload on focus.
+  // NB: we avoid @react-navigation's useFocusEffect — pnpm resolves multiple
+  // @react-navigation/core copies against distinct React peer hashes, and the
+  // hook form crashes with "Cannot read property 'useCallback' of null" when
+  // it crosses that boundary. The imperative `addListener('focus', …)` form
+  // runs entirely in our local React instance.
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      void useHistoryStore.getState().load();
+      void useFavoritesStore.getState().load();
+    });
+    return unsub;
+  }, [navigation]);
 
   const rows = useMemo(() => {
     const byType = (t: ContentType) =>
@@ -91,6 +168,29 @@ export function HomeScreen() {
       series: byType('series'),
     };
   }, [channels]);
+
+  // Continue-watching rail from watch_history. Entries already carry the
+  // joined content row, so no second lookup is needed.
+  const continueWatching = useMemo<HistoryEntry[]>(() => {
+    return recentHistory.filter((e) => e.content.type !== 'live').slice(0, 15);
+  }, [recentHistory]);
+
+  // Recent live channels: resolve IDs against the in-memory channel map so
+  // a zap-back tile shows the same metadata as the main grid. Skip any id
+  // whose source has since been removed.
+  const recentLive = useMemo<ContentItem[]>(() => {
+    if (recentChannelIds.length === 0) return [];
+    const byId = new Map(channels.map((c) => [c.id, c]));
+    const out: ContentItem[] = [];
+    for (const id of recentChannelIds) {
+      const c = byId.get(id);
+      if (c && c.type === 'live') out.push(c);
+    }
+    return out;
+  }, [channels, recentChannelIds]);
+
+  const openPlayer = (channelId: string, episodeId?: string) =>
+    navigation.navigate('Player', { channelId, episodeId });
 
   const totalCount = channels.length;
 
@@ -139,6 +239,22 @@ export function HomeScreen() {
           </View>
         ) : (
           <>
+            {continueWatching.length > 0 ? (
+              <ContinueWatchingRow
+                items={continueWatching}
+                onResume={(entry) =>
+                  openPlayer(entry.contentId, entry.episodeId)
+                }
+                onShowDetail={(entry) => openDetail(entry.contentId)}
+              />
+            ) : null}
+            {recentLive.length > 0 ? (
+              <RecentRow
+                title="Recent channels"
+                items={recentLive}
+                onPick={(id) => openPlayer(id)}
+              />
+            ) : null}
             <RecentRow title="Live TV" items={rows.live} onPick={openDetail} />
             <RecentRow title="Movies" items={rows.movies} onPick={openDetail} />
             <RecentRow title="Series" items={rows.series} onPick={openDetail} />

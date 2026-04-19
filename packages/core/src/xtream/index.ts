@@ -1,4 +1,4 @@
-export { XtreamClient } from './client';
+export { XtreamClient } from './client.js';
 export type {
   XtreamClientOptions,
   XtreamAuthInfo,
@@ -9,4 +9,4 @@ export type {
   XtreamSeriesEpisode,
   XtreamSeriesDetail,
   XtreamVodDetail,
-} from './client';
+} from './client.js';

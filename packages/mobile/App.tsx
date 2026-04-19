@@ -13,6 +13,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { useSourcesStore } from './src/stores/sources-store';
 import { useRecentChannelsStore } from './src/stores/recent-channels-store';
+import { useFavoritesStore } from './src/stores/favorites-store';
+import { useHistoryStore } from './src/stores/history-store';
+import { useSearchHistoryStore } from './src/stores/search-history-store';
 import { Sentry } from './src/sentry';
 import { initDatabase, type InitDbResult } from './src/db/db';
 
@@ -104,6 +107,22 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
       .catch((e: unknown) => {
         Sentry.captureException(e);
       });
+    // M5: load favorites + watch history from SQLite, search history from
+    // AsyncStorage. None of these block the first render — failures surface
+    // through the stores' own `lastError` field, and the UI falls back to
+    // empty collections.
+    useFavoritesStore
+      .getState()
+      .load()
+      .catch((e: unknown) => Sentry.captureException(e));
+    useHistoryStore
+      .getState()
+      .load()
+      .catch((e: unknown) => Sentry.captureException(e));
+    useSearchHistoryStore
+      .getState()
+      .load()
+      .catch((e: unknown) => Sentry.captureException(e));
   }, [hydrate, dbInit]);
 
   if (dbError) {

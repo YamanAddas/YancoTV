@@ -28,6 +28,8 @@ const NAV_ITEMS: NavItem[] = [
   { route: 'Live', label: 'Live TV' },
   { route: 'Movies', label: 'Movies' },
   { route: 'Series', label: 'Series' },
+  { route: 'Search', label: 'Search' },
+  { route: 'Favorites', label: 'Favorites' },
   { route: 'Sources', label: 'Sources' },
 ];
 
@@ -90,6 +92,30 @@ function NavIcon({ route, color }: { route: NavRoute; color: string }) {
           <Rect x={13} y={4} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
           <Rect x={3} y={13} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
           <Rect x={13} y={13} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
+        </Svg>
+      );
+    case 'Search':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Circle cx={11} cy={11} r={6.5} fill="none" stroke={color} strokeWidth={stroke} />
+          <Path
+            d="M16 16l4.5 4.5"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+          />
+        </Svg>
+      );
+    case 'Favorites':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M12 20s-7-4.35-7-10a4 4 0 017-2.65A4 4 0 0119 10c0 5.65-7 10-7 10z"
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinejoin="round"
+          />
         </Svg>
       );
     case 'Sources':

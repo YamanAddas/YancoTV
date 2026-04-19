@@ -1,4 +1,4 @@
-export { StalkerClient } from './client';
+export { StalkerClient } from './client.js';
 export type {
   StalkerClientOptions,
   StalkerAuthInfo,
@@ -6,4 +6,4 @@ export type {
   StalkerChannel,
   StalkerVodItem,
   StalkerSeriesItem,
-} from './client';
+} from './client.js';

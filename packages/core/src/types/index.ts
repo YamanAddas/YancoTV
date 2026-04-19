@@ -1,4 +1,4 @@
-export type { Source, AddSourceInput, UpdateSourceInput, SourceType } from './source';
+export type { Source, AddSourceInput, UpdateSourceInput, SourceType } from './source.js';
 export type {
   ContentItem,
   ContentType,
@@ -10,16 +10,16 @@ export type {
   HistoryEntry,
   FavoriteEntry,
   SubtitleTrack,
-} from './content';
-export type { Result } from './result';
-export type { Recording, RecordingStatus, StartRecordingInput, RecordingProgress } from './recording';
+} from './content.js';
+export type { Result } from './result.js';
+export type { Recording, RecordingStatus, StartRecordingInput, RecordingProgress } from './recording.js';
 export type {
   Download,
   DownloadStatus,
   EnqueueDownloadInput,
   DownloadProgress,
   DownloadStatusChange,
-} from './download';
+} from './download.js';
 export type {
   EpgProgramme,
   NowNext,
@@ -28,4 +28,4 @@ export type {
   EpgGuideChannel,
   EpgRefreshResult,
   EpgSettings,
-} from './epg';
+} from './epg.js';

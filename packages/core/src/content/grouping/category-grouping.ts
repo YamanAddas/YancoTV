@@ -7,7 +7,7 @@
  * belongs to, using prefix codes and Unicode script detection.
  */
 
-import { parseAllGroups } from './group-parser';
+import { parseAllGroups } from './group-parser.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,7 +106,7 @@ export function groupCategoriesSmart(categories: string[]): SmartGroupedCategori
 // Helper
 // ---------------------------------------------------------------------------
 
-import { getCountryFlag } from './group-parser';
+import { getCountryFlag } from './group-parser.js';
 
 function getFlagFromParsed(countryCode: string): string | null {
   return getCountryFlag(countryCode);

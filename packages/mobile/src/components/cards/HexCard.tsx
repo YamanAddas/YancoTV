@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -19,12 +19,42 @@ import {
 // Desktop hex aspect ratio is 200:230. Width drives height.
 const HEX_ASPECT = 200 / 230;
 
+// Memoized frame layer — re-uses the same parsed SvgXml across cards of the
+// same width/state. Wrapping in renderToHardwareTextureAndroid pins the
+// rasterized result so scrolling doesn't trigger a re-paint of the gradients.
+const HexFrame = React.memo(function HexFrame({
+  width,
+  height,
+  focused,
+}: {
+  width: number;
+  height: number;
+  focused: boolean;
+}) {
+  return (
+    <View
+      style={[StyleSheet.absoluteFill, { width, height }]}
+      renderToHardwareTextureAndroid
+      pointerEvents="none"
+    >
+      <SvgXml
+        xml={focused ? HEX_FRAME_HOVER : HEX_FRAME_NORMAL}
+        width={width}
+        height={height}
+      />
+    </View>
+  );
+});
+
 interface Props {
   title: string;
   subtitle?: string;
   imageUrl?: string;
   width: number;
   onPress: () => void;
+  onLongPress?: () => void;
+  /** 0..1 — renders a thin progress bar below the hex silhouette. */
+  progress?: number;
 }
 
 function scalePoints(points: string, w: number, h: number): string {
@@ -46,12 +76,24 @@ function HexMask({ width, height }: { width: number; height: number }) {
   );
 }
 
-export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
+function HexCardImpl({
+  title,
+  subtitle,
+  imageUrl,
+  width,
+  onPress,
+  onLongPress,
+  progress,
+}: Props) {
   const [focused, setFocused] = useState(false);
   const [imgError, setImgError] = useState(false);
   const height = Math.round(width / HEX_ASPECT);
   const showImage = !!imageUrl && !imgError;
   const letter = (title || '?').charAt(0).toUpperCase();
+  const mask = useMemo(
+    () => <HexMask width={width} height={height} />,
+    [width, height],
+  );
 
   // Reset the error flag when the URL changes — otherwise a card that once
   // failed to load (e.g. an earlier TVG logo 404) stays stuck on the fallback
@@ -61,10 +103,15 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
   }, [imageUrl]);
 
   const a11yLabel = subtitle ? `${title}, ${subtitle}` : title;
+  const clampedProgress =
+    typeof progress === 'number'
+      ? Math.max(0, Math.min(1, progress))
+      : undefined;
 
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onHoverIn={() => setFocused(true)}
@@ -74,10 +121,7 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
       style={({ pressed }) => [styles.root, pressed && styles.pressed]}
     >
       <View style={[styles.frame, { width, height }]}>
-        <MaskedView
-          style={{ width, height }}
-          maskElement={<HexMask width={width} height={height} />}
-        >
+        <MaskedView style={{ width, height }} maskElement={mask}>
           {showImage ? (
             <Image
               source={{ uri: imageUrl }}
@@ -93,13 +137,19 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
           <View style={styles.bottomFade} pointerEvents="none" />
         </MaskedView>
 
-        <SvgXml
-          xml={focused ? HEX_FRAME_HOVER : HEX_FRAME_NORMAL}
-          width={width}
-          height={height}
-          style={StyleSheet.absoluteFill}
-        />
+        <HexFrame width={width} height={height} focused={focused} />
       </View>
+
+      {clampedProgress !== undefined ? (
+        <View style={[styles.progressTrack, { width }]} pointerEvents="none">
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.round(clampedProgress * 100)}%` },
+            ]}
+          />
+        </View>
+      ) : null}
 
       <Text
         style={[styles.title, focused && styles.titleFocused]}
@@ -115,6 +165,9 @@ export function HexCard({ title, subtitle, imageUrl, width, onPress }: Props) {
     </Pressable>
   );
 }
+
+// Memoized so FlatList/FlashList recyclers skip identical-prop renders.
+export const HexCard = React.memo(HexCardImpl);
 
 const styles = StyleSheet.create({
   root: {
@@ -171,5 +224,16 @@ const styles = StyleSheet.create({
     color: colors.surface500,
     fontSize: 10,
     textAlign: 'center',
+  },
+  progressTrack: {
+    marginTop: 4,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
   },
 });

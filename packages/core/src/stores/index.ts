@@ -1,14 +1,14 @@
-export { createFavoritesStore } from './favorites';
+export { createFavoritesStore } from './favorites.js';
 export type {
   FavoritesAdapter,
   FavoritesStore,
   FavoritesStoreState,
-} from './favorites';
+} from './favorites.js';
 
-export { createRecentChannelsStore } from './recent-channels';
+export { createRecentChannelsStore } from './recent-channels.js';
 export type {
   RecentChannelsAdapter,
   RecentChannelsStore,
   RecentChannelsStoreState,
   RecentChannelsOptions,
-} from './recent-channels';
+} from './recent-channels.js';

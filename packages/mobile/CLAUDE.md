@@ -19,18 +19,19 @@ TV and phone share one codebase. UI branches via `Platform.isTV` at the navigato
 |---|---|
 | Framework | React Native 0.85 (`react-native-tvos` fork) |
 | Language | TypeScript 5 strict |
-| Playback | react-native-video 6 (ExoPlayer/Media3) |
-| Navigation | React Navigation 7 (installed in M3) |
+| Playback | react-native-video 6 (ExoPlayer/Media3) + FFmpeg ExoPlayer extension (M8R — codec gap) |
+| Navigation | React Navigation 7 — collapsed to `Shell` + `FullscreenPlayer` in M4R |
 | State | Zustand 5 |
-| Database | op-sqlite (installed in M2) |
+| Database | op-sqlite |
 | Data fetching | TanStack Query 5 |
 | Styling | StyleSheet + theme module (src/styles/theme.ts) |
-| Animations | Reanimated 3 (added in M4) |
-| Lists | FlashList (Shopify) |
-| Crash | Sentry (already wired) |
-| Credentials | react-native-keychain (M7) |
-| Notifications | Notifee (M6) |
-| Hex clipping | @react-native-masked-view/masked-view (M1.2) |
+| Animations | Reanimated 3 |
+| Lists | FlashList (Shopify) + paged SQL windows |
+| Image cache | `CachedImage` wrapper (M4R.11) — all `<Image>` routed through it |
+| Crash | Sentry |
+| Credentials | react-native-keychain (M7R) |
+| Notifications | Notifee (M6R) |
+| Hex clipping | **REMOVED from mobile** — flat `ChannelTile` replaced hex cards 2026-04-19 (GPU cost on Android). Hex stays on desktop. |
 | Build | local Gradle → EAS later |
 
 ## Project Layout
@@ -43,24 +44,33 @@ packages/mobile/
 │   └── gradle.properties      # AsyncStorage_db_size_in_MB=64, 2GB JVM heap
 ├── src/
 │   ├── index.js               # Entry, Sentry bootstrap
-│   ├── App.tsx                # Error boundary, hydration gate, splash
+│   ├── App.tsx                # Error boundary, cached-first boot, splash (rewritten M4R.6)
 │   ├── sentry.ts
 │   ├── navigation/
-│   │   ├── RootNavigator.tsx  # React Navigation 7 stack (M3)
-│   │   └── TvDrawerContent.tsx # Permanent drawer content for TV
-│   ├── screens/               # One file per screen
+│   │   └── RootNavigator.tsx  # Collapsed in M4R.2 to `Shell` + `FullscreenPlayer` routes only
+│   ├── shell/                 # NEW in M4R — the single state-driven surface
+│   │   ├── HomeShell.tsx      # Left rail + content panel + persistent MiniPlayer
+│   │   ├── LeftRail.tsx       # Category / language / favorites navigation column
+│   │   ├── ContentPanel.tsx   # Paged SQL-backed FlashList
+│   │   ├── InfoPanel.tsx      # Right-side context: now/next, metadata, actions
+│   │   ├── MiniPlayer.tsx     # Persistent corner surface; expands to fullscreen
+│   │   ├── SearchOverlay.tsx  # Modal overlay, not a separate screen
+│   │   └── SettingsModal.tsx  # Modal overlay
+│   ├── screens/
+│   │   └── FullscreenPlayer.tsx   # The ONLY other route post-M4R
 │   ├── components/
-│   │   ├── cards/             # HexCard, ContentCard, hex-frames
-│   │   ├── layout/            # PageHeader (sidebar now lives in navigation/)
-│   │   ├── tv/                # TV-specific (TvButton, focus helpers)
-│   │   └── phone/             # Phone-specific (added M8)
-│   ├── focus/                 # Focus primitive (rebuilt M3.8)
-│   ├── player/                # Video wrapper + IPlayer-equivalent (expanded M4)
-│   ├── db/                    # op-sqlite + migrations
-│   ├── services/              # Keystore, notifications, cast (M7–M8)
-│   ├── stores/                # Zustand: sources-store, favorites-store, history-store
+│   │   ├── cards/             # ChannelTile (flat), ContentCard. HexCard REMOVED mobile-side.
+│   │   ├── layout/            # PageHeader only; AppLayout/Sidebar deleted in M4R.1
+│   │   ├── tv/                # TvButton, focus helpers
+│   │   └── phone/             # Phone-specific (added M9R)
+│   ├── focus/                 # Rebuilt M4R.10 — Focusable primitive + focus-memory module
+│   ├── image/                 # NEW M4R.11 — CachedImage wrapper (disk + memory LRU)
+│   ├── player/                # Video wrapper; FFmpeg extension jniLibs land in M8R
+│   ├── db/                    # op-sqlite + migrations + queries.ts (paged SQL, M4R.4)
+│   ├── services/              # Keystore, notifications, cast (M6R–M9R)
+│   ├── stores/                # Zustand: sources-store, favorites-store, history-store, shell-store
 │   ├── http/fetch-http-client.ts
-│   ├── storage/               # AsyncStorage wrappers (small keys only post-M2)
+│   ├── storage/               # AsyncStorage — hydration flags + last-view ONLY
 │   ├── styles/theme.ts        # Ported from desktop palette
 │   └── assets/
 ├── package.json
@@ -97,52 +107,71 @@ Metro troubleshooting:
 pnpm start --reset-cache
 ```
 
-## Current State (snapshot — 2026-04-18)
+## Current State (snapshot — 2026-04-19, REBOOT)
 
-- Phase 1 (scaffold + debug + release APK + Sentry) **DONE** — commits `29cbbc2`, `7533c24`, `2ad3fad`
-- M1.1 Phase 2 rewrite (theme, layout, hex cards, full player, HTTP client, all screens) **DONE** — commit `5f0edbf` through `9b98eeb`
-- M1.2 real hex clipping via MaskedView **DONE** — `5990c0c`
-- M1.3 XMLTV extracted to core with pako **DONE** — `69e0cff`
-- M1.7 Parental PIN hashing in core **DONE** — `0fc5da6`
-- M1.8 Zustand store factories in core **DONE** — `94b7eac`
-- M1.4 / M1.5 / M1.6 (title-cleaner, classifier, catchup URL-builder full parity) **DEFERRED** to M7 (needs settings UI to matter)
-- **M2 op-sqlite + migrations** **DONE** — `c44599b` (content + FTS) · `cac9cde` (favorites) · `b45b974` (history) · `0b93214` (sources) · `b8bec53` (settings). MB-11 fixed at root; `KEY_CHANNELS` AsyncStorage path deleted.
-- **M3 React Navigation 7** **DONE** — `a87c726`. Root native-stack (Main / Detail / Player). Main = permanent Drawer on TV, bottom tabs on phone. `nav-store.ts`, `ScreenRouter.tsx`, old `AppLayout.tsx` + `Sidebar.tsx` all deleted.
-- **M4 browse parity — NEXT** (ContentGrid, CategorySidebar, full ContentDetail, resume playback)
+Phases 0–M3 landed on master. M4.1 `ContentGrid` (FlashList) + M4.2 `CategorySidebar` (language grouping) landed. Then the shell buckled under real-device testing and the 2026-04-19 audit reset the plan.
 
-**Known bugs:**
+**What's done and kept:**
+- `@yancotv/core` — parsers, clients, classifier, XMLTV, PIN hashing, store factories. Stable.
+- op-sqlite persistence (content, FTS, favorites, history, sources, settings) — stable.
+- React Navigation 7 wiring — kept, but routes collapse in M4R.2.
+- Sentry crash reporting — stable.
+- Release APK pipeline (Gradle, signing) — stable.
 
-- MB-11 channels re-sync every launch: **FIXED** (M2 — op-sqlite content store).
-- MB-12 VLC build crash: **OBSOLETE** — VLC dropped from V1 scope; see Decision Log below.
+**What's being rebuilt in M4R (in flight):**
+- Navigation shape — drawer + bottom-tabs + 4 stack screens collapse to one `Shell` + one `FullscreenPlayer` (M4R.2).
+- Most screens deleted — `HomeScreen`, `LiveTvScreen`, `MoviesScreen`, `SeriesScreen`, `SearchScreen`, `FavoritesScreen`, `ChannelDetailScreen` all go. Their logic folds into `HomeShell` + overlays (M4R.1).
+- Layout components deleted — `AppLayout`, `Sidebar`, old `PageHeader`, old `DetailHero`, old `DetailTabBar` (M4R.1).
+- Player — `PlayerScreen` is replaced by `FullscreenPlayer` backed by persistent `MiniPlayer` surface (M4R.7). Fixes MB-13 (double-back) and the "where did the picture go" state confusion.
+- Rendering model — paged SQL queries feed FlashList, no more hydrating 10K items into Zustand (M4R.4).
+- Boot — cached-first path, removes the blocking hydration gate (M4R.6). Fixes MB-15.
+- Focus — `Focusable` primitive + `focus-memory` module rewritten from scratch (M4R.10).
+- Images — new `CachedImage` wrapper; every `<Image>` routes through it (M4R.11).
+- Hex cards — deleted mobile-side. `ChannelTile` flat rectangle shipped 2026-04-19.
 
-**Player decision (2026-04-18):** V1 ships on `react-native-video` 6 / Media3. VLC was explored and dropped: no maintained RN VLC library works on RN 0.85 + tvos without native-module work (razorRun's lib autolink-breaks under RN 0.83+; jboz's Kotlin rewrite is 5-star unproven; no TheWidlarzGroup/Expo/community VLC module exists). Clean-path options are a custom Fabric wrapper over `libvlc-all:3.6.0` (3–5 days + ~40–90 MB APK) or the ExoPlayer FFmpeg decoder extension (clone `androidx/media`, NDK-build) — neither earns its keep for V1 vs Media3, which already handles ~95% of IPTV streams (what TiviMate / IPTV Smarters actually ship on). The 5% codec gap (AC3/EAC3/DTS/TrueHD) is a post-V1 ticket driven by real user reports, not speculative work.
+**Known bugs (mobile bug register):**
 
-**Working directive (user, 2026-04-18):** "rebuild from zero for these things. i don't want patching. i want clean building." Applied to op-sqlite persistence (M2) and React Navigation (M3). No patch-package entries.
+- **MB-13** player takes two back presses to close; surface state desyncs between routes — fix in M4R.7 via persistent MiniPlayer + single fullscreen route.
+- **MB-14** HEVC-main10 / AC3 / EAC3 / DTS / TrueHD decode as audio-only on ~30% of streams — fix in M8R via FFmpeg ExoPlayer extension (NDK build, vendored jniLibs).
+- **MB-15** first-frame blocked by hydration gate — fix in M4R.6.
+- **MB-16** SearchScreen crashes during fast typing — **FIXED 2026-04-19** (FlatList virtualization). Search path rebuilt entirely as `SearchOverlay` in M4R.
+- **MB-17** navigation sluggish across the whole app — fix in M4R (paged SQL + collapsed navigator + CachedImage).
+- **MB-18** desktop Electron boot `ERR_UNSUPPORTED_DIR_IMPORT` — **FIXED 2026-04-19** (explicit `.js` extensions across `@yancotv/core` internal imports).
 
-**Next-session start point:** M4.1 — `ContentGrid` on FlashList, replacing the FlatList grid in `ChannelListScreen.tsx`. Virtualized, dynamic columns from window width, TV-focus-aware. Then M4.2 `CategorySidebar` + M4.3 full `LiveTvScreen`. Build one task per commit.
+**Player decision (unchanged, 2026-04-18 → reaffirmed 2026-04-19):** V1 ships on `react-native-video` 6 / Media3. The codec gap that made users hate the app (audio-only streams) is closed with the ExoPlayer FFmpeg decoder extension in M8R — clone `androidx/media`, NDK-build `decoder_ffmpeg` for armeabi-v7a / arm64-v8a / x86_64, vendor the libs into `android/app/src/main/jniLibs/`. Not a Fabric VLC wrapper — wrong tradeoff (40–90 MB APK, unmaintained autolink path).
 
-## Architecture Rules (Mobile — non-negotiable)
+**Working directive (user, confirmed again 2026-04-19):** "rebuild from zero for these things. i don't want patching. i want clean building." The M4R reboot follows this to the letter — delete first, rebuild second. See the delete-before-add rule in the architecture list.
+
+**Next-session start point:** commit the 2026-04-19 perf checkpoint (flat ChannelTile, SearchScreen FlatList, desktop ESM fix, plan + CLAUDE.md rewrites) as one logical commit, then start M4R.0 (perf checkpoint verification) → M4R.1 (delete) → M4R.2 (collapse navigator). See [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md) § "M4R Shell reboot" for the task list.
+
+## Architecture Rules (Mobile — non-negotiable, 14 rules as of 2026-04-19 reboot)
 
 Mirrored from [PRODUCTION_PLAN_ANDROID.md § Architecture Rules](../../PRODUCTION_PLAN_ANDROID.md#architecture-rules-mobile):
 
 1. **No duplicated business logic.** Parsers, clients, classifier, title-cleaner, EPG, catchup, parental hashing, store factories — all live in `@yancotv/core`. If you need it on both platforms, put it in core first.
-2. **Persistence goes through op-sqlite.** AsyncStorage is ONLY for small app-level keys (hydration flags, last-screen). Never for content, EPG, or favorites.
-3. **All navigation through React Navigation.** No ad-hoc store-based routers after M3.
-4. **All focus through one primitive.** One `<Focusable>` or `TVFocusGuideView` wrapper — never per-screen custom behavior.
-5. **No credentials in AsyncStorage or SQLite in plaintext.** Use `react-native-keychain` (Android Keystore) for username/password/MAC.
-6. **Single-source theme.** Every color comes from `src/styles/theme.ts`. No inline hex.
-7. **TV vs phone branching at the navigator and component level only.** No `if (isTV)` inside stores, services, or data modules.
-8. **No emoji glyphs in UI.** SVG icons (`react-native-svg`) for everything cross-platform.
-9. **Zustand stores mirror desktop shapes.** If desktop has `player-store.play(url, title, contentId)`, mobile has the same signature. Makes core extraction trivial.
-10. **No ffmpeg subprocess assumptions.** Mobile uses Media3 for anything desktop does via ffmpeg. Live recording is dropped V1.
+2. **Persistence goes through op-sqlite.** AsyncStorage is ONLY for small app-level keys (hydration flags, last-view). Never for content, EPG, favorites, or lists of any size.
+3. **One screen, state-driven.** Post-M4R the navigator holds two routes only: `Shell` and `FullscreenPlayer`. Panels (LeftRail, ContentPanel, InfoPanel, MiniPlayer) are state-driven regions of `HomeShell` — not stack screens. Overlays (search, settings) are modals, not screens.
+4. **Paged SQL for content lists.** `ContentPanel` and every other list backed by content/EPG tables uses `db/queries.ts` with `LIMIT/OFFSET` (or keyset) paging. Never hydrate 10K+ rows into Zustand. Zustand holds UI state, cursors, and selection — not bulk data.
+5. **Persistent MiniPlayer surface.** Playback mounts on a single React Native SurfaceView that lives through navigation. Expanding to `FullscreenPlayer` does NOT unmount the player. Fixes the double-back problem.
+6. **Cached-first boot.** First frame paints from cached last-view immediately. Hydration, SQLite migrations, and EPG refresh run in the background — they never block paint. No more "SQLite migration thing takes long time" boot.
+7. **Every `<Image>` goes through `CachedImage`.** The `src/image/CachedImage.tsx` wrapper does disk + memory LRU. No raw `<Image source={{uri}} />` in components. Fixes logo/poster jank during scroll.
+8. **All focus through one primitive.** One `<Focusable>` or `TVFocusGuideView` wrapper. Focus memory lives in `src/focus/focus-memory.ts`, not in individual screens.
+9. **No credentials in AsyncStorage or SQLite in plaintext.** Use `react-native-keychain` (Android Keystore) for username/password/MAC.
+10. **Single-source theme.** Every color comes from `src/styles/theme.ts`. No inline hex.
+11. **TV vs phone branching at the shell/component level only.** No `if (Platform.isTV)` inside stores, services, data modules, or core.
+12. **No emoji glyphs in UI.** SVG icons (`react-native-svg`) for everything cross-platform.
+13. **Zustand stores mirror desktop shapes.** If desktop has `player-store.play(url, title, contentId)`, mobile has the same signature. Core extraction stays trivial.
+14. **Delete-before-add.** When a screen, component, or store is being replaced, the old file is deleted in the same commit as the replacement. No "old + new side by side for now" drift. M4R.1 is a pure deletion commit on purpose.
+
+**Codec gap (M8R):** Media3 alone ships ~95% of IPTV streams. The remaining ~30% that show audio-only on real provider feeds (HEVC-main10, AC3/EAC3, DTS, TrueHD) are closed with the ExoPlayer FFmpeg decoder extension — clone `androidx/media`, NDK-build `decoder_ffmpeg` for armeabi-v7a / arm64-v8a / x86_64, vendor libs into `android/app/src/main/jniLibs/`. Not a VLC Fabric wrapper (wrong tradeoff).
 
 ## TV vs Phone Handling
 
 The single APK adapts via:
 
 - **Manifest:** Both `LEANBACK_LAUNCHER` and standard `LAUNCHER` intent-filters declared. `android.software.leanback` required=false, `android.hardware.touchscreen` required=false.
-- **Code:** `Platform.isTV` from `react-native-tvos` branches the root navigator shape (drawer on TV, bottom tabs on phone) and gates TV-only components (`TvButton`, focus memory).
-- **Never:** don't branch inside a store action, a parser, an HTTP call, or a SQL query.
+- **Code:** `Platform.isTV` from `react-native-tvos` branches the `HomeShell` layout (TV: left rail + content panel + info panel + mini-player; phone: stacked with drawer-like overlays in M9R) and gates TV-only components (`TvButton`, focus memory). It does NOT change the set of routes — the route graph is identical on both form factors.
+- **Never:** don't branch inside a store action, a parser, an HTTP call, a SQL query, or `@yancotv/core`.
 
 TV focus:
 - Every screen needs an explicit first-focus element via `hasTVPreferredFocus`
@@ -209,9 +238,11 @@ Track selection (audio, subtitles) goes through react-native-video's built-in AP
 
 ## State Stores
 
-Zustand stores hydrate from AsyncStorage on App boot via `App.tsx`'s hydration gate. No persistence of content arrays — they're rehydrated from SQLite (post-M2) or re-fetched.
+Post-M4R Zustand holds **only**: selection state (active category, active item, active source), UI flags (overlay open, focus memory cursor), and the shell layout. Content and EPG stream out of SQLite via `db/queries.ts` paged cursors — never cached whole in Zustand.
 
-Never persist 10K-item arrays to AsyncStorage. This caused an `SQLITE_FULL` crash on Android before `gradle.properties: AsyncStorage_db_size_in_MB=64` was added. Persist only the source metadata; load content on demand.
+Hydration: cached last-view (active category, selected item) lands synchronously from AsyncStorage so `HomeShell` paints immediately. SQLite + EPG refresh kick off in the background. No blocking hydration gate.
+
+Never persist 10K-item arrays to AsyncStorage. This caused an `SQLITE_FULL` crash on Android before `gradle.properties: AsyncStorage_db_size_in_MB=64` was added.
 
 ## Testing
 
@@ -223,12 +254,13 @@ The 725-test core suite (desktop-side) validates every shared module — don't d
 
 ## Common Tasks
 
-### Add a new screen
-1. Create `src/screens/XxxScreen.tsx`
-2. Wire into `RootNavigator.tsx` (post-M3)
-3. Add to relevant nav group (drawer on TV, tab on phone, or stack-pushed from parent)
-4. Ensure it has a first-focus element for TV
-5. Add entry to the parity matrix in `PRODUCTION_PLAN_ANDROID.md` if it's new vs. desktop
+### Add a new "screen" (post-M4R, this usually means a panel or overlay — not a route)
+1. **Ask first: is it a route?** The only routes are `Shell` and `FullscreenPlayer`. If the answer is no, it's either a panel in `HomeShell` or a modal overlay.
+2. **Panel:** add under `src/shell/` (e.g. a new sub-panel of `ContentPanel`). Wire into `HomeShell` layout and shell-store selection state.
+3. **Overlay:** add as a modal under `src/shell/` (see `SearchOverlay`, `SettingsModal`). Triggered from shell-store flags.
+4. **Truly a new route:** justify it in a plan update first. New routes unmount the `MiniPlayer` surface by default and need an explicit reason.
+5. Ensure it has a first-focus element for TV.
+6. Add entry to the parity matrix in `PRODUCTION_PLAN_ANDROID.md` if it's new vs. desktop.
 
 ### Add a new shared module
 1. Start in `packages/core/src/` — write the pure-TypeScript version first
@@ -253,9 +285,14 @@ The 725-test core suite (desktop-side) validates every shared module — don't d
 - Do not add features not in [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md) without updating the plan first
 - Do not duplicate logic from `src/main/services/` — put it in `@yancotv/core` and consume there
 - Do not introduce NativeWind, styled-components, or another styling lib — we use StyleSheet + theme
-- Do not load content into AsyncStorage
-- Do not reintroduce a Zustand-based router or an `AppLayout` shell — navigation goes through `RootNavigator.tsx`
+- Do not load content or EPG arrays into AsyncStorage or Zustand — paged SQL only
+- Do not reintroduce a Zustand-based router, an `AppLayout` shell, or per-content-type screens (`LiveTvScreen`, `MoviesScreen`, etc.) — the shell is one `HomeShell`
+- Do not reintroduce hex cards on mobile — deleted 2026-04-19 for GPU cost reasons
+- Do not add raw `<Image>` — always `CachedImage`
+- Do not unmount the player when switching panels — `MiniPlayer` is a persistent surface
+- Do not block paint on SQLite migrations, EPG refresh, or network — cached-first boot
 - Do not hardcode colors, spacing, or radii — use `theme.ts`
-- Do not call mpv-specific APIs or assume ffmpeg presence
-- Do not check large binaries into `packages/mobile/` (APK outputs go to the `dist-apk/` directory at the root, which is gitignored)
-- Do not leave uncommitted work for more than a day — the current 13-file drift is a cautionary tale
+- Do not call mpv-specific APIs or assume ffmpeg subprocess — Android uses Media3 + FFmpeg decoder extension (M8R), not a subprocess
+- Do not check large binaries into `packages/mobile/` (APK outputs go to `dist-apk/` at the root, gitignored)
+- Do not leave uncommitted work for more than a day — Phase 2's 13-file drift and the shell buckling under it are both cautionary tales
+- Do not "patch" the M4R rebuild items — user directive is "rebuild from zero, don't patch." Delete first, rebuild second, in the same commit (rule 14).

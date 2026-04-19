@@ -285,12 +285,21 @@ pnpm typecheck        # tsc --noEmit
 
 See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full desktop roadmap and [bugs.md](bugs.md) for the active desktop bug register.
 
-### Mobile (M1 in progress — parity milestones ahead)
+### Mobile — REBOOT IN FLIGHT (2026-04-19)
 
-- Phase 0 (core extraction): mostly done through commit `86c45ed`
-- Phase 1 (mobile foundation): scaffold + debug + release APK done (`29cbbc2`, `7533c24`, `2ad3fad`)
-- Phase 2 rewrite (theme, layout, hex cards, full player, all screens): **uncommitted on master** — 13 files pending. M1 first task is to commit this.
-- Persistence, navigation, and full feature parity: M1 → M9 ahead
+Phases 0–M3 landed (core extraction, foundation, op-sqlite, React Navigation 7, drawer+tabs shell). M4.1/M4.2 landed flat `ContentGrid` + `CategorySidebar` groupings. Then the shell buckled under real usage: boot stalls on hydration gate, navigation is sluggish, player takes two back presses to close, search crashes while typing, ~30% of channels decode audio-only (HEVC-main10 / AC3 / EAC3 / DTS / TrueHD codec gap).
+
+Verdict after the 2026-04-19 audit: the shell, navigator, and rendering model were built wrong for a TV app — this is a rebuild, not a patch. New milestones **M4R → M10R** supersede M4–M9. See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) — sections "Reboot Notice — 2026-04-19", "Audit 2026-04-19" (delete + rebuild lists), and the 14 non-negotiable architecture rules.
+
+- **M4R** Shell reboot (2 wk) — collapse to one `HomeShell` + one `FullscreenPlayer` route, paged SQL, persistent `MiniPlayer` surface, cached-first boot
+- **M5R** Groups + EPG ribbon + Favorites (1 wk)
+- **M6R** EPG + Catch-up + Timeshift (2 wk)
+- **M7R** Settings + Parental + Polish (1 wk)
+- **M8R** Codec gap — FFmpeg ExoPlayer extension NDK build (1 wk)
+- **M9R** TV UX + Phone-native (2 wk)
+- **M10R** Distribution + QA (2 wk)
+
+Target: ~14 weeks to Play Store with buffer. New bug register MB-13…MB-18 opened; MB-18 (desktop `ERR_UNSUPPORTED_DIR_IMPORT`) already FIXED in this reboot wave.
 
 See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full mobile roadmap and parity matrix.
 
@@ -302,6 +311,7 @@ See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full mobile
 - **No platform I/O.** No `better-sqlite3`, no `fs`, no native mobile modules. Inject what you need via interfaces (`HttpClient`, `Logger`).
 - **Pure TypeScript.** Only dependency: `zod` (and peer interfaces).
 - **Deterministic, testable.** Every new module gets unit tests that run in both the desktop and mobile test suites.
+- **Explicit `.js` extensions on every internal relative import.** `@yancotv/core` is ESM (`"type": "module"`) and Node 22's loader rejects both directory imports and extensionless specifiers at runtime. TS `moduleResolution: "bundler"` is configured to accept `.js` on `.ts` sources, so `export * from './types/index.js'` type-checks and runs. Leaving out the extension compiles clean but crashes Electron boot with `ERR_UNSUPPORTED_DIR_IMPORT` (MB-18, 2026-04-19).
 
 ### Desktop — Electron Security (NON-NEGOTIABLE)
 

@@ -1,6 +1,6 @@
-import type { Result } from '../types';
-import { NOOP_LOGGER, type Logger } from '../logger';
-import { HttpResponseError, type HttpClient } from '../http';
+import type { Result } from '../types/index.js';
+import { NOOP_LOGGER, type Logger } from '../logger.js';
+import { HttpResponseError, type HttpClient } from '../http/index.js';
 
 export interface XtreamAuthInfo {
   userInfo: {

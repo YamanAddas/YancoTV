@@ -8,8 +8,8 @@
  * - Duration (live = -1, VOD = positive)
  */
 
-import type { ContentType } from '../types';
-import type { M3uEntry } from '../parsers';
+import type { ContentType } from '../types/index.js';
+import type { M3uEntry } from '../parsers/index.js';
 
 // Series group markers — kept broad so non-English providers land correctly.
 // Matches: "Series", "TV Shows", "Episodes", "Sezon", "Dizi" (TR), "Serial"

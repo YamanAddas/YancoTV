@@ -1,1 +1,1 @@
-export { buildXtreamTimeshiftUrl, buildM3uCatchupUrl } from './url-builder';
+export { buildXtreamTimeshiftUrl, buildM3uCatchupUrl } from './url-builder.js';

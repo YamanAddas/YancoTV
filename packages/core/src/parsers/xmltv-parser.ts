@@ -12,7 +12,7 @@
  */
 
 import { inflate, ungzip } from 'pako';
-import { NOOP_LOGGER, type Logger } from '../logger';
+import { NOOP_LOGGER, type Logger } from '../logger.js';
 
 // ---------------------------------------------------------------------------
 // Public types

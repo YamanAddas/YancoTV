@@ -28,11 +28,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TvButton } from '../components/tv/TvButton';
 import { useSourcesStore } from '../stores/sources-store';
 import { useRecentChannelsStore } from '../stores/recent-channels-store';
-import {
-  getLastPosition,
-  recordWatch,
-  updatePosition,
-} from '../db/history-store';
+import { useFavoritesStore } from '../stores/favorites-store';
+import { useHistoryStore } from '../stores/history-store';
+import { getLastPosition, updatePosition } from '../db/history-store';
 import type {
   PlayerScreenProps,
   RootStackParamList,
@@ -117,6 +115,13 @@ export function PlayerScreen() {
   const channel = useSourcesStore((s) =>
     s.channels.find((c) => c.id === selectedId),
   );
+  const isFavorite = useFavoritesStore((s) =>
+    selectedId ? s.favoriteIds.has(selectedId) : false,
+  );
+  const toggleFavorite = useFavoritesStore((s) => s.toggle);
+  const onToggleFavorite = useCallback(() => {
+    if (selectedId) void toggleFavorite(selectedId);
+  }, [selectedId, toggleFavorite]);
 
   const metadata = useMemo(() => parseMetadata(channel?.metadataJson), [
     channel?.metadataJson,
@@ -228,7 +233,9 @@ export function PlayerScreen() {
           });
           setPaused(true);
         }
-        const id = await recordWatch(contentId, episodeId);
+        // Use the Zustand wrapper so the Home "Continue watching" rail
+        // picks up the new entry as soon as the screen mounts.
+        const id = await useHistoryStore.getState().recordWatch(contentId, episodeId);
         if (!cancelled) setHistoryId(id);
       } catch {
         // Resume is a nice-to-have; fall through to normal playback if SQLite
@@ -467,6 +474,13 @@ export function PlayerScreen() {
                     setPaused((p) => !p);
                     showControls();
                   }}
+                />
+              </View>
+              <View style={styles.backBtn}>
+                <TvButton
+                  label={isFavorite ? '\u2665 Saved' : '\u2661 Save'}
+                  onSelect={onToggleFavorite}
+                  active={isFavorite}
                 />
               </View>
               {audioTracks.length > 1 ? (
