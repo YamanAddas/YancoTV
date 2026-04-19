@@ -83,12 +83,16 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Hydrate touches SQLite (sources + content tables), so it MUST run after
+    // initDatabase() resolves. Running both effects in parallel races the DB
+    // open and throws `Database not initialized`.
+    if (!dbInit) return;
     hydrate().catch((e: unknown) => {
       const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : String(e);
       setHydrateError(msg);
       Sentry.captureException(e);
     });
-  }, [hydrate]);
+  }, [hydrate, dbInit]);
 
   if (dbError) {
     return (
