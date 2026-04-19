@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupCategories } from '../../src/renderer/utils/category-grouping';
+import { groupCategories } from '@yancotv/core';
 
 describe('Category Grouping', () => {
   describe('groupCategories', () => {

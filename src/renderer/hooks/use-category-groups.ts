@@ -11,7 +11,7 @@ import {
   type SmartSection,
   type SmartChild,
   type SmartGroupedCategories,
-} from '../utils/category-grouping';
+} from '@yancotv/core';
 import { useGroupPreferencesStore } from '../stores/group-preferences-store';
 import type { ContentType } from '../../shared/types';
 

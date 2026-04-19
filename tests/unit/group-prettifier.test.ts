@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prettifyGroupName } from '../../src/renderer/utils/group-parser';
+import { prettifyGroupName } from '@yancotv/core';
 
 describe('prettifyGroupName', () => {
   it('returns empty string for empty input', () => {

@@ -1,6 +1,6 @@
 import { HexCard } from './HexCard';
 import type { ContentItem } from '../../shared/types';
-import { prettifyGroupName } from '../utils/group-parser';
+import { prettifyGroupName } from '@yancotv/core';
 
 interface RelatedTabProps {
   sameGroup: ContentItem[];

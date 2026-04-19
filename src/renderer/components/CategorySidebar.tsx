@@ -25,8 +25,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useCategoryGroups, type EnhancedSection } from '../hooks/use-category-groups';
 import { GroupContextMenu, type ContextMenuAction } from './GroupContextMenu';
 import type { ContentType } from '../../shared/types';
-import type { SmartChild } from '../utils/category-grouping';
-import { prettifyGroupName } from '../utils/group-parser';
+import { prettifyGroupName, type SmartChild } from '@yancotv/core';
 
 // ---------------------------------------------------------------------------
 // Types

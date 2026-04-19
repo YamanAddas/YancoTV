@@ -21,7 +21,7 @@ import { useSettingsStore } from '../stores/settings-store';
 import { HexCard } from './HexCard';
 import { PosterCard } from './PosterCard';
 import { ChannelHexRow } from './ChannelHexRow';
-import { prettifyGroupName } from '../utils/group-parser';
+import { prettifyGroupName } from '@yancotv/core';
 import type { NowNextMap } from '../../shared/types/epg';
 
 /**
