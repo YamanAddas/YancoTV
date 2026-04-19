@@ -9,11 +9,25 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import type { ContentItem, ContentType } from '@yancotv/core';
+import {
+  useNavigation,
+  type CompositeNavigationProp,
+} from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { PageHeader } from '../components/layout/PageHeader';
 import { ContentCard } from '../components/cards/ContentCard';
-import { useNavStore } from '../stores/nav-store';
 import { useSourcesStore } from '../stores/sources-store';
 import { colors, radii, spacing, sidebar } from '../styles/theme';
+import type {
+  MainTabsParamList,
+  RootStackParamList,
+} from '../navigation/RootNavigator';
+
+type ListNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabsParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const ALL = '__all__';
 
@@ -23,8 +37,9 @@ interface Props {
 }
 
 export function ChannelListScreen({ type, title }: Props) {
-  const openDetail = useNavStore((s) => s.openDetail);
-  const navigate = useNavStore((s) => s.navigate);
+  const navigation = useNavigation<ListNavigation>();
+  const openDetail = (channelId: string) =>
+    navigation.navigate('Detail', { channelId });
   const allChannels = useSourcesStore((s) => s.channels);
   const [category, setCategory] = useState<string>(ALL);
 
@@ -76,7 +91,7 @@ export function ChannelListScreen({ type, title }: Props) {
             Add an IPTV source to start browsing.
           </Text>
           <Pressable
-            onPress={() => navigate('sources')}
+            onPress={() => navigation.navigate('Sources')}
             style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
           >
             <Text style={styles.ctaText}>Go to Sources</Text>

@@ -8,22 +8,39 @@ import {
   View,
 } from 'react-native';
 import type { ContentItem, ContentType } from '@yancotv/core';
+import {
+  useNavigation,
+  type CompositeNavigationProp,
+} from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { PageHeader } from '../components/layout/PageHeader';
 import { ContentCard } from '../components/cards/ContentCard';
-import { useNavStore, type Screen } from '../stores/nav-store';
 import { useSourcesStore } from '../stores/sources-store';
 import { colors, radii, spacing } from '../styles/theme';
+import type {
+  MainTabsParamList,
+  RootStackParamList,
+} from '../navigation/RootNavigator';
+
+// The navigator is a drawer on TV and bottom-tabs on phone, but the nav methods
+// we use (`navigate`, `getParent`) are identical across them. Typing against
+// BottomTab is sufficient for strict-mode callers.
+type HomeNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabsParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const QUICK_LINKS: {
-  screen: Screen;
+  route: keyof MainTabsParamList;
   label: string;
   caption: string;
   accent: string;
 }[] = [
-  { screen: 'live', label: 'Live TV', caption: 'Channels now on air', accent: '#22c55e' },
-  { screen: 'movies', label: 'Movies', caption: 'On-demand films', accent: '#a855f7' },
-  { screen: 'series', label: 'Series', caption: 'TV shows', accent: '#f97316' },
-  { screen: 'sources', label: 'Sources', caption: 'Manage playlists', accent: '#3b82f6' },
+  { route: 'Live', label: 'Live TV', caption: 'Channels now on air', accent: '#22c55e' },
+  { route: 'Movies', label: 'Movies', caption: 'On-demand films', accent: '#a855f7' },
+  { route: 'Series', label: 'Series', caption: 'TV shows', accent: '#f97316' },
+  { route: 'Sources', label: 'Sources', caption: 'Manage playlists', accent: '#3b82f6' },
 ];
 
 function RecentRow({ title, items, onPick }: {
@@ -59,8 +76,9 @@ function RecentRow({ title, items, onPick }: {
 }
 
 export function HomeScreen() {
-  const navigate = useNavStore((s) => s.navigate);
-  const openDetail = useNavStore((s) => s.openDetail);
+  const navigation = useNavigation<HomeNavigation>();
+  const openDetail = (channelId: string) =>
+    navigation.navigate('Detail', { channelId });
   const channels = useSourcesStore((s) => s.channels);
   const sources = useSourcesStore((s) => s.sources);
 
@@ -91,8 +109,8 @@ export function HomeScreen() {
         <View style={styles.tilesWrap}>
           {QUICK_LINKS.map((q) => (
             <Pressable
-              key={q.screen}
-              onPress={() => navigate(q.screen)}
+              key={q.route}
+              onPress={() => navigation.navigate(q.route)}
               style={({ pressed, focused }) => [
                 styles.tile,
                 { borderColor: q.accent + '55' },
@@ -113,7 +131,7 @@ export function HomeScreen() {
               Add an Xtream, M3U or Stalker playlist from the Sources screen.
             </Text>
             <Pressable
-              onPress={() => navigate('sources')}
+              onPress={() => navigation.navigate('Sources')}
               style={({ pressed }) => [styles.cta, pressed && { opacity: 0.8 }]}
             >
               <Text style={styles.ctaText}>Go to Sources</Text>

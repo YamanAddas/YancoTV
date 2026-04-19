@@ -10,10 +10,17 @@ import {
   View,
 } from 'react-native';
 import type { EpisodeInfo } from '@yancotv/core';
-import { useNavStore } from '../stores/nav-store';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSourcesStore } from '../stores/sources-store';
 import { useContentDetail } from '../hooks/use-content-detail';
 import { colors, radii, spacing } from '../styles/theme';
+import type {
+  DetailScreenProps,
+  RootStackParamList,
+} from '../navigation/RootNavigator';
+
+type DetailNavigation = NativeStackNavigationProp<RootStackParamList, 'Detail'>;
 
 const TYPE_LABEL: Record<string, string> = {
   live: 'Live channel',
@@ -22,9 +29,12 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function ChannelDetailScreen() {
-  const back = useNavStore((s) => s.back);
-  const openPlayer = useNavStore((s) => s.openPlayer);
-  const selectedId = useNavStore((s) => s.selectedChannelId);
+  const navigation = useNavigation<DetailNavigation>();
+  const route = useRoute<DetailScreenProps['route']>();
+  const selectedId = route.params?.channelId;
+  const back = () => navigation.goBack();
+  const openPlayer = (channelId: string, episodeId?: string) =>
+    navigation.navigate('Player', { channelId, episodeId });
   const channel = useSourcesStore((s) =>
     s.channels.find((c) => c.id === selectedId),
   );

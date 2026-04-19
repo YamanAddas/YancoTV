@@ -7,8 +7,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ScreenRouter } from './src/navigation/ScreenRouter';
+import { RootNavigator } from './src/navigation/RootNavigator';
 import { useSourcesStore } from './src/stores/sources-store';
 import { Sentry } from './src/sentry';
 import { initDatabase, type InitDbResult } from './src/db/db';
@@ -148,16 +150,23 @@ function App() {
 
   return (
     <RootErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <HydrationGate>
-          <ScreenRouter />
-        </HydrationGate>
-      </QueryClientProvider>
+      <GestureHandlerRootView style={bootStyles.rootFlex}>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <HydrationGate>
+              <RootNavigator />
+            </HydrationGate>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </RootErrorBoundary>
   );
 }
 
 const bootStyles = StyleSheet.create({
+  rootFlex: {
+    flex: 1,
+  },
   splash: {
     flex: 1,
     alignItems: 'center',

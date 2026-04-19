@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -22,9 +22,16 @@ import Video, {
   type VideoRef,
 } from 'react-native-video';
 import type { ContentMetadata, SubtitleTrack } from '@yancotv/core';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TvButton } from '../components/tv/TvButton';
-import { useNavStore } from '../stores/nav-store';
 import { useSourcesStore } from '../stores/sources-store';
+import type {
+  PlayerScreenProps,
+  RootStackParamList,
+} from '../navigation/RootNavigator';
+
+type PlayerNavigation = NativeStackNavigationProp<RootStackParamList, 'Player'>;
 
 // In react-native-video v6 the `type` prop only accepts these MIME hints.
 // For MPEG-TS (.ts) and file containers (.mp4/.mkv/.avi/.mov) we intentionally
@@ -78,9 +85,11 @@ const DEFAULT_AUDIO: SelectedTrack = { type: SelectedTrackType.SYSTEM };
 const DEFAULT_VIEW_TYPE = Platform.isTV ? ViewType.TEXTURE : ViewType.SURFACE;
 
 export function PlayerScreen() {
-  const back = useNavStore((s) => s.back);
-  const selectedId = useNavStore((s) => s.selectedChannelId);
-  const selectedEpisodeId = useNavStore((s) => s.selectedEpisodeId);
+  const navigation = useNavigation<PlayerNavigation>();
+  const route = useRoute<PlayerScreenProps['route']>();
+  const selectedId = route.params?.channelId;
+  const selectedEpisodeId = route.params?.episodeId;
+  const back = useCallback(() => navigation.goBack(), [navigation]);
   const channel = useSourcesStore((s) =>
     s.channels.find((c) => c.id === selectedId),
   );
