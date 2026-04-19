@@ -37,6 +37,15 @@ const REACT_SINGLETON_PKGS = new Set(['react', 'react-native']);
 
 const MOBILE_ORIGIN = path.join(projectRoot, 'index.js');
 
+// @yancotv/core source files are .ts but their internal relative imports use
+// explicit .js extensions — required by Node 22 ESM at runtime (see desktop
+// MB-18 fix, CLAUDE.md § Shared Core rules). Metro's default resolver treats
+// an explicit .js extension as literal and won't substitute .ts, so those
+// imports fail to resolve during bundling. Strip the .js suffix when the
+// request originates from inside @yancotv/core so the default resolver can
+// pick up the matching .ts source.
+const CORE_SRC_FRAGMENT = path.join('packages', 'core', 'src');
+
 function rootPkgOf(moduleName) {
   const parts = moduleName.split('/');
   return parts[0].startsWith('@') ? `${parts[0]}/${parts[1]}` : parts[0];
@@ -62,6 +71,17 @@ const config = {
         return context.resolveRequest(
           { ...context, originModulePath: MOBILE_ORIGIN },
           moduleName,
+          platform,
+        );
+      }
+      if (
+        (moduleName.startsWith('./') || moduleName.startsWith('../')) &&
+        moduleName.endsWith('.js') &&
+        (context.originModulePath || '').includes(CORE_SRC_FRAGMENT)
+      ) {
+        return context.resolveRequest(
+          context,
+          moduleName.slice(0, -3),
           platform,
         );
       }
