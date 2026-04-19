@@ -16,6 +16,7 @@ import Video, {
   TextTrackType,
   ViewType,
   type OnAudioTracksData,
+  type OnProgressData,
   type OnTextTracksData,
   type SelectedTrack,
   type TextTracks,
@@ -26,6 +27,11 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TvButton } from '../components/tv/TvButton';
 import { useSourcesStore } from '../stores/sources-store';
+import {
+  getLastPosition,
+  recordWatch,
+  updatePosition,
+} from '../db/history-store';
 import type {
   PlayerScreenProps,
   RootStackParamList,
@@ -77,6 +83,23 @@ function buildTextTracks(subs: SubtitleTrack[] | undefined): TextTracks {
 const CONTROLS_HIDE_MS = 5000;
 const DEFAULT_TRACK: SelectedTrack = { type: SelectedTrackType.SYSTEM };
 const DEFAULT_AUDIO: SelectedTrack = { type: SelectedTrackType.SYSTEM };
+const HISTORY_SAVE_INTERVAL_MS = 10_000;
+const RESUME_THRESHOLD_SECONDS = 30;
+const RESUME_NEAR_END_BUFFER_SECONDS = 60;
+
+interface ResumeCandidate {
+  positionSeconds: number;
+  durationSeconds?: number;
+}
+
+function formatHMS(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
 
 // TV is the bigger problem child: SurfaceView z-order bugs are well-documented
 // on older Fire TV sticks and low-end Android TV boxes. TextureView is slightly
@@ -136,8 +159,12 @@ export function PlayerScreen() {
   const [selectedAudio, setSelectedAudio] = useState<SelectedTrack>(DEFAULT_AUDIO);
   const [selectedText, setSelectedText] = useState<SelectedTrack>(DEFAULT_TRACK);
   const [pickerOpen, setPickerOpen] = useState<null | 'audio' | 'subs'>(null);
+  const [resumePrompt, setResumePrompt] = useState<ResumeCandidate | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
   const loadStartRef = useRef<number>(0);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
+  const lastSaveAtRef = useRef<number>(0);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -167,6 +194,73 @@ export function PlayerScreen() {
     setControlsVisible(true);
     scheduleHide();
   }
+
+  // Resume check: for non-live content, look up the last saved position and
+  // either offer a resume prompt (paused until the user picks) or start from
+  // zero. `recordWatch` fires in parallel so we have a historyId to write
+  // positions to from onProgress below.
+  useEffect(() => {
+    if (!channel || channel.type === 'live') return;
+    const contentId = channel.id;
+    const episodeId = selectedEpisodeId;
+    let cancelled = false;
+    (async () => {
+      try {
+        const prev = await getLastPosition(contentId, episodeId);
+        if (cancelled) return;
+        const nearEnd =
+          prev?.durationSeconds != null &&
+          prev.positionSeconds >
+            prev.durationSeconds - RESUME_NEAR_END_BUFFER_SECONDS;
+        if (prev && prev.positionSeconds > RESUME_THRESHOLD_SECONDS && !nearEnd) {
+          setResumePrompt({
+            positionSeconds: prev.positionSeconds,
+            durationSeconds: prev.durationSeconds,
+          });
+          setPaused(true);
+        }
+        const id = await recordWatch(contentId, episodeId);
+        if (!cancelled) setHistoryId(id);
+      } catch {
+        // Resume is a nice-to-have; fall through to normal playback if SQLite
+        // is unavailable for any reason.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [channel, selectedEpisodeId]);
+
+  const onResumeAccept = useCallback(() => {
+    if (resumePrompt) pendingSeekRef.current = resumePrompt.positionSeconds;
+    setResumePrompt(null);
+    setPaused(false);
+  }, [resumePrompt]);
+
+  const onResumeDecline = useCallback(() => {
+    pendingSeekRef.current = null;
+    setResumePrompt(null);
+    setPaused(false);
+  }, []);
+
+  const onProgress = useCallback(
+    (data: OnProgressData) => {
+      if (!historyId || resumePrompt || pendingSeekRef.current != null) return;
+      const now = Date.now();
+      if (now - lastSaveAtRef.current < HISTORY_SAVE_INTERVAL_MS) return;
+      lastSaveAtRef.current = now;
+      updatePosition(
+        historyId,
+        Math.floor(data.currentTime),
+        data.seekableDuration > 0
+          ? Math.floor(data.seekableDuration)
+          : undefined,
+      ).catch(() => {
+        // Fire-and-forget; a dropped write will be caught by the next tick.
+      });
+    },
+    [historyId, resumePrompt],
+  );
 
   // On Android TV, D-pad key presses don't fire onPress on the invisible
   // tap catcher — we need the real TV event handler to wake the controls.
@@ -239,7 +333,15 @@ export function PlayerScreen() {
           setSubTracks([]);
         }}
         onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-        onLoad={() => setBuffering(false)}
+        onLoad={() => {
+          setBuffering(false);
+          const seekTo = pendingSeekRef.current;
+          if (seekTo != null) {
+            videoRef.current?.seek(seekTo);
+            pendingSeekRef.current = null;
+          }
+        }}
+        onProgress={onProgress}
         onAudioTracks={(e) => setAudioTracks(e.audioTracks)}
         onTextTracks={(e) => setSubTracks(e.textTracks)}
         onReadyForDisplay={() => {
@@ -376,6 +478,12 @@ export function PlayerScreen() {
         </>
       ) : null}
 
+      <ResumePromptModal
+        candidate={resumePrompt}
+        onResume={onResumeAccept}
+        onStartOver={onResumeDecline}
+      />
+
       <TrackPickerModal
         open={pickerOpen}
         audioTracks={audioTracks}
@@ -393,6 +501,55 @@ export function PlayerScreen() {
         onClose={() => setPickerOpen(null)}
       />
     </View>
+  );
+}
+
+interface ResumePromptModalProps {
+  candidate: ResumeCandidate | null;
+  onResume: () => void;
+  onStartOver: () => void;
+}
+
+function ResumePromptModal({
+  candidate,
+  onResume,
+  onStartOver,
+}: ResumePromptModalProps) {
+  if (!candidate) return null;
+  const resumeAt = formatHMS(candidate.positionSeconds);
+  const total = candidate.durationSeconds
+    ? ` / ${formatHMS(candidate.durationSeconds)}`
+    : '';
+  return (
+    <Modal
+      transparent
+      animationType="fade"
+      visible
+      onRequestClose={onStartOver}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.resumeCard}>
+          <Text style={styles.modalTitle}>Resume where you left off?</Text>
+          <Text style={styles.resumeDetail}>
+            {resumeAt}
+            {total}
+          </Text>
+          <View style={styles.resumeActions}>
+            <View style={styles.resumeBtn}>
+              <TvButton
+                label={`Resume from ${resumeAt}`}
+                onSelect={onResume}
+                autoFocus
+                active
+              />
+            </View>
+            <View style={styles.resumeBtn}>
+              <TvButton label="Start over" onSelect={onStartOver} />
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -600,5 +757,28 @@ const styles = StyleSheet.create({
   },
   modalSep: {
     height: 8,
+  },
+  resumeCard: {
+    width: 440,
+    maxWidth: '90%',
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  resumeDetail: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginTop: -4,
+    marginBottom: 20,
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+  },
+  resumeActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resumeBtn: {
+    minWidth: 160,
   },
 });
