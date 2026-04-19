@@ -47,18 +47,18 @@ packages/mobile/
 │   ├── sentry.ts
 │   ├── navigation/
 │   │   ├── RootNavigator.tsx  # React Navigation 7 stack (M3)
-│   │   └── ScreenRouter.tsx   # Zustand-based interim (removed after M3)
+│   │   └── TvDrawerContent.tsx # Permanent drawer content for TV
 │   ├── screens/               # One file per screen
 │   ├── components/
 │   │   ├── cards/             # HexCard, ContentCard, hex-frames
-│   │   ├── layout/            # AppLayout, PageHeader, Sidebar
+│   │   ├── layout/            # PageHeader (sidebar now lives in navigation/)
 │   │   ├── tv/                # TV-specific (TvButton, focus helpers)
 │   │   └── phone/             # Phone-specific (added M8)
 │   ├── focus/                 # Focus primitive (rebuilt M3.8)
 │   ├── player/                # Video wrapper + IPlayer-equivalent (expanded M4)
-│   ├── db/                    # op-sqlite + migrations (added M2)
+│   ├── db/                    # op-sqlite + migrations
 │   ├── services/              # Keystore, notifications, cast (M7–M8)
-│   ├── stores/                # Zustand: nav-store, sources-store, + future
+│   ├── stores/                # Zustand: sources-store, favorites-store, history-store
 │   ├── http/fetch-http-client.ts
 │   ├── storage/               # AsyncStorage wrappers (small keys only post-M2)
 │   ├── styles/theme.ts        # Ported from desktop palette
@@ -97,14 +97,29 @@ Metro troubleshooting:
 pnpm start --reset-cache
 ```
 
-## Current State (snapshot)
+## Current State (snapshot — 2026-04-18)
 
-At the time of this writing:
 - Phase 1 (scaffold + debug + release APK + Sentry) **DONE** — commits `29cbbc2`, `7533c24`, `2ad3fad`
-- Phase 2 rewrite (theme, layout, hex cards, full player, HTTP client hardening, all screens polished) **DONE but uncommitted** — 13 modified files + 3 untracked folders sitting on master
-- Persistence, full navigation, feature parity: all ahead (M1 → M9 in the roadmap)
+- M1.1 Phase 2 rewrite (theme, layout, hex cards, full player, HTTP client, all screens) **DONE** — commit `5f0edbf` through `9b98eeb`
+- M1.2 real hex clipping via MaskedView **DONE** — `5990c0c`
+- M1.3 XMLTV extracted to core with pako **DONE** — `69e0cff`
+- M1.7 Parental PIN hashing in core **DONE** — `0fc5da6`
+- M1.8 Zustand store factories in core **DONE** — `94b7eac`
+- M1.4 / M1.5 / M1.6 (title-cleaner, classifier, catchup URL-builder full parity) **DEFERRED** to M7 (needs settings UI to matter)
+- **M2 op-sqlite + migrations** **DONE** — `c44599b` (content + FTS) · `cac9cde` (favorites) · `b45b974` (history) · `0b93214` (sources) · `b8bec53` (settings). MB-11 fixed at root; `KEY_CHANNELS` AsyncStorage path deleted.
+- **M3 React Navigation 7** **DONE** — `a87c726`. Root native-stack (Main / Detail / Player). Main = permanent Drawer on TV, bottom tabs on phone. `nav-store.ts`, `ScreenRouter.tsx`, old `AppLayout.tsx` + `Sidebar.tsx` all deleted.
+- **M4 browse parity — NEXT** (ContentGrid, CategorySidebar, full ContentDetail, resume playback)
 
-**If you're opening this repo for the first time:** your first job is to land [M1.1](../../PRODUCTION_PLAN_ANDROID.md#m1--commit-the-phase-2-rewrite-finish-core-extraction-1-week) — commit the Phase 2 rewrite cleanly. Then continue with M1.2 onward.
+**Known bugs:**
+
+- MB-11 channels re-sync every launch: **FIXED** (M2 — op-sqlite content store).
+- MB-12 VLC build crash: **OBSOLETE** — VLC dropped from V1 scope; see Decision Log below.
+
+**Player decision (2026-04-18):** V1 ships on `react-native-video` 6 / Media3. VLC was explored and dropped: no maintained RN VLC library works on RN 0.85 + tvos without native-module work (razorRun's lib autolink-breaks under RN 0.83+; jboz's Kotlin rewrite is 5-star unproven; no TheWidlarzGroup/Expo/community VLC module exists). Clean-path options are a custom Fabric wrapper over `libvlc-all:3.6.0` (3–5 days + ~40–90 MB APK) or the ExoPlayer FFmpeg decoder extension (clone `androidx/media`, NDK-build) — neither earns its keep for V1 vs Media3, which already handles ~95% of IPTV streams (what TiviMate / IPTV Smarters actually ship on). The 5% codec gap (AC3/EAC3/DTS/TrueHD) is a post-V1 ticket driven by real user reports, not speculative work.
+
+**Working directive (user, 2026-04-18):** "rebuild from zero for these things. i don't want patching. i want clean building." Applied to op-sqlite persistence (M2) and React Navigation (M3). No patch-package entries.
+
+**Next-session start point:** M4.1 — `ContentGrid` on FlashList, replacing the FlatList grid in `ChannelListScreen.tsx`. Virtualized, dynamic columns from window width, TV-focus-aware. Then M4.2 `CategorySidebar` + M4.3 full `LiveTvScreen`. Build one task per commit.
 
 ## Architecture Rules (Mobile — non-negotiable)
 
@@ -239,7 +254,7 @@ The 725-test core suite (desktop-side) validates every shared module — don't d
 - Do not duplicate logic from `src/main/services/` — put it in `@yancotv/core` and consume there
 - Do not introduce NativeWind, styled-components, or another styling lib — we use StyleSheet + theme
 - Do not load content into AsyncStorage
-- Do not use `ScreenRouter.tsx` pattern for new screens after M3 lands
+- Do not reintroduce a Zustand-based router or an `AppLayout` shell — navigation goes through `RootNavigator.tsx`
 - Do not hardcode colors, spacing, or radii — use `theme.ts`
 - Do not call mpv-specific APIs or assume ffmpeg presence
 - Do not check large binaries into `packages/mobile/` (APK outputs go to the `dist-apk/` directory at the root, which is gitignored)
