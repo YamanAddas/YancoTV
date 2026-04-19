@@ -17,6 +17,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { HomeScreen } from '../screens/HomeScreen';
 import { ChannelListScreen } from '../screens/ChannelListScreen';
+import { LiveTvScreen } from '../screens/LiveTvScreen';
 import { SourcesScreen } from '../screens/SourcesScreen';
 import { ChannelDetailScreen } from '../screens/ChannelDetailScreen';
 import { PlayerScreen } from '../screens/PlayerScreen';
@@ -61,9 +62,6 @@ const Tabs = createBottomTabNavigator<MainTabsParamList>();
 // routes per content type, so each route gets a thin wrapper that supplies the
 // props. Avoids route-param plumbing for static values.
 
-function LiveRoute() {
-  return <ChannelListScreen type="live" title="Live TV" />;
-}
 function MoviesRoute() {
   return <ChannelListScreen type="movie" title="Movies" />;
 }
@@ -90,7 +88,7 @@ function TvDrawerShell() {
       )}
     >
       <Drawer.Screen name="Home" component={HomeScreen} />
-      <Drawer.Screen name="Live" component={LiveRoute} />
+      <Drawer.Screen name="Live" component={LiveTvScreen} />
       <Drawer.Screen name="Movies" component={MoviesRoute} />
       <Drawer.Screen name="Series" component={SeriesRoute} />
       <Drawer.Screen name="Sources" component={SourcesScreen} />
@@ -119,7 +117,7 @@ function PhoneTabsShell() {
       />
       <Tabs.Screen
         name="Live"
-        component={LiveRoute}
+        component={LiveTvScreen}
         options={{ tabBarLabel: 'Live' }}
       />
       <Tabs.Screen
