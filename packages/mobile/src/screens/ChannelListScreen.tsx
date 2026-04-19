@@ -1,12 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import type { ContentItem, ContentType } from '@yancotv/core';
 import {
@@ -16,9 +14,9 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { PageHeader } from '../components/layout/PageHeader';
-import { ContentCard } from '../components/cards/ContentCard';
+import { ContentGrid } from '../components/cards/ContentGrid';
 import { useSourcesStore } from '../stores/sources-store';
-import { colors, radii, spacing, sidebar } from '../styles/theme';
+import { colors, radii, spacing } from '../styles/theme';
 import type {
   MainTabsParamList,
   RootStackParamList,
@@ -62,24 +60,13 @@ export function ChannelListScreen({ type, title }: Props) {
     return { categories: names, countByCategory: counts };
   }, [items]);
 
-  const filtered = useMemo(() => {
+  const filtered: ContentItem[] = useMemo(() => {
     if (category === ALL) return items;
     return items.filter((it) => it.groupName === category);
   }, [items, category]);
 
-  const { width: screenW } = useWindowDimensions();
   // Live TV uses the honeycomb hex card; movies/series use 2:3 posters.
-  const variantKey: 'hex' | 'poster' = type === 'live' ? 'hex' : 'poster';
-  // Assume sidebar collapsed on phones (matches Sidebar's narrow-screen default)
-  // and expanded on larger displays. Either way, leave gutter room on both sides.
-  const sidebarW = screenW >= 720 ? sidebar.width : sidebar.widthCollapsed;
-  const availableWidth = screenW - sidebarW - spacing.md * 2;
-  const targetCardW = variantKey === 'poster' ? 120 : 130;
-  const columns = Math.max(
-    2,
-    Math.floor(availableWidth / (targetCardW + 12)),
-  );
-  const cardWidth = Math.floor((availableWidth - 12 * (columns - 1)) / columns);
+  const variant: 'hex' | 'poster' = type === 'live' ? 'hex' : 'poster';
 
   if (items.length === 0) {
     return (
@@ -131,65 +118,10 @@ export function ChannelListScreen({ type, title }: Props) {
         ))}
       </ScrollView>
 
-      <ChannelGrid
-        columns={columns}
-        cardWidth={cardWidth}
-        variantKey={variantKey}
-        data={filtered}
-        onOpen={openDetail}
-      />
+      <ContentGrid data={filtered} variant={variant} onOpen={openDetail} />
     </View>
   );
 }
-
-// Memoized grid. Stable renderItem + getItemLayout avoids re-renders of every
-// card on each category switch, which was a big contributor to tab-switch lag
-// with 5k+ items.
-const ChannelGrid = React.memo(function ChannelGrid({
-  columns,
-  cardWidth,
-  variantKey,
-  data,
-  onOpen,
-}: {
-  columns: number;
-  cardWidth: number;
-  variantKey: 'hex' | 'poster';
-  data: ContentItem[];
-  onOpen: (id: string) => void;
-}) {
-  const renderItem = useCallback(
-    ({ item }: { item: ContentItem }) => (
-      <ContentCard
-        title={item.title}
-        subtitle={item.groupName}
-        imageUrl={item.logoUrl}
-        variant={variantKey}
-        width={cardWidth}
-        onPress={() => onOpen(item.id)}
-      />
-    ),
-    [variantKey, cardWidth, onOpen],
-  );
-
-  return (
-    <FlatList
-      key={`grid-${columns}`}
-      data={data}
-      keyExtractor={keyExtractor}
-      numColumns={columns}
-      columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
-      contentContainerStyle={styles.gridContent}
-      renderItem={renderItem}
-      initialNumToRender={12}
-      maxToRenderPerBatch={12}
-      windowSize={7}
-      removeClippedSubviews
-    />
-  );
-});
-
-const keyExtractor = (it: ContentItem) => it.id;
 
 function CategoryChip({
   label,
@@ -268,14 +200,6 @@ const styles = StyleSheet.create({
   chipCountActive: {
     color: colors.accent,
     backgroundColor: 'rgba(0, 255, 170, 0.12)',
-  },
-  gridRow: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  gridContent: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
   },
   emptyPanel: {
     margin: spacing.xl,
