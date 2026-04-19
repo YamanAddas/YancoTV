@@ -598,7 +598,18 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
     const source = get().sources.find((s) => s.id === id);
     if (!source) return;
 
-    set({ syncStatus: 'fetching', syncMessage: `Starting ${source.name}...` });
+    // MB-4: clear any previously surfaced error on the source so a successful
+    // resync wipes the red text the moment the user kicks it off, instead of
+    // letting it linger until the new sync resolves (or worse — forever, if
+    // the new sync also succeeds with no warnings, since `lastError` would
+    // only be overwritten when warnings is non-empty).
+    set((s) => ({
+      syncStatus: 'fetching',
+      syncMessage: `Starting ${source.name}...`,
+      sources: s.sources.map((src) =>
+        src.id === id ? { ...src, lastError: undefined } : src,
+      ),
+    }));
 
     const setMsg = (msg: string) => set({ syncStatus: 'fetching', syncMessage: msg });
 

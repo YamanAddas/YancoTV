@@ -120,9 +120,9 @@ YancoTV/  (pnpm workspace root)
 | **M1.1 Commit Phase 2 rewrite** | **DONE** | commits `5f0edbf`, `6a08dcd`, then hardening commits through `9b98eeb` |
 | **M1.2 Real hex clipping (MaskedView)** | **DONE** | commit `5990c0c` |
 | **M1.3 XMLTV parser in core (pako)** | **DONE** | commit `69e0cff` |
-| **M1.4 title-cleaner full parity** | NOT STARTED | only Phase-0 version in core |
-| **M1.5 content-classifier full parity** | NOT STARTED | only Phase-0 version in core |
-| **M1.6 catchup URL builder full parity** | NOT STARTED | only Phase-0 version in core |
+| **M1.4 title-cleaner full parity** | **DONE** | core has cleanTitle/extractYear/extractSeasonEpisode/extractShowName; desktop re-exports |
+| **M1.5 content-classifier full parity** | **DONE** | core exports classifyEntry + normalizeCategory; desktop re-exports |
+| **M1.6 catchup URL builder full parity** | **DONE** | core exports buildXtreamTimeshiftUrl + buildM3uCatchupUrl; desktop consumes |
 | **M1.7 Parental PIN hashing in core** | **DONE** | commit `0fc5da6` |
 | **M1.8 Zustand store factories in core** | **DONE** | commit `94b7eac` |
 | **M2 op-sqlite + migrations** | **DONE** | commits `c44599b` (content + FTS), `cac9cde` (favorites), `b45b974` (history), `0b93214` (sources), `b8bec53` (settings). MB-11 fixed at root. |
@@ -131,7 +131,7 @@ YancoTV/  (pnpm workspace root)
 
 **What's installed on the user's test device right now:** needs a fresh APK built from `a87c726` — verifies SQLite persistence + the new nav stack before layering M4 on top.
 
-**V1 path from here:** M4 (browse parity) → M5 (search/favorites/history) → M6 (EPG + catchup) → M7 (settings + subs + parental) → M9 (QA) → release APK. Player stays on `react-native-video` 6 / Media3. M1.4/M1.5/M1.6 deferred to M7 (affect parity polish, not usability).
+**V1 path from here:** M4 (browse parity) → M5 (search/favorites/history) → M6 (EPG + catchup) → M7 (settings + subs + parental) → M9 (QA) → release APK. Player stays on `react-native-video` 6 / Media3.
 
 ---
 
@@ -210,7 +210,7 @@ Each milestone produces a runnable APK with a verifiable new capability. Commit 
 | M4.7 | Related tab: two HexCard horizontal rails | Same-group + same-source queries |
 | M4.8 | Playback resume | `onProgress` throttled write to `history_store`; on re-open, resume prompt |
 | M4.9 | Route Movie/Series card taps to detail, not direct-play | Matches desktop flow |
-| M4.10 | Zustand store factories from core wired to mobile DB adapter | `favorites-store`, `player-store`, `settings-store` consume core factories |
+| M4.10 | Zustand store factories from core wired to mobile DB adapter | `favorites-store` + `recent-channels-store` consume core factories. `player-store` and `settings-store` factories don't exist in core yet — extraction deferred until M7 settings UI lands and surfaces a real second consumer |
 
 **Ship criterion:** Brand-new user adds a source, browses movies, opens one, reads plot/cast, resumes from where they left off. It feels like the desktop.
 
@@ -389,15 +389,15 @@ These were found in the mobile audits (2026-04-18). All land in the relevant mil
 | ID | Bug | Fix Milestone | Status |
 |---|---|---|---|
 | MB-1 | HexCard not actually hex-clipped (borderRadius approximation) | M1.2 | FIXED `5990c0c` |
-| MB-2 | No playback resume — every relaunch starts at 0:00 | M4.8 | open |
-| MB-3 | Sources form doesn't disable during sync; dup submissions possible | M1 (small fix) | open |
-| MB-4 | Source error state never auto-clears | M1 (small fix) | open |
+| MB-2 | No playback resume — every relaunch starts at 0:00 | M4.8 | FIXED `32223c4` |
+| MB-3 | Sources form doesn't disable during sync; dup submissions possible | M1 (small fix) | FIXED (M4 cleanup pass) |
+| MB-4 | Source error state never auto-clears | M1 (small fix) | FIXED (M4 cleanup pass) |
 | MB-5 | HTTP client has zero retry logic on transient failures | M7.9 | open |
 | MB-6 | `RootNavigator.tsx` is empty placeholder | M3.1 | FIXED `a87c726` |
-| MB-7 | `Focusable.tsx` is dead code | M3.8 | open |
+| MB-7 | `Focusable.tsx` is dead code | M3.8 | OBSOLETE — rebuilt as the real primitive in M3.8 and consumed by SeasonPicker / SortDropdown |
 | MB-8 | Settings screen is in nav enum but unreachable | M7.1 | open (settings screen doesn't exist yet) |
-| MB-9 | `LiveTvScreen.tsx` is empty | M4.3 | open |
-| MB-10 | Sidebar emoji glyphs may not render across Android fonts | M7.8 | open (now in `TvDrawerContent.tsx` + phone tab labels) |
+| MB-9 | `LiveTvScreen.tsx` is empty | M4.3 | FIXED `3857172` |
+| MB-10 | Sidebar emoji/Unicode glyphs may not render across Android fonts | M7.8 | FIXED (M4 cleanup pass) — TvDrawerContent now uses `react-native-svg` icons |
 | **MB-11** | All channels re-sync on every launch — content was a JSON blob in AsyncStorage with silent write-failure on 10k+ catalogs. Root cause: content shouldn't live in AsyncStorage at all. | M2 (ported to op-sqlite; `KEY_CHANNELS` path deleted) | **FIXED** commits `c44599b` + `0b93214` |
 | **MB-12** | App crashed navigating to list screens on the VLC build (2026-04-18). Was `react-native-vlc-media-player@1.0.98` autolinking under RN 0.85 + tvos. | N/A — VLC dropped from V1; see Decision Log | **OBSOLETE** 2026-04-18 (VLC no longer in scope; current master uses react-native-video) |
 
@@ -462,3 +462,4 @@ These were found in the mobile audits (2026-04-18). All land in the relevant mil
 | **V1 ships on `react-native-video` 6 / Media3. VLC dropped from V1 scope.** | Post-M3 survey of the RN VLC landscape (2026-04-18) found no maintained library that works cleanly on RN 0.85 + `react-native-tvos` + new-arch: razorRun's `react-native-vlc-media-player` is RN 0.83+ autolink-broken (MB-12); `jboz/react-native-vlc-media-player-view` is a 5-star unproven Kotlin rewrite; no `@thewidlarzgroup` / Expo / react-native-community VLC module exists. The clean paths are a custom Fabric wrapper over `libvlc-all:3.6.0` (3–5 days native work + ~40–90 MB APK inflation) or the ExoPlayer FFmpeg decoder extension (cloning `androidx/media`, NDK-build, patch to react-native-video). Neither earns its keep for V1: Media3 already handles ~95% of IPTV streams — which is what TiviMate and IPTV Smarters ship on. The 5% codec gap (AC3/EAC3/DTS/TrueHD) is a post-V1 problem to address when real user reports come in, not speculative work blocking every other milestone. | 2026-04-18 |
 | Clean rebuild of persistence + navigation instead of patching | User directive 2026-04-18: "rebuild from zero for these things. i dont want patching. i want clean building." Applied to: op-sqlite persistence (M2, landed), React Navigation (M3, landed). No patch-package entries, no band-aid stores. (VLC rebuild scoped out — see row above.) | 2026-04-18 |
 | Defer M1.4 / M1.5 / M1.6 (title-cleaner + classifier + catchup URL-builder full parity) | The Phase-0 versions in core are enough for what mobile renders today; the full desktop rules only surface in UI that doesn't exist yet (settings overrides, catchup EPG). Re-picks up in M7 when settings screen lands. | 2026-04-18 |
+| **Reverse:** M1.4/M1.5/M1.6 actually landed at Phase-0-extraction time | 2026-04-19 audit found the core modules already had full desktop parity (title-cleaner: cleanTitle/extractYear/extractSeasonEpisode/extractShowName; classifier: classifyEntry+normalizeCategory; catchup: buildXtreamTimeshiftUrl+buildM3uCatchupUrl). The "deferred" marking was a documentation lag. Plan corrected. | 2026-04-19 |

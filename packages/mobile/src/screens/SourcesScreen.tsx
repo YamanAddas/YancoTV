@@ -78,8 +78,12 @@ export function SourcesScreen() {
     }
   };
 
+  // MB-3: block submit while a sync is in flight, otherwise the user can fire
+  // a duplicate add of the same source and watch the channels list double up.
+  const isSyncing = syncStatus === 'fetching' || syncStatus === 'parsing';
   const canAdd =
-    tab === 'm3u' ? canAddM3u : tab === 'xtream' ? canAddXtream : canAddStalker;
+    !isSyncing &&
+    (tab === 'm3u' ? canAddM3u : tab === 'xtream' ? canAddXtream : canAddStalker);
 
   return (
     <ScrollView contentContainerStyle={styles.content}>

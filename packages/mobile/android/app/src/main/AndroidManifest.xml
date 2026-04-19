@@ -36,6 +36,14 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent-filter>
+        <!-- M3.6: yancotv:// deep-link scheme. Routed by React Navigation's
+             linking config in src/navigation/RootNavigator.tsx. -->
+        <intent-filter android:autoVerify="false">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="yancotv" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

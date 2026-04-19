@@ -3,6 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import {
   DarkTheme,
   NavigationContainer,
+  type LinkingOptions,
   type Theme,
 } from '@react-navigation/native';
 import {
@@ -133,6 +134,37 @@ function MainShell() {
 
 // ---------- Root ----------
 
+// M3.6: deep-link scheme. The Android intent-filter for `yancotv://` lives in
+// AndroidManifest.xml — this config tells React Navigation how to map an
+// incoming URL to a screen + params.
+//
+// Supported URLs:
+//   yancotv://home              → Main / Home
+//   yancotv://live              → Main / Live
+//   yancotv://movies            → Main / Movies
+//   yancotv://series            → Main / Series
+//   yancotv://sources           → Main / Sources
+//   yancotv://detail/:channelId → Detail
+//   yancotv://player/:channelId → Player
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['yancotv://'],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Home: 'home',
+          Live: 'live',
+          Movies: 'movies',
+          Series: 'series',
+          Sources: 'sources',
+        },
+      },
+      Detail: 'detail/:channelId',
+      Player: 'player/:channelId',
+    },
+  },
+};
+
 const navTheme: Theme = {
   ...DarkTheme,
   colors: {
@@ -147,7 +179,7 @@ const navTheme: Theme = {
 
 export function RootNavigator() {
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} linking={linking}>
       <View style={styles.root}>
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
           <RootStack.Screen name="Main" component={MainShell} />

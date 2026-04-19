@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import type { DrawerContentComponentProps } from '@react-navigation/drawer';
+import Svg, { Circle, Path, Polygon, Rect } from 'react-native-svg';
 import { useSourcesStore } from '../stores/sources-store';
 import { colors, glow, radii, sidebar, spacing } from '../styles/theme';
 import type { MainTabsParamList } from './RootNavigator';
@@ -15,21 +16,96 @@ import type { MainTabsParamList } from './RootNavigator';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const LOGO = require('../assets/yancotv_logo.png');
 
+type NavRoute = keyof MainTabsParamList;
+
 interface NavItem {
-  route: keyof MainTabsParamList;
+  route: NavRoute;
   label: string;
-  icon: string;
 }
 
-// Unicode geometric glyphs — not emoji. MB-10 tracks replacing these with SVG
-// icons project-wide.
 const NAV_ITEMS: NavItem[] = [
-  { route: 'Home', label: 'Home', icon: '\u2302' },
-  { route: 'Live', label: 'Live TV', icon: '\u25CF' },
-  { route: 'Movies', label: 'Movies', icon: '\u25B6' },
-  { route: 'Series', label: 'Series', icon: '\u25A4' },
-  { route: 'Sources', label: 'Sources', icon: '\u2699' },
+  { route: 'Home', label: 'Home' },
+  { route: 'Live', label: 'Live TV' },
+  { route: 'Movies', label: 'Movies' },
+  { route: 'Series', label: 'Series' },
+  { route: 'Sources', label: 'Sources' },
 ];
+
+// MB-10: SVG icons replace Unicode glyphs. Hand-rolled inline so we don't pull
+// an icon-pack dep for five shapes — keeps APK lean and lets the active colour
+// flow straight from the theme.
+function NavIcon({ route, color }: { route: NavRoute; color: string }) {
+  const size = 18;
+  const stroke = 1.8;
+  switch (route) {
+    case 'Home':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-7H10v7H4a1 1 0 01-1-1z"
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'Live':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect
+            x={2.5}
+            y={5}
+            width={19}
+            height={13}
+            rx={2}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+          />
+          <Path
+            d="M8 21h8M12 18v3"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+          />
+        </Svg>
+      );
+    case 'Movies':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Polygon
+            points="7,4 20,12 7,20"
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'Series':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={3} y={4} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
+          <Rect x={13} y={4} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
+          <Rect x={3} y={13} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
+          <Rect x={13} y={13} width={8} height={7} rx={1.5} fill="none" stroke={color} strokeWidth={stroke} />
+        </Svg>
+      );
+    case 'Sources':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Circle cx={12} cy={12} r={3} fill="none" stroke={color} strokeWidth={stroke} />
+          <Path
+            d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+          />
+        </Svg>
+      );
+  }
+}
 
 /**
  * Drawer content for TV — renders the YancoTV sidebar and dispatches to
@@ -64,9 +140,12 @@ export function TvDrawerContent(props: DrawerContentComponentProps) {
                 (pressed || focused) && !active && styles.itemFocus,
               ]}
             >
-              <Text style={[styles.icon, active && styles.iconActive]}>
-                {item.icon}
-              </Text>
+              <View style={styles.icon}>
+                <NavIcon
+                  route={item.route}
+                  color={active ? colors.accent : colors.surface400}
+                />
+              </View>
               <Text
                 style={[styles.label, active && styles.labelActive]}
                 numberOfLines={1}
@@ -131,14 +210,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   icon: {
-    color: colors.surface400,
-    fontSize: 16,
-    fontWeight: '700',
     width: 22,
-    textAlign: 'center',
-  },
-  iconActive: {
-    color: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
     marginLeft: 10,
