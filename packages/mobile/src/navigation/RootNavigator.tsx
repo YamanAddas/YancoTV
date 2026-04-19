@@ -64,7 +64,15 @@ export function RootNavigator() {
           <RootStack.Screen
             name="FullscreenPlayer"
             component={FullscreenPlayer}
-            options={{ animation: 'fade', gestureEnabled: false }}
+            options={{
+              animation: 'fade',
+              gestureEnabled: false,
+              // transparentModal keeps HomeShell (and its PersistentPlayerHost
+              // child) mounted beneath the controls overlay — critical for
+              // the single-<Video> architecture (M4R rule 5).
+              presentation: 'transparentModal',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
           />
         </RootStack.Navigator>
       </View>

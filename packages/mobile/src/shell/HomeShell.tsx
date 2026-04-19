@@ -2,13 +2,24 @@ import React from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { LeftRail } from './LeftRail';
 import { ContentPanel } from './ContentPanel';
+import { MiniPlayer } from './MiniPlayer';
+import { PersistentPlayerHost } from '../player/PersistentPlayerHost';
 import { colors, radii, spacing } from '../styles/theme';
 
 // Three-column TV layout: LeftRail · ContentPanel · (InfoPanel stacked over
-// MiniPlayer). Phone stacks them vertically. InfoPanel + MiniPlayer are
-// still placeholders; M4R.7 / M4R.8 replace them.
+// MiniPlayer). Phone stacks them vertically. InfoPanel is still a
+// placeholder; M4R.8 replaces it.
+//
+// PersistentPlayerHost is rendered last so its absolute-positioned mini
+// wrapper paints over the MiniPlayer slot, and its fullscreen wrapper
+// paints over the whole shell (M4R rule 5).
 export function HomeShell() {
-  return Platform.isTV ? <TvLayout /> : <PhoneLayout />;
+  return (
+    <View style={styles.outer}>
+      {Platform.isTV ? <TvLayout /> : <PhoneLayout />}
+      <PersistentPlayerHost />
+    </View>
+  );
 }
 
 function TvLayout() {
@@ -22,7 +33,7 @@ function TvLayout() {
       </View>
       <View style={styles.rightColumn}>
         <View style={styles.playerSlot}>
-          <PlaceholderLabel text="MiniPlayer · M4R.7" />
+          <MiniPlayer />
         </View>
         <View style={styles.infoSlot}>
           <PlaceholderLabel text="InfoPanel · M4R.8" />
@@ -42,7 +53,7 @@ function PhoneLayout() {
         <ContentPanel />
       </View>
       <View style={styles.phonePlayerSlot}>
-        <PlaceholderLabel text="MiniPlayer · M4R.7" />
+        <MiniPlayer />
       </View>
     </View>
   );
@@ -60,6 +71,10 @@ const RAIL_WIDTH = 260;
 const RIGHT_WIDTH = 360;
 
 const styles = StyleSheet.create({
+  outer: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   tvRoot: {
     flex: 1,
     flexDirection: 'row',

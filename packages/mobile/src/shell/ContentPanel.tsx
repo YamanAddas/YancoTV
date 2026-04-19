@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import type { ContentItem } from '@yancotv/core';
 import { useShellStore, type RailCategory } from '../stores/shell-store';
+import { usePlayerStore } from '../stores/player-store';
 import { listByType } from '../db/queries';
 import { colors, radii, spacing } from '../styles/theme';
 
@@ -14,6 +15,21 @@ export function ContentPanel() {
   const category = useShellStore((s) => s.category);
   const setActiveContent = useShellStore((s) => s.setActiveContent);
   const activeContentId = useShellStore((s) => s.activeContentId);
+  const play = usePlayerStore((s) => s.play);
+
+  const onRowPress = useCallback(
+    (item: ContentItem) => {
+      setActiveContent(item.id);
+      if (!item.streamUrl) return;
+      play({
+        contentId: item.id,
+        url: item.streamUrl,
+        title: item.cleanTitle || item.title,
+        logoUrl: item.logoUrl,
+      });
+    },
+    [setActiveContent, play],
+  );
 
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,10 +99,10 @@ export function ContentPanel() {
       <ContentRow
         item={item}
         active={item.id === activeContentId}
-        onPress={setActiveContent}
+        onPress={onRowPress}
       />
     ),
-    [activeContentId, setActiveContent],
+    [activeContentId, onRowPress],
   );
 
   return (
@@ -156,11 +172,11 @@ function labelForType(t: 'live' | 'movie' | 'series'): string {
 interface RowProps {
   item: ContentItem;
   active: boolean;
-  onPress: (id: string) => void;
+  onPress: (item: ContentItem) => void;
 }
 
 function ContentRow({ item, active, onPress }: RowProps) {
-  const handlePress = useCallback(() => onPress(item.id), [item, onPress]);
+  const handlePress = useCallback(() => onPress(item), [item, onPress]);
   return (
     <Pressable
       onPress={handlePress}
