@@ -138,6 +138,7 @@ export function ContentDetailScreen() {
       ) : null}
       {tab === 'episodes' && isSeries ? (
         <EpisodesTab
+          contentId={item.id}
           episodes={episodes}
           onEpisodePlay={(epId) => openPlayer(epId)}
           emptyLabel={loading ? 'Loading episodes\u2026' : 'No episodes available'}
