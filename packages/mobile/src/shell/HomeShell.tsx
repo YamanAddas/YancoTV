@@ -1,10 +1,12 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
+import { LeftRail } from './LeftRail';
+import { ContentPanel } from './ContentPanel';
 import { colors, radii, spacing } from '../styles/theme';
 
 // Three-column TV layout: LeftRail · ContentPanel · (InfoPanel stacked over
-// MiniPlayer). Phone stacks them vertically. Each region is a labeled
-// placeholder that M4R.4–M4R.8 will replace with its real component.
+// MiniPlayer). Phone stacks them vertically. InfoPanel + MiniPlayer are
+// still placeholders; M4R.7 / M4R.8 replace them.
 export function HomeShell() {
   return Platform.isTV ? <TvLayout /> : <PhoneLayout />;
 }
@@ -13,17 +15,17 @@ function TvLayout() {
   return (
     <View style={styles.tvRoot}>
       <View style={styles.railSlot}>
-        <RegionLabel text="LeftRail · M4R.4" />
+        <LeftRail />
       </View>
       <View style={styles.contentSlot}>
-        <RegionLabel text="ContentPanel · M4R.5" />
+        <ContentPanel />
       </View>
       <View style={styles.rightColumn}>
         <View style={styles.playerSlot}>
-          <RegionLabel text="MiniPlayer · M4R.7" />
+          <PlaceholderLabel text="MiniPlayer · M4R.7" />
         </View>
         <View style={styles.infoSlot}>
-          <RegionLabel text="InfoPanel · M4R.8" />
+          <PlaceholderLabel text="InfoPanel · M4R.8" />
         </View>
       </View>
     </View>
@@ -34,19 +36,19 @@ function PhoneLayout() {
   return (
     <View style={styles.phoneRoot}>
       <View style={styles.phoneRail}>
-        <RegionLabel text="LeftRail · M4R.4" />
+        <LeftRail />
       </View>
       <View style={styles.phoneContent}>
-        <RegionLabel text="ContentPanel · M4R.5" />
+        <ContentPanel />
       </View>
       <View style={styles.phonePlayerSlot}>
-        <RegionLabel text="MiniPlayer · M4R.7" />
+        <PlaceholderLabel text="MiniPlayer · M4R.7" />
       </View>
     </View>
   );
 }
 
-function RegionLabel({ text }: { text: string }) {
+function PlaceholderLabel({ text }: { text: string }) {
   return (
     <View style={styles.labelFill}>
       <Text style={styles.labelText}>{text}</Text>
@@ -54,8 +56,6 @@ function RegionLabel({ text }: { text: string }) {
   );
 }
 
-// TV: 3-column flex. Rail width tuned for D-pad reach without crowding the
-// content panel. Right column splits ~45/55 between player and info.
 const RAIL_WIDTH = 260;
 const RIGHT_WIDTH = 360;
 
