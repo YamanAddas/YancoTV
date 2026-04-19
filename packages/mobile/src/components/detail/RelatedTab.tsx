@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
-import type { ContentItem } from '@yancotv/core';
-import { ContentCard, type CardVariant } from '../cards/ContentCard';
+import { prettifyGroupName, type ContentItem } from '@yancotv/core';
+import { HexCard } from '../cards/HexCard';
 import { colors, spacing } from '../../styles/theme';
+
+const HEX_WIDTH = 130;
+const RAIL_LIMIT = 12;
 
 interface Props {
   sameGroup: ContentItem[];
@@ -12,11 +15,11 @@ interface Props {
 }
 
 /**
- * Related tab — two horizontal rails matching the desktop RelatedTab. The
- * first rail is the "More in <group>" cohort (same groupName, same type);
- * the second is "More from this source" as a broader fallback when the
- * group rail is thin. Rails render as FlatLists so D-pad navigates each
- * axis cleanly and scroll state persists across tab switches.
+ * Related tab — two HexCard horizontal rails, matching the desktop Sprint 11B
+ * layout. "More in <group>" is the same-type+same-group cohort; "You might
+ * also like" is the broader same-source fallback, deduped against the first
+ * rail so the user never sees the same title twice. Rails are FlatLists so
+ * D-pad traverses each axis cleanly and scroll state survives tab switches.
  */
 export function RelatedTab({
   sameGroup,
@@ -24,8 +27,19 @@ export function RelatedTab({
   groupName,
   onItemPress,
 }: Props) {
-  const hasGroup = sameGroup.length > 0;
-  const hasSource = sameSource.length > 0;
+  const shownIds = useMemo(
+    () => new Set(sameGroup.slice(0, RAIL_LIMIT).map((it) => it.id)),
+    [sameGroup],
+  );
+  const sourceRail = useMemo(
+    () =>
+      sameSource.filter((it) => !shownIds.has(it.id)).slice(0, RAIL_LIMIT),
+    [sameSource, shownIds],
+  );
+  const groupRail = useMemo(() => sameGroup.slice(0, RAIL_LIMIT), [sameGroup]);
+
+  const hasGroup = groupRail.length > 0;
+  const hasSource = sourceRail.length > 0;
 
   if (!hasGroup && !hasSource) {
     return (
@@ -41,15 +55,19 @@ export function RelatedTab({
     <View style={styles.root}>
       {hasGroup ? (
         <Rail
-          title={groupName ? `More in ${groupName}` : 'More like this'}
-          data={sameGroup}
+          title={
+            groupName
+              ? `More in ${prettifyGroupName(groupName)}`
+              : 'More like this'
+          }
+          data={groupRail}
           onItemPress={onItemPress}
         />
       ) : null}
       {hasSource ? (
         <Rail
-          title="More from this source"
-          data={sameSource}
+          title="You might also like"
+          data={sourceRail}
           onItemPress={onItemPress}
         />
       ) : null}
@@ -75,22 +93,17 @@ function Rail({
         keyExtractor={(it) => it.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.railContent}
-        renderItem={({ item }) => {
-          const variant: CardVariant = item.type === 'live' ? 'hex' : 'poster';
-          const width = variant === 'hex' ? 130 : 120;
-          return (
-            <View style={{ width }}>
-              <ContentCard
-                title={item.cleanTitle || item.title}
-                subtitle={item.groupName}
-                imageUrl={item.logoUrl}
-                variant={variant}
-                width={width}
-                onPress={() => onItemPress(item.id)}
-              />
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <View style={styles.cell}>
+            <HexCard
+              title={item.cleanTitle || item.title}
+              subtitle={item.groupName}
+              imageUrl={item.logoUrl}
+              width={HEX_WIDTH}
+              onPress={() => onItemPress(item.id)}
+            />
+          </View>
+        )}
       />
     </View>
   );
@@ -124,5 +137,9 @@ const styles = StyleSheet.create({
   },
   railContent: {
     gap: 12,
+    paddingRight: spacing.xl,
+  },
+  cell: {
+    width: HEX_WIDTH,
   },
 });
