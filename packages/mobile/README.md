@@ -13,12 +13,11 @@ Android TV + Google TV + Fire TV + Android phone/tablet client for YancoTV, buil
 
 ## Current State
 
-- Phase 0 (shared core extraction): Xtream + Stalker + M3U + classifier + types already in `@yancotv/core`
-- Phase 1 (scaffold + debug APK + release APK + Sentry): DONE
-- Phase 2 rewrite (theme, layout, hex cards, full player, all screens): **done but sitting uncommitted** — M1.1 lands it
-- M1 → M9 roadmap covers persistence, navigation, browse parity, search/favorites/history, EPG, settings/parental, TV polish, and distribution
+**As of commit `f4a657c` (2026-04-19):** M4R reboot in flight. Phases 0–M3 landed on master (core extraction, op-sqlite + migrations, React Navigation 7). M4R.0 perf checkpoint + M4R.1 delete + M4R.2 navigator collapse + M4R.4/M4R.5 paged-SQL LeftRail+ContentPanel + M4R.7 persistent MiniPlayer are landed. Next: M4R.8 InfoPanel.
 
-Current working APK supports: add M3U / Xtream / Stalker sources, browse channels, play video. Missing everything else (search, favorites, EPG, detail pages, resume, settings UI) until the milestones land.
+The reboot collapsed the navigator from 3 stacks + 7 screens to **one `Shell` route + one `FullscreenPlayer` route**, and rebuilt content rendering on paged SQL (never hydrating 10K+ rows into Zustand). See [PRODUCTION_PLAN_ANDROID.md § Reboot Notice](../../PRODUCTION_PLAN_ANDROID.md) for the full M4R → M10R plan.
+
+Current APK supports: add M3U / Xtream / Stalker sources, browse channels via paged SQL, play video, persistent MiniPlayer surface. Missing: search overlay, favorites, EPG, settings UI, codec gap fix — land across M4R.8 through M10R.
 
 ## Prerequisites
 
@@ -72,40 +71,37 @@ adb install -r app-release.apk
 
 ```
 src/
-├── navigation/      React Navigation 7 stacks (set up in M3)
-├── screens/         Top-level route components
+├── navigation/      React Navigation 7 — collapsed to Shell + FullscreenPlayer routes (M4R.2)
+├── screens/         FullscreenPlayer.tsx (only remaining screen — the rest became shell panels)
+├── shell/           HomeShell, LeftRail, ContentPanel, MiniPlayer, SourcesModal (M4R core)
 ├── components/
-│   ├── cards/       HexCard, ContentCard
-│   ├── layout/      AppLayout, Sidebar, PageHeader
-│   ├── tv/          TV-optimized (D-pad focus)
-│   └── phone/       Phone-optimized touch UX (M8)
-├── focus/           Focus primitive + spatial navigation
-├── player/          react-native-video wrapper
-├── db/              op-sqlite + migrations (M2)
-├── services/        Platform glue: Keystore, notifications, cast
-├── stores/          Zustand stores (mirror desktop shapes)
+│   └── cards/       ChannelTile (flat) — hex cards removed on mobile 2026-04-19
+├── focus/           Focusable primitive + focus-memory (M4R.10)
+├── player/          react-native-video wrapper + PersistentPlayerHost
+├── db/              op-sqlite + migrations + queries.ts (paged SQL, M4R.4)
+├── services/        Platform glue: Keystore, notifications, cast (M6R–M9R)
+├── stores/          Zustand — shell-store, player-store, sources-store (state only, no bulk data)
 ├── http/            fetch-http-client (XMLHttpRequest-based)
-├── storage/         AsyncStorage wrappers (small keys only post-M2)
+├── storage/         AsyncStorage — hydration flags + last-view ONLY
 └── styles/theme.ts  Ported from desktop palette
 ```
 
 All platform-agnostic business logic lives in [`@yancotv/core`](../core) — parsers, API clients, classifiers, types, schemas. Import from `@yancotv/core`, not from relative paths.
 
-## Milestone Map
+## Milestone Map (post-2026-04-19 reboot)
 
 | Milestone | Scope | Status |
 |---|---|---|
-| M1 | Commit Phase 2 + finish core extraction | IN PROGRESS |
-| M2 | op-sqlite + migrations | PLANNED |
-| M3 | React Navigation + dual layout (TV drawer / phone tabs) | PLANNED |
-| M4 | Browse parity + Content Detail page + playback resume | PLANNED |
-| M5 | Search + Favorites + History | PLANNED |
-| M6 | EPG + Catch-up + Timeshift | PLANNED |
-| M7 | Settings (8 tabs) + Parental + Polish | PLANNED |
-| M8 | TV UX polish + Phone-native features (PIP, Cast, gestures) | PLANNED |
-| M9 | Distribution (Play Store / Fire TV / sideload) + QA | PLANNED |
+| M0–M3 | Core extraction, op-sqlite, React Navigation 7 scaffolding | DONE |
+| M4R | Shell reboot — collapsed navigator, paged SQL, persistent MiniPlayer, cached-first boot | IN PROGRESS (through M4R.7) |
+| M5R | Groups + EPG ribbon + Favorites | PLANNED |
+| M6R | EPG + Catch-up + Timeshift | PLANNED |
+| M7R | Settings + Parental + Polish | PLANNED |
+| M8R | Codec gap — FFmpeg ExoPlayer extension NDK build | PLANNED |
+| M9R | TV UX + Phone-native features (PIP, Cast, gestures, voice) | PLANNED |
+| M10R | Distribution (Play Store / Fire TV / sideload) + QA | PLANNED |
 
-See [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md) for the full task breakdown per milestone.
+The pre-reboot M4–M9 milestones are superseded. See [PRODUCTION_PLAN_ANDROID.md § Reboot Notice](../../PRODUCTION_PLAN_ANDROID.md) for the full task breakdown.
 
 ## License
 

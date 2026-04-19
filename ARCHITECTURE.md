@@ -32,6 +32,8 @@ YancoTV ships as two sibling apps driven by a shared TypeScript core.
 
 See [CLAUDE.md § The `@yancotv/core` Discipline](CLAUDE.md#the-yancotvcore-discipline) for the rules on what belongs in core.
 
+> **Non-negotiable:** `@yancotv/core` is pure ESM. Every internal relative import must use an explicit `.js` extension (`export * from './types/index.js'`, `import { X } from './xtream/client.js'`). Node 22's loader rejects extensionless specifiers at runtime — omitting the extension compiles clean but crashes Electron boot with `ERR_UNSUPPORTED_DIR_IMPORT` (caused MB-18 on 2026-04-19). Metro strips the extension for the mobile side, so the same source works on both apps. See [packages/core/README.md § ESM gotcha](packages/core/README.md#esm-gotcha--explicit-js-extensions-required).
+
 ## Desktop System Overview
 
 ```

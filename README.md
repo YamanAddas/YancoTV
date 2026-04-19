@@ -53,17 +53,17 @@ See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full desktop roadmap and [C
 
 ## Mobile — Current State
 
-Phase 1 scaffold + debug/release APK + Sentry are done. Phase 2 rewrite (theme, layout, hex cards, full player, all screens) is in hand. The M1→M9 roadmap takes the app from "working shell" to full desktop parity + mobile-native wins:
+**Status as of 2026-04-19:** Phases 0–M3 landed (core extraction, op-sqlite, React Navigation 7). The initial desktop-shaped port buckled under real-device use, so the stack was reset on 2026-04-19 to the **M4R reboot** — a delete-first rebuild of the shell into a single `HomeShell` + `FullscreenPlayer` surface with paged SQL, persistent MiniPlayer, and cached-first boot. Hex cards were dropped on mobile (GPU cost); flat `ChannelTile` replaced them. Target: ~14 weeks to Play Store.
 
-- **M1** Commit Phase 2 + finish core extraction
-- **M2** op-sqlite + migrations (same schema as desktop)
-- **M3** React Navigation 7 + dual layout (TV drawer / phone tabs)
-- **M4** Browse parity + Content Detail page + playback resume
-- **M5** Search + Favorites + History
-- **M6** EPG + Catch-up + Timeshift
-- **M7** Settings (8 tabs) + Parental + Polish
-- **M8** TV UX polish + Phone-native features (PIP, Cast, gestures, voice)
-- **M9** Distribution (Play Store / Fire TV / sideload) + QA
+Post-reboot milestones:
+
+- **M4R** Shell reboot — paged SQL, persistent MiniPlayer, cached-first boot (in flight)
+- **M5R** Groups + EPG ribbon + Favorites
+- **M6R** EPG + Catch-up + Timeshift
+- **M7R** Settings + Parental + Polish
+- **M8R** Codec gap — FFmpeg ExoPlayer extension (HEVC-main10 / AC3 / EAC3 / DTS / TrueHD)
+- **M9R** TV UX + Phone-native (PIP, Cast, gestures, voice)
+- **M10R** Distribution + QA
 
 See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full mobile roadmap, parity matrix, and architecture rules.
 

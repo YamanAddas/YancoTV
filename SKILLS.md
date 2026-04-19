@@ -57,16 +57,17 @@ Platform-agnostic TypeScript consumed by both desktop and mobile via `workspace:
 | Framework | React Native 0.85 (`react-native-tvos` fork) | Single APK for TV + phone |
 | Language | TypeScript 5 (strict) | Same typing story as desktop |
 | Playback | react-native-video 6 (ExoPlayer/Media3 backend) | HLS, DASH, MPEG-TS on Android |
-| Navigation | React Navigation 7 (drawer on TV / tabs on phone) | Installed in M3 |
-| State | Zustand 5 | Same store shapes as desktop |
-| Database | op-sqlite (JSI-based) | WAL + FTS5; byte-identical schema to desktop (M2) |
+| Navigation | React Navigation 7 — collapsed to `Shell` + `FullscreenPlayer` routes only | M4R reboot |
+| State | Zustand 5 | Same store shapes as desktop; state only, no bulk content |
+| Database | op-sqlite (JSI-based) | WAL + FTS5; byte-identical schema to desktop |
 | Data fetching | TanStack Query 5 | Caching DB + HTTP calls |
 | Styling | StyleSheet + `src/styles/theme.ts` | No NativeWind, no styled-components |
-| Animations | Reanimated 3 | M4+ animations, hex card transitions |
-| Lists | FlashList (Shopify) | Virtualized grids/rails for 10K+ items |
+| Animations | Reanimated 3 | Panel/overlay transitions |
+| Lists | FlashList (Shopify) + paged SQL windows | Never hydrate 10K rows into Zustand |
 | Credentials | react-native-keychain | Android Keystore-backed credential encryption |
-| Notifications | Notifee | EPG reminders (M6) |
-| Hex clipping | `@react-native-masked-view/masked-view` | SVG clipPath doesn't work on RN Views |
+| Notifications | Notifee | EPG reminders (M6R) |
+| Image cache | `src/image/CachedImage.tsx` wrapper (M4R.11) | Every `<Image>` routes through it |
+| Hex clipping | **Desktop only** — removed on mobile 2026-04-19 for GPU cost | Mobile uses flat `ChannelTile` |
 | Crash reporting | Sentry | Already wired |
 | Build | local Gradle (EAS later) | Debug + signed release APK |
 

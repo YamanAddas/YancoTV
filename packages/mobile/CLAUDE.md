@@ -109,7 +109,9 @@ pnpm start --reset-cache
 
 ## Current State (snapshot — 2026-04-19, REBOOT)
 
-Phases 0–M3 landed on master. M4.1 `ContentGrid` (FlashList) + M4.2 `CategorySidebar` (language grouping) landed. Then the shell buckled under real-device testing and the 2026-04-19 audit reset the plan.
+**As of commit `f4a657c` (master):** M4R.0 (perf checkpoint, flat tiles) + M4R.1 (delete) + M4R.2 (navigator collapse) + M4R.4/M4R.5 (paged SQL LeftRail + ContentPanel) + M4R.7 (persistent MiniPlayer + hidden-when-empty slot) + Sources modal are all landed on master. **Next up: M4R.8 (InfoPanel)**, then M4R.6 (cached-first boot, MB-15 fix), M4R.10 (focus primitive rebuild), M4R.11 (CachedImage wrapper).
+
+Phases 0–M3 landed previously. M4.1 `ContentGrid` (FlashList) + M4.2 `CategorySidebar` (language grouping) were landed then the shell buckled under real-device testing; the 2026-04-19 audit reset the plan to the M4R reboot.
 
 **What's done and kept:**
 - `@yancotv/core` — parsers, clients, classifier, XMLTV, PIN hashing, store factories. Stable.
