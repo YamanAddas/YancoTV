@@ -5,6 +5,7 @@ import { ContentPanel } from './ContentPanel';
 import { MiniPlayer } from './MiniPlayer';
 import { SourcesModal } from './SourcesModal';
 import { PersistentPlayerHost } from '../player/PersistentPlayerHost';
+import { usePlayerStore } from '../stores/player-store';
 import { colors, radii, spacing } from '../styles/theme';
 
 // Three-column TV layout: LeftRail · ContentPanel · (InfoPanel stacked over
@@ -15,16 +16,17 @@ import { colors, radii, spacing } from '../styles/theme';
 // wrapper paints over the MiniPlayer slot, and its fullscreen wrapper
 // paints over the whole shell (M4R rule 5).
 export function HomeShell() {
+  const hasTrack = usePlayerStore((s) => s.track !== null);
   return (
     <View style={styles.outer}>
-      {Platform.isTV ? <TvLayout /> : <PhoneLayout />}
+      {Platform.isTV ? <TvLayout hasTrack={hasTrack} /> : <PhoneLayout hasTrack={hasTrack} />}
       <PersistentPlayerHost />
       <SourcesModal />
     </View>
   );
 }
 
-function TvLayout() {
+function TvLayout({ hasTrack }: { hasTrack: boolean }) {
   return (
     <View style={styles.tvRoot}>
       <View style={styles.railSlot}>
@@ -33,19 +35,21 @@ function TvLayout() {
       <View style={styles.contentSlot}>
         <ContentPanel />
       </View>
-      <View style={styles.rightColumn}>
-        <View style={styles.playerSlot}>
-          <MiniPlayer />
+      {hasTrack && (
+        <View style={styles.rightColumn}>
+          <View style={styles.playerSlot}>
+            <MiniPlayer />
+          </View>
+          <View style={styles.infoSlot}>
+            <PlaceholderLabel text="InfoPanel · M4R.8" />
+          </View>
         </View>
-        <View style={styles.infoSlot}>
-          <PlaceholderLabel text="InfoPanel · M4R.8" />
-        </View>
-      </View>
+      )}
     </View>
   );
 }
 
-function PhoneLayout() {
+function PhoneLayout({ hasTrack }: { hasTrack: boolean }) {
   return (
     <View style={styles.phoneRoot}>
       <View style={styles.phoneRail}>
@@ -54,9 +58,11 @@ function PhoneLayout() {
       <View style={styles.phoneContent}>
         <ContentPanel />
       </View>
-      <View style={styles.phonePlayerSlot}>
-        <MiniPlayer />
-      </View>
+      {hasTrack && (
+        <View style={styles.phonePlayerSlot}>
+          <MiniPlayer />
+        </View>
+      )}
     </View>
   );
 }
