@@ -20,7 +20,7 @@ import { LiveTvScreen } from '../screens/LiveTvScreen';
 import { MoviesScreen } from '../screens/MoviesScreen';
 import { SeriesScreen } from '../screens/SeriesScreen';
 import { SourcesScreen } from '../screens/SourcesScreen';
-import { ChannelDetailScreen } from '../screens/ChannelDetailScreen';
+import { ContentDetailScreen } from '../screens/ContentDetailScreen';
 import { PlayerScreen } from '../screens/PlayerScreen';
 import { TvDrawerContent } from './TvDrawerContent';
 import { colors } from '../styles/theme';
@@ -151,7 +151,7 @@ export function RootNavigator() {
       <View style={styles.root}>
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
           <RootStack.Screen name="Main" component={MainShell} />
-          <RootStack.Screen name="Detail" component={ChannelDetailScreen} />
+          <RootStack.Screen name="Detail" component={ContentDetailScreen} />
           <RootStack.Screen
             name="Player"
             component={PlayerScreen}
