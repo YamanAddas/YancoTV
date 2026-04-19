@@ -10,22 +10,38 @@ import {
 } from '@yancotv/core';
 import { fetchHttpClient, fetchTextRaw, pingHost } from '../http/fetch-http-client';
 import { asyncStorageKV } from '../storage/async-storage';
-import { getJson, setJson, type KVStore } from '../storage/kv-store';
+import { getJson, type KVStore } from '../storage/kv-store';
+import * as sourcesDb from '../db/sources-store';
+import * as contentDb from '../db/content-store';
 
-const KEY_SOURCES = 'yancotv.v1.sources';
-// Channels are NOT persisted. On old devices (e.g. Pixel XL) a 10k-item JSON
-// blob overruns AsyncStorage's SQLite (SQLITE_FULL, code 12) and crashes the
-// app. Sources alone are tiny, so we keep those saved and re-sync on demand.
+/**
+ * Mobile sources-store — Zustand in-memory shape over the op-sqlite persistence
+ * layer (`src/db/sources-store.ts` + `src/db/content-store.ts`).
+ *
+ * Content lives in SQLite. The in-memory `channels` array is a read-through
+ * cache we rebuild from the DB on boot and after each resync, so the screens
+ * that look up channels synchronously (ChannelListScreen, HomeScreen, player)
+ * stay fast and simple. Credentials are hydrated out of the sources table and
+ * exposed on the union so the detail-fetch path in `use-content-detail.ts`
+ * keeps working without an extra async call.
+ *
+ * Legacy AsyncStorage keys (`KEY_SOURCES`, `KEY_CHANNELS_LEGACY`) are migrated
+ * to SQLite on first hydrate and then removed. `KEY_CHANNELS_LEGACY` was the
+ * culprit behind MB-11 (crash on launch with 10k-item JSON blob).
+ */
+
+const KEY_SOURCES_LEGACY = 'yancotv.v1.sources';
 const KEY_CHANNELS_LEGACY = 'yancotv.v1.channels';
+const KEY_SOURCES_MIGRATED = 'yancotv.v2.sources-migrated';
 
 // NOTE: sources-store is deliberately NOT a core store factory (unlike
-// favorites/recent-channels). The Xtream/Stalker sync path pulls in
-// platform-specific HTTP plumbing, preflight ping, and a parser pipeline that
-// only makes sense on mobile for now. When desktop grows multi-source sync we
-// can revisit extracting the shape (sources CRUD + sync status) into core and
-// inject the sync function as a dependency.
+// favorites/history). The Xtream/Stalker sync path pulls in platform-specific
+// HTTP plumbing, preflight ping, and a parser pipeline that only makes sense
+// on mobile for now. When desktop grows multi-source sync we can revisit
+// extracting the shape (sources CRUD + sync status) into core and inject the
+// sync function as a dependency.
 
-export type MobileSourceType = 'm3u_url' | 'xtream' | 'stalker';
+export type MobileSourceType = sourcesDb.MobileSourceType;
 
 interface BaseSource {
   id: string;
@@ -80,10 +96,9 @@ interface SourcesState {
   }) => Promise<void>;
   removeSource: (id: string) => Promise<void>;
   resync: (id: string) => Promise<void>;
-  // Merge a partial metadata patch into an in-memory channel. Used after a
-  // detail-screen fetch to hydrate plot/cast/subtitles/episodes without
-  // re-syncing the whole provider. Not persisted — enrichment is cheap to
-  // re-fetch, and AsyncStorage already chokes on large content payloads.
+  // Merge a partial metadata patch into an in-memory channel + persist through
+  // to SQLite. Used after a detail-screen fetch to hydrate plot/cast/subtitles
+  // /episodes without re-syncing the whole provider.
   enrichContent: (id: string, patch: Record<string, unknown>) => void;
 }
 
@@ -91,6 +106,90 @@ const kv: KVStore = asyncStorageKV;
 
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function storedToMobile(
+  stored: sourcesDb.StoredSource,
+  creds: sourcesDb.StoredCredentials,
+): MobileSource {
+  const base: BaseSource = {
+    id: stored.id,
+    name: stored.name,
+    createdAt: stored.createdAt,
+    lastSynced: stored.lastSynced,
+    lastError: stored.lastSyncError,
+    channelCount: stored.channelCount,
+  };
+  if (stored.type === 'xtream') {
+    return {
+      ...base,
+      type: 'xtream',
+      url: stored.url,
+      username: creds.username ?? '',
+      password: creds.password ?? '',
+    };
+  }
+  if (stored.type === 'stalker') {
+    return {
+      ...base,
+      type: 'stalker',
+      url: stored.url,
+      macAddress: creds.macAddress ?? '',
+    };
+  }
+  return { ...base, type: 'm3u_url', url: stored.url };
+}
+
+async function loadAllChannels(): Promise<ContentItem[]> {
+  // Keep the union of all three types consistent with sortOrder from the DB so
+  // ChannelListScreen's provider-order filtering still matches the payload the
+  // user picked up at sync time. We fetch per-type and concat — one SELECT per
+  // type is cheap on op-sqlite compared to the hex-card render that follows.
+  const types: ContentType[] = ['live', 'movie', 'series'];
+  const all: ContentItem[] = [];
+  for (const type of types) {
+    const items = await contentDb.getContentByType(type);
+    for (const item of items) all.push(item);
+  }
+  return all;
+}
+
+async function migrateLegacySourcesIfNeeded() {
+  const alreadyMigrated = await kv.get(KEY_SOURCES_MIGRATED);
+  if (alreadyMigrated === '1') return;
+
+  const legacy = await getJson<MobileSource[]>(kv, KEY_SOURCES_LEGACY);
+  if (legacy && legacy.length > 0) {
+    // Skip any that already exist in SQLite (re-migration safety).
+    const existing = await sourcesDb.getAllSources();
+    const existingIds = new Set(existing.map((s) => s.id));
+    for (const src of legacy) {
+      if (existingIds.has(src.id)) continue;
+      await sourcesDb.insertSource({
+        id: src.id,
+        name: src.name,
+        type: src.type,
+        url: src.url,
+        username: src.type === 'xtream' ? src.username : undefined,
+        password: src.type === 'xtream' ? src.password : undefined,
+        macAddress: src.type === 'stalker' ? src.macAddress : undefined,
+      });
+    }
+  }
+
+  // Mark migrated BEFORE clearing the legacy keys so a crash mid-cleanup
+  // doesn't leave us re-importing forever.
+  await kv.set(KEY_SOURCES_MIGRATED, '1');
+  try {
+    await kv.remove(KEY_SOURCES_LEGACY);
+  } catch {
+    // noop
+  }
+  try {
+    await kv.remove(KEY_CHANNELS_LEGACY);
+  } catch {
+    // noop
+  }
 }
 
 function m3uEntryToItem(
@@ -113,8 +212,10 @@ function m3uEntryToItem(
   };
 }
 
-async function persistSources(sources: MobileSource[]) {
-  await setJson(kv, KEY_SOURCES, sources);
+interface SyncResult {
+  items: ContentItem[];
+  counts: { live: number; movie: number; series: number };
+  warnings: string[];
 }
 
 async function syncM3u(
@@ -132,12 +233,6 @@ async function syncM3u(
     return m3uEntryToItem(entry, source.id, i, type);
   });
   return { items, counts, warnings: [] };
-}
-
-interface SyncResult {
-  items: ContentItem[];
-  counts: { live: number; movie: number; series: number };
-  warnings: string[];
 }
 
 async function syncXtream(
@@ -391,24 +486,26 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
 
   hydrate: async () => {
     if (get().hydrated) return;
-    const sources = await getJson<MobileSource[]>(kv, KEY_SOURCES);
-    set({
-      sources: sources ?? [],
-      channels: [],
-      hydrated: true,
-    });
-    // Best-effort cleanup of the legacy channels blob if an older build
-    // previously wrote one. Ignore failures.
-    try {
-      await kv.remove(KEY_CHANNELS_LEGACY);
-    } catch {
-      // noop
+
+    await migrateLegacySourcesIfNeeded();
+
+    const stored = await sourcesDb.getAllSources();
+    const sources: MobileSource[] = [];
+    for (const s of stored) {
+      const creds = await sourcesDb.getSourceCredentials(s.id);
+      sources.push(storedToMobile(s, creds));
     }
+
+    const channels = await loadAllChannels();
+
+    set({ sources, channels, hydrated: true });
   },
 
   addM3uSource: async ({ name, url }) => {
+    const id = makeId('src');
+    await sourcesDb.insertSource({ id, name, type: 'm3u_url', url });
     const source: M3uSource = {
-      id: makeId('src'),
+      id,
       name,
       type: 'm3u_url',
       url,
@@ -416,13 +513,21 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       channelCount: 0,
     };
     set((s) => ({ sources: [...s.sources, source] }));
-    await persistSources(get().sources);
-    await get().resync(source.id);
+    await get().resync(id);
   },
 
   addXtreamSource: async ({ name, url, username, password }) => {
+    const id = makeId('src');
+    await sourcesDb.insertSource({
+      id,
+      name,
+      type: 'xtream',
+      url,
+      username,
+      password,
+    });
     const source: XtreamSource = {
-      id: makeId('src'),
+      id,
       name,
       type: 'xtream',
       url,
@@ -432,13 +537,20 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       channelCount: 0,
     };
     set((s) => ({ sources: [...s.sources, source] }));
-    await persistSources(get().sources);
-    await get().resync(source.id);
+    await get().resync(id);
   },
 
   addStalkerSource: async ({ name, url, macAddress }) => {
+    const id = makeId('src');
+    await sourcesDb.insertSource({
+      id,
+      name,
+      type: 'stalker',
+      url,
+      macAddress,
+    });
     const source: StalkerSource = {
-      id: makeId('src'),
+      id,
       name,
       type: 'stalker',
       url,
@@ -447,11 +559,11 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       channelCount: 0,
     };
     set((s) => ({ sources: [...s.sources, source] }));
-    await persistSources(get().sources);
-    await get().resync(source.id);
+    await get().resync(id);
   },
 
   enrichContent: (id, patch) => {
+    // Optimistic in-memory update so the detail screen paints immediately.
     set((s) => ({
       channels: s.channels.map((ch) => {
         if (ch.id !== id) return ch;
@@ -467,14 +579,19 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
         return { ...ch, metadataJson: JSON.stringify(merged) };
       }),
     }));
+    // Fire-and-forget DB write. A failed merge just means the user pays a
+    // re-fetch next open — not worth blocking the UI on.
+    void contentDb.patchContentMetadata(id, patch).catch(() => {
+      // noop
+    });
   },
 
   removeSource: async (id) => {
+    await sourcesDb.deleteSource(id);
     set((s) => ({
       sources: s.sources.filter((src) => src.id !== id),
       channels: s.channels.filter((ch) => ch.sourceId !== id),
     }));
-    await persistSources(get().sources);
   },
 
   resync: async (id) => {
@@ -496,12 +613,23 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       }
 
       const { items, counts, warnings } = result;
+
+      setMsg('Persisting...');
+      await contentDb.replaceSourceContent(id, items);
+      const lastError = warnings.length ? warnings.join('; ') : null;
+      await sourcesDb.updateSourceSync(id, {
+        lastSynced: Date.now(),
+        channelCount: items.length,
+        lastSyncError: lastError,
+      });
+
       const countsStr = `${counts.live} live · ${counts.movie} movies · ${counts.series} series`;
       const finalMsg = warnings.length
         ? `${countsStr} (partial: ${warnings.length} endpoint issue${warnings.length === 1 ? '' : 's'})`
         : `${countsStr}`;
 
       set((s) => ({
+        // Drop the old rows for this source and append the fresh batch.
         channels: [...s.channels.filter((ch) => ch.sourceId !== id), ...items],
         sources: s.sources.map((src) =>
           src.id === id
@@ -510,7 +638,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
                 lastSynced: Date.now(),
                 // Surface per-endpoint issues even when the sync "succeeded".
                 // Without this, a provider silently dropping VOD looks identical
-                // to a provider with genuinely no VOD catalogue.
+                // to one with genuinely no VOD catalogue.
                 lastError: warnings.length ? warnings.join('; ') : undefined,
                 channelCount: items.length,
               }
@@ -519,9 +647,16 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
         syncStatus: 'done',
         syncMessage: finalMsg,
       }));
-      await persistSources(get().sources);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // Best-effort write the error through to the DB. If that fails too
+      // (disk full, db locked), swallow — we already have the error we care
+      // about and we're about to report it to the user.
+      try {
+        await sourcesDb.updateSourceSync(id, { lastSyncError: msg });
+      } catch {
+        // noop
+      }
       set((s) => ({
         sources: s.sources.map((src) =>
           src.id === id ? { ...src, lastError: msg } : src,
@@ -529,7 +664,6 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
         syncStatus: 'error',
         syncMessage: msg,
       }));
-      await persistSources(get().sources);
     }
   },
 }));
