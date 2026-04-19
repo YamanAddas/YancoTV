@@ -5,6 +5,7 @@ import * as m004 from './004-epg-enhancements';
 import * as m005 from './005-parental-controls';
 import * as m006 from './006-epg-indexes';
 import * as m007 from './007-source-management-enhancements';
+import * as m008 from './008-group-preferences';
 
 export interface Migration {
   readonly name: string;
@@ -26,4 +27,5 @@ export const MIGRATIONS: readonly Migration[] = [
   m005,
   m006,
   m007,
+  m008,
 ];

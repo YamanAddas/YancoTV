@@ -1,11 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ContentItem, ContentType } from '@yancotv/core';
 import {
   useNavigation,
@@ -15,6 +9,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { PageHeader } from '../components/layout/PageHeader';
 import { ContentGrid } from '../components/cards/ContentGrid';
+import {
+  CategorySidebar,
+  type CategorySelection,
+} from '../components/layout/CategorySidebar';
 import { useSourcesStore } from '../stores/sources-store';
 import { colors, radii, spacing } from '../styles/theme';
 import type {
@@ -27,8 +25,6 @@ type ListNavigation = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-const ALL = '__all__';
-
 interface Props {
   type: ContentType;
   title: string;
@@ -39,16 +35,13 @@ export function ChannelListScreen({ type, title }: Props) {
   const openDetail = (channelId: string) =>
     navigation.navigate('Detail', { channelId });
   const allChannels = useSourcesStore((s) => s.channels);
-  const [category, setCategory] = useState<string>(ALL);
+  const [selection, setSelection] = useState<CategorySelection>(null);
 
   const items = useMemo(
     () => allChannels.filter((c) => c.type === type),
     [allChannels, type],
   );
 
-  // Compute category names AND per-category counts in a single pass. The old
-  // chip-row rendered `items.filter(...)` for every category on every render —
-  // O(categories × items) and a big source of the tab-switch stall.
   const { categories, countByCategory } = useMemo(() => {
     const counts = new Map<string, number>();
     for (const it of items) {
@@ -56,17 +49,28 @@ export function ChannelListScreen({ type, title }: Props) {
         counts.set(it.groupName, (counts.get(it.groupName) ?? 0) + 1);
       }
     }
-    const names = Array.from(counts.keys()).sort((a, b) => a.localeCompare(b));
-    return { categories: names, countByCategory: counts };
+    return {
+      categories: Array.from(counts.keys()),
+      countByCategory: counts,
+    };
   }, [items]);
 
   const filtered: ContentItem[] = useMemo(() => {
-    if (category === ALL) return items;
-    return items.filter((it) => it.groupName === category);
-  }, [items, category]);
+    if (selection === null) return items;
+    if (Array.isArray(selection)) {
+      const set = new Set(selection);
+      return items.filter((it) => it.groupName && set.has(it.groupName));
+    }
+    return items.filter((it) => it.groupName === selection);
+  }, [items, selection]);
 
-  // Live TV uses the honeycomb hex card; movies/series use 2:3 posters.
   const variant: 'hex' | 'poster' = type === 'live' ? 'hex' : 'poster';
+
+  const subtitle = useMemo(() => {
+    if (selection === null) return 'All categories';
+    if (Array.isArray(selection)) return `${selection.length} groups`;
+    return selection;
+  }, [selection]);
 
   if (items.length === 0) {
     return (
@@ -89,117 +93,35 @@ export function ChannelListScreen({ type, title }: Props) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <PageHeader
-        eyebrow={`${items.length.toLocaleString()} items`}
-        title={title}
-        subtitle={category === ALL ? 'All categories' : category}
+    <View style={styles.root}>
+      <CategorySidebar
+        categories={categories}
+        selected={selection}
+        onSelect={setSelection}
+        contentType={type}
+        categoryCounts={countByCategory}
+        totalCount={items.length}
       />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        <CategoryChip
-          label="All"
-          count={items.length}
-          active={category === ALL}
-          onPress={() => setCategory(ALL)}
+      <View style={styles.main}>
+        <PageHeader
+          eyebrow={`${filtered.length.toLocaleString()} items`}
+          title={title}
+          subtitle={subtitle}
         />
-        {categories.map((cat) => (
-          <CategoryChip
-            key={cat}
-            label={cat}
-            count={countByCategory.get(cat) ?? 0}
-            active={category === cat}
-            onPress={() => setCategory(cat)}
-          />
-        ))}
-      </ScrollView>
-
-      <ContentGrid data={filtered} variant={variant} onOpen={openDetail} />
+        <ContentGrid data={filtered} variant={variant} onOpen={openDetail} />
+      </View>
     </View>
   );
 }
 
-function CategoryChip({
-  label,
-  count,
-  active,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed, focused }) => [
-        styles.chip,
-        active && styles.chipActive,
-        (pressed || focused) && !active && styles.chipFocus,
-      ]}
-    >
-      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
-        {label}
-      </Text>
-      <Text style={[styles.chipCount, active && styles.chipCountActive]}>
-        {count}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  chipRow: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-    gap: 8,
-  },
-  chip: {
+  root: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface800,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginRight: 8,
   },
-  chipActive: {
-    backgroundColor: 'rgba(0, 255, 170, 0.12)',
-    borderColor: colors.accent,
-  },
-  chipFocus: {
-    borderColor: 'rgba(0, 255, 170, 0.5)',
-  },
-  chipLabel: {
-    color: colors.surface200,
-    fontSize: 12,
-    fontWeight: '600',
-    marginRight: 6,
-  },
-  chipLabelActive: {
-    color: colors.accent,
-  },
-  chipCount: {
-    color: colors.surface400,
-    fontSize: 10,
-    fontWeight: '700',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    minWidth: 22,
-    textAlign: 'center',
-  },
-  chipCountActive: {
-    color: colors.accent,
-    backgroundColor: 'rgba(0, 255, 170, 0.12)',
+  main: {
+    flex: 1,
   },
   emptyPanel: {
     margin: spacing.xl,

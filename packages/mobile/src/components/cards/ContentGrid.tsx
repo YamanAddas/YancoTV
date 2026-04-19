@@ -1,14 +1,14 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
-  useWindowDimensions,
+  type LayoutChangeEvent,
   type ViewStyle,
 } from 'react-native';
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import type { ContentItem } from '@yancotv/core';
 import { ContentCard, type CardVariant } from './ContentCard';
-import { sidebar, spacing } from '../../styles/theme';
+import { spacing } from '../../styles/theme';
 
 // Column metrics shared with ChannelListScreen's empty-state math. Tweaking
 // these changes card density for the whole app.
@@ -29,6 +29,7 @@ const ESTIMATED_ROW_HEIGHT: Record<CardVariant, number> = {
 };
 
 const GAP = 12;
+const HORIZONTAL_PADDING = spacing.xl;
 
 interface Props {
   data: ContentItem[];
@@ -39,10 +40,11 @@ interface Props {
 
 /**
  * Virtualized grid for ContentItem lists — Live TV (hex), Movies/Series
- * (poster), EPG/timeshift (landscape). Dynamic column count derived from the
- * window width minus the permanent TV sidebar. TV focus works out of the box
- * because FlashList mounts a viewport window of real views (no clipping-subviews
- * gotcha like FlatList).
+ * (poster), EPG/timeshift (landscape). Column count is derived from the
+ * actual container width via onLayout so the grid is honest inside any
+ * ancestor layout (permanent drawer, category sidebar, phone tabs).
+ * TV focus works out of the box because FlashList mounts a viewport
+ * window of real views (no clipping-subviews gotcha like FlatList).
  */
 export const ContentGrid = React.memo(function ContentGrid({
   data,
@@ -50,17 +52,19 @@ export const ContentGrid = React.memo(function ContentGrid({
   onOpen,
   contentContainerStyle,
 }: Props) {
-  const { width: screenW } = useWindowDimensions();
+  const [containerW, setContainerW] = useState(0);
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    setContainerW(e.nativeEvent.layout.width);
+  }, []);
 
   const { columns, cardWidth } = useMemo(() => {
-    // Reserve the permanent drawer on TV / wide layouts; collapse on phones.
-    const sidebarW = screenW >= 720 ? sidebar.width : sidebar.widthCollapsed;
-    const availableW = screenW - sidebarW - spacing.xl * 2;
+    const availableW = Math.max(0, containerW - HORIZONTAL_PADDING * 2);
     const target = TARGET_CARD_WIDTH[variant];
     const cols = Math.max(2, Math.floor(availableW / (target + GAP)));
     const w = Math.floor((availableW - GAP * (cols - 1)) / cols);
     return { columns: cols, cardWidth: w };
-  }, [screenW, variant]);
+  }, [containerW, variant]);
 
   const renderItem = useCallback<ListRenderItem<ContentItem>>(
     ({ item, index }) => {
@@ -87,29 +91,36 @@ export const ContentGrid = React.memo(function ContentGrid({
   );
 
   return (
-    <FlashList
-      // `key` forces a fresh recycler when the column count changes (rotation,
-      // window resize). Without this, FlashList keeps the old layout and
-      // overlaps cards.
-      key={`grid-${variant}-${columns}`}
-      data={data}
-      numColumns={columns}
-      keyExtractor={keyExtractor}
-      renderItem={renderItem}
-      estimatedItemSize={ESTIMATED_ROW_HEIGHT[variant]}
-      contentContainerStyle={{
-        paddingHorizontal: spacing.xl,
-        paddingBottom: spacing.xxl,
-        ...contentContainerStyle,
-      }}
-      removeClippedSubviews={false}
-    />
+    <View style={styles.container} onLayout={onLayout}>
+      {containerW > 0 ? (
+        <FlashList
+          // `key` forces a fresh recycler when the column count changes
+          // (rotation, sidebar collapse, window resize). Without this,
+          // FlashList keeps the old layout and overlaps cards.
+          key={`grid-${variant}-${columns}`}
+          data={data}
+          numColumns={columns}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          estimatedItemSize={ESTIMATED_ROW_HEIGHT[variant]}
+          contentContainerStyle={{
+            paddingHorizontal: HORIZONTAL_PADDING,
+            paddingBottom: spacing.xxl,
+            ...contentContainerStyle,
+          }}
+          removeClippedSubviews={false}
+        />
+      ) : null}
+    </View>
   );
 });
 
 const keyExtractor = (it: ContentItem) => it.id;
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   cell: {
     marginBottom: 16,
   },
