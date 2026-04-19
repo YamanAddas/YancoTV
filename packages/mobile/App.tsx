@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { useSourcesStore } from './src/stores/sources-store';
+import { useRecentChannelsStore } from './src/stores/recent-channels-store';
 import { Sentry } from './src/sentry';
 import { initDatabase, type InitDbResult } from './src/db/db';
 
@@ -92,6 +93,17 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
       setHydrateError(msg);
       Sentry.captureException(e);
     });
+    // Recent channels live in AsyncStorage and come from a core-factory store,
+    // so we call `.getState()` here instead of subscribing as a hook — pnpm
+    // ends up with distinct zustand instances per workspace (peer-dep hashing
+    // via @types/react) and the hook form crosses that boundary and throws
+    // "Invalid hook call". `.getState()` is instance-agnostic.
+    useRecentChannelsStore
+      .getState()
+      .hydrate()
+      .catch((e: unknown) => {
+        Sentry.captureException(e);
+      });
   }, [hydrate, dbInit]);
 
   if (dbError) {

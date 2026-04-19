@@ -27,6 +27,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TvButton } from '../components/tv/TvButton';
 import { useSourcesStore } from '../stores/sources-store';
+import { useRecentChannelsStore } from '../stores/recent-channels-store';
 import {
   getLastPosition,
   recordWatch,
@@ -194,6 +195,14 @@ export function PlayerScreen() {
     setControlsVisible(true);
     scheduleHide();
   }
+
+  // Record live zaps into the recent-channels ring buffer (≤10, most-recent
+  // first, persisted to AsyncStorage via the core factory). Non-live flows
+  // use watch_history instead and are handled in the effect below.
+  useEffect(() => {
+    if (!channel || channel.type !== 'live') return;
+    void useRecentChannelsStore.getState().record(channel.id);
+  }, [channel]);
 
   // Resume check: for non-live content, look up the last saved position and
   // either offer a resume prompt (paused until the user picks) or start from
