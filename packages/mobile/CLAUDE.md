@@ -31,7 +31,7 @@ TV and phone share one codebase. UI branches via `Platform.isTV` at the navigato
 | Crash | Sentry |
 | Credentials | react-native-keychain (M7R) |
 | Notifications | Notifee (M6R) |
-| Hex clipping | **REMOVED from mobile** — flat `ChannelTile` replaced hex cards 2026-04-19 (GPU cost on Android). Hex stays on desktop. |
+| Hex visuals | **Outline-only** — stroked `react-native-svg` `<Polygon>` for the channel-logo frame. No `MaskedView`, no clipping children into a hex path (that's what killed perf on 2026-04-12). Rows stay rectangular; only the logo container is hex-framed. See M4R.D in [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md). |
 | Build | local Gradle → EAS later |
 
 ## Project Layout
@@ -289,7 +289,7 @@ The 725-test core suite (desktop-side) validates every shared module — don't d
 - Do not introduce NativeWind, styled-components, or another styling lib — we use StyleSheet + theme
 - Do not load content or EPG arrays into AsyncStorage or Zustand — paged SQL only
 - Do not reintroduce a Zustand-based router, an `AppLayout` shell, or per-content-type screens (`LiveTvScreen`, `MoviesScreen`, etc.) — the shell is one `HomeShell`
-- Do not reintroduce hex cards on mobile — deleted 2026-04-19 for GPU cost reasons
+- Do not reintroduce full hex clipping on mobile (`MaskedView`, `@react-native-masked-view/masked-view` on list items) — that caused the 2026-04-12 GPU regression. Hex **outlines** on the logo container only are fine (M4R.D) — stroked SVG polygon, no child clipping.
 - Do not add raw `<Image>` — always `CachedImage`
 - Do not unmount the player when switching panels — `MiniPlayer` is a persistent surface
 - Do not block paint on SQLite migrations, EPG refresh, or network — cached-first boot

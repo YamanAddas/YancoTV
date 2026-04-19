@@ -67,7 +67,7 @@ Platform-agnostic TypeScript consumed by both desktop and mobile via `workspace:
 | Credentials | react-native-keychain | Android Keystore-backed credential encryption |
 | Notifications | Notifee | EPG reminders (M6R) |
 | Image cache | `src/image/CachedImage.tsx` wrapper (M4R.11) | Every `<Image>` routes through it |
-| Hex clipping | **Desktop only** — removed on mobile 2026-04-19 for GPU cost | Mobile uses flat `ChannelTile` |
+| Hex visuals | Desktop: full hex clipping via CSS `clip-path`. Mobile: **outline only** (stroked SVG polygon on logo frame) — no `MaskedView`, no child clipping | M4R.D reinstates hex outlines on mobile |
 | Crash reporting | Sentry | Already wired |
 | Build | local Gradle (EAS later) | Debug + signed release APK |
 

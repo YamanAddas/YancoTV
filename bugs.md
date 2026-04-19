@@ -18,6 +18,7 @@ Living register of **open** bugs across desktop and mobile. Closed bugs move to 
 | MB-21 | Mobile | High | No SafeAreaView / status bar inset on HomeShell — top content covered on notched phones | Open | 2026-04-19 | New task — wrap in SafeAreaView with proper insets |
 | MB-22 | Mobile | Medium | `ContentPanel.tsx:56` dead conditional (`category.kind === 'type' ? category.type : category.type` — both branches identical) | Open | 2026-04-19 | Fix inline |
 | MB-23 | Mobile | Medium | No `hasTVPreferredFocus` on first mount — D-pad does nothing until click | Open | 2026-04-19 | M4R.10 (focus primitive) |
+| MB-24 | Mobile | High | Visual design doesn't match desktop — flat tiles, no hex logo frames, no quality badges, no category filter column, sidebar only has 4 content types (not full global nav) | Open | 2026-04-19 | M4R.D (design parity block) |
 
 ## How to use this register
 

@@ -188,6 +188,27 @@ Each milestone produces a runnable APK with a verifiable new capability. Commit 
 
 ---
 
+### **M4R.D — Design parity with desktop** *(~5 days, inserts between M4R.7 and M4R.8)*
+
+**Goal:** Match the desktop look shown in the 2026-04-19 photo — three-column shell with hex-framed channel rows, accent cyan focus, quality badges. This is a direction reversal on the earlier "no hex on mobile" rule, scoped narrowly: **hex is allowed as an outline only (stroked SVG polygon, no masking, no clipping of children)**. The GPU cost that killed perf on 2026-04-12 came from `MaskedView` + `@react-native-masked-view/masked-view` clipping every list item — stroked outlines on 50k items are cheap.
+
+| # | Task | DoD |
+|---|---|---|
+| M4R.D.1 | Expand `LeftRail.tsx` into `AppSidebar.tsx` — logo-in-hex-badge at top, `SearchButton` (opens `SearchOverlay`), full global nav (Home / Live TV / TV Guide / Movies / Series / Favorites / Recordings / Downloads / Settings), Sources button at bottom. Global nav items live in `shell-store` as `navTarget`; content-type categories move into the new `CategoryFilterPanel` | D-pad Down walks the full nav; focus memory remembers last nav item; visually mirrors the desktop sidebar |
+| M4R.D.2 | New `CategoryFilterPanel.tsx` — middle column between sidebar and content. Top: "Filter groups" `SearchInput` that filters the list below in-memory. Body: scrollable list of groups with counts sourced from `db/queries.groupsForType(type)`. "All" pinned at top with total count. Active group highlights cyan | on TV: walks with D-pad Left/Right from AppSidebar into the filter panel, then into ContentPanel; on phone: this panel is hidden and surfaces as a **Drawer** triggered from a filter-chevron on `ContentPanel` header |
+| M4R.D.3 | `HexChannelRow.tsx` — replaces flat `ChannelTile` for Live TV rows. Three parts, side-by-side: (a) hex-outlined logo container ~64×64 built from `react-native-svg` `<Polygon>` with `stroke={colors.accent}` `fill="none"`, channel logo `<CachedImage>` centered inside at normal opacity (no clipping); (b) channel name + number text; (c) `QualityBadgePills` on the right. Row container has a subtle 1px cyan border at 18% opacity — no hex edge on the row itself (row stays rectangular; only the logo frame is hex) | visually matches photo on real device; scroll stays ≥55 FPS on Fire TV 4K with 50k rows |
+| M4R.D.4 | `QualityBadgePills.tsx` — parses channel title with a regex (`/\b(4K|UHD|2160p|1440p|1080p|FHD|720p|HD|SD)\b/gi`, TiviMate-style) and renders 1–3 pills per match. Pills are themed by tier (cyan for 4K/UHD, amber for HD, neutral for SD) | known test titles produce expected badge sets; unknown titles render no pills |
+| M4R.D.5 | Theme pass — port the desktop gradient background into `theme.ts` (`colors.bg` becomes two stops: top `#0a0a1a`, bottom `#151528` or whatever the desktop palette produces), accent matches desktop cyan exactly (read from `src/renderer/styles` + `tailwind.config.js`), active-nav green matches desktop | side-by-side APK vs desktop screenshot in daylight: feels like the same app |
+
+**Ship criterion:** Side-by-side photo of the mobile APK and the 2026-04-19 desktop screenshot looks like the same product on two form factors — hex-outlined logos, cyan accents, three-column TV layout, phone drawer for groups, quality pills on 4K/UHD channels.
+
+**Non-goals:**
+- Do NOT reintroduce `MaskedView` or clip children through a hex path anywhere.
+- Do NOT hex the row outline itself — only the logo container. A hex-edged 50k-row list is a rerun of the 2026-04-12 perf regression.
+- Do NOT scope TV Guide / Recordings / Downloads / Settings screens into this milestone — those are M5R.2 / M6R / M7R. M4R.D.1 only wires their **nav entries**; each nav target lands a "coming in MxR" placeholder panel for now.
+
+---
+
 ### **M5R — Groups + EPG ribbon + Favorites flow** *(1 week)*
 
 **Goal:** Features from the old M5 fold back in inside the new shell.
