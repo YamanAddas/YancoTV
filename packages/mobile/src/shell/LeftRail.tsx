@@ -5,6 +5,7 @@ import {
   useShellStore,
   type RailCategory,
 } from '../stores/shell-store';
+import { useSourcesStore } from '../stores/sources-store';
 import { colors, spacing } from '../styles/theme';
 
 // Flat category list: Live / Movies / Series / Favorites.
@@ -26,6 +27,8 @@ const ITEMS: RailItem[] = [
 export function LeftRail() {
   const activeKey = useShellStore((s) => categoryKey(s.category));
   const setCategory = useShellStore((s) => s.setCategory);
+  const openSources = useShellStore((s) => s.openSourcesModal);
+  const sourceCount = useSourcesStore((s) => s.sources.length);
 
   return (
     <View style={styles.root}>
@@ -40,6 +43,24 @@ export function LeftRail() {
           />
         ))}
       </View>
+      <Pressable
+        onPress={openSources}
+        style={({ focused }) => [
+          styles.sourcesRow,
+          focused && styles.sourcesRowFocused,
+        ]}
+      >
+        {({ focused }) => (
+          <Text
+            style={[
+              styles.sourcesLabel,
+              focused && styles.sourcesLabelFocused,
+            ]}
+          >
+            Sources ({sourceCount})
+          </Text>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -115,6 +136,29 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   rowLabelFocused: {
+    color: colors.focus,
+  },
+  sourcesRow: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  sourcesRowFocused: {
+    borderColor: colors.focus,
+    backgroundColor: colors.glass,
+  },
+  sourcesLabel: {
+    color: colors.surface300,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  sourcesLabelFocused: {
     color: colors.focus,
   },
 });

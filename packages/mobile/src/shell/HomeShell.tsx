@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { LeftRail } from './LeftRail';
 import { ContentPanel } from './ContentPanel';
 import { MiniPlayer } from './MiniPlayer';
+import { SourcesModal } from './SourcesModal';
 import { PersistentPlayerHost } from '../player/PersistentPlayerHost';
 import { colors, radii, spacing } from '../styles/theme';
 
@@ -18,6 +19,7 @@ export function HomeShell() {
     <View style={styles.outer}>
       {Platform.isTV ? <TvLayout /> : <PhoneLayout />}
       <PersistentPlayerHost />
+      <SourcesModal />
     </View>
   );
 }

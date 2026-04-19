@@ -4,6 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import type { ContentItem } from '@yancotv/core';
 import { useShellStore, type RailCategory } from '../stores/shell-store';
 import { usePlayerStore } from '../stores/player-store';
+import { useSourcesStore } from '../stores/sources-store';
 import { listByType } from '../db/queries';
 import { colors, radii, spacing } from '../styles/theme';
 
@@ -16,6 +17,10 @@ export function ContentPanel() {
   const setActiveContent = useShellStore((s) => s.setActiveContent);
   const activeContentId = useShellStore((s) => s.activeContentId);
   const play = usePlayerStore((s) => s.play);
+  // Re-query when a source sync finishes — the `syncStatus` transition
+  // from 'fetching'/'parsing' back to 'done' or 'error' means new rows
+  // are (or aren't) in SQLite and the panel needs to refresh.
+  const syncStatus = useSourcesStore((s) => s.syncStatus);
 
   const onRowPress = useCallback(
     (item: ContentItem) => {
@@ -64,7 +69,7 @@ export function ContentPanel() {
         if (token !== loadToken.current) return;
         setLoading(false);
       });
-  }, [category]);
+  }, [category, syncStatus]);
 
   const loadMore = useCallback(() => {
     if (loading || exhausted) return;

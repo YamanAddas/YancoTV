@@ -13,8 +13,11 @@ export type RailCategory =
 interface ShellState {
   category: RailCategory;
   activeContentId: string | null;
+  sourcesModalOpen: boolean;
   setCategory: (c: RailCategory) => void;
   setActiveContent: (id: string | null) => void;
+  openSourcesModal: () => void;
+  closeSourcesModal: () => void;
 }
 
 const DEFAULT_CATEGORY: RailCategory = { kind: 'type', type: 'live' };
@@ -22,9 +25,12 @@ const DEFAULT_CATEGORY: RailCategory = { kind: 'type', type: 'live' };
 export const useShellStore = create<ShellState>((set) => ({
   category: DEFAULT_CATEGORY,
   activeContentId: null,
+  sourcesModalOpen: false,
   setCategory: (category) =>
     set({ category, activeContentId: null }),
   setActiveContent: (activeContentId) => set({ activeContentId }),
+  openSourcesModal: () => set({ sourcesModalOpen: true }),
+  closeSourcesModal: () => set({ sourcesModalOpen: false }),
 }));
 
 export function categoryKey(c: RailCategory): string {
