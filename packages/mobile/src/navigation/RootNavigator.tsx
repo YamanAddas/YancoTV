@@ -16,8 +16,9 @@ import {
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { HomeScreen } from '../screens/HomeScreen';
-import { ChannelListScreen } from '../screens/ChannelListScreen';
 import { LiveTvScreen } from '../screens/LiveTvScreen';
+import { MoviesScreen } from '../screens/MoviesScreen';
+import { SeriesScreen } from '../screens/SeriesScreen';
 import { SourcesScreen } from '../screens/SourcesScreen';
 import { ChannelDetailScreen } from '../screens/ChannelDetailScreen';
 import { PlayerScreen } from '../screens/PlayerScreen';
@@ -56,19 +57,6 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Drawer = createDrawerNavigator<MainTabsParamList>();
 const Tabs = createBottomTabNavigator<MainTabsParamList>();
 
-// ---------- List-screen wrappers ----------
-//
-// ChannelListScreen takes `type` + `title` props. The drawer/tabs use distinct
-// routes per content type, so each route gets a thin wrapper that supplies the
-// props. Avoids route-param plumbing for static values.
-
-function MoviesRoute() {
-  return <ChannelListScreen type="movie" title="Movies" />;
-}
-function SeriesRoute() {
-  return <ChannelListScreen type="series" title="Series" />;
-}
-
 // ---------- Main shells ----------
 
 function TvDrawerShell() {
@@ -89,8 +77,8 @@ function TvDrawerShell() {
     >
       <Drawer.Screen name="Home" component={HomeScreen} />
       <Drawer.Screen name="Live" component={LiveTvScreen} />
-      <Drawer.Screen name="Movies" component={MoviesRoute} />
-      <Drawer.Screen name="Series" component={SeriesRoute} />
+      <Drawer.Screen name="Movies" component={MoviesScreen} />
+      <Drawer.Screen name="Series" component={SeriesScreen} />
       <Drawer.Screen name="Sources" component={SourcesScreen} />
     </Drawer.Navigator>
   );
@@ -122,12 +110,12 @@ function PhoneTabsShell() {
       />
       <Tabs.Screen
         name="Movies"
-        component={MoviesRoute}
+        component={MoviesScreen}
         options={{ tabBarLabel: 'Movies' }}
       />
       <Tabs.Screen
         name="Series"
-        component={SeriesRoute}
+        component={SeriesScreen}
         options={{ tabBarLabel: 'Series' }}
       />
       <Tabs.Screen

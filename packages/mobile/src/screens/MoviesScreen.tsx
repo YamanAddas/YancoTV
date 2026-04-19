@@ -1,45 +1,44 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ContentItem, ContentType } from '@yancotv/core';
 import {
   useNavigation,
   type CompositeNavigationProp,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { ContentItem, SortOption } from '@yancotv/core';
 import { PageHeader } from '../components/layout/PageHeader';
+import { SortDropdown } from '../components/layout/SortDropdown';
 import { ContentGrid } from '../components/cards/ContentGrid';
 import {
   CategorySidebar,
   type CategorySelection,
 } from '../components/layout/CategorySidebar';
 import { useSourcesStore } from '../stores/sources-store';
+import { sortContent } from '../utils/sort-content';
 import { colors, radii, spacing } from '../styles/theme';
 import type {
   MainTabsParamList,
   RootStackParamList,
 } from '../navigation/RootNavigator';
 
-type ListNavigation = CompositeNavigationProp<
+type MoviesNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabsParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-interface Props {
-  type: ContentType;
-  title: string;
-}
-
-export function ChannelListScreen({ type, title }: Props) {
-  const navigation = useNavigation<ListNavigation>();
+export function MoviesScreen() {
+  const navigation = useNavigation<MoviesNavigation>();
   const openDetail = (channelId: string) =>
     navigation.navigate('Detail', { channelId });
+
   const allChannels = useSourcesStore((s) => s.channels);
   const [selection, setSelection] = useState<CategorySelection>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('provider');
 
   const items = useMemo(
-    () => allChannels.filter((c) => c.type === type),
-    [allChannels, type],
+    () => allChannels.filter((c) => c.type === 'movie'),
+    [allChannels],
   );
 
   const { categories, countByCategory } = useMemo(() => {
@@ -55,16 +54,16 @@ export function ChannelListScreen({ type, title }: Props) {
     };
   }, [items]);
 
-  const filtered: ContentItem[] = useMemo(() => {
+  const filtered = useMemo<ContentItem[]>(() => {
     if (selection === null) return items;
     if (Array.isArray(selection)) {
       const set = new Set(selection);
-      return items.filter((it) => it.groupName && set.has(it.groupName));
+      return items.filter((it) => it.groupName != null && set.has(it.groupName));
     }
     return items.filter((it) => it.groupName === selection);
   }, [items, selection]);
 
-  const variant: 'hex' | 'poster' = type === 'live' ? 'hex' : 'poster';
+  const sorted = useMemo(() => sortContent(filtered, sortBy), [filtered, sortBy]);
 
   const subtitle = useMemo(() => {
     if (selection === null) return 'All categories';
@@ -75,9 +74,9 @@ export function ChannelListScreen({ type, title }: Props) {
   if (items.length === 0) {
     return (
       <View style={{ flex: 1 }}>
-        <PageHeader title={title} subtitle="Nothing here yet" />
+        <PageHeader title="Movies" subtitle="Nothing here yet" />
         <View style={styles.emptyPanel}>
-          <Text style={styles.emptyTitle}>No {title.toLowerCase()}</Text>
+          <Text style={styles.emptyTitle}>No movies</Text>
           <Text style={styles.emptyText}>
             Add an IPTV source to start browsing.
           </Text>
@@ -98,18 +97,19 @@ export function ChannelListScreen({ type, title }: Props) {
         categories={categories}
         selected={selection}
         onSelect={setSelection}
-        contentType={type}
+        contentType="movie"
         categoryCounts={countByCategory}
         totalCount={items.length}
       />
 
       <View style={styles.main}>
         <PageHeader
-          eyebrow={`${filtered.length.toLocaleString()} items`}
-          title={title}
+          eyebrow={`${sorted.length.toLocaleString()} movies`}
+          title="Movies"
           subtitle={subtitle}
+          right={<SortDropdown value={sortBy} onChange={setSortBy} />}
         />
-        <ContentGrid data={filtered} variant={variant} onOpen={openDetail} />
+        <ContentGrid data={sorted} variant="poster" onOpen={openDetail} />
       </View>
     </View>
   );

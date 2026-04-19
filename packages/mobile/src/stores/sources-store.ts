@@ -20,7 +20,7 @@ import * as contentDb from '../db/content-store';
  *
  * Content lives in SQLite. The in-memory `channels` array is a read-through
  * cache we rebuild from the DB on boot and after each resync, so the screens
- * that look up channels synchronously (ChannelListScreen, HomeScreen, player)
+ * that look up channels synchronously (browse screens, HomeScreen, player)
  * stay fast and simple. Credentials are hydrated out of the sources table and
  * exposed on the union so the detail-fetch path in `use-content-detail.ts`
  * keeps working without an extra async call.
@@ -142,7 +142,7 @@ function storedToMobile(
 
 async function loadAllChannels(): Promise<ContentItem[]> {
   // Keep the union of all three types consistent with sortOrder from the DB so
-  // ChannelListScreen's provider-order filtering still matches the payload the
+  // the browse screens' provider-order filtering still matches the payload the
   // user picked up at sync time. We fetch per-type and concat — one SELECT per
   // type is cheap on op-sqlite compared to the hex-card render that follows.
   const types: ContentType[] = ['live', 'movie', 'series'];

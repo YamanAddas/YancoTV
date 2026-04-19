@@ -15,7 +15,6 @@ import {
   type CategorySelection,
 } from '../components/layout/CategorySidebar';
 import { useSourcesStore } from '../stores/sources-store';
-import { useNowNext } from '../hooks/use-now-next';
 import { sortContent } from '../utils/sort-content';
 import { colors, radii, spacing } from '../styles/theme';
 import type {
@@ -23,13 +22,13 @@ import type {
   RootStackParamList,
 } from '../navigation/RootNavigator';
 
-type LiveNavigation = CompositeNavigationProp<
+type SeriesNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabsParamList>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-export function LiveTvScreen() {
-  const navigation = useNavigation<LiveNavigation>();
+export function SeriesScreen() {
+  const navigation = useNavigation<SeriesNavigation>();
   const openDetail = (channelId: string) =>
     navigation.navigate('Detail', { channelId });
 
@@ -38,7 +37,7 @@ export function LiveTvScreen() {
   const [sortBy, setSortBy] = useState<SortOption>('provider');
 
   const items = useMemo(
-    () => allChannels.filter((c) => c.type === 'live'),
+    () => allChannels.filter((c) => c.type === 'series'),
     [allChannels],
   );
 
@@ -66,17 +65,6 @@ export function LiveTvScreen() {
 
   const sorted = useMemo(() => sortContent(filtered, sortBy), [filtered, sortBy]);
 
-  // Now/next hook call site is in place for M6. Today it returns an empty map
-  // so the overlay renders nothing; wiring EPG data later is a drop-in.
-  const tvgIds = useMemo(
-    () =>
-      sorted
-        .map((c) => c.tvgId)
-        .filter((id): id is string => !!id && id.length > 0),
-    [sorted],
-  );
-  useNowNext(tvgIds);
-
   const subtitle = useMemo(() => {
     if (selection === null) return 'All categories';
     if (Array.isArray(selection)) return `${selection.length} groups`;
@@ -86,9 +74,9 @@ export function LiveTvScreen() {
   if (items.length === 0) {
     return (
       <View style={{ flex: 1 }}>
-        <PageHeader title="Live TV" subtitle="Nothing here yet" />
+        <PageHeader title="Series" subtitle="Nothing here yet" />
         <View style={styles.emptyPanel}>
-          <Text style={styles.emptyTitle}>No live channels</Text>
+          <Text style={styles.emptyTitle}>No series</Text>
           <Text style={styles.emptyText}>
             Add an IPTV source to start browsing.
           </Text>
@@ -109,19 +97,19 @@ export function LiveTvScreen() {
         categories={categories}
         selected={selection}
         onSelect={setSelection}
-        contentType="live"
+        contentType="series"
         categoryCounts={countByCategory}
         totalCount={items.length}
       />
 
       <View style={styles.main}>
         <PageHeader
-          eyebrow={`${sorted.length.toLocaleString()} channels`}
-          title="Live TV"
+          eyebrow={`${sorted.length.toLocaleString()} series`}
+          title="Series"
           subtitle={subtitle}
           right={<SortDropdown value={sortBy} onChange={setSortBy} />}
         />
-        <ContentGrid data={sorted} variant="hex" onOpen={openDetail} />
+        <ContentGrid data={sorted} variant="poster" onOpen={openDetail} />
       </View>
     </View>
   );

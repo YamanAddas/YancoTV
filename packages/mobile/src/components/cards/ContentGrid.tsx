@@ -10,8 +10,7 @@ import type { ContentItem } from '@yancotv/core';
 import { ContentCard, type CardVariant } from './ContentCard';
 import { spacing } from '../../styles/theme';
 
-// Column metrics shared with ChannelListScreen's empty-state math. Tweaking
-// these changes card density for the whole app.
+// Column metrics — tweaking these changes card density for the whole app.
 const TARGET_CARD_WIDTH: Record<CardVariant, number> = {
   hex: 130,
   poster: 120,
