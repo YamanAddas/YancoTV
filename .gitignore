@@ -22,3 +22,6 @@ packages/mobile/android/.gradle/
 dont commit.txt
 /yancotv_logo.png
 .claude-scratch/
+
+# pnpm patch editable copies (the generated patch in patches/ is committed)
+patches-work/
