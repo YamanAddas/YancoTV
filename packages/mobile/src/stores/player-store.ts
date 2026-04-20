@@ -1,9 +1,13 @@
 import { create } from 'zustand';
+import { launchNativePlayer } from '../player/PlayerLauncher';
+import { Sentry } from '../sentry';
 
-// Playback selection state. Holds only the current track + UI flags —
-// the actual <Video> surface lives in PersistentPlayerHost so it doesn't
-// unmount across mini/fullscreen transitions (M4R rule 5).
-// Mirrors the desktop player-store shape (rule 13).
+// Playback selection state.
+//
+// Post-TiviMate rewrite: the native PlayerActivity owns everything about
+// playback (surface, controls, pause, fullscreen, D-pad). JS only tracks
+// the last track the user opened so the MiniPlayer re-entry tile can
+// re-launch the same stream. No <Video> mounts in RN.
 
 export interface PlayerTrack {
   contentId: string;
@@ -14,27 +18,19 @@ export interface PlayerTrack {
 
 interface PlayerState {
   track: PlayerTrack | null;
-  isFullscreen: boolean;
-  isPaused: boolean;
-  // Starts playback in fullscreen — the mini slot is a re-entry surface
-  // after fullscreen is dismissed, not the default landing. Users expect
-  // pressing a channel to immediately fill the screen (TiviMate / Smart
-  // IPTV / every Leanback app do this); the mini-player surface exists
-  // only so the <Video> isn't unmounted when the user backs out.
   play: (track: PlayerTrack) => void;
   stop: () => void;
-  enterFullscreen: () => void;
-  exitFullscreen: () => void;
-  togglePause: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set) => ({
   track: null,
-  isFullscreen: false,
-  isPaused: false,
-  play: (track) => set({ track, isFullscreen: true, isPaused: false }),
-  stop: () => set({ track: null, isFullscreen: false, isPaused: false }),
-  enterFullscreen: () => set({ isFullscreen: true }),
-  exitFullscreen: () => set({ isFullscreen: false }),
-  togglePause: () => set((s) => ({ isPaused: !s.isPaused })),
+  play: (track) => {
+    set({ track });
+    void launchNativePlayer({ url: track.url, title: track.title }).catch(
+      (e: unknown) => {
+        Sentry.captureException(e);
+      },
+    );
+  },
+  stop: () => set({ track: null }),
 }));

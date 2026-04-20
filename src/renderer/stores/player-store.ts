@@ -524,8 +524,16 @@ export function initPlayerEventListeners(): () => void {
 
     if (mpvState.status) {
       update.status = mpvState.status as PlayerStoreState['status'];
-      // If mpv reports idle and we're in theater mode, the stream ended or mpv exited
-      if (mpvState.status === 'idle' && mode === 'theater') {
+      // If mpv reports idle or stopped while in theater mode, the stream ended,
+      // the user clicked Back/Escape on the overlay, or mpv exited — in every
+      // case the main window must leave theater mode so the sidebar + page
+      // content become visible again. Without handling 'stopped' here, a Back
+      // click in the transparent overlay window updates only the overlay's
+      // Zustand store; the main window stays stuck on a blank theater screen.
+      if (
+        (mpvState.status === 'idle' || mpvState.status === 'stopped') &&
+        mode === 'theater'
+      ) {
         usePlayerStore.getState().stop();
         return;
       }

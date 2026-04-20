@@ -1,4 +1,4 @@
-# YancoTV — Claude Code Project Guide
+# YancoTV — Codex Project Guide
 
 ## Project Overview
 
@@ -15,7 +15,7 @@ Not a fork — both apps are built from scratch with selective use of open-sourc
 
 ```
 YancoTV/                              # pnpm workspace root
-├── CLAUDE.md                         # This file — monorepo guide
+├── AGENTS.md                         # This file — monorepo guide
 ├── ARCHITECTURE.md                   # Process/data architecture for both apps
 ├── PRODUCTION_PLAN.md                # Desktop roadmap (Phases 1–5, mostly DONE)
 ├── PRODUCTION_PLAN_ANDROID.md        # Mobile roadmap — milestones M1–M9
@@ -311,7 +311,7 @@ See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full mobile
 - **No platform I/O.** No `better-sqlite3`, no `fs`, no native mobile modules. Inject what you need via interfaces (`HttpClient`, `Logger`).
 - **Pure TypeScript.** Only dependency: `zod` (and peer interfaces).
 - **Deterministic, testable.** Every new module gets unit tests that run in both the desktop and mobile test suites.
-- **Build `@yancotv/core` to `dist/` before running or bundling the desktop main.** `@yancotv/core` is ESM (`"type": "module"`) and Electron 41 bundles Node 24, whose loader rejects directory imports and will not map `.js` specifiers to `.ts` files. Internal re-exports use explicit `.js` extensions (`export * from './types/index.js'`) that resolve against emitted artifacts in `packages/core/dist/`. Root `package.json` runs `pnpm build:core` ahead of `dev:electron`, `build:main`, and `build`, and `packages/core/package.json` routes `main`/`types`/`exports.default` at `./dist/*.js` while keeping `exports.source` + `exports.react-native` on `./src/*.ts` so Metro still reads TS sources directly. Skipping the build crashes Electron boot with `ERR_MODULE_NOT_FOUND` (MB-18, 2026-04-20).
+- **Explicit `.js` extensions on every internal relative import.** `@yancotv/core` is ESM (`"type": "module"`) and Node 22's loader rejects both directory imports and extensionless specifiers at runtime. TS `moduleResolution: "bundler"` is configured to accept `.js` on `.ts` sources, so `export * from './types/index.js'` type-checks and runs. Leaving out the extension compiles clean but crashes Electron boot with `ERR_UNSUPPORTED_DIR_IMPORT` (MB-18, 2026-04-19).
 
 ### Desktop — Electron Security (NON-NEGOTIABLE)
 
@@ -340,7 +340,7 @@ See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full mobile
 
 ### Mobile — Architecture Rules
 
-See [PRODUCTION_PLAN_ANDROID.md § Architecture Rules](PRODUCTION_PLAN_ANDROID.md#architecture-rules-mobile) and [packages/mobile/CLAUDE.md](packages/mobile/CLAUDE.md) for the mobile-specific list (persistence, navigation, focus, credentials, theme).
+See [PRODUCTION_PLAN_ANDROID.md § Architecture Rules](PRODUCTION_PLAN_ANDROID.md#architecture-rules-mobile) and [packages/mobile/AGENTS.md](packages/mobile/AGENTS.md) for the mobile-specific list (persistence, navigation, focus, credentials, theme).
 
 ### Code Conventions (Both Apps)
 
@@ -368,4 +368,4 @@ See [PRODUCTION_PLAN_ANDROID.md § Architecture Rules](PRODUCTION_PLAN_ANDROID.m
 - **Adding a feature to the desktop app?** Read [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md), find the sprint it belongs to (or propose a new one), then [ARCHITECTURE.md](ARCHITECTURE.md) for service placement.
 - **Adding a feature to mobile?** Read [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) — find the milestone, follow the tasks. If it's not in the plan, add it to the plan first.
 - **Cross-cutting change (parser, client, types)?** It belongs in `packages/core`. Update both consumers in the same PR.
-- **Debugging mobile?** See [packages/mobile/CLAUDE.md](packages/mobile/CLAUDE.md) for mobile-specific tips.
+- **Debugging mobile?** See [packages/mobile/AGENTS.md](packages/mobile/AGENTS.md) for mobile-specific tips.

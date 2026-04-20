@@ -8,6 +8,8 @@ import {
   Text,
   View,
 } from 'react-native';
+// PlayerSurface + ControlsOverlay deleted — playback runs in a native
+// Android PlayerActivity (TiviMate-style). RN shell never mounts <Video>.
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppSidebar } from './AppSidebar';
@@ -19,7 +21,6 @@ import {
 import { ContentPanel } from './ContentPanel';
 import { MiniPlayer } from './MiniPlayer';
 import { SourcesModal } from './SourcesModal';
-import { PersistentPlayerHost } from '../player/PersistentPlayerHost';
 import { usePlayerStore } from '../stores/player-store';
 import {
   isContentNavTarget,
@@ -28,15 +29,11 @@ import {
 } from '../stores/shell-store';
 import { colors, radii, spacing } from '../styles/theme';
 
-// Three-column TV layout: AppSidebar · ContentPanel (or placeholder) ·
-// (InfoPanel stacked over MiniPlayer). Phone stacks them vertically.
-// InfoPanel is still a placeholder; M4R.8 replaces it.
-//
-// PersistentPlayerHost is rendered last so its absolute-positioned mini
-// wrapper paints over the MiniPlayer slot, and its fullscreen wrapper
-// paints over the whole shell (M4R rule 5).
+// One screen, state-driven. Playback is a native Android Activity — the
+// shell never renders <Video>. Back-peel collapses the UI layers only.
 export function HomeShell() {
-  const hasTrack = usePlayerStore((s) => s.track !== null);
+  const track = usePlayerStore((s) => s.track);
+  const stop = usePlayerStore((s) => s.stop);
   const navTarget = useShellStore((s) => s.navTarget);
   const sidebarCollapsed = useShellStore((s) => s.sidebarCollapsed);
   const filterCollapsed = useShellStore((s) => s.filterCollapsed);
@@ -45,20 +42,12 @@ export function HomeShell() {
   const sourcesModalOpen = useShellStore((s) => s.sourcesModalOpen);
   const searchOverlayOpen = useShellStore((s) => s.searchOverlayOpen);
   const insets = useSafeAreaInsets();
-  // Phone needs top/bottom padding to clear the status bar + gesture area.
-  // TV runs full-bleed — no status bar, no nav gestures.
   const outerPad = Platform.isTV
     ? null
     : { paddingTop: insets.top, paddingBottom: insets.bottom };
-  // Group filter panel only applies to type-backed nav targets
-  // (live / movies / series). Favorites has no groups; non-content targets
-  // render placeholder panels with no filter column.
   const showFilter = hasGroupFilter(navTarget);
 
-  // Back press peels chrome layers before leaving the shell: filter →
-  // sidebar → stop player → default (exit). Matches TiviMate / Smart IPTV
-  // Pro muscle memory where BACK gradually widens the content view and
-  // only exits the app once you're bare.
+  // Back press peels layers: filter → collapse, sidebar → collapse, else exit app.
   useEffect(() => {
     if (!Platform.isTV) return;
     const onBack = () => {
@@ -85,6 +74,21 @@ export function HomeShell() {
     setSidebarCollapsed,
   ]);
 
+  // Phone Android back: clear last track if present, else default.
+  useEffect(() => {
+    if (Platform.isTV) return;
+    const onBack = () => {
+      if (sourcesModalOpen || searchOverlayOpen) return false;
+      if (track) {
+        stop();
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [sourcesModalOpen, searchOverlayOpen, track, stop]);
+
   return (
     <View style={[styles.outer, outerPad]}>
       {!Platform.isTV && (
@@ -96,15 +100,14 @@ export function HomeShell() {
       )}
       {Platform.isTV ? (
         <TvLayout
-          hasTrack={hasTrack}
+          hasTrack={track !== null}
           showFilter={showFilter}
           sidebarCollapsed={sidebarCollapsed}
           filterCollapsed={filterCollapsed}
         />
       ) : (
-        <PhoneLayout hasTrack={hasTrack} />
+        <PhoneLayout hasTrack={track !== null} />
       )}
-      <PersistentPlayerHost />
       <SourcesModal />
       {!Platform.isTV && <CategoryFilterDrawer />}
     </View>
@@ -143,9 +146,6 @@ function TvLayout({
       )}
       <View style={styles.contentSlot}>
         <MainPanel />
-        {/* Edge-expand affordances: slim Pressables pinned to the left edge
-            that restore the collapsed chrome. Two stacked when both are
-            hidden so D-pad up/down picks which layer to peel back. */}
         {sidebarCollapsed && (
           <EdgeExpandButton
             side="menu"
@@ -226,10 +226,6 @@ function PhoneLayout({ hasTrack }: { hasTrack: boolean }) {
   );
 }
 
-// Routes the main column based on navTarget. Content-bearing targets
-// (live / movies / series / favorites) keep the ContentPanel behavior the
-// ship criterion depends on; the other five land placeholders until their
-// milestone ships (M4R.D non-goals list).
 function MainPanel() {
   const navTarget = useShellStore((s) => s.navTarget);
   if (isContentNavTarget(navTarget)) return <ContentPanel />;
@@ -285,6 +281,10 @@ const styles = StyleSheet.create({
   outer: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  fullscreenRoot: {
+    flex: 1,
+    backgroundColor: '#000',
   },
   tvRoot: {
     flex: 1,
@@ -394,8 +394,6 @@ const styles = StyleSheet.create({
     borderColor: colors.glassBorder,
   },
   edgeBtnFilter: {
-    // Slightly inset when a secondary peel target; keeps it visually
-    // distinct from the primary (sidebar) expand button.
     top: '35%',
   },
   edgeBtnFocused: {

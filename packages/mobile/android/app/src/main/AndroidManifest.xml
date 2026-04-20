@@ -47,5 +47,14 @@
             <data android:scheme="yancotv" />
         </intent-filter>
       </activity>
+
+      <!-- Native playback Activity. Launched from JS via PlayerLauncher.launch(...). -->
+      <activity
+        android:name=".player.PlayerActivity"
+        android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|navigation"
+        android:launchMode="singleTask"
+        android:screenOrientation="landscape"
+        android:theme="@style/PlayerTheme"
+        android:exported="false" />
     </application>
 </manifest>

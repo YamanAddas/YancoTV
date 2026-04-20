@@ -6,30 +6,17 @@ import {
   type LinkingOptions,
   type Theme,
 } from '@react-navigation/native';
-import {
-  createNativeStackNavigator,
-  type NativeStackScreenProps,
-} from '@react-navigation/native-stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { HomeShell } from '../shell/HomeShell';
-import { FullscreenPlayer } from '../screens/FullscreenPlayer';
 import { colors } from '../styles/theme';
 
-// The navigator holds exactly two routes after the 2026-04-19 reboot:
-//   • Shell            — the only regular screen; contains AppSidebar,
-//                        ContentPanel, InfoPanel, MiniPlayer, overlays.
-//   • FullscreenPlayer — the expanded-from-MiniPlayer playback surface.
-// Anything that used to be its own screen is now a panel or modal inside
-// HomeShell. See PRODUCTION_PLAN_ANDROID.md § M4R.
+// One route. Fullscreen playback is a HomeShell state, not a navigator
+// frame — that's what makes the video surface stable on Android TV.
+// See 2026-04-20 sure-fix rewrite (retires FullscreenPlayer route).
 export type RootStackParamList = {
   Shell: undefined;
-  FullscreenPlayer: { url: string; title?: string; contentId?: string };
 };
-
-export type FullscreenPlayerProps = NativeStackScreenProps<
-  RootStackParamList,
-  'FullscreenPlayer'
->;
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
@@ -38,7 +25,6 @@ const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: {
       Shell: '',
-      FullscreenPlayer: 'play',
     },
   },
 };
@@ -61,19 +47,6 @@ export function RootNavigator() {
       <View style={styles.root}>
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
           <RootStack.Screen name="Shell" component={HomeShell} />
-          <RootStack.Screen
-            name="FullscreenPlayer"
-            component={FullscreenPlayer}
-            options={{
-              animation: 'fade',
-              gestureEnabled: false,
-              // transparentModal keeps HomeShell (and its PersistentPlayerHost
-              // child) mounted beneath the controls overlay — critical for
-              // the single-<Video> architecture (M4R rule 5).
-              presentation: 'transparentModal',
-              contentStyle: { backgroundColor: 'transparent' },
-            }}
-          />
         </RootStack.Navigator>
       </View>
     </NavigationContainer>

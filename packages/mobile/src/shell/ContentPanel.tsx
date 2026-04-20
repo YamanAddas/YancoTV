@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { FlashList } from '@shopify/flash-list';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ContentItem } from '@yancotv/core';
 import { useShellStore, type RailCategory } from '../stores/shell-store';
 import { usePlayerStore } from '../stores/player-store';
@@ -12,7 +10,6 @@ import { useBootStore } from '../stores/boot-store';
 import { listByType } from '../db/queries';
 import { HexChannelRow } from '../components/HexChannelRow';
 import { CachedImage } from '../image/CachedImage';
-import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, radii, spacing } from '../styles/theme';
 
 const PAGE_SIZE = 40;
@@ -24,7 +21,6 @@ export function ContentPanel() {
   const setActiveContent = useShellStore((s) => s.setActiveContent);
   const activeContentId = useShellStore((s) => s.activeContentId);
   const play = usePlayerStore((s) => s.play);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Re-query when a source sync finishes — the `syncStatus` transition
   // from 'fetching'/'parsing' back to 'done' or 'error' means new rows
   // are (or aren't) in SQLite and the panel needs to refresh.
@@ -39,22 +35,17 @@ export function ContentPanel() {
       setActiveContent(item.id);
       if (!item.streamUrl) return;
       const title = item.cleanTitle || item.title;
+      // play() flips isFullscreen=true in the store, and HomeShell renders
+      // its fullscreen branch (PlayerSurface + ControlsOverlay). No
+      // navigation — one route, state-driven.
       play({
         contentId: item.id,
         url: item.streamUrl,
         title,
         logoUrl: item.logoUrl,
       });
-      // Navigate to the fullscreen route so the controls overlay mounts.
-      // PersistentPlayerHost keeps the single <Video> alive across the
-      // transition — fullscreen is a transparentModal, not a remount.
-      navigation.navigate('FullscreenPlayer', {
-        url: item.streamUrl,
-        title,
-        contentId: item.id,
-      });
     },
-    [setActiveContent, play, navigation],
+    [setActiveContent, play],
   );
 
   const [items, setItems] = useState<ContentItem[]>([]);

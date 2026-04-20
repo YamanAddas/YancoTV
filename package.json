@@ -11,9 +11,10 @@
   "scripts": {
     "dev": "concurrently -k \"pnpm dev:vite\" \"pnpm dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "tsc -p tsconfig.main.json && pnpm build:preload && wait-on http://localhost:5173 && electron .",
-    "build": "tsc -p tsconfig.main.json && pnpm copy:migrations && pnpm build:preload && vite build",
-    "build:main": "tsc -p tsconfig.main.json && pnpm copy:migrations && pnpm build:preload",
+    "dev:electron": "pnpm build:core && tsc -p tsconfig.main.json && pnpm build:preload && wait-on http://localhost:5173 && electron .",
+    "build": "pnpm build:core && tsc -p tsconfig.main.json && pnpm copy:migrations && pnpm build:preload && vite build",
+    "build:core": "pnpm -C packages/core build",
+    "build:main": "pnpm build:core && tsc -p tsconfig.main.json && pnpm copy:migrations && pnpm build:preload",
     "typecheck": "pnpm typecheck:core && pnpm typecheck:main && pnpm typecheck:renderer && pnpm typecheck:mobile",
     "typecheck:core": "pnpm -C packages/core typecheck",
     "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
@@ -94,10 +95,7 @@
       "electron",
       "esbuild",
       "ffmpeg-static"
-    ],
-    "patchedDependencies": {
-      "react-native-video@6.19.1": "patches/react-native-video@6.19.1.patch"
-    }
+    ]
   },
   "engines": {
     "node": ">=20.0.0"

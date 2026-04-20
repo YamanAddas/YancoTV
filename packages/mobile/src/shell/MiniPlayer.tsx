@@ -1,36 +1,19 @@
 import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePlayerStore } from '../stores/player-store';
-import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, spacing } from '../styles/theme';
 
-// Pressable slot inside HomeShell that lives at the same geometry as
-// PersistentPlayerHost's mini wrapper. The <Video> itself is rendered OVER
-// this slot by the root-level host with pointerEvents="none", so taps on
-// the video region bubble through to this Pressable and trigger fullscreen
-// expand.
-//
-// When no track is playing, shows an empty placeholder so the rest of the
-// shell layout remains stable.
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+// Re-entry tile for the last-played track. Tapping it re-launches the
+// native PlayerActivity for the same stream. RN never mounts <Video>.
 
 export function MiniPlayer() {
   const track = usePlayerStore((s) => s.track);
-  const enterFullscreen = usePlayerStore((s) => s.enterFullscreen);
-  const navigation = useNavigation<Nav>();
+  const play = usePlayerStore((s) => s.play);
 
   const onPress = useCallback(() => {
     if (!track) return;
-    enterFullscreen();
-    navigation.navigate('FullscreenPlayer', {
-      url: track.url,
-      title: track.title,
-      contentId: track.contentId,
-    });
-  }, [track, enterFullscreen, navigation]);
+    play(track);
+  }, [track, play]);
 
   return (
     <Pressable
@@ -39,11 +22,16 @@ export function MiniPlayer() {
       style={({ focused }) => [styles.root, focused && styles.rootFocused]}
     >
       {track ? (
-        <View style={styles.titleBar} pointerEvents="none">
-          <Text style={styles.title} numberOfLines={1}>
-            {track.title}
-          </Text>
-        </View>
+        <>
+          <View style={styles.badge} pointerEvents="none">
+            <Text style={styles.badgeText}>Tap to expand</Text>
+          </View>
+          <View style={styles.titleBar} pointerEvents="none">
+            <Text style={styles.title} numberOfLines={1}>
+              {track.title}
+            </Text>
+          </View>
+        </>
       ) : (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>No media</Text>
@@ -56,7 +44,7 @@ export function MiniPlayer() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#000',
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -72,6 +60,21 @@ const styles = StyleSheet.create({
     color: colors.surface400,
     fontSize: 13,
     fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  badge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderRadius: 4,
+  },
+  badgeText: {
+    color: colors.surface200,
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   titleBar: {
