@@ -1,5 +1,14 @@
-import React from 'react';
-import { Platform, StatusBar, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppSidebar } from './AppSidebar';
 import {
@@ -29,6 +38,12 @@ import { colors, radii, spacing } from '../styles/theme';
 export function HomeShell() {
   const hasTrack = usePlayerStore((s) => s.track !== null);
   const navTarget = useShellStore((s) => s.navTarget);
+  const sidebarCollapsed = useShellStore((s) => s.sidebarCollapsed);
+  const filterCollapsed = useShellStore((s) => s.filterCollapsed);
+  const setSidebarCollapsed = useShellStore((s) => s.setSidebarCollapsed);
+  const setFilterCollapsed = useShellStore((s) => s.setFilterCollapsed);
+  const sourcesModalOpen = useShellStore((s) => s.sourcesModalOpen);
+  const searchOverlayOpen = useShellStore((s) => s.searchOverlayOpen);
   const insets = useSafeAreaInsets();
   // Phone needs top/bottom padding to clear the status bar + gesture area.
   // TV runs full-bleed — no status bar, no nav gestures.
@@ -39,6 +54,37 @@ export function HomeShell() {
   // (live / movies / series). Favorites has no groups; non-content targets
   // render placeholder panels with no filter column.
   const showFilter = hasGroupFilter(navTarget);
+
+  // Back press peels chrome layers before leaving the shell: filter →
+  // sidebar → stop player → default (exit). Matches TiviMate / Smart IPTV
+  // Pro muscle memory where BACK gradually widens the content view and
+  // only exits the app once you're bare.
+  useEffect(() => {
+    if (!Platform.isTV) return;
+    const onBack = () => {
+      if (sourcesModalOpen || searchOverlayOpen) return false;
+      if (showFilter && !filterCollapsed) {
+        setFilterCollapsed(true);
+        return true;
+      }
+      if (!sidebarCollapsed) {
+        setSidebarCollapsed(true);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [
+    sourcesModalOpen,
+    searchOverlayOpen,
+    showFilter,
+    filterCollapsed,
+    sidebarCollapsed,
+    setFilterCollapsed,
+    setSidebarCollapsed,
+  ]);
+
   return (
     <View style={[styles.outer, outerPad]}>
       {!Platform.isTV && (
@@ -49,7 +95,12 @@ export function HomeShell() {
         />
       )}
       {Platform.isTV ? (
-        <TvLayout hasTrack={hasTrack} showFilter={showFilter} />
+        <TvLayout
+          hasTrack={hasTrack}
+          showFilter={showFilter}
+          sidebarCollapsed={sidebarCollapsed}
+          filterCollapsed={filterCollapsed}
+        />
       ) : (
         <PhoneLayout hasTrack={hasTrack} />
       )}
@@ -67,22 +118,48 @@ function hasGroupFilter(navTarget: NavTarget): boolean {
 function TvLayout({
   hasTrack,
   showFilter,
+  sidebarCollapsed,
+  filterCollapsed,
 }: {
   hasTrack: boolean;
   showFilter: boolean;
+  sidebarCollapsed: boolean;
+  filterCollapsed: boolean;
 }) {
+  const toggleSidebar = useShellStore((s) => s.toggleSidebar);
+  const toggleFilter = useShellStore((s) => s.toggleFilter);
+  const filterVisible = showFilter && !filterCollapsed;
   return (
     <View style={styles.tvRoot}>
-      <View style={styles.railSlot}>
-        <AppSidebar />
-      </View>
-      {showFilter && (
+      {!sidebarCollapsed && (
+        <View style={styles.railSlot}>
+          <AppSidebar />
+        </View>
+      )}
+      {filterVisible && (
         <View style={styles.filterSlot}>
           <CategoryFilterPanel />
         </View>
       )}
       <View style={styles.contentSlot}>
         <MainPanel />
+        {/* Edge-expand affordances: slim Pressables pinned to the left edge
+            that restore the collapsed chrome. Two stacked when both are
+            hidden so D-pad up/down picks which layer to peel back. */}
+        {sidebarCollapsed && (
+          <EdgeExpandButton
+            side="menu"
+            onPress={toggleSidebar}
+            accessibilityLabel="Show menu"
+          />
+        )}
+        {!sidebarCollapsed && showFilter && filterCollapsed && (
+          <EdgeExpandButton
+            side="filter"
+            onPress={toggleFilter}
+            accessibilityLabel="Show groups"
+          />
+        )}
       </View>
       {hasTrack && (
         <View style={styles.rightColumn}>
@@ -95,6 +172,39 @@ function TvLayout({
         </View>
       )}
     </View>
+  );
+}
+
+function EdgeExpandButton({
+  side,
+  onPress,
+  accessibilityLabel,
+}: {
+  side: 'menu' | 'filter';
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={accessibilityLabel}
+      style={({ focused, pressed }) => [
+        styles.edgeBtn,
+        side === 'filter' && styles.edgeBtnFilter,
+        focused && styles.edgeBtnFocused,
+        pressed && styles.edgeBtnPressed,
+      ]}
+    >
+      <Svg width={14} height={20} viewBox="0 0 14 20" fill="none">
+        <Path
+          d="M4 4l6 6-6 6"
+          stroke={colors.surface200}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </Pressable>
   );
 }
 
@@ -266,5 +376,33 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: 360,
+  },
+  edgeBtn: {
+    position: 'absolute',
+    left: 0,
+    top: '50%',
+    width: 28,
+    height: 72,
+    marginTop: -36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface900,
+    borderTopRightRadius: radii.md,
+    borderBottomRightRadius: radii.md,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: colors.glassBorder,
+  },
+  edgeBtnFilter: {
+    // Slightly inset when a secondary peel target; keeps it visually
+    // distinct from the primary (sidebar) expand button.
+    top: '35%',
+  },
+  edgeBtnFocused: {
+    backgroundColor: colors.glass,
+    borderColor: colors.focus,
+  },
+  edgeBtnPressed: {
+    backgroundColor: colors.glass,
   },
 });

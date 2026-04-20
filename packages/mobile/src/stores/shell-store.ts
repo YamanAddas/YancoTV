@@ -34,6 +34,11 @@ interface ShellState {
   sourcesModalOpen: boolean;
   searchOverlayOpen: boolean;
   filterDrawerOpen: boolean;
+  // TV-only chrome collapse. On phone the sidebar is a top bar and the
+  // filter lives in a drawer, so these are ignored there. Back-press on
+  // the shell peels layers: filter -> sidebar -> player-stop -> exit.
+  sidebarCollapsed: boolean;
+  filterCollapsed: boolean;
   setNavTarget: (t: NavTarget) => void;
   setCategory: (c: RailCategory) => void;
   setActiveContent: (id: string | null) => void;
@@ -43,6 +48,11 @@ interface ShellState {
   closeSearchOverlay: () => void;
   openFilterDrawer: () => void;
   closeFilterDrawer: () => void;
+  toggleSidebar: () => void;
+  toggleFilter: () => void;
+  setSidebarCollapsed: (v: boolean) => void;
+  setFilterCollapsed: (v: boolean) => void;
+  expandAllChrome: () => void;
 }
 
 const DEFAULT_NAV: NavTarget = 'live';
@@ -71,6 +81,8 @@ export const useShellStore = create<ShellState>((set) => ({
   sourcesModalOpen: false,
   searchOverlayOpen: false,
   filterDrawerOpen: false,
+  sidebarCollapsed: false,
+  filterCollapsed: false,
   setNavTarget: (navTarget) => {
     if (isContentNavTarget(navTarget)) {
       set({
@@ -92,6 +104,14 @@ export const useShellStore = create<ShellState>((set) => ({
   closeSearchOverlay: () => set({ searchOverlayOpen: false }),
   openFilterDrawer: () => set({ filterDrawerOpen: true }),
   closeFilterDrawer: () => set({ filterDrawerOpen: false }),
+  toggleSidebar: () =>
+    set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  toggleFilter: () =>
+    set((s) => ({ filterCollapsed: !s.filterCollapsed })),
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  setFilterCollapsed: (filterCollapsed) => set({ filterCollapsed }),
+  expandAllChrome: () =>
+    set({ sidebarCollapsed: false, filterCollapsed: false }),
 }));
 
 export function categoryKey(c: RailCategory): string {
