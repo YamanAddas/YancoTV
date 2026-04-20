@@ -43,12 +43,18 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.mock)
             }
         }
         val androidMain by getting {
             dependencies {
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sqldelight.android.driver)
+            }
+        }
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(libs.sqldelight.sqlite.driver)
             }
         }
         val iosX64Main by getting

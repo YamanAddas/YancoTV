@@ -13,6 +13,7 @@ import kotlin.test.assertTrue
 
 private class DummyHttpClient : HttpClient {
     override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = null
+    override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
 }
 
 class StalkerClientTest {

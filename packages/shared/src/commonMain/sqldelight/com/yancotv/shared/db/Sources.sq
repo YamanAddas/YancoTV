@@ -50,5 +50,21 @@ WHERE id = ?;
 setActive:
 UPDATE sources SET is_active = ?, updated_at = ? WHERE id = ?;
 
+updateFields:
+UPDATE sources
+SET name = ?,
+    url = ?,
+    username_encrypted = ?,
+    password_encrypted = ?,
+    mac_address_encrypted = ?,
+    epg_url = ?,
+    user_agent = ?,
+    auto_sync_interval = ?,
+    updated_at = ?
+WHERE id = ?;
+
+setPriority:
+UPDATE sources SET priority = ?, updated_at = ? WHERE id = ?;
+
 deleteById:
 DELETE FROM sources WHERE id = ?;

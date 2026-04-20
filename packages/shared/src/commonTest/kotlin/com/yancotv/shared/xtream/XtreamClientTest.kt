@@ -33,6 +33,8 @@ private class FakeHttpClient : HttpClient {
         return next
     }
 
+    override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
+
     private class ResponseBox(val value: Any?)
 }
 

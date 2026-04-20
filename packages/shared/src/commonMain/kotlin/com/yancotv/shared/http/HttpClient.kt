@@ -25,4 +25,7 @@ class HttpResponseError(
 interface HttpClient {
     /** Fetch JSON from a URL. Throws on network error, non-2xx status, or invalid JSON. */
     suspend fun getJson(url: String, options: HttpRequestOptions = HttpRequestOptions()): Any?
+
+    /** Fetch plain text (UTF-8) from a URL. Used for M3U playlist downloads. */
+    suspend fun getText(url: String, options: HttpRequestOptions = HttpRequestOptions()): String
 }

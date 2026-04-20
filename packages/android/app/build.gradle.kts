@@ -94,4 +94,7 @@ dependencies {
     // Koin DI
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+
+    // WorkManager — background sync for sources (MK.3.3)
+    implementation(libs.androidx.work.runtime.ktx)
 }

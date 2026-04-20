@@ -26,12 +26,17 @@ CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);
 -- unicode61 + remove_diacritics lets non-Latin titles (Arabic, Cyrillic,
 -- accented Latin) match without requiring the user to type diacritics.
 -- Default ASCII tokenizer would silently drop these into one opaque bucket.
+-- unicode61 splits non-Latin scripts correctly (Arabic, Cyrillic, accented
+-- Latin). FTS4's tokenize argument is a single token, so the parameter-style
+-- form "unicode61 remove_diacritics=1" is rejected by some SQLite builds as
+-- an unknown tokenizer. We drop the diacritics flag here and handle case-
+-- folding/diacritic stripping in clean_title at write time instead.
 CREATE VIRTUAL TABLE content_fts USING fts4(
     content_id,
     title,
     clean_title,
     group_name,
-    tokenize="unicode61 remove_diacritics=1"
+    tokenize=unicode61
 );
 
 CREATE TRIGGER content_ai AFTER INSERT ON content BEGIN
