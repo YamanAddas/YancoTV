@@ -23,11 +23,15 @@ CREATE INDEX idx_content_group ON content(group_name);
 CREATE INDEX idx_content_clean_title ON content(clean_title);
 CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);
 
+-- unicode61 + remove_diacritics lets non-Latin titles (Arabic, Cyrillic,
+-- accented Latin) match without requiring the user to type diacritics.
+-- Default ASCII tokenizer would silently drop these into one opaque bucket.
 CREATE VIRTUAL TABLE content_fts USING fts4(
     content_id,
     title,
     clean_title,
-    group_name
+    group_name,
+    tokenize="unicode61 remove_diacritics=1"
 );
 
 CREATE TRIGGER content_ai AFTER INSERT ON content BEGIN
