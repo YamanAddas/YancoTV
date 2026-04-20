@@ -16,7 +16,7 @@ import { FullscreenPlayer } from '../screens/FullscreenPlayer';
 import { colors } from '../styles/theme';
 
 // The navigator holds exactly two routes after the 2026-04-19 reboot:
-//   • Shell            — the only regular screen; contains LeftRail,
+//   • Shell            — the only regular screen; contains AppSidebar,
 //                        ContentPanel, InfoPanel, MiniPlayer, overlays.
 //   • FullscreenPlayer — the expanded-from-MiniPlayer playback surface.
 // Anything that used to be its own screen is now a panel or modal inside

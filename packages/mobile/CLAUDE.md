@@ -50,7 +50,8 @@ packages/mobile/
 │   │   └── RootNavigator.tsx  # Collapsed in M4R.2 to `Shell` + `FullscreenPlayer` routes only
 │   ├── shell/                 # NEW in M4R — the single state-driven surface
 │   │   ├── HomeShell.tsx      # Left rail + content panel + persistent MiniPlayer
-│   │   ├── LeftRail.tsx       # Category / language / favorites navigation column
+│   │   ├── AppSidebar.tsx     # Global nav (Home / Live TV / TV Guide / Movies / Series / Favorites / Recordings / Downloads / Settings) + Search + Sources (M4R.D.1, replaced LeftRail)
+│   │   ├── CategoryFilterPanel.tsx # Middle column: "Filter groups" input + group list w/ counts. TV inline, phone drawer (M4R.D.2)
 │   │   ├── ContentPanel.tsx   # Paged SQL-backed FlashList
 │   │   ├── InfoPanel.tsx      # Right-side context: now/next, metadata, actions
 │   │   ├── MiniPlayer.tsx     # Persistent corner surface; expands to fullscreen
@@ -152,7 +153,7 @@ Mirrored from [PRODUCTION_PLAN_ANDROID.md § Architecture Rules](../../PRODUCTIO
 
 1. **No duplicated business logic.** Parsers, clients, classifier, title-cleaner, EPG, catchup, parental hashing, store factories — all live in `@yancotv/core`. If you need it on both platforms, put it in core first.
 2. **Persistence goes through op-sqlite.** AsyncStorage is ONLY for small app-level keys (hydration flags, last-view). Never for content, EPG, favorites, or lists of any size.
-3. **One screen, state-driven.** Post-M4R the navigator holds two routes only: `Shell` and `FullscreenPlayer`. Panels (LeftRail, ContentPanel, InfoPanel, MiniPlayer) are state-driven regions of `HomeShell` — not stack screens. Overlays (search, settings) are modals, not screens.
+3. **One screen, state-driven.** Post-M4R the navigator holds two routes only: `Shell` and `FullscreenPlayer`. Panels (AppSidebar, ContentPanel, InfoPanel, MiniPlayer) are state-driven regions of `HomeShell` — not stack screens. Overlays (search, settings) are modals, not screens.
 4. **Paged SQL for content lists.** `ContentPanel` and every other list backed by content/EPG tables uses `db/queries.ts` with `LIMIT/OFFSET` (or keyset) paging. Never hydrate 10K+ rows into Zustand. Zustand holds UI state, cursors, and selection — not bulk data.
 5. **Persistent MiniPlayer surface.** Playback mounts on a single React Native SurfaceView that lives through navigation. Expanding to `FullscreenPlayer` does NOT unmount the player. Fixes the double-back problem.
 6. **Cached-first boot.** First frame paints from cached last-view immediately. Hydration, SQLite migrations, and EPG refresh run in the background — they never block paint. No more "SQLite migration thing takes long time" boot.

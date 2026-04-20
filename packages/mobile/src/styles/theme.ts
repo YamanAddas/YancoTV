@@ -45,6 +45,8 @@ export const colors = {
   glassSubtle: 'rgba(6, 12, 22, 0.5)',
   glassBorder: 'rgba(0, 255, 170, 0.12)',
   glassBorderSoft: 'rgba(0, 255, 170, 0.08)',
+  // Accent border used for HexChannelRow container (M4R.D.3 spec: 18%).
+  accentBorder18: 'rgba(0, 255, 170, 0.18)',
 
   accentGlow: 'rgba(0, 255, 170, 0.25)',
 };

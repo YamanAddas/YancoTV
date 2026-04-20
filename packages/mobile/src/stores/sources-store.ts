@@ -15,15 +15,14 @@ import * as sourcesDb from '../db/sources-store';
 import * as contentDb from '../db/content-store';
 
 /**
- * Mobile sources-store — Zustand in-memory shape over the op-sqlite persistence
- * layer (`src/db/sources-store.ts` + `src/db/content-store.ts`).
+ * Mobile sources-store — Zustand shape over the op-sqlite persistence layer
+ * (`src/db/sources-store.ts` + `src/db/content-store.ts`).
  *
- * Content lives in SQLite. The in-memory `channels` array is a read-through
- * cache we rebuild from the DB on boot and after each resync, so the screens
- * that look up channels synchronously (browse screens, HomeScreen, player)
- * stay fast and simple. Credentials are hydrated out of the sources table and
- * exposed on the union so the detail-fetch path in `use-content-detail.ts`
- * keeps working without an extra async call.
+ * Rule 4: Zustand never caches bulk content. All channel/movie/series rows
+ * live in SQLite and are fed to screens through paged queries in
+ * `db/queries.ts`. The store holds only the source list, sync status, and
+ * credentials — the latter exposed on the union so `use-content-detail.ts`
+ * can hit provider detail endpoints without an extra async lookup.
  *
  * Legacy AsyncStorage keys (`KEY_SOURCES`, `KEY_CHANNELS_LEGACY`) are migrated
  * to SQLite on first hydrate and then removed. `KEY_CHANNELS_LEGACY` was the
@@ -76,7 +75,6 @@ export type SyncStatus = 'idle' | 'fetching' | 'parsing' | 'done' | 'error';
 
 interface SourcesState {
   sources: MobileSource[];
-  channels: ContentItem[];
   syncStatus: SyncStatus;
   syncMessage?: string;
   hydrated: boolean;
@@ -96,9 +94,10 @@ interface SourcesState {
   }) => Promise<void>;
   removeSource: (id: string) => Promise<void>;
   resync: (id: string) => Promise<void>;
-  // Merge a partial metadata patch into an in-memory channel + persist through
-  // to SQLite. Used after a detail-screen fetch to hydrate plot/cast/subtitles
-  // /episodes without re-syncing the whole provider.
+  // Persist a partial metadata patch for a single content row. Used after a
+  // detail-screen fetch to hydrate plot/cast/subtitles/episodes without
+  // re-syncing the whole provider. No in-memory mirror — the consumer
+  // re-reads via `contentDb.getContentById` to see the merged row.
   enrichContent: (id: string, patch: Record<string, unknown>) => void;
 }
 
@@ -138,20 +137,6 @@ function storedToMobile(
     };
   }
   return { ...base, type: 'm3u_url', url: stored.url };
-}
-
-async function loadAllChannels(): Promise<ContentItem[]> {
-  // Keep the union of all three types consistent with sortOrder from the DB so
-  // the browse screens' provider-order filtering still matches the payload the
-  // user picked up at sync time. We fetch per-type and concat — one SELECT per
-  // type is cheap on op-sqlite compared to the hex-card render that follows.
-  const types: ContentType[] = ['live', 'movie', 'series'];
-  const all: ContentItem[] = [];
-  for (const type of types) {
-    const items = await contentDb.getContentByType(type);
-    for (const item of items) all.push(item);
-  }
-  return all;
 }
 
 async function migrateLegacySourcesIfNeeded() {
@@ -480,7 +465,6 @@ async function syncStalker(
 
 export const useSourcesStore = create<SourcesState>((set, get) => ({
   sources: [],
-  channels: [],
   syncStatus: 'idle',
   hydrated: false,
 
@@ -496,9 +480,7 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
       sources.push(storedToMobile(s, creds));
     }
 
-    const channels = await loadAllChannels();
-
-    set({ sources, channels, hydrated: true });
+    set({ sources, hydrated: true });
   },
 
   addM3uSource: async ({ name, url }) => {
@@ -563,24 +545,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
   },
 
   enrichContent: (id, patch) => {
-    // Optimistic in-memory update so the detail screen paints immediately.
-    set((s) => ({
-      channels: s.channels.map((ch) => {
-        if (ch.id !== id) return ch;
-        let existing: Record<string, unknown> = {};
-        if (ch.metadataJson) {
-          try {
-            existing = JSON.parse(ch.metadataJson) as Record<string, unknown>;
-          } catch {
-            existing = {};
-          }
-        }
-        const merged = { ...existing, ...patch };
-        return { ...ch, metadataJson: JSON.stringify(merged) };
-      }),
-    }));
-    // Fire-and-forget DB write. A failed merge just means the user pays a
-    // re-fetch next open — not worth blocking the UI on.
+    // Fire-and-forget DB write. Consumers re-read via getContentById to
+    // observe the merged row — no in-memory mirror (rule 4).
     void contentDb.patchContentMetadata(id, patch).catch(() => {
       // noop
     });
@@ -590,7 +556,6 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
     await sourcesDb.deleteSource(id);
     set((s) => ({
       sources: s.sources.filter((src) => src.id !== id),
-      channels: s.channels.filter((ch) => ch.sourceId !== id),
     }));
   },
 
@@ -625,8 +590,24 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
 
       const { items, counts, warnings } = result;
 
-      setMsg('Persisting...');
-      await contentDb.replaceSourceContent(id, items);
+      setMsg(`Persisting ${items.length.toLocaleString()} items...`);
+      await contentDb.replaceSourceContent(id, items, {}, (p) => {
+        const done = p.done.toLocaleString();
+        const total = p.total.toLocaleString();
+        if (p.phase === 'wiping') {
+          if (p.done === 0) setMsg('Clearing old catalog...');
+          return;
+        }
+        if (p.phase === 'content') {
+          setMsg(`Persisting ${done}/${total}...`);
+          return;
+        }
+        if (p.phase === 'index') {
+          setMsg(`Indexing ${done}/${total}...`);
+          return;
+        }
+        setMsg(`Persisting episodes ${done}/${total}...`);
+      });
       const lastError = warnings.length ? warnings.join('; ') : null;
       await sourcesDb.updateSourceSync(id, {
         lastSynced: Date.now(),
@@ -640,8 +621,6 @@ export const useSourcesStore = create<SourcesState>((set, get) => ({
         : `${countsStr}`;
 
       set((s) => ({
-        // Drop the old rows for this source and append the fresh batch.
-        channels: [...s.channels.filter((ch) => ch.sourceId !== id), ...items],
         sources: s.sources.map((src) =>
           src.id === id
             ? {

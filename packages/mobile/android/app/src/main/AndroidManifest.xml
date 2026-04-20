@@ -18,6 +18,8 @@
       android:usesCleartextTraffic="true"
       tools:replace="android:usesCleartextTraffic"
       android:supportsRtl="true"
+      android:extractNativeLibs="false"
+      android:largeHeap="false"
       android:banner="@mipmap/ic_launcher">
       <activity
         android:name=".MainActivity"

@@ -21,3 +21,4 @@ packages/mobile/android/.gradle/
 # Local working files (secrets, scratch)
 dont commit.txt
 /yancotv_logo.png
+.claude-scratch/

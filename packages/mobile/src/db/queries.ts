@@ -68,6 +68,39 @@ export async function listByType(opts: ListOptions): Promise<ContentItem[]> {
   return ((res.rows ?? []) as unknown as ContentRow[]).map(rowToContent);
 }
 
+export interface GroupCount {
+  name: string;
+  count: number;
+}
+
+// Group counts for the CategoryFilterPanel middle column (M4R.D.2).
+// Returns all non-empty `group_name` values for the given content type with
+// their row count, ordered alphabetically. Rows with `group_name IS NULL`
+// are folded into the caller's "All" bucket via `countByType`.
+export async function groupsForType(
+  type: ContentType,
+  sourceId?: string,
+): Promise<GroupCount[]> {
+  const db = getDb();
+  const params: (string | number)[] = [type];
+  let where = "type = ? AND group_name IS NOT NULL AND group_name <> ''";
+  if (sourceId) {
+    where += ' AND source_id = ?';
+    params.push(sourceId);
+  }
+  const res = await db.execute(
+    `SELECT group_name AS name, COUNT(*) AS count FROM content
+       WHERE ${where}
+     GROUP BY group_name
+     ORDER BY group_name COLLATE NOCASE`,
+    params,
+  );
+  return ((res.rows ?? []) as unknown as GroupCount[]).map((r) => ({
+    name: r.name,
+    count: Number(r.count),
+  }));
+}
+
 export interface CountOptions {
   type: ContentType;
   groupName?: string;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   XtreamClient,
   type ContentItem,
@@ -6,6 +6,7 @@ import {
   type EpisodeInfo,
 } from '@yancotv/core';
 import { fetchHttpClient } from '../http/fetch-http-client';
+import * as contentDb from '../db/content-store';
 import { useSourcesStore, type MobileSource } from '../stores/sources-store';
 
 interface DetailState {
@@ -15,7 +16,7 @@ interface DetailState {
   episodes: EpisodeInfo[];
 }
 
-function parseMetadata(item: ContentItem | undefined): ContentMetadata {
+function parseMetadata(item: ContentItem | undefined | null): ContentMetadata {
   if (!item?.metadataJson) return {};
   try {
     return JSON.parse(item.metadataJson) as ContentMetadata;
@@ -29,22 +30,48 @@ function parseMetadata(item: ContentItem | undefined): ContentMetadata {
  * — for series — the episode tree). Cached in the item's `metadataJson` so
  * subsequent opens are instant. The fetch runs only for xtream movies/series
  * because that's the only provider with a real detail endpoint.
+ *
+ * Post-M4R the item is fetched directly from SQLite via `getContentById`
+ * instead of scanning a full channels array in memory (rule 4 — Zustand
+ * never caches bulk content).
  */
 export function useContentDetail(contentId: string | undefined): DetailState {
-  const item = useSourcesStore((s) =>
-    contentId ? s.channels.find((c) => c.id === contentId) : undefined,
-  );
+  const [item, setItem] = useState<ContentItem | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Bumped after a successful enrich so the next effect re-reads fresh
+  // metadata from SQLite rather than trusting a stale local copy.
+  const [revision, setRevision] = useState(0);
+
   const source = useSourcesStore((s) =>
     item ? s.sources.find((src) => src.id === item.sourceId) : undefined,
   );
   const enrichContent = useSourcesStore((s) => s.enrichContent);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Guard against double-firing under React 19 strict mode + navigation remounts.
   const inflightRef = useRef<string | null>(null);
 
-  const metadata = parseMetadata(item);
+  useEffect(() => {
+    let cancelled = false;
+    if (!contentId) {
+      setItem(null);
+      return;
+    }
+    contentDb
+      .getContentById(contentId)
+      .then((row) => {
+        if (cancelled) return;
+        setItem(row);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId, revision]);
+
+  const metadata = useMemo(() => parseMetadata(item), [item]);
   const episodes = metadata.episodes ?? [];
 
   useEffect(() => {
@@ -60,7 +87,10 @@ export function useContentDetail(contentId: string | undefined): DetailState {
 
     fetchDetail(item, source, metadata)
       .then((patch) => {
-        if (patch) enrichContent(item.id, { ...patch, detailFetchedAt: Date.now() });
+        if (patch) {
+          enrichContent(item.id, { ...patch, detailFetchedAt: Date.now() });
+          setRevision((r) => r + 1);
+        }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
@@ -70,7 +100,7 @@ export function useContentDetail(contentId: string | undefined): DetailState {
         inflightRef.current = null;
         setLoading(false);
       });
-  }, [item, source, metadata.detailFetchedAt, enrichContent, metadata]);
+  }, [item, source, metadata, enrichContent]);
 
   return { loading, error, metadata, episodes };
 }

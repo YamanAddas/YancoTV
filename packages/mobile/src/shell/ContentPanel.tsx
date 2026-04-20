@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { FlashList } from '@shopify/flash-list';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ContentItem } from '@yancotv/core';
 import { useShellStore, type RailCategory } from '../stores/shell-store';
 import { usePlayerStore } from '../stores/player-store';
 import { useSourcesStore } from '../stores/sources-store';
 import { listByType } from '../db/queries';
+import { HexChannelRow } from '../components/HexChannelRow';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, radii, spacing } from '../styles/theme';
 
 const PAGE_SIZE = 40;
@@ -17,6 +22,7 @@ export function ContentPanel() {
   const setActiveContent = useShellStore((s) => s.setActiveContent);
   const activeContentId = useShellStore((s) => s.activeContentId);
   const play = usePlayerStore((s) => s.play);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Re-query when a source sync finishes — the `syncStatus` transition
   // from 'fetching'/'parsing' back to 'done' or 'error' means new rows
   // are (or aren't) in SQLite and the panel needs to refresh.
@@ -26,14 +32,23 @@ export function ContentPanel() {
     (item: ContentItem) => {
       setActiveContent(item.id);
       if (!item.streamUrl) return;
+      const title = item.cleanTitle || item.title;
       play({
         contentId: item.id,
         url: item.streamUrl,
-        title: item.cleanTitle || item.title,
+        title,
         logoUrl: item.logoUrl,
       });
+      // Navigate to the fullscreen route so the controls overlay mounts.
+      // PersistentPlayerHost keeps the single <Video> alive across the
+      // transition — fullscreen is a transparentModal, not a remount.
+      navigation.navigate('FullscreenPlayer', {
+        url: item.streamUrl,
+        title,
+        contentId: item.id,
+      });
     },
-    [setActiveContent, play],
+    [setActiveContent, play, navigation],
   );
 
   const [items, setItems] = useState<ContentItem[]>([]);
@@ -99,15 +114,30 @@ export function ContentPanel() {
       });
   }, [category, items.length, loading, exhausted]);
 
+  const isLive =
+    (category.kind === 'type' && category.type === 'live') ||
+    (category.kind === 'group' && category.type === 'live');
+
   const renderItem = useCallback(
-    ({ item }: { item: ContentItem }) => (
-      <ContentRow
-        item={item}
-        active={item.id === activeContentId}
-        onPress={onRowPress}
-      />
-    ),
-    [activeContentId, onRowPress],
+    ({ item }: { item: ContentItem }) => {
+      if (isLive) {
+        return (
+          <HexChannelRow
+            item={item}
+            active={item.id === activeContentId}
+            onPress={onRowPress}
+          />
+        );
+      }
+      return (
+        <ContentRow
+          item={item}
+          active={item.id === activeContentId}
+          onPress={onRowPress}
+        />
+      );
+    },
+    [activeContentId, onRowPress, isLive],
   );
 
   return (
@@ -149,15 +179,38 @@ function Header({
   total: number;
   exhausted: boolean;
 }) {
+  const openFilterDrawer = useShellStore((s) => s.openFilterDrawer);
   const label =
     category.kind === 'type'
       ? labelForType(category.type)
       : category.kind === 'favorites'
         ? 'Favorites'
         : category.groupName;
+  // Filter chevron surfaces the CategoryFilterDrawer on phone. On TV the
+  // middle column is already visible, so the chevron is hidden. Favorites
+  // has no groups either way.
+  const showChevron = !Platform.isTV && category.kind !== 'favorites';
+  const activeGroup = category.kind === 'group' ? category.groupName : null;
   return (
     <View style={styles.header}>
-      <Text style={styles.headerTitle}>{label}</Text>
+      {showChevron ? (
+        <Pressable
+          onPress={openFilterDrawer}
+          style={({ pressed }) => [
+            styles.filterChip,
+            pressed && styles.filterChipPressed,
+          ]}
+          accessibilityLabel="Filter groups"
+        >
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {label}
+          </Text>
+          <ChevronDown />
+          {activeGroup && <View style={styles.filterDot} />}
+        </Pressable>
+      ) : (
+        <Text style={styles.headerTitle}>{label}</Text>
+      )}
       {total > 0 && (
         <Text style={styles.headerCount}>
           {total}
@@ -165,6 +218,20 @@ function Header({
         </Text>
       )}
     </View>
+  );
+}
+
+function ChevronDown() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6 9l6 6 6-6"
+        stroke={colors.surface300}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
@@ -239,6 +306,25 @@ const styles = StyleSheet.create({
     color: colors.surface400,
     fontSize: 13,
     fontWeight: '600',
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    marginLeft: -spacing.sm,
+    borderRadius: radii.md,
+  },
+  filterChipPressed: {
+    backgroundColor: colors.glass,
+  },
+  filterDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+    marginLeft: 2,
   },
   empty: {
     flex: 1,
