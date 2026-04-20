@@ -1,0 +1,6 @@
+-- MK.0 placeholder. Real schema lands in MK.2 (ported from
+-- src/main/services/migrations/*.sql on the desktop side).
+
+CREATE TABLE Placeholder (
+    id INTEGER NOT NULL PRIMARY KEY
+);
