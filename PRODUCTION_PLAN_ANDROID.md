@@ -1,8 +1,12 @@
-# YancoTV Android — Production Plan
+# YancoTV Android — Production Plan (RN — SUPERSEDED 2026-04-20)
 
-**Mission:** Ship an Android TV + phone app that feels like TiviMate / Smarters in responsiveness, wears the YancoTV desktop visual language, and reuses our `@yancotv/core` business logic.
-
-This plan is the single source of truth for mobile. Every mobile commit should map to a task here.
+> **SUPERSEDED.** As of 2026-04-20 the mobile app is being rewritten in **Kotlin Multiplatform + Compose** (Android/Android TV) + **SwiftUI** (iOS/iPadOS). The RN codebase in `packages/mobile/` is **FROZEN** — no new features, no bug fixes except P0 crashes. All roadmap items below are superseded by the native plan.
+>
+> **Active plan:** see [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md).
+>
+> **Why:** a week of Fire TV black-screen-with-audio only fixed by stepping over the RN bridge (M4R.Player, commit `09150e9`, 2026-04-20) made the pattern clear — every TiviMate-shaped capability we need (mini-preview, channel zap, PIP, Leanback integration, TV launcher channels) costs a custom native bridge in RN and comes for free in Compose. TiviMate/Smarters/Kodi are all native. Goal: beat TiviMate → substrate has to match.
+>
+> **What stays from this plan:** the architecture *targets* (TiviMate-shaped shell, paged queries, persistent player surface, cached-first boot, focus memory, FFmpeg extension for codec gap) carry over to the Kotlin plan. Only the *implementation stack* changes.
 
 ---
 

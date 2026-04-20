@@ -1,6 +1,14 @@
-# @yancotv/mobile — Claude Code Guide
+# @yancotv/mobile — Claude Code Guide (FROZEN 2026-04-20)
 
-This is the mobile-specific project guide. For monorepo context see the [root CLAUDE.md](../../CLAUDE.md). For the roadmap, see [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md).
+> **FROZEN.** This React Native app is superseded by the native Kotlin + KMP rewrite in `packages/android/` (and later `packages/ios/`). See [PRODUCTION_PLAN_NATIVE.md](../../PRODUCTION_PLAN_NATIVE.md).
+>
+> **No new features. No bug fixes except P0 crashes or data loss.** No Metro/RN/dep upgrades. Kept runnable until the native Android app reaches parity + ships an internal-track build; then archived (not deleted — retained for reference).
+>
+> **If you're working on Android, do NOT touch this package.** Work in `packages/android/` + `packages/shared/` against the `MK.*` milestones.
+>
+> Everything below describes the frozen state of the RN app as of commit `fe6819e` (2026-04-20). The architectural notes about native `PlayerActivity` carry forward into the Kotlin rewrite because the Activity itself is reused.
+
+This is the mobile-specific project guide. For monorepo context see the [root CLAUDE.md](../../CLAUDE.md). For the frozen RN roadmap, see [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md). For the active native plan, see [PRODUCTION_PLAN_NATIVE.md](../../PRODUCTION_PLAN_NATIVE.md).
 
 ## What This Is
 
