@@ -1,0 +1,43 @@
+CREATE TABLE downloads (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT,
+    episode_id TEXT,
+    title TEXT NOT NULL,
+    stream_url TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('queued', 'downloading', 'paused', 'completed', 'failed', 'cancelled')),
+    queued_at INTEGER NOT NULL,
+    started_at INTEGER,
+    completed_at INTEGER,
+    bytes_downloaded INTEGER NOT NULL DEFAULT 0,
+    bytes_total INTEGER,
+    error TEXT,
+    resumable INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_downloads_status ON downloads(status);
+CREATE INDEX idx_downloads_queued_at ON downloads(queued_at DESC);
+
+selectAll:
+SELECT * FROM downloads ORDER BY queued_at DESC;
+
+selectByStatus:
+SELECT * FROM downloads WHERE status = ? ORDER BY queued_at DESC;
+
+selectById:
+SELECT * FROM downloads WHERE id = ?;
+
+insert:
+INSERT INTO downloads
+    (id, content_id, episode_id, title, stream_url, file_path, status,
+     queued_at, started_at, completed_at,
+     bytes_downloaded, bytes_total, error, resumable)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateProgress:
+UPDATE downloads
+SET status = ?, bytes_downloaded = ?, bytes_total = ?, started_at = ?, completed_at = ?, error = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM downloads WHERE id = ?;

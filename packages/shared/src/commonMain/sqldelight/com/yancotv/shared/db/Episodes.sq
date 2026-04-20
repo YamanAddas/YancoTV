@@ -1,0 +1,26 @@
+CREATE TABLE episodes (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
+    season_number INTEGER,
+    episode_number INTEGER,
+    title TEXT,
+    stream_url TEXT NOT NULL,
+    duration INTEGER
+);
+
+CREATE INDEX idx_episodes_content ON episodes(content_id, season_number, episode_number);
+
+selectByContent:
+SELECT * FROM episodes
+WHERE content_id = ?
+ORDER BY season_number, episode_number;
+
+selectById:
+SELECT * FROM episodes WHERE id = ?;
+
+insert:
+INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+deleteByContent:
+DELETE FROM episodes WHERE content_id = ?;

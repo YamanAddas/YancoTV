@@ -1,0 +1,54 @@
+-- IPTV sources (M3U URLs, local files, Xtream/Stalker credentials).
+-- Mirrors src/main/services/migrations/001 + 004 + 007 + 014 consolidated.
+
+CREATE TABLE sources (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('m3u_url', 'm3u_file', 'xtream', 'stalker')),
+    url TEXT,
+    file_path TEXT,
+    username_encrypted BLOB,
+    password_encrypted BLOB,
+    mac_address_encrypted BLOB,
+    epg_url TEXT,
+    user_agent TEXT,
+    last_synced INTEGER,
+    last_sync_error TEXT,
+    is_active INTEGER AS kotlin.Boolean NOT NULL DEFAULT 1,
+    priority INTEGER NOT NULL DEFAULT 0,
+    channel_count INTEGER NOT NULL DEFAULT 0,
+    auto_sync_interval INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_sources_priority ON sources(priority ASC);
+
+selectAll:
+SELECT * FROM sources ORDER BY priority ASC, created_at ASC;
+
+selectById:
+SELECT * FROM sources WHERE id = ?;
+
+selectActive:
+SELECT * FROM sources WHERE is_active = 1 ORDER BY priority ASC;
+
+insert:
+INSERT INTO sources (
+    id, name, type, url, file_path,
+    username_encrypted, password_encrypted, mac_address_encrypted,
+    epg_url, user_agent, last_synced, last_sync_error,
+    is_active, priority, channel_count, auto_sync_interval,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateSyncResult:
+UPDATE sources
+SET last_synced = ?, last_sync_error = ?, channel_count = ?, updated_at = ?
+WHERE id = ?;
+
+setActive:
+UPDATE sources SET is_active = ?, updated_at = ? WHERE id = ?;
+
+deleteById:
+DELETE FROM sources WHERE id = ?;

@@ -1,0 +1,22 @@
+CREATE TABLE favorites (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
+    added_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_favorites_content ON favorites(content_id);
+
+selectAll:
+SELECT f.id AS favorite_id, f.added_at, c.*
+FROM favorites f
+JOIN content c ON c.id = f.content_id
+ORDER BY f.added_at DESC;
+
+isFavorite:
+SELECT COUNT(*) > 0 FROM favorites WHERE content_id = ?;
+
+insert:
+INSERT INTO favorites (id, content_id, added_at) VALUES (?, ?, ?);
+
+deleteByContent:
+DELETE FROM favorites WHERE content_id = ?;

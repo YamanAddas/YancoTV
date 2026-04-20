@@ -1,0 +1,39 @@
+CREATE TABLE recordings (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT,
+    title TEXT NOT NULL,
+    stream_url TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('recording', 'completed', 'failed', 'cancelled')),
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    duration_seconds INTEGER,
+    file_size_bytes INTEGER,
+    error TEXT
+);
+
+CREATE INDEX idx_recordings_status ON recordings(status);
+CREATE INDEX idx_recordings_started_at ON recordings(started_at DESC);
+
+selectAll:
+SELECT * FROM recordings ORDER BY started_at DESC;
+
+selectByStatus:
+SELECT * FROM recordings WHERE status = ? ORDER BY started_at DESC;
+
+selectById:
+SELECT * FROM recordings WHERE id = ?;
+
+insert:
+INSERT INTO recordings
+    (id, content_id, title, stream_url, file_path, status,
+     started_at, ended_at, duration_seconds, file_size_bytes, error)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateStatus:
+UPDATE recordings
+SET status = ?, ended_at = ?, duration_seconds = ?, file_size_bytes = ?, error = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM recordings WHERE id = ?;

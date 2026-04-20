@@ -1,0 +1,25 @@
+CREATE TABLE subtitle_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_id TEXT NOT NULL,
+    episode_id TEXT,
+    language TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_id INTEGER,
+    created_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_subtitle_cache_unique
+    ON subtitle_cache(content_id, COALESCE(episode_id, ''), language);
+
+CREATE INDEX idx_subtitle_cache_lookup
+    ON subtitle_cache(content_id, language);
+
+selectForContent:
+SELECT * FROM subtitle_cache WHERE content_id = ? AND language = ?;
+
+insert:
+INSERT INTO subtitle_cache (content_id, episode_id, language, file_path, file_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+deleteById:
+DELETE FROM subtitle_cache WHERE id = ?;

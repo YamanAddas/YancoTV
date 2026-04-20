@@ -1,0 +1,90 @@
+-- Channels, movies, series entries. Mirrors migrations 001 + 003.
+-- FTS4 (not FTS5) because Android's bundled SQLite doesn't ship FTS5
+-- on every device/API level.
+
+CREATE TABLE content (
+    id TEXT PRIMARY KEY NOT NULL,
+    source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK(type IN ('live', 'movie', 'series')),
+    title TEXT NOT NULL,
+    clean_title TEXT,
+    group_name TEXT,
+    stream_url TEXT NOT NULL,
+    logo_url TEXT,
+    tvg_id TEXT,
+    metadata_json TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_content_source ON content(source_id);
+CREATE INDEX idx_content_type ON content(type);
+CREATE INDEX idx_content_group ON content(group_name);
+CREATE INDEX idx_content_clean_title ON content(clean_title);
+CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);
+
+CREATE VIRTUAL TABLE content_fts USING fts4(
+    content_id,
+    title,
+    clean_title,
+    group_name
+);
+
+CREATE TRIGGER content_ai AFTER INSERT ON content BEGIN
+    INSERT INTO content_fts (content_id, title, clean_title, group_name)
+    VALUES (new.id, new.title, new.clean_title, new.group_name);
+END;
+
+CREATE TRIGGER content_ad AFTER DELETE ON content BEGIN
+    DELETE FROM content_fts WHERE content_id = old.id;
+END;
+
+CREATE TRIGGER content_au AFTER UPDATE ON content BEGIN
+    DELETE FROM content_fts WHERE content_id = old.id;
+    INSERT INTO content_fts (content_id, title, clean_title, group_name)
+    VALUES (new.id, new.title, new.clean_title, new.group_name);
+END;
+
+selectById:
+SELECT * FROM content WHERE id = ?;
+
+selectByType:
+SELECT * FROM content
+WHERE type = ?
+ORDER BY source_id, sort_order;
+
+selectByTypeAndSource:
+SELECT * FROM content
+WHERE type = ? AND source_id = ?
+ORDER BY sort_order;
+
+selectByTypeAndGroup:
+SELECT * FROM content
+WHERE type = ? AND group_name = ?
+ORDER BY sort_order;
+
+distinctGroupsForType:
+SELECT DISTINCT group_name FROM content
+WHERE type = ? AND group_name IS NOT NULL
+ORDER BY group_name;
+
+searchFts:
+SELECT c.*
+FROM content c
+JOIN content_fts f ON f.content_id = c.id
+WHERE content_fts MATCH :query
+ORDER BY c.type, c.sort_order
+LIMIT :limitCount;
+
+insert:
+INSERT INTO content (
+    id, source_id, type, title, clean_title, group_name,
+    stream_url, logo_url, tvg_id, metadata_json,
+    sort_order, created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteBySource:
+DELETE FROM content WHERE source_id = ?;
+
+countBySource:
+SELECT COUNT(*) FROM content WHERE source_id = ?;

@@ -1,0 +1,24 @@
+CREATE TABLE group_preferences (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_type TEXT NOT NULL CHECK(content_type IN ('live', 'movie', 'series')),
+    group_key TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_hidden INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    is_pinned INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    custom_name TEXT,
+    created_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_group_prefs_type_key
+    ON group_preferences(content_type, group_key);
+
+selectByType:
+SELECT * FROM group_preferences WHERE content_type = ? ORDER BY sort_order;
+
+upsert:
+INSERT OR REPLACE INTO group_preferences
+    (id, content_type, group_key, sort_order, is_hidden, is_pinned, custom_name, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteById:
+DELETE FROM group_preferences WHERE id = ?;

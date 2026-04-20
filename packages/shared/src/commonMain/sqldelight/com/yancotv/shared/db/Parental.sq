@@ -1,0 +1,57 @@
+CREATE TABLE locked_channels (
+    content_id TEXT PRIMARY KEY NOT NULL,
+    locked_at INTEGER NOT NULL
+);
+
+CREATE TABLE hidden_channels (
+    content_id TEXT PRIMARY KEY NOT NULL,
+    hidden_at INTEGER NOT NULL
+);
+
+CREATE TABLE channel_overrides (
+    content_id TEXT PRIMARY KEY NOT NULL,
+    custom_name TEXT,
+    custom_logo_url TEXT,
+    custom_number INTEGER,
+    custom_group TEXT,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_channel_overrides_number ON channel_overrides(custom_number);
+
+selectLocked:
+SELECT content_id FROM locked_channels;
+
+isLocked:
+SELECT COUNT(*) > 0 FROM locked_channels WHERE content_id = ?;
+
+lockChannel:
+INSERT OR REPLACE INTO locked_channels (content_id, locked_at) VALUES (?, ?);
+
+unlockChannel:
+DELETE FROM locked_channels WHERE content_id = ?;
+
+selectHidden:
+SELECT content_id FROM hidden_channels;
+
+isHidden:
+SELECT COUNT(*) > 0 FROM hidden_channels WHERE content_id = ?;
+
+hideChannel:
+INSERT OR REPLACE INTO hidden_channels (content_id, hidden_at) VALUES (?, ?);
+
+unhideChannel:
+DELETE FROM hidden_channels WHERE content_id = ?;
+
+selectOverride:
+SELECT * FROM channel_overrides WHERE content_id = ?;
+
+selectAllOverrides:
+SELECT * FROM channel_overrides;
+
+upsertOverride:
+INSERT OR REPLACE INTO channel_overrides (content_id, custom_name, custom_logo_url, custom_number, custom_group, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+deleteOverride:
+DELETE FROM channel_overrides WHERE content_id = ?;
