@@ -88,7 +88,7 @@ Rule: if you're tempted to duplicate logic between `src/main/services/` and `pac
 
 - **Framework:** React Native 0.85 (`react-native-tvos` fork) — one codebase for TV + phone
 - **Language:** TypeScript 5 strict
-- **Playback:** react-native-video 6 (ExoPlayer/Media3 backend)
+- **Playback:** Native Android `PlayerActivity` hosting Media3 ExoPlayer directly (TiviMate-style). RN bridges via `PlayerLauncher` NativeModule; JS never mounts `<Video>`. react-native-video removed 2026-04-20 (M4R.Player, commit `09150e9`).
 - **Navigation:** React Navigation 7 (M3 milestone — not yet integrated)
 - **State:** Zustand 5 (same shapes as desktop)
 - **Database:** op-sqlite (JSI-based) — ports desktop schema + migrations (M2 milestone)

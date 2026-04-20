@@ -44,8 +44,8 @@ This plan is the single source of truth for mobile. Every mobile commit should m
 |---|---|---|
 | Framework | **React Native 0.85 (`react-native-tvos` fork)** | in place |
 | Language | TypeScript strict | in place |
-| Playback | **react-native-video 6 (ExoPlayer/Media3 backend)** | in place |
-| Codec gap fix | **ExoPlayer FFmpeg extension** (HEVC-main10, AC3/EAC3, DTS, TrueHD) | **NEW — M8** |
+| Playback | **Native Android `PlayerActivity`** hosting Media3 ExoPlayer directly. RN bridges via `PlayerLauncher` NativeModule; JS never mounts `<Video>`. | **LANDED 2026-04-20** (M4R.Player) — replaced react-native-video |
+| Codec gap fix | **ExoPlayer FFmpeg extension** (HEVC-main10, AC3/EAC3, DTS, TrueHD) registered on the native Activity's `DefaultRenderersFactory` | **NEW — M8R** |
 | Navigation | **React Navigation 7**, stack-only, one top-level screen | reduced — drawer + bottom-tabs deleted |
 | State | **Zustand 5** | in place |
 | Database | **op-sqlite** (JSI) | in place |
@@ -178,7 +178,8 @@ Each milestone produces a runnable APK with a verifiable new capability. Commit 
 | M4R.4 | `LeftRail.tsx` = flat category list: Live, Movies, Series, Favorites, (later) Groups | focusable, remembers last-selected |
 | M4R.5 | `ContentPanel.tsx` = FlashList driven by paged SQL, not Zustand `channels.filter(...)` | `db/queries.listByType(type, limit, offset)` returns a page per scroll tick |
 | M4R.6 | Boot path: open SQLite → if content rows exist, render shell immediately; refresh sources in background | cold-boot to first render < 1s on Fire TV 4K |
-| M4R.7 | `MiniPlayer.tsx` = persistent player surface, corner-docked by default, expands fullscreen on Enter | one back = shrink; second back does nothing |
+| M4R.7 | `MiniPlayer.tsx` = re-entry tile that re-launches native `PlayerActivity` for the last-played track (no persistent `<Video>` surface) | tapping the tile fires an Intent; playback is a native Activity |
+| M4R.Player | **Native Android `PlayerActivity` + `PlayerLauncher` NativeModule** — AppCompat Activity hosts Media3 ExoPlayer, OkHttpDataSource, PlayerView (SurfaceView). `PlayerLauncherModule.launch({url,title,userAgent})` fires an Intent; JS never mounts `<Video>`. Handles BACK/MENU/PLAY_PAUSE key events natively. Activity is `exported="false"`. `react-native-video` removed from deps; patch deleted. | **LANDED 2026-04-20** (`09150e9`) — picture renders on Fire TV (v7a) + phone (arm64). Closes MB-25..MB-29. |
 | M4R.8 | `InfoPanel.tsx` = right-side now/next + description for the currently focused row | replaces the deleted `ContentDetailScreen` |
 | M4R.9 | `SearchOverlay.tsx` = modal triggered by the TV remote's search button / a Ctrl-K shortcut on phone | results are a single FlashList, SQL-FTS backed |
 | M4R.10 | Focus primitive rebuilt in `src/focus/Focusable.tsx` + `focus-memory.ts` | last-focused cell per group is restored on return |
@@ -267,8 +268,8 @@ Each milestone produces a runnable APK with a verifiable new capability. Commit 
 |---|---|---|
 | M8R.1 | Clone `androidx/media`, checkout tag matching our Media3 version | local build succeeds |
 | M8R.2 | Build the FFmpeg decoder extension (`libraries/decoder_ffmpeg`) via NDK for armeabi-v7a + arm64-v8a + x86_64 | `.so` artifacts produced |
-| M8R.3 | Vendor the extension into `packages/mobile/android/app/src/main/jniLibs` + register `FfmpegAudioRenderer` / `FfmpegVideoRenderer` in the player | decoders available |
-| M8R.4 | Patch `react-native-video` config (or a small native override) to prefer the FFmpeg decoder on unsupported codecs | `DefaultRenderersFactory.setExtensionRendererMode(EXTENSION_RENDERER_MODE_PREFER)` |
+| M8R.3 | Vendor the extension into `packages/mobile/android/app/src/main/jniLibs` + register `FfmpegAudioRenderer` / `FfmpegVideoRenderer` in `PlayerActivity`'s `DefaultRenderersFactory` | decoders available |
+| M8R.4 | Wire `DefaultRenderersFactory.setExtensionRendererMode(EXTENSION_RENDERER_MODE_PREFER)` inside `PlayerActivity.startPlayer()` | FFmpeg decoder picked on unsupported codecs |
 | M8R.5 | Regression test against 10 real IPTV channels that were audio-only before | all 10 render picture |
 | M8R.6 | APK-size audit; gate per-ABI splits if the increase is large | target < 60 MB per split |
 
@@ -460,6 +461,7 @@ Non-negotiable:
 | Credentials via react-native-keychain | Desktop safeStorage has no RN equivalent | 2026-04-18 |
 | AsyncStorage settings-only; content in op-sqlite | AsyncStorage crashed at 10K items | 2026-04-18 |
 | V1 ships on react-native-video 6 / Media3 (VLC dropped) | No maintained RN VLC library works on RN 0.85 + tvos fork | 2026-04-18 |
+| **Dropped react-native-video — native Android `PlayerActivity` instead** | After a week chasing black-screen-with-audio on Fire TV through RN bridge views (TextureView patches, `viewType={TEXTURE}`, transparentModal, persistent `<Video>` surfaces), the RN bridge itself was the problem. Stepping over it to a dedicated AppCompat Activity hosting Media3 ExoPlayer + PlayerView directly (TiviMate/Smarters pattern) rendered picture on first try. JS fires an Intent via `PlayerLauncher` NativeModule; JS never mounts `<Video>`. `react-native-video` dep + patch deleted | 2026-04-20 |
 | **Reboot: single-screen TiviMate-shaped shell, delete desktop-ported screens** | Desktop "page" thinking (stack+drawer+tabs, seven destinations, dashboard, stacked player, 2:3 detail tabs, hex SVG cards) is wrong for TV. Result: sluggish navigation, double-back semantics, codec-gap audio-only, dashboard nobody asked for. User directive 2026-04-19: full audit + start over. New shape: left rail + right panel + persistent MiniPlayer. Search and Sources become overlays/settings. Delete-before-add enforced. | 2026-04-19 |
 | **Flat channel tiles on mobile; hex is desktop-only** | Hex SVG + MaskedView per tile was a 20+ ms/card paint cost on Android GPU. TiviMate / Smarters / Stremio all ship flat rectangular tiles with centered logo. Desktop keeps hex | 2026-04-19 |
 | **Codec gap fixed via ExoPlayer FFmpeg extension (M8R)** | Cleanest path. Same strategy TiviMate ships. ~15 MB APK growth, ~1 week native build | 2026-04-19 |

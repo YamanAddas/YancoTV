@@ -19,7 +19,7 @@ TV and phone share one codebase. UI branches via `Platform.isTV` at the navigato
 |---|---|
 | Framework | React Native 0.85 (`react-native-tvos` fork) |
 | Language | TypeScript 5 strict |
-| Playback | react-native-video 6 (ExoPlayer/Media3) + FFmpeg ExoPlayer extension (M8R — codec gap) |
+| Playback | **Native Android `PlayerActivity` + `PlayerLauncher` NativeModule** (AppCompat Activity hosts Media3 ExoPlayer directly; RN never mounts `<Video>`) + FFmpeg ExoPlayer extension (M8R — codec gap). **react-native-video removed 2026-04-20 (M4R.Player).** |
 | Navigation | React Navigation 7 — collapsed to `Shell` + `FullscreenPlayer` in M4R |
 | State | Zustand 5 |
 | Database | op-sqlite |
@@ -58,7 +58,7 @@ packages/mobile/
 │   │   ├── SearchOverlay.tsx  # Modal overlay, not a separate screen
 │   │   └── SettingsModal.tsx  # Modal overlay
 │   ├── screens/
-│   │   └── FullscreenPlayer.tsx   # The ONLY other route post-M4R
+│   │   └── (no FullscreenPlayer — playback is a native Android Activity, not an RN route)
 │   ├── components/
 │   │   ├── cards/             # ChannelTile (flat), ContentCard. HexCard REMOVED mobile-side.
 │   │   ├── layout/            # PageHeader only; AppLayout/Sidebar deleted in M4R.1
@@ -66,7 +66,7 @@ packages/mobile/
 │   │   └── phone/             # Phone-specific (added M9R)
 │   ├── focus/                 # Rebuilt M4R.10 — Focusable primitive + focus-memory module
 │   ├── image/                 # NEW M4R.11 — CachedImage wrapper (disk + memory LRU)
-│   ├── player/                # Video wrapper; FFmpeg extension jniLibs land in M8R
+│   ├── player/                # `PlayerLauncher.ts` — NativeModule bridge to Android `PlayerActivity`. FFmpeg extension jniLibs land in M8R (registered on the native Activity's DefaultRenderersFactory)
 │   ├── db/                    # op-sqlite + migrations + queries.ts (paged SQL, M4R.4)
 │   ├── services/              # Keystore, notifications, cast (M6R–M9R)
 │   ├── stores/                # Zustand: sources-store, favorites-store, history-store, shell-store
@@ -141,7 +141,7 @@ Phases 0–M3 landed previously. M4.1 `ContentGrid` (FlashList) + M4.2 `Category
 - **MB-17** navigation sluggish across the whole app — fix in M4R (paged SQL + collapsed navigator + CachedImage).
 - **MB-18** desktop Electron boot `ERR_UNSUPPORTED_DIR_IMPORT` — **FIXED 2026-04-19** (explicit `.js` extensions across `@yancotv/core` internal imports).
 
-**Player decision (unchanged, 2026-04-18 → reaffirmed 2026-04-19):** V1 ships on `react-native-video` 6 / Media3. The codec gap that made users hate the app (audio-only streams) is closed with the ExoPlayer FFmpeg decoder extension in M8R — clone `androidx/media`, NDK-build `decoder_ffmpeg` for armeabi-v7a / arm64-v8a / x86_64, vendor the libs into `android/app/src/main/jniLibs/`. Not a Fabric VLC wrapper — wrong tradeoff (40–90 MB APK, unmaintained autolink path).
+**Player decision (reversed 2026-04-20):** `react-native-video` is OUT. V1 ships on a **native Android `PlayerActivity`** hosting Media3 ExoPlayer directly — TiviMate/Smarters pattern. After a week of Fire TV black-screen-with-audio that no RN bridge patch could fix (TextureView, `viewType={TEXTURE}`, transparentModal, persistent `<Video>` surface, patched `exo_player_view_texture.xml`), stepping over the RN bridge rendered picture on first try. JS fires an Intent via `PlayerLauncher` NativeModule; JS never mounts `<Video>`. Codec gap closes in M8R with the FFmpeg ExoPlayer extension (NDK-built, vendored jniLibs, registered on the Activity's `DefaultRenderersFactory`).
 
 **Working directive (user, confirmed again 2026-04-19):** "rebuild from zero for these things. i don't want patching. i want clean building." The M4R reboot follows this to the letter — delete first, rebuild second. See the delete-before-add rule in the architecture list.
 
@@ -153,9 +153,9 @@ Mirrored from [PRODUCTION_PLAN_ANDROID.md § Architecture Rules](../../PRODUCTIO
 
 1. **No duplicated business logic.** Parsers, clients, classifier, title-cleaner, EPG, catchup, parental hashing, store factories — all live in `@yancotv/core`. If you need it on both platforms, put it in core first.
 2. **Persistence goes through op-sqlite.** AsyncStorage is ONLY for small app-level keys (hydration flags, last-view). Never for content, EPG, favorites, or lists of any size.
-3. **One screen, state-driven.** Post-M4R the navigator holds two routes only: `Shell` and `FullscreenPlayer`. Panels (AppSidebar, ContentPanel, InfoPanel, MiniPlayer) are state-driven regions of `HomeShell` — not stack screens. Overlays (search, settings) are modals, not screens.
+3. **One screen, state-driven.** Post-M4R the navigator holds exactly one route: `Shell`. Panels (AppSidebar, ContentPanel, InfoPanel, MiniPlayer) are state-driven regions of `HomeShell` — not stack screens. Overlays (search, settings) are modals, not screens. **Playback is a native Android Activity** launched via Intent from `PlayerLauncher`; it is not an RN route.
 4. **Paged SQL for content lists.** `ContentPanel` and every other list backed by content/EPG tables uses `db/queries.ts` with `LIMIT/OFFSET` (or keyset) paging. Never hydrate 10K+ rows into Zustand. Zustand holds UI state, cursors, and selection — not bulk data.
-5. **Persistent MiniPlayer surface.** Playback mounts on a single React Native SurfaceView that lives through navigation. Expanding to `FullscreenPlayer` does NOT unmount the player. Fixes the double-back problem.
+5. **Native Android `PlayerActivity` for playback.** Playback is NOT a React Native view — it runs in a dedicated AppCompat Activity (`com.yancotv.mobile.player.PlayerActivity`) that hosts Media3 ExoPlayer + PlayerView directly. JS never mounts `<Video>`. `MiniPlayer.tsx` is a re-entry tile that re-launches the native Activity via `PlayerLauncher.launch({url,title,userAgent})`. `PlayerActivity` is `android:exported="false"` — only the in-app NativeModule can start it. Fixes the black-screen-with-audio class of bugs (MB-25..MB-29) that no amount of RN bridge patching resolved.
 6. **Cached-first boot.** First frame paints from cached last-view immediately. Hydration, SQLite migrations, and EPG refresh run in the background — they never block paint. No more "SQLite migration thing takes long time" boot.
 7. **Every `<Image>` goes through `CachedImage`.** The `src/image/CachedImage.tsx` wrapper does disk + memory LRU. No raw `<Image source={{uri}} />` in components. Fixes logo/poster jank during scroll.
 8. **All focus through one primitive.** One `<Focusable>` or `TVFocusGuideView` wrapper. Focus memory lives in `src/focus/focus-memory.ts`, not in individual screens.
@@ -228,16 +228,23 @@ const client = new XtreamClient(fetchHttpClient);
 
 ## Playback
 
-`PlayerScreen.tsx` uses react-native-video. Key gotchas:
+Playback is a **native Android Activity**, not an RN view. TiviMate/Smarters pattern — landed 2026-04-20 as M4R.Player (commit `09150e9`) after a week of chasing Fire TV black-screen-with-audio through the RN bridge (TextureView patches, `viewType={TEXTURE}`, transparentModal) all failed.
 
-- Root container must be `<View>`, never `<Pressable>` — Pressable changes the Android SurfaceView z-order and the overlay eats touches
-- `viewType={1}` forces TextureView (fallback for older Fire TV)
-- Buffer config: 15–50s window, 2.5s threshold (tuned for IPTV HLS)
-- Stream type detection from URL (`.m3u8` → HLS, `.mpd` → DASH, else MPEG-TS)
-- Auto-hide controls after 4s of no input
-- `BackHandler` wired; cleanup timer on unmount
+**Files:**
+- `android/app/src/main/java/com/yancotv/mobile/player/PlayerActivity.kt` — AppCompat Activity. Builds OkHttpDataSource.Factory with UA, DefaultMediaSourceFactory, ExoPlayer.Builder. Hosts `PlayerView` (SurfaceView) from `res/layout/activity_player.xml`. Handles BACK/ESCAPE/MENU/PLAY_PAUSE via `onKeyDown`. Immersive fullscreen via `WindowInsetsControllerCompat`. `android:exported="false"`, `launchMode="singleTask"`, `screenOrientation="landscape"`, `@style/PlayerTheme` (AppCompat.NoActionBar, black bg, fullscreen).
+- `PlayerLauncherModule.kt` — RN NativeModule with one Promise-returning method: `launch(options: ReadableMap, promise: Promise)`. Builds an Intent with `extra_url` / `extra_title` / `extra_user_agent` extras, calls `startActivity`.
+- `PlayerLauncherPackage.kt` — registered manually in `MainApplication.kt` (not autolinked).
+- `src/player/PlayerLauncher.ts` — thin TS wrapper: `launchNativePlayer({url,title?,userAgent?})`.
+- `src/stores/player-store.ts` — `play(track)` sets last-track + fires `launchNativePlayer`. `track` state powers `MiniPlayer` re-entry tile. No `isFullscreen`, no surface state.
 
-Track selection (audio, subtitles) goes through react-native-video's built-in APIs, not desktop's mpv properties. This changes in M4 (player abstraction mirrors desktop `IPlayer`).
+**Track selection (audio, subtitles):** via Media3 track-selection APIs inside `PlayerActivity`. Overlay UI lands later (M7R).
+
+**Do NOT:**
+- Reintroduce `react-native-video` or a `<Video>` component in the RN tree.
+- Try to launch `PlayerActivity` from outside the app (`adb am start`) — it's `exported="false"` by design.
+- Add "fullscreen" shell state — the Activity owns the whole Window while playing.
+
+**Codec gap (M8R):** FFmpeg ExoPlayer extension is registered against `DefaultRenderersFactory.setExtensionRendererMode(EXTENSION_RENDERER_MODE_PREFER)` inside `PlayerActivity.startPlayer()`. Same file, no RN-side config.
 
 ## State Stores
 
@@ -278,10 +285,11 @@ The 725-test core suite (desktop-side) validates every shared module — don't d
 4. Wrap troublesome horizontal rails in `TVFocusGuideView` with `destinations={[...]}` so D-pad knows where to go
 
 ### Debug a playback issue
-1. Check stream type detection in `PlayerScreen.tsx` (log `detectStreamType(url)`)
-2. Set `useTextureView` to true via `viewType={1}` for older hardware
-3. Check the error object keys (react-native-video error shape varies by platform version)
-4. Confirm `cleartextTraffic` still true in manifest (many IPTV providers are HTTP-only)
+1. `adb logcat -s YancoPlayerActivity ExoPlayerImpl MediaCodec* AndroidRuntime:E` while triggering playback from the UI
+2. `PlayerActivity` is `exported="false"` — must go through RN UI (tap a channel in the shell); `adb am start` will throw SecurityException
+3. Confirm `cleartextTraffic=true` in manifest (many IPTV providers are HTTP-only)
+4. If picture is black but audio plays: it's a codec gap (M8R FFmpeg extension) — check ExoPlayer `Format` logs for `codecs=` and cross-reference Media3's built-in decoder list
+5. If Activity fails to launch: confirm `PlayerLauncherPackage` is registered in `MainApplication.kt` and `NativeModules.PlayerLauncher` is defined in JS
 
 ## What NOT To Do
 
@@ -292,7 +300,7 @@ The 725-test core suite (desktop-side) validates every shared module — don't d
 - Do not reintroduce a Zustand-based router, an `AppLayout` shell, or per-content-type screens (`LiveTvScreen`, `MoviesScreen`, etc.) — the shell is one `HomeShell`
 - Do not reintroduce full hex clipping on mobile (`MaskedView`, `@react-native-masked-view/masked-view` on list items) — that caused the 2026-04-12 GPU regression. Hex **outlines** on the logo container only are fine (M4R.D) — stroked SVG polygon, no child clipping.
 - Do not add raw `<Image>` — always `CachedImage`
-- Do not unmount the player when switching panels — `MiniPlayer` is a persistent surface
+- Do not reintroduce `react-native-video` or any RN `<Video>` component — playback is a native Android `PlayerActivity`, launched via Intent from `PlayerLauncher`
 - Do not block paint on SQLite migrations, EPG refresh, or network — cached-first boot
 - Do not hardcode colors, spacing, or radii — use `theme.ts`
 - Do not call mpv-specific APIs or assume ffmpeg subprocess — Android uses Media3 + FFmpeg decoder extension (M8R), not a subprocess
