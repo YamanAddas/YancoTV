@@ -1,6 +1,7 @@
 package com.yancotv.shared.content
 
 import com.yancotv.shared.parsers.M3uEntry
+import com.yancotv.shared.types.ContentType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
