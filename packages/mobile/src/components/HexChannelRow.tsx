@@ -1,8 +1,9 @@
 import React, { useCallback } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 import type { ContentItem } from '@yancotv/core';
 import { colors, radii, spacing } from '../styles/theme';
+import { CachedImage } from '../image/CachedImage';
 import { QualityBadgePills } from './QualityBadgePills';
 
 // M4R.D.3 — Live TV row with a hex-outlined logo frame.
@@ -14,9 +15,6 @@ import { QualityBadgePills } from './QualityBadgePills';
 // hex — **outline only** via a stroked SVG Polygon. No MaskedView, no child
 // clipping. That was the 2026-04-12 GPU regression; the M4R.D non-goals list
 // forbids reintroducing it.
-//
-// CachedImage (M4R.11) will later replace the raw <Image>; the swap is a
-// one-line change once that wrapper ships.
 
 const HEX_SIZE = 64;
 const LOGO_IMAGE = 40;
@@ -54,8 +52,8 @@ export function HexChannelRow({ item, active, onPress }: Props) {
           />
         </Svg>
         {item.logoUrl ? (
-          <Image
-            source={{ uri: item.logoUrl }}
+          <CachedImage
+            uri={item.logoUrl}
             style={styles.logoImage}
             resizeMode="contain"
           />

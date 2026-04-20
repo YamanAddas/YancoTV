@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { useSourcesStore } from '../stores/sources-store';
 import { useBootStore } from '../stores/boot-store';
 import { listByType } from '../db/queries';
 import { HexChannelRow } from '../components/HexChannelRow';
+import { CachedImage } from '../image/CachedImage';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, radii, spacing } from '../styles/theme';
 
@@ -270,8 +271,8 @@ function ContentRow({ item, active, onPress }: RowProps) {
     >
       <View style={styles.logoWrap}>
         {item.logoUrl ? (
-          <Image
-            source={{ uri: item.logoUrl }}
+          <CachedImage
+            uri={item.logoUrl}
             style={styles.logo}
             resizeMode="contain"
           />

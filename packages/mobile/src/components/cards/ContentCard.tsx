@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CachedImage } from '../../image/CachedImage';
 import { colors, radii } from '../../styles/theme';
 
 // Card variants:
@@ -73,8 +74,8 @@ function ChannelTile({
         ]}
       >
         {showImage ? (
-          <Image
-            source={{ uri: imageUrl }}
+          <CachedImage
+            uri={imageUrl}
             style={tileStyles.logo}
             resizeMode="contain"
             onError={() => setImgError(true)}
@@ -160,8 +161,8 @@ function PosterCard({
         ]}
       >
         {showImage ? (
-          <Image
-            source={{ uri: imageUrl }}
+          <CachedImage
+            uri={imageUrl}
             style={styles.image}
             resizeMode="cover"
             onError={() => setImgError(true)}

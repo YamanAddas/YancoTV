@@ -1,6 +1,5 @@
 import React, { useCallback } from 'react';
 import {
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import {
   type NavTarget,
 } from '../stores/shell-store';
 import { useSourcesStore } from '../stores/sources-store';
+import { CachedImage } from '../image/CachedImage';
 import { colors, radii, spacing } from '../styles/theme';
 
 // Metro's static asset loader resolves `require()` calls at bundle time.
@@ -238,7 +238,7 @@ function LogoBadge() {
             strokeWidth={3}
           />
         </Svg>
-        <Image
+        <CachedImage
           source={LOGO_SOURCE}
           style={styles.logoImage}
           resizeMode="contain"
