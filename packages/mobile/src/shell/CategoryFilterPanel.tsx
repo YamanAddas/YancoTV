@@ -13,6 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { ContentType } from '@yancotv/core';
 import { groupsForType, countByType, type GroupCount } from '../db/queries';
 import { useSourcesStore } from '../stores/sources-store';
+import { useBootStore } from '../stores/boot-store';
 import {
   useShellStore,
   type NavTarget,
@@ -46,6 +47,9 @@ interface GroupListState {
 
 function useGroupList(type: ContentType | null): GroupListState {
   const syncStatus = useSourcesStore((s) => s.syncStatus);
+  // Cached-first boot (M4R.6): don't hit SQLite until `initDatabase()` has
+  // resolved — the effect re-runs once `dbReady` flips true.
+  const dbReady = useBootStore((s) => s.dbReady);
   const [state, setState] = useState<GroupListState>({
     groups: [],
     total: 0,
@@ -59,6 +63,7 @@ function useGroupList(type: ContentType | null): GroupListState {
       setState({ groups: [], total: 0, loading: false, error: null });
       return;
     }
+    if (!dbReady) return;
     const t = ++token.current;
     setState((prev) => ({ ...prev, loading: true, error: null }));
     Promise.all([groupsForType(type), countByType({ type })])
@@ -75,7 +80,7 @@ function useGroupList(type: ContentType | null): GroupListState {
           error: e instanceof Error ? e.message : String(e),
         });
       });
-  }, [type, syncStatus]);
+  }, [type, syncStatus, dbReady]);
 
   return state;
 }

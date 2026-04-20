@@ -8,6 +8,7 @@ import {
 import { fetchHttpClient } from '../http/fetch-http-client';
 import * as contentDb from '../db/content-store';
 import { useSourcesStore, type MobileSource } from '../stores/sources-store';
+import { useBootStore } from '../stores/boot-store';
 
 interface DetailState {
   loading: boolean;
@@ -47,6 +48,8 @@ export function useContentDetail(contentId: string | undefined): DetailState {
     item ? s.sources.find((src) => src.id === item.sourceId) : undefined,
   );
   const enrichContent = useSourcesStore((s) => s.enrichContent);
+  // Cached-first boot (M4R.6): don't hit SQLite until the DB is open.
+  const dbReady = useBootStore((s) => s.dbReady);
 
   const inflightRef = useRef<string | null>(null);
 
@@ -56,6 +59,7 @@ export function useContentDetail(contentId: string | undefined): DetailState {
       setItem(null);
       return;
     }
+    if (!dbReady) return;
     contentDb
       .getContentById(contentId)
       .then((row) => {
@@ -69,7 +73,7 @@ export function useContentDetail(contentId: string | undefined): DetailState {
     return () => {
       cancelled = true;
     };
-  }, [contentId, revision]);
+  }, [contentId, revision, dbReady]);
 
   const metadata = useMemo(() => parseMetadata(item), [item]);
   const episodes = metadata.episodes ?? [];

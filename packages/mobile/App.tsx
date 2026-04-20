@@ -1,12 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useEffect } from 'react';
+import { ScrollView, StatusBar, StyleSheet, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,8 +9,9 @@ import { useRecentChannelsStore } from './src/stores/recent-channels-store';
 import { useFavoritesStore } from './src/stores/favorites-store';
 import { useHistoryStore } from './src/stores/history-store';
 import { useSearchHistoryStore } from './src/stores/search-history-store';
+import { useBootStore } from './src/stores/boot-store';
 import { Sentry } from './src/sentry';
-import { initDatabase, type InitDbResult } from './src/db/db';
+import { initDatabase } from './src/db/db';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,128 +63,83 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-function HydrationGate({ children }: { children: React.ReactNode }) {
-  const hydrated = useSourcesStore((s) => s.hydrated);
-  const hydrate = useSourcesStore((s) => s.hydrate);
-  const [hydrateError, setHydrateError] = useState<string | null>(null);
-  const [dbInit, setDbInit] = useState<InitDbResult | null>(null);
-  const [dbError, setDbError] = useState<string | null>(null);
-
+// Cached-first boot (M4R.6, rule 6). Open the DB, flip `dbReady`, then
+// kick off every hydrate path in the background. The shell is already
+// mounted by the time any of this runs — panels render their empty state
+// until SQLite is open and consumers re-query on `dbReady` flip.
+//
+// Only a true DB-open failure blocks paint; hydrate failures surface via
+// Sentry and the UI degrades to empty collections.
+function BackgroundBoot() {
   useEffect(() => {
+    let cancelled = false;
     initDatabase()
-      .then((r) => setDbInit(r))
+      .then(() => {
+        if (cancelled) return;
+        useBootStore.getState().setDbReady(true);
+        void useSourcesStore
+          .getState()
+          .hydrate()
+          .catch((e: unknown) => Sentry.captureException(e));
+        // Factory-store hydrates: call via `.getState()` because pnpm
+        // workspaces can produce distinct zustand module identities and
+        // the hook form throws "Invalid hook call" across that boundary.
+        void useRecentChannelsStore
+          .getState()
+          .hydrate()
+          .catch((e: unknown) => Sentry.captureException(e));
+        void useFavoritesStore
+          .getState()
+          .load()
+          .catch((e: unknown) => Sentry.captureException(e));
+        void useHistoryStore
+          .getState()
+          .load()
+          .catch((e: unknown) => Sentry.captureException(e));
+        void useSearchHistoryStore
+          .getState()
+          .load()
+          .catch((e: unknown) => Sentry.captureException(e));
+      })
       .catch((e: unknown) => {
+        if (cancelled) return;
         const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : String(e);
-        setDbError(msg);
+        useBootStore.getState().setDbError(msg);
         Sentry.captureException(e);
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+  return null;
+}
 
-  useEffect(() => {
-    // Hydrate touches SQLite (sources + content tables), so it MUST run after
-    // initDatabase() resolves. Running both effects in parallel races the DB
-    // open and throws `Database not initialized`.
-    if (!dbInit) return;
-    hydrate().catch((e: unknown) => {
-      const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : String(e);
-      setHydrateError(msg);
-      Sentry.captureException(e);
-    });
-    // Recent channels live in AsyncStorage and come from a core-factory store,
-    // so we call `.getState()` here instead of subscribing as a hook — pnpm
-    // ends up with distinct zustand instances per workspace (peer-dep hashing
-    // via @types/react) and the hook form crosses that boundary and throws
-    // "Invalid hook call". `.getState()` is instance-agnostic.
-    useRecentChannelsStore
-      .getState()
-      .hydrate()
-      .catch((e: unknown) => {
-        Sentry.captureException(e);
-      });
-    // M5: load favorites + watch history from SQLite, search history from
-    // AsyncStorage. None of these block the first render — failures surface
-    // through the stores' own `lastError` field, and the UI falls back to
-    // empty collections.
-    useFavoritesStore
-      .getState()
-      .load()
-      .catch((e: unknown) => Sentry.captureException(e));
-    useHistoryStore
-      .getState()
-      .load()
-      .catch((e: unknown) => Sentry.captureException(e));
-    useSearchHistoryStore
-      .getState()
-      .load()
-      .catch((e: unknown) => Sentry.captureException(e));
-  }, [hydrate, dbInit]);
+function DbErrorScreen({ message }: { message: string }) {
+  return (
+    <ScrollView style={bootStyles.errorScroll}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a0000" />
+      <Text style={bootStyles.errorTitle}>Database init failed</Text>
+      <Text style={bootStyles.errorStack}>{message}</Text>
+    </ScrollView>
+  );
+}
 
-  if (dbError) {
-    return (
-      <ScrollView style={bootStyles.errorScroll}>
-        <StatusBar barStyle="light-content" backgroundColor="#1a0000" />
-        <Text style={bootStyles.errorTitle}>Database init failed</Text>
-        <Text style={bootStyles.errorStack}>{dbError}</Text>
-      </ScrollView>
-    );
-  }
-
-  if (hydrateError) {
-    return (
-      <ScrollView style={bootStyles.errorScroll}>
-        <StatusBar barStyle="light-content" backgroundColor="#1a0000" />
-        <Text style={bootStyles.errorTitle}>Hydration failed</Text>
-        <Text style={bootStyles.errorStack}>{hydrateError}</Text>
-      </ScrollView>
-    );
-  }
-
-  if (!hydrated || !dbInit) {
-    return (
-      <View style={bootStyles.loadingRoot}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
-        <ActivityIndicator size="large" color="#fbbf24" />
-        <Text style={bootStyles.loadingText}>
-          {dbInit ? 'Loading (BUILD 2)…' : 'Opening database…'}
-        </Text>
-        {dbInit && (
-          <Text style={bootStyles.loadingText}>
-            sqlite {dbInit.version} · {dbInit.applied.length} migration(s) applied
-          </Text>
-        )}
-      </View>
-    );
-  }
-
+function BootGate({ children }: { children: React.ReactNode }) {
+  const dbError = useBootStore((s) => s.dbError);
+  if (dbError) return <DbErrorScreen message={dbError} />;
   return <>{children}</>;
 }
 
 function App() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const id = setTimeout(() => setMounted(true), 800);
-    return () => clearTimeout(id);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <View style={bootStyles.splash}>
-        <StatusBar barStyle="light-content" backgroundColor="#004d26" />
-        <Text style={bootStyles.splashTitle}>YancoTV BUILD 2</Text>
-        <Text style={bootStyles.splashSub}>JS bundle loaded ✓</Text>
-      </View>
-    );
-  }
-
   return (
     <RootErrorBoundary>
       <GestureHandlerRootView style={bootStyles.rootFlex}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <HydrationGate>
+            <BackgroundBoot />
+            <BootGate>
               <RootNavigator />
-            </HydrationGate>
+            </BootGate>
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -201,33 +150,6 @@ function App() {
 const bootStyles = StyleSheet.create({
   rootFlex: {
     flex: 1,
-  },
-  splash: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#004d26',
-  },
-  splashTitle: {
-    color: '#ffffff',
-    fontSize: 36,
-    fontWeight: '800',
-  },
-  splashSub: {
-    color: '#a7f3d0',
-    fontSize: 18,
-    marginTop: 12,
-  },
-  loadingRoot: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0a0a0f',
-  },
-  loadingText: {
-    color: '#9ca3af',
-    marginTop: 16,
-    fontSize: 14,
   },
   errorScroll: {
     flex: 1,

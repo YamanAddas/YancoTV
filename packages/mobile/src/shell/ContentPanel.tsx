@@ -8,6 +8,7 @@ import type { ContentItem } from '@yancotv/core';
 import { useShellStore, type RailCategory } from '../stores/shell-store';
 import { usePlayerStore } from '../stores/player-store';
 import { useSourcesStore } from '../stores/sources-store';
+import { useBootStore } from '../stores/boot-store';
 import { listByType } from '../db/queries';
 import { HexChannelRow } from '../components/HexChannelRow';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -27,6 +28,10 @@ export function ContentPanel() {
   // from 'fetching'/'parsing' back to 'done' or 'error' means new rows
   // are (or aren't) in SQLite and the panel needs to refresh.
   const syncStatus = useSourcesStore((s) => s.syncStatus);
+  // Cached-first boot: the shell mounts before `initDatabase()` resolves,
+  // so SQL queries would throw "Database not initialized" on the first
+  // effect run. Gate on `dbReady` and let the effect re-run when it flips.
+  const dbReady = useBootStore((s) => s.dbReady);
 
   const onRowPress = useCallback(
     (item: ContentItem) => {
@@ -67,6 +72,10 @@ export function ContentPanel() {
       setExhausted(true);
       return;
     }
+    if (!dbReady) {
+      // DB not open yet — effect will re-run when `dbReady` flips true.
+      return;
+    }
     setLoading(true);
     const type = category.kind === 'type' ? category.type : category.type;
     const groupName = category.kind === 'group' ? category.groupName : undefined;
@@ -84,11 +93,12 @@ export function ContentPanel() {
         if (token !== loadToken.current) return;
         setLoading(false);
       });
-  }, [category, syncStatus]);
+  }, [category, syncStatus, dbReady]);
 
   const loadMore = useCallback(() => {
     if (loading || exhausted) return;
     if (category.kind === 'favorites') return;
+    if (!dbReady) return;
     const token = loadToken.current;
     setLoading(true);
     const type = category.kind === 'type' ? category.type : category.type;
@@ -112,7 +122,7 @@ export function ContentPanel() {
         if (token !== loadToken.current) return;
         setLoading(false);
       });
-  }, [category, items.length, loading, exhausted]);
+  }, [category, items.length, loading, exhausted, dbReady]);
 
   const isLive =
     (category.kind === 'type' && category.type === 'live') ||
