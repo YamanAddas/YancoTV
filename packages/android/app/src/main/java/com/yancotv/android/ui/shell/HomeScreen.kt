@@ -95,6 +95,14 @@ fun HomeScreen(
                     },
                 )
             }
+        } else if (section == AppSection.Favorites) {
+            Box(modifier = Modifier.weight(1f)) {
+                FavoritesScreen(isTv = isTv)
+            }
+        } else if (section == AppSection.Search) {
+            Box(modifier = Modifier.weight(1f)) {
+                SearchScreen(isTv = isTv)
+            }
         } else {
             Box(modifier = Modifier.weight(1f)) {
                 PlaceholderArea(section = section)

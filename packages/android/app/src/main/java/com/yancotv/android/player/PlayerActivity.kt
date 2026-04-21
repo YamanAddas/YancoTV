@@ -113,6 +113,14 @@ class PlayerActivity : AppCompatActivity() {
         attachShared()
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Snapshot the VOD resume point every time the activity leaves the
+        // foreground — home button, app switcher, back to shell. Live
+        // streams are ignored inside persistResumePoint.
+        controller.persistResumePoint()
+    }
+
     override fun onStop() {
         super.onStop()
         // Hand the player back to the mini by detaching this view. The

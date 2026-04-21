@@ -9,7 +9,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.types.ContentItem
+import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +41,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * to cover the TV path.
  */
 @UnstableApi
-class PlaybackController(private val context: Context) {
+class PlaybackController(
+    private val context: Context,
+    private val history: WatchHistoryRepository? = null,
+) {
 
     private var controller: MediaController? = null
     private val pendingOps = ArrayDeque<() -> Unit>()
@@ -141,9 +146,42 @@ class PlaybackController(private val context: Context) {
                     .build(),
             )
             .build()
-        c.setMediaItem(mediaItem)
+        // Resume for VOD only — a saved position on a live stream doesn't
+        // make sense and most IPTV back-ends won't honour a seek on live.
+        // `setMediaItem(item, positionMs)` seeks before prepare so we don't
+        // burn a buffer on the intro.
+        val resumeMs = if (item.type != ContentType.LIVE) {
+            (history?.positionFor(item.id) ?: 0L) * 1000L
+        } else {
+            0L
+        }
+        if (resumeMs > 0) c.setMediaItem(mediaItem, resumeMs) else c.setMediaItem(mediaItem)
         c.prepare()
         c.playWhenReady = true
+    }
+
+    /**
+     * Snapshot current position into the watch-history table. Called from
+     * [PlayerActivity] on pause/stop — we don't persist on every tick because
+     * (a) it's wasteful, (b) a crash loses at most a few seconds, and (c) the
+     * app lifecycle guarantees an onStop before the process is killed in
+     * nearly all cases.
+     */
+    fun persistResumePoint() {
+        val item = _currentItem.value ?: return
+        if (item.type == ContentType.LIVE) return
+        val c = controller ?: return
+        val pos = c.currentPosition.coerceAtLeast(0L) / 1000L
+        val dur = c.duration.takeIf { it > 0L }?.let { it / 1000L }
+        // Don't bother recording positions near the very start — if the user
+        // opened a title and immediately bailed they probably didn't want a
+        // resume card.
+        if (pos < 5L) return
+        history?.upsert(
+            contentId = item.id,
+            positionSeconds = pos,
+            durationSeconds = dur,
+        )
     }
 
     private fun runOrDefer(op: () -> Unit) {

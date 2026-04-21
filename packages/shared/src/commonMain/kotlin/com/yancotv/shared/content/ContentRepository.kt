@@ -30,24 +30,54 @@ class ContentRepository(private val db: YancoDb) {
         } else {
             db.contentQueries.listByTypeAndGroupPaged(t, group, limit, offset).executeAsList()
         }
-        return rows.map { row ->
-            ContentItem(
-                id = row.id,
-                sourceId = row.source_id,
-                type = contentTypeFromDb(row.type),
-                title = row.title,
-                cleanTitle = row.clean_title,
-                groupName = row.group_name,
-                streamUrl = row.stream_url,
-                logoUrl = row.logo_url,
-                tvgId = row.tvg_id,
-                metadataJson = row.metadata_json,
-                sortOrder = row.sort_order.toInt(),
-                createdAt = row.created_at,
-            )
-        }
+        return rows.map { it.toDomain() }
     }
+
+    /**
+     * FTS4-backed search across `title`, `clean_title`, and `group_name`.
+     * Returns results ordered by content type then source's native sort
+     * order — so a live channel a user searches for shows up with its
+     * sibling live channels before movies/series of the same name.
+     *
+     * [query] is passed through to SQLite verbatim, so callers can use
+     * FTS4 operators (`*` prefix wildcards, quoted phrases). We strip
+     * leading/trailing whitespace only.
+     */
+    fun search(query: String, limit: Long = 100): List<ContentItem> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        // Prefix wildcard so typing "mar" matches "Marvel". Users typing
+        // a full word still match — the `*` only widens, never narrows.
+        val ftsQuery = buildString {
+            val tokens = trimmed.split(Regex("\\s+"))
+            tokens.forEachIndexed { i, tok ->
+                if (tok.isEmpty()) return@forEachIndexed
+                if (i > 0) append(' ')
+                // Escape double-quotes per FTS4 syntax (they delimit phrases).
+                append('"').append(tok.replace("\"", "\"\"")).append("\"*")
+            }
+        }
+        return db.contentQueries.searchFts(ftsQuery, limit).executeAsList().map { it.toDomain() }
+    }
+
+    fun findById(id: String): ContentItem? =
+        db.contentQueries.selectById(id).executeAsOneOrNull()?.toDomain()
 }
+
+private fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(
+    id = id,
+    sourceId = source_id,
+    type = contentTypeFromDb(type),
+    title = title,
+    cleanTitle = clean_title,
+    groupName = group_name,
+    streamUrl = stream_url,
+    logoUrl = logo_url,
+    tvgId = tvg_id,
+    metadataJson = metadata_json,
+    sortOrder = sort_order.toInt(),
+    createdAt = created_at,
+)
 
 private val ContentType.dbValue: String
     get() = when (this) {

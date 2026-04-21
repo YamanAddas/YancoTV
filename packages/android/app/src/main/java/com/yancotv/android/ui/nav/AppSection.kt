@@ -18,6 +18,7 @@ enum class AppSection(
     Movies("Movies", ContentType.MOVIE),
     Series("Series", ContentType.SERIES),
     Favorites("Favorites"),
+    Search("Search"),
     Recordings("Recordings"),
     Downloads("Downloads"),
     Settings("Settings"),

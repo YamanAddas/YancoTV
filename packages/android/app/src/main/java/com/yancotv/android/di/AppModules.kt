@@ -7,6 +7,8 @@ import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.reminders.ReminderRepository
 import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.db.DatabaseFactory
@@ -52,7 +54,7 @@ val appModule = module {
         )
     }
     single { SourceSyncCoordinator(context = androidContext(), repo = get(), logger = get()) }
-    single { PlaybackController(androidContext()) }
+    single { PlaybackController(context = androidContext(), history = get()) }
     single {
         EpgRepository(
             db = get(),
@@ -69,4 +71,6 @@ val appModule = module {
         )
     }
     single { ReminderScheduler(androidContext(), get()) }
+    single { FavoritesRepository(db = get(), clock = { System.currentTimeMillis() }) }
+    single { WatchHistoryRepository(db = get(), clock = { System.currentTimeMillis() }) }
 }
