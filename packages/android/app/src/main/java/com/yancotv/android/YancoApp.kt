@@ -1,6 +1,8 @@
 package com.yancotv.android
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import androidx.media3.common.util.UnstableApi
 import coil3.SingletonImageLoader
 import com.yancotv.android.di.appModule
@@ -16,6 +18,7 @@ import org.koin.core.context.startKoin
 class YancoApp : Application() {
 
     private val playbackController: PlaybackController by inject()
+    private var startedActivities = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -24,17 +27,31 @@ class YancoApp : Application() {
             modules(appModule)
         }
         SingletonImageLoader.setSafe { buildYancoImageLoader(this) }
-        // Enqueue the 6-hour periodic EPG refresh. KEEP semantics mean a
-        // reinstall or app upgrade doesn't reset the window, and the first
-        // run still happens quickly because WorkManager fires periodic work
-        // in its first flex period.
         EpgSyncWorker.schedulePeriodic(this)
-        // Reminders need a notification channel registered once per install.
         ReminderNotificationChannel.ensureCreated(this)
-        // Kick off the async bind to PlaybackService. The controller buffers
-        // any play() calls issued before the connection resolves so the
-        // shell never has to wait — the first tap on a channel works even
-        // if the service is still starting.
-        playbackController.connect()
+
+        // Pause playback whenever the last visible Activity stops — pressing
+        // Home or switching apps should silence the stream immediately. We
+        // dropped the MediaSessionService (MK.9.5), so Media3's automatic
+        // background-state machine is gone; this is the replacement. Count
+        // started activities rather than listening to a single one so the
+        // mini→fullscreen handoff (both started briefly) doesn't trip it.
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) {
+                startedActivities++
+            }
+            override fun onActivityStopped(activity: Activity) {
+                startedActivities--
+                if (startedActivities <= 0) {
+                    startedActivities = 0
+                    playbackController.player.pause()
+                }
+            }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
     }
 }

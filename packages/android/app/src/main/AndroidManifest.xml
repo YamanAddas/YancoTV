@@ -12,15 +12,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- PlaybackService (MediaSessionService) keeps audio/video alive when the
-         shell is backgrounded, the phone is locked, or another TV app takes
-         foreground. FOREGROUND_SERVICE is required on API 28+;
-         FOREGROUND_SERVICE_MEDIA_PLAYBACK is mandatory on API 34+ for the
-         `mediaPlayback` service type declared on PlaybackService below.
-         WAKE_LOCK lets ExoPlayer hold a partial wake lock while buffering so
+    <!-- WAKE_LOCK lets ExoPlayer hold a partial wake lock while buffering so
          the screen-off phone doesn't drop the stream mid-segment. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Programme reminders need exact-alarm scheduling. USE_EXACT_ALARM is
          the non-revocable variant for bona-fide alarm/reminder apps (which we
@@ -64,21 +57,6 @@
             android:screenOrientation="landscape"
             android:theme="@style/PlayerTheme"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode" />
-
-        <!-- MediaSessionService exposed via the standard Media3 action so
-             MediaController.Builder(context, ComponentName).buildAsync()
-             resolves this class. `exported="true"` is required so Android
-             Auto / Wear / system media routers can discover it; the session
-             itself authenticates callers internally. -->
-        <service
-            android:name=".player.PlaybackService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-        </service>
 
         <receiver
             android:name=".reminders.ReminderAlarmReceiver"

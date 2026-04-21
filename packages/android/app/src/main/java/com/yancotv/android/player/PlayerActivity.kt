@@ -17,20 +17,15 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.MediaController
 import androidx.media3.ui.PlayerView
 import com.yancotv.android.R
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
- * Fullscreen player. Attaches the shared [PlaybackController]'s
- * [MediaController] to the local [PlayerView] so the decoder handed off
- * from the mini preview keeps running without a rebuffer.
- *
- * The activity is thin: playback state lives in [PlaybackService], queue
- * identity lives in [PlaybackController]. We only drive D-pad zap and
- * re-render the title overlay when [PlaybackController.currentItem] ticks.
+ * Fullscreen player. Attaches the shared [PlaybackController.player]
+ * ExoPlayer to the local [PlayerView] so the decoder handed off from the
+ * mini preview keeps running without a rebuffer.
  */
 @UnstableApi
 class PlayerActivity : AppCompatActivity() {
@@ -43,7 +38,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var playerView: PlayerView
     private lateinit var titleOverlay: TextView
-    private var attachedPlayer: MediaController? = null
+    private var listenerAttached = false
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -82,9 +77,6 @@ class PlayerActivity : AppCompatActivity() {
         playerView.controllerHideOnTouch = true
         playerView.setControllerShowTimeoutMs(4000)
 
-        // Title overlay updates on queue changes. repeatOnLifecycle keeps
-        // the collector tied to STARTED so we don't leak work when the
-        // activity is in the background.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 controller.currentItem.collect { item ->
@@ -98,14 +90,6 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
         }
-
-        // If the service bind hadn't resolved by the time the user tapped
-        // a channel (cold boot race), wait for it and attach on arrival.
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                controller.connected.collect { ready -> if (ready) attachShared() }
-            }
-        }
     }
 
     override fun onStart() {
@@ -116,8 +100,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         // Snapshot the VOD resume point every time the activity leaves the
-        // foreground — home button, app switcher, back to shell. Live
-        // streams are ignored inside persistResumePoint.
+        // foreground. Live streams are ignored inside persistResumePoint.
         controller.persistResumePoint()
     }
 
@@ -126,14 +109,14 @@ class PlayerActivity : AppCompatActivity() {
         // Hand the player back to the mini by detaching this view. The
         // MiniPlayer observes ON_RESUME and reclaims the surface on the
         // next composition, so the stream never pauses.
-        if (playerView.player === attachedPlayer) {
-            playerView.player = null
-        }
+        playerView.player = null
     }
 
     override fun onDestroy() {
-        attachedPlayer?.removeListener(playerListener)
-        attachedPlayer = null
+        if (listenerAttached) {
+            controller.player.removeListener(playerListener)
+            listenerAttached = false
+        }
         super.onDestroy()
     }
 
@@ -144,18 +127,16 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun attachShared() {
-        val target = controller.player ?: return
-        if (attachedPlayer !== target) {
-            attachedPlayer?.removeListener(playerListener)
+        val target = controller.player
+        if (!listenerAttached) {
             target.addListener(playerListener)
-            attachedPlayer = target
+            listenerAttached = true
         }
         playerView.player = target
         playerView.requestFocus()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val player = attachedPlayer
         when (keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 finish()
@@ -172,10 +153,9 @@ class PlayerActivity : AppCompatActivity() {
                 if (controller.next()) return true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
-                if (player != null) {
-                    player.playWhenReady = !player.playWhenReady
-                    return true
-                }
+                val p = controller.player
+                p.playWhenReady = !p.playWhenReady
+                return true
             }
         }
         return super.onKeyDown(keyCode, event)
