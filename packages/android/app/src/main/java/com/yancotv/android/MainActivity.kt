@@ -11,9 +11,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.shell.HomeScreen
 import com.yancotv.android.ui.theme.YancoTheme
 
+@UnstableApi
 class MainActivity : ComponentActivity() {
 
     // We silently accept whatever the user chooses. Reminders still schedule

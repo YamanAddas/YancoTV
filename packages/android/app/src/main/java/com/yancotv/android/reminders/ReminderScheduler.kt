@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.media3.common.util.UnstableApi
 import com.yancotv.shared.reminders.Reminder
 import com.yancotv.shared.reminders.ReminderRepository
 import com.yancotv.shared.types.EpgProgramme
@@ -21,6 +22,7 @@ import com.yancotv.shared.types.EpgProgramme
  *   - PendingIntent requestCode = stable hash of programme id — replacing a
  *     reminder on the same programme replaces its alarm instead of stacking.
  */
+@UnstableApi
 class ReminderScheduler(
     private val context: Context,
     private val repo: ReminderRepository,

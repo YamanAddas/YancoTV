@@ -30,7 +30,7 @@ import org.koin.dsl.module
  *
  * Desktop has its own TS module system — this file is Android-only.
  */
-@OptIn(UnstableApi::class)
+@UnstableApi
 val appModule = module {
     single<Logger> { AndroidLogger() }
     single<YancoDatabase> { DatabaseFactory(androidContext()).create() }

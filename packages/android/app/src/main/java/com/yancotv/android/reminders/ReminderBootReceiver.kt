@@ -3,6 +3,7 @@ package com.yancotv.android.reminders
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.media3.common.util.UnstableApi
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -15,6 +16,7 @@ import org.koin.core.component.inject
  * isn't needed because the DB lives in credential-encrypted storage and
  * isn't readable until the user unlocks the device anyway.
  */
+@UnstableApi
 class ReminderBootReceiver : BroadcastReceiver(), KoinComponent {
 
     private val scheduler: ReminderScheduler by inject()

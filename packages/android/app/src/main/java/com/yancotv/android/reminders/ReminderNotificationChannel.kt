@@ -4,8 +4,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import androidx.media3.common.util.UnstableApi
 
 /** Registers the notification channel used by reminder alarms. Idempotent. */
+@UnstableApi
 object ReminderNotificationChannel {
     fun ensureCreated(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

@@ -25,7 +25,7 @@ import org.koin.compose.koinInject
  * queue is empty the slot collapses. Now/next EPG + rich metadata land in
  * MK.7 and MK.14.
  */
-@OptIn(UnstableApi::class)
+@UnstableApi
 @Composable
 fun InfoPanel(
     item: ContentItem?,

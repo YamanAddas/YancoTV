@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -19,12 +21,18 @@ import org.koin.compose.koinInject
 
 /**
  * In-shell preview. Hosts a [PlayerView] bound to the shared
- * [PlaybackController.player]. When the fullscreen
- * [com.yancotv.android.player.PlayerActivity] resigns the surface on its
- * `onStop`, this view reclaims it on the next `ON_RESUME` so the stream
- * continues without a rebuffer.
+ * [PlaybackController.player] ([androidx.media3.session.MediaController]
+ * proxy for [com.yancotv.android.player.PlaybackService]'s ExoPlayer).
+ *
+ * The controller is null until [PlaybackController.connect] resolves the
+ * bind; we collect [PlaybackController.connected] so the view is
+ * reassigned the moment the proxy is available.
+ *
+ * When the fullscreen [com.yancotv.android.player.PlayerActivity] resigns
+ * the surface on its `onStop`, this view reclaims it on the next
+ * `ON_RESUME` so the stream continues without a rebuffer.
  */
-@OptIn(UnstableApi::class)
+@UnstableApi
 @Composable
 fun MiniPlayer(
     modifier: Modifier = Modifier,
@@ -32,6 +40,7 @@ fun MiniPlayer(
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val viewRef = remember { arrayOfNulls<PlayerView>(1) }
+    val connected by controller.connected.collectAsState()
 
     AndroidView(
         modifier = modifier
@@ -47,6 +56,10 @@ fun MiniPlayer(
         },
         update = { view ->
             viewRef[0] = view
+            // `connected` is read so update runs when the controller flips
+            // from null to bound; the flag itself isn't used, the recompose
+            // is what matters.
+            val ignored = connected
             if (view.player !== controller.player) view.player = controller.player
         },
     )
@@ -55,11 +68,12 @@ fun MiniPlayer(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewRef[0]?.let { v ->
-                    if (v.player !== controller.player) v.player = controller.player
-                    else {
-                        // Surface may have been claimed by fullscreen; reassign to reclaim.
+                    val target = controller.player
+                    if (target != null && v.player !== target) {
+                        // Fullscreen activity may have taken the surface;
+                        // reassigning forces the PlayerView to reparent.
                         v.player = null
-                        v.player = controller.player
+                        v.player = target
                     }
                 }
             }

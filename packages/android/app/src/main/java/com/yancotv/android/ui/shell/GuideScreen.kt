@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.theme.YancoPalette
@@ -88,6 +89,7 @@ private const val NOW_TICK_MS = 60_000L
  *    the window horizontally when you focus an off-screen block. Polishing
  *    that needs bringIntoViewRequester wiring — deferred.
  */
+@UnstableApi
 @Composable
 fun GuideScreen(
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,

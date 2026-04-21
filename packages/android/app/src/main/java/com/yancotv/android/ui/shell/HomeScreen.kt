@@ -43,7 +43,7 @@ import org.koin.compose.koinInject
  * group, currently-focused item — so rotating or backgrounding restores cleanly
  * via `rememberSaveable`.
  */
-@OptIn(UnstableApi::class)
+@UnstableApi
 @Composable
 fun HomeScreen(
     isTv: Boolean,
@@ -67,8 +67,18 @@ fun HomeScreen(
                 type = contentType,
                 repo = repo,
                 onActivate = { list, idx ->
-                    controller.play(list, idx)
-                    PlayerLauncher.launch(context)
+                    val target = list.getOrNull(idx) ?: return@ContentArea
+                    // Two-tap activation on TV (TiviMate-style): first press
+                    // starts the stream in the mini preview, second press on
+                    // the same channel fullscreens with zero rebuffer. Phone
+                    // skips the mini because the shell doesn't dedicate
+                    // screen real-estate to InfoPanel — tap goes straight to
+                    // the player.
+                    val alreadyPlaying = controller.currentId == target.id
+                    if (!alreadyPlaying) controller.play(list, idx)
+                    if (!isTv || alreadyPlaying) {
+                        PlayerLauncher.launch(context)
+                    }
                 },
             )
         } else if (section == AppSection.Settings) {
@@ -117,6 +127,7 @@ private fun guideChannelToContentItem(channel: EpgGuideChannel): ContentItem? {
     )
 }
 
+@UnstableApi
 @Composable
 private fun RowScope.ContentArea(
     isTv: Boolean,
