@@ -34,17 +34,21 @@ class SourceRepositoryTest {
         http: HttpClient = FakeHttpClient(),
         reader: FileContentReader = FakeFileReader(emptyMap()),
         now: Long = 1_000L,
-    ) = SourceRepository(
-        db = testDb(),
-        credentialStore = PlaintextCredentialStore(),
-        http = http,
-        fileReader = reader,
-        clock = { now },
-        idGenerator = run {
-            var n = 0
-            { "id-${++n}" }
-        },
-    )
+    ): SourceRepository {
+        val bundle = testDatabase()
+        return SourceRepository(
+            db = bundle.db,
+            driver = bundle.driver,
+            credentialStore = PlaintextCredentialStore(),
+            http = http,
+            fileReader = reader,
+            clock = { now },
+            idGenerator = run {
+                var n = 0
+                { "id-${++n}" }
+            },
+        )
+    }
 
     @Test
     fun `add + get round-trip`() {

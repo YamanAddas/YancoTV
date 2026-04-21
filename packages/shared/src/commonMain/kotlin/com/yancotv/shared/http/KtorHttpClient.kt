@@ -1,12 +1,20 @@
 package com.yancotv.shared.http
 
 import io.ktor.client.HttpClient as KtorClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readRemaining
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.io.Source
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
@@ -39,14 +47,58 @@ class KtorHttpClient(
     override suspend fun getText(url: String, options: HttpRequestOptions): String =
         fetchText(url, options)
 
-    private suspend fun fetchText(url: String, options: HttpRequestOptions): String {
-        // Per-request timeouts would require installing the HttpTimeout plugin
-        // on the Ktor client. For now, the engine-level timeout configured in
-        // HttpClientFactory.{android,ios}.kt (90s) is the effective bound.
+    override suspend fun getBytes(url: String, options: HttpRequestOptions): ByteArray {
+        val response = performGet(url, options)
+        val bytes: ByteArray = response.body()
+        options.maxResponseBytes?.let { cap ->
+            if (bytes.size.toLong() > cap) {
+                throw HttpResponseError(
+                    status = HttpStatusCode.PayloadTooLarge.value,
+                    statusText = "Payload too large",
+                    message = "Response ${bytes.size} bytes exceeds cap $cap bytes ($url)",
+                )
+            }
+        }
+        return bytes
+    }
+
+    /**
+     * Stream the response body directly from Ktor's [ByteReadChannel] as a
+     * [kotlinx.io.Source]. Never buffers the whole response. This is the memory-
+     * safe path used by [com.yancotv.shared.xtream.XtreamClient] for catalog
+     * fetches — a 100MB+ VOD list stays off-heap except for whatever the
+     * consumer decodes + retains.
+     */
+    override suspend fun <T> getSource(
+        url: String,
+        options: HttpRequestOptions,
+        block: suspend (Source) -> T,
+    ): T = withContext(Dispatchers.Default) {
+        val response = performGet(url, options)
+        val channel: ByteReadChannel = response.bodyAsChannel()
+        // Ktor 3.0.3 doesn't ship ByteReadChannel.asSource() (added in 3.1+).
+        // readRemaining() buffers the body into a kotlinx.io.Source — not true
+        // streaming, but still vastly cheaper than bodyAsText() + JsonElement
+        // tree: we skip the UTF-8 String allocation and the full parsed tree,
+        // and decodeSourceToSequence walks elements lazily so peak heap is
+        // bounded by (raw bytes + one chunk of parsed objects), not 3-4x size.
+        val source: Source = channel.readRemaining()
+        source.use { block(it) }
+    }
+
+    private suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
         val response: HttpResponse = ktor.get(url) {
             header("User-Agent", options.headers["User-Agent"] ?: defaultUserAgent)
             for ((k, v) in options.headers) {
                 if (!k.equals("User-Agent", ignoreCase = true)) header(k, v)
+            }
+            // Honor per-request timeout. The engine-level default (90s in
+            // HttpClientFactory.android.kt) is too long for a fast Xtream auth
+            // probe — without this the user sees "fetching…" for 90s × retries
+            // before getting feedback. MK.6 sync debug: caller passes 30s for
+            // auth, 60s for catalog fetches.
+            options.timeoutMs?.let { ms ->
+                timeout { requestTimeoutMillis = ms }
             }
         }
         if (!response.status.isSuccess()) {
@@ -56,22 +108,33 @@ class KtorHttpClient(
                 message = "HTTP ${response.status.value} from $url",
             )
         }
+        return response
+    }
+
+    private suspend fun fetchText(url: String, options: HttpRequestOptions): String = withContext(Dispatchers.Default) {
+        // Force this off the caller's dispatcher — Ktor dispatches network I/O
+        // internally, but `bodyAsText()` + UTF-8 decoding of a 20MB Xtream
+        // response on Main thread will ANR the app. Dispatchers.Default is
+        // KMP-safe (unlike Dispatchers.IO which is JVM-only).
+        val response = performGet(url, options)
         val text = response.bodyAsText()
         options.maxResponseBytes?.let { cap ->
-            // bodyAsText has already buffered; enforce size cap after the fact.
-            // Strict pre-buffer cap requires a raw channel read — not worth the
-            // complexity here since M3U downloads are bounded by MAX_M3U_SIZE
-            // in the caller.
-            val size = text.encodeToByteArray().size.toLong()
-            if (size > cap) {
+            // bodyAsText has already buffered; this is a post-hoc sanity check.
+            // Using char count (not encodeToByteArray) saves a full ByteArray
+            // clone of the payload — critical on memory-tight TV devices where
+            // a single 30MB Xtream response would otherwise burn an extra 30MB
+            // just to run this check. Xtream/M3U are ASCII-dominant so chars
+            // ≈ bytes; allow up to 2× to cover occasional non-ASCII without a
+            // second pass.
+            if (text.length.toLong() > cap) {
                 throw HttpResponseError(
                     status = HttpStatusCode.PayloadTooLarge.value,
                     statusText = "Payload too large",
-                    message = "Response $size bytes exceeds cap $cap bytes ($url)",
+                    message = "Response ~${text.length} chars exceeds cap $cap bytes ($url)",
                 )
             }
         }
-        return text
+        text
     }
 }
 

@@ -1,11 +1,13 @@
 package com.yancotv.shared.sources
 
+import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.db.Sources
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
+import com.yancotv.shared.parsers.M3uEntry
 import com.yancotv.shared.parsers.parseM3u
 import com.yancotv.shared.stalker.StalkerClient
 import com.yancotv.shared.stalker.StalkerClientOptions
@@ -16,8 +18,16 @@ import com.yancotv.shared.types.SourceType
 import com.yancotv.shared.types.UpdateSourceInput
 import com.yancotv.shared.xtream.XtreamClient
 import com.yancotv.shared.xtream.XtreamClientOptions
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 /**
@@ -35,6 +45,7 @@ import kotlin.random.Random
  */
 class SourceRepository(
     private val db: YancoDb,
+    private val driver: SqlDriver,
     private val credentialStore: CredentialStore,
     private val http: HttpClient,
     private val fileReader: FileContentReader,
@@ -44,19 +55,48 @@ class SourceRepository(
 ) {
 
     fun addSource(input: AddSourceInput): Source {
+        // Breadcrumbs so a silent hang shows up in logcat: each step logs
+        // before it starts, so whichever message is last in the log is the
+        // step that stalled. Hooked up MK.6 while chasing the Save-hang that
+        // wedged the AddSource dialog on Fire TV.
+        logger.info("addSource[${input.type}] validating")
         validate(input)
         val id = idGenerator()
         val now = clock()
 
+        logger.info("addSource[$id] encrypt username")
         val usernameBlob = input.username?.takeIf { it.isNotEmpty() }
             ?.let { credentialStore.encrypt(it) }
+        logger.info("addSource[$id] encrypt password")
         val passwordBlob = input.password?.takeIf { it.isNotEmpty() }
             ?.let { credentialStore.encrypt(it) }
+        logger.info("addSource[$id] encrypt mac")
         val macBlob = input.macAddress?.takeIf { it.isNotEmpty() }
             ?.let { credentialStore.encrypt(it) }
 
+        logger.info("addSource[$id] next priority")
         val priority = nextPriority()
 
+        // Auto-derive an Xtream provider's XMLTV endpoint when the user didn't
+        // paste one explicitly. Beats TiviMate's UX: most users never know the
+        // EPG URL is just `xmltv.php` on the same host as `player_api.php` —
+        // without this, Xtream sources land with no EPG and the Guide sits
+        // empty until the user pokes at settings.
+        val derivedEpgUrl = input.epgUrl?.takeIf { it.isNotBlank() }
+            ?: if (input.type == SourceType.XTREAM &&
+                !input.url.isNullOrBlank() &&
+                !input.username.isNullOrBlank() &&
+                !input.password.isNullOrBlank()
+            ) {
+                XtreamClient(
+                    input.url,
+                    input.username,
+                    input.password,
+                    XtreamClientOptions(http, logger),
+                ).buildEpgUrl()
+            } else null
+
+        logger.info("addSource[$id] insert")
         db.sourcesQueries.insert(
             id = id,
             name = input.name,
@@ -66,7 +106,7 @@ class SourceRepository(
             username_encrypted = usernameBlob,
             password_encrypted = passwordBlob,
             mac_address_encrypted = macBlob,
-            epg_url = input.epgUrl,
+            epg_url = derivedEpgUrl,
             user_agent = input.userAgent,
             last_synced = null,
             last_sync_error = null,
@@ -77,8 +117,11 @@ class SourceRepository(
             created_at = now,
             updated_at = now,
         )
+        logger.info("addSource[$id] insert complete")
 
-        return getById(id) ?: error("insert succeeded but row missing: $id")
+        val saved = getById(id) ?: error("insert succeeded but row missing: $id")
+        logger.info("addSource[$id] done")
+        return saved
     }
 
     fun getAll(): List<Source> =
@@ -134,31 +177,40 @@ class SourceRepository(
     }
 
     /**
-     * Destructive sync. The [ContentWriter] wraps DELETE + INSERT in a single
-     * transaction so a mid-sync failure leaves the previous catalog intact.
+     * Destructive sync. M3U and Stalker paths use a single transaction so a
+     * mid-sync failure leaves the previous catalog intact. The Xtream path
+     * fetches per-category in parallel and writes chunks incrementally (large
+     * catalogs otherwise OOM the Fire TV heap) — a mid-sync failure there
+     * leaves partial rows, which [updateSyncResult] flags via
+     * `last_sync_error` so the UI can warn the user.
+     *
+     * Uses [channelFlow] so parallel fetchers can emit progress concurrently
+     * without racing a shared flow collector.
      */
-    fun syncSource(id: String): Flow<SyncProgress> = flow {
+    fun syncSource(id: String): Flow<SyncProgress> = channelFlow {
         val source = getById(id) ?: run {
-            emit(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
-            return@flow
+            logger.warn("syncSource[$id] not found")
+            send(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
+            return@channelFlow
         }
 
+        logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
         try {
-            emit(SyncProgress(SyncProgress.Phase.FETCHING, message = "Fetching ${source.name}"))
+            send(SyncProgress(SyncProgress.Phase.FETCHING, message = "Connecting"))
             val writer = ContentWriter(db)
             val now = clock()
             val inserted = when (source.type) {
                 SourceType.M3U_URL -> syncM3uUrl(source, writer, now) { cur, total ->
-                    emit(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
+                    send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
                 }
                 SourceType.M3U_FILE -> syncM3uFile(source, writer, now) { cur, total ->
-                    emit(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
+                    send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
                 }
                 SourceType.XTREAM -> syncXtream(source, writer, now) { phase, cur, total, msg ->
-                    emit(SyncProgress(phase, cur, total, msg))
+                    send(SyncProgress(phase, cur, total, msg))
                 }
                 SourceType.STALKER -> syncStalker(source, writer, now) { phase, cur, total, msg ->
-                    emit(SyncProgress(phase, cur, total, msg))
+                    send(SyncProgress(phase, cur, total, msg))
                 }
             }
 
@@ -169,7 +221,15 @@ class SourceRepository(
                 updated_at = now,
                 id = id,
             )
-            emit(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
+            logger.info("syncSource[$id] done inserted=$inserted")
+            send(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
+        } catch (ce: CancellationException) {
+            // User pressed Cancel (or scope was torn down). Leave the source's
+            // last-sync-error alone — cancellation isn't a "failure" the user
+            // needs to be told about on next open. Must rethrow so the Flow
+            // shuts down instead of being treated as a normal error emission.
+            logger.info("syncSource[$id] cancelled")
+            throw ce
         } catch (t: Throwable) {
             val msg = t.message ?: t.toString()
             logger.error("sync failed for ${source.id}: $msg")
@@ -180,7 +240,7 @@ class SourceRepository(
                 updated_at = clock(),
                 id = id,
             )
-            emit(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
+            send(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
         }
     }
 
@@ -188,7 +248,7 @@ class SourceRepository(
 
     private suspend fun syncM3uUrl(
         source: Source,
-        writer: ContentWriter,
+        @Suppress("UNUSED_PARAMETER") legacyWriter: ContentWriter,
         now: Long,
         onProgress: suspend (Int, Int) -> Unit,
     ): Int {
@@ -201,33 +261,106 @@ class SourceRepository(
             ),
         )
         val parsed = parseM3u(text, logger)
-        // Intermediate ContentWriter progress ticks can't suspend out of the
-        // SQLDelight transaction, so we emit a single WRITING tick after the
-        // transaction commits. Total is known up front.
-        onProgress(0, parsed.entries.size)
-        val inserted = writer.writeM3u(source.id, parsed.entries, now)
-        onProgress(inserted, parsed.entries.size)
-        return inserted
+        adoptDiscoveredEpgUrl(source, parsed.epgUrl, now)
+        return writeM3uBulk(source.id, parsed.entries, now, onProgress)
     }
 
     private suspend fun syncM3uFile(
         source: Source,
-        writer: ContentWriter,
+        @Suppress("UNUSED_PARAMETER") legacyWriter: ContentWriter,
         now: Long,
         onProgress: suspend (Int, Int) -> Unit,
     ): Int {
         val path = source.filePath ?: error("m3u_file source missing filePath")
         val text = fileReader.readText(path)
         val parsed = parseM3u(text, logger)
-        onProgress(0, parsed.entries.size)
-        val inserted = writer.writeM3u(source.id, parsed.entries, now)
-        onProgress(inserted, parsed.entries.size)
-        return inserted
+        adoptDiscoveredEpgUrl(source, parsed.epgUrl, now)
+        return writeM3uBulk(source.id, parsed.entries, now, onProgress)
     }
 
+    /**
+     * Bulk-write path for M3U sources (MK.3.e, 2026-04-21). Mirrors the
+     * Xtream `prepareSource → writeChunk+ → finishSource` lifecycle so large
+     * playlists don't hold the WAL write lock for minutes. Chunks the parsed
+     * entry list into 500-row batches; each chunk runs in its own short
+     * transaction and is committed before the next one starts, so the Guide
+     * and Home screens can keep querying while sync is in flight.
+     */
+    private suspend fun writeM3uBulk(
+        sourceId: String,
+        entries: List<M3uEntry>,
+        now: Long,
+        onProgress: suspend (Int, Int) -> Unit,
+    ): Int {
+        val bulk = BulkContentWriter(driver, logger)
+        val total = entries.size
+        onProgress(0, total)
+        bulk.prepareSource(sourceId)
+        var written = 0
+        var sort = 0L
+        try {
+            var i = 0
+            while (i < entries.size) {
+                val end = minOf(i + CHUNK_SIZE, entries.size)
+                val chunk = entries.subList(i, end)
+                val wrote = withContext(Dispatchers.IO) {
+                    bulk.writeM3uChunk(sourceId, chunk, now, sort)
+                }
+                sort += wrote
+                written += wrote
+                onProgress(written, total)
+                i = end
+            }
+            withContext(Dispatchers.IO) { bulk.finishSource(sourceId) }
+            return written
+        } catch (t: Throwable) {
+            bulk.abortSource(sourceId)
+            throw t
+        }
+    }
+
+    /**
+     * If the M3U header carried a `url-tvg` / `x-tvg-url` and the source has
+     * no `epg_url` configured, persist it so the next EPG refresh picks it up
+     * automatically. Many providers ship the right XMLTV URL in the header —
+     * not using it means the user has to paste it by hand or live without EPG.
+     */
+    private fun adoptDiscoveredEpgUrl(source: Source, discovered: String?, now: Long) {
+        val d = discovered?.takeIf { it.isNotBlank() } ?: return
+        if (!source.epgUrl.isNullOrBlank()) return
+        logger.info("syncSource[${source.id}] adopting M3U-header EPG URL: $d")
+        db.sourcesQueries.setEpgUrl(d, now, source.id)
+    }
+
+    /**
+     * Xtream sync — parallel-fetch + serialized-writer (MK.3.e, 2026-04-21).
+     *
+     * Prior design fetched live → VOD → series strictly sequentially. Since
+     * `readRemaining()` buffers the full HTTP body before the parser starts,
+     * each phase's network TTFB+download latency was pure dead time with
+     * zero DB activity. Three phases in series = 3× the network wait.
+     *
+     * New shape:
+     *   1. Three category maps fetched in parallel (unchanged — small).
+     *   2. **All three catalog endpoints fetched in parallel.** A 100MB
+     *      VOD download now overlaps with live's write phase and series's
+     *      parse phase. Peak heap stays bounded because each phase still
+     *      drops chunks after writing; only one raw response body is
+     *      resident at a time in steady state.
+     *   3. A single [Mutex] serializes the three writer coroutines so
+     *      `BulkContentWriter`'s `BEGIN IMMEDIATE` transactions never
+     *      race each other (SQLite is single-writer; contention here
+     *      would just spin on `busy_timeout`). The mutex costs nothing
+     *      when one writer is CPU-bound — the other two continue
+     *      downloading/parsing concurrently.
+     *
+     * Expected wall-clock: ≈ max(fetch_live, fetch_vod, fetch_series) +
+     * serialized-write time, vs. sum-of-three previously. On a 200k-item
+     * provider over a 5 Mbps link that's a 2–3× speedup.
+     */
     private suspend fun syncXtream(
         source: Source,
-        writer: ContentWriter,
+        @Suppress("UNUSED_PARAMETER") legacyWriter: ContentWriter,
         now: Long,
         onProgress: suspend (SyncProgress.Phase, Int, Int, String?) -> Unit,
     ): Int {
@@ -235,44 +368,125 @@ class SourceRepository(
         val username = source.usernameOrThrow()
         val password = source.passwordOrThrow()
         val client = XtreamClient(url, username, password, XtreamClientOptions(http, logger))
+        val bulk = BulkContentWriter(driver, logger)
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Authenticating")
         val auth = client.authenticate()
         if (auth is Result.Err) throw auth.error
 
-        onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
+        onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching categories")
+        val fetchMark = kotlin.time.TimeSource.Monotonic.markNow()
 
-        val liveCatsR = client.getLiveCategories()
-        val vodCatsR = client.getVodCategories()
-        val seriesCatsR = client.getSeriesCategories()
-        val liveR = client.getLiveStreams()
-        val vodR = client.getVodStreams()
-        val seriesR = client.getSeriesList()
+        val (liveCats, vodCats, seriesCats) = coroutineScope {
+            val a = async { client.getLiveCategories().unwrap().associate { it.categoryId to it.categoryName } }
+            val b = async { client.getVodCategories().unwrap().associate { it.categoryId to it.categoryName } }
+            val c = async { client.getSeriesCategories().unwrap().associate { it.categoryId to it.categoryName } }
+            Triple(a.await(), b.await(), c.await())
+        }
 
-        val liveCats = liveCatsR.unwrap().associate { it.categoryId to it.categoryName }
-        val vodCats = vodCatsR.unwrap().associate { it.categoryId to it.categoryName }
-        val seriesCats = seriesCatsR.unwrap().associate { it.categoryId to it.categoryName }
+        bulk.prepareSource(source.id)
 
-        val liveBundle = XtreamBundle(liveR.unwrap(), liveCats)
-        val vodBundle = XtreamBundle(vodR.unwrap(), vodCats)
-        val seriesBundle = XtreamBundle(seriesR.unwrap(), seriesCats)
+        // Running totals. Each phase tracks its own sort_order via the
+        // LIVE/VOD/SERIES _BASE constants + local counter — no cross-phase
+        // mutation, so no extra synchronization needed for sort assignment.
+        // Shared `total` + the progress emit are guarded by the same
+        // [writeMutex] that serializes the DB transactions.
+        var liveWritten = 0
+        var vodWritten = 0
+        var seriesWritten = 0
+        var total = 0
+        val writeMutex = Mutex()
+        val ioCtx = Dispatchers.IO
 
-        val total = liveBundle.items.size + vodBundle.items.size + seriesBundle.items.size
-        onProgress(SyncProgress.Phase.WRITING, 0, total, null)
-        val inserted = writer.writeXtream(source.id, client, liveBundle, vodBundle, seriesBundle, now)
-        onProgress(SyncProgress.Phase.WRITING, inserted, total, null)
-        return inserted
+        try {
+            coroutineScope {
+                onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
+
+                val liveJob = async {
+                    var sort = ContentWriter.LIVE_BASE
+                    val res = client.streamLiveStreams(chunkSize = 500) { chunk ->
+                        writeMutex.withLock {
+                            val wrote = withContext(ioCtx) {
+                                bulk.writeLiveChunk(source.id, client, chunk, liveCats, now, sort)
+                            }
+                            sort += wrote
+                            liveWritten += wrote
+                            total += wrote
+                            onProgress(SyncProgress.Phase.WRITING, total, 0, "Live $liveWritten")
+                        }
+                    }
+                    if (res is Result.Err) throw res.error
+                }
+
+                val vodJob = async {
+                    var sort = ContentWriter.VOD_BASE
+                    val res = client.streamVodStreams(chunkSize = 500) { chunk ->
+                        writeMutex.withLock {
+                            val wrote = withContext(ioCtx) {
+                                bulk.writeVodChunk(source.id, client, chunk, vodCats, now, sort)
+                            }
+                            sort += wrote
+                            vodWritten += wrote
+                            total += wrote
+                            onProgress(SyncProgress.Phase.WRITING, total, 0, "Movies $vodWritten")
+                        }
+                    }
+                    if (res is Result.Err) throw res.error
+                }
+
+                val seriesJob = async {
+                    var sort = ContentWriter.SERIES_BASE
+                    val res = client.streamSeriesList(chunkSize = 500) { chunk ->
+                        writeMutex.withLock {
+                            val wrote = withContext(ioCtx) {
+                                bulk.writeSeriesChunk(source.id, chunk, seriesCats, now, sort)
+                            }
+                            sort += wrote
+                            seriesWritten += wrote
+                            total += wrote
+                            onProgress(SyncProgress.Phase.WRITING, total, 0, "Series $seriesWritten")
+                        }
+                    }
+                    if (res is Result.Err) throw res.error
+                }
+
+                awaitAll(liveJob, vodJob, seriesJob)
+            }
+
+            onProgress(SyncProgress.Phase.WRITING, total, total, "Finalizing")
+            withContext(ioCtx) { bulk.finishSource(source.id) }
+
+            val elapsedMs = fetchMark.elapsedNow().inWholeMilliseconds
+            logger.info(
+                "syncSource[${source.id}] done — live=$liveWritten vod=$vodWritten series=$seriesWritten " +
+                    "(total=$total) in ${elapsedMs}ms",
+            )
+            return total
+        } catch (t: Throwable) {
+            logger.error("syncSource[${source.id}] failed: ${t.message} — rolling back partial writes")
+            bulk.abortSource(source.id)
+            throw t
+        }
     }
 
+    /**
+     * Stalker sync — bulk-write path (MK.3.e, 2026-04-21).
+     *
+     * Categories and catalogs are fetched in parallel (Stalker's endpoints
+     * are independent), then written through [BulkContentWriter] in 500-row
+     * chunks. Mirrors the Xtream lifecycle so a 50k-item portal doesn't
+     * freeze the UI for minutes inside a single giant transaction.
+     */
     private suspend fun syncStalker(
         source: Source,
-        writer: ContentWriter,
+        @Suppress("UNUSED_PARAMETER") legacyWriter: ContentWriter,
         now: Long,
         onProgress: suspend (SyncProgress.Phase, Int, Int, String?) -> Unit,
     ): Int {
         val url = source.url ?: error("stalker source missing url")
         val mac = source.macOrThrow()
         val client = StalkerClient(url, mac, StalkerClientOptions(http, logger))
+        val bulk = BulkContentWriter(driver, logger)
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Authenticating")
         val auth = client.authenticate()
@@ -280,23 +494,69 @@ class SourceRepository(
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
 
-        val liveCats = client.getLiveCategories().unwrap().associate { it.id to it.title }
-        val vodCats = client.getVodCategories().unwrap().associate { it.id to it.title }
-        val seriesCats = client.getSeriesCategories().unwrap().associate { it.id to it.title }
-        val live = client.getLiveChannels().unwrap()
-        val vod = client.getVodItems().unwrap()
-        val series = client.getSeriesList().unwrap()
+        val (liveCats, vodCats, seriesCats, live, vod, series) = coroutineScope {
+            val a = async { client.getLiveCategories().unwrap().associate { it.id to it.title } }
+            val b = async { client.getVodCategories().unwrap().associate { it.id to it.title } }
+            val c = async { client.getSeriesCategories().unwrap().associate { it.id to it.title } }
+            val d = async { client.getLiveChannels().unwrap() }
+            val e = async { client.getVodItems().unwrap() }
+            val f = async { client.getSeriesList().unwrap() }
+            StalkerFetch(a.await(), b.await(), c.await(), d.await(), e.await(), f.await())
+        }
 
-        val liveBundle = StalkerBundle(live, liveCats)
-        val vodBundle = StalkerBundle(vod, vodCats)
-        val seriesBundle = StalkerBundle(series, seriesCats)
-
-        val total = liveBundle.items.size + vodBundle.items.size + seriesBundle.items.size
+        val total = live.size + vod.size + series.size
         onProgress(SyncProgress.Phase.WRITING, 0, total, null)
-        val inserted = writer.writeStalker(source.id, liveBundle, vodBundle, seriesBundle, now)
-        onProgress(SyncProgress.Phase.WRITING, inserted, total, null)
-        return inserted
+        bulk.prepareSource(source.id)
+        var written = 0
+        val ioCtx = Dispatchers.IO
+        try {
+            var sort = 0L
+            var i = 0
+            while (i < live.size) {
+                val end = minOf(i + CHUNK_SIZE, live.size)
+                val wrote = withContext(ioCtx) {
+                    bulk.writeStalkerLiveChunk(source.id, live.subList(i, end), liveCats, now, sort)
+                }
+                sort += wrote; written += wrote
+                onProgress(SyncProgress.Phase.WRITING, written, total, "Live $written")
+                i = end
+            }
+            i = 0
+            while (i < vod.size) {
+                val end = minOf(i + CHUNK_SIZE, vod.size)
+                val wrote = withContext(ioCtx) {
+                    bulk.writeStalkerVodChunk(source.id, vod.subList(i, end), vodCats, now, sort)
+                }
+                sort += wrote; written += wrote
+                onProgress(SyncProgress.Phase.WRITING, written, total, "Movies $written")
+                i = end
+            }
+            i = 0
+            while (i < series.size) {
+                val end = minOf(i + CHUNK_SIZE, series.size)
+                val wrote = withContext(ioCtx) {
+                    bulk.writeStalkerSeriesChunk(source.id, series.subList(i, end), seriesCats, now, sort)
+                }
+                sort += wrote; written += wrote
+                onProgress(SyncProgress.Phase.WRITING, written, total, "Series $written")
+                i = end
+            }
+            withContext(ioCtx) { bulk.finishSource(source.id) }
+            return written
+        } catch (t: Throwable) {
+            bulk.abortSource(source.id)
+            throw t
+        }
     }
+
+    private data class StalkerFetch(
+        val liveCats: Map<String, String>,
+        val vodCats: Map<String, String>,
+        val seriesCats: Map<String, String>,
+        val live: List<com.yancotv.shared.stalker.StalkerChannel>,
+        val vod: List<com.yancotv.shared.stalker.StalkerVodItem>,
+        val series: List<com.yancotv.shared.stalker.StalkerSeriesItem>,
+    )
 
     // ───── private ─────
 
@@ -379,6 +639,14 @@ class SourceRepository(
             val rnd = Random.nextInt(0x10000).toString(16).padStart(4, '0')
             return "src-$ts-$rnd"
         }
+
+        /**
+         * Rows per bulk-writer chunk. Larger than `BulkContentWriter.BATCH_ROWS`
+         * (80 rows per multi-row INSERT) — a 500-row chunk issues ~6 INSERTs
+         * inside one short transaction, then releases the WAL write lock so
+         * UI queries can interleave.
+         */
+        private const val CHUNK_SIZE = 500
     }
 }
 

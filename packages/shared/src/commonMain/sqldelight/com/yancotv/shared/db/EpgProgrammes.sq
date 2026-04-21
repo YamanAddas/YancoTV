@@ -21,6 +21,12 @@ SELECT * FROM epg_programmes
 WHERE channel_tvg_id = ? AND start_time <= ? AND end_time > ?
 LIMIT 1;
 
+nowNextForChannel:
+SELECT * FROM epg_programmes
+WHERE channel_tvg_id = ? AND end_time > ?
+ORDER BY start_time ASC
+LIMIT 2;
+
 guideWindow:
 SELECT * FROM epg_programmes
 WHERE end_time > ? AND start_time < ?
@@ -35,8 +41,21 @@ insert:
 INSERT INTO epg_programmes (id, source_id, channel_tvg_id, title, description, start_time, end_time, category, icon_url)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+upsert:
+INSERT OR REPLACE INTO epg_programmes (id, source_id, channel_tvg_id, title, description, start_time, end_time, category, icon_url)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteAll:
+DELETE FROM epg_programmes;
+
 deleteBySource:
 DELETE FROM epg_programmes WHERE source_id = ?;
 
 deleteStale:
 DELETE FROM epg_programmes WHERE end_time < ?;
+
+countAll:
+SELECT COUNT(*) FROM epg_programmes;
+
+countChannels:
+SELECT COUNT(DISTINCT channel_tvg_id) FROM epg_programmes;

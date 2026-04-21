@@ -44,15 +44,16 @@ CREATE TRIGGER content_ai AFTER INSERT ON content BEGIN
     VALUES (new.id, new.title, new.clean_title, new.group_name);
 END;
 
-CREATE TRIGGER content_ad AFTER DELETE ON content BEGIN
-    DELETE FROM content_fts WHERE content_id = old.id;
-END;
-
-CREATE TRIGGER content_au AFTER UPDATE ON content BEGIN
-    DELETE FROM content_fts WHERE content_id = old.id;
-    INSERT INTO content_fts (content_id, title, clean_title, group_name)
-    VALUES (new.id, new.title, new.clean_title, new.group_name);
-END;
+-- `content_ad` (per-row FTS delete trigger) was removed in MK.6.d: it made a
+-- whole-catalog resync take minutes. FTS4's virtual table has no index on
+-- `content_id`, so each trigger fire scanned the entire FTS → O(N²) for an
+-- N-row wipe (50k rows ≈ 2.5B scans). It also wedged the thread enough to
+-- make Cancel unresponsive. FTS is now cleared explicitly in a single bulk
+-- statement (`deleteFtsBySource`) before the content DELETE.
+--
+-- `content_au` was also removed — we never do row UPDATEs today; rows are
+-- only inserted (via bulk writes) or wiped (via `deleteBySource`). If we
+-- ever add an UPDATE path it needs matching manual FTS handling.
 
 selectById:
 SELECT * FROM content WHERE id = ?;
@@ -95,5 +96,51 @@ INSERT INTO content (
 deleteBySource:
 DELETE FROM content WHERE source_id = ?;
 
+-- One-shot FTS wipe for a source. Paired with `deleteBySource` in
+-- ContentWriter to replace the per-row `content_ad` trigger.
+deleteFtsBySource:
+DELETE FROM content_fts
+ WHERE content_id IN (SELECT id FROM content WHERE source_id = :sourceId);
+
+
 countBySource:
 SELECT COUNT(*) FROM content WHERE source_id = ?;
+
+countByType:
+SELECT COUNT(*) FROM content WHERE type = ?;
+
+countByTypeAndGroup:
+SELECT COUNT(*) FROM content WHERE type = ? AND group_name = ?;
+
+listByTypePaged:
+SELECT * FROM content
+WHERE type = ?
+ORDER BY source_id, sort_order
+LIMIT :limitCount OFFSET :offsetCount;
+
+listByTypeAndGroupPaged:
+SELECT * FROM content
+WHERE type = ? AND group_name = ?
+ORDER BY sort_order
+LIMIT :limitCount OFFSET :offsetCount;
+
+-- Guide channel list: distinct live channels that have at least one programme
+-- in the [startTime, endTime) window. Joins epg_programmes so channels with no
+-- guide data are skipped (they render as "no data" rows otherwise). Ordered by
+-- title for a stable, alphabetical channels column in the grid.
+guideChannelsAll:
+SELECT DISTINCT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+FROM content c
+INNER JOIN epg_programmes ep ON ep.channel_tvg_id = c.tvg_id
+WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
+  AND ep.end_time > :startTime AND ep.start_time < :endTime
+ORDER BY c.title ASC;
+
+guideChannelsBySource:
+SELECT DISTINCT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+FROM content c
+INNER JOIN epg_programmes ep ON ep.channel_tvg_id = c.tvg_id
+WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
+  AND c.source_id = :sourceId
+  AND ep.end_time > :startTime AND ep.start_time < :endTime
+ORDER BY c.title ASC;

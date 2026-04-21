@@ -10,12 +10,29 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Programme reminders need exact-alarm scheduling. USE_EXACT_ALARM is
+         the non-revocable variant for bona-fide alarm/reminder apps (which we
+         are). Without it, `setExactAndAllowWhileIdle` throws SecurityException
+         on API 31+. SCHEDULE_EXACT_ALARM is the user-revocable fallback. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Android 11+ package visibility: lets us resolve the speech recognizer
+         intent used by the voice-input buttons on Fire TV remotes. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
 
     <!-- MK.0: no app icon / banner resources yet. Real assets land in MK.12. -->
     <application
         android:name=".YancoApp"
         android:allowBackup="false"
         android:label="@string/app_name"
+        android:largeHeap="true"
         android:theme="@style/Theme.YancoTV"
         android:usesCleartextTraffic="true">
 
@@ -37,6 +54,19 @@
             android:screenOrientation="landscape"
             android:theme="@style/PlayerTheme"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode" />
+
+        <receiver
+            android:name=".reminders.ReminderAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminders.ReminderBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

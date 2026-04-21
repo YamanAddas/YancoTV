@@ -66,5 +66,11 @@ WHERE id = ?;
 setPriority:
 UPDATE sources SET priority = ?, updated_at = ? WHERE id = ?;
 
+-- Updates `epg_url` without touching credentials. Used to adopt an EPG URL
+-- discovered during sync (the M3U `#EXTM3U url-tvg=`/`x-tvg-url=` header, or
+-- the derived Xtream `xmltv.php` endpoint) when the user never provided one.
+setEpgUrl:
+UPDATE sources SET epg_url = ?, updated_at = ? WHERE id = ?;
+
 deleteById:
 DELETE FROM sources WHERE id = ?;

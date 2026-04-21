@@ -4,6 +4,11 @@ import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.types.Result
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,12 +19,15 @@ import kotlin.test.assertNotNull
  * Mirrors `tests/unit/xtream-client.test.ts`. TS suite mocks `http.get`/`https.get`
  * at the module level; here we inject a FakeHttpClient. Each `enqueue(...)` seeds
  * the next HTTP response (equivalent to the TS `mockHttpGet(...)` helper).
+ *
+ * XtreamClient fetches via [HttpClient.getText] and parses JSON itself (the old
+ * getJson path materialized a redundant Map/List tree on top of the JsonElement
+ * tree and OOM'd on large Fire TV catalogs). The fake therefore serializes the
+ * enqueued native Kotlin value back to JSON text on-the-fly.
  */
 
 private class FakeHttpClient : HttpClient {
-    /** Either an `Any?` (JSON-shaped) to return, or a Throwable to throw. */
     private val queue = ArrayDeque<Any?>()
-    private var defaultResponse: Any? = Unit
     val calls = mutableListOf<Pair<String, HttpRequestOptions>>()
 
     fun enqueue(response: Any?) { queue.addLast(ResponseBox(response)) }
@@ -27,13 +35,30 @@ private class FakeHttpClient : HttpClient {
 
     override suspend fun getJson(url: String, options: HttpRequestOptions): Any? {
         calls.add(url to options)
-        val next = if (queue.isNotEmpty()) queue.removeFirst() else defaultResponse
+        val next = if (queue.isNotEmpty()) queue.removeFirst() else null
         if (next is Throwable) throw next
         if (next is ResponseBox) return next.value
         return next
     }
 
-    override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
+    override suspend fun getText(url: String, options: HttpRequestOptions): String {
+        calls.add(url to options)
+        val next = if (queue.isNotEmpty()) queue.removeFirst() else null
+        if (next is Throwable) throw next
+        val value = if (next is ResponseBox) next.value else next
+        return toJson(value).toString()
+    }
+
+    private fun toJson(v: Any?): JsonElement = when (v) {
+        null -> JsonNull
+        is JsonElement -> v
+        is String -> JsonPrimitive(v)
+        is Boolean -> JsonPrimitive(v)
+        is Number -> JsonPrimitive(v)
+        is Map<*, *> -> JsonObject(v.entries.associate { (k, value) -> k.toString() to toJson(value) })
+        is List<*> -> JsonArray(v.map { toJson(it) })
+        else -> JsonPrimitive(v.toString())
+    }
 
     private class ResponseBox(val value: Any?)
 }

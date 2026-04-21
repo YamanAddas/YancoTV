@@ -4,29 +4,49 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+// Palette ported from the desktop Tailwind theme (`src/renderer/styles/global.css`).
+// Kept as a single source so the phone + TV themes stay visually identical.
+object YancoPalette {
+    val BackgroundDeep = Color(0xFF0B0F14)
+    val BackgroundRaised = Color(0xFF10161D)
+    val BackgroundHover = Color(0xFF162029)
+    val BorderSubtle = Color(0xFF1C2732)
+    val TextPrimary = Color(0xFFE6EDF3)
+    val TextMuted = Color(0xFF8B97A7)
+    val Accent = Color(0xFF9FC9FF)
+    val AccentMuted = Color(0xFF4F7FBF)
+    val Error = Color(0xFFFF6B6B)
+    val FocusRing = Color(0xFF9FC9FF)
+}
+
 private val PhoneDarkScheme = darkColorScheme(
-    primary = Color(0xFF9FC9FF),
-    background = Color(0xFF0B0F14),
-    surface = Color(0xFF10161D),
+    primary = YancoPalette.Accent,
     onPrimary = Color.Black,
-    onBackground = Color(0xFFE6EDF3),
-    onSurface = Color(0xFFE6EDF3),
+    secondary = YancoPalette.AccentMuted,
+    background = YancoPalette.BackgroundDeep,
+    surface = YancoPalette.BackgroundRaised,
+    surfaceVariant = YancoPalette.BackgroundHover,
+    onBackground = YancoPalette.TextPrimary,
+    onSurface = YancoPalette.TextPrimary,
+    onSurfaceVariant = YancoPalette.TextMuted,
+    outline = YancoPalette.BorderSubtle,
+    error = YancoPalette.Error,
 )
 
 private val TvDarkScheme = androidx.tv.material3.darkColorScheme(
-    primary = Color(0xFF9FC9FF),
-    background = Color(0xFF0B0F14),
-    surface = Color(0xFF10161D),
+    primary = YancoPalette.Accent,
     onPrimary = Color.Black,
-    onBackground = Color(0xFFE6EDF3),
-    onSurface = Color(0xFFE6EDF3),
+    secondary = YancoPalette.AccentMuted,
+    background = YancoPalette.BackgroundDeep,
+    surface = YancoPalette.BackgroundRaised,
+    surfaceVariant = YancoPalette.BackgroundHover,
+    onBackground = YancoPalette.TextPrimary,
+    onSurface = YancoPalette.TextPrimary,
+    onSurfaceVariant = YancoPalette.TextMuted,
+    border = YancoPalette.BorderSubtle,
+    error = YancoPalette.Error,
 )
 
-/**
- * Single theme wrapper. Branches to the TV Material3 theme when on a leanback
- * device so focus-aware surfaces pick up the right palette, otherwise uses the
- * phone Material3 theme. Real typography/shape scales land in MK.4.
- */
 @Composable
 fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
     if (isTv) {

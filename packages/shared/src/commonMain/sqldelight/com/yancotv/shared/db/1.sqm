@@ -1,0 +1,8 @@
+-- v1 → v2 (MK.6.d): drop the per-row FTS DELETE / UPDATE triggers. They
+-- caused O(N²) behavior on a full-catalog resync because FTS4 has no
+-- secondary index on `content_id`, so each DELETE scanned the entire FTS
+-- for every content row being wiped. ContentWriter now calls
+-- `deleteFtsBySource` (one bulk scan) before `deleteBySource`. The INSERT
+-- trigger (`content_ai`) is kept — inserts are on the fast path.
+DROP TRIGGER IF EXISTS content_ad;
+DROP TRIGGER IF EXISTS content_au;

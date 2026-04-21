@@ -1,5 +1,9 @@
 package com.yancotv.shared.http
 
+import kotlinx.io.Buffer
+import kotlinx.io.Source
+import kotlinx.io.writeString
+
 data class HttpRequestOptions(
     /** Per-request timeout in milliseconds. */
     val timeoutMs: Long? = null,
@@ -28,4 +32,35 @@ interface HttpClient {
 
     /** Fetch plain text (UTF-8) from a URL. Used for M3U playlist downloads. */
     suspend fun getText(url: String, options: HttpRequestOptions = HttpRequestOptions()): String
+
+    /**
+     * Fetch raw bytes. Needed for binary payloads like `.xml.gz` EPG dumps
+     * where going through UTF-8 decoding would corrupt the stream.
+     *
+     * Default falls back to UTF-8 encoding of [getText] so test fakes that
+     * never serve binary content don't need to implement it.
+     */
+    suspend fun getBytes(url: String, options: HttpRequestOptions = HttpRequestOptions()): ByteArray =
+        getText(url, options).encodeToByteArray()
+
+    /**
+     * Stream the response body as a [Source]. The [block] is called with a
+     * lazy source that reads incrementally from the network; memory stays
+     * bounded regardless of payload size. Used for the Xtream catalog fetches
+     * where a single response can exceed 100MB and materializing it to a
+     * String would OOM Fire TV.
+     *
+     * Default implementation buffers via [getText] — correct but not memory-
+     * efficient. Production transports ([KtorHttpClient]) must override with a
+     * real stream-through-the-channel path. Test fakes can ignore.
+     */
+    suspend fun <T> getSource(
+        url: String,
+        options: HttpRequestOptions = HttpRequestOptions(),
+        block: suspend (Source) -> T,
+    ): T {
+        val text = getText(url, options)
+        val buffer = Buffer().apply { writeString(text) }
+        return buffer.use { block(it) }
+    }
 }

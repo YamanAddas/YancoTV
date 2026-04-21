@@ -1,0 +1,595 @@
+package com.yancotv.shared.sources
+
+import app.cash.sqldelight.db.SqlDriver
+import com.yancotv.shared.content.classifyEntry
+import com.yancotv.shared.content.cleanTitle
+import com.yancotv.shared.logger.Logger
+import com.yancotv.shared.logger.NOOP_LOGGER
+import com.yancotv.shared.parsers.M3uEntry
+import com.yancotv.shared.stalker.StalkerChannel
+import com.yancotv.shared.stalker.StalkerSeriesItem
+import com.yancotv.shared.stalker.StalkerVodItem
+import com.yancotv.shared.types.ContentMetadata
+import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.xtream.XtreamClient
+import com.yancotv.shared.xtream.XtreamLiveStream
+import com.yancotv.shared.xtream.XtreamSeriesInfo
+import com.yancotv.shared.xtream.XtreamStreamType
+import com.yancotv.shared.xtream.XtreamVodStream
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+/**
+ * Chunk-streaming bulk writer for Xtream catalog syncs. Replaces SQLDelight's
+ * generated per-row inserts on the hot path.
+ *
+ * Lifecycle (caller is expected to follow this order):
+ *   1. [prepareSource] — one tiny transaction: clear previous rows for this
+ *      source and drop the `content_ai` FTS trigger. FTS will be rebuilt
+ *      in one pass at the end.
+ *   2. Any number of [writeLiveChunk] / [writeVodChunk] / [writeSeriesChunk]
+ *      calls — each chunk is its own short transaction with one or more
+ *      multi-row INSERTs (80 rows per statement). The write lock is
+ *      released between chunks so the UI can keep querying.
+ *   3. [finishSource] — bulk populate FTS for this source in one
+ *      `INSERT … SELECT` and recreate the trigger.
+ *
+ * Why the chunked-transaction design:
+ *   - A single "mega transaction" wrapping everything held the WAL write
+ *     lock for the entire sync and froze the Guide/Home screens for
+ *     minutes. Per-chunk transactions let SQLite release the lock
+ *     between 500-row batches.
+ *   - Multi-row INSERT still amortises statement prepare + SQL parse
+ *     across 80 rows, which is the real per-row cost.
+ *   - Dropping the FTS AFTER-INSERT trigger skips per-row tokenization
+ *     during writes; one `INSERT … SELECT` at the end walks the table
+ *     once in a tight C loop.
+ *
+ * Indexes are intentionally *not* dropped — B-tree inserts are fast, and
+ * leaving the schema stable on a crash is more important than the small
+ * theoretical speedup.
+ */
+class BulkContentWriter(
+    private val driver: SqlDriver,
+    private val logger: Logger = NOOP_LOGGER,
+) {
+    private val json = Json {
+        encodeDefaults = false
+        explicitNulls = false
+    }
+
+    private fun encodeMeta(meta: ContentMetadata): String? =
+        if (meta == ContentMetadata()) null else json.encodeToString(meta)
+
+    // ───── Sync lifecycle ─────
+
+    /**
+     * Clears previous content + FTS rows for [sourceId] and drops the FTS
+     * AFTER-INSERT trigger for the duration of the sync. All wrapped in a
+     * single `IMMEDIATE` transaction so a mid-call crash leaves the schema
+     * either fully cleared or untouched — never half-cleared with the
+     * trigger still firing.
+     */
+    fun prepareSource(sourceId: String) {
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            driver.execute(
+                null,
+                "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
+                1,
+            ) { bindString(0, sourceId) }
+            driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
+                bindString(0, sourceId)
+            }
+            driver.execute(null, "DROP TRIGGER IF EXISTS content_ai", 0)
+            driver.execute(null, "COMMIT", 0)
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    /**
+     * Bulk-populates the FTS table for this source in a single
+     * `INSERT … SELECT`, then recreates the trigger. Called once at the end
+     * of a successful sync.
+     *
+     * Safety-net: if [prepareSource] ran but [finishSource] is never
+     * called (caller crashed mid-sync), the next call to
+     * [prepareSource] for this source will DELETE the half-written rows
+     * before reinstalling clean data. The trigger is recreated defensively
+     * on the error path too so non-bulk inserts (M3U, Stalker) stay
+     * FTS-consistent.
+     */
+    fun finishSource(sourceId: String) {
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            driver.execute(
+                null,
+                "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
+                    "SELECT id, title, clean_title, group_name FROM content WHERE source_id = ?",
+                1,
+            ) { bindString(0, sourceId) }
+            driver.execute(
+                null,
+                "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +
+                    "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
+                    "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
+                0,
+            )
+            driver.execute(null, "COMMIT", 0)
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching {
+                // Defensive: even if FTS populate failed, make sure the
+                // trigger is back so subsequent non-bulk inserts stay
+                // consistent.
+                driver.execute(
+                    null,
+                    "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +
+                        "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
+                        "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
+                    0,
+                )
+            }
+            throw t
+        }
+    }
+
+    /**
+     * Called from the error path when a sync aborts after [prepareSource]
+     * but before [finishSource]. Brings the schema back to a sane state:
+     * clears any partially-written rows for this source and reinstalls the
+     * FTS trigger. Safe to call even if `prepareSource` never ran.
+     */
+    fun abortSource(sourceId: String) {
+        runCatching {
+            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+            try {
+                driver.execute(
+                    null,
+                    "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
+                    1,
+                ) { bindString(0, sourceId) }
+                driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
+                    bindString(0, sourceId)
+                }
+                driver.execute(
+                    null,
+                    "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +
+                        "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
+                        "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
+                    0,
+                )
+                driver.execute(null, "COMMIT", 0)
+            } catch (t: Throwable) {
+                runCatching { driver.execute(null, "ROLLBACK", 0) }
+            }
+        }
+    }
+
+    // ───── Per-chunk writers ─────
+
+    /**
+     * Writes [items] into `content` in batches of [BATCH_ROWS] per
+     * multi-row INSERT, wrapped in a single short transaction. Returns
+     * how many rows were written.
+     *
+     * [sortOrderStart] is the absolute sort_order for the first row —
+     * the caller keeps a running counter per content-type to preserve
+     * globally-ordered rows across streaming chunks.
+     */
+    fun writeLiveChunk(
+        sourceId: String,
+        client: XtreamClient,
+        items: List<XtreamLiveStream>,
+        categoryNames: Map<String, String>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val s = items[k]
+                        val meta = ContentMetadata(
+                            streamId = s.streamId.toLong(),
+                            tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
+                            tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
+                        )
+                        val groupName = categoryNames[s.categoryId] ?: s.categoryId.ifBlank { null }
+                        bindString(p++, ContentIds.xtreamLive(sourceId, s.streamId.toString()))
+                        bindString(p++, sourceId)
+                        bindString(p++, "live")
+                        bindString(p++, s.name)
+                        bindString(p++, cleanTitle(s.name))
+                        bindString(p++, groupName)
+                        bindString(p++, client.buildStreamUrl(s.streamId, XtreamStreamType.LIVE))
+                        bindString(p++, s.streamIcon.ifBlank { null })
+                        bindString(p++, s.epgChannelId.ifBlank { null })
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    fun writeVodChunk(
+        sourceId: String,
+        client: XtreamClient,
+        items: List<XtreamVodStream>,
+        categoryNames: Map<String, String>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val v = items[k]
+                        val meta = ContentMetadata(
+                            streamId = v.streamId.toLong(),
+                            rating = v.rating.ifBlank { null },
+                        )
+                        val groupName = categoryNames[v.categoryId] ?: v.categoryId.ifBlank { null }
+                        bindString(p++, ContentIds.xtreamVod(sourceId, v.streamId.toString()))
+                        bindString(p++, sourceId)
+                        bindString(p++, "movie")
+                        bindString(p++, v.name)
+                        bindString(p++, cleanTitle(v.name))
+                        bindString(p++, groupName)
+                        bindString(p++, client.buildStreamUrl(v.streamId, XtreamStreamType.MOVIE, v.containerExtension))
+                        bindString(p++, v.streamIcon.ifBlank { null })
+                        bindString(p++, null) // tvg_id
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    fun writeSeriesChunk(
+        sourceId: String,
+        items: List<XtreamSeriesInfo>,
+        categoryNames: Map<String, String>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val sr = items[k]
+                        val meta = ContentMetadata(
+                            seriesId = sr.seriesId.toLong(),
+                            plot = sr.plot.ifBlank { null },
+                            cast = sr.cast.ifBlank { null },
+                            director = sr.director.ifBlank { null },
+                            genre = sr.genre.ifBlank { null },
+                            releaseDate = sr.releaseDate.ifBlank { null },
+                            rating = sr.rating.ifBlank { null },
+                        )
+                        val groupName = categoryNames[sr.categoryId] ?: sr.categoryId.ifBlank { null }
+                        bindString(p++, ContentIds.xtreamSeries(sourceId, sr.seriesId.toString()))
+                        bindString(p++, sourceId)
+                        bindString(p++, "series")
+                        bindString(p++, sr.name)
+                        bindString(p++, cleanTitle(sr.name))
+                        bindString(p++, groupName)
+                        bindString(p++, "xtream-series://${sr.seriesId}")
+                        bindString(p++, sr.cover.ifBlank { null })
+                        bindString(p++, null) // tvg_id
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    /**
+     * Writes a chunk of classified M3U entries. The caller is responsible for
+     * slicing the parsed entry list into chunks (typical: 500-row chunks).
+     * Each chunk is one short transaction, matching the Xtream chunk pattern —
+     * a 100k-entry playlist used to hold the WAL write lock for minutes in a
+     * single giant transaction, freezing the Guide screen.
+     *
+     * [sortOrderStart] is the absolute sort_order for the first row. M3U has
+     * no separate live/VOD/series endpoints, so sort order is a single
+     * monotonic counter across the whole playlist.
+     */
+    fun writeM3uChunk(
+        sourceId: String,
+        items: List<M3uEntry>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val e = items[k]
+                        val type = serializeType(classifyEntry(e))
+                        val meta = ContentMetadata(
+                            catchupType = e.catchupType,
+                            catchupSource = e.catchupSource,
+                            tvArchiveDuration = e.catchupDays,
+                        )
+                        bindString(p++, ContentIds.m3u(sourceId, e.title, e.streamUrl))
+                        bindString(p++, sourceId)
+                        bindString(p++, type)
+                        bindString(p++, e.title)
+                        bindString(p++, cleanTitle(e.title))
+                        bindString(p++, e.groupTitle.ifBlank { null })
+                        bindString(p++, e.streamUrl)
+                        bindString(p++, e.tvgLogo.ifBlank { null })
+                        bindString(p++, e.tvgId.ifBlank { null })
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    fun writeStalkerLiveChunk(
+        sourceId: String,
+        items: List<StalkerChannel>,
+        categoryNames: Map<String, String>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val c = items[k]
+                        val meta = ContentMetadata(
+                            stalkerId = c.id.toString(),
+                            tvArchive = if (c.tvArchive != 0) c.tvArchive else null,
+                            tvArchiveDuration = if (c.tvArchiveDuration != 0) c.tvArchiveDuration else null,
+                        )
+                        val groupName = categoryNames[c.tvGenreId] ?: c.tvGenreId.ifBlank { null }
+                        bindString(p++, ContentIds.stalkerLive(sourceId, c.id.toString()))
+                        bindString(p++, sourceId)
+                        bindString(p++, "live")
+                        bindString(p++, c.name)
+                        bindString(p++, cleanTitle(c.name))
+                        bindString(p++, groupName)
+                        bindString(p++, c.cmd)
+                        bindString(p++, c.logo.ifBlank { null })
+                        bindString(p++, c.epgId.ifBlank { null })
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    fun writeStalkerVodChunk(
+        sourceId: String,
+        items: List<StalkerVodItem>,
+        categoryNames: Map<String, String>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val v = items[k]
+                        val meta = ContentMetadata(
+                            stalkerId = v.id.toString(),
+                            description = v.description.ifBlank { null },
+                        )
+                        val groupName = categoryNames[v.categoryId] ?: v.categoryId.ifBlank { null }
+                        bindString(p++, ContentIds.stalkerVod(sourceId, v.id.toString()))
+                        bindString(p++, sourceId)
+                        bindString(p++, "movie")
+                        bindString(p++, v.name)
+                        bindString(p++, cleanTitle(v.name))
+                        bindString(p++, groupName)
+                        bindString(p++, v.cmd)
+                        bindString(p++, v.logo.ifBlank { null })
+                        bindString(p++, null) // tvg_id
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    fun writeStalkerSeriesChunk(
+        sourceId: String,
+        items: List<StalkerSeriesItem>,
+        categoryNames: Map<String, String>,
+        now: Long,
+        sortOrderStart: Long,
+    ): Int {
+        if (items.isEmpty()) return 0
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            var i = 0
+            var sortOrder = sortOrderStart
+            while (i < items.size) {
+                val end = minOf(i + BATCH_ROWS, items.size)
+                val rows = end - i
+                val sql = if (rows == BATCH_ROWS) sqlBatch else buildInsertSql(rows)
+                driver.execute(null, sql, rows * COLS) {
+                    var p = 0
+                    for (k in i until end) {
+                        val sr = items[k]
+                        val meta = ContentMetadata(
+                            stalkerId = sr.id.toString(),
+                            plot = sr.plot.ifBlank { null },
+                            genre = sr.genre.ifBlank { null },
+                        )
+                        val groupName = categoryNames[sr.categoryId] ?: sr.categoryId.ifBlank { null }
+                        bindString(p++, ContentIds.stalkerSeries(sourceId, sr.id.toString()))
+                        bindString(p++, sourceId)
+                        bindString(p++, "series")
+                        bindString(p++, sr.name)
+                        bindString(p++, cleanTitle(sr.name))
+                        bindString(p++, groupName)
+                        bindString(p++, "stalker-series://${sr.id}")
+                        bindString(p++, sr.cover.ifBlank { null })
+                        bindString(p++, null) // tvg_id
+                        bindString(p++, encodeMeta(meta))
+                        bindLong(p++, sortOrder)
+                        bindLong(p++, now)
+                        sortOrder++
+                    }
+                }
+                i = end
+            }
+            driver.execute(null, "COMMIT", 0)
+            return items.size
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
+    private fun serializeType(type: ContentType): String = when (type) {
+        ContentType.LIVE -> "live"
+        ContentType.MOVIE -> "movie"
+        ContentType.SERIES -> "series"
+    }
+
+    companion object {
+        /**
+         * Rows per multi-row INSERT statement. 80 × 12 columns = 960
+         * parameters, under SQLite's default SQLITE_MAX_VARIABLE_NUMBER
+         * (999 on Android up to ~API 32, 32766 on newer).
+         */
+        const val BATCH_ROWS = 80
+        const val COLS = 12
+
+        // Pre-built SQL for the hot-path 80-row statement. JIT-friendly —
+        // SQLite's statement cache sees the exact same string for every
+        // full batch and can skip reparsing.
+        private val sqlBatch: String = buildInsertSql(BATCH_ROWS)
+
+        private fun buildInsertSql(rowCount: Int): String {
+            // OR IGNORE: providers regularly send the same channel twice (our
+            // M3u parser already logs "duplicate URLs collapsed"), and a short
+            // 32-bit FNV hash in ContentIds.m3u means ID collisions are likely
+            // on large playlists. Without this, one dupe PK fails the whole
+            // 80-row INSERT, rolls back the chunk, and abortSource() wipes
+            // every row written so far — surfacing as a mysterious sync error.
+            // prepareSource() already cleared this source's rows, so every ID
+            // in the batch is fresh from the wire; IGNORE is correct.
+            val sb = StringBuilder(
+                "INSERT OR IGNORE INTO content (" +
+                    "id, source_id, type, title, clean_title, group_name, " +
+                    "stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at" +
+                    ") VALUES ",
+            )
+            for (r in 0 until rowCount) {
+                if (r > 0) sb.append(',')
+                sb.append("(?,?,?,?,?,?,?,?,?,?,?,?)")
+            }
+            return sb.toString()
+        }
+    }
+}

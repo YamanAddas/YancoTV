@@ -22,8 +22,14 @@ SELECT * FROM reminders WHERE fired = 0 AND fire_at <= ? ORDER BY fire_at;
 selectAll:
 SELECT * FROM reminders ORDER BY start_time;
 
+selectAllUnfired:
+SELECT * FROM reminders WHERE fired = 0 ORDER BY fire_at;
+
 selectById:
 SELECT * FROM reminders WHERE id = ?;
+
+selectByProgrammeId:
+SELECT * FROM reminders WHERE programme_id = ? LIMIT 1;
 
 insert:
 INSERT INTO reminders
@@ -35,3 +41,9 @@ UPDATE reminders SET fired = 1 WHERE id = ?;
 
 deleteById:
 DELETE FROM reminders WHERE id = ?;
+
+deleteByProgrammeId:
+DELETE FROM reminders WHERE programme_id = ?;
+
+deleteStale:
+DELETE FROM reminders WHERE end_time < ?;
