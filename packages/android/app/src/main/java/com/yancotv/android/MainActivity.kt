@@ -8,10 +8,12 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.ui.shell.HomeScreen
@@ -31,6 +33,17 @@ class MainActivity : ComponentActivity() {
 
     private val controller: PlaybackController by inject()
 
+    // Keep the shell's window awake only while the shared ExoPlayer is
+    // actually playing — covers the mini-preview case where MainActivity
+    // hosts playback. Without this the TV's inactivity timer puts the
+    // screen to sleep mid-channel. Cleared on pause so the device can
+    // sleep normally when nothing is on.
+    private val keepAwakeListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            setKeepScreenOn(isPlaying)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -44,13 +57,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        controller.player.addListener(keepAwakeListener)
+        // Seed from current state: if the mini-preview is already playing
+        // when the shell returns to the foreground (e.g. back from
+        // PlayerActivity), flip the flag on immediately.
+        setKeepScreenOn(controller.player.isPlaying)
+    }
+
     override fun onStop() {
         super.onStop()
+        controller.player.removeListener(keepAwakeListener)
+        setKeepScreenOn(false)
         // Mini-preview can host VOD (e.g. a movie the user dismissed back
         // to the shell). Pressing Home while that plays must persist the
         // resume point — PlayerActivity.onPause only covers the fullscreen
         // path. persistResumePoint is a no-op for live streams.
         controller.persistResumePoint()
+    }
+
+    private fun setKeepScreenOn(on: Boolean) {
+        if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
