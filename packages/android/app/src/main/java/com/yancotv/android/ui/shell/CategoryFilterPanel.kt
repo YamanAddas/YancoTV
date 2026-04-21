@@ -26,12 +26,20 @@ import com.yancotv.android.ui.theme.YancoPalette
 
 const val ALL_GROUPS = "__all__"
 
+/**
+ * Synthetic group id for the pinned "Favorites" row at the top of the
+ * category rail (MK.8.3 spec). Selecting it swaps the content list's data
+ * source from the paged `content` query to `FavoritesRepository.allForType`.
+ */
+const val FAVORITES_GROUP = "__favorites__"
+
 @Composable
 fun CategoryFilterPanel(
     groups: List<String>,
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    showFavorites: Boolean = true,
 ) {
     Column(
         modifier = modifier
@@ -47,6 +55,19 @@ fun CategoryFilterPanel(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
         LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (showFavorites) {
+                // Pinned at the top so a user scanning for saved items never
+                // has to scroll past a provider's noisy group list. Hollow
+                // star glyph because selecting it doesn't favorite anything —
+                // it filters to what's already starred.
+                item {
+                    GroupRow(
+                        label = "\u2606 Favorites",
+                        selected = selected == FAVORITES_GROUP,
+                        onClick = { onSelect(FAVORITES_GROUP) },
+                    )
+                }
+            }
             item {
                 GroupRow(
                     label = "All",

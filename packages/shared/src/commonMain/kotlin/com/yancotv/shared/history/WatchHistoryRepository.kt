@@ -40,7 +40,7 @@ class WatchHistoryRepository(
             episode_id = episodeId,
             position_seconds = positionSeconds,
             duration_seconds = durationSeconds,
-            watched_at = clock() / 1000L,
+            watched_at = clock(),
         )
     }
 
@@ -85,11 +85,17 @@ class WatchHistoryRepository(
         }
     }
 
-    /** Resume position for a content item (no episode), or null if unwatched. */
+    /**
+     * Resume position (seconds) for a content-level row — that is, a row
+     * with `episode_id IS NULL`. Returns null if there's no such row.
+     *
+     * Do NOT fall through to episode rows here: a series container must not
+     * seek to some arbitrary episode's offset just because that episode
+     * happens to be the most recent entry under the same `content_id`.
+     */
     fun positionFor(contentId: String): Long? {
         val rows = db.watchHistoryQueries.selectByContent(contentId).executeAsList()
-        val primary = rows.firstOrNull { it.episode_id == null } ?: rows.firstOrNull()
-        return primary?.position_seconds
+        return rows.firstOrNull { it.episode_id == null }?.position_seconds
     }
 
     fun removeForContent(contentId: String) {

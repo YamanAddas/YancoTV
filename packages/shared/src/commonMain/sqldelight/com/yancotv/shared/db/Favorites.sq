@@ -1,7 +1,7 @@
 CREATE TABLE favorites (
     id TEXT PRIMARY KEY NOT NULL,
     content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
-    added_at INTEGER NOT NULL
+    added_at INTEGER NOT NULL -- wall clock, ms since epoch
 );
 
 CREATE INDEX idx_favorites_content ON favorites(content_id);

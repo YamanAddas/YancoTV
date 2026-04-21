@@ -7,13 +7,17 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.ui.shell.HomeScreen
+import com.yancotv.android.ui.shell.SearchOverlayState
 import com.yancotv.android.ui.theme.YancoTheme
+import org.koin.android.ext.android.inject
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
@@ -24,6 +28,8 @@ class MainActivity : ComponentActivity() {
     // works regardless.
     private val notificationsPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
+
+    private val controller: PlaybackController by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +42,30 @@ class MainActivity : ComponentActivity() {
                 HomeScreen(isTv = isTv)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Mini-preview can host VOD (e.g. a movie the user dismissed back
+        // to the shell). Pressing Home while that plays must persist the
+        // resume point — PlayerActivity.onPause only covers the fullscreen
+        // path. persistResumePoint is a no-op for live streams.
+        controller.persistResumePoint()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Global search hotkeys — work from anywhere in the shell without
+        // first navigating to the Search sidebar destination. TV remotes
+        // send KEYCODE_SEARCH; phone / bluetooth keyboards send Ctrl-K.
+        // Short-circuit before super so the key doesn't also trigger a
+        // device-level global search handler.
+        val isSearchKey = keyCode == KeyEvent.KEYCODE_SEARCH
+        val isCtrlK = keyCode == KeyEvent.KEYCODE_K && (event?.isCtrlPressed == true)
+        if (isSearchKey || isCtrlK) {
+            SearchOverlayState.show()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun requestNotificationsPermissionIfNeeded() {

@@ -1,16 +1,22 @@
 package com.yancotv.android.ui.shell
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -53,7 +60,15 @@ fun HomeScreen(
     var section by rememberSaveable { mutableStateOf(AppSection.LiveTv) }
     val contentType = section.contentType
     val context = LocalContext.current
+    val searchOverlayVisible by SearchOverlayState.visible.collectAsState()
 
+    // Back on TV + phone dismisses the overlay without going through the
+    // shell's navigation — matches the behavior users expect from any
+    // "press a hotkey, overlay appears, press Back, overlay disappears"
+    // surface. Scoped on searchOverlayVisible so it's a no-op otherwise.
+    BackHandler(enabled = searchOverlayVisible) { SearchOverlayState.hide() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -106,6 +121,38 @@ fun HomeScreen(
         } else {
             Box(modifier = Modifier.weight(1f)) {
                 PlaceholderArea(section = section)
+            }
+        }
+    }
+
+        // Overlay rides above the Row so it dims the whole shell, not just
+        // one region. Scrim is a dark translucent layer that swallows clicks
+        // so focus doesn't leak to the underlying sidebar while typing.
+        if (searchOverlayVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { SearchOverlayState.hide() },
+                    ),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(if (isTv) 0.6f else 1f)
+                        .fillMaxHeight()
+                        .background(YancoPalette.BackgroundDeep)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { /* swallow — keep overlay open when clicking inside */ },
+                        ),
+                ) {
+                    SearchScreen(isTv = isTv)
+                }
             }
         }
     }

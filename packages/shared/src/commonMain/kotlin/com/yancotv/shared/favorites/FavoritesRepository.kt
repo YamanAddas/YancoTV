@@ -1,9 +1,15 @@
 package com.yancotv.shared.favorites
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOne
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.FavoriteEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Favorites CRUD. A favorite is a pointer into [content] — when the content
@@ -46,6 +52,43 @@ class FavoritesRepository(
     fun isFavorite(contentId: String): Boolean =
         db.favoritesQueries.isFavorite(contentId).executeAsOne()
 
+    /**
+     * Reactive [all] — backed by SQLDelight's [asFlow]. Emits the current
+     * snapshot immediately on collection, then re-emits every time a write
+     * through any `favoritesQueries` binding fires a notifier. Dispatches
+     * the terminal query to IO so collectors on Main.immediate don't block.
+     */
+    fun allFlow(): Flow<List<FavoriteEntry>> =
+        db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.IO).map { rows ->
+            rows.map { row ->
+                FavoriteEntry(
+                    favoriteId = row.favorite_id,
+                    addedAt = row.added_at,
+                    content = ContentItem(
+                        id = row.id,
+                        sourceId = row.source_id,
+                        type = contentTypeFromDb(row.type),
+                        title = row.title,
+                        cleanTitle = row.clean_title,
+                        groupName = row.group_name,
+                        streamUrl = row.stream_url,
+                        logoUrl = row.logo_url,
+                        tvgId = row.tvg_id,
+                        metadataJson = row.metadata_json,
+                        sortOrder = row.sort_order.toInt(),
+                        createdAt = row.created_at,
+                    ),
+                )
+            }
+        }
+
+    /**
+     * Reactive [isFavorite] for a single content id. Lets a star button
+     * reflect state changes made from other screens without a focus round-trip.
+     */
+    fun isFavoriteFlow(contentId: String): Flow<Boolean> =
+        db.favoritesQueries.isFavorite(contentId).asFlow().mapToOne(Dispatchers.IO)
+
     fun toggle(contentId: String): Boolean {
         // Returns the new state — caller can flip a UI star without re-querying.
         return if (isFavorite(contentId)) {
@@ -55,7 +98,7 @@ class FavoritesRepository(
             db.favoritesQueries.insert(
                 id = "fav:$contentId",
                 content_id = contentId,
-                added_at = clock() / 1000L,
+                added_at = clock(),
             )
             true
         }

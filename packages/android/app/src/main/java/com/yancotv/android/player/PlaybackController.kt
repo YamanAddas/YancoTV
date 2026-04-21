@@ -12,9 +12,15 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * App-scoped client façade in front of [PlaybackService]'s [MediaController].
@@ -48,6 +54,12 @@ class PlaybackController(
 
     private var controller: MediaController? = null
     private val pendingOps = ArrayDeque<() -> Unit>()
+
+    // Main-immediate so state mutations stay on the main thread; IO work
+    // (SQLDelight reads/writes) dispatches into Dispatchers.IO via withContext.
+    // All DB calls into `history` must go through this scope — the repo is
+    // synchronous and blocks the caller thread.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /**
      * The [MediaController] once connected, or null during app boot before
@@ -98,6 +110,7 @@ class PlaybackController(
         controller = null
         _connected.value = false
         pendingOps.clear()
+        scope.cancel()
     }
 
     /** Plays [list]`[startIndex]` and stores the list for [next]/[previous] zap. */
@@ -112,6 +125,9 @@ class PlaybackController(
     fun previous(): Boolean = step(-1)
 
     fun stop() {
+        // Snapshot the outgoing VOD's resume point before we drop the queue —
+        // BACK out of the fullscreen player must not lose progress.
+        persistResumePoint()
         _queue.value = emptyList()
         _index.value = -1
         _currentItem.value = null
@@ -126,6 +142,9 @@ class PlaybackController(
         if (list.isEmpty()) return false
         val target = (_index.value + delta).coerceIn(0, list.size - 1)
         if (target == _index.value) return false
+        // Persist before mutating _index so the snapshot still reads the
+        // outgoing item. The upsert dispatches to IO; the capture is main.
+        persistResumePoint()
         _index.value = target
         runOrDefer { loadCurrent() }
         return true
@@ -146,18 +165,27 @@ class PlaybackController(
                     .build(),
             )
             .build()
-        // Resume for VOD only — a saved position on a live stream doesn't
-        // make sense and most IPTV back-ends won't honour a seek on live.
-        // `setMediaItem(item, positionMs)` seeks before prepare so we don't
-        // burn a buffer on the intro.
-        val resumeMs = if (item.type != ContentType.LIVE) {
-            (history?.positionFor(item.id) ?: 0L) * 1000L
-        } else {
-            0L
+        val repo = history
+        if (item.type == ContentType.LIVE || repo == null) {
+            c.setMediaItem(mediaItem)
+            c.prepare()
+            c.playWhenReady = true
+            return
         }
-        if (resumeMs > 0) c.setMediaItem(mediaItem, resumeMs) else c.setMediaItem(mediaItem)
-        c.prepare()
-        c.playWhenReady = true
+        // VOD: fetch the resume offset off the main thread, then finish
+        // wiring the media item on main. If the user zapped again while
+        // we were awaiting the IO read, drop this result — a newer
+        // loadCurrent will have kicked off a fresh lookup for the new item.
+        scope.launch {
+            val resumeMs = withContext(Dispatchers.IO) {
+                (repo.positionFor(item.id) ?: 0L) * 1000L
+            }
+            if (_currentItem.value?.id != item.id) return@launch
+            val liveCtl = controller ?: return@launch
+            if (resumeMs > 0) liveCtl.setMediaItem(mediaItem, resumeMs) else liveCtl.setMediaItem(mediaItem)
+            liveCtl.prepare()
+            liveCtl.playWhenReady = true
+        }
     }
 
     /**
@@ -166,6 +194,10 @@ class PlaybackController(
      * (a) it's wasteful, (b) a crash loses at most a few seconds, and (c) the
      * app lifecycle guarantees an onStop before the process is killed in
      * nearly all cases.
+     *
+     * Capture runs synchronously on the caller thread (main) because
+     * [MediaController.currentPosition] is main-thread-only; the DB upsert
+     * is dispatched to IO to keep main unblocked.
      */
     fun persistResumePoint() {
         val item = _currentItem.value ?: return
@@ -177,11 +209,14 @@ class PlaybackController(
         // opened a title and immediately bailed they probably didn't want a
         // resume card.
         if (pos < 5L) return
-        history?.upsert(
-            contentId = item.id,
-            positionSeconds = pos,
-            durationSeconds = dur,
-        )
+        val repo = history ?: return
+        scope.launch(Dispatchers.IO) {
+            repo.upsert(
+                contentId = item.id,
+                positionSeconds = pos,
+                durationSeconds = dur,
+            )
+        }
     }
 
     private fun runOrDefer(op: () -> Unit) {

@@ -17,15 +17,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +41,7 @@ import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
 import org.koin.compose.koinInject
@@ -60,21 +60,23 @@ fun FavoritesScreen(
     favorites: FavoritesRepository = koinInject(),
     controller: PlaybackController = koinInject(),
 ) {
-    val items = remember { mutableStateListOf<ContentItem>() }
-    var loading by remember { mutableStateOf(true) }
+    // Reactive list: SQLDelight drives recomposition only when the favorites
+    // table actually changes, so unstarring from InfoPanel on another screen
+    // updates this list without a navigation round-trip.
+    val favorited by favorites.allFlow().collectAsState(initial = null)
+    val loading = favorited == null
+    val items = remember(favorited) { favorited?.map { it.content } ?: emptyList() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        loading = true
-        val loaded = withContext(Dispatchers.IO) { favorites.all().map { it.content } }
-        items.clear()
-        items.addAll(loaded)
-        loading = false
-    }
-
-    val live = items.filter { it.type == ContentType.LIVE }
-    val movies = items.filter { it.type == ContentType.MOVIE }
-    val series = items.filter { it.type == ContentType.SERIES }
+    // Re-partition only when the flow emits a new list, not on every recomp.
+    val live = remember(items) { items.filter { it.type == ContentType.LIVE } }
+    val movies = remember(items) { items.filter { it.type == ContentType.MOVIE } }
+    val series = remember(items) { items.filter { it.type == ContentType.SERIES } }
+    // Hoist scroll state so a section becoming empty and re-added (e.g.
+    // unstarring the last movie, then re-starring one) keeps the user's
+    // scroll position rather than snapping back to the top.
+    val listState = rememberLazyListState()
 
     if (items.isEmpty() && !loading) {
         Box(
@@ -96,6 +98,7 @@ fun FavoritesScreen(
     }
 
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep)
@@ -113,10 +116,7 @@ fun FavoritesScreen(
                         if (!alreadyPlaying) controller.play(live, live.indexOf(row))
                         if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
                     },
-                    onRemove = {
-                        favorites.remove(row.id)
-                        items.removeAll { it.id == row.id }
-                    },
+                    onRemove = { removeFavorite(row, scope, favorites) },
                 )
             }
         }
@@ -126,13 +126,16 @@ fun FavoritesScreen(
                 FavoriteRow(
                     item = row,
                     onActivate = {
-                        controller.play(movies, movies.indexOf(row))
-                        PlayerLauncher.launch(context)
+                        // Mirror HomeScreen's two-tap flow: first tap loads
+                        // the item (if not already current), second tap (or
+                        // phone tap) launches fullscreen. Tapping the
+                        // currently-playing row goes straight to fullscreen
+                        // instead of rebuffering.
+                        val alreadyPlaying = controller.currentId == row.id
+                        if (!alreadyPlaying) controller.play(movies, movies.indexOf(row))
+                        if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
                     },
-                    onRemove = {
-                        favorites.remove(row.id)
-                        items.removeAll { it.id == row.id }
-                    },
+                    onRemove = { removeFavorite(row, scope, favorites) },
                 )
             }
         }
@@ -142,17 +145,26 @@ fun FavoritesScreen(
                 FavoriteRow(
                     item = row,
                     onActivate = {
-                        controller.play(series, series.indexOf(row))
-                        PlayerLauncher.launch(context)
+                        val alreadyPlaying = controller.currentId == row.id
+                        if (!alreadyPlaying) controller.play(series, series.indexOf(row))
+                        if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
                     },
-                    onRemove = {
-                        favorites.remove(row.id)
-                        items.removeAll { it.id == row.id }
-                    },
+                    onRemove = { removeFavorite(row, scope, favorites) },
                 )
             }
         }
     }
+}
+
+private fun removeFavorite(
+    row: ContentItem,
+    scope: kotlinx.coroutines.CoroutineScope,
+    favorites: FavoritesRepository,
+) {
+    // SQLDelight is blocking and a main-thread write would jank focus. The
+    // UI-side list updates automatically via `favorites.allFlow()` once the
+    // delete commits — no manual list mutation needed here.
+    scope.launch(Dispatchers.IO) { favorites.remove(row.id) }
 }
 
 @Composable
@@ -200,7 +212,7 @@ private fun FavoriteRow(
             if (!item.logoUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = item.logoUrl,
-                    contentDescription = null,
+                    contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                 )
@@ -231,8 +243,11 @@ private fun UnstarButton(onClick: () -> Unit) {
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.BackgroundHover else Color.Transparent
     val border = if (focused) YancoPalette.FocusRing else Color.Transparent
+    // Hollow star glyph (\u2606) semantically matches the remove action —
+    // tapping it will make the row "no longer favorited". The filled \u2605
+    // is reserved for "currently starred" state in InfoPanel.
     Text(
-        text = "\u2605 Remove",
+        text = "\u2606 Remove",
         color = YancoPalette.Accent,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))

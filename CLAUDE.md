@@ -402,6 +402,57 @@ See [PRODUCTION_PLAN_NATIVE.md § Architecture rules](PRODUCTION_PLAN_NATIVE.md#
 - **Ktor + Kotlinx Serialization only** — no Retrofit/Moshi/Gson (iOS can't compile them).
 - **Desktop unaffected** — `packages/core/` TypeScript keeps shipping Electron. Don't cross-compile.
 
+### Native Android — Lessons from MK.8 Audit (2026-04-21)
+
+Shipping MK.8.3/8.4/8.5 (commit `ae6a7cf`) introduced **29 bugs in one commit** (MB-35 through MB-63). Self-audit caught them; a user hadn't hit production yet. The meta-lesson: commit smaller and self-review before committing, not after. Specific rules distilled from the bug set — follow these for every future MK.* task:
+
+**Threading (MB-35, MB-36, MB-37, MB-38):**
+
+- **Never call a `packages/shared/` repository directly from a Compose lambda.** All SQLDelight calls block the caller thread. Click handlers that mutate state must go through `rememberCoroutineScope().launch(Dispatchers.IO) { ... }` or hoist into a `LaunchedEffect` with `withContext(Dispatchers.IO)`.
+- **`PlaybackController` is main-thread-only.** Any repo field it holds (`history`, future `favorites`) must be invoked inside `CoroutineScope(Dispatchers.IO).launch { ... }`, not on the caller. `persistResumePoint()` and `loadCurrent()` are both called from lifecycle hooks — they cannot block.
+
+**Schema discipline (MB-39, MB-40):**
+
+- **All DB timestamps are milliseconds.** Every `clock()` call in `packages/shared/` writes raw `Clock.System.now().toEpochMilliseconds()`. Do NOT divide by 1000. `content.created_at`, `epg_programmes.start_time/end_time`, `favorites.added_at`, `watch_history.watched_at`, `sources.last_synced` — all ms. Seconds are only used in one place: `watch_history.position_seconds` / `duration_seconds` (they model media playback offsets, not wall-clock time).
+- **When adding a timestamp column, document the unit in the SQLDelight file.** A one-line comment (`-- ms since epoch`) beats a future audit.
+
+**Resume-point persistence (MB-41, MB-42, MB-43, MB-44):**
+
+- **`positionFor(contentId)` returns a content-level row or null — never an episode row.** Series containers must not seek to an arbitrary episode's offset. The correct fallback when no `episode_id IS NULL` row exists is `null`, not "the first row we found".
+- **Every transition that loads a new `MediaItem` must persist the outgoing resume point first.** That includes `stop()`, `next()`, `previous()`, `play()` when the queue changes. Lifecycle hooks (`onPause`, `onStop`) catch *some* transitions but miss zap-through-player and queue-replace paths.
+- **MainActivity.onStop must persist too** if a mini-preview can host VOD. Not just PlayerActivity.
+
+**Reactive state across screens (MB-45, MB-46):**
+
+- **Favorite / history / parental state must flow through a `StateFlow` in `shared/`**, not a per-screen `LaunchedEffect(Unit)`. Toggling a favorite in InfoPanel must immediately refresh FavoritesScreen without a navigation round-trip. Use SQLDelight's `asFlow()` on queries that mutate, not imperative reloads.
+- **User-input state uses `rememberSaveable`**, not `remember`. Search queries, form fields, focused IDs, scroll offsets — anything the user would be annoyed to retype after a rotation or process death.
+
+**Two-tap TV activation (MB-48, MB-49):**
+
+- **Every place that launches the player must check `controller.currentId == target.id` first.** If already playing, go straight to fullscreen via `PlayerLauncher.launch(context)` — do NOT call `controller.play(...)` again (it re-creates the `MediaItem` and rebuffers). HomeScreen does this; FavoritesScreen was missing it on movie/series rows. Grep for `controller.play(` and confirm every call site is guarded.
+
+**Display IDs vs display names (MB-58):**
+
+- **Never render `ContentItem.sourceId` as user-visible text.** It's a UUID/slug. Look up `sources.name` via a `SourceRepository.nameFor(sourceId)` call and display that. Same rule applies to `tvg_id`, `group_name` (if raw), and any other FK.
+
+**Plan-spec drift (MB-61, MB-62):**
+
+- **Cross-check each MK task against its written spec before committing.** MK.8.3 called for a pinned "Favorites" group at the top of the category rail — we built a standalone page. MK.8.5 called for a global search overlay + KEYCODE_SEARCH remote hotkey + Ctrl-K phone shortcut — we built a sidebar destination. The spec text exists for a reason. If you choose to deviate, update the plan text in the same commit with a note explaining why.
+
+**Accessibility (MB-51, MB-55, MB-59):**
+
+- **Every user-visible `AsyncImage` needs a `contentDescription`** (or `= null` with a paired text label explicitly explaining why). TalkBack / TV reader announces nothing otherwise.
+- **Every interactive control that is not a native Material3 button needs `Modifier.semantics { contentDescription = ... }`.** Custom `Row`/`Box` + `clickable` blocks are silent by default.
+
+**Error handling (MB-60):**
+
+- **DB reads at composable entry points need try/catch.** A corrupted row in `content` or `watch_history` crashes the whole screen otherwise. Log via `kermit` and render an empty state.
+
+**Commit hygiene (meta-lesson):**
+
+- **One MK sub-task per commit, not three.** MK.8.3 + MK.8.4 + MK.8.5 shipped together and the bug count scaled with commit size.
+- **Before committing a shell screen, self-audit the checklist above.** Five minutes of re-reading saves a 29-bug register entry.
+
 ### Code Conventions (Both Apps)
 
 - TypeScript strict — no `any` unless unavoidable

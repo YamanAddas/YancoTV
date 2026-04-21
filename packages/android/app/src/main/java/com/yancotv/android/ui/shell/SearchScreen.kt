@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,15 +28,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,7 +78,10 @@ fun SearchScreen(
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
 ) {
-    var query by remember { mutableStateOf("") }
+    // rememberSaveable so a rotation / process-death while the user has a
+    // query typed doesn't wipe the term. Results are not saved — rerunning
+    // the FTS query is cheap and keeps the snapshot small.
+    var query by rememberSaveable { mutableStateOf("") }
     val results = remember { mutableStateListOf<ContentItem>() }
     var searching by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -105,7 +117,7 @@ fun SearchScreen(
             )
             searching && results.isEmpty() -> EmptyState(
                 title = "Searching…",
-                subtitle = "Looking through ${query.trim()}.",
+                subtitle = "Searching for \"${query.trim()}\"…",
             )
             results.isEmpty() -> EmptyState(
                 title = "No matches",
@@ -136,6 +148,14 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val requester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    // Pull focus on entry so phone users land on an active field (IME pops
+    // automatically) and TV users see the field highlighted for typing via
+    // the remote. Safe on TV — focus just lives on the field, no keyboard.
+    LaunchedEffect(Unit) { requester.requestFocus() }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -144,12 +164,6 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             .border(1.dp, border, RoundedCornerShape(8.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        if (value.isEmpty()) {
-            Text(
-                text = "Search channels, movies, series…",
-                color = YancoPalette.TextMuted,
-            )
-        }
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -157,7 +171,24 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 16.sp),
             cursorBrush = SolidColor(YancoPalette.Accent),
             interactionSource = interaction,
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            // Search IME button just hides the keyboard — the LaunchedEffect
+            // on `query` already drives the actual FTS call after the 220ms
+            // debounce, so there's nothing extra to fire here.
+            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(requester)
+                .semantics { contentDescription = "Search channels, movies, and series" },
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Search channels, movies, series…",
+                        color = YancoPalette.TextMuted,
+                    )
+                }
+                inner()
+            },
         )
     }
 }
@@ -209,7 +240,7 @@ private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
             if (!item.logoUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = item.logoUrl,
-                    contentDescription = null,
+                    contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                 )

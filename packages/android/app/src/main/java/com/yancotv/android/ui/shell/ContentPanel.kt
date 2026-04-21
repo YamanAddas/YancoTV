@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
+import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
@@ -78,19 +79,36 @@ fun ContentPanel(
     modifier: Modifier = Modifier,
     repo: ContentRepository = koinInject(),
     epg: EpgRepository = koinInject(),
+    favorites: FavoritesRepository = koinInject(),
 ) {
+    val isFavoritesFilter = group == FAVORITES_GROUP
     val items = remember(type, group) { mutableStateListOf<ContentItem>() }
     var total by remember(type, group) { mutableStateOf(0L) }
     var loaded by remember(type, group) { mutableStateOf(0L) }
     var loading by remember(type, group) { mutableStateOf(false) }
 
-    LaunchedEffect(type, group) {
-        items.clear()
-        total = withContext(Dispatchers.IO) { repo.count(type, group) }
-        loaded = 0L
-        loadNextPage(repo, type, group, loaded) { page ->
-            items.addAll(page)
-            loaded += page.size
+    // Favorites filter uses a different data source — the `favorites` table
+    // joined against `content`. We collect the reactive flow so starring or
+    // unstarring from InfoPanel updates the filtered list immediately.
+    if (isFavoritesFilter) {
+        LaunchedEffect(type) {
+            favorites.allFlow().collect { list ->
+                val filtered = list.map { it.content }.filter { it.type == type }
+                items.clear()
+                items.addAll(filtered)
+                total = filtered.size.toLong()
+                loaded = filtered.size.toLong()
+            }
+        }
+    } else {
+        LaunchedEffect(type, group) {
+            items.clear()
+            total = withContext(Dispatchers.IO) { repo.count(type, group) }
+            loaded = 0L
+            loadNextPage(repo, type, group, loaded) { page ->
+                items.addAll(page)
+                loaded += page.size
+            }
         }
     }
 
