@@ -1,134 +1,80 @@
 # YancoTV
 
-Custom IPTV media application. Two sibling apps sharing a common core:
-
-- **Desktop** — Windows-first, built with Electron + React + TypeScript + mpv. Feature-complete (v0.2.0).
-- **Mobile** — Android TV + Google TV + Fire TV + Android phone/tablet, built with React Native. In active development toward full desktop parity.
+Custom IPTV media player. Three sibling apps on a shared business core. Built to beat TiviMate on Android TV and ship the same experience to Windows, iPhone, and iPad.
 
 ## What is YancoTV?
 
-A premium IPTV player that organizes content from M3U playlists, Xtream Codes, and Stalker Portal sources into a clean, browsable interface — separating Live TV, Movies, and Series into proper sections instead of dumping everything into one list.
+A premium IPTV player that organizes content from M3U playlists, Xtream Codes, and Stalker Portal sources into a clean, browsable interface — Live TV, Movies, and Series in proper sections instead of one flat dump. Full EPG with catch-up and timeshift. Favorites and history with resume. Parental controls. Keyboard, gamepad, and D-pad navigation.
 
-Desktop is built to match and surpass apps like TiviMate on Windows. Mobile takes that same experience onto every Android screen — TV, tablet, and phone.
+## Apps
 
-## Monorepo Layout
+- **Desktop (Windows)** — Electron + React + TypeScript + mpv. Feature-complete (v0.2.0). See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md).
+- **Android / Android TV / Fire TV / Google TV** — Native Kotlin + Jetpack Compose + Media3. Active development as of 2026-04-20. See [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md).
+- **iOS / iPadOS** — SwiftUI + shared Kotlin framework. Scheduled post-Android-1.0.
+
+The Android and iOS apps share business logic via a Kotlin Multiplatform module (`packages/shared/`). The desktop app uses a parallel TypeScript implementation (`packages/core/`) — two mirrored ports, tests on both sides, neither is the source.
+
+**Frozen:** the earlier React Native app in `packages/mobile/`. Superseded 2026-04-20 after Fire TV bridge issues; kept runnable for reference. No new work except P0 fixes. See [docs/adr/0001-native-pivot.md](docs/adr/0001-native-pivot.md) for why.
+
+## Monorepo layout
 
 ```
-YancoTV/                              # pnpm workspace root
-├── CLAUDE.md                         # Monorepo guide
-├── ARCHITECTURE.md                   # System architecture (both apps)
-├── PRODUCTION_PLAN.md                # Desktop roadmap
-├── PRODUCTION_PLAN_ANDROID.md        # Mobile roadmap (M1→M9)
-├── CHANGELOG.md                      # Desktop release notes
-├── src/                              # Electron desktop app
-├── tests/                            # Desktop tests
-└── packages/
-    ├── core/                         # @yancotv/core — shared TypeScript business logic
-    └── mobile/                       # @yancotv/mobile — React Native TV + phone app
+YancoTV/                         # pnpm workspace root
+├── src/                         # Electron desktop app
+├── packages/
+│   ├── core/                    # @yancotv/core — TypeScript business logic (desktop)
+│   ├── shared/                  # Kotlin Multiplatform business logic (Android + iOS)
+│   ├── android/                 # Native Android app
+│   ├── ios/                     # Native iOS app (lands post-Android-1.0)
+│   └── mobile/                  # FROZEN — React Native, kept for reference
+├── AGENTS.md / CLAUDE.md        # AI-agent guides (shared rules + Claude-specific)
+├── ARCHITECTURE.md              # System architecture
+├── PRODUCTION_PLAN.md           # Desktop roadmap
+├── PRODUCTION_PLAN_NATIVE.md    # ACTIVE — Native Android + iOS roadmap
+├── CHANGELOG.md                 # Desktop releases
+├── bugs.md                      # Desktop bug register
+└── docs/
+    ├── adr/                     # Architecture decision records
+    └── incidents/               # Post-mortems
 ```
-
-`@yancotv/core` holds every platform-agnostic piece: parsers (M3U, XMLTV), API clients (Xtream, Stalker), content classifier, title cleaner, catch-up URL builder, types, Zod schemas. Both apps consume it via `workspace:*`.
-
-## Desktop — Current Features
-
-- **Source Management** — Add M3U files, M3U URLs, Xtream Codes credentials, Stalker Portal MACs. Encrypted credential storage via Electron safeStorage. Multi-source merge + dedup.
-- **Content Organization** — Automatic separation into Live TV, Movies, and Series. Category grouping, language-grouped sidebar, sort/filter.
-- **Smart Search** — Full-text search (SQLite FTS5) with type filter, autocomplete, history.
-- **Browsing** — Virtualized grids for 10K+ channels, cinematic content detail pages (hero + Info/Episodes/Related tabs).
-- **Playback** — Stable video playback via mpv: play/pause/seek/volume/mute/speed, aspect ratio cycling, subtitle + audio track selection, external subtitle loading, channel surfing.
-- **EPG** — Full XMLTV support with now/next, Guide grid page, auto-refresh, per-source + global EPG URLs.
-- **Catch-Up TV** — Xtream timeshift and M3U catchup pattern support.
-- **Timeshift** — Pause and rewind live TV.
-- **Recording** — ffmpeg-based live recording, scheduled from EPG.
-- **Downloads** — VOD download manager with retry/resume, asset bundling (poster/backdrop/.nfo/subtitles).
-- **Metadata Enrichment** — TMDb integration: posters, backdrops, cast, descriptions.
-- **Subtitles** — OpenSubtitles auto-search + download + appearance config.
-- **Parental Controls** — PIN lock (salted scrypt), lock/hide channels, name/logo/group overrides.
-- **Favorites + History** — Persistent favorites, watch history with resume position.
-- **System Integration** — System tray, auto-update check, backup export/import, crash handler.
-- **Settings** — 8 organized tabs (General, Playback, Network, Playlist, EPG, Parental, Shortcuts, About).
-- **Full Keyboard + Gamepad** — Every action reachable without a mouse.
-
-See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the full desktop roadmap and [CHANGELOG.md](CHANGELOG.md) for release notes.
-
-## Mobile — Current State
-
-**Status as of 2026-04-19:** Phases 0–M3 landed (core extraction, op-sqlite, React Navigation 7). The initial desktop-shaped port buckled under real-device use, so the stack was reset on 2026-04-19 to the **M4R reboot** — a delete-first rebuild of the shell into a single `HomeShell` + `FullscreenPlayer` surface with paged SQL, persistent MiniPlayer, and cached-first boot. Hex cards were dropped on mobile (GPU cost); flat `ChannelTile` replaced them. Target: ~14 weeks to Play Store.
-
-Post-reboot milestones:
-
-- **M4R** Shell reboot — paged SQL, persistent MiniPlayer, cached-first boot (in flight)
-- **M5R** Groups + EPG ribbon + Favorites
-- **M6R** EPG + Catch-up + Timeshift
-- **M7R** Settings + Parental + Polish
-- **M8R** Codec gap — FFmpeg ExoPlayer extension (HEVC-main10 / AC3 / EAC3 / DTS / TrueHD)
-- **M9R** TV UX + Phone-native (PIP, Cast, gestures, voice)
-- **M10R** Distribution + QA
-
-See [PRODUCTION_PLAN_ANDROID.md](PRODUCTION_PLAN_ANDROID.md) for the full mobile roadmap, parity matrix, and architecture rules.
-
-## Desktop — Tech Stack
-
-- Electron 41+ (hardened)
-- React 18 + TypeScript 5 + Tailwind CSS 3
-- SQLite (better-sqlite3, WAL mode, FTS5)
-- Zustand 5 (state), React Query 5 (async caching)
-- mpv via JSON-RPC over named pipes
-- ffmpeg (recording, downloads, subtitle extraction)
-- Vite 6 (bundler), Vitest + Playwright (tests), Zod (validation)
-
-## Mobile — Tech Stack
-
-- React Native 0.85 (`react-native-tvos` fork)
-- TypeScript 5 strict, Zustand 5, TanStack Query 5
-- react-native-video 6 (ExoPlayer/Media3 backend)
-- React Navigation 7 (M3), op-sqlite (M2), FlashList, Reanimated 3
-- react-native-keychain (Android Keystore for credentials)
-- `@react-native-masked-view/masked-view` for hex-card clipping
-- Sentry crash reporting
 
 ## Development
+
+Requires pnpm (enforced via preinstall), Node 22+, and (for native Android) JDK 17+ via Android Studio's bundled JBR.
 
 ### Desktop
 
 ```bash
-pnpm install      # Install all workspace deps
-pnpm dev          # Electron + Vite HMR + tsc watch
-pnpm build        # Production build
-pnpm package      # Windows installer (NSIS + portable)
-pnpm test         # Vitest unit tests
-pnpm test:e2e     # Playwright E2E
-pnpm lint
+pnpm install
+pnpm dev             # Vite HMR + tsc + Electron on :5173
+pnpm build
+pnpm package         # NSIS installer + portable .exe
+pnpm test            # Vitest unit (rebuilds better-sqlite3 ABI)
+pnpm test:e2e        # Playwright E2E
 ```
 
-### Mobile
+### Android (native)
+
+Open `packages/android/` in Android Studio, or from CLI:
 
 ```bash
-cd packages/mobile
-pnpm start              # Metro on :8081
-pnpm android            # Build + install debug APK on connected device
-pnpm typecheck
+cd packages/android
+./gradlew :app:installDebug       # build + install on connected device
+./gradlew :app:assembleRelease    # signed per-ABI APKs
+./gradlew :shared:commonTest :shared:androidUnitTest   # KMP tests
 ```
 
-Release APK:
-```bash
-cd packages/mobile/android && ./gradlew assembleRelease
-# Output: packages/mobile/android/app/build/outputs/apk/release/app-release.apk
-```
+Release output: `packages/android/app/build/outputs/apk/release/app-<abi>-release.apk`.
 
-## Architecture
+### iOS
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for:
-- Process architecture (Electron main/renderer, React Native bundler/native)
-- Data flow (IPC on desktop, op-sqlite direct access on mobile)
-- Shared core boundaries and platform abstractions
-- Database schema (mirrored between platforms)
+Scheduled post-Android-1.0. Will open `packages/ios/YancoTV.xcodeproj` in Xcode 16+; shared Kotlin framework built via `./gradlew :shared:linkReleaseFrameworkIosArm64`.
 
-## Project Status
+## Current status
 
-**Desktop:** Phase 1 feature-complete (Sprints 1–15 + 17–20 DONE). Sprint 21 stabilization mostly done; Sprint 21.6 human QA against real IPTV sources pending before release sign-off.
-
-**Mobile:** M1 in progress. Phase 2 rewrite sits uncommitted as the first task.
+- **Desktop:** Phase 1 feature-complete (Sprints 1–20 DONE, Sprint 21 stabilization mostly done; Sprint 21.6 human QA against real sources pending before release sign-off).
+- **Android:** MK.0 through MK.8 landed — scaffold, shared core port, SQLDelight schema, sources, shell UI (hero-centric browse), channel list, shared ExoPlayer with mini-to-fullscreen handoff, XMLTV EPG, Catch-up / Timeshift / Favorites / History / Search / Settings / Parental. Target: ~12 weeks from 2026-04-20 to Android 1.0. See [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md) for the full milestone breakdown.
+- **iOS:** not started. Begins post-Android-1.0.
 
 ## License
 

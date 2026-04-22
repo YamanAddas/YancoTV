@@ -7,7 +7,13 @@ release/
 .env
 .env.local
 *.log
-.claude/
+# Commit shared Claude Code config (skills, agents, project-shared settings);
+# ignore only personal/generated files. Skills encode non-negotiable project
+# rules (see .claude/skills/native-android-mk/) and must survive a fresh clone.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/launch.json
+CLAUDE.local.md
 mpv/
 playwright-report/
 test-results/
