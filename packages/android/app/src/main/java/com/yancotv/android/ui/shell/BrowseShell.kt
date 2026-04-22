@@ -163,6 +163,11 @@ internal fun initialFocusIndex(
     return savedIndex.coerceIn(0, items.size - 1)
 }
 
+internal fun heroPlaybackForFocused(
+    focused: ContentItem?,
+    playing: ContentItem?,
+): ContentItem? = playing?.takeIf { focused?.id == it.id }
+
 /**
  * Browse orchestrator for Live / Movies / Series. Composes the three pieces
  * of the new shell — category chips, a cinematic feature hero driven by the
@@ -392,6 +397,7 @@ fun BrowseShell(
     }
 
     val playing by controller.currentItem.collectAsState()
+    val heroPlaying = heroPlaybackForFocused(focusedItem, playing)
 
     // Auto-preview on focus for LIVE channels. Moving the rail focus to a
     // channel card implicitly starts its stream in the hero MiniPlayer —
@@ -541,7 +547,7 @@ fun BrowseShell(
         ) {
             FeatureHero(
                 focused = focusedItem,
-                playing = playing,
+                playing = heroPlaying,
                 nowNext = focusedItem?.tvgId?.let { nowNextMap[it] },
                 nowSeconds = nowSeconds,
                 sourceName = sourceName,

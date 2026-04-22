@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlin.test.Test
@@ -327,6 +328,43 @@ class BrowseShellLogicTest {
         assertEquals(
             0,
             initialFocusIndex(items, savedIndex = 2, currentlyPlayingId = "c1"),
+        )
+    }
+
+    // ---- preview ownership ----
+
+    @Test fun heroPlaybackOnlyReturnsFocusedPlayerItem() {
+        val focused = movie(id = "m1", title = "The Matrix")
+        val playing = movie(id = "m1", title = "The Matrix")
+        assertEquals(playing, heroPlaybackForFocused(focused, playing))
+    }
+
+    @Test fun heroPlaybackReturnsNullForCrossTabPlayerItem() {
+        val focused = movie(id = "m1", title = "The Matrix")
+        val playing = liveChannel("c1")
+        assertNull(heroPlaybackForFocused(focused, playing))
+    }
+
+    @Test fun homeSectionStopsLivePreviewWhenLeavingLiveTv() {
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Movies, liveChannel("c1")))
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Series, liveChannel("c1")))
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Home, liveChannel("c1")))
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Guide, liveChannel("c1")))
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Favorites, liveChannel("c1")))
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Search, liveChannel("c1")))
+        assertTrue(shouldStopLivePreviewForSection(AppSection.Settings, liveChannel("c1")))
+    }
+
+    @Test fun homeSectionKeepsLivePreviewInsideLiveTv() {
+        assertFalse(shouldStopLivePreviewForSection(AppSection.LiveTv, liveChannel("c1")))
+    }
+
+    @Test fun homeSectionDoesNotStopVodWhenLeavingLiveTv() {
+        assertFalse(
+            shouldStopLivePreviewForSection(
+                AppSection.Movies,
+                movie(id = "m1", title = "The Matrix"),
+            ),
         )
     }
 

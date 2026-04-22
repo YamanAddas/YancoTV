@@ -49,6 +49,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
+internal fun shouldStopLivePreviewForSection(
+    section: AppSection,
+    playing: ContentItem?,
+): Boolean = section != AppSection.LiveTv && playing?.type == ContentType.LIVE
+
 /**
  * Adaptive shell. The browse sections (Live / Movies / Series) now delegate
  * to [BrowseShell] — category chips across the top, a feature hero driven
@@ -104,6 +109,13 @@ fun HomeScreen(
     val contentType = section.contentType
     val context = LocalContext.current
     val searchOverlayVisible by SearchOverlayState.visible.collectAsState()
+
+    LaunchedEffect(section) {
+        val playing = controller.currentItem.value
+        if (shouldStopLivePreviewForSection(section, playing)) {
+            controller.stop()
+        }
+    }
 
     BackHandler(enabled = searchOverlayVisible) { SearchOverlayState.hide() }
 
