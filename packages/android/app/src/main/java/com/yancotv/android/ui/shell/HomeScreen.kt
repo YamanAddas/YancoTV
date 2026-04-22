@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
@@ -133,10 +134,51 @@ fun HomeScreen(
 
     // Initial focus request. Without this, a user landing on any section
     // has to press a random d-pad key before the focus manager wakes up.
+    // For browse sections (Live / Movies / Series) the requester is wired
+    // into BrowseShell's chip bar — forward motion is sidebar → chips →
+    // rail → detail → player, matching the hierarchical BACK chain below.
     val mainContentFocus = remember { FocusRequester() }
     LaunchedEffect(section) {
         delay(120)
         runCatching { mainContentFocus.requestFocus() }
+    }
+
+    // Sidebar focus + tracking. BACK from any non-sidebar zone (detail,
+    // chips on "All", non-browse content) returns focus here; BACK while
+    // the sidebar itself has focus falls through to the system default
+    // (exit). `sidebarHasFocus` gates the escape handlers so they don't
+    // fire while the user is already on the sidebar.
+    val sidebarFocus = remember { FocusRequester() }
+    var sidebarHasFocus by remember { mutableStateOf(false) }
+
+    // Re-focus content when the detail overlay is dismissed. Compose
+    // doesn't automatically reassign focus to the underlying rail / chip
+    // bar when a focusGroup leaves composition, so the selector would
+    // otherwise go dark until the user presses a d-pad key. Fires only
+    // on the open→closed transition to avoid grabbing focus at startup.
+    var prevDetailOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(detailItem) {
+        val isOpen = detailItem != null
+        val justClosed = prevDetailOpen && !isOpen
+        prevDetailOpen = isOpen
+        if (justClosed) {
+            delay(80)
+            runCatching { mainContentFocus.requestFocus() }
+        }
+    }
+
+    // Top-level escape for non-browse sections. BrowseShell handles its
+    // own back chain (rail → chips → sidebar); this handler covers the
+    // sections that don't use BrowseShell (Home / Guide / Favorites /
+    // Search / Settings): any BACK while content has focus returns to
+    // the sidebar, and a further BACK on the sidebar exits.
+    BackHandler(
+        enabled = !sidebarHasFocus &&
+            detailItem == null &&
+            !searchOverlayVisible &&
+            contentType == null,
+    ) {
+        runCatching { sidebarFocus.requestFocus() }
     }
 
     val onBrowseActivate = fun(list: List<ContentItem>, idx: Int) {
@@ -168,6 +210,9 @@ fun HomeScreen(
             AppSidebar(
                 current = section,
                 onSelect = { section = it },
+                modifier = Modifier
+                    .focusRequester(sidebarFocus)
+                    .onFocusChanged { sidebarHasFocus = it.hasFocus },
             )
 
             if (contentType != null) {
@@ -177,7 +222,10 @@ fun HomeScreen(
                     onActivate = onBrowseActivate,
                     onChipsFocusChanged = { /* unused — shell is flat now */ },
                     onRailFocusChanged = { /* unused */ },
-                    railFocus = mainContentFocus,
+                    entryFocus = mainContentFocus,
+                    onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
+                    restoreFocusOnWindowRegain =
+                        detailItem == null && !searchOverlayVisible && pendingPlay == null,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             } else if (section == AppSection.Settings) {
@@ -265,6 +313,12 @@ fun HomeScreen(
         }
 
         // Movie / series detail overlay.
+        //
+        // Detail is NOT dismissed when the player launches — the overlay
+        // lives behind PlayerActivity so BACK from the player returns the
+        // user to the episodes page / movie detail, then another BACK
+        // dismisses detail and drops back onto the rail. Matches the
+        // hierarchical BACK chain: Player → Detail → Rail → Chips → Sidebar.
         detailItem?.let { item ->
             ContentDetailScreen(
                 item = item,
@@ -272,12 +326,11 @@ fun HomeScreen(
                     // Series containers have no playable stream — they reach
                     // this branch only as a last-ditch fallback (detail's
                     // HeroBlock routes to onPlayEpisode when episodes exist).
-                    // Blank-URL short-circuit: just dismiss, no dead player.
+                    // Blank-URL short-circuit: stay on detail, no dead player.
                     if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
                         controller.play(listOf(target), 0)
                         PlayerLauncher.launch(context)
                     }
-                    detailItem = null
                 },
                 onPlayEpisode = { target, ep ->
                     // Type-safe episode play via the Playable sealed type.
@@ -290,7 +343,6 @@ fun HomeScreen(
                         controller.play(playable)
                         PlayerLauncher.launch(context)
                     }
-                    detailItem = null
                 },
                 onDismiss = { detailItem = null },
             )

@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -189,7 +191,9 @@ fun BrowseShell(
     onActivate: (List<ContentItem>, Int) -> Unit,
     onChipsFocusChanged: (Boolean) -> Unit,
     onRailFocusChanged: (Boolean) -> Unit,
-    railFocus: FocusRequester,
+    entryFocus: FocusRequester,
+    onExitToSidebar: () -> Unit,
+    restoreFocusOnWindowRegain: Boolean,
     controller: PlaybackController = koinInject(),
     epg: EpgRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
@@ -348,7 +352,27 @@ fun BrowseShell(
         hideAdult = parentalSettings.hideAdultContent,
     )
 
-    val firstItemFocus = remember(type, group) { FocusRequester() }
+    // Focus requester that tracks the rail's current first-item card. Must
+    // NOT re-key on (type, group): when the user zaps to a different group
+    // the rail recomposes with a new first card, but this requester itself
+    // stays stable and re-attaches to the new card via ContentRail's
+    // focusRestorer. Re-keying here produced the "orphan requester" crash
+    // when the window-focus restore loop fired against a disposed node.
+    val firstItemFocus = remember { FocusRequester() }
+
+    // Focus requester attached to the currently-selected chip. Externally
+    // owned so BrowseShell can swing focus onto a specific chip (e.g. the
+    // "All" chip when the user BACKs out of a filtered view) without the
+    // chip bar having to expose its internal firstItemFocus.
+    val selectedChipFocus = remember { FocusRequester() }
+
+    // Which zone owns focus right now — the chip bar or the rail. Drives
+    // the hierarchical BackHandler chain: rail → chips → (reset group) →
+    // sidebar. Both values can be false briefly (during transitions) which
+    // disables the handlers — good, the system BACK then falls through to
+    // whatever HomeScreen has registered.
+    var chipsHasFocus by remember { mutableStateOf(false) }
+    var railHasFocus by remember { mutableStateOf(false) }
 
     // Tail-prefetch for paged catalogues. Triggered on focus position (not
     // scroll position) so D-pad users who over-shoot via OK's restore don't
@@ -422,6 +446,11 @@ fun BrowseShell(
     // the WheelRow recomposes immediately on window regain (controller state
     // + EPG tick), temporarily detaching firstItemFocus from any node.
     val windowInfo = LocalWindowInfo.current
+    // `restoreFocusOnWindowRegain` flips false while an overlay (detail,
+    // search) is live — without this gate BrowseShell would steal focus
+    // out of the overlay when PlayerActivity finishes, and the user'd
+    // land on a rail card instead of the detail Play button.
+    val canRestore by rememberUpdatedState(restoreFocusOnWindowRegain)
     LaunchedEffect(Unit) {
         var seenUnfocused = false
         snapshotFlow { windowInfo.isWindowFocused }.collect { windowFocused ->
@@ -429,8 +458,10 @@ fun BrowseShell(
                 seenUnfocused = true
             } else if (seenUnfocused) {
                 seenUnfocused = false
+                if (!canRestore) return@collect
                 for (delayMs in longArrayOf(80L, 250L, 500L)) {
                     delay(delayMs)
+                    if (!canRestore) break
                     val ok = runCatching { firstItemFocus.requestFocus() }.isSuccess
                     if (ok) break
                 }
@@ -438,13 +469,56 @@ fun BrowseShell(
         }
     }
 
+    // Hierarchical BACK chain inside the browse shell. Each handler is
+    // guarded by the zone that currently owns focus so only one fires at
+    // a time:
+    //   rail focused                      → move focus up to the chip bar
+    //   chips focused on a non-All group  → reset to "All" (selector snaps
+    //                                        to the All chip via selectedChipFocus)
+    //   chips focused on "All" / favorites → leave the shell entirely,
+    //                                        handing focus back to the sidebar
+    // When neither zone has focus (sidebar has it, or an overlay is up),
+    // all handlers are disabled and BACK falls through to HomeScreen /
+    // system default. The handlers register LIFO so the later ones — the
+    // chip-level escapes — take precedence over the rail handler when
+    // their conditions are true; that's fine because chipsHasFocus and
+    // railHasFocus are mutually exclusive.
+    BackHandler(enabled = railHasFocus) {
+        runCatching { selectedChipFocus.requestFocus() }
+    }
+    val scopeBack = rememberCoroutineScope()
+    BackHandler(enabled = chipsHasFocus && group != ALL_GROUPS) {
+        group = ALL_GROUPS
+        focusedIndex = 0
+        // Re-assert focus on the "All" chip after the chip bar recomposes
+        // with the new selection (focusRequester is attached to whichever
+        // chip has `isSelected = true`). The small delay lets the new node
+        // finish onPlaced before we call requestFocus on it.
+        scopeBack.launch {
+            for (delayMs in longArrayOf(40L, 120L, 280L)) {
+                delay(delayMs)
+                if (runCatching { selectedChipFocus.requestFocus() }.isSuccess) break
+            }
+        }
+    }
+    BackHandler(enabled = chipsHasFocus && group == ALL_GROUPS) {
+        onExitToSidebar()
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         // Top: categories. Thin and airy — dominating filter UI is the
-        // old shell's sin.
+        // old shell's sin. `entryFocus` is attached here so the sidebar's
+        // forward-from-section handoff lands on the chips (hierarchical
+        // forward: sidebar → chips → rail → detail → player).
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .onFocusChanged { if (it.hasFocus) onChipsFocusChanged(true) },
+                .focusRequester(entryFocus)
+                .onFocusChanged {
+                    val has = it.hasFocus
+                    chipsHasFocus = has
+                    if (has) onChipsFocusChanged(true)
+                },
         ) {
             CategoryChipBar(
                 groups = visibleGroups,
@@ -453,6 +527,7 @@ fun BrowseShell(
                     group = picked
                     focusedIndex = 0
                 },
+                externalSelectedFocus = selectedChipFocus,
             )
         }
 
@@ -497,10 +572,11 @@ fun BrowseShell(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(230.dp)
-                .focusRequester(railFocus)
                 .focusGroup()
                 .onFocusChanged {
-                    if (it.hasFocus) onRailFocusChanged(true)
+                    val has = it.hasFocus
+                    railHasFocus = has
+                    if (has) onRailFocusChanged(true)
                 },
         ) {
             if (visible.isEmpty()) {

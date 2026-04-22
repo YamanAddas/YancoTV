@@ -63,9 +63,16 @@ fun CategoryChipBar(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     showFavorites: Boolean = true,
+    externalSelectedFocus: FocusRequester? = null,
 ) {
     val listState = rememberLazyListState()
-    val firstItemFocus = remember { FocusRequester() }
+    // `externalSelectedFocus` (when provided) lets the caller request focus
+    // onto whichever chip is currently selected — used by BrowseShell to
+    // snap the selector onto "All" when the user BACKs out of a filtered
+    // group. When no external requester is supplied we fall back to a
+    // local one so focusRestorer still has a target on first entry.
+    val internalFirstFocus = remember { FocusRequester() }
+    val firstItemFocus = externalSelectedFocus ?: internalFirstFocus
 
     val selectedIndex = remember(groups, selected, showFavorites) {
         val prefix = (if (showFavorites) 1 else 0)

@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +43,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -237,6 +239,29 @@ fun ContentDetailScreen(
             if (delayMs > 0L) delay(delayMs)
             val ok = runCatching { playFocus.requestFocus() }.isSuccess
             if (ok) break
+        }
+    }
+
+    // Return-from-player focus restore. PlayerActivity yanks window focus
+    // away; when it finishes and this overlay regains focus, Compose does
+    // NOT automatically re-run the open-time focus ladder above because
+    // `loaded` hasn't changed. Without this the user comes back to the
+    // detail page with no visible selector — they have to press a d-pad
+    // key to wake it up. Mirrors BrowseShell's window-focus handler.
+    val windowInfo = LocalWindowInfo.current
+    LaunchedEffect(Unit) {
+        var seenUnfocused = false
+        snapshotFlow { windowInfo.isWindowFocused }.collect { windowFocused ->
+            if (!windowFocused) {
+                seenUnfocused = true
+            } else if (seenUnfocused) {
+                seenUnfocused = false
+                for (delayMs in longArrayOf(80L, 250L, 500L)) {
+                    delay(delayMs)
+                    val ok = runCatching { playFocus.requestFocus() }.isSuccess
+                    if (ok) break
+                }
+            }
         }
     }
 }
