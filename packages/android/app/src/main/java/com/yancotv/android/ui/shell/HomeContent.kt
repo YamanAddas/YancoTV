@@ -1,5 +1,10 @@
 package com.yancotv.android.ui.shell
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -28,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,25 +60,37 @@ import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
+import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
+import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.EpgProgramme
 import com.yancotv.shared.types.HistoryEntry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
 /**
- * Home landing surface. Stacks two horizontal rails — Continue watching
- * (recent VOD resume points) and Favorites (most-recently-starred) — on a
- * cinematic canvas. Each rail is a [LazyRow] so D-pad LEFT/RIGHT move
- * horizontally and UP/DOWN between rails; the outer [verticalScroll] lets
- * a short panel still reach Favorites.
+ * Home landing dashboard. Six rails stacked on a cinematic canvas:
+ *   1. Hero — single-slide feature card rotating through the top
+ *      Continue Watching pick + top "On Now" favorite-channel programs.
+ *   2. Continue Watching — resume points from watch_history.
+ *   3. On Now — favorite live channels with their current EPG program.
+ *   4. Favorites — starred non-live titles (channels live in On Now).
+ *   5. Up Next Tonight — favorite channels' next program in the next 2h.
+ *   6. Recently Added — newest VOD from the catalogue (createdAt DESC).
  *
- * Empty state is a branded welcome card instead of the old plain-text
- * "Welcome to YancoTV" block — matches the premium shell language.
+ * Every surface uses [HexSurface] + [YancoShapes] cut-corner / hex
+ * shapes so the dashboard reads as part of the angular shell — not a
+ * generic Netflix clone.
+ *
+ * Empty state is a branded welcome card shown only when everything
+ * (history + favorites + catalogue) is empty.
  */
 @UnstableApi
 @Composable
@@ -81,55 +100,145 @@ fun HomeContent(
     history: WatchHistoryRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
     parental: ParentalRepository = koinInject(),
+    epg: EpgRepository = koinInject(),
+    content: ContentRepository = koinInject(),
 ) {
     val continueWatching = remember { mutableStateListOf<ContentItem>() }
     val favoriteList by favorites.allFlow().collectAsState(initial = emptyList())
     val hiddenIds by parental.hiddenIds.collectAsState()
     val lockedIds by parental.lockedIds.collectAsState()
 
+    val resumeByContent = remember { mutableStateOf<Map<String, HistoryEntry>>(emptyMap()) }
+    val onNowItems = remember { mutableStateListOf<NowPairing>() }
+    val upNextItems = remember { mutableStateListOf<NowPairing>() }
+    val recentlyAdded = remember { mutableStateListOf<ContentItem>() }
+
+    // Continue watching + resume lookup map come from the same table;
+    // load both in one pass so the resume map is ready as soon as the
+    // rail renders.
     LaunchedEffect(Unit) {
         val recent = withContext(Dispatchers.IO) {
-            runCatching { history.recent(limit = 20) }.getOrElse { emptyList() }
+            runCatching { history.recent(limit = 30) }.getOrElse { emptyList() }
         }
+        resumeByContent.value = recent.associateBy { it.contentId }
         continueWatching.clear()
         continueWatching.addAll(
-            recent.map { entry -> entry.content to entry }
-                .filter { it.first.id !in hiddenIds }
-                .distinctBy { it.first.id }
-                .take(12)
-                .map { it.first },
+            recent.map { it.content }
+                .filter { it.id !in hiddenIds }
+                .distinctBy { it.id }
+                .take(12),
         )
     }
 
-    val favoriteItems = remember(favoriteList, hiddenIds) {
+    // Favorites-derived: non-live favorites for the Favorites rail,
+    // and live favorites' tvgIds for the On Now + Up Next EPG batch.
+    val nonLiveFavorites = remember(favoriteList, hiddenIds) {
         favoriteList.map { it.content }
-            .filter { it.id !in hiddenIds }
+            .filter { it.type != ContentType.LIVE && it.id !in hiddenIds }
             .take(20)
     }
-
-    val resumeByContent = remember(continueWatching) { mutableStateOf<Map<String, HistoryEntry>>(emptyMap()) }
-    LaunchedEffect(continueWatching.size) {
-        val map = withContext(Dispatchers.IO) {
-            history.recent(limit = 30).associateBy { it.contentId }
-        }
-        resumeByContent.value = map
+    val liveFavorites = remember(favoriteList, hiddenIds) {
+        favoriteList.map { it.content }
+            .filter { it.type == ContentType.LIVE && it.id !in hiddenIds }
     }
+
+    // Batch EPG lookup for all favorite live channels. The map is keyed
+    // by tvgId, so we filter the liveFavorites list back into the two
+    // rails (on-now = programmes where start<=now<end; up-next = next
+    // programme starting within 2h).
+    LaunchedEffect(liveFavorites) {
+        onNowItems.clear()
+        upNextItems.clear()
+        if (liveFavorites.isEmpty()) return@LaunchedEffect
+        val ids = liveFavorites.mapNotNull { it.tvgId?.takeIf { tv -> tv.isNotBlank() } }
+            .distinct()
+            .take(60)
+        if (ids.isEmpty()) return@LaunchedEffect
+        val batch = withContext(Dispatchers.IO) {
+            runCatching { epg.getNowNextBatch(ids) }.getOrElse { emptyMap() }
+        }
+        val nowSec = System.currentTimeMillis() / 1000
+        val upNextCutoff = nowSec + 2 * 3600 // 2 hours out
+        val nowList = mutableListOf<NowPairing>()
+        val upNextList = mutableListOf<NowPairing>()
+        for (channel in liveFavorites) {
+            val key = channel.tvgId?.takeIf { it.isNotBlank() } ?: continue
+            val nn = batch[key] ?: continue
+            nn.now?.let { nowList.add(NowPairing(channel, it)) }
+            val next = nn.next
+            if (next != null && next.startTime in (nowSec + 1)..upNextCutoff) {
+                upNextList.add(NowPairing(channel, next))
+            }
+        }
+        onNowItems.addAll(nowList.take(12))
+        upNextItems.addAll(upNextList.sortedBy { it.programme.startTime }.take(12))
+    }
+
+    // Recently added = VOD rows (movies + series) ordered by created_at DESC
+    // via a dedicated SQLDelight query. The older client-side merge paged 400
+    // rows and re-sorted in Kotlin, which was slow on first catalog load and
+    // also wrong past the 200-per-type cap.
+    //
+    // Language bias: this user's catalog is English + Arabic heavy, so we
+    // prefer titles that match one of those scripts or whose group name
+    // contains a matching language token. If the filtered result is too
+    // thin (< 8), fall back to the unfiltered list so the rail never
+    // collapses on a small catalog.
+    LaunchedEffect(Unit) {
+        val combined = withContext(Dispatchers.IO) {
+            runCatching {
+                content.recentlyAddedVod(limit = 60)
+            }.getOrElse { emptyList() }
+                .filter { it.id !in hiddenIds }
+        }
+        val biased = combined.filter { matchesPreferredLanguage(it) }
+        val final = if (biased.size >= 8) biased.take(20) else combined.take(20)
+        recentlyAdded.clear()
+        recentlyAdded.addAll(final)
+    }
+
+    // Hero slides are derived, not stored — they recompute when any
+    // source rail updates so the carousel is always fresh.
+    val heroSlides by remember {
+        derivedStateOf {
+            buildHeroSlides(
+                continueWatching = continueWatching,
+                resumeByContent = resumeByContent.value,
+                onNow = onNowItems,
+            )
+        }
+    }
+
+    val isTotallyEmpty = continueWatching.isEmpty() &&
+        nonLiveFavorites.isEmpty() &&
+        onNowItems.isEmpty() &&
+        upNextItems.isEmpty() &&
+        recentlyAdded.isEmpty()
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep)
             .verticalScroll(rememberScrollState())
-            .padding(top = Space.xxxl, bottom = Space.section),
+            .padding(top = Space.xl, bottom = Space.section),
         verticalArrangement = Arrangement.spacedBy(Space.xxxl),
     ) {
-        if (continueWatching.isEmpty() && favoriteItems.isEmpty()) {
+        if (isTotallyEmpty) {
             EmptyHome(modifier = Modifier.padding(horizontal = Space.section))
             return@Column
         }
 
+        if (heroSlides.isNotEmpty()) {
+            HomeHero(
+                slides = heroSlides,
+                lockedIds = lockedIds,
+                onPlay = { slide -> onPlay(listOf(slide.item), 0) },
+                modifier = Modifier.padding(horizontal = Space.section),
+            )
+        }
+
         if (continueWatching.isNotEmpty()) {
-            Rail(
+            PosterRail(
                 eyebrow = "FOR YOU",
                 title = "Continue watching",
                 caption = "Jump back where you left off",
@@ -142,25 +251,361 @@ fun HomeContent(
                 },
             )
         }
-        if (favoriteItems.isNotEmpty()) {
-            Rail(
+        if (onNowItems.isNotEmpty()) {
+            OnNowRail(
+                items = onNowItems,
+                lockedIds = lockedIds,
+                onPlay = { item ->
+                    val idx = onNowItems.indexOfFirst { it.channel.id == item.id }
+                    val list = onNowItems.map { it.channel }
+                    if (idx >= 0) onPlay(list, idx)
+                },
+            )
+        }
+        if (nonLiveFavorites.isNotEmpty()) {
+            PosterRail(
                 eyebrow = "YOUR LIBRARY",
                 title = "Favorites",
-                caption = "Channels and titles you starred",
-                items = favoriteItems,
+                caption = "Movies and series you starred",
+                items = nonLiveFavorites,
                 lockedIds = lockedIds,
                 resumeByContent = resumeByContent.value,
                 onPlay = { item ->
-                    val idx = favoriteItems.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(favoriteItems, idx)
+                    val idx = nonLiveFavorites.indexOfFirst { it.id == item.id }
+                    if (idx >= 0) onPlay(nonLiveFavorites, idx)
+                },
+            )
+        }
+        if (upNextItems.isNotEmpty()) {
+            UpNextRail(
+                items = upNextItems,
+                lockedIds = lockedIds,
+                onPlay = { item ->
+                    val idx = upNextItems.indexOfFirst { it.channel.id == item.id }
+                    val list = upNextItems.map { it.channel }
+                    if (idx >= 0) onPlay(list, idx)
+                },
+            )
+        }
+        if (recentlyAdded.isNotEmpty()) {
+            PosterRail(
+                eyebrow = "FRESH",
+                title = "Recently added",
+                caption = "New movies and series in your library",
+                items = recentlyAdded,
+                lockedIds = lockedIds,
+                resumeByContent = resumeByContent.value,
+                onPlay = { item ->
+                    val idx = recentlyAdded.indexOfFirst { it.id == item.id }
+                    if (idx >= 0) onPlay(recentlyAdded.toList(), idx)
                 },
             )
         }
     }
 }
 
+// ---------- Hero ----------
+
+private data class HeroSlide(
+    val item: ContentItem,
+    val eyebrow: String,
+    val accentIcon: ImageVector,
+    val headline: String,
+    val subhead: String,
+)
+
+private fun buildHeroSlides(
+    continueWatching: List<ContentItem>,
+    resumeByContent: Map<String, HistoryEntry>,
+    onNow: List<NowPairing>,
+): List<HeroSlide> {
+    val slides = mutableListOf<HeroSlide>()
+    continueWatching.firstOrNull()?.let { item ->
+        val resume = resumeByContent[item.id]
+        val sub = resume?.let { r ->
+            val dur = r.durationSeconds
+            if (dur != null && dur > 0) {
+                val remainingSec = (dur - r.positionSeconds).coerceAtLeast(0.0).roundToInt()
+                val minutes = (remainingSec / 60).coerceAtLeast(1)
+                "${minutes}m left • pick up where you stopped"
+            } else {
+                "Resume playback"
+            }
+        } ?: "Resume playback"
+        slides.add(
+            HeroSlide(
+                item = item,
+                eyebrow = "CONTINUE WATCHING",
+                accentIcon = YancoIcons.Play,
+                headline = item.cleanTitle?.ifBlank { null } ?: item.title,
+                subhead = sub,
+            ),
+        )
+    }
+    onNow.take(2).forEach { pair ->
+        slides.add(
+            HeroSlide(
+                item = pair.channel,
+                eyebrow = "ON AIR NOW",
+                accentIcon = YancoIcons.Live,
+                headline = pair.programme.title,
+                subhead = (pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title) +
+                    "  •  " + formatTimeWindow(pair.programme),
+            ),
+        )
+    }
+    return slides
+}
+
 @Composable
-private fun Rail(
+private fun HomeHero(
+    slides: List<HeroSlide>,
+    lockedIds: Set<String>,
+    onPlay: (HeroSlide) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var index by remember(slides.size) { mutableStateOf(0) }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+
+    // Auto-rotate every 7s, but pause when the hero has focus so the
+    // user has time to read + press OK. A single focusable element —
+    // LEFT/RIGHT on the hero falls through to the surrounding focus
+    // graph (sidebar on LEFT), matching the rest of the shell.
+    LaunchedEffect(slides.size, focused) {
+        if (slides.size <= 1 || focused) return@LaunchedEffect
+        while (true) {
+            delay(7000L)
+            if (focused) break
+            index = (index + 1) % slides.size
+        }
+    }
+
+    val safeIndex = index.coerceIn(0, slides.lastIndex)
+    val slide = slides[safeIndex]
+    val locked = slide.item.id in lockedIds
+
+    HexSurface(
+        shape = YancoShapes.CutCornerCard,
+        focused = focused,
+        bevelInset = 4.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(320.dp)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = { onPlay(slide) }),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = slide,
+                transitionSpec = {
+                    (fadeIn(tween(durationMillis = 420))) togetherWith
+                        fadeOut(tween(durationMillis = 280))
+                },
+                label = "hero-slide",
+                modifier = Modifier.fillMaxSize(),
+            ) { current ->
+                HeroFrame(
+                    slide = current,
+                    focused = focused,
+                    locked = locked,
+                )
+            }
+            // Slide-position pips — only show when there's more than one
+            // slide, tucked into the top-right cut-corner.
+            if (slides.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(Space.lg),
+                    horizontalArrangement = Arrangement.spacedBy(Space.xs),
+                ) {
+                    slides.indices.forEach { i ->
+                        Box(
+                            modifier = Modifier
+                                .size(width = if (i == safeIndex) 18.dp else 6.dp, height = 6.dp)
+                                .clip(RoundedCornerShape(Radius.pill))
+                                .background(
+                                    if (i == safeIndex) YancoPalette.Accent
+                                    else YancoPalette.TextFaint,
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroFrame(slide: HeroSlide, focused: Boolean, locked: Boolean) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Backdrop — full-bleed artwork, falls back to a two-tone
+        // gradient when the item has no logo so the hero still reads
+        // premium on catalogues without artwork.
+        if (!slide.item.logoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = slide.item.logoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                YancoPalette.BackgroundElevated,
+                                YancoPalette.BackgroundHover,
+                            ),
+                        ),
+                    ),
+            )
+        }
+        // Cinematic gradient — darken left for text legibility + fade
+        // bottom so the eyebrow/title/subhead float on a soft base.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.40f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.45f),
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.85f),
+                        ),
+                    ),
+                ),
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = Space.xxxl, vertical = Space.xxl),
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+            ) {
+                Icon(
+                    imageVector = slide.accentIcon,
+                    contentDescription = null,
+                    tint = YancoPalette.Accent,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = slide.eyebrow,
+                    color = YancoPalette.Accent,
+                    style = YancoType.Overline,
+                )
+            }
+            Spacer(Modifier.height(Space.sm))
+            Text(
+                text = slide.headline,
+                color = YancoPalette.TextPrimary,
+                style = YancoType.DisplayM,
+                maxLines = 2,
+            )
+            Spacer(Modifier.height(Space.xs))
+            Text(
+                text = slide.subhead,
+                color = YancoPalette.TextSecondary,
+                style = YancoType.Body,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(Space.lg))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.md),
+            ) {
+                HeroCta(focused = focused, locked = locked)
+                if (!slide.item.groupName.isNullOrBlank()) {
+                    Text(
+                        text = slide.item.groupName!!,
+                        color = YancoPalette.TextMuted,
+                        style = YancoType.Caption,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCta(focused: Boolean, locked: Boolean) {
+    val label = if (locked) "Enter PIN" else "Watch now"
+    val icon = if (locked) YancoIcons.Lock else YancoIcons.Play
+    Row(
+        modifier = Modifier
+            .clip(YancoShapes.ButtonBevel)
+            .background(
+                if (focused) YancoPalette.Accent
+                else YancoPalette.Accent.copy(alpha = 0.22f),
+            )
+            .padding(horizontal = Space.lg, vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (focused) YancoPalette.BackgroundDeep else YancoPalette.Accent,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = label,
+            color = if (focused) YancoPalette.BackgroundDeep else YancoPalette.Accent,
+            style = YancoType.LabelStrong,
+        )
+    }
+}
+
+// ---------- Rails (shared header + wheel row) ----------
+
+@Composable
+private fun RailHeader(eyebrow: String, title: String, caption: String) {
+    Column(modifier = Modifier.padding(horizontal = Space.section)) {
+        Text(
+            text = eyebrow,
+            color = YancoPalette.Accent,
+            style = YancoType.Overline,
+        )
+        Spacer(Modifier.height(Space.xxs))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = title,
+                color = YancoPalette.TextPrimary,
+                style = YancoType.TitleL,
+            )
+            Spacer(Modifier.width(Space.md))
+            Text(
+                text = caption,
+                color = YancoPalette.TextMuted,
+                style = YancoType.Caption,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterRail(
     eyebrow: String,
     title: String,
     caption: String,
@@ -170,35 +615,8 @@ private fun Rail(
     onPlay: (ContentItem) -> Unit,
 ) {
     val listState = rememberLazyListState()
-
-    // Scroll is driven solely by focus → WheelRow's CenterBringIntoViewSpec
-    // centre-snaps the focused card automatically. Do NOT add an
-    // animateScrollToItem keyed on a local focused-index state — it races
-    // with bringIntoView and stacks two scroll animations.
-
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-        Column(modifier = Modifier.padding(horizontal = Space.section)) {
-            Text(
-                text = eyebrow,
-                color = YancoPalette.Accent,
-                style = YancoType.Overline,
-            )
-            Spacer(Modifier.height(Space.xxs))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = title,
-                    color = YancoPalette.TextPrimary,
-                    style = YancoType.TitleL,
-                )
-                Spacer(Modifier.width(Space.md))
-                Text(
-                    text = caption,
-                    color = YancoPalette.TextMuted,
-                    style = YancoType.Caption,
-                    modifier = Modifier.padding(bottom = 3.dp),
-                )
-            }
-        }
+        RailHeader(eyebrow = eyebrow, title = title, caption = caption)
         WheelRow(
             itemWidth = ShellDim.posterTile,
             listState = listState,
@@ -218,6 +636,72 @@ private fun Rail(
         }
     }
 }
+
+@Composable
+private fun OnNowRail(
+    items: List<NowPairing>,
+    lockedIds: Set<String>,
+    onPlay: (ContentItem) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+        RailHeader(
+            eyebrow = "ON AIR",
+            title = "On now",
+            caption = "Live right this second on your favorite channels",
+        )
+        WheelRow(
+            itemWidth = ShellDim.posterTile,
+            listState = listState,
+            horizontalArrangement = Arrangement.spacedBy(Space.lg),
+            verticalPadding = Space.lg,
+            minSidePadding = Space.section,
+        ) {
+            itemsIndexed(items, key = { _, it -> it.channel.id }) { index, pair ->
+                OnNowTile(
+                    pair = pair,
+                    locked = pair.channel.id in lockedIds,
+                    onClick = { onPlay(pair.channel) },
+                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpNextRail(
+    items: List<NowPairing>,
+    lockedIds: Set<String>,
+    onPlay: (ContentItem) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+        RailHeader(
+            eyebrow = "TONIGHT",
+            title = "Up next",
+            caption = "Starting soon on your favorite channels",
+        )
+        WheelRow(
+            itemWidth = ShellDim.posterTile,
+            listState = listState,
+            horizontalArrangement = Arrangement.spacedBy(Space.lg),
+            verticalPadding = Space.lg,
+            minSidePadding = Space.section,
+        ) {
+            itemsIndexed(items, key = { _, it -> it.channel.id + ":" + it.programme.id }) { index, pair ->
+                UpNextTile(
+                    pair = pair,
+                    locked = pair.channel.id in lockedIds,
+                    onClick = { onPlay(pair.channel) },
+                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
+                )
+            }
+        }
+    }
+}
+
+// ---------- Tile variants ----------
 
 @Composable
 private fun PosterTile(
@@ -249,7 +733,7 @@ private fun PosterTile(
                     .fillMaxWidth()
                     .aspectRatio(ShellDim.posterTileAspect),
             ) {
-                Artwork(item = item, focused = focused)
+                TileArt(item = item, focused = focused)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -312,7 +796,168 @@ private fun PosterTile(
 }
 
 @Composable
-private fun Artwork(item: ContentItem, focused: Boolean) {
+private fun OnNowTile(
+    pair: NowPairing,
+    locked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val nowSec = remember { System.currentTimeMillis() / 1000 }
+    val dur = (pair.programme.endTime - pair.programme.startTime).coerceAtLeast(1)
+    val elapsed = (nowSec - pair.programme.startTime).coerceIn(0, dur)
+    val progressPct = (elapsed.toFloat() / dur.toFloat()).coerceIn(0f, 1f)
+
+    HexSurface(
+        shape = YancoShapes.CutCornerCardSmall,
+        focused = focused,
+        bevelInset = 3.dp,
+        modifier = modifier
+            .width(ShellDim.posterTile)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ShellDim.posterTileAspect),
+            ) {
+                TileArt(item = pair.channel, focused = focused)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                                ),
+                            ),
+                        ),
+                )
+                if (locked) {
+                    LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
+                }
+                LiveBadge(modifier = Modifier.align(Alignment.TopEnd).padding(Space.sm))
+                TypeChip(
+                    item = pair.channel,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Space.sm),
+                )
+                ProgressStripe(
+                    progress = progressPct,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                    .padding(horizontal = Space.md, vertical = Space.sm),
+                verticalArrangement = Arrangement.spacedBy(Space.xxs),
+            ) {
+                Text(
+                    text = pair.programme.title,
+                    color = YancoPalette.TextPrimary,
+                    style = YancoType.TitleS,
+                    maxLines = 1,
+                )
+                Text(
+                    text = pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
+                    color = YancoPalette.TextMuted,
+                    style = YancoType.Caption,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpNextTile(
+    pair: NowPairing,
+    locked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+
+    HexSurface(
+        shape = YancoShapes.CutCornerCardSmall,
+        focused = focused,
+        bevelInset = 3.dp,
+        modifier = modifier
+            .width(ShellDim.posterTile)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ShellDim.posterTileAspect),
+            ) {
+                TileArt(item = pair.channel, focused = focused)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                                ),
+                            ),
+                        ),
+                )
+                if (locked) {
+                    LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
+                }
+                StartTimeBadge(
+                    programme = pair.programme,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Space.sm),
+                )
+                TypeChip(
+                    item = pair.channel,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Space.sm),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                    .padding(horizontal = Space.md, vertical = Space.sm),
+                verticalArrangement = Arrangement.spacedBy(Space.xxs),
+            ) {
+                Text(
+                    text = pair.programme.title,
+                    color = YancoPalette.TextPrimary,
+                    style = YancoType.TitleS,
+                    maxLines = 1,
+                )
+                Text(
+                    text = pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
+                    color = YancoPalette.TextMuted,
+                    style = YancoType.Caption,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+// ---------- Shared tile chrome ----------
+
+@Composable
+private fun TileArt(item: ContentItem, focused: Boolean) {
     if (!item.logoUrl.isNullOrBlank()) {
         AsyncImage(
             model = item.logoUrl,
@@ -321,8 +966,6 @@ private fun Artwork(item: ContentItem, focused: Boolean) {
             modifier = Modifier.fillMaxSize(),
         )
     } else {
-        // No artwork — fall back to a gradient-washed monogram so the card
-        // still reads premium instead of a grey rectangle with letters.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -397,6 +1040,48 @@ private fun ResumeBadge(resume: HistoryEntry, modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun LiveBadge(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(YancoPalette.Live.copy(alpha = 0.88f))
+            .padding(horizontal = Space.sm, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(YancoPalette.TextPrimary),
+        )
+        Text(
+            text = "LIVE",
+            color = YancoPalette.TextPrimary,
+            style = YancoType.Overline,
+        )
+    }
+}
+
+@Composable
+private fun StartTimeBadge(programme: EpgProgramme, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.78f))
+            .padding(horizontal = Space.sm, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
+    ) {
+        Text(
+            text = formatClock(programme.startTime),
+            color = YancoPalette.Accent,
+            style = YancoType.CaptionStrong,
+        )
+    }
+}
+
+@Composable
 private fun TypeChip(item: ContentItem, modifier: Modifier = Modifier) {
     val raw = item.groupName?.takeIf { it.isNotBlank() }
         ?: item.type.name.lowercase().replaceFirstChar(Char::uppercase)
@@ -418,8 +1103,6 @@ private fun TypeChip(item: ContentItem, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ProgressStripe(progress: Float, modifier: Modifier) {
-    // Two-layer stripe — dimmed track + accent fill with a soft trailing
-    // glow so it reads at 10 ft. Sits flush at the bottom of the artwork.
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -439,6 +1122,49 @@ private fun ProgressStripe(progress: Float, modifier: Modifier) {
     }
 }
 
+// ---------- Utilities ----------
+
+private data class NowPairing(
+    val channel: ContentItem,
+    val programme: EpgProgramme,
+)
+
+/**
+ * Preferred-language filter for the Recently Added rail. This user's catalog is
+ * English + Arabic heavy; providers dump every language into one playlist, so
+ * the raw "newest first" view gets flooded with TR/RU/ES rows the user won't
+ * watch.
+ *
+ * Matching is cheap and forgiving — we accept a row if any of these hold:
+ *   1. The title contains Arabic script (U+0600..U+06FF).
+ *   2. The title is ASCII-dominant (≥70% printable ASCII), which catches
+ *      Latin-script non-English titles too but is close enough at this scale.
+ *   3. The group name contains a language token we recognise (EN/AR/UK/US/USA/
+ *      ENGLISH/ARABIC). Providers frequently prefix groups like "EN | MOVIES".
+ *
+ * Callers fall back to the unfiltered list when this returns too few rows —
+ * don't tighten it into a hard gate.
+ */
+private fun matchesPreferredLanguage(item: ContentItem): Boolean {
+    val title = item.title
+    if (title.any { it.code in 0x0600..0x06FF }) return true
+    val group = item.groupName?.uppercase() ?: ""
+    val tokens = listOf(
+        "EN", "ENGLISH",
+        "AR", "ARABIC",
+        "UK", "US", "USA",
+    )
+    if (tokens.any { tok ->
+            // Word-boundary-ish match so "UKR" (Ukrainian) doesn't satisfy "UK".
+            val idx = group.indexOf(tok)
+            idx >= 0 &&
+                (idx == 0 || !group[idx - 1].isLetterOrDigit()) &&
+                (idx + tok.length == group.length || !group[idx + tok.length].isLetterOrDigit())
+        }) return true
+    val asciiCount = title.count { it.code in 0x20..0x7E }
+    return title.isNotEmpty() && asciiCount.toFloat() / title.length >= 0.7f
+}
+
 private fun secondaryLine(item: ContentItem, resume: HistoryEntry?): String {
     return when {
         resume != null && resume.durationSeconds != null -> {
@@ -448,46 +1174,6 @@ private fun secondaryLine(item: ContentItem, resume: HistoryEntry?): String {
         }
         !item.groupName.isNullOrBlank() -> item.groupName!!
         else -> item.type.name.lowercase().replaceFirstChar(Char::uppercase)
-    }
-}
-
-@Composable
-private fun EmptyHome(modifier: Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.panel))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        YancoPalette.BackgroundRaised,
-                        YancoPalette.BackgroundElevated,
-                    ),
-                ),
-            )
-            .padding(horizontal = Space.section, vertical = Space.section),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(Space.sm),
-        ) {
-            Text(
-                text = "YANCOTV+",
-                color = YancoPalette.Accent,
-                style = YancoType.Overline,
-            )
-            Text(
-                text = "Your cinematic IPTV suite",
-                color = YancoPalette.TextPrimary,
-                style = YancoType.DisplayS,
-            )
-            Spacer(Modifier.height(Space.xs))
-            Text(
-                text = "Add a source in Settings → Sources and pick a channel. Everything you watch or star lands right here.",
-                color = YancoPalette.TextSecondary,
-                style = YancoType.BodyLong,
-            )
-        }
     }
 }
 
@@ -501,5 +1187,70 @@ private fun formatMmSs(sec: Int): String {
         String.format("%d:%02d:%02d", h, mm, r)
     } else {
         String.format("%d:%02d", m, r)
+    }
+}
+
+private fun formatClock(unixSeconds: Long): String {
+    val millis = unixSeconds * 1000
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    val hour24 = cal.get(java.util.Calendar.HOUR_OF_DAY)
+    val minute = cal.get(java.util.Calendar.MINUTE)
+    val hour12 = ((hour24 + 11) % 12) + 1
+    val suffix = if (hour24 < 12) "AM" else "PM"
+    return String.format("%d:%02d %s", hour12, minute, suffix)
+}
+
+private fun formatTimeWindow(programme: EpgProgramme): String {
+    return "${formatClock(programme.startTime)} – ${formatClock(programme.endTime)}"
+}
+
+@Composable
+private fun EmptyHome(modifier: Modifier) {
+    // Cut-corner hero-sized welcome card. Same shape family as the
+    // real hero so an empty catalogue still reads as "the dashboard
+    // is here, just waiting on content".
+    HexSurface(
+        shape = YancoShapes.CutCornerCard,
+        focused = false,
+        bevelInset = 4.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(260.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            YancoPalette.BackgroundRaised,
+                            YancoPalette.BackgroundElevated,
+                        ),
+                    ),
+                )
+                .padding(horizontal = Space.xxxl, vertical = Space.xxxl),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(Space.sm),
+            ) {
+                Text(
+                    text = "YANCOTV+",
+                    color = YancoPalette.Accent,
+                    style = YancoType.Overline,
+                )
+                Text(
+                    text = "Your cinematic IPTV suite",
+                    color = YancoPalette.TextPrimary,
+                    style = YancoType.DisplayS,
+                )
+                Spacer(Modifier.height(Space.xs))
+                Text(
+                    text = "Add a source in Settings → Sources, star a few channels, and this dashboard lights up with what to watch right now.",
+                    color = YancoPalette.TextSecondary,
+                    style = YancoType.BodyLong,
+                )
+            }
+        }
     }
 }
