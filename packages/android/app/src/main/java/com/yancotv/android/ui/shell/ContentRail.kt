@@ -33,12 +33,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.geometry.Offset
@@ -73,7 +71,7 @@ import com.yancotv.shared.types.NowNext
  * Cards consume [HexSurface] so the angular frame language stays consistent
  * with filter chips and buttons in the same shell.
  */
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ContentRail(
     type: ContentType,
@@ -108,7 +106,6 @@ fun ContentRail(
         minSidePadding = Space.page,
         modifier = modifier
             .fillMaxWidth()
-            .focusRestorer { firstItemFocus }
             .focusGroup(),
     ) {
         itemsIndexed(items, key = { _, it -> it.id }) { index, item ->

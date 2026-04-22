@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
@@ -357,19 +356,18 @@ fun BrowseShell(
         hideAdult = parentalSettings.hideAdultContent,
     )
 
-    // Focus requester that tracks the rail's current first-item card. Must
-    // NOT re-key on (type, group): when the user zaps to a different group
-    // the rail recomposes with a new first card, but this requester itself
-    // stays stable and re-attaches to the new card via ContentRail's
-    // focusRestorer. Re-keying here produced the "orphan requester" crash
-    // when the window-focus restore loop fired against a disposed node.
+    // Focus requester that tracks the rail's current card. Must NOT re-key
+    // on (type, group): when the user zaps to a different group the rail
+    // recomposes with a new target card, but this requester itself stays
+    // stable and re-attaches to that card. Re-keying here produced the
+    // "orphan requester" crash when the window-focus restore loop fired
+    // against a disposed node.
     val firstItemFocus = remember { FocusRequester() }
 
-    // Focus requester attached to the currently-selected chip. Externally
-    // owned so BrowseShell can swing focus onto a specific chip (e.g. the
-    // "All" chip when the user BACKs out of a filtered view) without the
-    // chip bar having to expose its internal firstItemFocus.
-    val selectedChipFocus = remember { FocusRequester() }
+    // HomeScreen owns entryFocus and requests it on section/detail changes.
+    // Attach that requester directly to the selected chip; wiring it to a
+    // non-focusable wrapper can silently no-op and leave the selector dark.
+    val selectedChipFocus = entryFocus
 
     // Which zone owns focus right now — the chip bar or the rail. Drives
     // the hierarchical BackHandler chain: rail → chips → (reset group) →
@@ -442,9 +440,9 @@ fun BrowseShell(
     //
     // The previous fix in HomeScreen called mainContentFocus.requestFocus()
     // on a Box that has .focusGroup() — which sets canFocus=false. A
-    // requestFocus() on a canFocus=false node does NOT propagate down through
-    // focusRestorer into a real focusable leaf; it silently no-ops. The user
-    // still had to press a key to light up any card.
+    // requestFocus() on a canFocus=false node does NOT propagate down into
+    // a real focusable leaf; it silently no-ops. The user still had to
+    // press a key to light up any card.
     //
     // Fix: call firstItemFocus.requestFocus() directly — it is attached to
     // an actual .focusable() card at focusedIndex, so Compose emits a real
@@ -513,13 +511,12 @@ fun BrowseShell(
 
     Column(modifier = modifier.fillMaxSize()) {
         // Top: categories. Thin and airy — dominating filter UI is the
-        // old shell's sin. `entryFocus` is attached here so the sidebar's
-        // forward-from-section handoff lands on the chips (hierarchical
-        // forward: sidebar → chips → rail → detail → player).
+        // old shell's sin. `entryFocus` is attached to the selected chip so
+        // the sidebar's forward-from-section handoff lands on a real leaf
+        // (hierarchical forward: sidebar → chips → rail → detail → player).
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .focusRequester(entryFocus)
                 .onFocusChanged {
                     val has = it.hasFocus
                     chipsHasFocus = has

@@ -92,6 +92,47 @@ class BrowseShellLogicTest {
         assertTrue(visibleGroupsFor(emptyList(), setOf("Adult")).isEmpty())
     }
 
+    // ---- selectedChipIndex ----
+
+    @Test fun selectedChipIndexPointsAtAllAfterFavoritesChip() {
+        assertEquals(
+            1,
+            selectedChipIndex(groups = listOf("Drama"), selected = ALL_GROUPS, showFavorites = true),
+        )
+    }
+
+    @Test fun selectedChipIndexPointsAtAllFirstWhenFavoritesHidden() {
+        assertEquals(
+            0,
+            selectedChipIndex(groups = listOf("Drama"), selected = ALL_GROUPS, showFavorites = false),
+        )
+    }
+
+    @Test fun selectedChipIndexCountsSeparatorBeforeRealGroups() {
+        assertEquals(
+            4,
+            selectedChipIndex(
+                groups = listOf("Kids", "Drama", "Sports"),
+                selected = "Drama",
+                showFavorites = true,
+            ),
+        )
+    }
+
+    @Test fun selectedChipIndexReturnsMinusOneForUnavailableFavoriteChip() {
+        assertEquals(
+            -1,
+            selectedChipIndex(groups = emptyList(), selected = FAVORITES_GROUP, showFavorites = false),
+        )
+    }
+
+    @Test fun selectedChipIndexReturnsMinusOneForHiddenGroup() {
+        assertEquals(
+            -1,
+            selectedChipIndex(groups = listOf("Kids"), selected = "Sports", showFavorites = true),
+        )
+    }
+
     // ---- applyParentalFilters ----
 
     @Test fun applyParentalFiltersReturnsUnchangedWhenNothingFiltered() {

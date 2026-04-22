@@ -28,13 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
@@ -49,13 +46,13 @@ import com.yancotv.android.ui.theme.YancoType
  * below, they don't dominate the browse canvas.
  *
  * Focus behavior:
- *   - `focusRestorer` returns to the last selected chip on re-entry
+ *   - The selected chip owns the caller's [FocusRequester], so section
+ *     entry and BACK-from-rail land on a real focusable leaf
  *   - The selected chip auto-scrolls into view so a 40-group catalogue
  *     remains usable
  *   - Specialized first chips — Favorites (heart) + All (grid) — stay
  *     pinned so the most-used filters are always one focus hop away.
  */
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CategoryChipBar(
     groups: List<String>,
@@ -70,20 +67,12 @@ fun CategoryChipBar(
     // onto whichever chip is currently selected — used by BrowseShell to
     // snap the selector onto "All" when the user BACKs out of a filtered
     // group. When no external requester is supplied we fall back to a
-    // local one so focusRestorer still has a target on first entry.
+    // local one so the selected chip can still be requested directly.
     val internalFirstFocus = remember { FocusRequester() }
     val firstItemFocus = externalSelectedFocus ?: internalFirstFocus
 
     val selectedIndex = remember(groups, selected, showFavorites) {
-        val prefix = (if (showFavorites) 1 else 0)
-        when (selected) {
-            FAVORITES_GROUP -> 0
-            ALL_GROUPS -> prefix
-            else -> {
-                val g = groups.indexOf(selected)
-                if (g < 0) -1 else prefix + 1 + g
-            }
-        }
+        selectedChipIndex(groups = groups, selected = selected, showFavorites = showFavorites)
     }
     LaunchedEffect(selectedIndex) {
         if (selectedIndex >= 0) {
@@ -94,7 +83,6 @@ fun CategoryChipBar(
     LazyRow(
         state = listState,
         modifier = modifier
-            .focusRestorer { firstItemFocus }
             .focusGroup(),
         contentPadding = PaddingValues(
             horizontal = Space.page,
@@ -142,6 +130,22 @@ fun CategoryChipBar(
                 focusRequester = if (isSelected) firstItemFocus else null,
                 onClick = { onSelect(group) },
             )
+        }
+    }
+}
+
+internal fun selectedChipIndex(
+    groups: List<String>,
+    selected: String,
+    showFavorites: Boolean,
+): Int {
+    val favoriteCount = if (showFavorites) 1 else 0
+    return when (selected) {
+        FAVORITES_GROUP -> if (showFavorites) 0 else -1
+        ALL_GROUPS -> favoriteCount
+        else -> {
+            val g = groups.indexOf(selected)
+            if (g < 0) -1 else favoriteCount + 2 + g
         }
     }
 }
