@@ -108,6 +108,10 @@ fun HomeScreen(
                         controller.play(listOf(item), 0)
                         PlayerLauncher.launch(context)
                     },
+                    onPlayCatchup = { item ->
+                        controller.play(listOf(item), 0)
+                        PlayerLauncher.launch(context)
+                    },
                 )
             }
         } else if (section == AppSection.Favorites) {

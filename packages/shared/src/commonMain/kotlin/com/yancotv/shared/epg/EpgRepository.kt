@@ -1,5 +1,6 @@
 package com.yancotv.shared.epg
 
+import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.db.Epg_programmes
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.http.HttpClient
@@ -42,6 +43,7 @@ import kotlinx.coroutines.withContext
  */
 class EpgRepository(
     private val db: YancoDb,
+    private val driver: SqlDriver,
     private val http: HttpClient,
     private val clock: () -> Long,
     private val logger: Logger = NOOP_LOGGER,
@@ -53,6 +55,8 @@ class EpgRepository(
      */
     private val gunzip: (ByteArray) -> ByteArray = { it },
 ) {
+
+    private val bulkWriter = BulkEpgWriter(driver, logger)
 
     // ───── Queries ─────
 
@@ -104,17 +108,28 @@ class EpgRepository(
             .map { it.toDomain() }
 
     /**
-     * Guide grid data: the [startTime, endTime) window projected across all
-     * live channels (that have guide data) as a list of
-     * `EpgGuideChannel { programmes[] }`.
+     * Guide grid data: the [startTime, endTime) window projected across
+     * [limit] live channels starting at [offset].
+     *
+     * **Paged** — callers MUST not request the whole catalog at once.
+     * A provider with 250 k live channels would materialise ~10 million
+     * programme objects across every matching channel for a 6 h window;
+     * far past the 320 MB heap cap on Fire TV. GuideScreen loads in
+     * ~100-row pages and extends as the user scrolls.
      */
-    fun getGuideData(startTime: Long, endTime: Long, sourceId: String? = null): EpgGuideData {
+    fun getGuideData(
+        startTime: Long,
+        endTime: Long,
+        sourceId: String? = null,
+        limit: Long = 100L,
+        offset: Long = 0L,
+    ): EpgGuideData {
         val channels = if (sourceId == null) {
-            db.contentQueries.guideChannelsAll(startTime, endTime).executeAsList().map {
+            db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
                 GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
             }
         } else {
-            db.contentQueries.guideChannelsBySource(sourceId, startTime, endTime).executeAsList().map {
+            db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
                 GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
             }
         }
@@ -144,6 +159,14 @@ class EpgRepository(
         }
         return EpgGuideData(channels = result, startTime = startTime, endTime = endTime)
     }
+
+    /** Total distinct live channels with guide data in the window. Used by the guide's "X of Y" header. */
+    fun countGuideChannels(startTime: Long, endTime: Long, sourceId: String? = null): Long =
+        if (sourceId == null) {
+            db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
+        } else {
+            db.contentQueries.countGuideChannelsBySource(sourceId, startTime, endTime).executeAsOne()
+        }
 
     fun getStats(): EpgStats {
         val programmes = db.epgProgrammesQueries.countAll().executeAsOne()
@@ -178,20 +201,28 @@ class EpgRepository(
             return EpgRefreshResult(ok = true, programmeCount = 0, channelCount = 0)
         }
 
-        data class Parsed(val sourceKey: String, val sourceIdForDb: String?, val programmes: List<XmltvProgramme>)
+        val errors = mutableListOf<String>()
+        val batches = mutableListOf<BulkEpgWriter.ProgrammeBatch>()
 
-        val parsed = mutableListOf<Parsed>()
         targets.forEachIndexed { idx, t ->
             onProgress("Fetching EPG ${idx + 1}/${targets.size} (${t.sourceKey})")
             try {
+                val fetchStart = clock()
                 val text = fetchXmltvText(t.url)
+                val fetchMs = clock() - fetchStart
+                logger.info("EPG fetch: ${t.sourceKey} took ${fetchMs}ms, ${text.length} chars")
+
                 onProgress("Parsing EPG ${idx + 1}/${targets.size} (${t.sourceKey})")
+                val parseStart = clock()
                 val result = withContext(Dispatchers.Default) { parseXmltv(text, logger) }
+                logger.info("EPG parse: ${t.sourceKey} yielded ${result.programmes.size} programmes in ${clock() - parseStart}ms")
+
                 if (result.programmes.isEmpty()) {
+                    errors.add("${t.sourceKey}: response parsed but contained 0 programmes (check URL / XMLTV format)")
                     logger.warn("EPG source ${t.sourceKey} returned no programmes")
                 } else {
-                    parsed.add(
-                        Parsed(
+                    batches.add(
+                        BulkEpgWriter.ProgrammeBatch(
                             sourceKey = t.sourceKey,
                             sourceIdForDb = if (t.sourceKey == GLOBAL_SOURCE_KEY) null else t.sourceKey,
                             programmes = result.programmes,
@@ -199,47 +230,56 @@ class EpgRepository(
                     )
                 }
             } catch (error: Throwable) {
-                logger.error("EPG fetch/parse failed for ${t.sourceKey}: ${error.message}")
+                val msg = error.message ?: error::class.simpleName ?: "unknown"
+                errors.add("${t.sourceKey}: $msg")
+                logger.error("EPG fetch/parse failed for ${t.sourceKey}: $msg")
             }
         }
 
-        if (parsed.isEmpty()) {
-            return EpgRefreshResult(ok = false, error = "All EPG sources failed to load")
+        if (batches.isEmpty()) {
+            val detail = if (errors.isEmpty()) "All EPG sources failed to load" else errors.joinToString(" | ")
+            setLastError(detail)
+            return EpgRefreshResult(ok = false, error = detail)
         }
 
-        onProgress("Writing ${parsed.sumOf { it.programmes.size }} programmes")
-        var total = 0
-        val channels = HashSet<String>()
-        withContext(Dispatchers.Default) {
-            db.transaction {
-                db.epgProgrammesQueries.deleteAll()
-                for (p in parsed) {
-                    for (prog in p.programmes) {
-                        val id = "${prog.channelId}|${prog.startTime}|${p.sourceKey}"
-                        db.epgProgrammesQueries.upsert(
-                            id = id,
-                            source_id = p.sourceIdForDb,
-                            channel_tvg_id = prog.channelId,
-                            title = prog.title,
-                            description = prog.description,
-                            start_time = prog.startTime,
-                            end_time = prog.endTime,
-                            category = prog.category,
-                            icon_url = prog.iconUrl,
-                        )
-                        total++
-                        channels.add(prog.channelId)
-                    }
-                }
-                db.settingsQueries.upsert(LAST_REFRESHED_KEY, clock().toString())
-            }
+        val total = batches.sumOf { it.programmes.size }
+        onProgress("Writing $total programmes (bulk-insert)")
+
+        val writeStart = clock()
+        val result = withContext(Dispatchers.Default) {
+            bulkWriter.replaceAll(
+                batches = batches,
+                onBatch = { written, t -> onProgress("Writing $written/$t programmes") },
+                lastRefreshedMs = clock(),
+            )
+        }
+        val writeMs = clock() - writeStart
+        logger.info("EPG bulk write: ${result.rowsWritten} rows across ${result.channels} channels in ${writeMs}ms")
+
+        clearLastError()
+        if (errors.isNotEmpty()) {
+            // Partial success — some sources failed but at least one succeeded.
+            // Persist the warning so the panel can flag it without failing the
+            // whole refresh.
+            setLastError("Partial: " + errors.joinToString(" | "))
         }
 
         return EpgRefreshResult(
             ok = true,
-            programmeCount = total,
-            channelCount = channels.size,
+            programmeCount = result.rowsWritten,
+            channelCount = result.channels,
         )
+    }
+
+    fun getLastError(): String? =
+        db.settingsQueries.get(LAST_ERROR_KEY).executeAsOneOrNull()?.takeIf { it.isNotBlank() }
+
+    private fun setLastError(msg: String) {
+        db.settingsQueries.upsert(LAST_ERROR_KEY, msg)
+    }
+
+    private fun clearLastError() {
+        db.settingsQueries.delete(LAST_ERROR_KEY)
     }
 
     /** Drop programmes whose end_time is before [cutoffSeconds]. */
@@ -257,20 +297,19 @@ class EpgRepository(
      *     magic (0x1F 0x8B), and gunzip via the platform hook.
      */
     private suspend fun fetchXmltvText(url: String): String {
-        val looksGz = url.substringBefore('?').endsWith(".gz", ignoreCase = true)
+        // Always fetch bytes and sniff the gzip magic. Xtream's `xmltv.php`
+        // routinely gzips without sending `Content-Encoding: gzip`, so
+        // `http.getText()` would UTF-8-decode binary bytes into mojibake and
+        // the parser would report zero programmes — silently breaking EPG.
         val options = HttpRequestOptions(
             timeoutMs = FETCH_TIMEOUT_MS,
             maxResponseBytes = MAX_EPG_BYTES,
         )
-        if (!looksGz) return http.getText(url, options)
-
         val bytes = http.getBytes(url, options)
         val inflated = if (bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()) {
+            logger.info("EPG fetch: gzip detected at $url (${bytes.size} B compressed)")
             gunzip(bytes)
         } else {
-            // URL ended with .gz but server already gave us plain XML (some
-            // providers do this when the client sends Accept-Encoding: gzip
-            // and the proxy decompresses). Trust the bytes.
             bytes
         }
         return inflated.decodeToString()
@@ -334,6 +373,7 @@ class EpgRepository(
 
         const val GLOBAL_URL_KEY: String = "epg_global_url"
         const val LAST_REFRESHED_KEY: String = "epg_last_refreshed"
+        const val LAST_ERROR_KEY: String = "epg_last_error"
         const val GLOBAL_SOURCE_KEY: String = "global"
     }
 }

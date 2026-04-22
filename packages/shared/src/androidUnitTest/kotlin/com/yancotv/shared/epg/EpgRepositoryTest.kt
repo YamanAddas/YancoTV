@@ -109,8 +109,8 @@ class EpgRepositoryTest {
 
     @Test
     fun `refresh with no sources returns ok with zero counts`() = runTest {
-        val db = testDb()
-        val repo = EpgRepository(db, FakeHttpClient(), clock = { 10_000L })
+        val (db, driver) = newDbPair()
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 10_000L })
         val result = repo.refresh()
         assertTrue(result.ok)
         assertEquals(0, result.programmeCount)
@@ -118,7 +118,7 @@ class EpgRepositoryTest {
 
     @Test
     fun `refresh ingests programmes into the DB`() = runTest {
-        val db = testDb()
+        val (db, driver) = newDbPair()
         insertSource(db, "src-A", "http://host/epg-a.xml")
 
         val now = 1_700_000_000L
@@ -129,7 +129,7 @@ class EpgRepositoryTest {
             ),
         )
         val http = FakeHttpClient(mapOf("http://host/epg-a.xml" to xml))
-        val repo = EpgRepository(db, http, clock = { now * 1000L })
+        val repo = EpgRepository(db, driver, http, clock = { now * 1000L })
 
         val result = repo.refresh()
         assertTrue(result.ok, "error: ${result.error}")
@@ -145,7 +145,7 @@ class EpgRepositoryTest {
 
     @Test
     fun `refresh keeps existing rows when all sources fail`() = runTest {
-        val db = testDb()
+        val (db, driver) = newDbPair()
         insertSource(db, "src-A", "http://host/epg-a.xml")
 
         val now = 1_700_000_000L
@@ -153,6 +153,7 @@ class EpgRepositoryTest {
         val xml = xmltv(listOf(Quadruple("c1", "Baseline", now - 100, now + 100)))
         var repo = EpgRepository(
             db,
+            driver,
             FakeHttpClient(mapOf("http://host/epg-a.xml" to xml)),
             clock = { now * 1000L },
         )
@@ -162,6 +163,7 @@ class EpgRepositoryTest {
         // Second refresh: network failure — existing row must survive.
         repo = EpgRepository(
             db,
+            driver,
             FakeHttpClient(errors = setOf("http://host/epg-a.xml")),
             clock = { now * 1000L },
         )
@@ -172,12 +174,13 @@ class EpgRepositoryTest {
 
     @Test
     fun `getNowNext returns next-only when nothing is airing right now`() = runTest {
-        val db = testDb()
+        val (db, driver) = newDbPair()
         insertSource(db, "src-A", "http://host/epg-a.xml")
         val now = 1_700_000_000L
         val xml = xmltv(listOf(Quadruple("c1", "Upcoming", now + 600, now + 1200)))
         val repo = EpgRepository(
             db,
+            driver,
             FakeHttpClient(mapOf("http://host/epg-a.xml" to xml)),
             clock = { now * 1000L },
         )
@@ -191,11 +194,12 @@ class EpgRepositoryTest {
 
     @Test
     fun `global EPG URL is included as the 'global' source key`() = runTest {
-        val db = testDb()
+        val (db, driver) = newDbPair()
         val now = 1_700_000_000L
         val xml = xmltv(listOf(Quadruple("c1", "Global Show", now - 100, now + 100)))
         val repo = EpgRepository(
             db,
+            driver,
             FakeHttpClient(mapOf("http://host/global.xml" to xml)),
             clock = { now * 1000L },
         )
@@ -205,5 +209,10 @@ class EpgRepositoryTest {
         assertEquals(1, result.programmeCount)
         val nn = repo.getNowNext("c1")
         assertEquals("Global Show", nn.now?.title)
+    }
+
+    private fun newDbPair(): Pair<com.yancotv.shared.db.YancoDb, app.cash.sqldelight.db.SqlDriver> {
+        val pair = com.yancotv.shared.sources.testDatabase()
+        return pair.db to pair.driver
     }
 }

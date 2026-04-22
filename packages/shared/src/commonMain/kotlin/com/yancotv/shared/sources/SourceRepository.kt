@@ -158,6 +158,24 @@ class SourceRepository(
         return getById(input.id) ?: error("update failed: ${input.id}")
     }
 
+    /**
+     * Decrypted Xtream credentials for [sourceId]. Returns null for non-Xtream
+     * sources, for missing/blank URL, or if either credential is absent. Used
+     * by the catchup builder to construct timeshift stream URLs without
+     * teaching that layer about the credential store.
+     */
+    fun xtreamCredentials(sourceId: String): XtreamCredentials? {
+        val source = getById(sourceId) ?: return null
+        if (source.type != SourceType.XTREAM) return null
+        val baseUrl = source.url?.takeIf { it.isNotBlank() } ?: return null
+        val row = db.sourcesQueries.selectById(sourceId).executeAsOneOrNull() ?: return null
+        val userBlob = row.username_encrypted ?: return null
+        val passBlob = row.password_encrypted ?: return null
+        val username = runCatching { credentialStore.decrypt(userBlob) }.getOrNull() ?: return null
+        val password = runCatching { credentialStore.decrypt(passBlob) }.getOrNull() ?: return null
+        return XtreamCredentials(baseUrl = baseUrl, username = username, password = password)
+    }
+
     fun reorder(idsInOrder: List<String>) {
         val now = clock()
         db.transaction {

@@ -25,9 +25,9 @@ import kotlinx.serialization.json.JsonElement
  * Non-2xx responses throw [HttpResponseError] so upstream retry logic can match
  * on the status code — same semantics as the desktop `HttpClient` wrapper.
  */
-class KtorHttpClient(
-    private val ktor: KtorClient,
-    private val defaultUserAgent: String = "YancoTV/0.1.0",
+open class KtorHttpClient(
+    protected val ktor: KtorClient,
+    protected val defaultUserAgent: String = "YancoTV/0.1.0",
 ) : HttpClient {
 
     private val json = Json {
@@ -76,17 +76,16 @@ class KtorHttpClient(
     ): T = withContext(Dispatchers.Default) {
         val response = performGet(url, options)
         val channel: ByteReadChannel = response.bodyAsChannel()
-        // Ktor 3.0.3 doesn't ship ByteReadChannel.asSource() (added in 3.1+).
-        // readRemaining() buffers the body into a kotlinx.io.Source — not true
-        // streaming, but still vastly cheaper than bodyAsText() + JsonElement
-        // tree: we skip the UTF-8 String allocation and the full parsed tree,
-        // and decodeSourceToSequence walks elements lazily so peak heap is
-        // bounded by (raw bytes + one chunk of parsed objects), not 3-4x size.
+        // Default implementation buffers via readRemaining() — correct but
+        // not memory-efficient on catalogs >~30MB. Production transports
+        // (AndroidKtorHttpClient) override to stream via a temp file so peak
+        // memory stays bounded regardless of payload size. iOS + test fakes
+        // can keep the eager fallback.
         val source: Source = channel.readRemaining()
         source.use { block(it) }
     }
 
-    private suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
+    protected suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
         val response: HttpResponse = ktor.get(url) {
             header("User-Agent", options.headers["User-Agent"] ?: defaultUserAgent)
             for ((k, v) in options.headers) {

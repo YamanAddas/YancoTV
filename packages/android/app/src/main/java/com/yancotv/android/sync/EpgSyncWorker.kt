@@ -14,6 +14,7 @@ import androidx.work.workDataOf
 import com.yancotv.shared.epg.EpgRepository
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import androidx.work.ForegroundInfo
 import java.util.concurrent.TimeUnit
 
 /**
@@ -39,13 +40,18 @@ class EpgSyncWorker(
 ) : CoroutineWorker(appContext, params), KoinComponent {
 
     private val epg: EpgRepository by inject()
+    private val importer: AndroidEpgImporter by inject()
 
     override suspend fun doWork(): Result {
         return try {
-            val result = epg.refresh()
+            // Stream-based importer keeps peak memory bounded — the shared
+            // [EpgRepository.refresh] path materialises the whole XML as a
+            // String and OOMs on Fire TV when the provider's feed is large.
+            // The importer uses XmlPullParser + incremental batched writes.
+            val result = importer.refresh { msg ->
+                setProgress(workDataOf(KEY_PROGRESS to msg))
+            }
             if (result.ok) {
-                // Drop programmes that ended before 24h ago — the guide never
-                // shows yesterday's schedule and keeping them bloats the index.
                 val cutoff = (System.currentTimeMillis() / 1000L) - STALE_WINDOW_SECONDS
                 runCatching { epg.deleteStale(cutoff) }
                 Result.success()
@@ -62,6 +68,7 @@ class EpgSyncWorker(
 
     companion object {
         const val KEY_ERROR = "error"
+        const val KEY_PROGRESS = "progress"
         private const val MAX_RETRIES = 3
         private const val UNIQUE_PERIODIC = "epg-sync-periodic"
         private const val UNIQUE_ONESHOT = "epg-sync-oneshot"

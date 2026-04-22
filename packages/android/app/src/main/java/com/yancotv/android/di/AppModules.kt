@@ -5,7 +5,10 @@ import com.yancotv.android.logger.AndroidLogger
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.sync.AndroidEpgImporter
+import com.yancotv.shared.epg.BulkEpgWriter
 import com.yancotv.shared.logger.Logger
+import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
@@ -17,7 +20,7 @@ import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.androidGunzip
 import com.yancotv.shared.http.HttpClient
-import com.yancotv.shared.http.createHttpClient
+import com.yancotv.shared.http.createAndroidHttpClient
 import com.yancotv.shared.sources.AndroidFileContentReader
 import com.yancotv.shared.sources.AndroidKeystoreCredentialStore
 import com.yancotv.shared.sources.CredentialStore
@@ -38,7 +41,12 @@ val appModule = module {
     single<YancoDatabase> { DatabaseFactory(androidContext()).create() }
     single<YancoDb> { get<YancoDatabase>().db }
     single<SqlDriver> { get<YancoDatabase>().driver }
-    single<HttpClient> { createHttpClient(defaultUserAgent = "YancoTV/0.1 (Android)") }
+    single<HttpClient> {
+        createAndroidHttpClient(
+            defaultUserAgent = "YancoTV/0.1 (Android)",
+            cacheDir = androidContext().cacheDir,
+        )
+    }
     single<CredentialStore> { AndroidKeystoreCredentialStore() }
     single<FileContentReader> { AndroidFileContentReader(androidContext()) }
     single { ContentRepository(get()) }
@@ -58,9 +66,19 @@ val appModule = module {
     single {
         EpgRepository(
             db = get(),
+            driver = get(),
             http = get(),
             clock = { System.currentTimeMillis() },
             gunzip = ::androidGunzip,
+            logger = get(),
+        )
+    }
+    single { BulkEpgWriter(driver = get(), logger = get()) }
+    single {
+        AndroidEpgImporter(
+            context = androidContext(),
+            db = get(),
+            writer = get(),
             logger = get(),
         )
     }
@@ -73,4 +91,11 @@ val appModule = module {
     single { ReminderScheduler(androidContext(), get()) }
     single { FavoritesRepository(db = get(), clock = { System.currentTimeMillis() }) }
     single { WatchHistoryRepository(db = get(), clock = { System.currentTimeMillis() }) }
+    single {
+        CatchupService(
+            contentRepo = get(),
+            sourceRepo = get(),
+            clock = { System.currentTimeMillis() },
+        )
+    }
 }

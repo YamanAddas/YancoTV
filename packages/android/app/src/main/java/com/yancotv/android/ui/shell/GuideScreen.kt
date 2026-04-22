@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -29,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +51,9 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.epg.EpgRepository
+import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
 import com.yancotv.shared.types.EpgProgramme
@@ -75,6 +80,13 @@ private const val WINDOW_HOURS = 6L
 // when the window slides — which happens on a coarser 30-min grain.
 private const val NOW_TICK_MS = 60_000L
 
+// Paged guide load: 100 channels per page, extend when the user scrolls
+// within PREFETCH_THRESHOLD rows of the end. Tuned for Fire TV: a bigger
+// page buys fewer DB round-trips but each one locks main for longer when
+// the result is mapped to domain objects.
+private const val GUIDE_PAGE_SIZE = 100L
+private const val PREFETCH_THRESHOLD = 20
+
 /**
  * 2D EPG guide: channels on the Y axis, time on the X axis. Horizontal
  * scroll is shared across the header and every channel row so the time
@@ -93,27 +105,90 @@ private const val NOW_TICK_MS = 60_000L
 @Composable
 fun GuideScreen(
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,
+    onPlayCatchup: (ContentItem) -> Unit,
     modifier: Modifier = Modifier,
     epg: EpgRepository = koinInject(),
     scheduler: ReminderScheduler = koinInject(),
+    catchup: CatchupService = koinInject(),
 ) {
-    var data by remember { mutableStateOf<EpgGuideData?>(null) }
+    // Channel list is grown via pagination — initial 100, then more as the
+    // user scrolls. Holds bounded memory even for 250k-channel catalogs.
+    var channels by remember { mutableStateOf<List<EpgGuideChannel>>(emptyList()) }
+    var totalChannels by remember { mutableStateOf(0L) }
+    var windowStartState by remember { mutableStateOf(0L) }
+    var windowEndState by remember { mutableStateOf(0L) }
     var loading by remember { mutableStateOf(true) }
+    var loadingMore by remember { mutableStateOf(false) }
+    var allLoaded by remember { mutableStateOf(false) }
     var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
     var actionTarget by remember { mutableStateOf<ProgrammeAction?>(null) }
+    var reloadTick by remember { mutableStateOf(0) }
+    val listState = rememberLazyListState()
 
-    LaunchedEffect(Unit) {
-        loading = true
+    // Initial / forced reload — resets pagination and fetches page 0.
+    LaunchedEffect(reloadTick) {
+        val initial = channels.isEmpty()
+        if (initial) loading = true
         val now = System.currentTimeMillis() / 1000L
-        // Floor to the previous 30-min boundary so the header ticks land on
-        // round clock times (e.g. 12:00, 12:30) instead of 12:07.
         val windowStart = now - (now % (30L * 60L))
         val windowEnd = windowStart + WINDOW_HOURS * 60L * 60L
-        data = withContext(Dispatchers.IO) {
-            epg.getGuideData(startTime = windowStart, endTime = windowEnd, sourceId = null)
+        windowStartState = windowStart
+        windowEndState = windowEnd
+
+        val loaded = withContext(Dispatchers.IO) {
+            val total = runCatching {
+                epg.countGuideChannels(startTime = windowStart, endTime = windowEnd)
+            }.getOrElse { 0L }
+            val page = epg.getGuideData(
+                startTime = windowStart,
+                endTime = windowEnd,
+                sourceId = null,
+                limit = GUIDE_PAGE_SIZE,
+                offset = 0L,
+            )
+            total to page
         }
-        loading = false
+        totalChannels = loaded.first
+        // Defensive dedup: LazyColumn crashes hard on duplicate keys, and the
+        // SQL is supposed to return one row per tvg_id — but this belt-and-
+        // suspenders keeps the UI alive if the query ever regresses.
+        channels = loaded.second.channels.distinctBy { it.tvgId }
+        allLoaded = channels.size >= totalChannels.toInt() || loaded.second.channels.isEmpty()
+        if (initial) loading = false
     }
+
+    // Scroll-triggered pagination. Fires when the user's close to the end of
+    // the currently-loaded window; loads the next page in the background.
+    val lastVisibleIndex by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo.visibleItemsInfo
+            if (info.isEmpty()) -1 else info.last().index
+        }
+    }
+    LaunchedEffect(lastVisibleIndex, allLoaded) {
+        if (allLoaded || loadingMore || channels.isEmpty()) return@LaunchedEffect
+        if (lastVisibleIndex < channels.size - PREFETCH_THRESHOLD) return@LaunchedEffect
+        loadingMore = true
+        val nextPage = withContext(Dispatchers.IO) {
+            epg.getGuideData(
+                startTime = windowStartState,
+                endTime = windowEndState,
+                sourceId = null,
+                limit = GUIDE_PAGE_SIZE,
+                offset = channels.size.toLong(),
+            )
+        }
+        // Same defensive dedup: if a page overlaps with what's already loaded
+        // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
+        // we drop the duplicates so LazyColumn keys stay unique.
+        val existing = channels.mapTo(HashSet(channels.size)) { it.tvgId }
+        val newOnly = nextPage.channels.filter { it.tvgId !in existing }
+        val appended = channels + newOnly
+        channels = appended
+        allLoaded = nextPage.channels.isEmpty() || appended.size >= totalChannels.toInt()
+        loadingMore = false
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             delay(NOW_TICK_MS)
@@ -121,39 +196,76 @@ fun GuideScreen(
         }
     }
 
-    val guide = data
-    if (loading || guide == null) {
-        GuideEmptyState(text = "Loading guide…", modifier = modifier)
-        return
-    }
-    if (guide.channels.isEmpty()) {
-        GuideEmptyState(
-            text = "No EPG data yet. Add a source with an EPG URL and wait for the next sync.",
-            modifier = modifier,
-        )
-        return
-    }
-
-    GuideGrid(
-        guide = guide,
-        nowSeconds = nowSeconds,
-        onPlay = onPlay,
-        onProgrammeAction = { channel, programme ->
-            actionTarget = ProgrammeAction(channel, programme)
-        },
-        modifier = modifier,
+    val guide = if (channels.isEmpty()) null else EpgGuideData(
+        channels = channels,
+        startTime = windowStartState,
+        endTime = windowEndState,
     )
+    val guideEmpty = guide == null
+
+    Column(modifier = modifier.fillMaxSize()) {
+        if (guideEmpty) {
+            if (loading) {
+                GuideEmptyState(text = "Loading guide…", modifier = Modifier.fillMaxSize())
+            } else {
+                // Diagnostics panel takes over the full area, carrying the
+                // refresh + re-sync actions so the user never has to dig
+                // through Settings to unstick an empty guide.
+                GuideSyncPanel(
+                    compact = false,
+                    onRefreshed = { reloadTick++ },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        } else {
+            GuideSyncPanel(
+                compact = true,
+                onRefreshed = { reloadTick++ },
+            )
+            GuideGrid(
+                guide = guide!!,
+                nowSeconds = nowSeconds,
+                listState = listState,
+                totalCount = totalChannels,
+                loadingMore = loadingMore,
+                onPlay = onPlay,
+                onProgrammeAction = { channel, programme ->
+                    actionTarget = ProgrammeAction(channel, programme)
+                },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
 
     val target = actionTarget
     if (target != null) {
+        // Cheap availability probe for past programmes: DB-only, no network.
+        // Running it in a LaunchedEffect keyed on the target keeps the probe
+        // off the main thread while the dialog renders immediately.
+        var catchupItem by remember(target.programme.id) { mutableStateOf<ContentItem?>(null) }
+        LaunchedEffect(target.programme.id) {
+            val programme = target.programme
+            if (programme.endTime > nowSeconds) {
+                catchupItem = null
+                return@LaunchedEffect
+            }
+            val resolved = withContext(Dispatchers.IO) { catchup.resolve(programme) }
+            catchupItem = (resolved as? CatchupService.Resolution.Playable)?.item
+        }
+
         ProgrammeActionDialog(
             channel = target.channel,
             programme = target.programme,
             nowSeconds = nowSeconds,
             isReminderSet = scheduler.isSet(target.programme.id),
+            catchupItem = catchupItem,
             onWatch = {
                 actionTarget = null
                 onPlay(target.channel, target.programme)
+            },
+            onPlayCatchup = { item ->
+                actionTarget = null
+                onPlayCatchup(item)
             },
             onSetReminder = {
                 scheduler.set(target.channel.tvgId, target.programme)
@@ -178,6 +290,9 @@ private data class ProgrammeAction(
 private fun GuideGrid(
     guide: EpgGuideData,
     nowSeconds: Long,
+    listState: LazyListState,
+    totalCount: Long,
+    loadingMore: Boolean,
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,
     onProgrammeAction: (EpgGuideChannel, EpgProgramme) -> Unit,
     modifier: Modifier,
@@ -198,8 +313,27 @@ private fun GuideGrid(
             hScroll = hScroll,
         )
 
+        if (totalCount > guide.channels.size) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(horizontal = 24.dp, vertical = 4.dp),
+            ) {
+                androidx.compose.material3.Text(
+                    text = if (loadingMore)
+                        "Showing ${guide.channels.size} of $totalCount channels · loading more…"
+                    else
+                        "Showing ${guide.channels.size} of $totalCount channels",
+                    color = YancoPalette.TextMuted,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -442,7 +576,9 @@ private fun ProgrammeActionDialog(
     programme: EpgProgramme,
     nowSeconds: Long,
     isReminderSet: Boolean,
+    catchupItem: ContentItem?,
     onWatch: () -> Unit,
+    onPlayCatchup: (ContentItem) -> Unit,
     onSetReminder: () -> Unit,
     onCancelReminder: () -> Unit,
     onDismiss: () -> Unit,
@@ -450,6 +586,7 @@ private fun ProgrammeActionDialog(
     // "Future" means the programme hasn't started yet. Setting a reminder on
     // something already live is pointless — the user should just press Watch.
     val isFuture = programme.startTime > nowSeconds
+    val isPast = programme.endTime <= nowSeconds
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -472,21 +609,40 @@ private fun ProgrammeActionDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onWatch) {
-                Text(text = "Watch channel", color = YancoPalette.Accent)
+            // For past programmes with a resolvable catchup URL, surface the
+            // replay button as the primary action — that's what the user
+            // almost certainly wants when they tap an ended programme. The
+            // live "Watch channel" option stays available underneath so the
+            // user can still bail out to live playback.
+            if (isPast && catchupItem != null) {
+                TextButton(onClick = { onPlayCatchup(catchupItem) }) {
+                    Text(text = "Play catch-up", color = YancoPalette.Accent)
+                }
+            } else {
+                TextButton(onClick = onWatch) {
+                    Text(text = "Watch channel", color = YancoPalette.Accent)
+                }
             }
         },
         dismissButton = {
-            if (isFuture) {
-                if (isReminderSet) {
-                    TextButton(onClick = onCancelReminder) {
-                        Text(text = "Cancel reminder", color = YancoPalette.TextPrimary)
-                    }
-                } else {
-                    TextButton(onClick = onSetReminder) {
-                        Text(text = "Set reminder", color = YancoPalette.TextPrimary)
+            when {
+                isFuture -> {
+                    if (isReminderSet) {
+                        TextButton(onClick = onCancelReminder) {
+                            Text(text = "Cancel reminder", color = YancoPalette.TextPrimary)
+                        }
+                    } else {
+                        TextButton(onClick = onSetReminder) {
+                            Text(text = "Set reminder", color = YancoPalette.TextPrimary)
+                        }
                     }
                 }
+                isPast && catchupItem != null -> {
+                    TextButton(onClick = onWatch) {
+                        Text(text = "Watch channel", color = YancoPalette.TextPrimary)
+                    }
+                }
+                else -> Unit
             }
         },
     )

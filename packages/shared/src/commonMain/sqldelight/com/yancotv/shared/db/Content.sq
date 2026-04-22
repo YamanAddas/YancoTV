@@ -58,6 +58,27 @@ END;
 selectById:
 SELECT * FROM content WHERE id = ?;
 
+-- Distinct tvg_ids for live channels. Used by the Android EPG streamer to
+-- discard programmes whose channel the user doesn't have — a massive feed
+-- (the IPTV providers ship every channel on earth) can be filtered down to
+-- just the rows we'll ever display, cutting DB writes by 50–90% for users
+-- whose catalog is a small subset of the feed.
+distinctLiveTvgIds:
+SELECT DISTINCT tvg_id FROM content
+WHERE type = 'live' AND tvg_id IS NOT NULL AND tvg_id != '';
+
+-- Pick the highest-priority live channel carrying a given tvg_id. A tvg_id
+-- can be shared across sources (same feed, multiple providers); the Guide
+-- shows one row per tvg_id, so catchup lookup needs to pick a single backing
+-- source. Priority ORDER BY matches how the sources list is ordered in the
+-- UI — user's preferred provider wins.
+selectLiveByTvgId:
+SELECT c.* FROM content c
+JOIN sources s ON s.id = c.source_id
+WHERE c.type = 'live' AND c.tvg_id = ?
+ORDER BY s.priority ASC, c.sort_order ASC
+LIMIT 1;
+
 selectByType:
 SELECT * FROM content
 WHERE type = ?
@@ -128,19 +149,90 @@ LIMIT :limitCount OFFSET :offsetCount;
 -- in the [startTime, endTime) window. Joins epg_programmes so channels with no
 -- guide data are skipped (they render as "no data" rows otherwise). Ordered by
 -- title for a stable, alphabetical channels column in the grid.
+-- GROUP BY c.tvg_id picks ONE row per channel even when the catalog has
+-- multiple content rows sharing the same tvg_id (1080p / 720p / backup
+-- variants are common on Xtream providers). DISTINCT on the full tuple
+-- would keep all variants and then the Compose LazyColumn's uniqueness
+-- check on the key crashes with "Key X was already used".
+--
+-- EXISTS (instead of INNER JOIN on epg_programmes) avoids row
+-- multiplication — a JOIN produces one output row per matching programme
+-- in the window, which is up to ~48 per channel before GROUP BY collapses
+-- them. EXISTS short-circuits as soon as one programme matches.
+--
+-- ORDER BY title, tvg_id — title alone isn't stable when two channels
+-- share a title (common when a provider ships multiple language feeds).
+-- The secondary sort on tvg_id makes LIMIT/OFFSET pagination deterministic
+-- across pages; without it the user can scroll and see the same channel
+-- repeat on page boundaries.
+
 guideChannelsAll:
-SELECT DISTINCT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
 FROM content c
-INNER JOIN epg_programmes ep ON ep.channel_tvg_id = c.tvg_id
 WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND ep.end_time > :startTime AND ep.start_time < :endTime
-ORDER BY c.title ASC;
+  AND EXISTS (
+    SELECT 1 FROM epg_programmes ep
+    WHERE ep.channel_tvg_id = c.tvg_id
+      AND ep.end_time > :startTime AND ep.start_time < :endTime
+  )
+GROUP BY c.tvg_id
+ORDER BY c.title ASC, c.tvg_id ASC;
 
 guideChannelsBySource:
-SELECT DISTINCT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
 FROM content c
-INNER JOIN epg_programmes ep ON ep.channel_tvg_id = c.tvg_id
 WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
   AND c.source_id = :sourceId
-  AND ep.end_time > :startTime AND ep.start_time < :endTime
-ORDER BY c.title ASC;
+  AND EXISTS (
+    SELECT 1 FROM epg_programmes ep
+    WHERE ep.channel_tvg_id = c.tvg_id
+      AND ep.end_time > :startTime AND ep.start_time < :endTime
+  )
+GROUP BY c.tvg_id
+ORDER BY c.title ASC, c.tvg_id ASC;
+
+guideChannelsAllPaged:
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+FROM content c
+WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
+  AND EXISTS (
+    SELECT 1 FROM epg_programmes ep
+    WHERE ep.channel_tvg_id = c.tvg_id
+      AND ep.end_time > :startTime AND ep.start_time < :endTime
+  )
+GROUP BY c.tvg_id
+ORDER BY c.title ASC, c.tvg_id ASC
+LIMIT :limit OFFSET :offset;
+
+guideChannelsBySourcePaged:
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+FROM content c
+WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
+  AND c.source_id = :sourceId
+  AND EXISTS (
+    SELECT 1 FROM epg_programmes ep
+    WHERE ep.channel_tvg_id = c.tvg_id
+      AND ep.end_time > :startTime AND ep.start_time < :endTime
+  )
+GROUP BY c.tvg_id
+ORDER BY c.title ASC, c.tvg_id ASC
+LIMIT :limit OFFSET :offset;
+
+countGuideChannelsAll:
+SELECT COUNT(DISTINCT c.tvg_id) FROM content c
+WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
+  AND EXISTS (
+    SELECT 1 FROM epg_programmes ep
+    WHERE ep.channel_tvg_id = c.tvg_id
+      AND ep.end_time > :startTime AND ep.start_time < :endTime
+  );
+
+countGuideChannelsBySource:
+SELECT COUNT(DISTINCT c.tvg_id) FROM content c
+WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
+  AND c.source_id = :sourceId
+  AND EXISTS (
+    SELECT 1 FROM epg_programmes ep
+    WHERE ep.channel_tvg_id = c.tvg_id
+      AND ep.end_time > :startTime AND ep.start_time < :endTime
+  );

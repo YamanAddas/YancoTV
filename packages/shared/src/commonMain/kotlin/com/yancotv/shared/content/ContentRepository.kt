@@ -62,6 +62,17 @@ class ContentRepository(private val db: YancoDb) {
 
     fun findById(id: String): ContentItem? =
         db.contentQueries.selectById(id).executeAsOneOrNull()?.toDomain()
+
+    /**
+     * Pick the highest-priority live channel that carries [tvgId]. Used by
+     * catchup resolution: the Guide keys programmes on tvg_id (one guide row
+     * per tvg_id even if several sources carry the same feed), so the catchup
+     * path needs to choose a single source to build the replay URL against.
+     */
+    fun findLiveByTvgId(tvgId: String): ContentItem? {
+        if (tvgId.isBlank()) return null
+        return db.contentQueries.selectLiveByTvgId(tvgId).executeAsOneOrNull()?.toDomain()
+    }
 }
 
 private fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(
