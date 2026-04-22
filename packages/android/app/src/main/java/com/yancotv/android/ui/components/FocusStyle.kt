@@ -43,8 +43,15 @@ fun Modifier.focusStyle(
     raised: Boolean = true,
     unfocusedBorder: Color = YancoPalette.BorderSubtle,
     focusedBorder: Color = YancoPalette.FocusRing,
-    unfocusedBg: Color = YancoPalette.BackgroundRaised,
-    focusedBg: Color = YancoPalette.BackgroundHover,
+    // Translucent unfocused surface so the cinematic hero / preview shows
+    // through the rail and chip strip — TiviMate-style shell where the
+    // container frames the video, it doesn't cover it.
+    unfocusedBg: Color = YancoPalette.BackgroundRaised.copy(alpha = 0.55f),
+    // Focus state reads as a tinted accent wash rather than a neutral
+    // slate fill so the selector is clearly "colored" at 10 ft. The alpha
+    // lets the backdrop bleed through so the focused card still feels
+    // part of the scene.
+    focusedBg: Color = YancoPalette.Accent.copy(alpha = 0.22f),
 ): Modifier {
     val scale by animateFloatAsState(
         targetValue = if (focused) liftScale else 1f,

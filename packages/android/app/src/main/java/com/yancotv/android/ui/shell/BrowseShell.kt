@@ -362,7 +362,9 @@ fun BrowseShell(
                 .height(230.dp)
                 .focusRequester(railFocus)
                 .focusGroup()
-                .onFocusChanged { if (it.hasFocus) onRailFocusChanged(true) },
+                .onFocusChanged {
+                    if (it.hasFocus) onRailFocusChanged(true)
+                },
         ) {
             if (visible.isEmpty()) {
                 BrowseEmptyState(type = type, favoritesFilter = isFavoritesFilter)

@@ -221,7 +221,13 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         playerView.useController = true
-        playerView.controllerAutoShow = true
+        // Controls must stay hidden on fullscreen entry. Media3's default
+        // `controllerAutoShow = true` pops them on every STATE_READY /
+        // paused / ended transition — which fired on every channel change
+        // in fullscreen and on the initial bind when we hand off from the
+        // mini preview. The user's mental model is: the picture fills the
+        // screen, OK toggles the controls. See 2026-04-22 fix.
+        playerView.controllerAutoShow = false
         playerView.controllerHideOnTouch = true
         playerView.setControllerShowTimeoutMs(CONTROLLER_TIMEOUT_MS)
 
@@ -400,11 +406,10 @@ class PlayerActivity : AppCompatActivity() {
         zapLiveLabel.visibility = if (isLive) View.VISIBLE else View.GONE
         zapNow.visibility = View.GONE
         zapNext.visibility = View.GONE
-        zapBar.visibility = View.VISIBLE
-        // Force the controller visible for a moment on channel change — the
-        // built-in auto-hide takes it away after CONTROLLER_TIMEOUT_MS and
-        // our listener fades the zap bar with it.
-        playerView.showController()
+        // zap bar is chromed-in by the controller-visibility listener; we
+        // no longer force the controller open on channel change (see the
+        // `controllerAutoShow = false` decision above).
+        zapBar.visibility = if (controllerVisible) View.VISIBLE else View.GONE
 
         val tvgId = item.tvgId?.takeIf { it.isNotBlank() }
         if (!isLive || tvgId == null) {
@@ -658,6 +663,47 @@ class PlayerActivity : AppCompatActivity() {
 
     // ───── Keys ─────
 
+    /**
+     * Intercept key events before Media3's PlayerView sees them. With
+     * [controllerAutoShow] = false, PlayerView.dispatchKeyEvent consumes
+     * every D-pad press by calling `maybeShowController(true)` — which is a
+     * no-op when auto-show is off — and returns `true`, so the event never
+     * reaches [Activity.onKeyDown]. That's why MENU/CENTER/INFO appeared
+     * "dead" when the controller was hidden (2026-04-22 follow-up).
+     *
+     * Handling the handful of keys we actually care about here short-circuits
+     * PlayerView entirely; anything we don't consume falls through to the
+     * normal dispatch chain so the controller's own focus traversal keeps
+     * working once the controller is visible.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            // While the controller is hidden, don't let PlayerView silently
+            // eat the press — run our own handler first.
+            if (!controllerVisible && !surfVisible) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_MENU,
+                    KeyEvent.KEYCODE_INFO,
+                    KeyEvent.KEYCODE_GUIDE,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_TV_CONTENTS_MENU,
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_CHANNEL_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_CHANNEL_DOWN,
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    KeyEvent.KEYCODE_SPACE,
+                    KeyEvent.KEYCODE_MEDIA_STOP -> {
+                        if (onKeyDown(event.keyCode, event)) return true
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         // Surf overlay swallows keys while visible — it has its own focus
         // traversal; only BACK dismisses it. Do this early so built-in
@@ -686,6 +732,17 @@ class PlayerActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_MENU -> {
                 playerView.showController()
                 return true
+            }
+            // OK / ENTER toggles the controller — the user asked explicitly
+            // for "controls hidden on open, OK to show, OK (or timeout) to
+            // hide" behaviour (2026-04-22). When the controller is already
+            // visible we let Media3 handle the key so the focused transport
+            // button (play/pause, seek) still works; otherwise we pop it.
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                if (!controllerVisible) {
+                    playerView.showController()
+                    return true
+                }
             }
             KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE -> {
                 toggleQuickInfo()

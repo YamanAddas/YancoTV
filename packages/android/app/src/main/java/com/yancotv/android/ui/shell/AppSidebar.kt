@@ -68,12 +68,14 @@ fun AppSidebar(
 ) {
     // Rail background: a softly lit vertical gradient against the
     // cinematic canvas so the three-column shell has real edge
-    // definition without resorting to a hard divider line.
+    // definition without resorting to a hard divider line. Alpha so
+    // the hero preview / cinematic backdrop shows through — the rail
+    // frames the scene, it doesn't cover it (2026-04-22 translucent pass).
     val brush = remember {
         Brush.verticalGradient(
             colors = listOf(
-                YancoPalette.BackgroundRaised,
-                YancoPalette.BackgroundDeep,
+                YancoPalette.BackgroundRaised.copy(alpha = 0.72f),
+                YancoPalette.BackgroundDeep.copy(alpha = 0.82f),
             ),
         )
     }
@@ -194,11 +196,11 @@ private fun SidebarRow(
     val focused by interaction.collectIsFocusedAsState()
 
     // Three visual states stack left-to-right in priority:
-    //   focused  → bright ring + filled bg + scale lift
+    //   focused  → accent-tinted translucent fill + bright ring + scale lift
     //   selected → accent pill background (low alpha), no ring
     //   idle     → transparent, muted foreground
     val bg = when {
-        focused -> YancoPalette.BackgroundHover
+        focused -> YancoPalette.Accent.copy(alpha = 0.22f)
         selected -> YancoPalette.Accent.copy(alpha = 0.14f)
         else -> Color.Transparent
     }

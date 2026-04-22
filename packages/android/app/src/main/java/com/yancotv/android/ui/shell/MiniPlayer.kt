@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -45,12 +46,23 @@ fun MiniPlayer(
     val viewRef = remember { arrayOfNulls<TextureView>(1) }
 
     AndroidView(
+        // Hide the whole AndroidView wrapper from Compose's focus search.
+        // Without this the embedded TextureView subtree participates in
+        // focus traversal, and after the hero flips from idle → playing
+        // (OK on a rail card) Compose lands focus *inside* the interop
+        // subtree — which has no focus visual — so the chip bar and rail
+        // look like they've lost their selector until the user blindly
+        // wakes focus with an arrow key. See BrowseShell MiniPlayer focus
+        // leak regression, 2026-04-22 fix.
         modifier = modifier
             .fillMaxWidth()
-            .height(180.dp),
+            .height(180.dp)
+            .focusProperties { canFocus = false },
         factory = { ctx ->
             TextureView(ctx).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+                isFocusable = false
+                isFocusableInTouchMode = false
                 viewRef[0] = this
                 controller.player.setVideoTextureView(this)
             }

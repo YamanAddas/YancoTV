@@ -147,9 +147,12 @@ private fun Chip(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = when {
-        focused -> YancoPalette.BackgroundHover
+        // Focused chip = colored selector — accent-tinted translucent wash
+        // so the hero/backdrop still bleeds through and the ring + fill
+        // read as "picked" at 10 ft (2026-04-22).
+        focused -> YancoPalette.Accent.copy(alpha = 0.28f)
         selected -> YancoPalette.Accent.copy(alpha = 0.18f)
-        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.55f)
+        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.45f)
     }
     val border = when {
         focused -> YancoPalette.FocusRing

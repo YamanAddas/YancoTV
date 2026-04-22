@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -38,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -148,6 +151,16 @@ private fun LiveCard(
     val focused by interaction.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocus() }
 
+    // Per-card requester, always attached. Used by the card's own click
+    // handler to reclaim focus after [onActivate] — controller.play() binds
+    // a new MediaItem to MiniPlayer's TextureView, and the View-layer
+    // layout/hover changes steal focus off this Compose rail card even with
+    // the AndroidView marked canFocus = false. Re-requesting on the card's
+    // own requester (not `firstItemFocus`) guarantees focus returns to this
+    // exact card even if focusedIndex shifted in the meantime (2026-04-22).
+    val selfRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+
     val displayTitle = item.cleanTitle?.ifBlank { null } ?: item.title
     val nowProg = nowNext?.now
 
@@ -155,12 +168,19 @@ private fun LiveCard(
         modifier = Modifier
             .width(280.dp)
             .height(120.dp)
+            .focusRequester(selfRequester)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .focusable(interactionSource = interaction)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
-                onClick = onActivate,
+                onClick = {
+                    onActivate()
+                    scope.launch {
+                        delay(80)
+                        runCatching { selfRequester.requestFocus() }
+                    }
+                },
                 onLongClick = onLongPress,
             )
             .focusStyle(focused = focused, radius = Radius.card)
@@ -292,17 +312,30 @@ private fun PosterCard(
     val focused by interaction.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocus() }
 
+    // See LiveCard for why each card owns a private requester; same story
+    // for VOD rails — player binds to MiniPlayer TextureView on activate
+    // and the View-layer hover can steal focus off the rail.
+    val selfRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+
     val title = item.cleanTitle?.ifBlank { null } ?: item.title
 
     Column(
         modifier = Modifier
             .width(220.dp)
+            .focusRequester(selfRequester)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .focusable(interactionSource = interaction)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
-                onClick = onActivate,
+                onClick = {
+                    onActivate()
+                    scope.launch {
+                        delay(80)
+                        runCatching { selfRequester.requestFocus() }
+                    }
+                },
                 onLongClick = onLongPress,
             )
             .focusStyle(focused = focused, radius = Radius.card),
