@@ -23,6 +23,7 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.shell.HomeScreen
 import com.yancotv.android.ui.shell.SearchOverlayState
+import com.yancotv.android.ui.shell.ShellUiState
 import com.yancotv.android.ui.theme.YancoTheme
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -114,7 +115,24 @@ class MainActivity : ComponentActivity() {
             SearchOverlayState.show()
             return true
         }
+        // Progressive LEFT / RIGHT reveal — TiviMate-style one-panel-per-
+        // press slide-in from the left. Only swallows the key when the
+        // current zone actually transitioned; any leftover presses fall
+        // through to Compose's default focus traversal so embedded
+        // widgets (text fields, tab rails) keep working.
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (ShellUiState.onLeft()) return true
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (ShellUiState.onRight()) return true
+        }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onBackPressed() {
+        // BACK collapses the revealed shell panels one at a time before
+        // falling back to the system back (exit). Matches the "LEFT to
+        // open, BACK to close" pairing users expect on TV.
+        if (ShellUiState.onBack()) return
+        @Suppress("DEPRECATION") super.onBackPressed()
     }
 
     private fun requestNotificationsPermissionIfNeeded() {

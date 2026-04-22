@@ -43,6 +43,10 @@
 
         <activity
             android:name=".MainActivity"
+            android:banner="@drawable/tv_banner"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:logo="@drawable/tv_banner"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>

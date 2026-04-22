@@ -82,6 +82,10 @@ class AppPreferences(
         _general.value = _general.value.copy(showChannelNumbers = enabled)
     }
 
+    suspend fun setSmartGrouping(enabled: Boolean) = write(KEY_SMART_GROUPING, if (enabled) "1" else "0") {
+        _general.value = _general.value.copy(smartGrouping = enabled)
+    }
+
     // ───── Hidden groups ─────
     //
     // Providers routinely push 400+ category groups, most of which a
@@ -127,6 +131,7 @@ class AppPreferences(
     private fun readGeneral(): GeneralPrefs = GeneralPrefs(
         openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
         showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
+        smartGrouping = readString(KEY_SMART_GROUPING) == "1",
     )
 
     private fun readHiddenGroups(): Set<String> = readString(KEY_HIDDEN_GROUPS)
@@ -162,6 +167,7 @@ class AppPreferences(
         private const val KEY_OPEN_ON = "pref_general_open_on"
         private const val KEY_SHOW_NUMBERS = "pref_general_show_channel_numbers"
         private const val KEY_HIDDEN_GROUPS = "pref_hidden_groups"
+        private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
     }
 }
 
@@ -180,6 +186,13 @@ enum class OpenOn(val key: String, val displayName: String) {
 data class GeneralPrefs(
     val openOn: OpenOn = OpenOn.HOME,
     val showChannelNumbers: Boolean = false,
+    /**
+     * Smart grouping buckets the provider's flat category list into
+     * meaningful sections (Sports, News, Movies, Kids, Music, Regions,
+     * Other) via keyword matching. Visual only — still filters on the
+     * exact group name when a sub-entry is selected.
+     */
+    val smartGrouping: Boolean = false,
 )
 
 enum class ResizeMode(val key: String, val displayName: String) {

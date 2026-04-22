@@ -1,6 +1,12 @@
 package com.yancotv.android.ui.shell
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,11 +15,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -135,19 +150,54 @@ fun HomeScreen(
             parentalSettings.requirePinForSettings &&
             !settingsUnlocked
 
+    // Progressive reveal state — only Live TV / Movies / Series participate;
+    // other sections force the full layout so their navigation stays intact.
+    val revealLevel by ShellUiState.revealLevel.collectAsState()
+    val focusZone by ShellUiState.focusZone.collectAsState()
+    val focusTick by ShellUiState.focusTick.collectAsState()
+    val progressiveSection = contentType != null
+    LaunchedEffect(section, progressiveSection) {
+        if (progressiveSection) ShellUiState.resetToContent()
+        else ShellUiState.forceFull()
+    }
+    val sidebarFocus = remember { FocusRequester() }
+    val groupsFocus = remember { FocusRequester() }
+    val contentFocus = remember { FocusRequester() }
+    LaunchedEffect(focusTick, focusZone) {
+        val requester = when (focusZone) {
+            ShellUiState.Zone.SIDEBAR -> sidebarFocus
+            ShellUiState.Zone.GROUPS -> groupsFocus
+            ShellUiState.Zone.CONTENT -> contentFocus
+        }
+        runCatching { requester.requestFocus() }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep),
     ) {
-        AppSidebar(current = section, onSelect = { section = it })
+        AnimatedVisibility(
+            visible = revealLevel >= 2,
+            enter = slideInHorizontally(animationSpec = tween(220)) { -it } + fadeIn(tween(220)),
+            exit = slideOutHorizontally(animationSpec = tween(180)) { -it } + fadeOut(tween(180)),
+        ) {
+            AppSidebar(
+                current = section,
+                onSelect = { section = it },
+                modifier = Modifier.focusRequester(sidebarFocus),
+            )
+        }
 
         if (contentType != null) {
             ContentArea(
                 isTv = isTv,
                 type = contentType,
                 repo = repo,
+                groupsVisible = revealLevel >= 1,
+                groupsFocus = groupsFocus,
+                contentFocus = contentFocus,
                 onActivate = { list, idx ->
                     val target = list.getOrNull(idx) ?: return@ContentArea
                     gatedPlay(target.id) {
@@ -333,14 +383,19 @@ private fun RowScope.ContentArea(
     isTv: Boolean,
     type: ContentType,
     repo: ContentRepository,
+    groupsVisible: Boolean,
+    groupsFocus: FocusRequester,
+    contentFocus: FocusRequester,
     onActivate: (List<ContentItem>, Int) -> Unit,
     prefs: AppPreferences = koinInject(),
 ) {
     val groupsState = remember(type) { mutableStateListOf<String>() }
+    var totalCount by remember(type) { mutableStateOf(0L) }
     LaunchedEffect(type) {
         val loaded = withContext(Dispatchers.IO) { repo.groups(type) }
         groupsState.clear()
         groupsState.addAll(loaded)
+        totalCount = withContext(Dispatchers.IO) { runCatching { repo.count(type) }.getOrElse { 0L } }
     }
     // Hidden-groups filter runs in the sidebar only, not the DB. A hidden
     // group is never auto-selected; if the user's saved selection is now
@@ -360,22 +415,87 @@ private fun RowScope.ContentArea(
     var focused by remember(type) { mutableStateOf<ContentItem?>(null) }
     val groupFilter = group.takeIf { it != ALL_GROUPS }
 
-    CategoryFilterPanel(
-        groups = visibleGroups,
-        selected = group,
-        onSelect = { group = it },
-    )
-    Box(modifier = Modifier.weight(1f)) {
-        ContentPanel(
-            type = type,
-            group = groupFilter,
-            onItemFocus = { focused = it },
-            onItemActivate = onActivate,
+    AnimatedVisibility(
+        visible = groupsVisible,
+        enter = slideInHorizontally(animationSpec = tween(220)) { -it } + fadeIn(tween(220)),
+        exit = slideOutHorizontally(animationSpec = tween(180)) { -it } + fadeOut(tween(180)),
+    ) {
+        CategoryFilterPanel(
+            groups = visibleGroups,
+            selected = group,
+            onSelect = { group = it },
+            modifier = Modifier.focusRequester(groupsFocus),
+            smartGrouping = prefs.generalFlow.collectAsState().value.smartGrouping,
         )
+    }
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .focusRequester(contentFocus),
+    ) {
+        SectionHeader(
+            type = type,
+            total = totalCount,
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            ContentPanel(
+                type = type,
+                group = groupFilter,
+                onItemFocus = { focused = it },
+                onItemActivate = onActivate,
+            )
+        }
     }
     if (isTv) {
         InfoPanel(item = focused)
     }
+}
+
+/**
+ * Desktop-parity banner above the channel list: italic section title +
+ * channel count, with a muted rule at the bottom. Visible in every
+ * progressive section (Live TV / Movies / Series) so the user always
+ * knows which catalog they're in and how big it is.
+ */
+@Composable
+private fun SectionHeader(type: ContentType, total: Long) {
+    val label = when (type) {
+        ContentType.LIVE -> "Live TV"
+        ContentType.MOVIE -> "Movies"
+        ContentType.SERIES -> "Series"
+    }
+    val suffix = when (type) {
+        ContentType.LIVE -> "channels"
+        ContentType.MOVIE -> "titles"
+        ContentType.SERIES -> "shows"
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = label,
+            color = YancoPalette.TextPrimary,
+            fontSize = 28.sp,
+            fontStyle = FontStyle.Italic,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "${formatCount(total)} $suffix",
+            color = YancoPalette.TextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+    }
+}
+
+private fun formatCount(n: Long): String = when {
+    n >= 1_000_000 -> "%.1fM".format(n / 1_000_000.0)
+    n >= 1_000 -> "%,d".format(n)
+    else -> n.toString()
 }
 
 @Composable

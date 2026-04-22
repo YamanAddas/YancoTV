@@ -85,40 +85,62 @@ fun SettingsGeneralTab(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Show channel numbers",
-                    color = YancoPalette.TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Prepends the channel's position number before its title. Helpful if you remember channels by number.",
-                    color = YancoPalette.TextMuted,
-                    fontSize = 11.sp,
-                )
-            }
-            Switch(
-                checked = state.showChannelNumbers,
-                onCheckedChange = { scope.launch { prefs.setShowChannelNumbers(it) } },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = YancoPalette.Accent,
-                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = YancoPalette.TextMuted,
-                    uncheckedTrackColor = YancoPalette.BackgroundHover,
-                ),
+        ToggleRow(
+            title = "Show channel numbers",
+            body = "Prepends the channel's position number before its title. Helpful if you remember channels by number.",
+            checked = state.showChannelNumbers,
+            onChange = { scope.launch { prefs.setShowChannelNumbers(it) } },
+        )
+
+        ToggleRow(
+            title = "Smart grouping",
+            body = "Bucket the provider's 400+ category list into Sports / Movies / News / Kids / Music / Regions for easy scanning. Selecting a sub-group still filters by the exact category.",
+            checked = state.smartGrouping,
+            onChange = { scope.launch { prefs.setSmartGrouping(it) } },
+        )
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    body: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(YancoPalette.BackgroundRaised)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = YancoPalette.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = body,
+                color = YancoPalette.TextMuted,
+                fontSize = 11.sp,
             )
         }
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = YancoPalette.Accent,
+                checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
+                uncheckedThumbColor = YancoPalette.TextMuted,
+                uncheckedTrackColor = YancoPalette.BackgroundHover,
+            ),
+        )
     }
 }
 
