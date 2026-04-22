@@ -1,12 +1,6 @@
 package com.yancotv.android.ui.shell
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,9 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -159,54 +150,29 @@ fun HomeScreen(
             parentalSettings.requirePinForSettings &&
             !settingsUnlocked
 
-    // Progressive reveal state — only Live TV / Movies / Series participate;
-    // other sections force the full layout so their navigation stays intact.
-    val revealLevel by ShellUiState.revealLevel.collectAsState()
-    val focusZone by ShellUiState.focusZone.collectAsState()
-    val focusTick by ShellUiState.focusTick.collectAsState()
-    val progressiveSection = contentType != null
-    LaunchedEffect(section, progressiveSection) {
-        if (progressiveSection) ShellUiState.resetToContent()
-        else ShellUiState.forceFull()
-    }
-    val sidebarFocus = remember { FocusRequester() }
-    val groupsFocus = remember { FocusRequester() }
-    val contentFocus = remember { FocusRequester() }
-    LaunchedEffect(focusTick, focusZone) {
-        val requester = when (focusZone) {
-            ShellUiState.Zone.SIDEBAR -> sidebarFocus
-            ShellUiState.Zone.GROUPS -> groupsFocus
-            ShellUiState.Zone.CONTENT -> contentFocus
-        }
-        runCatching { requester.requestFocus() }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep),
     ) {
-        AnimatedVisibility(
-            visible = revealLevel >= 2,
-            enter = slideInHorizontally(animationSpec = tween(220)) { -it } + fadeIn(tween(220)),
-            exit = slideOutHorizontally(animationSpec = tween(180)) { -it } + fadeOut(tween(180)),
-        ) {
-            AppSidebar(
-                current = section,
-                onSelect = { section = it },
-                currentRowFocus = sidebarFocus,
-            )
-        }
+        // Always-show TiviMate-style 3-panel layout. Focus traversal is
+        // pure Compose focus manager — LEFT/RIGHT walk between panels,
+        // UP/DOWN walk within a panel. [Modifier.focusGroup] on each
+        // panel + [Modifier.focusRestorer] inside give us "remember the
+        // last focused row" semantics for free. No animation, no state
+        // machine, no requestFocus juggling — that was what broke the
+        // selector on the previous iteration.
+        AppSidebar(
+            current = section,
+            onSelect = { section = it },
+        )
 
         if (contentType != null) {
             ContentArea(
                 isTv = isTv,
                 type = contentType,
                 repo = repo,
-                groupsVisible = revealLevel >= 1,
-                groupsFocus = groupsFocus,
-                contentFocus = contentFocus,
                 onActivate = { list, idx ->
                     val target = list.getOrNull(idx) ?: return@ContentArea
                     gatedPlay(target.id) {
@@ -429,9 +395,6 @@ private fun RowScope.ContentArea(
     isTv: Boolean,
     type: ContentType,
     repo: ContentRepository,
-    groupsVisible: Boolean,
-    groupsFocus: FocusRequester,
-    contentFocus: FocusRequester,
     onActivate: (List<ContentItem>, Int) -> Unit,
     prefs: AppPreferences = koinInject(),
 ) {
@@ -461,28 +424,14 @@ private fun RowScope.ContentArea(
     var focused by remember(type) { mutableStateOf<ContentItem?>(null) }
     val groupFilter = group.takeIf { it != ALL_GROUPS }
 
-    AnimatedVisibility(
-        visible = groupsVisible,
-        enter = slideInHorizontally(animationSpec = tween(220)) { -it } + fadeIn(tween(220)),
-        exit = slideOutHorizontally(animationSpec = tween(180)) { -it } + fadeOut(tween(180)),
-    ) {
-        CategoryFilterPanel(
-            groups = visibleGroups,
-            selected = group,
-            onSelect = { group = it },
-            smartGrouping = prefs.generalFlow.collectAsState().value.smartGrouping,
-            selectedRowFocus = groupsFocus,
-        )
-    }
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .focusRequester(contentFocus),
-    ) {
-        SectionHeader(
-            type = type,
-            total = totalCount,
-        )
+    CategoryFilterPanel(
+        groups = visibleGroups,
+        selected = group,
+        onSelect = { group = it },
+        smartGrouping = prefs.generalFlow.collectAsState().value.smartGrouping,
+    )
+    Column(modifier = Modifier.weight(1f)) {
+        SectionHeader(type = type, total = totalCount)
         Box(modifier = Modifier.fillMaxSize()) {
             ContentPanel(
                 type = type,
@@ -492,17 +441,10 @@ private fun RowScope.ContentArea(
             )
         }
     }
-    // Hide the info rail when the user is browsing the groups / sidebar
-    // so the channel list gets the extra width the user expects once
-    // they move leftward. Also: only render on TV where there's room,
-    // and only when a row is actually focused so we don't show empty
-    // scaffolding. Width shrunk from 320dp → 260dp to stop crowding
-    // channel titles on 1080p panels.
-    AnimatedVisibility(
-        visible = isTv && !groupsVisible && focused != null,
-        enter = slideInHorizontally(animationSpec = tween(180)) { it } + fadeIn(tween(180)),
-        exit = slideOutHorizontally(animationSpec = tween(140)) { it } + fadeOut(tween(140)),
-    ) {
+    // Info rail only on TV where there's room. Stays always visible so
+    // the user always sees what they're focused on — shrunk to 260dp
+    // from the original 320dp so it never crowds the channel list.
+    if (isTv && focused != null) {
         InfoPanel(item = focused)
     }
 }

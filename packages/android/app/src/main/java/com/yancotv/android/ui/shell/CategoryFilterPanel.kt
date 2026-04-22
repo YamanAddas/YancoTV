@@ -3,6 +3,7 @@ package com.yancotv.android.ui.shell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -24,10 +25,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,7 @@ const val ALL_GROUPS = "__all__"
  */
 const val FAVORITES_GROUP = "__favorites__"
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CategoryFilterPanel(
     groups: List<String>,
@@ -51,33 +53,20 @@ fun CategoryFilterPanel(
     modifier: Modifier = Modifier,
     showFavorites: Boolean = true,
     smartGrouping: Boolean = false,
-    /**
-     * When the shell reveals this panel, it calls `requestFocus()` on this
-     * requester to move D-pad focus here. We wire it to the currently-
-     * selected row so landing never dumps the user on "All" or the first
-     * provider category — they land on whatever they last picked.
-     *
-     * Previous versions attached this to the panel's outer Column, which
-     * meant focus fell on the first focusable descendant (the filter
-     * text field), auto-popping the software keyboard. Removing the
-     * text field + targeting the selected row fixes both bugs at once.
-     */
-    selectedRowFocus: FocusRequester? = null,
 ) {
     val bucketized = remember(groups, smartGrouping) {
         if (smartGrouping) bucketize(groups) else emptyMap()
     }
-
-    // Auto-scroll the selected row into view so after LEFT-revealing the
-    // panel, the user sees where focus landed. Without this, a long group
-    // list might scroll to top while focus is 40 rows down — disorienting.
     val listState = rememberLazyListState()
-    val selectedIndex = remember(groups, selected, smartGrouping) {
+    // Keep the selected row visible in the viewport — a 400-group provider
+    // list otherwise leaves the user scrolling blind when they come back
+    // from a deep pick. Fires whenever the selection moves, not on every
+    // recomposition, so focus isn't yanked mid-navigation.
+    val selectedIndex = remember(groups, selected, smartGrouping, showFavorites) {
         indexOfSelected(groups, bucketized, selected, smartGrouping, showFavorites)
     }
     LaunchedEffect(selectedIndex) {
         if (selectedIndex >= 0) {
-            // scroll near the middle — feels less edge-pinned than 0.
             runCatching { listState.scrollToItem(maxOf(0, selectedIndex - 3)) }
         }
     }
@@ -87,7 +76,9 @@ fun CategoryFilterPanel(
             .fillMaxHeight()
             .width(240.dp)
             .background(YancoPalette.BackgroundDeep)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = 12.dp, horizontal = 8.dp)
+            .focusRestorer()
+            .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
@@ -109,7 +100,6 @@ fun CategoryFilterPanel(
                         trailing = null,
                         selected = selected == FAVORITES_GROUP,
                         depth = 0,
-                        focusRequester = selectedRowFocus.takeIf { selected == FAVORITES_GROUP },
                         onClick = { onSelect(FAVORITES_GROUP) },
                     )
                 }
@@ -120,7 +110,6 @@ fun CategoryFilterPanel(
                     trailing = if (groups.isNotEmpty()) groups.size.toString() else null,
                     selected = selected == ALL_GROUPS,
                     depth = 0,
-                    focusRequester = selectedRowFocus.takeIf { selected == ALL_GROUPS },
                     onClick = { onSelect(ALL_GROUPS) },
                 )
             }
@@ -135,7 +124,6 @@ fun CategoryFilterPanel(
                             trailing = null,
                             selected = selected == group,
                             depth = 1,
-                            focusRequester = selectedRowFocus.takeIf { selected == group },
                             onClick = { onSelect(group) },
                         )
                     }
@@ -147,7 +135,6 @@ fun CategoryFilterPanel(
                         trailing = null,
                         selected = selected == group,
                         depth = 0,
-                        focusRequester = selectedRowFocus.takeIf { selected == group },
                         onClick = { onSelect(group) },
                     )
                 }
@@ -190,7 +177,6 @@ private fun GroupRow(
     trailing: String?,
     selected: Boolean,
     depth: Int,
-    focusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -204,18 +190,12 @@ private fun GroupRow(
     val border = if (focused) YancoPalette.FocusRing else Color.Transparent
     val leftPad = (12 + depth * 10).dp
 
-    val baseModifier = Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(6.dp))
-        .background(bg)
-        .border(1.dp, border, RoundedCornerShape(6.dp))
-    val withFocus = if (focusRequester != null) {
-        baseModifier.focusRequester(focusRequester)
-    } else {
-        baseModifier
-    }
     Row(
-        modifier = withFocus
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(6.dp))
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(start = leftPad, end = 10.dp, top = 8.dp, bottom = 8.dp),
@@ -239,12 +219,6 @@ private fun GroupRow(
     }
 }
 
-/**
- * Best-effort index of the selected row within the current LazyColumn
- * layout so the list can scroll near it on panel reveal. Keep the formula
- * close to the LazyColumn rendering logic in [CategoryFilterPanel] — if
- * they drift, the auto-scroll will land on the wrong row, not hard-fail.
- */
 private fun indexOfSelected(
     groups: List<String>,
     bucketized: Map<GroupBucket, List<String>>,
@@ -252,7 +226,6 @@ private fun indexOfSelected(
     smartGrouping: Boolean,
     showFavorites: Boolean,
 ): Int {
-    // Favorites row + All row at the top of every layout.
     val prefix = (if (showFavorites) 1 else 0) + 1
     if (selected == FAVORITES_GROUP) return 0
     if (selected == ALL_GROUPS) return prefix - 1

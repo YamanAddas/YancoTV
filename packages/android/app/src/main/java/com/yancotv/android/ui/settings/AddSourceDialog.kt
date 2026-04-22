@@ -10,14 +10,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +39,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -46,20 +52,16 @@ import com.yancotv.shared.types.AddSourceInput
 import com.yancotv.shared.types.SourceType
 
 /**
- * Premium add-source modal. The old MK.6 dialog was a plain rectangle with
- * label-over-field rows; it looked like a form generator had coughed it up.
+ * Add-source modal. Every field is a click-to-edit row: it sits there as
+ * plain read-only text until the user presses OK on it, at which point
+ * we flip into edit mode and push focus into the embedded text field —
+ * that's the ONLY time the on-screen keyboard appears.
  *
- * This rewrite (MK.6.b) does three things:
- *  1. Segmented type picker up top, sized for remote + touch alike.
- *  2. Two-column field grid on wide layouts so the eye scans down a short
- *     list instead of a long one.
- *  3. Explicit focus-ring outline on fields, consistent with the rest of
- *     the TV shell — makes D-pad travel visible without highlighting every
- *     pixel.
- *
- * D-pad flow: [Xtream chip] → [M3U chip] → Name → URL → Username → Password
- *  → EPG URL → Save → Cancel. The Name field auto-focuses on open so remote
- * users can start typing immediately.
+ * Previous versions auto-focused the Name field on open, which popped
+ * the IME the instant the dialog opened even when the user just wanted
+ * to flick between fields with the D-pad. The click-to-edit pattern
+ * matches how TiviMate + Netflix handle TV forms: scroll with remote,
+ * OK to type, Back to exit edit mode.
  */
 @Composable
 fun AddSourceDialog(
@@ -75,12 +77,6 @@ fun AddSourceDialog(
     var password by remember { mutableStateOf("") }
     var epgUrl by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
-    val nameFocus = remember { FocusRequester() }
-
-    // First field auto-focus. Leanback D-pad users open the dialog and
-    // expect typing to go somewhere — without this they'd have to DPAD-down
-    // twice before anything takes input.
-    LaunchedEffect(Unit) { nameFocus.requestFocus() }
 
     fun submit() {
         if (saving) return
@@ -91,8 +87,7 @@ fun AddSourceDialog(
         if (url.isBlank()) {
             validationError = if (type == SourceType.XTREAM)
                 "Host URL is required (e.g. http://provider.tv:8080)."
-            else
-                "M3U URL is required."
+            else "M3U URL is required."
             return
         }
         if (type == SourceType.XTREAM && (username.isBlank() || password.isBlank())) {
@@ -108,7 +103,7 @@ fun AddSourceDialog(
                 username = username.takeIf { it.isNotBlank() }?.trim(),
                 password = password.takeIf { it.isNotBlank() },
                 epgUrl = epgUrl.takeIf { it.isNotBlank() }?.trim(),
-            )
+            ),
         )
     }
 
@@ -142,7 +137,7 @@ fun AddSourceDialog(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Point YancoTV at your IPTV provider. Credentials are encrypted on-device.",
+                    text = "Scroll with the D-pad. Press OK on a field to type. Credentials are encrypted on-device.",
                     color = YancoPalette.TextMuted,
                     fontSize = 13.sp,
                 )
@@ -150,15 +145,13 @@ fun AddSourceDialog(
 
             Divider()
 
-            // Scrollable body — on phones in landscape the two-row credential
-            // block otherwise clips against the IME.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 28.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 SectionLabel("Source type")
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -177,53 +170,45 @@ fun AddSourceDialog(
                 }
 
                 SectionLabel("Details")
-                LabeledField(
+                ClickToEditField(
                     label = "Name",
-                    hint = "Shown in the Sources list",
+                    hint = "e.g. My IPTV",
                     value = name,
                     onValueChange = { name = it },
-                    voice = true,
-                    focusRequester = nameFocus,
                 )
-                LabeledField(
+                ClickToEditField(
                     label = if (type == SourceType.XTREAM) "Host URL" else "M3U URL",
                     hint = if (type == SourceType.XTREAM) "http://host:port" else "https://provider.tv/list.m3u",
                     value = url,
                     onValueChange = { url = it },
-                    voice = true,
-                    voiceTransform = ::normalizeUrlFromSpeech,
+                    keyboardType = KeyboardType.Uri,
                 )
 
                 if (type == SourceType.XTREAM) {
                     SectionLabel("Credentials")
-                    LabeledField(
+                    ClickToEditField(
                         label = "Username",
                         hint = null,
                         value = username,
                         onValueChange = { username = it },
                     )
-                    LabeledField(
+                    ClickToEditField(
                         label = "Password",
                         hint = null,
                         value = password,
                         onValueChange = { password = it },
                         transformation = PasswordVisualTransformation(),
-                    )
-                    Text(
-                        text = "Tip: use the keyboard for credentials. Voice transcription mangles the special characters these tokens usually contain.",
-                        color = YancoPalette.TextMuted,
-                        fontSize = 11.sp,
+                        keyboardType = KeyboardType.Password,
                     )
                 }
 
                 SectionLabel("Electronic program guide")
-                LabeledField(
+                ClickToEditField(
                     label = "EPG URL",
-                    hint = "Optional — leave blank to use the provider's built-in guide",
+                    hint = "Optional — leave blank for the provider's built-in guide",
                     value = epgUrl,
                     onValueChange = { epgUrl = it },
-                    voice = true,
-                    voiceTransform = ::normalizeUrlFromSpeech,
+                    keyboardType = KeyboardType.Uri,
                 )
 
                 validationError?.let { ErrorBanner(text = it) }
@@ -232,9 +217,6 @@ fun AddSourceDialog(
 
             Divider()
 
-            // Footer action row. Primary (Save) takes the accent fill; the
-            // secondary (Cancel) is a ghost — same contrast hierarchy as the
-            // desktop settings screens.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,11 +224,7 @@ fun AddSourceDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                GhostButton(
-                    label = "Cancel",
-                    onClick = onDismiss,
-                    enabled = !saving,
-                )
+                GhostButton(label = "Cancel", onClick = onDismiss, enabled = !saving)
                 PrimaryButton(
                     label = if (saving) "Saving…" else "Save",
                     onClick = { submit() },
@@ -257,7 +235,7 @@ fun AddSourceDialog(
     }
 }
 
-// ─────────────────────────── private building blocks ───────────────────────────
+// ─────────────────────────── building blocks ───────────────────────────
 
 @Composable
 private fun Divider() {
@@ -291,35 +269,43 @@ private fun ErrorBanner(text: String) {
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = text,
-            color = YancoPalette.Error,
-            fontSize = 12.sp,
-        )
+        Text(text = text, color = YancoPalette.Error, fontSize = 12.sp)
     }
 }
 
+/**
+ * Click-to-edit field. Default state: focusable read-only row showing
+ * the current value (or hint placeholder). Press OK → [editing] flips
+ * true → an embedded [BasicTextField] takes focus, which opens the IME.
+ * Press Done / Enter / Back → [editing] flips false, IME dismisses.
+ *
+ * This is the whole "only open the keyboard when I ask" flow — the
+ * field is never auto-focused unless the user explicitly activates it.
+ */
 @Composable
-private fun LabeledField(
+private fun ClickToEditField(
     label: String,
     hint: String?,
     value: String,
     onValueChange: (String) -> Unit,
     transformation: VisualTransformation = VisualTransformation.None,
-    voice: Boolean = false,
-    voiceTransform: (String) -> String = { it },
-    focusRequester: FocusRequester? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundDeep
+    var editing by remember { mutableStateOf(false) }
+    val editFocus = remember { FocusRequester() }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Push focus into the text field the frame after `editing` flips true.
+    // The field is only composed while editing, so this effect is keyed on
+    // `editing` — it can't race with its own recomposition.
+    LaunchedEffect(editing) {
+        if (editing) runCatching { editFocus.requestFocus() }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = label,
@@ -327,48 +313,105 @@ private fun LabeledField(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             )
-            if (!hint.isNullOrBlank()) {
-                Text(
-                    text = hint,
-                    color = YancoPalette.TextMuted,
-                    fontSize = 11.sp,
-                )
+            if (!hint.isNullOrBlank() && !editing) {
+                Text(text = hint, color = YancoPalette.TextMuted, fontSize = 11.sp)
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(bg)
-                    .border(1.dp, border, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                val textFieldModifier = Modifier
-                    .fillMaxWidth()
-                    .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    interactionSource = interaction,
-                    textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 14.sp),
-                    cursorBrush = SolidColor(YancoPalette.FocusRing),
-                    visualTransformation = transformation,
-                    modifier = textFieldModifier,
-                )
-            }
-            if (voice) {
-                VoiceInputButton(onResult = { onValueChange(voiceTransform(it)) })
-            }
+        if (editing) {
+            EditableBody(
+                value = value,
+                onValueChange = onValueChange,
+                transformation = transformation,
+                keyboardType = keyboardType,
+                focusRequester = editFocus,
+                onDone = { editing = false },
+            )
+        } else {
+            ReadOnlyBody(
+                display = transformForDisplay(value, transformation),
+                placeholder = hint?.takeIf { value.isBlank() } ?: "",
+                empty = value.isBlank(),
+                onClick = { editing = true },
+            )
         }
     }
+}
+
+@Composable
+private fun ReadOnlyBody(
+    display: String,
+    placeholder: String,
+    empty: Boolean,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundDeep
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = if (empty) placeholder else display,
+            color = if (empty) YancoPalette.TextMuted else YancoPalette.TextPrimary,
+            fontSize = 14.sp,
+        )
+    }
+}
+
+@Composable
+private fun EditableBody(
+    value: String,
+    onValueChange: (String) -> Unit,
+    transformation: VisualTransformation,
+    keyboardType: KeyboardType,
+    focusRequester: FocusRequester,
+    onDone: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(YancoPalette.BackgroundHover)
+            .border(1.dp, YancoPalette.FocusRing, RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            interactionSource = interaction,
+            textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 14.sp),
+            cursorBrush = SolidColor(YancoPalette.FocusRing),
+            visualTransformation = transformation,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = keyboardType,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { onDone() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+        )
+    }
+}
+
+private fun transformForDisplay(value: String, transformation: VisualTransformation): String {
+    if (value.isEmpty()) return ""
+    if (transformation is PasswordVisualTransformation) return "•".repeat(value.length)
+    return value
 }
 
 @Composable
@@ -421,7 +464,7 @@ private fun PrimaryButton(label: String, onClick: () -> Unit, enabled: Boolean) 
     val focused by interaction.collectIsFocusedAsState()
     val bg = when {
         !enabled -> YancoPalette.AccentMuted.copy(alpha = 0.4f)
-        focused -> YancoPalette.FocusRing
+        focused -> YancoPalette.AccentGlow
         else -> YancoPalette.Accent
     }
     val borderColor = if (focused) YancoPalette.TextPrimary else bg
@@ -482,18 +525,4 @@ private fun GhostButton(label: String, onClick: () -> Unit, enabled: Boolean) {
             fontSize = 14.sp,
         )
     }
-}
-
-/**
- * Speech-to-text emits friendly English — collapse it to a URL shape.
- * "H T T P colon slash slash foo dot bar" → "http://foo.bar", drop spaces.
- */
-private fun normalizeUrlFromSpeech(raw: String): String {
-    var s = raw.trim().lowercase()
-    s = s.replace(Regex("\\s*colon\\s*"), ":")
-    s = s.replace(Regex("\\s*(forward\\s+slash|slash)\\s*"), "/")
-    s = s.replace(Regex("\\s*dot\\s*"), ".")
-    s = s.replace(Regex("\\s*dash\\s*"), "-")
-    s = s.replace(Regex("\\s+"), "")
-    return s
 }

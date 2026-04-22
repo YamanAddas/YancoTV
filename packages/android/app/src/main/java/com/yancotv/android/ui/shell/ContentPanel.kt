@@ -5,7 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +81,7 @@ private const val EPG_TICK_MS = 60_000L
  * Focus memory: [rememberSaveable] keyed by `"$type|$group"` restores the
  * previously focused index when returning to a filter.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ContentPanel(
     type: ContentType,
@@ -194,7 +198,9 @@ fun ContentPanel(
         modifier = modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .focusRestorer()
+            .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // Filter out hidden channels at render time. SQL-side filtering
