@@ -88,19 +88,10 @@ fun SettingsScreen(
                 when (tab) {
                     SettingsTab.Sources -> SourcesScreen()
                     SettingsTab.Epg -> SettingsEpgTab()
-                    SettingsTab.Playback -> SettingsStubTab(
-                        title = "Playback",
-                        body = "Playback preferences — resize mode, buffer tuning, subtitle language default, audio track preference. Lands in MK.8.6.b.",
-                    )
-                    SettingsTab.Network -> SettingsStubTab(
-                        title = "Network",
-                        body = "Per-source User-Agent override, HTTP timeout, streaming buffer size. Lands in MK.8.6.c.",
-                    )
+                    SettingsTab.Playback -> SettingsPlaybackTab()
+                    SettingsTab.Network -> SettingsNetworkTab()
                     SettingsTab.Parental -> SettingsParentalTab()
-                    SettingsTab.Shortcuts -> SettingsStubTab(
-                        title = "Remote + keyboard shortcuts",
-                        body = "Key reference (Ctrl-K search, INFO for stream info, channel up/down, etc.). Read-only cheatsheet, lands in MK.8.6.d.",
-                    )
+                    SettingsTab.Shortcuts -> SettingsShortcutsTab()
                     SettingsTab.About -> SettingsAboutTab()
                 }
             }

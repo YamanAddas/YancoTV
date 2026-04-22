@@ -5,6 +5,7 @@ import com.yancotv.android.logger.AndroidLogger
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.sync.AndroidEpgImporter
 import com.yancotv.shared.epg.BulkEpgWriter
 import com.yancotv.shared.parental.AndroidPinHasher
@@ -109,4 +110,5 @@ val appModule = module {
             clock = { System.currentTimeMillis() },
         )
     }
+    single { AppPreferences(db = get()) }
 }
