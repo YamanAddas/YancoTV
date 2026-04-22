@@ -114,6 +114,15 @@ INSERT INTO content (
     sort_order, created_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+-- Merges enriched detail metadata (plot, cast, backdrop, episodes) into an
+-- existing row without touching the sort-critical columns. Used by the
+-- detail screen after a lazy get_vod_info / get_series_info fetch.
+updateMetadataAndLogo:
+UPDATE content
+SET metadata_json = :metadataJson,
+    logo_url = COALESCE(:logoUrl, logo_url)
+WHERE id = :id;
+
 deleteBySource:
 DELETE FROM content WHERE source_id = ?;
 

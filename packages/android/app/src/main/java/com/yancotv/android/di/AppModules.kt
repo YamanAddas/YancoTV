@@ -13,6 +13,7 @@ import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.parental.PinHasher
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.catchup.CatchupService
+import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
@@ -118,4 +119,13 @@ val appModule = module {
         )
     }
     single { AppPreferences(db = get()) }
+    single {
+        ContentDetailService(
+            db = get(),
+            sources = get(),
+            http = get(),
+            logger = get(),
+            clock = { System.currentTimeMillis() },
+        )
+    }
 }

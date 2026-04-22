@@ -7,16 +7,19 @@ import androidx.compose.ui.graphics.Color
 // Palette ported from the desktop Tailwind theme (`src/renderer/styles/global.css`).
 // Kept as a single source so the phone + TV themes stay visually identical.
 object YancoPalette {
-    val BackgroundDeep = Color(0xFF0B0F14)
-    val BackgroundRaised = Color(0xFF10161D)
-    val BackgroundHover = Color(0xFF162029)
-    val BorderSubtle = Color(0xFF1C2732)
-    val TextPrimary = Color(0xFFE6EDF3)
-    val TextMuted = Color(0xFF8B97A7)
-    val Accent = Color(0xFF9FC9FF)
-    val AccentMuted = Color(0xFF4F7FBF)
+    val BackgroundDeep = Color(0xFF0A120F)
+    val BackgroundRaised = Color(0xFF0F1B17)
+    val BackgroundHover = Color(0xFF16261F)
+    val BorderSubtle = Color(0xFF1E3229)
+    val TextPrimary = Color(0xFFE6F5EC)
+    val TextMuted = Color(0xFF8AA59A)
+    // Neon mint — desktop "YancoTV+" aesthetic. Saturated enough to pop on
+    // TV at a distance without bleeding into the backdrop.
+    val Accent = Color(0xFF2EE59D)
+    val AccentMuted = Color(0xFF1B8D63)
+    val AccentGlow = Color(0xFF5CFFBD)
     val Error = Color(0xFFFF6B6B)
-    val FocusRing = Color(0xFF9FC9FF)
+    val FocusRing = Color(0xFF5CFFBD)
 }
 
 private val PhoneDarkScheme = darkColorScheme(

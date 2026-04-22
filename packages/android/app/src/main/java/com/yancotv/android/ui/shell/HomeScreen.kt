@@ -48,10 +48,12 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.OpenOn
+import com.yancotv.android.ui.detail.ContentDetailScreen
 import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.shared.types.EpisodeInfo
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
@@ -136,6 +138,13 @@ fun HomeScreen(
         if (id in lockedIds) pendingPlay = action else action()
     }
 
+    // Detail overlay state. Movies + series route here on activation
+    // instead of straight to the player so the user can read plot / pick
+    // an episode / add to favourites before committing to playback. Live
+    // channels bypass the detail page entirely.
+    var detailItem by remember { mutableStateOf<ContentItem?>(null) }
+    BackHandler(enabled = detailItem != null) { detailItem = null }
+
     // MK.8.7.b — Settings-entry gate. When the user has enabled
     // "Require PIN for Settings", navigating to the Settings section sets
     // this flag until the PIN is verified. Clears when the user leaves
@@ -201,16 +210,27 @@ fun HomeScreen(
                 onActivate = { list, idx ->
                     val target = list.getOrNull(idx) ?: return@ContentArea
                     gatedPlay(target.id) {
-                        // Two-tap activation on TV (TiviMate-style): first
-                        // press starts the stream in the mini preview,
-                        // second press on the same channel fullscreens with
-                        // zero rebuffer. Phone skips the mini because the
-                        // shell doesn't dedicate screen real-estate to
-                        // InfoPanel — tap goes straight to the player.
-                        val alreadyPlaying = controller.currentId == target.id
-                        if (!alreadyPlaying) controller.play(list, idx)
-                        if (!isTv || alreadyPlaying) {
-                            PlayerLauncher.launch(context)
+                        when (target.type) {
+                            ContentType.LIVE -> {
+                                // Two-tap activation on TV (TiviMate-style):
+                                // first press starts the stream in the mini
+                                // preview, second press on the same channel
+                                // fullscreens with zero rebuffer. Phone skips
+                                // the mini because the shell doesn't dedicate
+                                // screen real-estate to InfoPanel — tap goes
+                                // straight to the player.
+                                val alreadyPlaying = controller.currentId == target.id
+                                if (!alreadyPlaying) controller.play(list, idx)
+                                if (!isTv || alreadyPlaying) {
+                                    PlayerLauncher.launch(context)
+                                }
+                            }
+                            ContentType.MOVIE, ContentType.SERIES -> {
+                                // Open the detail overlay instead of auto-
+                                // playing — the user almost always wants to
+                                // see a plot/poster/episode list first.
+                                detailItem = target
+                            }
                         }
                     }
                 },
@@ -303,6 +323,32 @@ fun HomeScreen(
                     SearchScreen(isTv = isTv)
                 }
             }
+        }
+
+        // Movie / Series detail overlay — rides above the shell Row so it
+        // can occupy the full screen while the shell keeps its state
+        // intact underneath (focus memory, scroll position, etc.).
+        detailItem?.let { item ->
+            ContentDetailScreen(
+                item = item,
+                onPlayContent = { target ->
+                    controller.play(listOf(target), 0)
+                    detailItem = null
+                    PlayerLauncher.launch(context)
+                },
+                onPlayEpisode = { target, ep ->
+                    val episodeItem = target.copy(
+                        id = "${target.id}:ep:${ep.id}",
+                        streamUrl = ep.streamUrl,
+                        title = "${target.title} — ${ep.title}",
+                        cleanTitle = ep.title,
+                    )
+                    controller.play(listOf(episodeItem), 0)
+                    detailItem = null
+                    PlayerLauncher.launch(context)
+                },
+                onDismiss = { detailItem = null },
+            )
         }
 
         // Parental PIN gate (MK.8.7). Rides above the shell so the dialog
