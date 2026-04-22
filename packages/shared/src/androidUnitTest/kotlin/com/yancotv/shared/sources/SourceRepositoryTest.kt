@@ -194,6 +194,49 @@ class SourceRepositoryTest {
         assertEquals(1, r.getById(s.id)?.channelCount)
     }
 
+    @Test
+    fun `removeSource cascades to content rows`() {
+        // Build the repo with a known db handle so we can poke content_fts
+        // via the same driver. Keeps the test focused on cascade behaviour.
+        val bundle = testDatabase()
+        val repo = SourceRepository(
+            db = bundle.db,
+            driver = bundle.driver,
+            credentialStore = PlaintextCredentialStore(),
+            http = FakeHttpClient(),
+            fileReader = FakeFileReader(emptyMap()),
+            clock = { 1_000L },
+            idGenerator = run { var n = 0; { "cascade-id-${++n}" } },
+        )
+        val saved = repo.addSource(
+            AddSourceInput(name = "S", type = SourceType.M3U_URL, url = "http://s"),
+        )
+        bundle.db.contentQueries.insert(
+            id = "ch-1",
+            source_id = saved.id,
+            type = "live",
+            title = "Ch",
+            clean_title = "Ch",
+            group_name = null,
+            stream_url = "http://stream/1",
+            logo_url = null,
+            tvg_id = "c1",
+            metadata_json = null,
+            sort_order = 0L,
+            created_at = 0L,
+        )
+        assertEquals(1L, bundle.db.contentQueries.countByType("live").executeAsOne())
+
+        repo.removeSource(saved.id)
+
+        assertEquals(
+            0L,
+            bundle.db.contentQueries.countByType("live").executeAsOne(),
+            "removeSource must cascade-delete content rows via the FK",
+        )
+        assertEquals(0, repo.getAll().size)
+    }
+
     private fun assertFails(block: () -> Unit) {
         var threw = false
         try { block() } catch (_: Throwable) { threw = true }
