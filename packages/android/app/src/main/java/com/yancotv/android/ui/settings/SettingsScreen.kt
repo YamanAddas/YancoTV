@@ -1,7 +1,10 @@
 package com.yancotv.android.ui.settings
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -9,12 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,25 +27,30 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.ui.theme.Radius
+import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoType
 
 /**
- * Top-level Settings shell. Left-rail vertical tab selector + right
- * content pane — TV-friendly (D-pad up/down on the rail, right into
- * content) and translates directly to a phone-sized column stack.
+ * Top-level Settings shell. Two-pane TV layout: a left rail of
+ * vertical tabs and a right content pane. Focus lives in
+ * [focusRestorer] + [focusGroup] so returning to the rail snaps
+ * back to the last selected tab instead of the first entry.
  *
- * MK.8.6 lands the expanded IA: Sources was the only tab since MK.6,
- * now we add Epg, Playback, Network, Parental, Shortcuts, About so
- * later milestones (MK.8.6.b playback prefs, MK.8.7 parental PIN) have
- * a pre-built home. Stub tabs render a placeholder that tells the user
- * which milestone adds their content — better than a dead-end "blank".
+ * Stub tabs are real composables in this package; this screen only
+ * routes to them. The surrounding chrome (eyebrow, title, tab rail,
+ * panel shell) is the shared "settings shell" language — the inner
+ * tab bodies decide their own content layout.
  */
 enum class SettingsTab(val label: String) {
     Sources("Sources"),
@@ -54,6 +64,7 @@ enum class SettingsTab(val label: String) {
     About("About"),
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
 fun SettingsScreen(
@@ -61,32 +72,27 @@ fun SettingsScreen(
     initialTab: SettingsTab = SettingsTab.Sources,
 ) {
     // rememberSaveable survives rotation + process death so the user returns
-    // to the tab they were on. `initialTab` only seeds the first render; we
-    // don't overwrite it on recomposition.
+    // to the tab they were on. `initialTab` only seeds the first render.
     var tab by rememberSaveable { mutableStateOf(initialTab) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = Space.page, vertical = Space.xxl),
+        verticalArrangement = Arrangement.spacedBy(Space.xl),
     ) {
-        Text(
-            text = "Settings",
-            color = YancoPalette.TextPrimary,
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        SettingsHeader()
         Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(Space.xxl),
         ) {
             TabRail(
                 current = tab,
                 onSelect = { tab = it },
-                modifier = Modifier.width(180.dp).fillMaxHeight(),
+                modifier = Modifier.width(208.dp).fillMaxHeight(),
             )
-            Box(modifier = Modifier.fillMaxSize()) {
+            ContentFrame(modifier = Modifier.fillMaxSize()) {
                 when (tab) {
                     SettingsTab.Sources -> SourcesScreen()
                     SettingsTab.General -> SettingsGeneralTab()
@@ -104,16 +110,48 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SettingsHeader() {
+    Column {
+        Text(
+            text = "PREFERENCES",
+            color = YancoPalette.Accent,
+            style = YancoType.Overline,
+        )
+        Spacer(Modifier.height(Space.xxs))
+        Text(
+            text = "Settings",
+            color = YancoPalette.TextPrimary,
+            style = YancoType.DisplayS,
+        )
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
 private fun TabRail(
     current: SettingsTab,
     onSelect: (SettingsTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val brush = remember {
+        Brush.verticalGradient(
+            colors = listOf(
+                YancoPalette.BackgroundRaised,
+                YancoPalette.BackgroundDeep,
+            ),
+        )
+    }
     Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.panel))
+            .background(brush)
+            .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(Radius.panel))
+            .padding(Space.sm)
+            .focusRestorer()
+            .focusGroup(),
+        verticalArrangement = Arrangement.spacedBy(Space.xxs),
     ) {
-        for (entry in SettingsTab.values()) {
+        for (entry in SettingsTab.entries) {
             TabRailItem(
                 label = entry.label,
                 selected = entry == current,
@@ -132,61 +170,67 @@ private fun TabRailItem(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = when {
-        selected -> YancoPalette.Accent.copy(alpha = 0.18f)
         focused -> YancoPalette.BackgroundHover
+        selected -> YancoPalette.Accent.copy(alpha = 0.14f)
         else -> Color.Transparent
     }
-    val border = when {
-        focused -> YancoPalette.Accent
-        selected -> YancoPalette.Accent.copy(alpha = 0.6f)
-        else -> Color.Transparent
-    }
-    val textColor = when {
-        selected || focused -> YancoPalette.TextPrimary
-        else -> YancoPalette.TextMuted
-    }
-    Row(
+    val border = if (focused) YancoPalette.FocusRing else Color.Transparent
+    val fg by animateColorAsState(
+        targetValue = when {
+            focused -> YancoPalette.TextPrimary
+            selected -> YancoPalette.Accent
+            else -> YancoPalette.TextSecondary
+        },
+        label = "settings-tab-fg",
+    )
+
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .focusable(interactionSource = interaction)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .fillMaxWidth()
+            .height(42.dp),
     ) {
-        Text(
-            text = label,
-            color = textColor,
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-    // Draw a thin left-border accent via a separate Box so we don't need
-    // a BorderStroke composable in the Row signature. Renders ABOVE bg.
-    if (selected || focused) {
+        // Left accent bar marks the currently-selected tab even when focus
+        // is elsewhere — matches the sidebar/groups language.
         Box(
             modifier = Modifier
-                .width(0.dp) // placeholder — actual accent baked into bg + textColor above
-                .background(border),
+                .width(3.dp)
+                .fillMaxHeight()
+                .padding(vertical = Space.sm)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(if (selected) YancoPalette.Accent else Color.Transparent),
         )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = Space.sm)
+                .clip(RoundedCornerShape(Radius.control))
+                .background(bg)
+                .border(1.dp, border, RoundedCornerShape(Radius.control))
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = Space.md, vertical = Space.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                color = fg,
+                style = if (selected) YancoType.LabelStrong else YancoType.Label,
+            )
+        }
     }
 }
 
 @Composable
-private fun SettingsStubTab(title: String, body: String) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+private fun ContentFrame(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    // Consistent panel chrome so each tab body lives inside the same
+    // card treatment without every tab having to repeat the background +
+    // border dance.
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.panel))
+            .background(YancoPalette.BackgroundRaised)
+            .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(Radius.panel)),
     ) {
-        Text(
-            text = title,
-            color = YancoPalette.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = body,
-            color = YancoPalette.TextMuted,
-            fontSize = 13.sp,
-        )
+        content()
     }
 }

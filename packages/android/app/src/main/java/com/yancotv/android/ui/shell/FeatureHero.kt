@@ -1,0 +1,532 @@
+package com.yancotv.android.ui.shell
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.media3.common.util.UnstableApi
+import coil3.compose.AsyncImage
+import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.ui.theme.Radius
+import com.yancotv.android.ui.theme.Space
+import com.yancotv.android.ui.theme.YancoIcons
+import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoType
+import com.yancotv.shared.types.ContentItem
+import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.NowNext
+
+/**
+ * Dominant hero at the top of the browse shell. Swaps its backdrop + copy
+ * as the user moves through the rail beneath — moving focus is what creates
+ * the cinematic payoff, not a separate click.
+ *
+ * Three compositional states:
+ *   - empty:   no item focused (initial paint, empty catalogue) → branded idle card
+ *   - idle:    item focused, nothing playing → backdrop + metadata + Play CTA
+ *   - playing: something is on → MiniPlayer as the backdrop + "Now playing" overlay
+ *
+ * The hero is edge-to-edge within its lane (no panel border) so the art
+ * bleeds against the shell. Left-darken gradient + vertical bottom-fade
+ * keep the copy readable regardless of the artwork's luminance.
+ */
+@UnstableApi
+@Composable
+fun FeatureHero(
+    focused: ContentItem?,
+    playing: ContentItem?,
+    nowNext: NowNext?,
+    nowSeconds: Long,
+    sourceName: String?,
+    isFavorite: Boolean,
+    isLocked: Boolean,
+    controller: PlaybackController,
+    onPlay: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        // Backdrop layer — either the live mini player, or the focused
+        // item's artwork, or a branded gradient when nothing is picked.
+        HeroBackdrop(
+            focused = focused,
+            playing = playing,
+            controller = controller,
+        )
+
+        // Dual gradient: horizontal left-darken so the copy column is
+        // readable, plus a subtle vertical bottom-fade so any card rail
+        // behind reads as continuation of the canvas, not a hard edge.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        0f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                        0.45f to YancoPalette.BackgroundDeep.copy(alpha = 0.45f),
+                        1f to Color.Transparent,
+                    ),
+                )
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.75f to Color.Transparent,
+                        1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
+                    ),
+                ),
+        )
+
+        if (focused == null) {
+            HeroIdlePlaceholder(modifier = Modifier.align(Alignment.CenterStart))
+            return@Box
+        }
+
+        HeroCopy(
+            focused = focused,
+            playing = playing,
+            nowNext = nowNext,
+            nowSeconds = nowSeconds,
+            sourceName = sourceName,
+            isFavorite = isFavorite,
+            isLocked = isLocked,
+            onPlay = onPlay,
+            onToggleFavorite = onToggleFavorite,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = Space.page, end = Space.xxxl)
+                .widthIn(max = 620.dp),
+        )
+    }
+}
+
+@UnstableApi
+@Composable
+private fun HeroBackdrop(
+    focused: ContentItem?,
+    playing: ContentItem?,
+    controller: PlaybackController,
+) {
+    when {
+        playing != null -> {
+            Box(Modifier.fillMaxSize()) {
+                MiniPlayer(controller = controller)
+            }
+        }
+        focused?.logoUrl?.isNotBlank() == true -> {
+            // AnimatedContent swaps the backdrop with a quick crossfade so
+            // rail traversal doesn't feel jarring — a hard replace at 10ft
+            // reads as flicker.
+            AnimatedContent(
+                targetState = focused.logoUrl!!,
+                transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(200)) },
+                label = "hero-backdrop",
+            ) { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        else -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                YancoPalette.BackgroundHover,
+                                YancoPalette.BackgroundDeep,
+                            ),
+                        ),
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroCopy(
+    focused: ContentItem,
+    playing: ContentItem?,
+    nowNext: NowNext?,
+    nowSeconds: Long,
+    sourceName: String?,
+    isFavorite: Boolean,
+    isLocked: Boolean,
+    onPlay: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    modifier: Modifier,
+) {
+    val eyebrow = when (focused.type) {
+        ContentType.LIVE -> "LIVE CHANNEL"
+        ContentType.MOVIE -> "FEATURE"
+        ContentType.SERIES -> "SERIES"
+    }
+    val title = focused.cleanTitle?.ifBlank { null } ?: focused.title
+    val nowProg = nowNext?.now
+    val nextProg = nowNext?.next
+    val isCurrentlyPlaying = playing?.id == focused.id
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Space.md),
+    ) {
+        // Eyebrow row: type label + live pill when something is on.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.md),
+        ) {
+            Text(
+                text = eyebrow,
+                color = YancoPalette.Accent,
+                style = YancoType.Overline,
+            )
+            if (isCurrentlyPlaying) HeroLivePill()
+            if (isLocked) HeroLockChip()
+        }
+
+        // Title in cinematic treatment. Clamp to 2 lines — the hero is
+        // horizontal, not a detail page.
+        Text(
+            text = title,
+            color = YancoPalette.TextPrimary,
+            style = YancoType.DisplayCinematic,
+            maxLines = 2,
+        )
+
+        // For live channels, the now-playing program is the headline
+        // metadata. For movies/series we surface plot — stored in
+        // metadataJson — but that parse is lossy enough to skip here and
+        // let Detail do its job, so we show category/source chips instead.
+        when (focused.type) {
+            ContentType.LIVE -> LiveHeroMeta(
+                nowProg = nowProg,
+                nextProg = nextProg,
+                nowSeconds = nowSeconds,
+                group = focused.groupName,
+            )
+            ContentType.MOVIE, ContentType.SERIES -> VodHeroMeta(
+                group = focused.groupName,
+                sourceName = sourceName,
+                type = focused.type,
+            )
+        }
+
+        Spacer(Modifier.height(Space.xs))
+        // Two-button action row. Play is the primary CTA — gets the accent
+        // fill. Favorite is secondary, tonal only.
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+            PrimaryCta(
+                label = if (isCurrentlyPlaying) "Open fullscreen" else "Play now",
+                icon = YancoIcons.Play,
+                onClick = onPlay,
+            )
+            TonalCta(
+                label = if (isFavorite) "In favorites" else "Favorite",
+                icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
+                highlighted = isFavorite,
+                onClick = onToggleFavorite,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveHeroMeta(
+    nowProg: com.yancotv.shared.types.EpgProgramme?,
+    nextProg: com.yancotv.shared.types.EpgProgramme?,
+    nowSeconds: Long,
+    group: String?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+        if (nowProg != null) {
+            Text(
+                text = "Now: ${nowProg.title}",
+                color = YancoPalette.TextPrimary,
+                style = YancoType.TitleM,
+                maxLines = 2,
+            )
+            // Progress bar with clock endpoints. Time left is the concise
+            // fact worth surfacing, not start/end as full timestamps.
+            HeroProgress(
+                start = nowProg.startTime,
+                end = nowProg.endTime,
+                now = nowSeconds,
+            )
+        }
+        if (nextProg != null) {
+            Text(
+                text = "Up next: ${nextProg.title}",
+                color = YancoPalette.TextMuted,
+                style = YancoType.Caption,
+                maxLines = 1,
+            )
+        }
+        MetaChipRow(
+            chips = buildList {
+                group?.takeIf { it.isNotBlank() }?.let { add(it) }
+                nowProg?.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun VodHeroMeta(
+    group: String?,
+    sourceName: String?,
+    type: ContentType,
+) {
+    MetaChipRow(
+        chips = buildList {
+            add(if (type == ContentType.MOVIE) "Movie" else "Series")
+            group?.takeIf { it.isNotBlank() }?.let { add(it) }
+            sourceName?.takeIf { it.isNotBlank() }?.let { add(it) }
+        },
+    )
+}
+
+@Composable
+private fun MetaChipRow(chips: List<String>) {
+    if (chips.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+        chips.take(4).forEach { chip -> HeroMetaChip(chip) }
+    }
+}
+
+@Composable
+private fun HeroMetaChip(label: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+            .border(
+                1.dp,
+                YancoPalette.BorderSubtle,
+                RoundedCornerShape(Radius.pill),
+            )
+            .padding(horizontal = Space.md, vertical = Space.xxs),
+    ) {
+        Text(
+            text = label,
+            color = YancoPalette.TextSecondary,
+            style = YancoType.Caption,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun HeroProgress(start: Long, end: Long, now: Long) {
+    val span = (end - start).coerceAtLeast(1)
+    val pct = ((now - start).toFloat() / span).coerceIn(0f, 1f)
+    val remainingMin = ((end - now).coerceAtLeast(0) / 60).toInt()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(YancoPalette.BorderSubtle),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(pct)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                YancoPalette.AccentDeep,
+                                YancoPalette.Accent,
+                                YancoPalette.AccentGlow,
+                            ),
+                        ),
+                    ),
+            )
+        }
+        Text(
+            text = if (remainingMin > 0) "$remainingMin min left" else "Ending now",
+            color = YancoPalette.TextMuted,
+            style = YancoType.Caption,
+        )
+    }
+}
+
+@Composable
+private fun PrimaryCta(label: String, icon: ImageVector, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
+    val fg = YancoPalette.BackgroundDeep
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(bg)
+            .border(
+                if (focused) 2.dp else 0.dp,
+                if (focused) YancoPalette.FocusRing else Color.Transparent,
+                RoundedCornerShape(Radius.pill),
+            )
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .semantics { contentDescription = label }
+            .padding(horizontal = Space.xxl, vertical = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+        Text(
+            text = label,
+            color = fg,
+            style = YancoType.LabelStrong,
+        )
+    }
+}
+
+@Composable
+private fun TonalCta(
+    label: String,
+    icon: ImageVector,
+    highlighted: Boolean,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val bg = when {
+        focused -> YancoPalette.BackgroundHover
+        highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
+        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.55f)
+    }
+    val border = when {
+        focused -> YancoPalette.FocusRing
+        highlighted -> YancoPalette.Accent.copy(alpha = 0.45f)
+        else -> YancoPalette.BorderSubtle
+    }
+    val fg = when {
+        highlighted -> YancoPalette.Accent
+        else -> YancoPalette.TextPrimary
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(bg)
+            .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(Radius.pill))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .semantics { contentDescription = label }
+            .padding(horizontal = Space.xxl, vertical = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+        Text(
+            text = label,
+            color = fg,
+            style = YancoType.LabelStrong,
+        )
+    }
+}
+
+@Composable
+private fun HeroLivePill() {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(YancoPalette.Live)
+            .padding(horizontal = Space.sm, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(Color.White),
+        )
+        Text(text = "LIVE", color = Color.White, style = YancoType.Overline)
+    }
+}
+
+@Composable
+private fun HeroLockChip() {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
+            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), RoundedCornerShape(Radius.pill))
+            .padding(horizontal = Space.sm, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
+    ) {
+        Icon(
+            imageVector = YancoIcons.Lock,
+            contentDescription = null,
+            tint = YancoPalette.Accent,
+            modifier = Modifier.size(10.dp),
+        )
+        Text(text = "LOCKED", color = YancoPalette.Accent, style = YancoType.Overline)
+    }
+}
+
+@Composable
+private fun HeroIdlePlaceholder(modifier: Modifier) {
+    Column(
+        modifier = modifier
+            .padding(start = Space.page, end = Space.xxxl)
+            .widthIn(max = 560.dp),
+        verticalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Text(
+            text = "YANCOTV+",
+            color = YancoPalette.Accent,
+            style = YancoType.Overline,
+        )
+        Text(
+            text = "Move through the rail to preview",
+            color = YancoPalette.TextPrimary,
+            style = YancoType.DisplayS,
+        )
+        Text(
+            text = "The focused title becomes the hero — browse, then press OK to watch.",
+            color = YancoPalette.TextSecondary,
+            style = YancoType.BodyLong,
+        )
+    }
+}

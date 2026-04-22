@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,13 +41,17 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.ui.components.focusStyle
+import com.yancotv.android.ui.theme.Radius
+import com.yancotv.android.ui.theme.ShellDim
+import com.yancotv.android.ui.theme.Space
+import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.types.ContentItem
@@ -112,10 +118,7 @@ fun ContentDetailScreen(
     }
 
     // Single LazyColumn governs the whole page so d-pad focus never has
-    // to cross a scroll-container boundary. Items are keyed by a stable
-    // string so focus survives episode-season swaps without rebuilding
-    // every row. rememberLazyListState keeps scroll position across
-    // metadata arrivals (plot → backdrop → episodes fill in over ~1s).
+    // to cross a scroll-container boundary.
     val listState = rememberLazyListState()
 
     LazyColumn(
@@ -123,7 +126,7 @@ fun ContentDetailScreen(
         modifier = modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep),
-        contentPadding = PaddingValues(bottom = 32.dp),
+        contentPadding = PaddingValues(bottom = Space.section),
     ) {
         item(key = "hero") {
             HeroBlock(
@@ -156,41 +159,18 @@ fun ContentDetailScreen(
 
         if (rendered.type == ContentType.SERIES) {
             item(key = "episodes_header") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "EPISODES",
-                        color = YancoPalette.Accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    if (loading && episodes.isEmpty()) {
-                        CircularProgressIndicator(
-                            color = YancoPalette.Accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.width(14.dp).height(14.dp),
-                        )
-                    } else {
-                        Text(
-                            text = "${episodes.size} total",
-                            color = YancoPalette.TextMuted,
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
+                EpisodesSectionHeader(
+                    loading = loading,
+                    episodeCount = episodes.size,
+                )
             }
             if (seasons.size > 1) {
                 item(key = "season_chips") {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 48.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = Space.page, vertical = Space.xs),
+                        horizontalArrangement = Arrangement.spacedBy(Space.sm),
                     ) {
                         seasons.keys.forEach { season ->
                             SeasonChip(
@@ -206,19 +186,21 @@ fun ContentDetailScreen(
             if (visibleEpisodes.isEmpty() && !loading) {
                 item(key = "no_episodes") {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Space.page, vertical = Space.md),
                     ) {
                         Text(
                             text = "No episodes available.",
                             color = YancoPalette.TextMuted,
-                            fontSize = 13.sp,
+                            style = YancoType.Body,
                         )
                     }
                 }
             }
             items(visibleEpisodes, key = { "ep:${it.id}" }) { ep ->
                 Box(
-                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xxs),
                 ) {
                     EpisodeRow(ep = ep, onClick = { onPlayEpisode(rendered, ep) })
                 }
@@ -226,9 +208,7 @@ fun ContentDetailScreen(
         }
     }
 
-    // Auto-focus Play on open so the user can press OK immediately. The
-    // LazyColumn renders the hero eagerly; by the time the effect fires
-    // the FocusRequester is attached and ready.
+    // Auto-focus Play on open so the user can press OK immediately.
     LaunchedEffect(Unit) {
         runCatching { playFocus.requestFocus() }
     }
@@ -250,38 +230,44 @@ private fun HeroBlock(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 48.dp, vertical = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = Space.page, vertical = Space.xxxl),
+            verticalArrangement = Arrangement.spacedBy(Space.lg),
         ) {
-            Spacer(modifier = Modifier.height(140.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            // Push the content block below the backdrop gradient so the
+            // title sits in the darkest band where the scrim reads best.
+            Spacer(modifier = Modifier.height(220.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xxl)) {
                 Poster(url = item.logoUrl ?: metadata.tmdbPosterUrl)
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(Space.md),
                 ) {
+                    if (!item.groupName.isNullOrBlank()) {
+                        Text(
+                            text = item.groupName!!.uppercase(),
+                            color = YancoPalette.Accent,
+                            style = YancoType.Overline,
+                        )
+                    }
                     Text(
                         text = item.cleanTitle?.ifBlank { null } ?: item.title,
                         color = YancoPalette.TextPrimary,
-                        fontSize = 30.sp,
-                        fontStyle = FontStyle.Italic,
-                        fontWeight = FontWeight.Bold,
+                        style = YancoType.DisplayCinematic,
+                        maxLines = 2,
                     )
                     metadata.tagline?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
                             color = YancoPalette.AccentGlow,
-                            fontSize = 13.sp,
-                            fontStyle = FontStyle.Italic,
+                            style = YancoType.BodyLong,
                         )
                     }
                     MetaLine(metadata, item.type, episodeCount = episodes.size)
                     metadata.plot?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
-                            color = YancoPalette.TextPrimary,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp,
+                            color = YancoPalette.TextSecondary,
+                            style = YancoType.BodyLong,
                             maxLines = 4,
                         )
                     }
@@ -301,7 +287,7 @@ private fun HeroBlock(
                     val cast = metadata.cast?.takeIf { it.isNotBlank() }
                     val director = metadata.director?.takeIf { it.isNotBlank() }
                     if (cast != null || director != null) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
                             director?.let { CreditRow(label = "Director", value = it) }
                             cast?.let { CreditRow(label = "Cast", value = it) }
                         }
@@ -323,7 +309,7 @@ private fun BackdropHero(url: String?) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(380.dp)
+            .height(ShellDim.heroHeight)
             .background(YancoPalette.BackgroundRaised),
     ) {
         if (!url.isNullOrBlank()) {
@@ -334,6 +320,22 @@ private fun BackdropHero(url: String?) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        // Dual gradient stack: horizontal left-side darken so the text
+        // column reads over any backdrop, plus a vertical bottom fade
+        // into the page background for a seamless hand-off.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.85f),
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.3f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -341,7 +343,7 @@ private fun BackdropHero(url: String?) {
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            YancoPalette.BackgroundDeep.copy(alpha = 0.75f),
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.6f),
                             YancoPalette.BackgroundDeep,
                         ),
                     ),
@@ -354,11 +356,11 @@ private fun BackdropHero(url: String?) {
 private fun Poster(url: String?) {
     Box(
         modifier = Modifier
-            .width(170.dp)
+            .width(ShellDim.detailPosterWidth)
             .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.panel))
             .background(YancoPalette.BackgroundRaised)
-            .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(10.dp)),
+            .border(1.dp, YancoPalette.PanelBorder, RoundedCornerShape(Radius.panel)),
         contentAlignment = Alignment.Center,
     ) {
         if (!url.isNullOrBlank()) {
@@ -372,7 +374,7 @@ private fun Poster(url: String?) {
             Text(
                 text = "No artwork",
                 color = YancoPalette.TextMuted,
-                fontSize = 11.sp,
+                style = YancoType.Caption,
             )
         }
     }
@@ -388,16 +390,23 @@ private fun MetaLine(meta: ContentMetadata, type: ContentType, episodeCount: Int
         if (type == ContentType.SERIES && episodeCount > 0) add("$episodeCount episodes")
     }
     if (bits.isEmpty()) return
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         bits.forEachIndexed { i, text ->
             if (i > 0) {
-                Text(text = "\u00b7", color = YancoPalette.TextMuted, fontSize = 12.sp)
+                Box(
+                    modifier = Modifier
+                        .size(3.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(YancoPalette.TextFaint),
+                )
             }
             Text(
                 text = text,
-                color = YancoPalette.TextMuted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                color = YancoPalette.TextSecondary,
+                style = YancoType.CaptionStrong,
             )
         }
     }
@@ -405,15 +414,18 @@ private fun MetaLine(meta: ContentMetadata, type: ContentType, episodeCount: Int
 
 @Composable
 private fun CreditRow(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
         Text(
-            text = label,
+            text = label.uppercase(),
             color = YancoPalette.TextMuted,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.width(64.dp),
+            style = YancoType.Overline,
+            modifier = Modifier.width(72.dp),
         )
-        Text(text = value, color = YancoPalette.TextPrimary, fontSize = 11.sp)
+        Text(
+            text = value,
+            color = YancoPalette.TextPrimary,
+            style = YancoType.Body,
+        )
     }
 }
 
@@ -427,8 +439,8 @@ private fun ActionRow(
     playFocus: FocusRequester,
 ) {
     Row(
-        modifier = Modifier.padding(top = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(top = Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(Space.md),
     ) {
         PrimaryButton(
             label = primaryLabel,
@@ -436,11 +448,17 @@ private fun ActionRow(
             focusRequester = playFocus,
         )
         SecondaryButton(
-            label = if (isFavorite) "\u2605 In favourites" else "\u2606 Add to favourites",
+            label = if (isFavorite) "In favourites" else "Add to favourites",
+            icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
             onClick = onFavoriteToggle,
             accent = isFavorite,
         )
-        SecondaryButton(label = "Back", onClick = onBack, accent = false)
+        SecondaryButton(
+            label = "Back",
+            icon = null,
+            onClick = onBack,
+            accent = false,
+        )
     }
 }
 
@@ -451,24 +469,36 @@ private fun PrimaryButton(label: String, onClick: () -> Unit, focusRequester: Fo
     val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(Radius.control))
             .background(bg)
             .focusRequester(focusRequester)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 12.dp),
+            .padding(horizontal = Space.xxl, vertical = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
+        Icon(
+            imageVector = YancoIcons.Play,
+            contentDescription = null,
+            tint = YancoPalette.BackgroundDeep,
+            modifier = Modifier.size(14.dp),
+        )
         Text(
             text = label,
             color = YancoPalette.BackgroundDeep,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
+            style = YancoType.LabelStrong,
         )
     }
 }
 
 @Composable
-private fun SecondaryButton(label: String, onClick: () -> Unit, accent: Boolean) {
+private fun SecondaryButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    onClick: () -> Unit,
+    accent: Boolean,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = when {
@@ -479,24 +509,67 @@ private fun SecondaryButton(label: String, onClick: () -> Unit, accent: Boolean)
     val border = when {
         focused -> YancoPalette.FocusRing
         accent -> YancoPalette.Accent.copy(alpha = 0.5f)
-        else -> YancoPalette.BorderSubtle
+        else -> YancoPalette.PanelBorder
     }
-    val textColor = if (accent) YancoPalette.Accent else YancoPalette.TextPrimary
+    val textColor = when {
+        accent -> YancoPalette.Accent
+        focused -> YancoPalette.TextPrimary
+        else -> YancoPalette.TextSecondary
+    }
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(Radius.control))
             .background(bg)
-            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .border(1.dp, border, RoundedCornerShape(Radius.control))
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(horizontal = Space.lg, vertical = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
+        icon?.let {
+            Icon(
+                imageVector = it,
+                contentDescription = null,
+                tint = textColor,
+                modifier = Modifier.size(14.dp),
+            )
+        }
         Text(
             text = label,
             color = textColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = YancoType.Label,
         )
+    }
+}
+
+@Composable
+private fun EpisodesSectionHeader(loading: Boolean, episodeCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.page, vertical = Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+    ) {
+        Text(
+            text = "EPISODES",
+            color = YancoPalette.Accent,
+            style = YancoType.Overline,
+        )
+        if (loading && episodeCount == 0) {
+            CircularProgressIndicator(
+                color = YancoPalette.Accent,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(14.dp),
+            )
+        } else {
+            Text(
+                text = "$episodeCount total",
+                color = YancoPalette.TextMuted,
+                style = YancoType.Caption,
+            )
+        }
     }
 }
 
@@ -512,25 +585,36 @@ private fun SeasonChip(label: String, selected: Boolean, count: Int, onClick: ()
     val border = when {
         focused -> YancoPalette.FocusRing
         selected -> YancoPalette.Accent.copy(alpha = 0.5f)
-        else -> YancoPalette.BorderSubtle
+        else -> YancoPalette.PanelBorder
     }
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(Radius.pill))
             .background(bg)
-            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .border(1.dp, border, RoundedCornerShape(Radius.pill))
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = Space.lg, vertical = Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            color = if (selected) YancoPalette.Accent else YancoPalette.TextPrimary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
+            color = if (selected || focused) YancoPalette.Accent else YancoPalette.TextPrimary,
+            style = YancoType.Label,
         )
-        Text(text = count.toString(), color = YancoPalette.TextMuted, fontSize = 11.sp)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.5f))
+                .padding(horizontal = Space.sm, vertical = 2.dp),
+        ) {
+            Text(
+                text = count.toString(),
+                color = YancoPalette.TextSecondary,
+                style = YancoType.Caption,
+            )
+        }
     }
 }
 
@@ -538,36 +622,70 @@ private fun SeasonChip(label: String, selected: Boolean, count: Int, onClick: ()
 private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .focusStyle(focused = focused, radius = Radius.card, liftScale = 1.015f)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
-        Text(
-            text = "E%02d".format(ep.episodeNumber),
-            color = YancoPalette.Accent,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(40.dp),
-        )
-        Text(
-            text = ep.title.takeIf { it.isNotBlank() } ?: "Episode ${ep.episodeNumber}",
-            color = YancoPalette.TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
-        ep.duration?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, color = YancoPalette.TextMuted, fontSize = 11.sp)
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(Radius.chip))
+                .background(
+                    if (focused) YancoPalette.Accent.copy(alpha = 0.22f)
+                    else YancoPalette.BackgroundElevated,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "E%02d".format(ep.episodeNumber),
+                color = YancoPalette.Accent,
+                style = YancoType.LabelStrong,
+            )
         }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Space.xxs),
+        ) {
+            Text(
+                text = ep.title.takeIf { it.isNotBlank() } ?: "Episode ${ep.episodeNumber}",
+                color = YancoPalette.TextPrimary,
+                style = YancoType.TitleS,
+                maxLines = 1,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Season ${ep.seasonNumber}",
+                    color = YancoPalette.TextMuted,
+                    style = YancoType.Caption,
+                )
+                ep.duration?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = "\u00b7",
+                        color = YancoPalette.TextFaint,
+                        style = YancoType.Caption,
+                    )
+                    Text(
+                        text = it,
+                        color = YancoPalette.TextMuted,
+                        style = YancoType.Caption,
+                    )
+                }
+            }
+        }
+        Icon(
+            imageVector = YancoIcons.Play,
+            contentDescription = null,
+            tint = if (focused) YancoPalette.Accent else YancoPalette.TextFaint,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }

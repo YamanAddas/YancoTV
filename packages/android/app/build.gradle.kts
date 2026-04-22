@@ -104,4 +104,8 @@ dependencies {
 
     // WorkManager — background sync for sources (MK.3.3)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // ───── test ─────
+    testImplementation(kotlin("test"))
+    testImplementation(libs.kotlinx.coroutines.test)
 }
