@@ -1,8 +1,13 @@
 package com.yancotv.android.player
 
+import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.util.Rational
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -104,6 +109,7 @@ class PlayerActivity : AppCompatActivity() {
     private var progressTickerJob: Job? = null
     private var quickInfoHideJob: Job? = null
     private var liveOffsetTickerJob: Job? = null
+    private var inPip = false
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -221,6 +227,82 @@ class PlayerActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         attachShared()
+    }
+
+    // ───── PIP (MK.11.1 — phone-only) ─────
+
+    /**
+     * Called when the user presses HOME (or the recents gesture). On
+     * phones with PIP support, shrink the player into a floating window
+     * instead of backgrounding audio-only. TV (Fire TV, Google TV) lacks
+     * the feature and the check gates out gracefully.
+     */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (shouldEnterPip()) {
+            enterPipSafely()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip = isInPictureInPictureMode
+        // While in PIP, the shrunken surface only needs the video — hide
+        // zap bar, quick info, program progress, live-jump bar. Media3's
+        // built-in PlayerView controller also hides itself in PIP mode
+        // automatically via useController behaviour.
+        if (inPip) {
+            playerView.useController = false
+            zapBar.visibility = View.GONE
+            quickInfo.visibility = View.GONE
+            progressRow.visibility = View.GONE
+            liveJumpBar.visibility = View.GONE
+        } else {
+            playerView.useController = true
+            // Let the next poll tick / state change re-surface the
+            // overlays that should be visible in fullscreen. controller
+            // visibility callback handles zapBar + progressRow.
+            applyOverlayVisibility()
+        }
+    }
+
+    private fun shouldEnterPip(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return false
+        val p = controller.player
+        // Don't hijack a stopped / idle state — only enter PIP if we're
+        // actually playing something the user wants to keep watching.
+        return p.playWhenReady && p.playbackState != androidx.media3.common.Player.STATE_IDLE
+    }
+
+    private fun enterPipSafely() {
+        try {
+            val params = pipParams()
+            @Suppress("DEPRECATION")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                enterPictureInPictureMode(params)
+            } else {
+                // Build gate in shouldEnterPip already prevents this, but
+                // keep the compiler happy.
+                return
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "enterPictureInPictureMode failed: ${t.message}")
+        }
+    }
+
+    private fun pipParams(): PictureInPictureParams {
+        val fmt = controller.player.videoFormat
+        val builder = PictureInPictureParams.Builder()
+        // Aspect ratio from the stream's video format — falls back to 16:9
+        // if we haven't got frame metadata yet. System clamps anything
+        // outside [0.42, 2.39] so we don't need to police the numbers.
+        val w = fmt?.width ?: 16
+        val h = fmt?.height ?: 9
+        if (w > 0 && h > 0) {
+            builder.setAspectRatio(Rational(w.coerceAtMost(239), h.coerceAtMost(100)))
+        }
+        return builder.build()
     }
 
     private fun attachShared() {

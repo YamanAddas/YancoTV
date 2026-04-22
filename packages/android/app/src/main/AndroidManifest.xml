@@ -56,7 +56,8 @@
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
             android:theme="@style/PlayerTheme"
-            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode" />
+            android:supportsPictureInPicture="true"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|smallestScreenSize" />
 
         <receiver
             android:name=".reminders.ReminderAlarmReceiver"
