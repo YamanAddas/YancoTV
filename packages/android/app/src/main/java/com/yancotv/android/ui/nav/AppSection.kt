@@ -4,9 +4,12 @@ import com.yancotv.shared.types.ContentType
 
 /**
  * Global nav destinations shown in [com.yancotv.android.ui.shell.AppSidebar].
- * MK.4 is scaffolding — only Home/LiveTV/Movies/Series are wired to the
- * content panel via [contentType]; the rest render placeholders until their
- * milestones (Guide = MK.7, Favorites/Recordings/Downloads/Settings = MK.8).
+ * [contentType] is set on the three type-filtered destinations so the shell
+ * can route them into the shared ContentPanel; everything else has its own
+ * dedicated screen.
+ *
+ * Recordings / Downloads were dropped — desktop-only features that never
+ * landed on Android and aren't on the roadmap.
  */
 enum class AppSection(
     val label: String,
@@ -19,7 +22,5 @@ enum class AppSection(
     Series("Series", ContentType.SERIES),
     Favorites("Favorites"),
     Search("Search"),
-    Recordings("Recordings"),
-    Downloads("Downloads"),
     Settings("Settings"),
 }

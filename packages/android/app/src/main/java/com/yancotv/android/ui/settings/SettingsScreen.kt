@@ -44,6 +44,7 @@ import com.yancotv.android.ui.theme.YancoPalette
  */
 enum class SettingsTab(val label: String) {
     Sources("Sources"),
+    General("General"),
     Epg("EPG"),
     Playback("Playback"),
     Network("Network"),
@@ -87,6 +88,7 @@ fun SettingsScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 when (tab) {
                     SettingsTab.Sources -> SourcesScreen()
+                    SettingsTab.General -> SettingsGeneralTab()
                     SettingsTab.Epg -> SettingsEpgTab()
                     SettingsTab.Playback -> SettingsPlaybackTab()
                     SettingsTab.Network -> SettingsNetworkTab()

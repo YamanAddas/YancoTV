@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.OpenOn
 import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
@@ -59,8 +61,19 @@ fun HomeScreen(
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
     parental: ParentalRepository = koinInject(),
+    prefs: AppPreferences = koinInject(),
 ) {
-    var section by rememberSaveable { mutableStateOf(AppSection.LiveTv) }
+    // Resolve the "Open app on" preference once at first composition. For
+    // `LAST_USED` we defer to rememberSaveable's persisted value; for
+    // explicit choices we seed the initial state and let the user navigate
+    // away freely afterwards.
+    val initialSection = remember {
+        when (prefs.generalSnapshot().openOn) {
+            OpenOn.LIVE_TV -> AppSection.LiveTv
+            OpenOn.LAST_USED, OpenOn.HOME -> AppSection.Home
+        }
+    }
+    var section by rememberSaveable { mutableStateOf(initialSection) }
     val contentType = section.contentType
     val context = LocalContext.current
     val searchOverlayVisible by SearchOverlayState.visible.collectAsState()
@@ -165,6 +178,19 @@ fun HomeScreen(
         } else if (section == AppSection.Search) {
             Box(modifier = Modifier.weight(1f)) {
                 SearchScreen(isTv = isTv)
+            }
+        } else if (section == AppSection.Home) {
+            Box(modifier = Modifier.weight(1f)) {
+                HomeContent(
+                    onPlay = { list, idx ->
+                        val target = list.getOrNull(idx) ?: return@HomeContent
+                        gatedPlay(target.id) {
+                            val alreadyPlaying = controller.currentId == target.id
+                            if (!alreadyPlaying) controller.play(list, idx)
+                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        }
+                    },
+                )
             }
         } else {
             Box(modifier = Modifier.weight(1f)) {

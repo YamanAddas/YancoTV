@@ -29,6 +29,14 @@ class AppPreferences(
     private val _network = MutableStateFlow(readNetwork())
     val networkFlow: StateFlow<NetworkPrefs> = _network.asStateFlow()
 
+    private val _general = MutableStateFlow(readGeneral())
+    val generalFlow: StateFlow<GeneralPrefs> = _general.asStateFlow()
+
+    // Synchronous snapshot for bootstrapping — MainActivity/HomeScreen need
+    // the "open app on" value on first composition before any flow has had
+    // a chance to emit. Reads the settings table directly.
+    fun generalSnapshot(): GeneralPrefs = readGeneral()
+
     // ───── Playback ─────
 
     suspend fun setResizeMode(mode: ResizeMode) = write(KEY_RESIZE, mode.key) {
@@ -61,6 +69,16 @@ class AppPreferences(
         _network.value = _network.value.copy(readTimeoutSec = sec)
     }
 
+    // ───── General ─────
+
+    suspend fun setOpenOn(section: OpenOn) = write(KEY_OPEN_ON, section.key) {
+        _general.value = _general.value.copy(openOn = section)
+    }
+
+    suspend fun setShowChannelNumbers(enabled: Boolean) = write(KEY_SHOW_NUMBERS, if (enabled) "1" else "0") {
+        _general.value = _general.value.copy(showChannelNumbers = enabled)
+    }
+
     // ───── internals ─────
 
     private fun readPlayback(): PlaybackPrefs = PlaybackPrefs(
@@ -74,6 +92,11 @@ class AppPreferences(
         userAgentOverride = readString(KEY_USER_AGENT)?.takeIf { it.isNotBlank() },
         connectTimeoutSec = readString(KEY_CONNECT_TIMEOUT)?.toIntOrNull() ?: DEFAULT_CONNECT_TIMEOUT,
         readTimeoutSec = readString(KEY_READ_TIMEOUT)?.toIntOrNull() ?: DEFAULT_READ_TIMEOUT,
+    )
+
+    private fun readGeneral(): GeneralPrefs = GeneralPrefs(
+        openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
+        showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
     )
 
     private fun readString(key: String): String? =
@@ -100,8 +123,27 @@ class AppPreferences(
         private const val KEY_USER_AGENT = "pref_network_user_agent"
         private const val KEY_CONNECT_TIMEOUT = "pref_network_connect_timeout_sec"
         private const val KEY_READ_TIMEOUT = "pref_network_read_timeout_sec"
+        private const val KEY_OPEN_ON = "pref_general_open_on"
+        private const val KEY_SHOW_NUMBERS = "pref_general_show_channel_numbers"
     }
 }
+
+/** Default section to land on when the app opens. TiviMate defaults to last-used. */
+enum class OpenOn(val key: String, val displayName: String) {
+    HOME("home", "Home"),
+    LIVE_TV("live_tv", "Live TV"),
+    LAST_USED("last_used", "Last used");
+
+    companion object {
+        fun fromKey(key: String?): OpenOn =
+            values().firstOrNull { it.key == key } ?: HOME
+    }
+}
+
+data class GeneralPrefs(
+    val openOn: OpenOn = OpenOn.HOME,
+    val showChannelNumbers: Boolean = false,
+)
 
 enum class ResizeMode(val key: String, val displayName: String) {
     FIT("fit", "Fit"),
