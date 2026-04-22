@@ -10,8 +10,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -37,6 +41,22 @@ class SourceSyncCoordinator(
 
     private val _state = MutableStateFlow<Active?>(null)
     val state: StateFlow<Active?> = _state.asStateFlow()
+
+    /**
+     * Fire-and-forget error bus. Emits a short user-facing message when a
+     * sync run crashes (bad credentials, unreachable host, parse failure).
+     * [MainActivity] subscribes and shows a Toast so the user gets feedback
+     * even when they navigate away from the Sources screen mid-sync.
+     *
+     * [BufferOverflow.DROP_OLDEST] means a fresh failure always wins over
+     * a stale one the user already ignored.
+     */
+    private val _errors = MutableSharedFlow<String>(
+        replay = 0,
+        extraBufferCapacity = 4,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     private var activeJob: Job? = null
 
@@ -67,7 +87,19 @@ class SourceSyncCoordinator(
                     // Keep startedAtMs stable across progress updates so the
                     // UI's elapsed-time ticker doesn't reset each time.
                     _state.value = _state.value?.copy(progress = p)
-                    if (p.phase == SyncProgress.Phase.DONE) completedOk = true
+                    when (p.phase) {
+                        SyncProgress.Phase.DONE -> completedOk = true
+                        SyncProgress.Phase.ERROR -> {
+                            // The repository reports credential + network
+                            // failures as ERROR progress events rather than
+                            // throwing. Surface them on the error bus so the
+                            // Toast still fires when the user has navigated
+                            // away from Sources mid-sync.
+                            val reason = p.message?.takeIf { it.isNotBlank() } ?: "unknown error"
+                            _errors.tryEmit("Sync failed for $sourceName: $reason")
+                        }
+                        else -> Unit
+                    }
                 }
                 // Kick EPG off the moment the catalog lands. The source row
                 // now carries either the user-provided `epg_url` or the
@@ -87,6 +119,8 @@ class SourceSyncCoordinator(
                 throw ce
             } catch (t: Throwable) {
                 logger.error("syncCoordinator crashed id=$sourceId: ${t.message}")
+                val reason = t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
+                _errors.tryEmit("Sync failed for $sourceName: $reason")
             } finally {
                 _state.value = null
                 activeJob = null

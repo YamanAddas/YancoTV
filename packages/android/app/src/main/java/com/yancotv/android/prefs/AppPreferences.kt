@@ -32,6 +32,9 @@ class AppPreferences(
     private val _general = MutableStateFlow(readGeneral())
     val generalFlow: StateFlow<GeneralPrefs> = _general.asStateFlow()
 
+    private val _hiddenGroups = MutableStateFlow(readHiddenGroups())
+    val hiddenGroupsFlow: StateFlow<Set<String>> = _hiddenGroups.asStateFlow()
+
     // Synchronous snapshot for bootstrapping — MainActivity/HomeScreen need
     // the "open app on" value on first composition before any flow has had
     // a chance to emit. Reads the settings table directly.
@@ -79,6 +82,33 @@ class AppPreferences(
         _general.value = _general.value.copy(showChannelNumbers = enabled)
     }
 
+    // ───── Hidden groups ─────
+    //
+    // Providers routinely push 400+ category groups, most of which a
+    // personal viewer never uses. The hidden set filters them out of the
+    // sidebar + channel list without touching the underlying rows, so a
+    // future "show all" recovers the user's world without a re-sync.
+    // Persisted as newline-joined names because category names can contain
+    // commas/pipes but practically never newlines.
+
+    suspend fun setGroupHidden(name: String, hidden: Boolean) {
+        val next = _hiddenGroups.value.toMutableSet().apply {
+            if (hidden) add(name) else remove(name)
+        }
+        writeHiddenGroups(next)
+    }
+
+    suspend fun clearHiddenGroups() = writeHiddenGroups(emptySet())
+
+    private suspend fun writeHiddenGroups(next: Set<String>) {
+        val value = next.joinToString("\n")
+        withContext(Dispatchers.IO) {
+            if (next.isEmpty()) db.settingsQueries.delete(KEY_HIDDEN_GROUPS)
+            else db.settingsQueries.upsert(KEY_HIDDEN_GROUPS, value)
+        }
+        _hiddenGroups.value = next
+    }
+
     // ───── internals ─────
 
     private fun readPlayback(): PlaybackPrefs = PlaybackPrefs(
@@ -98,6 +128,12 @@ class AppPreferences(
         openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
         showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
     )
+
+    private fun readHiddenGroups(): Set<String> = readString(KEY_HIDDEN_GROUPS)
+        ?.split('\n')
+        ?.mapNotNull { it.takeIf(String::isNotBlank) }
+        ?.toSet()
+        ?: emptySet()
 
     private fun readString(key: String): String? =
         db.settingsQueries.get(key).executeAsOneOrNull()
@@ -125,6 +161,7 @@ class AppPreferences(
         private const val KEY_READ_TIMEOUT = "pref_network_read_timeout_sec"
         private const val KEY_OPEN_ON = "pref_general_open_on"
         private const val KEY_SHOW_NUMBERS = "pref_general_show_channel_numbers"
+        private const val KEY_HIDDEN_GROUPS = "pref_hidden_groups"
     }
 }
 

@@ -276,4 +276,88 @@
             android:focusableInTouchMode="true" />
     </LinearLayout>
 
+    <!-- Channel-surf overlay: TiviMate-style translucent channel list that
+         rides over the live stream. Hosted as a ComposeView so the list,
+         focus, and now/next reuse existing Compose code paths. Anchored
+         right-edge, fixed width, never full-screen — the video stays
+         visible beneath it. -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/surf_overlay"
+        android:layout_width="360dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:visibility="gone" />
+
+    <!-- Stream error overlay: shown when ExoPlayer surfaces an unrecoverable
+         error (connection failed, 403/404, codec gap). User can retry or
+         back out to the shell. Hidden until onPlayerError fires. -->
+    <LinearLayout
+        android:id="@+id/stream_error_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="48dp"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Stream unavailable"
+            android:textColor="@android:color/white"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:id="@+id/stream_error_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFE6EDF3"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:maxLines="3"
+            android:ellipsize="end"
+            android:layout_marginBottom="24dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/stream_error_retry"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Retry"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:background="@drawable/player_overlay_pill"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:layout_marginEnd="12dp"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/stream_error_back"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Back"
+                android:textColor="#FFE6EDF3"
+                android:background="@drawable/player_overlay_pill"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
+        </LinearLayout>
+    </LinearLayout>
+
 </FrameLayout>

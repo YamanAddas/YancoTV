@@ -9,16 +9,22 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.shell.HomeScreen
 import com.yancotv.android.ui.shell.SearchOverlayState
 import com.yancotv.android.ui.theme.YancoTheme
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 @UnstableApi
@@ -32,6 +38,7 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
 
     private val controller: PlaybackController by inject()
+    private val syncCoordinator: SourceSyncCoordinator by inject()
 
     // Keep the shell's window awake only while the shared ExoPlayer is
     // actually playing — covers the mini-preview case where MainActivity
@@ -53,6 +60,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             YancoTheme(isTv = isTv) {
                 HomeScreen(isTv = isTv)
+            }
+        }
+
+        // Subscribe to the sync coordinator's error bus so bad-credential
+        // and unreachable-host failures reach the user even when they've
+        // navigated away from the Sources screen. repeatOnLifecycle keeps
+        // the collector scoped to STARTED so we don't pop toasts while
+        // the shell is backgrounded.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                syncCoordinator.errors.collect { message ->
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

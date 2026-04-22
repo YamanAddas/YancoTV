@@ -38,6 +38,7 @@ import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -62,18 +63,42 @@ fun HomeScreen(
     controller: PlaybackController = koinInject(),
     parental: ParentalRepository = koinInject(),
     prefs: AppPreferences = koinInject(),
+    history: WatchHistoryRepository = koinInject(),
 ) {
     // Resolve the "Open app on" preference once at first composition. For
     // `LAST_USED` we defer to rememberSaveable's persisted value; for
     // explicit choices we seed the initial state and let the user navigate
     // away freely afterwards.
-    val initialSection = remember {
-        when (prefs.generalSnapshot().openOn) {
+    val openOn = remember { prefs.generalSnapshot().openOn }
+    val initialSection = remember(openOn) {
+        when (openOn) {
             OpenOn.LIVE_TV -> AppSection.LiveTv
             OpenOn.LAST_USED, OpenOn.HOME -> AppSection.Home
         }
     }
     var section by rememberSaveable { mutableStateOf(initialSection) }
+
+    // OpenOn.LAST_USED auto-resumes the last played item into the mini
+    // preview so the user lands on the section with their stream already
+    // starting to warm up. Fullscreen is not triggered — the user still
+    // has to OK/tap into it, matching the "returning to where I left
+    // off" expectation without stealing focus into the player.
+    var autoplayAttempted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(openOn) {
+        if (autoplayAttempted) return@LaunchedEffect
+        if (openOn != OpenOn.LAST_USED) return@LaunchedEffect
+        if (controller.currentId != null) { autoplayAttempted = true; return@LaunchedEffect }
+        val entry = withContext(Dispatchers.IO) {
+            runCatching { history.recent(limit = 1).firstOrNull() }.getOrNull()
+        }
+        autoplayAttempted = true
+        val item = entry?.content ?: return@LaunchedEffect
+        // Respect the parental lock. If the last item is gated, skip the
+        // auto-resume rather than popping a PIN dialog the user didn't ask
+        // for on launch — they can click through manually if they want.
+        if (item.id in parental.lockedIds.value) return@LaunchedEffect
+        controller.play(listOf(item), 0)
+    }
     val contentType = section.contentType
     val context = LocalContext.current
     val searchOverlayVisible by SearchOverlayState.visible.collectAsState()
@@ -309,6 +334,7 @@ private fun RowScope.ContentArea(
     type: ContentType,
     repo: ContentRepository,
     onActivate: (List<ContentItem>, Int) -> Unit,
+    prefs: AppPreferences = koinInject(),
 ) {
     val groupsState = remember(type) { mutableStateListOf<String>() }
     LaunchedEffect(type) {
@@ -316,13 +342,26 @@ private fun RowScope.ContentArea(
         groupsState.clear()
         groupsState.addAll(loaded)
     }
+    // Hidden-groups filter runs in the sidebar only, not the DB. A hidden
+    // group is never auto-selected; if the user's saved selection is now
+    // hidden we fall back to "All" so they don't end up stuck on an
+    // invisible category.
+    val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
+    val visibleGroups = remember(groupsState.toList(), hiddenGroups) {
+        groupsState.filter { it !in hiddenGroups }
+    }
 
     var group by rememberSaveable(type) { mutableStateOf(ALL_GROUPS) }
+    LaunchedEffect(hiddenGroups) {
+        if (group != ALL_GROUPS && group != FAVORITES_GROUP && group in hiddenGroups) {
+            group = ALL_GROUPS
+        }
+    }
     var focused by remember(type) { mutableStateOf<ContentItem?>(null) }
     val groupFilter = group.takeIf { it != ALL_GROUPS }
 
     CategoryFilterPanel(
-        groups = groupsState.toList(),
+        groups = visibleGroups,
         selected = group,
         onSelect = { group = it },
     )

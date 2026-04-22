@@ -27,6 +27,11 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.media3.ui.AspectRatioFrameLayout
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
@@ -107,6 +112,18 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var liveOffsetLabel: TextView
     private lateinit var liveJumpButton: Button
 
+    // Stream error overlay
+    private lateinit var streamErrorOverlay: View
+    private lateinit var streamErrorMessage: TextView
+    private lateinit var streamErrorRetry: Button
+    private lateinit var streamErrorBack: Button
+
+    // Channel-surf overlay (ComposeView). Holding a Compose-owned mutable
+    // state lets the inner composable observe show/hide without Activity ↔
+    // Compose round-trips.
+    private lateinit var surfOverlay: ComposeView
+    private var surfVisible by mutableStateOf(false)
+
     private var listenerAttached = false
     private var controllerVisible = false
     private var currentProgramme: EpgProgramme? = null
@@ -118,6 +135,7 @@ class PlayerActivity : AppCompatActivity() {
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             Log.e(TAG, "onPlayerError ${error.errorCodeName}", error)
+            showStreamError(error)
         }
 
         override fun onPlaybackStateChanged(state: Int) {
@@ -130,6 +148,12 @@ class PlayerActivity : AppCompatActivity() {
             }
             Log.i(TAG, "onPlaybackStateChanged=$name")
             if (quickInfo.visibility == View.VISIBLE) refreshQuickInfo()
+            // Clear any lingering error UI once a retry (or channel change)
+            // transitions back to READY. Keeps the overlay from sticking
+            // after a successful zap away from a failed stream.
+            if (state == Player.STATE_READY && streamErrorOverlay.visibility == View.VISIBLE) {
+                hideStreamError()
+            }
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -173,6 +197,28 @@ class PlayerActivity : AppCompatActivity() {
         liveOffsetLabel = findViewById(R.id.live_offset_label)
         liveJumpButton = findViewById(R.id.live_jump_button)
         liveJumpButton.setOnClickListener { jumpToLive() }
+
+        streamErrorOverlay = findViewById(R.id.stream_error_overlay)
+        streamErrorMessage = findViewById(R.id.stream_error_message)
+        streamErrorRetry = findViewById(R.id.stream_error_retry)
+        streamErrorBack = findViewById(R.id.stream_error_back)
+        streamErrorRetry.setOnClickListener { retryCurrent() }
+        streamErrorBack.setOnClickListener { finish() }
+
+        surfOverlay = findViewById(R.id.surf_overlay)
+        surfOverlay.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        surfOverlay.setContent {
+            if (surfVisible) {
+                ChannelSurfOverlay(
+                    currentContentId = controller.currentId,
+                    onPick = { list, idx ->
+                        hideSurf()
+                        controller.play(list, idx)
+                        playerView.requestFocus()
+                    },
+                )
+            }
+        }
 
         playerView.useController = true
         playerView.controllerAutoShow = true
@@ -338,6 +384,10 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun onItemChanged(item: ContentItem?) {
         currentProgramme = null
+        // A new MediaItem means any error from the previous stream is now
+        // stale — hide the overlay so the user sees the new stream's
+        // BUFFERING/READY transition, not the last channel's failure.
+        hideStreamError()
         if (item == null) {
             zapBar.visibility = View.GONE
             progressRow.visibility = View.GONE
@@ -545,9 +595,89 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ───── Stream error ─────
+
+    private fun showStreamError(error: PlaybackException) {
+        // Map the handful of common failure codes to something a normal user
+        // can act on; anything unmapped falls through to the raw error name
+        // + localized message so we're not hiding information.
+        val friendly = when (error.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+                "Can't reach the stream server. Check your connection and retry."
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                "Server rejected the request — the stream may require a re-sync or the credentials are stale."
+            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+            PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ->
+                "Stream not found or returned unexpected data."
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
+                "This device can't decode the stream's codec."
+            else -> error.localizedMessage ?: error.errorCodeName
+        }
+        streamErrorMessage.text = friendly
+        streamErrorOverlay.visibility = View.VISIBLE
+        streamErrorRetry.requestFocus()
+        // Hide the built-in controller so the error overlay doesn't
+        // overlap the transport controls.
+        playerView.hideController()
+    }
+
+    private fun hideStreamError() {
+        if (streamErrorOverlay.visibility != View.GONE) {
+            streamErrorOverlay.visibility = View.GONE
+        }
+    }
+
+    private fun retryCurrent() {
+        hideStreamError()
+        val p = controller.player
+        p.prepare()
+        p.playWhenReady = true
+        playerView.requestFocus()
+    }
+
+    // ───── Channel surf ─────
+
+    private fun showSurf() {
+        if (surfVisible) return
+        surfVisible = true
+        surfOverlay.visibility = View.VISIBLE
+        // Let Compose populate the list, then steal focus to the overlay so
+        // D-pad input drives it and not the (possibly stale) PlayerView.
+        surfOverlay.post { surfOverlay.requestFocus() }
+    }
+
+    private fun hideSurf() {
+        if (!surfVisible) return
+        surfVisible = false
+        surfOverlay.visibility = View.GONE
+        playerView.requestFocus()
+    }
+
     // ───── Keys ─────
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        // Surf overlay swallows keys while visible — it has its own focus
+        // traversal; only BACK dismisses it. Do this early so built-in
+        // PlayerView handlers don't also act on the key press.
+        if (surfVisible) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                hideSurf()
+                return true
+            }
+            return super.onKeyDown(keyCode, event)
+        }
+        // Dedicated CHANNEL_LIST key + LEFT (when the Media3 controller is
+        // hidden) trigger the surf overlay. LEFT is the canonical TiviMate
+        // gesture; CHANNEL_LIST is what TV remotes with a guide button emit.
+        if (!controllerVisible) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_TV_CONTENTS_MENU) {
+                showSurf()
+                return true
+            }
+        }
         when (keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 finish()
