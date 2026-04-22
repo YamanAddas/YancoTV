@@ -154,6 +154,18 @@ WHERE type = ? AND group_name = ?
 ORDER BY sort_order
 LIMIT :limitCount OFFSET :offsetCount;
 
+-- Latest VOD rows across the whole catalogue, newest first. Used by the
+-- Home dashboard's "Recently added" rail — the regular listByTypePaged
+-- query sorts by source_id + sort_order (playlist position), which is
+-- the wrong order for "what arrived last". Mixes movies + series so the
+-- caller gets a single sorted stream and doesn't have to merge + re-sort
+-- client-side.
+recentlyAddedVod:
+SELECT * FROM content
+WHERE type IN ('movie', 'series')
+ORDER BY created_at DESC
+LIMIT :limitCount;
+
 -- Guide channel list: distinct live channels that have at least one programme
 -- in the [startTime, endTime) window. Joins epg_programmes so channels with no
 -- guide data are skipped (they render as "no data" rows otherwise). Ordered by

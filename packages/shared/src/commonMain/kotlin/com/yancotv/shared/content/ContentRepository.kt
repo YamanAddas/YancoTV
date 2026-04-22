@@ -34,6 +34,15 @@ class ContentRepository(private val db: YancoDb) {
     }
 
     /**
+     * Latest VOD rows (movies + series mixed), newest first. Backs the Home
+     * dashboard's "Recently added" rail — the Home shell was paging 400 rows
+     * client-side and sorting in Kotlin, which was both slow on first catalog
+     * load and incorrect past the 200-per-type cap. Pushed down to SQLDelight.
+     */
+    fun recentlyAddedVod(limit: Long): List<ContentItem> =
+        db.contentQueries.recentlyAddedVod(limit).executeAsList().map { it.toDomain() }
+
+    /**
      * FTS4-backed search across `title`, `clean_title`, and `group_name`.
      * Returns results ordered by content type then source's native sort
      * order — so a live channel a user searches for shows up with its
