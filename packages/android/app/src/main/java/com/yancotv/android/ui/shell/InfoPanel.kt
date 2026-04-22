@@ -107,10 +107,10 @@ fun InfoPanel(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(320.dp)
+            .width(260.dp)
             .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (playing != null) {
             MiniPlayer(controller = controller)

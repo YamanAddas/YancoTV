@@ -195,7 +195,7 @@ fun HomeScreen(
             AppSidebar(
                 current = section,
                 onSelect = { section = it },
-                modifier = Modifier.focusRequester(sidebarFocus),
+                currentRowFocus = sidebarFocus,
             )
         }
 
@@ -470,8 +470,8 @@ private fun RowScope.ContentArea(
             groups = visibleGroups,
             selected = group,
             onSelect = { group = it },
-            modifier = Modifier.focusRequester(groupsFocus),
             smartGrouping = prefs.generalFlow.collectAsState().value.smartGrouping,
+            selectedRowFocus = groupsFocus,
         )
     }
     Column(
@@ -492,7 +492,17 @@ private fun RowScope.ContentArea(
             )
         }
     }
-    if (isTv) {
+    // Hide the info rail when the user is browsing the groups / sidebar
+    // so the channel list gets the extra width the user expects once
+    // they move leftward. Also: only render on TV where there's room,
+    // and only when a row is actually focused so we don't show empty
+    // scaffolding. Width shrunk from 320dp → 260dp to stop crowding
+    // channel titles on 1080p panels.
+    AnimatedVisibility(
+        visible = isTv && !groupsVisible && focused != null,
+        enter = slideInHorizontally(animationSpec = tween(180)) { it } + fadeIn(tween(180)),
+        exit = slideOutHorizontally(animationSpec = tween(140)) { it } + fadeOut(tween(140)),
+    ) {
         InfoPanel(item = focused)
     }
 }

@@ -13,18 +13,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,22 +58,16 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
- * Full-screen detail hub for a movie or series. Opens when the user
- * activates a MOVIE / SERIES row instead of kicking straight into
- * playback, matching the desktop app's "show me before you play me"
- * pattern.
+ * Full-screen detail hub for a movie or series. Entire page is a single
+ * [LazyColumn] so TV D-pad focus traversal walks straight from the Play
+ * button down through the credits, the season chips, and every episode
+ * in order — no nested scroll regions fighting each other.
  *
- * Layout:
- *  - Backdrop hero (top ~40 %, fades to the page background)
- *  - Poster on the left + title/plot/meta on the right
- *  - Action row: Play / Play episode-1 / Favorite toggle
- *  - Series: season selector + episodes grid under the actions
- *
- * Data loads lazily via [ContentDetailService] — the row's cached
- * metadata paints immediately, and a provider round-trip merges the
- * enriched fields (plot, cast, backdrop, episodes) back in as soon
- * as they arrive. The backdrop + poster persist to the DB so the next
- * open is instant.
+ * Data loads lazily via [ContentDetailService]; the row's cached sync-
+ * time metadata paints the title + poster immediately, and the enriched
+ * fields (plot, cast, backdrop, episodes) fill in once the provider
+ * round-trip completes. Enriched metadata + cover are persisted so the
+ * next open is instant.
  */
 @UnstableApi
 @Composable
@@ -93,6 +84,7 @@ fun ContentDetailScreen(
     var loading by remember(item.id) { mutableStateOf(true) }
     var isFav by remember(item.id) { mutableStateOf(false) }
     val playFocus = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(item.id) {
         loading = true
@@ -102,53 +94,176 @@ fun ContentDetailScreen(
         loaded = result
         loading = false
     }
-
     LaunchedEffect(item.id) {
         try {
             favorites.isFavoriteFlow(item.id).collect { isFav = it }
-        } catch (_: Throwable) {
-            // Favorite stream failures are non-blocking; we render the
-            // detail anyway and let the star default to unstarred.
-        }
+        } catch (_: Throwable) { /* non-blocking */ }
     }
 
     val rendered = loaded?.item ?: item
-    // Until the detail service finishes (first paint), show an empty
-    // metadata stub — we intentionally don't decode the JSON blob here to
-    // keep the app module free of kotlinx.serialization. The service
-    // shares the same process, runs on IO, and the first paint window is
-    // sub-100ms so the user sees the poster + title immediately and the
-    // rest fills in.
     val metadata = loaded?.metadata ?: ContentMetadata()
     val episodes = loaded?.episodes.orEmpty()
-    val scope = rememberCoroutineScope()
+    val seasons = remember(episodes) { episodes.groupBy { it.seasonNumber }.toSortedMap() }
+    var selectedSeason by remember(seasons) {
+        mutableStateOf(seasons.keys.firstOrNull() ?: 0)
+    }
+    val visibleEpisodes = remember(seasons, selectedSeason) {
+        seasons[selectedSeason].orEmpty()
+    }
 
-    Box(
+    // Single LazyColumn governs the whole page so d-pad focus never has
+    // to cross a scroll-container boundary. Items are keyed by a stable
+    // string so focus survives episode-season swaps without rebuilding
+    // every row. rememberLazyListState keeps scroll position across
+    // metadata arrivals (plot → backdrop → episodes fill in over ~1s).
+    val listState = rememberLazyListState()
+
+    LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep),
+        contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-        BackdropHero(url = backdropUrlOf(rendered, metadata))
+        item(key = "hero") {
+            HeroBlock(
+                item = rendered,
+                metadata = metadata,
+                episodes = episodes,
+                isFavorite = isFav,
+                onPlay = {
+                    when (rendered.type) {
+                        ContentType.SERIES -> episodes.firstOrNull()?.let {
+                            onPlayEpisode(rendered, it)
+                        } ?: onPlayContent(rendered)
+                        else -> onPlayContent(rendered)
+                    }
+                },
+                onFavoriteToggle = {
+                    val optimistic = !isFav
+                    isFav = optimistic
+                    scope.launch {
+                        val newState = withContext(Dispatchers.IO) {
+                            runCatching { favorites.toggle(rendered.id) }.getOrElse { optimistic }
+                        }
+                        if (newState != optimistic) isFav = newState
+                    }
+                },
+                onBack = onDismiss,
+                playFocus = playFocus,
+            )
+        }
+
+        if (rendered.type == ContentType.SERIES) {
+            item(key = "episodes_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "EPISODES",
+                        color = YancoPalette.Accent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    if (loading && episodes.isEmpty()) {
+                        CircularProgressIndicator(
+                            color = YancoPalette.Accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.width(14.dp).height(14.dp),
+                        )
+                    } else {
+                        Text(
+                            text = "${episodes.size} total",
+                            color = YancoPalette.TextMuted,
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
+            if (seasons.size > 1) {
+                item(key = "season_chips") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        seasons.keys.forEach { season ->
+                            SeasonChip(
+                                label = if (season == 0) "Specials" else "Season $season",
+                                selected = season == selectedSeason,
+                                count = seasons[season]?.size ?: 0,
+                                onClick = { selectedSeason = season },
+                            )
+                        }
+                    }
+                }
+            }
+            if (visibleEpisodes.isEmpty() && !loading) {
+                item(key = "no_episodes") {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            text = "No episodes available.",
+                            color = YancoPalette.TextMuted,
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
+            }
+            items(visibleEpisodes, key = { "ep:${it.id}" }) { ep ->
+                Box(
+                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 3.dp),
+                ) {
+                    EpisodeRow(ep = ep, onClick = { onPlayEpisode(rendered, ep) })
+                }
+            }
+        }
+    }
+
+    // Auto-focus Play on open so the user can press OK immediately. The
+    // LazyColumn renders the hero eagerly; by the time the effect fires
+    // the FocusRequester is attached and ready.
+    LaunchedEffect(Unit) {
+        runCatching { playFocus.requestFocus() }
+    }
+}
+
+@Composable
+private fun HeroBlock(
+    item: ContentItem,
+    metadata: ContentMetadata,
+    episodes: List<EpisodeInfo>,
+    isFavorite: Boolean,
+    onPlay: () -> Unit,
+    onFavoriteToggle: () -> Unit,
+    onBack: () -> Unit,
+    playFocus: FocusRequester,
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        BackdropHero(url = backdropUrlOf(item, metadata))
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
                 .padding(horizontal = 48.dp, vertical = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Spacer so the poster/title row starts roughly below the
-            // backdrop gradient instead of fighting it at the top.
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(140.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Poster(url = rendered.logoUrl ?: metadata.tmdbPosterUrl)
+                Poster(url = item.logoUrl ?: metadata.tmdbPosterUrl)
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = rendered.cleanTitle?.ifBlank { null } ?: rendered.title,
+                        text = item.cleanTitle?.ifBlank { null } ?: item.title,
                         color = YancoPalette.TextPrimary,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                         fontStyle = FontStyle.Italic,
                         fontWeight = FontWeight.Bold,
                     )
@@ -156,88 +271,44 @@ fun ContentDetailScreen(
                         Text(
                             text = it,
                             color = YancoPalette.AccentGlow,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontStyle = FontStyle.Italic,
                         )
                     }
-                    MetaLine(metadata, rendered.type, episodeCount = episodes.size)
+                    MetaLine(metadata, item.type, episodeCount = episodes.size)
                     metadata.plot?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
                             color = YancoPalette.TextPrimary,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             lineHeight = 20.sp,
+                            maxLines = 4,
                         )
                     }
                     ActionRow(
-                        primaryLabel = when (rendered.type) {
-                            ContentType.SERIES -> if (episodes.isNotEmpty()) "Play S${episodes.first().seasonNumber}E${episodes.first().episodeNumber}" else "Play"
+                        primaryLabel = when (item.type) {
+                            ContentType.SERIES -> if (episodes.isNotEmpty())
+                                "Play S${episodes.first().seasonNumber}E${episodes.first().episodeNumber}"
+                            else "Play"
                             else -> "Play"
                         },
-                        isFavorite = isFav,
-                        onPlay = {
-                            when (rendered.type) {
-                                ContentType.SERIES -> episodes.firstOrNull()?.let {
-                                    onPlayEpisode(rendered, it)
-                                } ?: onPlayContent(rendered)
-                                else -> onPlayContent(rendered)
-                            }
-                        },
-                        onFavoriteToggle = {
-                            val optimistic = !isFav
-                            isFav = optimistic
-                            scope.launch {
-                                val newState = withContext(Dispatchers.IO) {
-                                    runCatching { favorites.toggle(rendered.id) }.getOrElse { optimistic }
-                                }
-                                if (newState != optimistic) isFav = newState
-                            }
-                        },
-                        onBack = onDismiss,
+                        isFavorite = isFavorite,
+                        onPlay = onPlay,
+                        onFavoriteToggle = onFavoriteToggle,
+                        onBack = onBack,
                         playFocus = playFocus,
                     )
                     val cast = metadata.cast?.takeIf { it.isNotBlank() }
                     val director = metadata.director?.takeIf { it.isNotBlank() }
                     if (cast != null || director != null) {
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            director?.let {
-                                CreditRow(label = "Director", value = it)
-                            }
-                            cast?.let {
-                                CreditRow(label = "Cast", value = it)
-                            }
+                            director?.let { CreditRow(label = "Director", value = it) }
+                            cast?.let { CreditRow(label = "Cast", value = it) }
                         }
                     }
                 }
             }
-
-            if (rendered.type == ContentType.SERIES) {
-                EpisodesSection(
-                    episodes = episodes,
-                    loading = loading,
-                    onPick = { ep -> onPlayEpisode(rendered, ep) },
-                )
-            }
-
-            if (loading) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    CircularProgressIndicator(
-                        color = YancoPalette.Accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.width(24.dp).height(24.dp),
-                    )
-                }
-            }
         }
-    }
-
-    // Auto-focus Play on open so a TV user can press OK immediately without
-    // hunting for a focus target under the backdrop.
-    LaunchedEffect(Unit) {
-        runCatching { playFocus.requestFocus() }
     }
 }
 
@@ -252,7 +323,7 @@ private fun BackdropHero(url: String?) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(360.dp)
+            .height(380.dp)
             .background(YancoPalette.BackgroundRaised),
     ) {
         if (!url.isNullOrBlank()) {
@@ -263,8 +334,6 @@ private fun BackdropHero(url: String?) {
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        // Vertical gradient over the backdrop so the title/plot text always
-        // has enough contrast no matter how bright the hero image is.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -272,7 +341,7 @@ private fun BackdropHero(url: String?) {
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            YancoPalette.BackgroundDeep.copy(alpha = 0.65f),
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.75f),
                             YancoPalette.BackgroundDeep,
                         ),
                     ),
@@ -285,7 +354,7 @@ private fun BackdropHero(url: String?) {
 private fun Poster(url: String?) {
     Box(
         modifier = Modifier
-            .width(180.dp)
+            .width(170.dp)
             .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(10.dp))
             .background(YancoPalette.BackgroundRaised)
@@ -313,7 +382,7 @@ private fun Poster(url: String?) {
 private fun MetaLine(meta: ContentMetadata, type: ContentType, episodeCount: Int) {
     val bits = buildList {
         meta.releaseDate?.takeIf { it.isNotBlank() }?.let { add(it.take(4)) }
-        meta.rating?.takeIf { it.isNotBlank() }?.let { add("★ $it") }
+        meta.rating?.takeIf { it.isNotBlank() }?.let { add("\u2605 $it") }
         meta.genre?.takeIf { it.isNotBlank() }?.let { add(it) }
         meta.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
         if (type == ContentType.SERIES && episodeCount > 0) add("$episodeCount episodes")
@@ -322,11 +391,7 @@ private fun MetaLine(meta: ContentMetadata, type: ContentType, episodeCount: Int
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         bits.forEachIndexed { i, text ->
             if (i > 0) {
-                Text(
-                    text = "·",
-                    color = YancoPalette.TextMuted,
-                    fontSize = 12.sp,
-                )
+                Text(text = "\u00b7", color = YancoPalette.TextMuted, fontSize = 12.sp)
             }
             Text(
                 text = text,
@@ -348,11 +413,7 @@ private fun CreditRow(label: String, value: String) {
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.width(64.dp),
         )
-        Text(
-            text = value,
-            color = YancoPalette.TextPrimary,
-            fontSize = 11.sp,
-        )
+        Text(text = value, color = YancoPalette.TextPrimary, fontSize = 11.sp)
     }
 }
 
@@ -372,30 +433,27 @@ private fun ActionRow(
         PrimaryButton(
             label = primaryLabel,
             onClick = onPlay,
-            modifier = Modifier.focusRequester(playFocus),
+            focusRequester = playFocus,
         )
         SecondaryButton(
             label = if (isFavorite) "\u2605 In favourites" else "\u2606 Add to favourites",
             onClick = onFavoriteToggle,
             accent = isFavorite,
         )
-        SecondaryButton(
-            label = "Back",
-            onClick = onBack,
-            accent = false,
-        )
+        SecondaryButton(label = "Back", onClick = onBack, accent = false)
     }
 }
 
 @Composable
-private fun PrimaryButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun PrimaryButton(label: String, onClick: () -> Unit, focusRequester: FocusRequester) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
     Row(
-        modifier = modifier
+        modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
+            .focusRequester(focusRequester)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 22.dp, vertical = 12.dp),
@@ -415,7 +473,7 @@ private fun SecondaryButton(label: String, onClick: () -> Unit, accent: Boolean)
     val focused by interaction.collectIsFocusedAsState()
     val bg = when {
         focused -> YancoPalette.BackgroundHover
-        accent -> YancoPalette.Accent.copy(alpha = 0.15f)
+        accent -> YancoPalette.Accent.copy(alpha = 0.18f)
         else -> Color.Transparent
     }
     val border = when {
@@ -439,59 +497,6 @@ private fun SecondaryButton(label: String, onClick: () -> Unit, accent: Boolean)
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
-    }
-}
-
-@Composable
-private fun EpisodesSection(
-    episodes: List<EpisodeInfo>,
-    loading: Boolean,
-    onPick: (EpisodeInfo) -> Unit,
-) {
-    if (episodes.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        ) {
-            Text(
-                text = if (loading) "Loading episodes…" else "No episodes available.",
-                color = YancoPalette.TextMuted,
-                fontSize = 13.sp,
-            )
-        }
-        return
-    }
-    // Group episodes by season so the user can pick a season first on long
-    // multi-season shows. Keep the first season expanded by default; only
-    // one season at a time so the list doesn't get unmanageably tall.
-    val seasons = remember(episodes) { episodes.groupBy { it.seasonNumber }.toSortedMap() }
-    var selectedSeason by remember(seasons) {
-        mutableStateOf(seasons.keys.firstOrNull() ?: 0)
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            seasons.keys.forEach { season ->
-                val selected = season == selectedSeason
-                SeasonChip(
-                    label = if (season == 0) "Episodes" else "Season $season",
-                    selected = selected,
-                    count = seasons[season]?.size ?: 0,
-                    onClick = { selectedSeason = season },
-                )
-            }
-        }
-        val current = seasons[selectedSeason].orEmpty()
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightWithCap(current.size),
-            contentPadding = PaddingValues(vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            itemsIndexed(current, key = { _, ep -> ep.id }) { _, ep ->
-                EpisodeRow(ep = ep, onClick = { onPick(ep) })
-            }
-        }
     }
 }
 
@@ -525,11 +530,7 @@ private fun SeasonChip(label: String, selected: Boolean, count: Int, onClick: ()
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            text = count.toString(),
-            color = YancoPalette.TextMuted,
-            fontSize = 11.sp,
-        )
+        Text(text = count.toString(), color = YancoPalette.TextMuted, fontSize = 11.sp)
     }
 }
 
@@ -547,7 +548,7 @@ private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit) {
             .border(1.dp, border, RoundedCornerShape(8.dp))
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -563,24 +564,10 @@ private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit) {
             color = YancoPalette.TextPrimary,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
         )
         ep.duration?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                text = it,
-                color = YancoPalette.TextMuted,
-                fontSize = 11.sp,
-            )
+            Text(text = it, color = YancoPalette.TextMuted, fontSize = 11.sp)
         }
     }
-}
-
-// LazyColumn inside a verticalScroll column needs an explicit height, but
-// sizing it to match every single episode makes long shows (100+ eps)
-// push the whole page off-screen. Cap at ~12 rows; the inner LazyColumn
-// scrolls internally from there.
-private fun Modifier.heightWithCap(itemCount: Int): Modifier {
-    val rows = itemCount.coerceAtMost(12)
-    // 52dp per row (height) + 4dp spacing — keep in sync with EpisodeRow.
-    return this.height((rows * 56).dp.coerceAtLeast(56.dp))
 }

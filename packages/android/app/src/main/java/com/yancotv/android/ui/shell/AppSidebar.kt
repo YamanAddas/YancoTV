@@ -17,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.nav.AppSection
@@ -27,17 +29,22 @@ import com.yancotv.android.ui.theme.YancoPalette
  * content column. Width is deliberately narrow on TV so the rail doesn't
  * dominate a 1080p surface; phone gets the same layout inside a drawer
  * ([com.yancotv.android.ui.shell.HomeScreen] handles the containment).
+ *
+ * [currentRowFocus] is requested by the shell when the sidebar is
+ * revealed, so focus lands on whichever section is currently selected
+ * rather than always falling to "Home".
  */
 @Composable
 fun AppSidebar(
     current: AppSection,
     onSelect: (AppSection) -> Unit,
     modifier: Modifier = Modifier,
+    currentRowFocus: FocusRequester? = null,
 ) {
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(220.dp)
+            .width(200.dp)
             .background(YancoPalette.BackgroundRaised)
             .padding(vertical = 16.dp, horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -46,6 +53,7 @@ fun AppSidebar(
             SidebarRow(
                 label = section.label,
                 selected = section == current,
+                focusRequester = currentRowFocus.takeIf { section == current },
                 onClick = { onSelect(section) },
             )
         }
@@ -56,25 +64,29 @@ fun AppSidebar(
 private fun SidebarRow(
     label: String,
     selected: Boolean,
+    focusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
     val bg = when {
-        selected -> YancoPalette.Accent.copy(alpha = 0.18f)
         focused -> YancoPalette.BackgroundHover
+        selected -> YancoPalette.Accent.copy(alpha = 0.22f)
         else -> Color.Transparent
     }
     val border = if (focused) YancoPalette.FocusRing else Color.Transparent
 
+    val base = Modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(bg)
+        .border(1.dp, border, RoundedCornerShape(8.dp))
+    val withFocus = if (focusRequester != null) base.focusRequester(focusRequester) else base
+
     androidx.compose.material3.Text(
         text = label,
         color = if (selected) YancoPalette.Accent else YancoPalette.TextPrimary,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(8.dp))
+        modifier = withFocus
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
