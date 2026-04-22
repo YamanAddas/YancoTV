@@ -23,5 +23,15 @@ dont commit.txt
 /yancotv_logo.png
 .claude-scratch/
 
+# adb logcat dumps + ad-hoc screenshots kept out of the tree — these
+# appear next to the repo root during debugging sessions and aren't
+# meant to be committed.
+tvdump*.txt
+tv-screen*.png
+tmp_screen*.png
+# Catches the accidentally-created `D:YancoTVtvdump.txt` style filenames
+# (Windows path typed as a filename instead of a redirect target).
+D:YancoTV*.txt
+
 # pnpm patch editable copies (the generated patch in patches/ is committed)
 patches-work/
