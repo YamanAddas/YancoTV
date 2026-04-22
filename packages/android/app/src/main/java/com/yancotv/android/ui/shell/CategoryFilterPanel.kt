@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -71,13 +73,23 @@ fun CategoryFilterPanel(
         }
     }
 
+    // Fallback requester for `focusRestorer`. Without it, when the category
+    // panel's focus group receives focus for the first time (e.g. DPAD RIGHT
+    // from the sidebar on cold start), Compose's default enter can't cascade
+    // through the nested LazyColumn to any `GroupRow`; focus stalls on the
+    // focusGroup wrapper and the user sees no selector until pressing OK.
+    // Attaching this requester to the currently-selected GroupRow and passing
+    // it to `focusRestorer { firstItemFocus }` routes first-arrival focus to
+    // the selected row. Saved-state restoration still wins on return visits.
+    val firstItemFocus = remember { FocusRequester() }
+
     Column(
         modifier = modifier
             .fillMaxHeight()
             .width(240.dp)
             .background(YancoPalette.BackgroundDeep)
             .padding(vertical = 12.dp, horizontal = 8.dp)
-            .focusRestorer()
+            .focusRestorer { firstItemFocus }
             .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -95,21 +107,25 @@ fun CategoryFilterPanel(
         ) {
             if (showFavorites) {
                 item(key = "__favorites__") {
+                    val isSelected = selected == FAVORITES_GROUP
                     GroupRow(
                         label = "\u2606  Favorites",
                         trailing = null,
-                        selected = selected == FAVORITES_GROUP,
+                        selected = isSelected,
                         depth = 0,
+                        focusRequester = if (isSelected) firstItemFocus else null,
                         onClick = { onSelect(FAVORITES_GROUP) },
                     )
                 }
             }
             item(key = "__all__") {
+                val isSelected = selected == ALL_GROUPS
                 GroupRow(
                     label = "All",
                     trailing = if (groups.isNotEmpty()) groups.size.toString() else null,
-                    selected = selected == ALL_GROUPS,
+                    selected = isSelected,
                     depth = 0,
+                    focusRequester = if (isSelected) firstItemFocus else null,
                     onClick = { onSelect(ALL_GROUPS) },
                 )
             }
@@ -119,22 +135,26 @@ fun CategoryFilterPanel(
                         BucketHeader(bucket = bucket, count = members.size)
                     }
                     items(members, key = { "${bucket.name}:$it" }) { group ->
+                        val isSelected = selected == group
                         GroupRow(
                             label = group,
                             trailing = null,
-                            selected = selected == group,
+                            selected = isSelected,
                             depth = 1,
+                            focusRequester = if (isSelected) firstItemFocus else null,
                             onClick = { onSelect(group) },
                         )
                     }
                 }
             } else {
                 items(groups, key = { it }) { group ->
+                    val isSelected = selected == group
                     GroupRow(
                         label = group,
                         trailing = null,
-                        selected = selected == group,
+                        selected = isSelected,
                         depth = 0,
+                        focusRequester = if (isSelected) firstItemFocus else null,
                         onClick = { onSelect(group) },
                     )
                 }
@@ -177,6 +197,7 @@ private fun GroupRow(
     trailing: String?,
     selected: Boolean,
     depth: Int,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -196,6 +217,12 @@ private fun GroupRow(
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(6.dp))
+            // focusRequester (if any) is the fallback target for the parent
+            // Column's `focusRestorer { firstItemFocus }` — only one GroupRow
+            // holds it per composition (the currently-selected one), so first-
+            // arrival focus lands on that visible row instead of dying on the
+            // focusGroup wrapper.
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(start = leftPad, end = 10.dp, top = 8.dp, bottom = 8.dp),
@@ -219,7 +246,7 @@ private fun GroupRow(
     }
 }
 
-private fun indexOfSelected(
+internal fun indexOfSelected(
     groups: List<String>,
     bucketized: Map<GroupBucket, List<String>>,
     selected: String,

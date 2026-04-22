@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -569,10 +570,21 @@ private fun RowScope.ContentArea(
             modifier = Modifier.onFocusChanged { if (it.hasFocus) onGroupsFocusChanged(true) },
         )
     }
+    // Outer column is a `focusGroup` (NOT a `focusRestorer`) so that
+    // `contentFocus.requestFocus()` cascades down to the LazyColumn's
+    // first focusable row via default enter semantics. We must NOT add a
+    // second `focusRestorer()` here because the inner LazyColumn already
+    // has one (see ContentPanel.kt). Nesting two restorers around the
+    // same lazy layout makes both of them try to release the same pinned
+    // item on focus re-entry, which throws `IllegalStateException:
+    // "Release should only be called once"` the moment the user scrolls
+    // and re-navigates (crash observed 2026-04-21, logcat shows the
+    // double-release at FocusRestorer.kt:112).
     Column(
         modifier = Modifier
             .weight(1f)
             .focusRequester(contentFocus)
+            .focusGroup()
             .onFocusChanged { if (it.hasFocus) onContentFocusChanged(true) },
     ) {
         SectionHeader(type = type, total = totalCount)
@@ -585,11 +597,13 @@ private fun RowScope.ContentArea(
             )
         }
     }
-    // Info rail: slides out once the user pushes LEFT into groups so the
-    // channel list gets the recovered width. Slides back in when focus
-    // returns to content. Only on TV — phones don't have the space.
+    // Info rail: always visible on TV once the user has a focused row.
+    // Earlier rev hid this whenever groups/sidebar revealed, which users
+    // read as "the info zone broke" — the content column already takes
+    // the weight=1f middle, InfoPanel is a fixed 260dp, and sidebar +
+    // groups only total 440dp. There's always room on TV.
     AnimatedVisibility(
-        visible = isTv && revealLevel == 0 && focused != null,
+        visible = isTv && focused != null,
         enter = slideInHorizontally(animationSpec = tween(180)) { it } + fadeIn(tween(180)),
         exit = slideOutHorizontally(animationSpec = tween(140)) { it } + fadeOut(tween(140)),
     ) {

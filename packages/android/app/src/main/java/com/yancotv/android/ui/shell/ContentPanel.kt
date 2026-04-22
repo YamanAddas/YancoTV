@@ -8,6 +8,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -139,6 +141,15 @@ fun ContentPanel(
     val focusKey = "content-focus|${type.name}|${group ?: "_all"}"
     var focusedIndex by rememberSaveable(focusKey) { mutableStateOf(0) }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = focusedIndex)
+    // Fallback requester for `focusRestorer`. When the LazyColumn's focus
+    // group receives focus for the first time (no saved state yet), Compose's
+    // default enter cannot reliably cascade through LazyLayout's lazy items
+    // — focus ends up stuck on the focusGroup wrapper and no row flips to
+    // `focused = true`, so the user sees no selector until they press OK.
+    // Supplying a fallback FocusRequester attached to the currently-focused
+    // row fixes that. On return, the saved-state path still wins, so the
+    // "restore to last focused row" UX is preserved.
+    val firstRowFocus = remember(focusKey) { FocusRequester() }
 
     LaunchedEffect(listState, total) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
@@ -199,7 +210,7 @@ fun ContentPanel(
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep)
             .padding(horizontal = 16.dp, vertical = 12.dp)
-            .focusRestorer()
+            .focusRestorer { firstRowFocus }
             .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -212,6 +223,12 @@ fun ContentPanel(
         val visible = items
             .let { if (hiddenIds.isEmpty()) it else it.filter { row -> row.id !in hiddenIds } }
             .let { if (!parentalSettings.hideAdultContent) it else it.filterNot(AdultContentFilter::isAdult) }
+        // The `firstRowFocus` requester is attached to whichever row the
+        // user was last on (clamped into the current `visible` list). On a
+        // fresh arrival from directional navigation the restorer-fallback
+        // path routes focus here instead of letting it die on the
+        // focusGroup wrapper.
+        val attachRowIndex = if (visible.isEmpty()) -1 else focusedIndex.coerceIn(0, visible.size - 1)
         itemsIndexed(visible, key = { _, it -> it.id }) { index, item ->
             ContentRow(
                 item = item,
@@ -219,6 +236,7 @@ fun ContentPanel(
                 nowNext = item.tvgId?.let { nowNextMap[it] },
                 nowSeconds = nowSeconds,
                 locked = item.id in lockedIds,
+                focusRequester = if (index == attachRowIndex) firstRowFocus else null,
                 onFocus = {
                     focusedIndex = visible.indexOfFirst { it.id == item.id }
                     onItemFocus(item)
@@ -264,6 +282,7 @@ private fun ContentRow(
     nowNext: NowNext?,
     nowSeconds: Long,
     locked: Boolean,
+    focusRequester: FocusRequester?,
     onFocus: () -> Unit,
     onActivate: () -> Unit,
     onLongPress: () -> Unit,
@@ -291,6 +310,12 @@ private fun ContentRow(
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            // focusRequester (if any) must precede focusable so the requester
+            // resolves to this node. Only one row per list holds it at a
+            // time — the parent LazyColumn's `focusRestorer { firstRowFocus }`
+            // fallback targets it when fresh focus arrives via directional
+            // navigation and there's no saved state yet.
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .focusable(interactionSource = interaction)
             // combinedClickable gives us short tap + long-press on the same
             // surface. TV remotes fire onLongClick for a held ENTER; phones
