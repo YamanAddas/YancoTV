@@ -88,14 +88,14 @@ fun AppSidebar(
             .width(ShellDim.sidebarExpanded)
             .background(brush)
             .border(1.dp, YancoPalette.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
-            .padding(horizontal = Space.md, vertical = Space.xl)
+            .padding(horizontal = Space.md, vertical = Space.md)
             .focusRestorer()
             .focusGroup(),
     ) {
         BrandMark()
-        Spacer(Modifier.height(Space.xxl))
+        Spacer(Modifier.height(Space.md))
         Column(
-            verticalArrangement = Arrangement.spacedBy(Space.xs),
+            verticalArrangement = Arrangement.spacedBy(Space.xxs),
         ) {
             AppSection.entries.forEach { section ->
                 SidebarRow(
@@ -106,15 +106,6 @@ fun AppSidebar(
                 )
             }
         }
-        // Push a subtle footer tag to the bottom — reinforces this is a
-        // branded product shell, not a debug menu.
-        Spacer(Modifier.fillMaxSize().weight(1f))
-        Text(
-            text = "YANCOTV+",
-            color = YancoPalette.TextFaint,
-            style = YancoType.Overline,
-            modifier = Modifier.padding(horizontal = Space.md, vertical = Space.sm),
-        )
     }
 }
 
