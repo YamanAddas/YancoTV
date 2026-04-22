@@ -317,7 +317,6 @@ fun BrowseShell(
                 .distinctUntilChanged()
                 .collect { tvgIds ->
                     if (tvgIds.isEmpty()) return@collect
-                    nowSeconds = System.currentTimeMillis() / 1000L
                     val ids = tvgIds.take(60) // cap the batch — no reason to fetch >60 at once
                     nowNextMap = withContext(Dispatchers.IO) { epg.getNowNextBatch(ids) }
                 }

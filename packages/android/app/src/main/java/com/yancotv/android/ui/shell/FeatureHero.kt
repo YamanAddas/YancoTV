@@ -310,9 +310,11 @@ private fun LiveHeroMeta(
             )
         }
         MetaChipRow(
-            chips = buildList {
-                group?.takeIf { it.isNotBlank() }?.let { add(it) }
-                nowProg?.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+            chips = remember(group, nowProg?.category) {
+                buildList {
+                    group?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    nowProg?.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+                }
             },
         )
     }
@@ -325,10 +327,12 @@ private fun VodHeroMeta(
     type: ContentType,
 ) {
     MetaChipRow(
-        chips = buildList {
-            add(if (type == ContentType.MOVIE) "Movie" else "Series")
-            group?.takeIf { it.isNotBlank() }?.let { add(it) }
-            sourceName?.takeIf { it.isNotBlank() }?.let { add(it) }
+        chips = remember(type, group, sourceName) {
+            buildList {
+                add(if (type == ContentType.MOVIE) "Movie" else "Series")
+                group?.takeIf { it.isNotBlank() }?.let { add(it) }
+                sourceName?.takeIf { it.isNotBlank() }?.let { add(it) }
+            }
         },
     )
 }

@@ -132,12 +132,12 @@ fun HomeContent(
 
     // Favorites-derived: non-live favorites for the Favorites rail,
     // and live favorites' tvgIds for the On Now + Up Next EPG batch.
-    val nonLiveFavorites = remember(favoriteList, hiddenIds) {
+    val nonLiveFavorites = remember(favoriteList.size, hiddenIds) {
         favoriteList.map { it.content }
             .filter { it.type != ContentType.LIVE && it.id !in hiddenIds }
             .take(20)
     }
-    val liveFavorites = remember(favoriteList, hiddenIds) {
+    val liveFavorites = remember(favoriteList.size, hiddenIds) {
         favoriteList.map { it.content }
             .filter { it.type == ContentType.LIVE && it.id !in hiddenIds }
     }
