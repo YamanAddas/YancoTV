@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +78,7 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
+    parental: com.yancotv.shared.parental.ParentalRepository = koinInject(),
 ) {
     // rememberSaveable so a rotation / process-death while the user has a
     // query typed doesn't wipe the term. Results are not saved — rerunning
@@ -85,6 +87,17 @@ fun SearchScreen(
     val results = remember { mutableStateListOf<ContentItem>() }
     var searching by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    // Parental gate — filter hidden IDs out of results, gate play on locked.
+    val lockedIds by parental.lockedIds.collectAsState()
+    val hiddenIds by parental.hiddenIds.collectAsState()
+    val visible = remember(results.toList(), hiddenIds) {
+        if (hiddenIds.isEmpty()) results.toList() else results.filter { it.id !in hiddenIds }
+    }
+    var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->
+        if (id in lockedIds) pendingPlay = action else action()
+    }
 
     LaunchedEffect(query) {
         val trimmed = query.trim()
@@ -127,19 +140,34 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(results, key = { it.id }) { row ->
+                items(visible, key = { it.id }) { row ->
                     SearchRow(
                         item = row,
                         onActivate = {
-                            val idx = results.indexOf(row)
-                            val alreadyPlaying = controller.currentId == row.id
-                            if (!alreadyPlaying) controller.play(results.toList(), idx)
-                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                            gatedPlay(row.id) {
+                                val idx = visible.indexOf(row)
+                                val alreadyPlaying = controller.currentId == row.id
+                                if (!alreadyPlaying) controller.play(visible, idx)
+                                if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                            }
                         },
                     )
                 }
             }
         }
+    }
+
+    pendingPlay?.let { action ->
+        com.yancotv.android.ui.parental.PinEntryDialog(
+            title = "Channel locked",
+            body = "Enter your PIN to watch this channel.",
+            repo = parental,
+            onSuccess = {
+                action()
+                pendingPlay = null
+            },
+            onDismiss = { pendingPlay = null },
+        )
     }
 }
 

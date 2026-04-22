@@ -77,10 +77,25 @@ fun HomeScreen(
     // Observing the lockedIds flow keeps the check live without a per-
     // press DB read.
     val lockedIds by parental.lockedIds.collectAsState()
+    val parentalSettings by parental.settings.collectAsState()
     var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
     val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->
         if (id in lockedIds) pendingPlay = action else action()
     }
+
+    // MK.8.7.b — Settings-entry gate. When the user has enabled
+    // "Require PIN for Settings", navigating to the Settings section sets
+    // this flag until the PIN is verified. Clears when the user leaves
+    // Settings (section changes) so re-entry re-prompts.
+    var settingsUnlocked by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(section) {
+        if (section != AppSection.Settings) settingsUnlocked = false
+    }
+    val needsSettingsGate =
+        section == AppSection.Settings &&
+            parentalSettings.pinSet &&
+            parentalSettings.requirePinForSettings &&
+            !settingsUnlocked
 
     Box(modifier = Modifier.fillMaxSize()) {
     Row(
@@ -114,7 +129,11 @@ fun HomeScreen(
             )
         } else if (section == AppSection.Settings) {
             Box(modifier = Modifier.weight(1f)) {
-                SettingsScreen()
+                if (needsSettingsGate) {
+                    SettingsLockedPlaceholder()
+                } else {
+                    SettingsScreen()
+                }
             }
         } else if (section == AppSection.Guide) {
             Box(modifier = Modifier.weight(1f)) {
@@ -201,6 +220,35 @@ fun HomeScreen(
                 onDismiss = { pendingPlay = null },
             )
         }
+
+        // Settings PIN gate (MK.8.7.b). Shown when the user has opted into
+        // "Require PIN for Settings" and they just navigated here. Cancel
+        // takes them back to the previous section rather than leaving
+        // them stranded in a locked Settings pane.
+        if (needsSettingsGate) {
+            PinEntryDialog(
+                title = "PIN required",
+                body = "Enter your PIN to open Settings.",
+                repo = parental,
+                onSuccess = { settingsUnlocked = true },
+                onDismiss = { section = AppSection.LiveTv },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsLockedPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(YancoPalette.BackgroundDeep),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Enter PIN to access Settings.",
+            color = YancoPalette.TextMuted,
+        )
     }
 }
 

@@ -1,8 +1,10 @@
 package com.yancotv.android.ui.shell
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -25,6 +27,7 @@ import coil3.compose.AsyncImage
 import com.yancotv.shared.content.QualityBadge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,10 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
@@ -80,12 +85,21 @@ fun ContentPanel(
     repo: ContentRepository = koinInject(),
     epg: EpgRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
+    parental: ParentalRepository = koinInject(),
 ) {
     val isFavoritesFilter = group == FAVORITES_GROUP
     val items = remember(type, group) { mutableStateListOf<ContentItem>() }
     var total by remember(type, group) { mutableStateOf(0L) }
     var loaded by remember(type, group) { mutableStateOf(0L) }
     var loading by remember(type, group) { mutableStateOf(false) }
+
+    // Parental filter state — lockedIds gives the row badge, hiddenIds
+    // drops the row out of the list entirely. Both are StateFlows so
+    // toggling from the ChannelActionsMenu (opened via long-press on a
+    // row) updates the list in the same recomposition.
+    val lockedIds by parental.lockedIds.collectAsState()
+    val hiddenIds by parental.hiddenIds.collectAsState()
+    var actionsFor by remember { mutableStateOf<ContentItem?>(null) }
 
     // Favorites filter uses a different data source — the `favorites` table
     // joined against `content`. We collect the reactive flow so starring or
@@ -177,21 +191,40 @@ fun ContentPanel(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        items(items, key = { it.id }) { item ->
+        // Filter out hidden channels at render time. SQL-side filtering
+        // would save a touch of memory but costs a schema-level JOIN on
+        // every content query; with realistic hide-list sizes (<100) the
+        // cost of filtering in Kotlin is negligible.
+        val visible = if (hiddenIds.isEmpty()) items else items.filter { it.id !in hiddenIds }
+        items(visible, key = { it.id }) { item ->
             ContentRow(
                 item = item,
                 nowNext = item.tvgId?.let { nowNextMap[it] },
                 nowSeconds = nowSeconds,
+                locked = item.id in lockedIds,
                 onFocus = {
-                    focusedIndex = items.indexOfFirst { it.id == item.id }
+                    focusedIndex = visible.indexOfFirst { it.id == item.id }
                     onItemFocus(item)
                 },
                 onActivate = {
-                    val idx = items.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onItemActivate(items.toList(), idx)
+                    val idx = visible.indexOfFirst { it.id == item.id }
+                    if (idx >= 0) onItemActivate(visible.toList(), idx)
                 },
+                onLongPress = { actionsFor = item },
             )
         }
+    }
+
+    // Channel-actions menu — one at a time, keyed on `actionsFor`.
+    // Dismiss either via Cancel or via action-completion (the menu
+    // invokes onDismiss on success so the list immediately reflects
+    // the lock/hide state change via its StateFlow).
+    actionsFor?.let { item ->
+        ChannelActionsMenu(
+            item = item,
+            repo = parental,
+            onDismiss = { actionsFor = null },
+        )
     }
 }
 
@@ -206,13 +239,16 @@ private suspend fun loadNextPage(
     onLoaded(page)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContentRow(
     item: ContentItem,
     nowNext: NowNext?,
     nowSeconds: Long,
+    locked: Boolean,
     onFocus: () -> Unit,
     onActivate: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -238,17 +274,46 @@ private fun ContentRow(
             .background(bg)
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
+            // combinedClickable gives us short tap + long-press on the same
+            // surface. TV remotes fire onLongClick for a held ENTER; phones
+            // fire for a held touch. Compose routes both to the same lambda.
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onActivate,
+                onLongClick = onLongPress,
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         LogoBox(url = item.logoUrl)
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(text = displayTitle, color = YancoPalette.TextPrimary, maxLines = 1)
+            Row(
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (locked) {
+                    // Lock glyph at the start of the title so the user sees
+                    // at a glance which rows are PIN-gated. Accent-tinted
+                    // rather than muted so it reads as a "status" not a
+                    // decoration.
+                    Text(
+                        text = "\uD83D\uDD12",
+                        color = YancoPalette.Accent,
+                        maxLines = 1,
+                    )
+                }
+                Text(
+                    text = displayTitle,
+                    color = YancoPalette.TextPrimary,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             Row(
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

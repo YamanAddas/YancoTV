@@ -23,8 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,9 +37,11 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
@@ -59,15 +63,29 @@ fun FavoritesScreen(
     modifier: Modifier = Modifier,
     favorites: FavoritesRepository = koinInject(),
     controller: PlaybackController = koinInject(),
+    parental: ParentalRepository = koinInject(),
 ) {
     // Reactive list: SQLDelight drives recomposition only when the favorites
     // table actually changes, so unstarring from InfoPanel on another screen
     // updates this list without a navigation round-trip.
     val favorited by favorites.allFlow().collectAsState(initial = null)
     val loading = favorited == null
-    val items = remember(favorited) { favorited?.map { it.content } ?: emptyList() }
+    val allItems = remember(favorited) { favorited?.map { it.content } ?: emptyList() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Parental filters: hidden_ids drop out of favourites entirely (a hide
+    // should feel consistent everywhere), lockedIds flag the row + gate the
+    // play handler.
+    val lockedIds by parental.lockedIds.collectAsState()
+    val hiddenIds by parental.hiddenIds.collectAsState()
+    val items = remember(allItems, hiddenIds) {
+        if (hiddenIds.isEmpty()) allItems else allItems.filterNot { it.id in hiddenIds }
+    }
+    var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->
+        if (id in lockedIds) pendingPlay = action else action()
+    }
 
     // Re-partition only when the flow emits a new list, not on every recomp.
     val live = remember(items) { items.filter { it.type == ContentType.LIVE } }
@@ -112,9 +130,11 @@ fun FavoritesScreen(
                 FavoriteRow(
                     item = row,
                     onActivate = {
-                        val alreadyPlaying = controller.currentId == row.id
-                        if (!alreadyPlaying) controller.play(live, live.indexOf(row))
-                        if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        gatedPlay(row.id) {
+                            val alreadyPlaying = controller.currentId == row.id
+                            if (!alreadyPlaying) controller.play(live, live.indexOf(row))
+                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        }
                     },
                     onRemove = { removeFavorite(row, scope, favorites) },
                 )
@@ -126,14 +146,16 @@ fun FavoritesScreen(
                 FavoriteRow(
                     item = row,
                     onActivate = {
-                        // Mirror HomeScreen's two-tap flow: first tap loads
-                        // the item (if not already current), second tap (or
-                        // phone tap) launches fullscreen. Tapping the
-                        // currently-playing row goes straight to fullscreen
-                        // instead of rebuffering.
-                        val alreadyPlaying = controller.currentId == row.id
-                        if (!alreadyPlaying) controller.play(movies, movies.indexOf(row))
-                        if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        gatedPlay(row.id) {
+                            // Mirror HomeScreen's two-tap flow: first tap loads
+                            // the item (if not already current), second tap (or
+                            // phone tap) launches fullscreen. Tapping the
+                            // currently-playing row goes straight to fullscreen
+                            // instead of rebuffering.
+                            val alreadyPlaying = controller.currentId == row.id
+                            if (!alreadyPlaying) controller.play(movies, movies.indexOf(row))
+                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        }
                     },
                     onRemove = { removeFavorite(row, scope, favorites) },
                 )
@@ -145,14 +167,32 @@ fun FavoritesScreen(
                 FavoriteRow(
                     item = row,
                     onActivate = {
-                        val alreadyPlaying = controller.currentId == row.id
-                        if (!alreadyPlaying) controller.play(series, series.indexOf(row))
-                        if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        gatedPlay(row.id) {
+                            val alreadyPlaying = controller.currentId == row.id
+                            if (!alreadyPlaying) controller.play(series, series.indexOf(row))
+                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        }
                     },
                     onRemove = { removeFavorite(row, scope, favorites) },
                 )
             }
         }
+    }
+
+    // MK.8.7.b — PIN gate for locked favourites. Same pattern as HomeScreen:
+    // gatedPlay stashes the deferred action into pendingPlay, the dialog
+    // runs it on success.
+    pendingPlay?.let { action ->
+        PinEntryDialog(
+            title = "Channel locked",
+            body = "Enter your PIN to watch this channel.",
+            repo = parental,
+            onSuccess = {
+                action()
+                pendingPlay = null
+            },
+            onDismiss = { pendingPlay = null },
+        )
     }
 }
 
