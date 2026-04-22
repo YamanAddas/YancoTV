@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -183,13 +185,14 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
-    val requester = remember { FocusRequester() }
+    val fieldAnchor = rememberPlacedFocusAnchor()
     val keyboard = LocalSoftwareKeyboardController.current
 
     // Pull focus on entry so phone users land on an active field (IME pops
     // automatically) and TV users see the field highlighted for typing via
-    // the remote. Safe on TV — focus just lives on the field, no keyboard.
-    LaunchedEffect(Unit) { requester.requestFocus() }
+    // the remote. awaitAndRequest() suspends until the field's onPlaced hook
+    // fires, then issues the focus request once — no delay-ladder race.
+    LaunchedEffect(Unit) { fieldAnchor.awaitAndRequest() }
 
     Box(
         modifier = Modifier
@@ -213,7 +216,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
             modifier = Modifier
                 .fillMaxWidth()
-                .focusRequester(requester)
+                .placedFocus(fieldAnchor)
                 .semantics { contentDescription = "Search channels, movies, and series" },
             decorationBox = { inner ->
                 if (value.isEmpty()) {

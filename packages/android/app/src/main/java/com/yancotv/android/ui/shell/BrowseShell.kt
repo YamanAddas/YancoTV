@@ -611,7 +611,13 @@ fun BrowseShell(
         ChannelActionsMenu(
             item = item,
             repo = parental,
-            onDismiss = { actionsFor = null },
+            onDismiss = {
+                actionsFor = null
+                scope.launch {
+                    delay(80)
+                    runCatching { firstItemFocus.requestFocus() }
+                }
+            },
         )
     }
 }

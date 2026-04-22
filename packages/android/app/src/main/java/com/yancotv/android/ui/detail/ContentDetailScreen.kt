@@ -40,6 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -93,7 +96,7 @@ fun ContentDetailScreen(
     var loaded by remember(item.id) { mutableStateOf<ContentDetailService.Loaded?>(null) }
     var loading by remember(item.id) { mutableStateOf(true) }
     var isFav by remember(item.id) { mutableStateOf(false) }
-    val playFocus = remember { FocusRequester() }
+    val playAnchor = rememberPlacedFocusAnchor()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(item.id) {
@@ -129,7 +132,7 @@ fun ContentDetailScreen(
     // Focus trap: focusGroup boundary + an invisible 0-dp Spacer anchor.
     // The Spacer is the first focusable node inside the group, so it
     // receives focus on open before the Play button is ready. LaunchedEffect
-    // below hands off to playFocus once the button node is placed.
+    // below hands off to playAnchor once the button node is placed.
     // Using .focusable() (not .clickable) ensures CENTER presses on the
     // anchor are no-ops — they never intercept episode-row activations.
     Box(
@@ -169,7 +172,7 @@ fun ContentDetailScreen(
                     }
                 },
                 onBack = onDismiss,
-                playFocus = playFocus,
+                playAnchor = playAnchor,
             )
         }
 
@@ -235,11 +238,7 @@ fun ContentDetailScreen(
     // button reliably focused on open for both movies and series.
     LaunchedEffect(loaded != null) {
         runCatching { trapFocus.requestFocus() }  // immediate trap while Play button renders
-        for (delayMs in longArrayOf(0L, 60L, 180L, 400L)) {
-            if (delayMs > 0L) delay(delayMs)
-            val ok = runCatching { playFocus.requestFocus() }.isSuccess
-            if (ok) break
-        }
+        playAnchor.awaitAndRequest()              // waits for onPlaced, then fires once
     }
 
     // Return-from-player focus restore. PlayerActivity yanks window focus
@@ -258,7 +257,7 @@ fun ContentDetailScreen(
                 seenUnfocused = false
                 for (delayMs in longArrayOf(80L, 250L, 500L)) {
                     delay(delayMs)
-                    val ok = runCatching { playFocus.requestFocus() }.isSuccess
+                    val ok = runCatching { playAnchor.requester.requestFocus() }.isSuccess
                     if (ok) break
                 }
             }
@@ -275,7 +274,7 @@ private fun HeroBlock(
     onPlay: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onBack: () -> Unit,
-    playFocus: FocusRequester,
+    playAnchor: PlacedFocusAnchor,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         BackdropHero(url = backdropUrlOf(item, metadata))
@@ -334,7 +333,7 @@ private fun HeroBlock(
                         onPlay = onPlay,
                         onFavoriteToggle = onFavoriteToggle,
                         onBack = onBack,
-                        playFocus = playFocus,
+                        playAnchor = playAnchor,
                     )
                     val cast = metadata.cast?.takeIf { it.isNotBlank() }
                     val director = metadata.director?.takeIf { it.isNotBlank() }
@@ -488,7 +487,7 @@ private fun ActionRow(
     onPlay: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onBack: () -> Unit,
-    playFocus: FocusRequester,
+    playAnchor: PlacedFocusAnchor,
 ) {
     Row(
         modifier = Modifier.padding(top = Space.sm),
@@ -497,7 +496,7 @@ private fun ActionRow(
         PrimaryButton(
             label = primaryLabel,
             onClick = onPlay,
-            focusRequester = playFocus,
+            playAnchor = playAnchor,
         )
         SecondaryButton(
             label = if (isFavorite) "In favourites" else "Add to favourites",
@@ -515,7 +514,7 @@ private fun ActionRow(
 }
 
 @Composable
-private fun PrimaryButton(label: String, onClick: () -> Unit, focusRequester: FocusRequester) {
+private fun PrimaryButton(label: String, onClick: () -> Unit, playAnchor: PlacedFocusAnchor) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
@@ -523,7 +522,7 @@ private fun PrimaryButton(label: String, onClick: () -> Unit, focusRequester: Fo
         modifier = Modifier
             .clip(RoundedCornerShape(Radius.control))
             .background(bg)
-            .focusRequester(focusRequester)
+            .placedFocus(playAnchor)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = Space.xxl, vertical = Space.md),
