@@ -221,4 +221,59 @@
             android:progressDrawable="@drawable/player_progress" />
     </LinearLayout>
 
+    <!-- Jump-to-LIVE affordance (MK.8.2 timeshift). Renders when the
+         player is more than a few seconds behind the live edge —
+         typically after a pause or user rewind. Top-end, under the
+         quick-info panel's horizontal slot so both overlays can
+         coexist without overlap. -->
+    <LinearLayout
+        android:id="@+id/live_jump_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="32dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/player_overlay_pill"
+        android:paddingStart="12dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone">
+
+        <View
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/player_live_dot"
+            android:alpha="0.6" />
+
+        <TextView
+            android:id="@+id/live_offset_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFE6EDF3"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:layout_marginEnd="12dp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/live_jump_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="JUMP TO LIVE"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#FFE53935"
+            android:background="@android:color/transparent"
+            android:letterSpacing="0.1"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+    </LinearLayout>
+
 </FrameLayout>

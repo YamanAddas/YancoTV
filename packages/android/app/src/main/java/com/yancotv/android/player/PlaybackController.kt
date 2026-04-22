@@ -58,12 +58,25 @@ class PlaybackController(
         // Tuned for channel-zap UX — start playing at 1s buffered instead
         // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
         // don't oscillate between BUFFERING and READY on flaky sources.
+        //
+        // MK.8.2 timeshift: retain 10 minutes of back-buffer + keep the
+        // last keyframe so the user can pause/rewind a non-DVR live
+        // stream. Back-buffer is encoded-sample-level (not decoded) and
+        // HLS chunk-backed where possible, so on Fire TV it lives in
+        // off-heap / chunk-cache memory rather than counting against
+        // the 320 MB heap cap. 10 min × 5 Mbps ≈ 375 MB of disk/cache —
+        // acceptable. 30 min would push it past 1 GB which is too much
+        // for low-end Fire TV Sticks.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 15_000,
                 /* maxBufferMs = */ 30_000,
                 /* bufferForPlaybackMs = */ 1_000,
                 /* bufferForPlaybackAfterRebufferMs = */ 2_500,
+            )
+            .setBackBuffer(
+                /* backBufferDurationMs = */ 10 * 60 * 1_000,
+                /* retainBackBufferFromKeyframe = */ true,
             )
             .build()
         ExoPlayer.Builder(context)

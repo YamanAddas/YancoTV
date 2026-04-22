@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -57,6 +58,13 @@ class PlayerActivity : AppCompatActivity() {
         private const val CONTROLLER_TIMEOUT_MS = 4000
         private const val QUICK_INFO_AUTO_HIDE_MS = 10_000L
         private const val PROGRESS_TICK_MS = 15_000L
+        // MK.8.2 — live-edge poll cadence and "you're behind live" floor.
+        // 1 s is fine; the subsequent UI write is a single TextView update.
+        // 8 s threshold ignores the normal ExoPlayer live latency (a few
+        // seconds behind the true edge by design) so the button only
+        // appears after an actual pause/rewind.
+        private const val LIVE_OFFSET_TICK_MS = 1_000L
+        private const val LIVE_BEHIND_THRESHOLD_MS = 8_000L
     }
 
     private val controller: PlaybackController by inject()
@@ -85,11 +93,17 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var ppTime: TextView
     private lateinit var ppBar: ProgressBar
 
+    // Jump-to-LIVE (MK.8.2 timeshift)
+    private lateinit var liveJumpBar: View
+    private lateinit var liveOffsetLabel: TextView
+    private lateinit var liveJumpButton: Button
+
     private var listenerAttached = false
     private var controllerVisible = false
     private var currentProgramme: EpgProgramme? = null
     private var progressTickerJob: Job? = null
     private var quickInfoHideJob: Job? = null
+    private var liveOffsetTickerJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -145,6 +159,11 @@ class PlayerActivity : AppCompatActivity() {
         ppTime = findViewById(R.id.pp_time)
         ppBar = findViewById(R.id.pp_bar)
 
+        liveJumpBar = findViewById(R.id.live_jump_bar)
+        liveOffsetLabel = findViewById(R.id.live_offset_label)
+        liveJumpButton = findViewById(R.id.live_jump_button)
+        liveJumpButton.setOnClickListener { jumpToLive() }
+
         playerView.useController = true
         playerView.controllerAutoShow = true
         playerView.controllerHideOnTouch = true
@@ -171,6 +190,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onStart()
         attachShared()
         startProgressTicker()
+        startLiveOffsetTicker()
     }
 
     override fun onPause() {
@@ -184,6 +204,8 @@ class PlayerActivity : AppCompatActivity() {
         progressTickerJob = null
         quickInfoHideJob?.cancel()
         quickInfoHideJob = null
+        liveOffsetTickerJob?.cancel()
+        liveOffsetTickerJob = null
         playerView.player = null
     }
 
@@ -356,6 +378,72 @@ class PlayerActivity : AppCompatActivity() {
         return "${ahead / 1000}s"
     }
 
+    // ───── Live-edge timeshift (MK.8.2) ─────
+
+    /**
+     * Poll the player every second for its distance from the live edge.
+     * Show the "Jump to LIVE" affordance whenever that distance crosses
+     * [LIVE_BEHIND_THRESHOLD_MS] — a small floor so a quick pause/resume
+     * or network wobble that nudges us a few seconds back doesn't flicker
+     * the overlay in and out.
+     */
+    private fun startLiveOffsetTicker() {
+        liveOffsetTickerJob?.cancel()
+        liveOffsetTickerJob = lifecycleScope.launch {
+            while (isActive) {
+                renderLiveOffset()
+                delay(LIVE_OFFSET_TICK_MS)
+            }
+        }
+    }
+
+    private fun renderLiveOffset() {
+        val p = controller.player
+        val item = controller.currentItem.value
+        if (item?.type != ContentType.LIVE || !p.isCurrentMediaItemLive) {
+            liveJumpBar.visibility = View.GONE
+            return
+        }
+        // currentLiveOffset can return C.TIME_UNSET (Long.MIN_VALUE) before
+        // the timeline resolves; clamp to 0 so we don't flash a bogus
+        // "-99h behind" label while the manifest loads.
+        val raw = p.currentLiveOffset
+        val offsetMs = if (raw == androidx.media3.common.C.TIME_UNSET) 0L else raw.coerceAtLeast(0L)
+        if (offsetMs < LIVE_BEHIND_THRESHOLD_MS) {
+            liveJumpBar.visibility = View.GONE
+            return
+        }
+        liveOffsetLabel.text = formatLiveOffset(offsetMs)
+        liveJumpBar.visibility = View.VISIBLE
+    }
+
+    private fun formatLiveOffset(ms: Long): String {
+        val totalSec = ms / 1000L
+        val h = totalSec / 3600L
+        val m = (totalSec % 3600L) / 60L
+        val s = totalSec % 60L
+        return when {
+            h > 0 -> String.format("-%d:%02d:%02d", h, m, s)
+            else -> String.format("-%d:%02d", m, s)
+        }
+    }
+
+    /**
+     * Snap the player back to the live edge. Uses [Player.seekToDefaultPosition]
+     * which for a live window jumps to the stream's current live edge —
+     * the same behavior as the built-in "GO TO LIVE" button that ships
+     * with Media3's default controller (we hide that button and route
+     * through our accent-tinted overlay for discoverability).
+     */
+    private fun jumpToLive() {
+        val p = controller.player
+        if (p.isCurrentMediaItemLive) {
+            p.seekToDefaultPosition()
+            p.playWhenReady = true
+            liveJumpBar.visibility = View.GONE
+        }
+    }
+
     // ───── Keys ─────
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -382,6 +470,17 @@ class PlayerActivity : AppCompatActivity() {
                 val p = controller.player
                 p.playWhenReady = !p.playWhenReady
                 return true
+            }
+            // MK.8.2 — MEDIA_STOP on TV remotes doubles as "snap to live"
+            // while on a live channel. Stopping the stream (the default
+            // interpretation) makes no sense for live TV — there's
+            // nothing to resume to. Jumping to live is what the user
+            // actually wants.
+            KeyEvent.KEYCODE_MEDIA_STOP -> {
+                if (controller.player.isCurrentMediaItemLive) {
+                    jumpToLive()
+                    return true
+                }
             }
         }
         return super.onKeyDown(keyCode, event)
