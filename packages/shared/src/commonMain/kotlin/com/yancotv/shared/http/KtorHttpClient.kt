@@ -27,8 +27,14 @@ import kotlinx.serialization.json.JsonElement
  */
 open class KtorHttpClient(
     protected val ktor: KtorClient,
-    protected val defaultUserAgent: String = "YancoTV/0.1.0",
+    protected val userAgentProvider: () -> String = { "YancoTV/0.1.0" },
+    /** When non-null, overrides the engine-level request timeout for calls that
+     * don't pass their own [HttpRequestOptions.timeoutMs]. Settings → Network
+     * feeds this from [AppPreferences.networkFlow]. */
+    protected val perRequestReadTimeoutMs: () -> Long? = { null },
 ) : HttpClient {
+    /** Backward-compat ctor used by tests + iOS factory. */
+    constructor(ktor: KtorClient, defaultUserAgent: String) : this(ktor, { defaultUserAgent })
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -87,7 +93,7 @@ open class KtorHttpClient(
 
     protected suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
         val response: HttpResponse = ktor.get(url) {
-            header("User-Agent", options.headers["User-Agent"] ?: defaultUserAgent)
+            header("User-Agent", options.headers["User-Agent"] ?: userAgentProvider())
             for ((k, v) in options.headers) {
                 if (!k.equals("User-Agent", ignoreCase = true)) header(k, v)
             }
@@ -96,8 +102,13 @@ open class KtorHttpClient(
             // probe — without this the user sees "fetching…" for 90s × retries
             // before getting feedback. MK.6 sync debug: caller passes 30s for
             // auth, 60s for catalog fetches.
-            options.timeoutMs?.let { ms ->
-                timeout { requestTimeoutMillis = ms }
+            val explicit = options.timeoutMs
+            if (explicit != null) {
+                timeout { requestTimeoutMillis = explicit }
+            } else {
+                perRequestReadTimeoutMs()?.let { ms ->
+                    timeout { requestTimeoutMillis = ms }
+                }
             }
         }
         if (!response.status.isSuccess()) {

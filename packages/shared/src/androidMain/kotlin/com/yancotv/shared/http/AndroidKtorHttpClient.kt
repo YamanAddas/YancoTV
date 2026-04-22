@@ -42,9 +42,10 @@ import java.util.UUID
  */
 class AndroidKtorHttpClient(
     ktor: KtorClient,
-    defaultUserAgent: String,
+    userAgentProvider: () -> String,
+    perRequestReadTimeoutMs: () -> Long?,
     private val cacheDir: File,
-) : KtorHttpClient(ktor, defaultUserAgent) {
+) : KtorHttpClient(ktor, userAgentProvider, perRequestReadTimeoutMs) {
 
     override suspend fun <T> getSource(
         url: String,

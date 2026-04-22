@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.ContentRepository
@@ -87,7 +89,9 @@ fun ContentPanel(
     epg: EpgRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
     parental: ParentalRepository = koinInject(),
+    prefs: AppPreferences = koinInject(),
 ) {
+    val general by prefs.generalFlow.collectAsState()
     val isFavoritesFilter = group == FAVORITES_GROUP
     val items = remember(type, group) { mutableStateListOf<ContentItem>() }
     var total by remember(type, group) { mutableStateOf(0L) }
@@ -202,9 +206,10 @@ fun ContentPanel(
         val visible = items
             .let { if (hiddenIds.isEmpty()) it else it.filter { row -> row.id !in hiddenIds } }
             .let { if (!parentalSettings.hideAdultContent) it else it.filterNot(AdultContentFilter::isAdult) }
-        items(visible, key = { it.id }) { item ->
+        itemsIndexed(visible, key = { _, it -> it.id }) { index, item ->
             ContentRow(
                 item = item,
+                channelNumber = if (general.showChannelNumbers && type == ContentType.LIVE) index + 1 else null,
                 nowNext = item.tvgId?.let { nowNextMap[it] },
                 nowSeconds = nowSeconds,
                 locked = item.id in lockedIds,
@@ -249,6 +254,7 @@ private suspend fun loadNextPage(
 @Composable
 private fun ContentRow(
     item: ContentItem,
+    channelNumber: Int?,
     nowNext: NowNext?,
     nowSeconds: Long,
     locked: Boolean,
@@ -310,6 +316,13 @@ private fun ContentRow(
                     Text(
                         text = "\uD83D\uDD12",
                         color = YancoPalette.Accent,
+                        maxLines = 1,
+                    )
+                }
+                channelNumber?.let {
+                    Text(
+                        text = it.toString().padStart(3, ' '),
+                        color = YancoPalette.TextMuted,
                         maxLines = 1,
                     )
                 }

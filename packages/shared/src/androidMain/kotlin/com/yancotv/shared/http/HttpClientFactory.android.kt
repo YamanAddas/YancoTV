@@ -27,9 +27,13 @@ actual fun createHttpClient(defaultUserAgent: String): HttpClient =
  * the default [KtorHttpClient.getSource] (which buffers the whole HTTP body)
  * for a temp-file streaming variant. See that class's KDoc for why.
  *
- * Koin wires this in instead of the default [createHttpClient] so every
- * `getSource` call — in particular the Xtream catalog stream APIs — pays
- * bounded memory regardless of payload size.
+ * Providers let Settings → Network override User-Agent + request timeout at
+ * runtime without rebuilding the singleton. The engine-level timeouts in
+ * [buildKtor] remain the floor; per-request values only apply when the
+ * caller didn't pass its own [HttpRequestOptions.timeoutMs].
  */
-fun createAndroidHttpClient(defaultUserAgent: String, cacheDir: File): HttpClient =
-    AndroidKtorHttpClient(buildKtor(), defaultUserAgent, cacheDir)
+fun createAndroidHttpClient(
+    userAgentProvider: () -> String,
+    perRequestReadTimeoutMs: () -> Long?,
+    cacheDir: File,
+): HttpClient = AndroidKtorHttpClient(buildKtor(), userAgentProvider, perRequestReadTimeoutMs, cacheDir)

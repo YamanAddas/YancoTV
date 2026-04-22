@@ -46,8 +46,15 @@ val appModule = module {
     single<YancoDb> { get<YancoDatabase>().db }
     single<SqlDriver> { get<YancoDatabase>().driver }
     single<HttpClient> {
+        val prefs = get<AppPreferences>()
         createAndroidHttpClient(
-            defaultUserAgent = "YancoTV/0.1 (Android)",
+            userAgentProvider = {
+                prefs.networkFlow.value.userAgentOverride?.takeIf { it.isNotBlank() }
+                    ?: "YancoTV/0.1 (Android)"
+            },
+            perRequestReadTimeoutMs = {
+                prefs.networkFlow.value.readTimeoutSec.takeIf { it > 0 }?.let { it * 1000L }
+            },
             cacheDir = androidContext().cacheDir,
         )
     }

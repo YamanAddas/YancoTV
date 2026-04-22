@@ -27,7 +27,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
 import com.yancotv.android.R
+import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -74,6 +77,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private val controller: PlaybackController by inject()
     private val epg: EpgRepository by inject()
+    private val prefs: AppPreferences by inject()
 
     private lateinit var playerView: PlayerView
 
@@ -190,6 +194,21 @@ class PlayerActivity : AppCompatActivity() {
                 controller.currentItem.collect { item -> onItemChanged(item) }
             }
         }
+        // Settings → Playback → Aspect. Re-applies whenever the user flips
+        // the chip row so a fullscreen session can change between Fit / Fill
+        // / Zoom without restarting. PlayerView reads the mode on the next
+        // frame layout pass.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                prefs.playbackFlow.collect { playerView.resizeMode = it.resizeMode.toPlayerViewMode() }
+            }
+        }
+    }
+
+    private fun ResizeMode.toPlayerViewMode(): Int = when (this) {
+        ResizeMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        ResizeMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        ResizeMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 
     override fun onStart() {
