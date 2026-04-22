@@ -313,9 +313,9 @@ fun BrowseShell(
     var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
     if (type == ContentType.LIVE) {
         LaunchedEffect(type, items.size) {
-            snapshotFlow { focusedItem?.tvgId to items.map { it.tvgId }.filterNotNull().distinct() }
+            snapshotFlow { items.map { it.tvgId }.filterNotNull().distinct() }
                 .distinctUntilChanged()
-                .collect { (_, tvgIds) ->
+                .collect { tvgIds ->
                     if (tvgIds.isEmpty()) return@collect
                     nowSeconds = System.currentTimeMillis() / 1000L
                     val ids = tvgIds.take(60) // cap the batch — no reason to fetch >60 at once
@@ -325,6 +325,7 @@ fun BrowseShell(
         LaunchedEffect(type) {
             while (true) {
                 delay(EPG_TICK_MS)
+                if (!restoreFocusOnWindowRegain) continue // overlay is up — skip tick
                 nowSeconds = System.currentTimeMillis() / 1000L
                 val ids = items.mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
                     .distinct()
@@ -385,6 +386,8 @@ fun BrowseShell(
         if (loading) return@LaunchedEffect
         if (loaded >= total) return@LaunchedEffect
         if (focusedIndex < (loaded - PREFETCH_THRESHOLD)) return@LaunchedEffect
+        delay(100L) // debounce — cancelled if focus moves again before it fires
+        if (loading) return@LaunchedEffect
         loading = true
         val page = withContext(Dispatchers.IO) {
             repo.page(type, groupFilter, loaded, PAGE_SIZE)
