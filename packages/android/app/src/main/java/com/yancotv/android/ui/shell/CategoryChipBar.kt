@@ -9,9 +9,11 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +40,7 @@ import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
 /**
@@ -167,15 +170,19 @@ private fun Chip(
         },
         label = "chip-fg",
     )
+    // Hex-inspired chip — leading angular bevel + rounded trailing cap so
+    // each chip reads as part of the shell's angular family. Selected chip
+    // picks up a 2dp accent rim and an LED-style dot on the leading edge.
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .height(36.dp)
+            .clip(YancoShapes.ChipBevel)
             .background(bg)
-            .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(Radius.pill))
+            .border(if (focused) 2.dp else 1.dp, border, YancoShapes.ChipBevel)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = Space.lg, vertical = Space.sm),
+            .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -185,6 +192,15 @@ private fun Chip(
                 contentDescription = null,
                 tint = fg,
                 modifier = Modifier.size(14.dp),
+            )
+        } else if (selected) {
+            // Small accent pip instead of an icon. Reinforces "picked" with
+            // a touch of colour without a generic leading glyph.
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(YancoPalette.Accent),
             )
         }
         Text(

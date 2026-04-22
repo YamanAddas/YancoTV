@@ -3,6 +3,7 @@ package com.yancotv.android.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -59,6 +60,7 @@ import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpisodeInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -120,12 +122,24 @@ fun ContentDetailScreen(
     // Single LazyColumn governs the whole page so d-pad focus never has
     // to cross a scroll-container boundary.
     val listState = rememberLazyListState()
+    val trapFocus = remember { FocusRequester() }
 
-    LazyColumn(
-        state = listState,
+    // Focus trap: focusGroup boundary + an invisible 0-dp Spacer anchor.
+    // The Spacer is the first focusable node inside the group, so it
+    // receives focus on open before the Play button is ready. LaunchedEffect
+    // below hands off to playFocus once the button node is placed.
+    // Using .focusable() (not .clickable) ensures CENTER presses on the
+    // anchor are no-ops — they never intercept episode-row activations.
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep),
+            .background(YancoPalette.BackgroundDeep)
+            .focusGroup(),
+    ) {
+        Spacer(Modifier.size(0.dp).focusRequester(trapFocus).focusable())
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = Space.section),
     ) {
         item(key = "hero") {
@@ -207,10 +221,23 @@ fun ContentDetailScreen(
             }
         }
     }
+    }
 
-    // Auto-focus Play on open so the user can press OK immediately.
-    LaunchedEffect(Unit) {
-        runCatching { playFocus.requestFocus() }
+    // Auto-focus Play on open and re-assert it when `loaded` settles.
+    // Series detail swaps the `rendered` ContentItem instance the moment
+    // the provider round-trip returns (`item` → `loaded.item` with a
+    // fresh reference), which re-keys the HeroBlock and can drop the
+    // initial focus grant. Re-requesting on `loaded != null` — with a
+    // short retry ladder for the frame gap between modifier attach and
+    // the underlying FocusRequester node being ready — makes the Play
+    // button reliably focused on open for both movies and series.
+    LaunchedEffect(loaded != null) {
+        runCatching { trapFocus.requestFocus() }  // immediate trap while Play button renders
+        for (delayMs in longArrayOf(0L, 60L, 180L, 400L)) {
+            if (delayMs > 0L) delay(delayMs)
+            val ok = runCatching { playFocus.requestFocus() }.isSuccess
+            if (ok) break
+        }
     }
 }
 

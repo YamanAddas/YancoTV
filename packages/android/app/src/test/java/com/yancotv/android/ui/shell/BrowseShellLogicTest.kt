@@ -144,6 +144,192 @@ class BrowseShellLogicTest {
         assertTrue(out.isEmpty())
     }
 
+    // ---- resolveAutoPreviewIndex ----
+
+    @Test fun resolveAutoPreviewReturnsNullForMovieType() {
+        // Auto-preview is LIVE-only; VOD files must not auto-start on focus.
+        val visible = liveChannels()
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.MOVIE,
+                focusedId = "c1",
+                visible = visible,
+                lockedIds = emptySet(),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsNullForSeriesType() {
+        val visible = liveChannels()
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.SERIES,
+                focusedId = "c1",
+                visible = visible,
+                lockedIds = emptySet(),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsNullWhenNothingFocused() {
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.LIVE,
+                focusedId = null,
+                visible = liveChannels(),
+                lockedIds = emptySet(),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsNullWhenFocusedIsLocked() {
+        // Parental lock must gate silent background playback — the PIN
+        // prompt only fires through the explicit activate path, so an
+        // auto-preview on a locked row would leak restricted content.
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.LIVE,
+                focusedId = "c2",
+                visible = liveChannels(),
+                lockedIds = setOf("c2"),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsNullWhenAlreadyPlaying() {
+        // No-op when the focused card is already the live MiniPlayer source.
+        // Re-calling play() would trigger a fresh prepare() and re-buffer.
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.LIVE,
+                focusedId = "c1",
+                visible = liveChannels(),
+                lockedIds = emptySet(),
+                currentlyPlayingId = "c1",
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsNullWhenFocusedNotInVisible() {
+        // Post-debounce re-check needs to survive the case where the
+        // focused id got filtered out during the 400ms window (user
+        // switched chips, parental list grew, etc).
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.LIVE,
+                focusedId = "ghost",
+                visible = liveChannels(),
+                lockedIds = emptySet(),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsIndexForEligibleLiveFocus() {
+        assertEquals(
+            1,
+            resolveAutoPreviewIndex(
+                type = ContentType.LIVE,
+                focusedId = "c2",
+                visible = liveChannels(),
+                lockedIds = emptySet(),
+                currentlyPlayingId = "c1",
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewReturnsNullForEmptyVisible() {
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.LIVE,
+                focusedId = "c1",
+                visible = emptyList(),
+                lockedIds = emptySet(),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    @Test fun resolveAutoPreviewTreatsTypeGuardAheadOfFocusGuard() {
+        // Short-circuits even when all other signals would allow playback.
+        // Protects against accidental auto-preview leaking into VOD rails
+        // if a future refactor forgets to gate the LaunchedEffect callsite.
+        assertNull(
+            resolveAutoPreviewIndex(
+                type = ContentType.MOVIE,
+                focusedId = "c1",
+                visible = liveChannels(),
+                lockedIds = emptySet(),
+                currentlyPlayingId = null,
+            ),
+        )
+    }
+
+    // ---- initialFocusIndex ----
+
+    @Test fun initialFocusReturnsMinusOneForEmptyItems() {
+        // -1 signals "no focus yet" — composable caller leaves focusedItem
+        // null rather than crashing on an out-of-bounds index.
+        assertEquals(-1, initialFocusIndex(emptyList(), savedIndex = 0, currentlyPlayingId = null))
+    }
+
+    @Test fun initialFocusPrefersCurrentlyPlayingItem() {
+        // Returning to LiveTv while a stream runs in the MiniPlayer must
+        // land focus on that channel — otherwise the auto-preview logic
+        // would re-prepare() a different stream and clobber playback.
+        val items = liveChannels()
+        assertEquals(
+            2,
+            initialFocusIndex(items, savedIndex = 0, currentlyPlayingId = "c3"),
+        )
+    }
+
+    @Test fun initialFocusFallsBackToSavedIndexWhenNoPlayingId() {
+        val items = liveChannels()
+        assertEquals(1, initialFocusIndex(items, savedIndex = 1, currentlyPlayingId = null))
+    }
+
+    @Test fun initialFocusFallsBackToSavedIndexWhenPlayingIdNotInList() {
+        // Playing channel belongs to a different section (e.g. MiniPlayer
+        // is showing a LIVE stream while the user is browsing MOVIES). The
+        // id lookup misses and we honour the saved cursor for this section.
+        val items = liveChannels()
+        assertEquals(1, initialFocusIndex(items, savedIndex = 1, currentlyPlayingId = "unrelated"))
+    }
+
+    @Test fun initialFocusClampsSavedIndexAboveLastPosition() {
+        // A previously-saved cursor can outrun the current rail after a
+        // filter drop (e.g. saved was 47, current visible size is 3).
+        val items = liveChannels()
+        assertEquals(2, initialFocusIndex(items, savedIndex = 99, currentlyPlayingId = null))
+    }
+
+    @Test fun initialFocusClampsNegativeSavedIndex() {
+        // Defensive: rememberSaveable can theoretically hand back a
+        // corrupted int. Clamp to 0 rather than crashing get(-1).
+        val items = liveChannels()
+        assertEquals(0, initialFocusIndex(items, savedIndex = -5, currentlyPlayingId = null))
+    }
+
+    @Test fun initialFocusSingleItemIgnoresSavedIndexOvershoot() {
+        val items = listOf(liveChannel("only"))
+        assertEquals(0, initialFocusIndex(items, savedIndex = 12, currentlyPlayingId = null))
+    }
+
+    @Test fun initialFocusPrefersPlayingEvenWhenSavedIndexIsValid() {
+        // Both signals are usable; playing id wins because continuity of
+        // the currently-running stream is the stronger UX contract.
+        val items = liveChannels()
+        assertEquals(
+            0,
+            initialFocusIndex(items, savedIndex = 2, currentlyPlayingId = "c1"),
+        )
+    }
+
     // ---- helpers ----
 
     private fun sampleItems(): List<ContentItem> = listOf(
@@ -165,6 +351,22 @@ class BrowseShellLogicTest {
         sourceId = "src",
         type = ContentType.MOVIE,
         title = title,
+        streamUrl = "http://x/$id",
+        sortOrder = 0,
+        createdAt = 0L,
+    )
+
+    private fun liveChannels(): List<ContentItem> = listOf(
+        liveChannel("c1"),
+        liveChannel("c2"),
+        liveChannel("c3"),
+    )
+
+    private fun liveChannel(id: String) = ContentItem(
+        id = id,
+        sourceId = "src",
+        type = ContentType.LIVE,
+        title = "Channel $id",
         streamUrl = "http://x/$id",
         sortOrder = 0,
         createdAt = 0L,

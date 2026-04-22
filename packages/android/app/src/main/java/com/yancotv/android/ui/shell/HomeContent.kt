@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -19,8 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -44,12 +43,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
-import com.yancotv.android.ui.components.focusStyle
+import com.yancotv.android.ui.components.HexSurface
+import com.yancotv.android.ui.components.WheelRow
+import com.yancotv.android.ui.components.wheelItemTransform
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
@@ -167,6 +169,13 @@ private fun Rail(
     resumeByContent: Map<String, HistoryEntry>,
     onPlay: (ContentItem) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+
+    // Scroll is driven solely by focus → WheelRow's CenterBringIntoViewSpec
+    // centre-snaps the focused card automatically. Do NOT add an
+    // animateScrollToItem keyed on a local focused-index state — it races
+    // with bringIntoView and stacks two scroll animations.
+
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
         Column(modifier = Modifier.padding(horizontal = Space.section)) {
             Text(
@@ -190,16 +199,20 @@ private fun Rail(
                 )
             }
         }
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = Space.section, vertical = Space.sm),
+        WheelRow(
+            itemWidth = ShellDim.posterTile,
+            listState = listState,
             horizontalArrangement = Arrangement.spacedBy(Space.lg),
+            verticalPadding = Space.lg,
+            minSidePadding = Space.section,
         ) {
-            items(items, key = { it.id }) { item ->
+            itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
                 PosterTile(
                     item = item,
                     locked = item.id in lockedIds,
                     resume = resumeByContent[item.id],
                     onClick = { onPlay(item) },
+                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
                 )
             }
         }
@@ -212,6 +225,7 @@ private fun PosterTile(
     locked: Boolean,
     resume: HistoryEntry?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -220,78 +234,79 @@ private fun PosterTile(
         if (dur <= 0) 0f else (entry.positionSeconds / dur).toFloat().coerceIn(0f, 1f)
     } ?: 0f
 
-    Column(
-        modifier = Modifier
+    HexSurface(
+        shape = YancoShapes.CutCornerCardSmall,
+        focused = focused,
+        bevelInset = 3.dp,
+        modifier = modifier
             .width(ShellDim.posterTile)
-            .focusStyle(focused = focused, radius = Radius.card)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(ShellDim.posterTileAspect)
-                .background(YancoPalette.BackgroundDeep),
-        ) {
-            Artwork(item = item, focused = focused)
-            // Cinematic scrim so overlay chips + title read regardless of
-            // the underlying artwork. Kept short so it doesn't darken too
-            // much of the image.
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Transparent,
-                                YancoPalette.BackgroundDeep.copy(alpha = 0.75f),
+                    .fillMaxWidth()
+                    .aspectRatio(ShellDim.posterTileAspect),
+            ) {
+                Artwork(item = item, focused = focused)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    YancoPalette.BackgroundDeep.copy(alpha = 0.9f),
+                                ),
                             ),
                         ),
-                    ),
-            )
-            if (locked) {
-                LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
-            }
-            if (resume != null) {
-                ResumeBadge(
-                    resume = resume,
+                )
+                if (locked) {
+                    LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
+                }
+                if (resume != null) {
+                    ResumeBadge(
+                        resume = resume,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Space.sm),
+                    )
+                }
+                TypeChip(
+                    item = item,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.BottomStart)
                         .padding(Space.sm),
                 )
+                if (progressPct > 0f) {
+                    ProgressStripe(
+                        progress = progressPct,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
             }
-            TypeChip(
-                item = item,
+            Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(Space.sm),
-            )
-            if (progressPct > 0f) {
-                ProgressStripe(
-                    progress = progressPct,
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                    .fillMaxWidth()
+                    .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                    .padding(horizontal = Space.md, vertical = Space.sm),
+                verticalArrangement = Arrangement.spacedBy(Space.xxs),
+            ) {
+                Text(
+                    text = item.cleanTitle?.ifBlank { null } ?: item.title,
+                    color = YancoPalette.TextPrimary,
+                    style = YancoType.TitleS,
+                    maxLines = 1,
+                )
+                Text(
+                    text = secondaryLine(item, resume),
+                    color = YancoPalette.TextMuted,
+                    style = YancoType.Caption,
+                    maxLines = 1,
                 )
             }
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Space.md, vertical = Space.sm),
-            verticalArrangement = Arrangement.spacedBy(Space.xxs),
-        ) {
-            Text(
-                text = item.cleanTitle?.ifBlank { null } ?: item.title,
-                color = YancoPalette.TextPrimary,
-                style = YancoType.TitleS,
-                maxLines = 1,
-            )
-            Text(
-                text = secondaryLine(item, resume),
-                color = YancoPalette.TextMuted,
-                style = YancoType.Caption,
-                maxLines = 1,
-            )
         }
     }
 }
@@ -388,9 +403,9 @@ private fun TypeChip(item: ContentItem, modifier: Modifier = Modifier) {
     val label = raw.take(28)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(Radius.chip))
-            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.6f))
-            .padding(horizontal = Space.sm, vertical = 2.dp),
+            .clip(YancoShapes.ChipBevel)
+            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
+            .padding(horizontal = Space.md, vertical = 3.dp),
     ) {
         Text(
             text = label,

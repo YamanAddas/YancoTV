@@ -46,6 +46,7 @@ import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -254,7 +255,16 @@ private fun HeroCopy(
         // fill. Favorite is secondary, tonal only.
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
             PrimaryCta(
-                label = if (isCurrentlyPlaying) "Open fullscreen" else "Play now",
+                // LIVE channels auto-preview on focus — the button never
+                // needs to say "Play now" because the stream is already
+                // running (or about to, inside the 400ms debounce window).
+                // For movies/series no auto-preview fires; the OK press
+                // opens the detail overlay, which owns the real Play CTA.
+                label = when {
+                    focused.type == ContentType.LIVE -> "Open fullscreen"
+                    isCurrentlyPlaying -> "Open fullscreen"
+                    else -> "Play now"
+                },
                 icon = YancoIcons.Play,
                 onClick = onPlay,
             )
@@ -335,14 +345,10 @@ private fun MetaChipRow(chips: List<String>) {
 private fun HeroMetaChip(label: String) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
-            .border(
-                1.dp,
-                YancoPalette.BorderSubtle,
-                RoundedCornerShape(Radius.pill),
-            )
-            .padding(horizontal = Space.md, vertical = Space.xxs),
+            .clip(YancoShapes.ChipBevel)
+            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.65f))
+            .border(1.dp, YancoPalette.PanelBorder, YancoShapes.ChipBevel)
+            .padding(horizontal = Space.md, vertical = Space.xs),
     ) {
         Text(
             text = label,
@@ -393,21 +399,24 @@ private fun HeroProgress(start: Long, end: Long, now: Long) {
 private fun PrimaryCta(label: String, icon: ImageVector, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val shape = YancoShapes.ButtonBevel
     val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
     val fg = YancoPalette.BackgroundDeep
+    // Bevelled hex button — accent-filled primary CTA. A hairline focus rim
+    // rides the bevel so the shape reads as an angular playbill.
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(shape)
             .background(bg)
             .border(
-                if (focused) 2.dp else 0.dp,
-                if (focused) YancoPalette.FocusRing else Color.Transparent,
-                RoundedCornerShape(Radius.pill),
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) YancoPalette.FocusRing else YancoPalette.AccentDeep,
+                shape = shape,
             )
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .semantics { contentDescription = label }
-            .padding(horizontal = Space.xxl, vertical = Space.md),
+            .padding(horizontal = Space.xxxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -429,15 +438,16 @@ private fun TonalCta(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val shape = YancoShapes.ButtonBevel
     val bg = when {
-        focused -> YancoPalette.BackgroundHover
+        focused -> YancoPalette.Accent.copy(alpha = 0.22f)
         highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
-        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.55f)
+        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
     }
     val border = when {
         focused -> YancoPalette.FocusRing
-        highlighted -> YancoPalette.Accent.copy(alpha = 0.45f)
-        else -> YancoPalette.BorderSubtle
+        highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
+        else -> YancoPalette.PanelBorder
     }
     val fg = when {
         highlighted -> YancoPalette.Accent
@@ -445,13 +455,13 @@ private fun TonalCta(
     }
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(shape)
             .background(bg)
-            .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(Radius.pill))
+            .border(if (focused) 2.dp else 1.dp, border, shape)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .semantics { contentDescription = label }
-            .padding(horizontal = Space.xxl, vertical = Space.md),
+            .padding(horizontal = Space.xxxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -468,9 +478,9 @@ private fun TonalCta(
 private fun HeroLivePill() {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(YancoShapes.ChipBevel)
             .background(YancoPalette.Live)
-            .padding(horizontal = Space.sm, vertical = 3.dp),
+            .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -488,10 +498,10 @@ private fun HeroLivePill() {
 private fun HeroLockChip() {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(YancoShapes.ChipBevel)
             .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
-            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), RoundedCornerShape(Radius.pill))
-            .padding(horizontal = Space.sm, vertical = 3.dp),
+            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
+            .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {

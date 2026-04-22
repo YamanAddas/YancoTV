@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
@@ -57,6 +58,15 @@ import org.koin.compose.koinInject
 private const val PAGE_SIZE = 100L
 private const val PREFETCH_THRESHOLD = 20
 private const val EPG_TICK_MS = 60_000L
+
+/**
+ * Debounce before the rail's focused LIVE card commits to actually
+ * starting its stream in the hero MiniPlayer. Short enough that a
+ * user who *settles* on a channel sees the preview come up almost
+ * immediately, long enough that arrow-key scrolling past 6 channels
+ * doesn't churn 6 ExoPlayer prepare() calls in a row.
+ */
+internal const val AUTO_PREVIEW_DEBOUNCE_MS = 400L
 
 /** Synthetic chip id for the default "All" filter. */
 const val ALL_GROUPS = "__all__"
@@ -101,6 +111,54 @@ internal fun applyParentalFilters(
     if (hiddenIds.isNotEmpty()) result = result.filterNot { it.id in hiddenIds }
     if (hideAdult) result = result.filterNot(com.yancotv.shared.parental.AdultContentFilter::isAdult)
     return result
+}
+
+/**
+ * Decide whether the focused LIVE card should auto-start its preview
+ * stream. Returns the index into [visible] that the rail should commit
+ * to, or null to skip (type isn't LIVE, nothing focused, card is
+ * parental-locked, stream is already playing, or the focused id is no
+ * longer in the visible list).
+ *
+ * Pure by design so the auto-preview's pre- and post-debounce checks
+ * can share a single decision site and unit tests can exhaustively
+ * cover the skip branches.
+ */
+internal fun resolveAutoPreviewIndex(
+    type: ContentType,
+    focusedId: String?,
+    visible: List<ContentItem>,
+    lockedIds: Set<String>,
+    currentlyPlayingId: String?,
+): Int? {
+    if (type != ContentType.LIVE) return null
+    if (focusedId == null) return null
+    if (focusedId in lockedIds) return null
+    if (currentlyPlayingId == focusedId) return null
+    val idx = visible.indexOfFirst { it.id == focusedId }
+    return if (idx >= 0) idx else null
+}
+
+/**
+ * Pick the initial focus index when a catalogue finishes loading.
+ * Prefers the currently-playing item (so returning to LiveTv while a
+ * channel is running in the MiniPlayer lands focus on that channel
+ * rather than zapping to items[0] and starting a fresh stream),
+ * otherwise falls back to the saved index (clamped to [0, size-1]).
+ * Returns -1 for an empty list — the caller should treat that as
+ * "no focus yet" and leave focusedItem null.
+ */
+internal fun initialFocusIndex(
+    items: List<ContentItem>,
+    savedIndex: Int,
+    currentlyPlayingId: String?,
+): Int {
+    if (items.isEmpty()) return -1
+    if (currentlyPlayingId != null) {
+        val playingIdx = items.indexOfFirst { it.id == currentlyPlayingId }
+        if (playingIdx >= 0) return playingIdx
+    }
+    return savedIndex.coerceIn(0, items.size - 1)
 }
 
 /**
@@ -214,9 +272,19 @@ fun BrowseShell(
     LaunchedEffect(items.size) {
         if (items.isEmpty()) {
             focusedItem = null
-        } else if (focusedItem == null || focusedItem !in items) {
-            val idx = focusedIndex.coerceIn(0, items.size - 1)
-            focusedItem = items[idx]
+            return@LaunchedEffect
+        }
+        if (focusedItem == null || focusedItem !in items) {
+            // Prefer the currently-playing channel on initial landing
+            // (returning to LiveTv while a stream runs in the MiniPlayer
+            // must not zap focus to items[0] and restart playback on a
+            // different channel). Falls back to the saved index so
+            // section-to-section navigation restores the last position.
+            val idx = initialFocusIndex(items.toList(), focusedIndex, controller.currentId)
+            if (idx >= 0) {
+                focusedIndex = idx
+                focusedItem = items[idx]
+            }
         }
     }
 
@@ -300,6 +368,75 @@ fun BrowseShell(
     }
 
     val playing by controller.currentItem.collectAsState()
+
+    // Auto-preview on focus for LIVE channels. Moving the rail focus to a
+    // channel card implicitly starts its stream in the hero MiniPlayer —
+    // pressing OK goes straight to fullscreen (see HomeScreen.onBrowseActivate
+    // LIVE branch). The AUTO_PREVIEW_DEBOUNCE_MS delay prevents scroll-past
+    // channels from churning N prepare() calls in a row; only the channel
+    // the user actually settles on commits to a stream. Locked channels are
+    // skipped — the PIN gate fires through onActivate instead, so a locked
+    // row never opens a stream silently in the background. Movies/series
+    // don't auto-preview (they're files, not broadcasts — scrubbing past
+    // would be disruptive).
+    //
+    // The resolver runs twice: once as an early cheap bail-out to avoid
+    // scheduling delay() work for ineligible cards, and again post-delay so
+    // state that drifted during the 400ms window (user tapped OK mid-delay,
+    // parental lock landed, filter changed) cleanly aborts the preview.
+    LaunchedEffect(focusedItem?.id) {
+        resolveAutoPreviewIndex(
+            type = type,
+            focusedId = focusedItem?.id,
+            visible = visible,
+            lockedIds = lockedIds,
+            currentlyPlayingId = controller.currentId,
+        ) ?: return@LaunchedEffect
+        delay(AUTO_PREVIEW_DEBOUNCE_MS)
+        val snapshot = visible.toList()
+        val idx = resolveAutoPreviewIndex(
+            type = type,
+            focusedId = focusedItem?.id,
+            visible = snapshot,
+            lockedIds = lockedIds,
+            currentlyPlayingId = controller.currentId,
+        ) ?: return@LaunchedEffect
+        controller.play(snapshot, idx)
+    }
+
+    // Post-fullscreen focus restoration. When PlayerActivity claims window
+    // focus and then releases it, Compose's MutableInteractionSource nodes go
+    // stale: the focused card still reports isFocused=true internally but no
+    // new Focus event is emitted, so the visual rim stays dark and the card's
+    // LaunchedEffect(focused){onFocus()} never re-fires to sync focusedItem.
+    //
+    // The previous fix in HomeScreen called mainContentFocus.requestFocus()
+    // on a Box that has .focusGroup() — which sets canFocus=false. A
+    // requestFocus() on a canFocus=false node does NOT propagate down through
+    // focusRestorer into a real focusable leaf; it silently no-ops. The user
+    // still had to press a key to light up any card.
+    //
+    // Fix: call firstItemFocus.requestFocus() directly — it is attached to
+    // an actual .focusable() card at focusedIndex, so Compose emits a real
+    // Focus event to its MutableInteractionSource. Retry with backoff because
+    // the WheelRow recomposes immediately on window regain (controller state
+    // + EPG tick), temporarily detaching firstItemFocus from any node.
+    val windowInfo = LocalWindowInfo.current
+    LaunchedEffect(Unit) {
+        var seenUnfocused = false
+        snapshotFlow { windowInfo.isWindowFocused }.collect { windowFocused ->
+            if (!windowFocused) {
+                seenUnfocused = true
+            } else if (seenUnfocused) {
+                seenUnfocused = false
+                for (delayMs in longArrayOf(80L, 250L, 500L)) {
+                    delay(delayMs)
+                    val ok = runCatching { firstItemFocus.requestFocus() }.isSuccess
+                    if (ok) break
+                }
+            }
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Top: categories. Thin and airy — dominating filter UI is the

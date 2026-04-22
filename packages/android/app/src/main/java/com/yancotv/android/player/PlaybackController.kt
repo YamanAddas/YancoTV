@@ -10,6 +10,8 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.playback.Playable
+import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.CoroutineScope
@@ -104,13 +106,86 @@ class PlaybackController(
     /** Stable id of whatever is loaded in the player right now, for fast identity checks. */
     val currentId: String? get() = _currentItem.value?.id
 
-    /** Plays [list]`[startIndex]` and stores the list for [next]/[previous] zap. */
+    /**
+     * Plays [list]`[startIndex]` and stores the list for [next]/[previous] zap.
+     *
+     * Contract:
+     *   - Target is validated via [ContentItem.toPlayable]: series containers
+     *     and blank stream URLs are rejected at the type level, callers that
+     *     pass one get a silent no-op instead of a dead player.
+     *   - If the requested item is already the current one, the queue/index
+     *     are updated in place but the underlying ExoPlayer is NOT re-prepared.
+     *     This makes second-tap-to-fullscreen free of rebuffers and protects
+     *     the mini-to-fullscreen handoff from racing with a fresh setMediaItem.
+     *   - Switching to a different item first persists the outgoing resume
+     *     point so VOD mid-seeks aren't lost when the user zaps between titles
+     *     without hitting a lifecycle hook.
+     */
     fun play(list: List<ContentItem>, startIndex: Int) {
         if (startIndex !in list.indices) return
+        val target = list[startIndex]
+        // Sealed-type gate — rejects Series containers and blank URLs.
+        target.toPlayable() ?: return
+        // Same-id: update the navigation queue for next/prev zap but don't
+        // touch the player — second OK on the current item must be a no-op.
+        if (_currentItem.value?.id == target.id) {
+            _queue.value = list
+            _index.value = startIndex
+            return
+        }
+        // Different item: capture the outgoing offset before the queue swap.
+        if (_currentItem.value != null) persistResumePoint()
         _queue.value = list
         _index.value = startIndex
         loadCurrent()
     }
+
+    /**
+     * Play a series episode directly. Bypasses the [ContentItem] queue
+     * (episode picks come from the detail overlay, not from a browsable
+     * rail), so next/prev zap is disabled for the life of this play.
+     *
+     * Constructs a minimal single-item queue of a synthesized "episode-as-
+     * MOVIE" [ContentItem] so the existing _currentItem/_queue StateFlows
+     * that UI consumers observe continue to report sane values (id =
+     * [Playable.Episode.id], type = MOVIE so `isLive` checks return false).
+     */
+    fun play(episode: Playable.Episode) {
+        if (episode.streamUrl.isBlank()) return
+        val view = episode.toContentItemView()
+        if (_currentItem.value?.id == view.id) {
+            _queue.value = listOf(view)
+            _index.value = 0
+            return
+        }
+        if (_currentItem.value != null) persistResumePoint()
+        _queue.value = listOf(view)
+        _index.value = 0
+        loadCurrent()
+    }
+
+    /**
+     * Synthesize a [ContentItem] "view" of a [Playable.Episode] so UI
+     * consumers that read [currentItem] (e.g. MiniPlayer, hero chrome,
+     * PlayerActivity's title bar) keep working without knowing about the
+     * Playable hierarchy. The synthesized item is typed MOVIE — it's a
+     * VOD file, resume-point logic behaves correctly, and
+     * `type == ContentType.LIVE` checks around the app correctly read false.
+     */
+    private fun Playable.Episode.toContentItemView(): ContentItem = ContentItem(
+        id = id,
+        sourceId = sourceId,
+        type = ContentType.MOVIE,
+        title = title,
+        cleanTitle = title,
+        groupName = null,
+        streamUrl = streamUrl,
+        logoUrl = artworkUrl,
+        tvgId = null,
+        metadataJson = null,
+        sortOrder = 0,
+        createdAt = 0L,
+    )
 
     fun next(): Boolean = step(+1)
     fun previous(): Boolean = step(-1)

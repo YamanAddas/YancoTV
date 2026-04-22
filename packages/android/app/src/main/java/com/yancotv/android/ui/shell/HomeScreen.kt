@@ -40,6 +40,7 @@ import com.yancotv.shared.types.EpisodeInfo
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
+import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgGuideChannel
@@ -91,6 +92,11 @@ fun HomeScreen(
         autoplayAttempted = true
         val item = entry?.content ?: return@LaunchedEffect
         if (item.id in parental.lockedIds.value) return@LaunchedEffect
+        // Series containers have no playable stream_url — only episodes do.
+        // Never auto-warm a series row; the user has to open detail and
+        // pick an episode.
+        if (item.type == ContentType.SERIES) return@LaunchedEffect
+        if (item.streamUrl.isBlank()) return@LaunchedEffect
         controller.play(listOf(item), 0)
     }
 
@@ -138,15 +144,16 @@ fun HomeScreen(
         gatedPlay(target.id) {
             when (target.type) {
                 ContentType.LIVE -> {
-                    // Two-tap activation: first OK plays in preview, second
-                    // OK on the same channel opens fullscreen without a
-                    // rebuffer. Phone skips the preview since it has no
-                    // dedicated preview surface.
+                    // Single-tap to fullscreen. The rail already auto-previews
+                    // the focused channel in the hero MiniPlayer (see
+                    // BrowseShell), so the first OK press no longer has to
+                    // start the stream — it just escalates the running
+                    // preview to fullscreen. If the user hits OK faster than
+                    // the 400ms auto-preview debounce, start the stream here
+                    // so fullscreen doesn't open on a stale channel.
                     val alreadyPlaying = controller.currentId == target.id
                     if (!alreadyPlaying) controller.play(list, idx)
-                    if (!isTv || alreadyPlaying) {
-                        PlayerLauncher.launch(context)
-                    }
+                    PlayerLauncher.launch(context)
                 }
                 ContentType.MOVIE, ContentType.SERIES -> {
                     detailItem = target
@@ -262,20 +269,28 @@ fun HomeScreen(
             ContentDetailScreen(
                 item = item,
                 onPlayContent = { target ->
-                    controller.play(listOf(target), 0)
+                    // Series containers have no playable stream — they reach
+                    // this branch only as a last-ditch fallback (detail's
+                    // HeroBlock routes to onPlayEpisode when episodes exist).
+                    // Blank-URL short-circuit: just dismiss, no dead player.
+                    if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
+                        controller.play(listOf(target), 0)
+                        PlayerLauncher.launch(context)
+                    }
                     detailItem = null
-                    PlayerLauncher.launch(context)
                 },
                 onPlayEpisode = { target, ep ->
-                    val episodeItem = target.copy(
-                        id = "${target.id}:ep:${ep.id}",
-                        streamUrl = ep.streamUrl,
-                        title = "${target.title} — ${ep.title}",
-                        cleanTitle = ep.title,
-                    )
-                    controller.play(listOf(episodeItem), 0)
+                    // Type-safe episode play via the Playable sealed type.
+                    // toPlayable() returns null for blank stream URLs, and
+                    // PlaybackController.play(Playable.Episode) uses the
+                    // real episode id as the content_id in watch_history —
+                    // no more synthetic "${seriesId}:ep:${episodeId}" rows.
+                    val playable = ep.toPlayable(target)
+                    if (playable != null) {
+                        controller.play(playable)
+                        PlayerLauncher.launch(context)
+                    }
                     detailItem = null
-                    PlayerLauncher.launch(context)
                 },
                 onDismiss = { detailItem = null },
             )

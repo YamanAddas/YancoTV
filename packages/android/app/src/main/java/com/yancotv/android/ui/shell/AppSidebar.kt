@@ -3,6 +3,7 @@ package com.yancotv.android.ui.shell
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,10 +37,12 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
@@ -142,47 +145,19 @@ private fun iconFor(section: AppSection): ImageVector = when (section) {
 
 @Composable
 private fun BrandMark() {
-    Row(
+    // Shipped raster logo stretched to fill the sidebar width. Replaces the
+    // old "Y tile + YancoTV / streaming suite" text block so the brand
+    // reads as a crafted mark rather than a hand-wired monogram.
+    Image(
+        painter = painterResource(id = R.drawable.tv_banner),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Space.sm, vertical = Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.sm),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(Radius.control))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(YancoPalette.Accent, YancoPalette.AccentGlow),
-                    ),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            // Mark glyph — simple stylised "Y" stroke so the brand reads
-            // as intentional without shipping a raster.
-            Text(
-                text = "Y",
-                color = YancoPalette.BackgroundDeep,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                fontStyle = FontStyle.Italic,
-            )
-        }
-        Column {
-            Text(
-                text = "YancoTV",
-                color = YancoPalette.TextPrimary,
-                style = YancoType.TitleM,
-            )
-            Text(
-                text = "streaming suite",
-                color = YancoPalette.TextMuted,
-                style = YancoType.Caption,
-            )
-        }
-    }
+            .height(96.dp)
+            .padding(horizontal = Space.xs, vertical = Space.xs)
+            .semantics { contentDescription = "YancoTV" },
+    )
 }
 
 @Composable

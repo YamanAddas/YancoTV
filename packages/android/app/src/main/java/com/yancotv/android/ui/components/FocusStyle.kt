@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.YancoPalette
@@ -52,6 +53,32 @@ fun Modifier.focusStyle(
     // lets the backdrop bleed through so the focused card still feels
     // part of the scene.
     focusedBg: Color = YancoPalette.Accent.copy(alpha = 0.22f),
+): Modifier = this.focusStyle(
+    focused = focused,
+    shape = RoundedCornerShape(radius),
+    liftScale = liftScale,
+    raised = raised,
+    unfocusedBorder = unfocusedBorder,
+    focusedBorder = focusedBorder,
+    unfocusedBg = unfocusedBg,
+    focusedBg = focusedBg,
+)
+
+/**
+ * Shape-aware overload. Hex-frame tiles, cut-corner cards, and bevelled
+ * chips use this so the focus ring + tinted wash follow the angular
+ * silhouette instead of a silent rounded rectangle underneath.
+ */
+@Composable
+fun Modifier.focusStyle(
+    focused: Boolean,
+    shape: Shape,
+    liftScale: Float = 1.035f,
+    raised: Boolean = true,
+    unfocusedBorder: Color = YancoPalette.BorderSubtle,
+    focusedBorder: Color = YancoPalette.FocusRing,
+    unfocusedBg: Color = YancoPalette.BackgroundRaised.copy(alpha = 0.55f),
+    focusedBg: Color = YancoPalette.Accent.copy(alpha = 0.22f),
 ): Modifier {
     val scale by animateFloatAsState(
         targetValue = if (focused) liftScale else 1f,
@@ -68,7 +95,6 @@ fun Modifier.focusStyle(
         animationSpec = spring(dampingRatio = 0.9f, stiffness = 600f),
         label = "focus-bw",
     )
-    val shape = RoundedCornerShape(radius)
     return this
         .scale(scale)
         .shadow(

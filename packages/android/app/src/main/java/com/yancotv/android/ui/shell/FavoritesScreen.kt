@@ -37,8 +37,10 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.parental.AdultContentFilter
@@ -229,56 +231,59 @@ private fun FavoriteRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
     val badges = remember(item.id) { QualityBadge.parse(item.title) }
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
-    Row(
+    HexSurface(
+        shape = YancoShapes.HexCapsule,
+        focused = focused,
+        bevelInset = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .height(72.dp)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .clickable(interactionSource = interaction, indication = null, onClick = onActivate),
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(YancoPalette.BackgroundDeep),
-            contentAlignment = Alignment.Center,
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!item.logoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = item.logoUrl,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().padding(2.dp),
-                )
-            }
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth(0.7f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(text = displayTitle, color = YancoPalette.TextPrimary, maxLines = 1)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(YancoShapes.HexCapsule)
+                    .background(YancoPalette.BackgroundDeep),
+                contentAlignment = Alignment.Center,
             ) {
-                item.groupName?.let {
-                    Text(text = it, color = YancoPalette.TextMuted, maxLines = 1)
+                if (!item.logoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = item.logoUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().padding(6.dp),
+                    )
                 }
-                QualityChips(badges = badges)
             }
+            Column(
+                modifier = Modifier.fillMaxWidth(0.7f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(text = displayTitle, color = YancoPalette.TextPrimary, maxLines = 1)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item.groupName?.let {
+                        Text(text = it, color = YancoPalette.TextMuted, maxLines = 1)
+                    }
+                    QualityChips(badges = badges)
+                }
+            }
+            UnstarButton(onClick = onRemove)
         }
-        UnstarButton(onClick = onRemove)
     }
 }
 
