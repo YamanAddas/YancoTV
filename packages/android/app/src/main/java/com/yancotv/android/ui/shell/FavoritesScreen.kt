@@ -41,6 +41,7 @@ import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.parental.AdultContentFilter
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -76,11 +77,15 @@ fun FavoritesScreen(
 
     // Parental filters: hidden_ids drop out of favourites entirely (a hide
     // should feel consistent everywhere), lockedIds flag the row + gate the
-    // play handler.
+    // play handler. The adult filter layers on top when the user has
+    // opted into "Hide adult-tagged content" in Settings → Parental.
     val lockedIds by parental.lockedIds.collectAsState()
     val hiddenIds by parental.hiddenIds.collectAsState()
-    val items = remember(allItems, hiddenIds) {
-        if (hiddenIds.isEmpty()) allItems else allItems.filterNot { it.id in hiddenIds }
+    val parentalSettings by parental.settings.collectAsState()
+    val items = remember(allItems, hiddenIds, parentalSettings.hideAdultContent) {
+        allItems
+            .let { if (hiddenIds.isEmpty()) it else it.filterNot { row -> row.id in hiddenIds } }
+            .let { if (!parentalSettings.hideAdultContent) it else it.filterNot(AdultContentFilter::isAdult) }
     }
     var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
     val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->

@@ -45,6 +45,7 @@ import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.parental.AdultContentFilter
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -99,6 +100,7 @@ fun ContentPanel(
     // row) updates the list in the same recomposition.
     val lockedIds by parental.lockedIds.collectAsState()
     val hiddenIds by parental.hiddenIds.collectAsState()
+    val parentalSettings by parental.settings.collectAsState()
     var actionsFor by remember { mutableStateOf<ContentItem?>(null) }
 
     // Favorites filter uses a different data source — the `favorites` table
@@ -194,8 +196,12 @@ fun ContentPanel(
         // Filter out hidden channels at render time. SQL-side filtering
         // would save a touch of memory but costs a schema-level JOIN on
         // every content query; with realistic hide-list sizes (<100) the
-        // cost of filtering in Kotlin is negligible.
-        val visible = if (hiddenIds.isEmpty()) items else items.filter { it.id !in hiddenIds }
+        // cost of filtering in Kotlin is negligible. The adult filter
+        // layers on top — best-effort keyword match, opt-in via the
+        // Settings → Parental toggle.
+        val visible = items
+            .let { if (hiddenIds.isEmpty()) it else it.filter { row -> row.id !in hiddenIds } }
+            .let { if (!parentalSettings.hideAdultContent) it else it.filterNot(AdultContentFilter::isAdult) }
         items(visible, key = { it.id }) { item ->
             ContentRow(
                 item = item,

@@ -88,11 +88,18 @@ fun SearchScreen(
     var searching by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Parental gate — filter hidden IDs out of results, gate play on locked.
+    // Parental gate — filter hidden IDs out of results, gate play on locked,
+    // and apply the adult-content filter when enabled in Settings.
     val lockedIds by parental.lockedIds.collectAsState()
     val hiddenIds by parental.hiddenIds.collectAsState()
-    val visible = remember(results.toList(), hiddenIds) {
-        if (hiddenIds.isEmpty()) results.toList() else results.filter { it.id !in hiddenIds }
+    val parentalSettings by parental.settings.collectAsState()
+    val visible = remember(results.toList(), hiddenIds, parentalSettings.hideAdultContent) {
+        results.toList()
+            .let { if (hiddenIds.isEmpty()) it else it.filter { row -> row.id !in hiddenIds } }
+            .let {
+                if (!parentalSettings.hideAdultContent) it
+                else it.filterNot(com.yancotv.shared.parental.AdultContentFilter::isAdult)
+            }
     }
     var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
     val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->

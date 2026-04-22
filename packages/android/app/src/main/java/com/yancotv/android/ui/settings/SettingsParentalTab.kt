@@ -37,9 +37,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.parental.ParentalRepository
+import com.yancotv.shared.types.ContentItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
 
 /**
  * Parental controls tab — set/change/remove PIN and toggle the two
@@ -59,15 +68,30 @@ import org.koin.compose.koinInject
 fun SettingsParentalTab(
     modifier: Modifier = Modifier,
     repo: ParentalRepository = koinInject(),
+    contentRepo: ContentRepository = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val settings = repo.settings.collectAsState().value
+    val hiddenIds = repo.hiddenIds.collectAsState().value
 
     var newPin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var showGate by remember { mutableStateOf<GateAction?>(null) }
     var awaitingNewPin by remember { mutableStateOf(false) }
+
+    // Hidden-channels roster, hydrated lazily from the content table via
+    // findById. Missing rows (content deleted mid-session) drop silently
+    // rather than rendering a ghost entry.
+    val hiddenItems = remember { mutableStateListOf<ContentItem>() }
+    LaunchedEffect(hiddenIds) {
+        val resolved = withContext(Dispatchers.IO) {
+            hiddenIds.mapNotNull { id -> runCatching { contentRepo.findById(id) }.getOrNull() }
+                .sortedBy { it.cleanTitle?.ifBlank { null } ?: it.title }
+        }
+        hiddenItems.clear()
+        hiddenItems.addAll(resolved)
+    }
 
     Column(
         modifier = modifier
@@ -185,6 +209,60 @@ fun SettingsParentalTab(
             checked = settings.requirePinForSettings,
             onCheckedChange = { repo.setRequirePinForSettings(it) },
         )
+
+        // Hidden-channels manager. Hide is one-way from list screens —
+        // without this panel there's no way to unhide except reinstalling.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Hidden channels",
+                    color = YancoPalette.TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (hiddenIds.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = {
+                            // Bulk unhide — snapshot first so the flow-driven
+                            // remove doesn't ConcurrentModification the set.
+                            hiddenIds.toList().forEach(repo::unhideChannel)
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.TextPrimary),
+                    ) {
+                        Text("Unhide all", fontSize = 12.sp)
+                    }
+                }
+            }
+            Text(
+                text = if (hiddenIds.isEmpty())
+                    "No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it."
+                else
+                    "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back.",
+                color = YancoPalette.TextMuted,
+                fontSize = 12.sp,
+            )
+            if (hiddenItems.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(hiddenItems, key = { it.id }) { item ->
+                        HiddenRow(
+                            item = item,
+                            onUnhide = { repo.unhideChannel(item.id) },
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // PIN gate dialog — wraps an action (Change / Remove) that needs the
@@ -289,5 +367,36 @@ private fun ToggleRow(
                 uncheckedTrackColor = YancoPalette.BackgroundHover,
             ),
         )
+    }
+}
+
+@Composable
+private fun HiddenRow(item: ContentItem, onUnhide: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(YancoPalette.BackgroundDeep)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.cleanTitle?.ifBlank { null } ?: item.title,
+                color = YancoPalette.TextPrimary,
+                fontSize = 13.sp,
+                maxLines = 1,
+            )
+            item.groupName?.takeIf { it.isNotBlank() }?.let {
+                Text(text = it, color = YancoPalette.TextMuted, fontSize = 11.sp, maxLines = 1)
+            }
+        }
+        OutlinedButton(
+            onClick = onUnhide,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.Accent),
+        ) {
+            Text("Unhide", fontSize = 11.sp)
+        }
     }
 }

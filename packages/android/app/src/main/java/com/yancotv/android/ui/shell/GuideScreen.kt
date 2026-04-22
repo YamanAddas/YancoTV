@@ -50,13 +50,17 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.reminders.ReminderScheduler
+import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.catchup.CatchupService
+import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
+import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
 import com.yancotv.shared.types.EpgProgramme
+import androidx.compose.foundation.combinedClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -110,6 +114,8 @@ fun GuideScreen(
     epg: EpgRepository = koinInject(),
     scheduler: ReminderScheduler = koinInject(),
     catchup: CatchupService = koinInject(),
+    contentRepo: ContentRepository = koinInject(),
+    parental: ParentalRepository = koinInject(),
 ) {
     // Channel list is grown via pagination — initial 100, then more as the
     // user scrolls. Holds bounded memory even for 250k-channel catalogs.
@@ -203,6 +209,58 @@ fun GuideScreen(
     )
     val guideEmpty = guide == null
 
+    // MK.8.7.c — channel long-press action menu. Resolve the Guide's
+    // EpgGuideChannel (which only carries tvg_id) into a real ContentItem
+    // via ContentRepository.findLiveByTvgId so the menu can key its
+    // lock/hide actions off the content row's id. Declared here (before
+    // the Column so the GuideGrid callsite can reference it) instead of
+    // after — Kotlin's lexical scoping requires the lambda to be in
+    // scope when passed down.
+    var actionsFor by remember { mutableStateOf<ContentItem?>(null) }
+    val onChannelLongPress: (EpgGuideChannel) -> Unit = { channel ->
+        val tvg = channel.tvgId
+        if (tvg.isNotBlank()) {
+            // Set a placeholder immediately; the LaunchedEffect below
+            // upgrades it to the real DB-resolved ContentItem.
+            actionsFor = ContentItem(
+                id = "guide:${tvg}",
+                sourceId = "",
+                type = com.yancotv.shared.types.ContentType.LIVE,
+                title = channel.name,
+                cleanTitle = channel.name,
+                groupName = null,
+                streamUrl = channel.streamUrl ?: "",
+                logoUrl = channel.logoUrl,
+                tvgId = tvg,
+                metadataJson = null,
+                sortOrder = 0,
+                createdAt = 0L,
+            )
+        }
+    }
+
+    // Upgrade the placeholder to the real ContentItem (with a valid db id)
+    // so lock/hide writes reach the right row.
+    LaunchedEffect(actionsFor?.tvgId) {
+        val snapshot = actionsFor ?: return@LaunchedEffect
+        if (snapshot.id.startsWith("guide:")) {
+            val real = withContext(Dispatchers.IO) {
+                snapshot.tvgId?.let { contentRepo.findLiveByTvgId(it) }
+            }
+            if (real != null) actionsFor = real
+        }
+    }
+
+    actionsFor?.let { item ->
+        if (!item.id.startsWith("guide:")) {
+            ChannelActionsMenu(
+                item = item,
+                repo = parental,
+                onDismiss = { actionsFor = null },
+            )
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         if (guideEmpty) {
             if (loading) {
@@ -232,6 +290,7 @@ fun GuideScreen(
                 onProgrammeAction = { channel, programme ->
                     actionTarget = ProgrammeAction(channel, programme)
                 },
+                onChannelLongPress = onChannelLongPress,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -295,6 +354,7 @@ private fun GuideGrid(
     loadingMore: Boolean,
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,
     onProgrammeAction: (EpgGuideChannel, EpgProgramme) -> Unit,
+    onChannelLongPress: (EpgGuideChannel) -> Unit,
     modifier: Modifier,
 ) {
     val hScroll = rememberScrollState()
@@ -345,6 +405,7 @@ private fun GuideGrid(
                         timelineWidth = timelineWidth,
                         hScroll = hScroll,
                         onPlayChannel = { onPlay(channel, null) },
+                        onLongPressChannel = { onChannelLongPress(channel) },
                         onProgrammeAction = { prog -> onProgrammeAction(channel, prog) },
                     )
                 }
@@ -429,6 +490,7 @@ private fun ChannelRow(
     timelineWidth: androidx.compose.ui.unit.Dp,
     hScroll: androidx.compose.foundation.ScrollState,
     onPlayChannel: () -> Unit,
+    onLongPressChannel: () -> Unit,
     onProgrammeAction: (EpgProgramme) -> Unit,
 ) {
     Row(
@@ -442,6 +504,7 @@ private fun ChannelRow(
         ChannelCell(
             channel = channel,
             onClick = onPlayChannel,
+            onLongPress = onLongPressChannel,
         )
 
         // Programme lane. We manually position each programme with a leading
@@ -474,8 +537,9 @@ private fun ChannelRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit) {
+private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPress: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
@@ -488,7 +552,12 @@ private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit) {
             .background(bg)
             .border(0.5.dp, border)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongPress,
+            )
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
