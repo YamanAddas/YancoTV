@@ -188,7 +188,7 @@ fun GuideScreen(
         // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
         // we drop the duplicates so LazyColumn keys stay unique.
         val existing = channels.mapTo(HashSet(channels.size)) { it.tvgId }
-        val newOnly = nextPage.channels.filter { it.tvgId !in existing }
+        val newOnly = nextPage.channels.distinctBy { it.tvgId }.filter { it.tvgId !in existing }
         val appended = channels + newOnly
         channels = appended
         allLoaded = nextPage.channels.isEmpty() || appended.size >= totalChannels.toInt()

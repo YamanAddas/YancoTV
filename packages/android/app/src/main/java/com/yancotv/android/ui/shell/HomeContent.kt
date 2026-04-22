@@ -246,8 +246,9 @@ fun HomeContent(
                 lockedIds = lockedIds,
                 resumeByContent = resumeByContent.value,
                 onPlay = { item ->
-                    val idx = continueWatching.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(continueWatching.toList(), idx)
+                    val snapshot = continueWatching.toList()
+                    val idx = snapshot.indexOfFirst { it.id == item.id }
+                    if (idx >= 0) onPlay(snapshot, idx)
                 },
             )
         }
@@ -256,8 +257,9 @@ fun HomeContent(
                 items = onNowItems,
                 lockedIds = lockedIds,
                 onPlay = { item ->
-                    val idx = onNowItems.indexOfFirst { it.channel.id == item.id }
-                    val list = onNowItems.map { it.channel }
+                    val snapshot = onNowItems.toList()
+                    val list = snapshot.map { it.channel }
+                    val idx = list.indexOfFirst { it.id == item.id }
                     if (idx >= 0) onPlay(list, idx)
                 },
             )
@@ -281,8 +283,9 @@ fun HomeContent(
                 items = upNextItems,
                 lockedIds = lockedIds,
                 onPlay = { item ->
-                    val idx = upNextItems.indexOfFirst { it.channel.id == item.id }
-                    val list = upNextItems.map { it.channel }
+                    val snapshot = upNextItems.toList()
+                    val list = snapshot.map { it.channel }
+                    val idx = list.indexOfFirst { it.id == item.id }
                     if (idx >= 0) onPlay(list, idx)
                 },
             )
@@ -296,8 +299,9 @@ fun HomeContent(
                 lockedIds = lockedIds,
                 resumeByContent = resumeByContent.value,
                 onPlay = { item ->
-                    val idx = recentlyAdded.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(recentlyAdded.toList(), idx)
+                    val snapshot = recentlyAdded.toList()
+                    val idx = snapshot.indexOfFirst { it.id == item.id }
+                    if (idx >= 0) onPlay(snapshot, idx)
                 },
             )
         }
