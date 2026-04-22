@@ -1,6 +1,12 @@
 package com.yancotv.android.ui.shell
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,13 +33,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
@@ -150,29 +167,123 @@ fun HomeScreen(
             parentalSettings.requirePinForSettings &&
             !settingsUnlocked
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Progressive panel reveal — TiviMate-style. Only Live/Movies/Series
+    // sections participate; everything else (Home, Guide, Favorites,
+    // Search, Settings) forces all panels visible so their navigation
+    // stays intuitive.
+    //
+    // State:
+    //   revealLevel = 0 → content full-width, groups + sidebar hidden
+    //   revealLevel = 1 → groups visible, sidebar hidden
+    //   revealLevel = 2 → all three panels visible
+    //
+    // currentZone tracks which panel has focus, updated by each panel's
+    // [Modifier.onFocusChanged]. We need this to decide whether LEFT
+    // should expand the next panel (from content → groups, groups →
+    // sidebar) or is a no-op (already at sidebar).
+    val progressiveSection = contentType != null
+    var revealLevel by rememberSaveable(progressiveSection) {
+        mutableStateOf(if (progressiveSection) 0 else 2)
+    }
+    var currentZone by remember { mutableStateOf(ShellZone.CONTENT) }
+    val focusManager = LocalFocusManager.current
+    val revealScope = rememberCoroutineScope()
+
+    // LEFT handler runs BEFORE any panel sees the key (onPreviewKeyEvent
+    // on the outer Box). When the revealed panel first becomes visible
+    // via AnimatedVisibility we have to wait for composition + layout to
+    // settle before moveFocus(Left) can walk into it — otherwise focus
+    // falls off the edge and stays put. A short delay + focusRestorer()
+    // on each panel is what makes "LEFT lands on the selected row" work.
+    val onShellLeft: () -> Boolean = left@{
+        if (!progressiveSection) return@left false
+        when (currentZone) {
+            ShellZone.CONTENT -> {
+                if (revealLevel < 1) {
+                    revealLevel = 1
+                    revealScope.launch {
+                        // Two frames is enough for AnimatedVisibility to
+                        // compose its children; moveFocus then walks the
+                        // focus graph which now includes the groups panel.
+                        delay(60)
+                        focusManager.moveFocus(FocusDirection.Left)
+                    }
+                } else {
+                    focusManager.moveFocus(FocusDirection.Left)
+                }
+                true
+            }
+            ShellZone.GROUPS -> {
+                if (revealLevel < 2) {
+                    revealLevel = 2
+                    revealScope.launch {
+                        delay(60)
+                        focusManager.moveFocus(FocusDirection.Left)
+                    }
+                } else {
+                    focusManager.moveFocus(FocusDirection.Left)
+                }
+                true
+            }
+            ShellZone.SIDEBAR -> false // already leftmost — let default handling apply
+        }
+    }
+
+    // BACK collapses the outer-most revealed panel one step at a time,
+    // then falls back to default (which will exit the app). Mirrors the
+    // pairing users expect: "LEFT opens, BACK closes".
+    BackHandler(enabled = progressiveSection && revealLevel > 0) {
+        revealLevel = (revealLevel - 1).coerceAtLeast(0)
+        revealScope.launch {
+            delay(60)
+            focusManager.moveFocus(FocusDirection.Right)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (event.key == Key.DirectionLeft) onShellLeft() else false
+            },
+    ) {
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(YancoPalette.BackgroundDeep),
     ) {
-        // Always-show TiviMate-style 3-panel layout. Focus traversal is
-        // pure Compose focus manager — LEFT/RIGHT walk between panels,
-        // UP/DOWN walk within a panel. [Modifier.focusGroup] on each
-        // panel + [Modifier.focusRestorer] inside give us "remember the
-        // last focused row" semantics for free. No animation, no state
-        // machine, no requestFocus juggling — that was what broke the
-        // selector on the previous iteration.
-        AppSidebar(
-            current = section,
-            onSelect = { section = it },
-        )
+        // Sidebar slides in when revealLevel >= 2. For non-progressive
+        // sections (contentType == null) revealLevel is pinned to 2 so
+        // the sidebar is always visible. [onFocusChanged] keeps the
+        // shell state aware of which panel has focus so LEFT knows when
+        // to expand the next panel vs just move focus.
+        AnimatedVisibility(
+            visible = revealLevel >= 2,
+            enter = slideInHorizontally(animationSpec = tween(200)) { -it } + fadeIn(tween(200)),
+            exit = slideOutHorizontally(animationSpec = tween(160)) { -it } + fadeOut(tween(160)),
+        ) {
+            AppSidebar(
+                current = section,
+                onSelect = { section = it },
+                modifier = Modifier.onFocusChanged {
+                    if (it.hasFocus) currentZone = ShellZone.SIDEBAR
+                },
+            )
+        }
 
         if (contentType != null) {
             ContentArea(
                 isTv = isTv,
                 type = contentType,
                 repo = repo,
+                revealLevel = revealLevel,
+                onGroupsFocusChanged = { hasFocus ->
+                    if (hasFocus) currentZone = ShellZone.GROUPS
+                },
+                onContentFocusChanged = { hasFocus ->
+                    if (hasFocus) currentZone = ShellZone.CONTENT
+                },
                 onActivate = { list, idx ->
                     val target = list.getOrNull(idx) ?: return@ContentArea
                     gatedPlay(target.id) {
@@ -389,12 +500,17 @@ private fun guideChannelToContentItem(channel: EpgGuideChannel): ContentItem? {
     )
 }
 
+enum class ShellZone { SIDEBAR, GROUPS, CONTENT }
+
 @UnstableApi
 @Composable
 private fun RowScope.ContentArea(
     isTv: Boolean,
     type: ContentType,
     repo: ContentRepository,
+    revealLevel: Int,
+    onGroupsFocusChanged: (Boolean) -> Unit,
+    onContentFocusChanged: (Boolean) -> Unit,
     onActivate: (List<ContentItem>, Int) -> Unit,
     prefs: AppPreferences = koinInject(),
 ) {
@@ -424,13 +540,28 @@ private fun RowScope.ContentArea(
     var focused by remember(type) { mutableStateOf<ContentItem?>(null) }
     val groupFilter = group.takeIf { it != ALL_GROUPS }
 
-    CategoryFilterPanel(
-        groups = visibleGroups,
-        selected = group,
-        onSelect = { group = it },
-        smartGrouping = prefs.generalFlow.collectAsState().value.smartGrouping,
-    )
-    Column(modifier = Modifier.weight(1f)) {
+    // Groups slide in when revealLevel >= 1. onFocusChanged flips the
+    // shell's zone state so the outer LEFT handler knows we're now
+    // "inside" the groups panel and the next LEFT should reveal the
+    // sidebar, not no-op at the leftmost content row.
+    AnimatedVisibility(
+        visible = revealLevel >= 1,
+        enter = slideInHorizontally(animationSpec = tween(200)) { -it } + fadeIn(tween(200)),
+        exit = slideOutHorizontally(animationSpec = tween(160)) { -it } + fadeOut(tween(160)),
+    ) {
+        CategoryFilterPanel(
+            groups = visibleGroups,
+            selected = group,
+            onSelect = { group = it },
+            smartGrouping = prefs.generalFlow.collectAsState().value.smartGrouping,
+            modifier = Modifier.onFocusChanged { if (it.hasFocus) onGroupsFocusChanged(true) },
+        )
+    }
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .onFocusChanged { if (it.hasFocus) onContentFocusChanged(true) },
+    ) {
         SectionHeader(type = type, total = totalCount)
         Box(modifier = Modifier.fillMaxSize()) {
             ContentPanel(
@@ -441,10 +572,14 @@ private fun RowScope.ContentArea(
             )
         }
     }
-    // Info rail only on TV where there's room. Stays always visible so
-    // the user always sees what they're focused on — shrunk to 260dp
-    // from the original 320dp so it never crowds the channel list.
-    if (isTv && focused != null) {
+    // Info rail: slides out once the user pushes LEFT into groups so the
+    // channel list gets the recovered width. Slides back in when focus
+    // returns to content. Only on TV — phones don't have the space.
+    AnimatedVisibility(
+        visible = isTv && revealLevel == 0 && focused != null,
+        enter = slideInHorizontally(animationSpec = tween(180)) { it } + fadeIn(tween(180)),
+        exit = slideOutHorizontally(animationSpec = tween(140)) { it } + fadeOut(tween(140)),
+    ) {
         InfoPanel(item = focused)
     }
 }
