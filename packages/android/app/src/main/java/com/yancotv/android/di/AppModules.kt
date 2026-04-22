@@ -7,6 +7,9 @@ import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.AndroidEpgImporter
 import com.yancotv.shared.epg.BulkEpgWriter
+import com.yancotv.shared.parental.AndroidPinHasher
+import com.yancotv.shared.parental.ParentalRepository
+import com.yancotv.shared.parental.PinHasher
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
@@ -91,6 +94,14 @@ val appModule = module {
     single { ReminderScheduler(androidContext(), get()) }
     single { FavoritesRepository(db = get(), clock = { System.currentTimeMillis() }) }
     single { WatchHistoryRepository(db = get(), clock = { System.currentTimeMillis() }) }
+    single<PinHasher> { AndroidPinHasher() }
+    single {
+        ParentalRepository(
+            db = get(),
+            hasher = get(),
+            clock = { System.currentTimeMillis() },
+        )
+    }
     single {
         CatchupService(
             contentRepo = get(),

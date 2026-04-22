@@ -32,9 +32,11 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.nav.AppSection
+import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgGuideChannel
@@ -56,6 +58,7 @@ fun HomeScreen(
     isTv: Boolean,
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
+    parental: ParentalRepository = koinInject(),
 ) {
     var section by rememberSaveable { mutableStateOf(AppSection.LiveTv) }
     val contentType = section.contentType
@@ -67,6 +70,17 @@ fun HomeScreen(
     // "press a hotkey, overlay appears, press Back, overlay disappears"
     // surface. Scoped on searchOverlayVisible so it's a no-op otherwise.
     BackHandler(enabled = searchOverlayVisible) { SearchOverlayState.hide() }
+
+    // MK.8.7 PIN gate — a locked channel's play attempt is deferred into
+    // `pendingPlay` while the PinEntryDialog sits on top. On success we
+    // invoke the captured action (usually controller.play + launch).
+    // Observing the lockedIds flow keeps the check live without a per-
+    // press DB read.
+    val lockedIds by parental.lockedIds.collectAsState()
+    var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->
+        if (id in lockedIds) pendingPlay = action else action()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Row(
@@ -83,16 +97,18 @@ fun HomeScreen(
                 repo = repo,
                 onActivate = { list, idx ->
                     val target = list.getOrNull(idx) ?: return@ContentArea
-                    // Two-tap activation on TV (TiviMate-style): first press
-                    // starts the stream in the mini preview, second press on
-                    // the same channel fullscreens with zero rebuffer. Phone
-                    // skips the mini because the shell doesn't dedicate
-                    // screen real-estate to InfoPanel — tap goes straight to
-                    // the player.
-                    val alreadyPlaying = controller.currentId == target.id
-                    if (!alreadyPlaying) controller.play(list, idx)
-                    if (!isTv || alreadyPlaying) {
-                        PlayerLauncher.launch(context)
+                    gatedPlay(target.id) {
+                        // Two-tap activation on TV (TiviMate-style): first
+                        // press starts the stream in the mini preview,
+                        // second press on the same channel fullscreens with
+                        // zero rebuffer. Phone skips the mini because the
+                        // shell doesn't dedicate screen real-estate to
+                        // InfoPanel — tap goes straight to the player.
+                        val alreadyPlaying = controller.currentId == target.id
+                        if (!alreadyPlaying) controller.play(list, idx)
+                        if (!isTv || alreadyPlaying) {
+                            PlayerLauncher.launch(context)
+                        }
                     }
                 },
             )
@@ -105,12 +121,21 @@ fun HomeScreen(
                 GuideScreen(
                     onPlay = { channel, _ ->
                         val item = guideChannelToContentItem(channel) ?: return@GuideScreen
-                        controller.play(listOf(item), 0)
-                        PlayerLauncher.launch(context)
+                        gatedPlay(item.id) {
+                            controller.play(listOf(item), 0)
+                            PlayerLauncher.launch(context)
+                        }
                     },
                     onPlayCatchup = { item ->
-                        controller.play(listOf(item), 0)
-                        PlayerLauncher.launch(context)
+                        // Catchup id is `catchup:<contentId>:<start>` — gate
+                        // against the underlying content id, not the catchup
+                        // pseudo-id, so lock status on the live channel
+                        // covers its replays too.
+                        val underlying = item.id.removePrefix("catchup:").substringBefore(':')
+                        gatedPlay(underlying) {
+                            controller.play(listOf(item), 0)
+                            PlayerLauncher.launch(context)
+                        }
                     },
                 )
             }
@@ -158,6 +183,23 @@ fun HomeScreen(
                     SearchScreen(isTv = isTv)
                 }
             }
+        }
+
+        // Parental PIN gate (MK.8.7). Rides above the shell so the dialog
+        // dims the sidebar + whatever content was under it. Dismissing via
+        // the Cancel button or the implicit tap-outside clears the pending
+        // play without running it — user opted out.
+        pendingPlay?.let { action ->
+            PinEntryDialog(
+                title = "Channel locked",
+                body = "Enter your PIN to watch this channel.",
+                repo = parental,
+                onSuccess = {
+                    action()
+                    pendingPlay = null
+                },
+                onDismiss = { pendingPlay = null },
+            )
         }
     }
 }
