@@ -39,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -189,6 +191,34 @@ fun HomeScreen(
     val focusManager = LocalFocusManager.current
     val revealScope = rememberCoroutineScope()
 
+    // Initial focus on the main content area. Without this, a user
+    // landing on any section (app launch, or switching via the sidebar)
+    // has to press a random d-pad key to "wake up" Compose's focus
+    // manager before navigation does anything — the classic TV-Compose
+    // cold-start symptom. The requester is attached to whichever outer
+    // container the active section renders; re-requesting on every
+    // [section] change covers cross-section transitions too.
+    val mainContentFocus = remember { FocusRequester() }
+    LaunchedEffect(section) {
+        // ~120 ms is enough for the destination screen's first
+        // composition + layout to produce focusable children; without
+        // it the request can hit a not-yet-composed tree and silently
+        // no-op.
+        delay(120)
+        runCatching { mainContentFocus.requestFocus() }
+    }
+
+    // Moves focus in a direction, retrying briefly if Compose's first
+    // attempt can't find a target (e.g. the revealed panel is still
+    // composing its children). Far more reliable than a single
+    // delay-then-move, which was losing focus hand-offs on slower TVs.
+    suspend fun moveFocusWithRetry(direction: FocusDirection) {
+        repeat(6) {
+            delay(40)
+            if (focusManager.moveFocus(direction)) return
+        }
+    }
+
     // LEFT handler runs BEFORE any panel sees the key (onPreviewKeyEvent
     // on the outer Box). When the revealed panel first becomes visible
     // via AnimatedVisibility we have to wait for composition + layout to
@@ -199,30 +229,13 @@ fun HomeScreen(
         if (!progressiveSection) return@left false
         when (currentZone) {
             ShellZone.CONTENT -> {
-                if (revealLevel < 1) {
-                    revealLevel = 1
-                    revealScope.launch {
-                        // Two frames is enough for AnimatedVisibility to
-                        // compose its children; moveFocus then walks the
-                        // focus graph which now includes the groups panel.
-                        delay(60)
-                        focusManager.moveFocus(FocusDirection.Left)
-                    }
-                } else {
-                    focusManager.moveFocus(FocusDirection.Left)
-                }
+                if (revealLevel < 1) revealLevel = 1
+                revealScope.launch { moveFocusWithRetry(FocusDirection.Left) }
                 true
             }
             ShellZone.GROUPS -> {
-                if (revealLevel < 2) {
-                    revealLevel = 2
-                    revealScope.launch {
-                        delay(60)
-                        focusManager.moveFocus(FocusDirection.Left)
-                    }
-                } else {
-                    focusManager.moveFocus(FocusDirection.Left)
-                }
+                if (revealLevel < 2) revealLevel = 2
+                revealScope.launch { moveFocusWithRetry(FocusDirection.Left) }
                 true
             }
             ShellZone.SIDEBAR -> false // already leftmost — let default handling apply
@@ -234,10 +247,7 @@ fun HomeScreen(
     // pairing users expect: "LEFT opens, BACK closes".
     BackHandler(enabled = progressiveSection && revealLevel > 0) {
         revealLevel = (revealLevel - 1).coerceAtLeast(0)
-        revealScope.launch {
-            delay(60)
-            focusManager.moveFocus(FocusDirection.Right)
-        }
+        revealScope.launch { moveFocusWithRetry(FocusDirection.Right) }
     }
 
     Box(
@@ -278,6 +288,7 @@ fun HomeScreen(
                 type = contentType,
                 repo = repo,
                 revealLevel = revealLevel,
+                contentFocus = mainContentFocus,
                 onGroupsFocusChanged = { hasFocus ->
                     if (hasFocus) currentZone = ShellZone.GROUPS
                 },
@@ -313,7 +324,7 @@ fun HomeScreen(
                 },
             )
         } else if (section == AppSection.Settings) {
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                 if (needsSettingsGate) {
                     SettingsLockedPlaceholder()
                 } else {
@@ -321,7 +332,7 @@ fun HomeScreen(
                 }
             }
         } else if (section == AppSection.Guide) {
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                 GuideScreen(
                     onPlay = { channel, _ ->
                         val item = guideChannelToContentItem(channel) ?: return@GuideScreen
@@ -344,15 +355,15 @@ fun HomeScreen(
                 )
             }
         } else if (section == AppSection.Favorites) {
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                 FavoritesScreen(isTv = isTv)
             }
         } else if (section == AppSection.Search) {
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                 SearchScreen(isTv = isTv)
             }
         } else if (section == AppSection.Home) {
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                 HomeContent(
                     onPlay = { list, idx ->
                         val target = list.getOrNull(idx) ?: return@HomeContent
@@ -509,6 +520,7 @@ private fun RowScope.ContentArea(
     type: ContentType,
     repo: ContentRepository,
     revealLevel: Int,
+    contentFocus: FocusRequester,
     onGroupsFocusChanged: (Boolean) -> Unit,
     onContentFocusChanged: (Boolean) -> Unit,
     onActivate: (List<ContentItem>, Int) -> Unit,
@@ -560,6 +572,7 @@ private fun RowScope.ContentArea(
     Column(
         modifier = Modifier
             .weight(1f)
+            .focusRequester(contentFocus)
             .onFocusChanged { if (it.hasFocus) onContentFocusChanged(true) },
     ) {
         SectionHeader(type = type, total = totalCount)
