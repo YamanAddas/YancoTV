@@ -22,5 +22,9 @@ insert:
 INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
+upsert:
+INSERT OR REPLACE INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
 deleteByContent:
 DELETE FROM episodes WHERE content_id = ?;

@@ -98,11 +98,46 @@ class ContentDetailService(
             )
         }.onFailure { logger.warn("ContentDetailService.updateMetadataAndLogo: ${it.message}") }
 
+        // Persist series episodes into the `episodes` table so the
+        // `watch_history.episode_id` FK is satisfied when the user
+        // resumes mid-episode. Without this, PlaybackController's
+        // episode resume-point write would FK-violate against
+        // `episodes(id)`. Idempotent via INSERT OR REPLACE.
+        if (item.type == ContentType.SERIES) {
+            persistEpisodes(item.id, enriched.episodes.orEmpty())
+        }
+
         val refreshedItem = item.copy(
             logoUrl = newLogoUrl,
             metadataJson = encodeMetadata(enriched),
         )
         return Loaded(refreshedItem, enriched, enriched.episodes.orEmpty())
+    }
+
+    /**
+     * Idempotent batch upsert of a series's episodes into the `episodes`
+     * table. Each row is wrapped individually so a malformed entry doesn't
+     * block the rest. Failures are logged, never thrown — episode
+     * persistence is best-effort and a missing row only costs the user a
+     * resume point on that one episode.
+     */
+    private fun persistEpisodes(seriesId: String, episodes: List<EpisodeInfo>) {
+        if (episodes.isEmpty()) return
+        episodes.forEach { ep ->
+            runCatching {
+                db.episodesQueries.upsert(
+                    id = ep.id,
+                    content_id = seriesId,
+                    season_number = ep.seasonNumber.toLong(),
+                    episode_number = ep.episodeNumber.toLong(),
+                    title = ep.title,
+                    stream_url = ep.streamUrl,
+                    duration = null,
+                )
+            }.onFailure {
+                logger.warn("ContentDetailService.persistEpisodes(${ep.id}): ${it.message}")
+            }
+        }
     }
 
     private suspend fun loadMovieDetail(

@@ -63,6 +63,7 @@ import org.koin.compose.koinInject
 @Composable
 fun FavoritesScreen(
     isTv: Boolean,
+    onOpenDetail: (ContentItem) -> Unit,
     modifier: Modifier = Modifier,
     favorites: FavoritesRepository = koinInject(),
     controller: PlaybackController = koinInject(),
@@ -174,11 +175,13 @@ fun FavoritesScreen(
                 FavoriteRow(
                     item = row,
                     onActivate = {
-                        gatedPlay(row.id) {
-                            val alreadyPlaying = controller.currentId == row.id
-                            if (!alreadyPlaying) controller.play(series, series.indexOf(row))
-                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
-                        }
+                        // Series containers are not Playable — calling
+                        // controller.play would silently no-op (toPlayable
+                        // returns null) but PlayerLauncher.launch would
+                        // still open an empty fullscreen surface. Route
+                        // through the host's detail overlay instead, same
+                        // as HomeScreen.onBrowseActivate's SERIES branch.
+                        gatedPlay(row.id) { onOpenDetail(row) }
                     },
                     onRemove = { removeFavorite(row, scope, favorites) },
                 )

@@ -98,6 +98,11 @@ class PlaybackController(
     private val _queue = MutableStateFlow<List<ContentItem>>(emptyList())
     private val _index = MutableStateFlow(-1)
     private val _currentItem = MutableStateFlow<ContentItem?>(null)
+    // Tracks the originating Playable.Episode for an episode play so
+    // persistResumePoint can write watch_history with the *series* id as
+    // content_id (FK target) and the episode id in the nullable episode_id
+    // column. Cleared on every non-episode load and on stop/release.
+    private var _currentEpisode: Playable.Episode? = null
 
     val queue: StateFlow<List<ContentItem>> = _queue.asStateFlow()
     val index: StateFlow<Int> = _index.asStateFlow()
@@ -135,6 +140,7 @@ class PlaybackController(
         }
         // Different item: capture the outgoing offset before the queue swap.
         if (_currentItem.value != null) persistResumePoint()
+        _currentEpisode = null
         _queue.value = list
         _index.value = startIndex
         loadCurrent()
@@ -149,16 +155,24 @@ class PlaybackController(
      * MOVIE" [ContentItem] so the existing _currentItem/_queue StateFlows
      * that UI consumers observe continue to report sane values (id =
      * [Playable.Episode.id], type = MOVIE so `isLive` checks return false).
+     *
+     * Also stashes the [Playable.Episode] in [_currentEpisode] so
+     * [persistResumePoint] can write the *series* id as the FK-clean
+     * content_id and the episode id as the nullable episode_id. The
+     * synthesized view's `id` is the episode id and would FK-violate
+     * if used as content_id (episodes live in their own table).
      */
     fun play(episode: Playable.Episode) {
         if (episode.streamUrl.isBlank()) return
         val view = episode.toContentItemView()
         if (_currentItem.value?.id == view.id) {
+            _currentEpisode = episode
             _queue.value = listOf(view)
             _index.value = 0
             return
         }
         if (_currentItem.value != null) persistResumePoint()
+        _currentEpisode = episode
         _queue.value = listOf(view)
         _index.value = 0
         loadCurrent()
@@ -192,6 +206,7 @@ class PlaybackController(
 
     fun stop() {
         persistResumePoint()
+        _currentEpisode = null
         _queue.value = emptyList()
         _index.value = -1
         _currentItem.value = null
@@ -201,6 +216,7 @@ class PlaybackController(
 
     fun release() {
         persistResumePoint()
+        _currentEpisode = null
         player.release()
         scope.cancel()
     }
@@ -271,12 +287,28 @@ class PlaybackController(
         // title and immediately bailed they probably don't want a resume card.
         if (pos < 5L) return
         val repo = history ?: return
+        // Episode sessions: write the *series* id into content_id (the FK
+        // target — series rows live in `content`, episode rows do not) and
+        // the episode id into the nullable episode_id column. Movies fall
+        // through to the simple item.id path. Snapshot the episode on the
+        // main thread before launching IO; the field can be cleared by the
+        // next loadCurrent() before the coroutine runs.
+        val episode = _currentEpisode
         scope.launch(Dispatchers.IO) {
-            repo.upsert(
-                contentId = item.id,
-                positionSeconds = pos,
-                durationSeconds = dur,
-            )
+            if (episode != null) {
+                repo.upsert(
+                    contentId = episode.seriesId,
+                    episodeId = episode.id,
+                    positionSeconds = pos,
+                    durationSeconds = dur,
+                )
+            } else {
+                repo.upsert(
+                    contentId = item.id,
+                    positionSeconds = pos,
+                    durationSeconds = dur,
+                )
+            }
         }
     }
 

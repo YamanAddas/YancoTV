@@ -273,7 +273,10 @@ fun HomeScreen(
                 }
             } else if (section == AppSection.Favorites) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
-                    FavoritesScreen(isTv = isTv)
+                    FavoritesScreen(
+                        isTv = isTv,
+                        onOpenDetail = { item -> detailItem = item },
+                    )
                 }
             } else if (section == AppSection.Search) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
@@ -350,10 +353,12 @@ fun HomeScreen(
                 },
                 onPlayEpisode = { target, ep ->
                     // Type-safe episode play via the Playable sealed type.
-                    // toPlayable() returns null for blank stream URLs, and
-                    // PlaybackController.play(Playable.Episode) uses the
-                    // real episode id as the content_id in watch_history —
-                    // no more synthetic "${seriesId}:ep:${episodeId}" rows.
+                    // toPlayable() returns null for blank stream URLs.
+                    // PlaybackController.play(Playable.Episode) writes
+                    // watch_history with content_id = seriesId (the FK
+                    // target — series rows live in `content`, episodes
+                    // don't) and episode_id = ep.id, so each episode gets
+                    // its own resume key without violating the FK.
                     val playable = ep.toPlayable(target)
                     if (playable != null) {
                         controller.play(playable)

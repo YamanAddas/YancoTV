@@ -387,7 +387,13 @@ fun BrowseShell(
     // MB-97: derivedStateOf tracks only items/hiddenIds/hideAdultContent as
     // snapshot dependencies, so EPG ticks, nowSeconds updates, and other
     // unrelated state changes don't re-run this O(n) filter.
-    val visible by remember {
+    //
+    // Keyed on `type` because `items` is `remember(type) { ... }` — when the
+    // user switches Live → Movies a NEW SnapshotStateList is allocated and
+    // the derivedStateOf lambda must rebind to it, otherwise it keeps
+    // observing the stale previous-type list and the rail shows old data
+    // under new category chips.
+    val visible by remember(type) {
         derivedStateOf {
             applyParentalFilters(
                 items = items,

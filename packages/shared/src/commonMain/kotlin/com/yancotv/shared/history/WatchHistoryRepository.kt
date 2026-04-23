@@ -1,9 +1,11 @@
 package com.yancotv.shared.history
 
 import com.yancotv.shared.db.YancoDb
+import com.yancotv.shared.logger.Log
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.HistoryEntry
+import kotlinx.coroutines.CancellationException
 
 /**
  * Watch-history writes and resume-point lookups. Live channels are skipped —
@@ -26,6 +28,13 @@ class WatchHistoryRepository(
      * Save a resume point. Pass [positionSeconds] = 0 (or equal to
      * [durationSeconds]) to effectively mark a title as watched; caller
      * decides whether to display a resume badge for such rows.
+     *
+     * Best-effort: any DB failure (FK violation, disk full, transient
+     * lock, schema mismatch) is logged and swallowed. Resume points are
+     * telemetry — losing one row must never crash the app. The caller
+     * gets no signal because there's no caller-actionable response.
+     * [CancellationException] is re-thrown so coroutine cancellation
+     * still propagates correctly.
      */
     fun upsert(
         contentId: String,
@@ -34,14 +43,20 @@ class WatchHistoryRepository(
         durationSeconds: Long? = null,
     ) {
         val id = if (episodeId != null) "wh:$contentId:$episodeId" else "wh:$contentId"
-        db.watchHistoryQueries.upsert(
-            id = id,
-            content_id = contentId,
-            episode_id = episodeId,
-            position_seconds = positionSeconds,
-            duration_seconds = durationSeconds,
-            watched_at = clock(),
-        )
+        try {
+            db.watchHistoryQueries.upsert(
+                id = id,
+                content_id = contentId,
+                episode_id = episodeId,
+                position_seconds = positionSeconds,
+                duration_seconds = durationSeconds,
+                watched_at = clock(),
+            )
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Log.l.w(t) { "WatchHistory.upsert failed (contentId=$contentId, episodeId=$episodeId): ${t.message}" }
+        }
     }
 
     /**
