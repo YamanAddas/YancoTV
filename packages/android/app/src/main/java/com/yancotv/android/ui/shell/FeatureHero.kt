@@ -1,9 +1,12 @@
 package com.yancotv.android.ui.shell
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,8 +30,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -142,18 +149,22 @@ private fun HeroBackdrop(
     playing: ContentItem?,
     controller: PlaybackController,
 ) {
+    // Debounce the URL so rapid D-pad traversal doesn't fire a new Coil
+    // request on every frame — wait until the user rests on a channel.
+    var debouncedUrl by remember { mutableStateOf(focused?.logoUrl) }
+    LaunchedEffect(focused?.logoUrl) {
+        delay(300L)
+        debouncedUrl = focused?.logoUrl
+    }
     when {
         playing != null -> {
             Box(Modifier.fillMaxSize()) {
                 MiniPlayer(controller = controller)
             }
         }
-        focused?.logoUrl?.isNotBlank() == true -> {
-            // AnimatedContent swaps the backdrop with a quick crossfade so
-            // rail traversal doesn't feel jarring — a hard replace at 10ft
-            // reads as flicker.
+        debouncedUrl?.isNotBlank() == true -> {
             AnimatedContent(
-                targetState = focused.logoUrl!!,
+                targetState = debouncedUrl!!,
                 transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(200)) },
                 label = "hero-backdrop",
             ) { url ->
@@ -404,7 +415,11 @@ private fun PrimaryCta(label: String, icon: ImageVector, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
-    val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
+    val bg by animateColorAsState(
+        targetValue = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "primaryCtaBg",
+    )
     val fg = YancoPalette.BackgroundDeep
     // Bevelled hex button — accent-filled primary CTA. A hairline focus rim
     // rides the bevel so the shape reads as an angular playbill.
@@ -419,7 +434,7 @@ private fun PrimaryCta(label: String, icon: ImageVector, onClick: () -> Unit) {
             )
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics { contentDescription = label }
+            .semantics(mergeDescendants = true) { contentDescription = label }
             .padding(horizontal = Space.xxxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
@@ -443,11 +458,15 @@ private fun TonalCta(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
-    val bg = when {
-        focused -> YancoPalette.Accent.copy(alpha = 0.22f)
-        highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
-        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
-    }
+    val bg by animateColorAsState(
+        targetValue = when {
+            focused -> YancoPalette.Accent.copy(alpha = 0.22f)
+            highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
+            else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
+        },
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "tonalCtaBg",
+    )
     val border = when {
         focused -> YancoPalette.FocusRing
         highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
@@ -464,7 +483,7 @@ private fun TonalCta(
             .border(if (focused) 2.dp else 1.dp, border, shape)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics { contentDescription = label }
+            .semantics(mergeDescendants = true) { contentDescription = label }
             .padding(horizontal = Space.xxxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
