@@ -140,7 +140,7 @@ private fun BrandMark() {
     // old "Y tile + YancoTV / streaming suite" text block so the brand
     // reads as a crafted mark rather than a hand-wired monogram.
     Image(
-        painter = painterResource(id = R.drawable.tv_banner),
+        painter = painterResource(id = R.drawable.ic_logo),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = Modifier
