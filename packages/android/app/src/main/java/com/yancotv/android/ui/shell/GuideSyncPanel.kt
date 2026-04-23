@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -337,7 +338,12 @@ fun GuideSyncPanel(
                     onClick = {
                         scope.launch {
                             val cleaned = globalUrlDraft.trim().ifBlank { null }
-                            withContext(Dispatchers.IO) { epg.setGlobalEpgUrl(cleaned) }
+                            val ok = withContext(Dispatchers.IO) {
+                                runCatching { epg.setGlobalEpgUrl(cleaned) }
+                                    .onFailure { Log.w("Yanco", "GuideSyncPanel.setGlobalEpgUrl failed: ${it.message}", it) }
+                                    .isSuccess
+                            }
+                            if (!ok) return@launch
                             savedGlobalUrl = cleaned
                             // Kick a refresh right after save so the user sees
                             // immediate feedback. KEEP dedups if one's already

@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.settings
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,7 +82,11 @@ fun SourcesScreen(
     }
 
     suspend fun refresh() {
-        val loaded = withContext(Dispatchers.IO) { repo.getAll() }
+        val loaded = withContext(Dispatchers.IO) {
+            runCatching { repo.getAll() }
+                .onFailure { Log.w("Yanco", "SourcesScreen.refresh failed: ${it.message}", it) }
+                .getOrElse { return@withContext null }
+        } ?: return
         sources.clear()
         sources.addAll(loaded)
     }
@@ -140,7 +145,10 @@ fun SourcesScreen(
                         onDelete = {
                             if (active?.sourceId == source.id) return@SourceRow
                             scope.launch {
-                                withContext(Dispatchers.IO) { repo.removeSource(source.id) }
+                                withContext(Dispatchers.IO) {
+                                    runCatching { repo.removeSource(source.id) }
+                                        .onFailure { Log.w("Yanco", "SourcesScreen.removeSource(${source.id}) failed: ${it.message}", it) }
+                                }
                                 refresh()
                             }
                         },
