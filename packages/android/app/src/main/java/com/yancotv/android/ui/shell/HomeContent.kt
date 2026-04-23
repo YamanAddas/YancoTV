@@ -38,7 +38,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -121,13 +123,15 @@ fun HomeContent(
             runCatching { history.recent(limit = 30) }.getOrElse { emptyList() }
         }
         resumeByContent.value = recent.associateBy { it.contentId }
-        continueWatching.clear()
-        continueWatching.addAll(
-            recent.map { it.content }
-                .filter { it.id !in hiddenIds }
-                .distinctBy { it.id }
-                .take(12),
-        )
+        val cwItems = recent.map { it.content }
+            .filter { it.id !in hiddenIds }
+            .distinctBy { it.id }
+            .take(12)
+        // MB-93: atomic so no recomposition fires between clear() and addAll().
+        Snapshot.withMutableSnapshot {
+            continueWatching.clear()
+            continueWatching.addAll(cwItems)
+        }
     }
 
     // Favorites-derived: non-live favorites for the Favorites rail,
@@ -147,9 +151,10 @@ fun HomeContent(
     // rails (on-now = programmes where start<=now<end; up-next = next
     // programme starting within 2h).
     LaunchedEffect(liveFavorites) {
-        onNowItems.clear()
-        upNextItems.clear()
-        if (liveFavorites.isEmpty()) return@LaunchedEffect
+        if (liveFavorites.isEmpty()) {
+            Snapshot.withMutableSnapshot { onNowItems.clear(); upNextItems.clear() }
+            return@LaunchedEffect
+        }
         val ids = liveFavorites.mapNotNull { it.tvgId?.takeIf { tv -> tv.isNotBlank() } }
             .distinct()
             .take(60)
@@ -170,8 +175,14 @@ fun HomeContent(
                 upNextList.add(NowPairing(channel, next))
             }
         }
-        onNowItems.addAll(nowList.take(12))
-        upNextItems.addAll(upNextList.sortedBy { it.programme.startTime }.take(12))
+        Snapshot.withMutableSnapshot {
+            onNowItems.clear()
+            onNowItems.addAll(nowList.take(12))
+        }
+        Snapshot.withMutableSnapshot {
+            upNextItems.clear()
+            upNextItems.addAll(upNextList.sortedBy { it.programme.startTime }.take(12))
+        }
     }
 
     // Recently added = VOD rows (movies + series) ordered by created_at DESC
@@ -193,20 +204,29 @@ fun HomeContent(
         }
         val biased = combined.filter { matchesPreferredLanguage(it) }
         val final = if (biased.size >= 8) biased.take(20) else combined.take(20)
-        recentlyAdded.clear()
-        recentlyAdded.addAll(final)
+        Snapshot.withMutableSnapshot {
+            recentlyAdded.clear()
+            recentlyAdded.addAll(final)
+        }
     }
 
-    // Hero slides are derived, not stored — they recompute when any
-    // source rail updates so the carousel is always fresh.
-    val heroSlides by remember {
+    // MB-74: coarse-key so buildHeroSlides only reruns when the lead CW item
+    // or top-2 On Now programme titles change — not on every EPG tick.
+    val heroSlidesKey by remember {
         derivedStateOf {
-            buildHeroSlides(
-                continueWatching = continueWatching,
-                resumeByContent = resumeByContent.value,
-                onNow = onNowItems,
+            Triple(
+                continueWatching.firstOrNull()?.id,
+                onNowItems.take(2).map { it.channel.id to it.programme.title },
+                resumeByContent.value.size,
             )
         }
+    }
+    val heroSlides = remember(heroSlidesKey) {
+        buildHeroSlides(
+            continueWatching = continueWatching.toList(),
+            resumeByContent = resumeByContent.value,
+            onNow = onNowItems.toList(),
+        )
     }
 
     val isTotallyEmpty = continueWatching.isEmpty() &&
@@ -372,16 +392,14 @@ private fun HomeHero(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
-    // Auto-rotate every 7s, but pause when the hero has focus so the
-    // user has time to read + press OK. A single focusable element —
-    // LEFT/RIGHT on the hero falls through to the surrounding focus
-    // graph (sidebar on LEFT), matching the rest of the shell.
-    LaunchedEffect(slides.size, focused) {
-        if (slides.size <= 1 || focused) return@LaunchedEffect
+    // MB-64: rememberUpdatedState so the effect doesn't restart on every
+    // focus change — only on slides.size. The loop checks focus each cycle.
+    val focusedState = rememberUpdatedState(focused)
+    LaunchedEffect(slides.size) {
+        if (slides.size <= 1) return@LaunchedEffect
         while (true) {
             delay(7000L)
-            if (focused) break
-            index = (index + 1) % slides.size
+            if (!focusedState.value) index = (index + 1) % slides.size
         }
     }
 
@@ -409,9 +427,12 @@ private fun HomeHero(
                 label = "hero-slide",
                 modifier = Modifier.fillMaxSize(),
             ) { current ->
+                // MB-64: pass interaction so HeroCta reads focused locally —
+                // only the CTA sub-tree recomposes on focus change, not the
+                // entire HeroFrame with its gradient siblings.
                 HeroFrame(
                     slide = current,
-                    focused = focused,
+                    interaction = interaction,
                     locked = locked,
                 )
             }
@@ -442,7 +463,7 @@ private fun HomeHero(
 }
 
 @Composable
-private fun HeroFrame(slide: HeroSlide, focused: Boolean, locked: Boolean) {
+private fun HeroFrame(slide: HeroSlide, interaction: MutableInteractionSource, locked: Boolean) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Backdrop — full-bleed artwork, falls back to a two-tone
         // gradient when the item has no logo so the hero still reads
@@ -538,7 +559,7 @@ private fun HeroFrame(slide: HeroSlide, focused: Boolean, locked: Boolean) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Space.md),
             ) {
-                HeroCta(focused = focused, locked = locked)
+                HeroCta(interaction = interaction, locked = locked)
                 if (!slide.item.groupName.isNullOrBlank()) {
                     Text(
                         text = slide.item.groupName!!,
@@ -552,7 +573,8 @@ private fun HeroFrame(slide: HeroSlide, focused: Boolean, locked: Boolean) {
 }
 
 @Composable
-private fun HeroCta(focused: Boolean, locked: Boolean) {
+private fun HeroCta(interaction: MutableInteractionSource, locked: Boolean) {
+    val focused by interaction.collectIsFocusedAsState()
     val label = if (locked) "Enter PIN" else "Watch now"
     val icon = if (locked) YancoIcons.Lock else YancoIcons.Play
     Row(
