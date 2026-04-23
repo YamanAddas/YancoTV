@@ -108,10 +108,9 @@ fun ContentRail(
             .fillMaxWidth()
             .focusGroup(),
     ) {
+        val safeFocusedIndex = focusedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
         itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
-            val attach = if (index == focusedIndex.coerceAtLeast(0)
-                    .coerceAtMost((items.size - 1).coerceAtLeast(0)))
-                firstItemFocus else null
+            val attach = if (index == safeFocusedIndex) firstItemFocus else null
             val wheel = Modifier.wheelItemTransform(listState = listState, index = index)
             when (type) {
                 ContentType.LIVE -> LiveCard(

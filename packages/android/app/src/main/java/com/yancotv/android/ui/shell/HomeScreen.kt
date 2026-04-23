@@ -150,7 +150,12 @@ fun HomeScreen(
     // into BrowseShell's chip bar — forward motion is sidebar → chips →
     // rail → detail → player, matching the hierarchical BACK chain below.
     val mainContentFocus = remember { FocusRequester() }
+    // MB-89: track the last section we focused so a same-section recomposition
+    // (e.g. favorites flow update) doesn't yank focus back to main content.
+    var lastFocusedSection by remember { mutableStateOf<AppSection?>(null) }
     LaunchedEffect(section) {
+        if (section == lastFocusedSection) return@LaunchedEffect
+        lastFocusedSection = section
         delay(120)
         runCatching { mainContentFocus.requestFocus() }
     }

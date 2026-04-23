@@ -237,6 +237,8 @@ fun BrowseShell(
         }
     }
     val groupFilter = resolveGroupFilter(group)
+    // MB-96: suppress empty-state until the first page finishes loading.
+    var hasLoaded by remember(type, group) { mutableStateOf(false) }
     val isFavoritesFilter = isFavoritesFilter(group)
 
     val lockedIds by parental.lockedIds.collectAsState()
@@ -255,11 +257,13 @@ fun BrowseShell(
                 items.addAll(filtered)
                 total = filtered.size.toLong()
                 loaded = filtered.size.toLong()
+                hasLoaded = true
             }
         }
     } else {
         LaunchedEffect(type, group) {
             items.clear()
+            hasLoaded = false
             total = withContext(Dispatchers.IO) { repo.count(type, groupFilter) }
             loaded = 0L
             val first = withContext(Dispatchers.IO) {
@@ -267,6 +271,7 @@ fun BrowseShell(
             }
             items.addAll(first)
             loaded += first.size
+            hasLoaded = true
         }
     }
 
@@ -588,10 +593,8 @@ fun BrowseShell(
                     if (has) onRailFocusChanged(true)
                 },
         ) {
-            if (visible.isEmpty()) {
-                BrowseEmptyState(type = type, favoritesFilter = isFavoritesFilter)
-            } else {
-                ContentRail(
+            when {
+                visible.isNotEmpty() -> ContentRail(
                     type = type,
                     items = visible,
                     nowNextMap = nowNextMap,
@@ -606,6 +609,9 @@ fun BrowseShell(
                     onActivate = { index -> onActivate(visible.toList(), index) },
                     onLongPress = { actionsFor = it },
                 )
+                // MB-96: only show the true empty state after the first page
+                // has loaded — suppresses the false "no videos" flash on entry.
+                hasLoaded -> BrowseEmptyState(type = type, favoritesFilter = isFavoritesFilter)
             }
         }
     }
