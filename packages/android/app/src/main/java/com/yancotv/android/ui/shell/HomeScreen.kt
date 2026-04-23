@@ -258,14 +258,18 @@ fun HomeScreen(
                         onPlay = { channel, _ ->
                             val item = guideChannelToContentItem(channel) ?: return@GuideScreen
                             gatedPlay(item.id) {
-                                controller.play(listOf(item), 0)
+                                if (controller.currentId != item.id) {
+                                    controller.play(listOf(item), 0)
+                                }
                                 PlayerLauncher.launch(context)
                             }
                         },
                         onPlayCatchup = { item ->
                             val underlying = item.id.removePrefix("catchup:").substringBefore(':')
                             gatedPlay(underlying) {
-                                controller.play(listOf(item), 0)
+                                if (controller.currentId != item.id) {
+                                    controller.play(listOf(item), 0)
+                                }
                                 PlayerLauncher.launch(context)
                             }
                         },
@@ -347,7 +351,9 @@ fun HomeScreen(
                     // HeroBlock routes to onPlayEpisode when episodes exist).
                     // Blank-URL short-circuit: stay on detail, no dead player.
                     if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
-                        controller.play(listOf(target), 0)
+                        if (controller.currentId != target.id) {
+                            controller.play(listOf(target), 0)
+                        }
                         PlayerLauncher.launch(context)
                     }
                 },
@@ -361,7 +367,9 @@ fun HomeScreen(
                     // its own resume key without violating the FK.
                     val playable = ep.toPlayable(target)
                     if (playable != null) {
-                        controller.play(playable)
+                        if (controller.currentId != ep.id) {
+                            controller.play(playable)
+                        }
                         PlayerLauncher.launch(context)
                     }
                 },

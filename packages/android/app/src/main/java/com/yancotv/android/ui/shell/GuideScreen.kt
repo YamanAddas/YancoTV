@@ -54,6 +54,7 @@ import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
+import android.util.Log
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
@@ -144,14 +145,20 @@ fun GuideScreen(
         val loaded = withContext(Dispatchers.IO) {
             val total = runCatching {
                 epg.countGuideChannels(startTime = windowStart, endTime = windowEnd)
-            }.getOrElse { 0L }
-            val page = epg.getGuideData(
-                startTime = windowStart,
-                endTime = windowEnd,
-                sourceId = null,
-                limit = GUIDE_PAGE_SIZE,
-                offset = 0L,
-            )
+            }
+                .onFailure { Log.w("Yanco", "GuideScreen.countGuideChannels failed: ${it.message}", it) }
+                .getOrElse { 0L }
+            val page = runCatching {
+                epg.getGuideData(
+                    startTime = windowStart,
+                    endTime = windowEnd,
+                    sourceId = null,
+                    limit = GUIDE_PAGE_SIZE,
+                    offset = 0L,
+                )
+            }
+                .onFailure { Log.w("Yanco", "GuideScreen.getGuideData(initial) failed: ${it.message}", it) }
+                .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStart, endTime = windowEnd) }
             total to page
         }
         totalChannels = loaded.first
@@ -176,13 +183,17 @@ fun GuideScreen(
         if (lastVisibleIndex < channels.size - PREFETCH_THRESHOLD) return@LaunchedEffect
         loadingMore = true
         val nextPage = withContext(Dispatchers.IO) {
-            epg.getGuideData(
-                startTime = windowStartState,
-                endTime = windowEndState,
-                sourceId = null,
-                limit = GUIDE_PAGE_SIZE,
-                offset = channels.size.toLong(),
-            )
+            runCatching {
+                epg.getGuideData(
+                    startTime = windowStartState,
+                    endTime = windowEndState,
+                    sourceId = null,
+                    limit = GUIDE_PAGE_SIZE,
+                    offset = channels.size.toLong(),
+                )
+            }
+                .onFailure { Log.w("Yanco", "GuideScreen.getGuideData(more) failed: ${it.message}", it) }
+                .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStartState, endTime = windowEndState) }
         }
         // Same defensive dedup: if a page overlaps with what's already loaded
         // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
@@ -245,7 +256,9 @@ fun GuideScreen(
         val snapshot = actionsFor ?: return@LaunchedEffect
         if (snapshot.id.startsWith("guide:")) {
             val real = withContext(Dispatchers.IO) {
-                snapshot.tvgId?.let { contentRepo.findLiveByTvgId(it) }
+                runCatching { snapshot.tvgId?.let { contentRepo.findLiveByTvgId(it) } }
+                    .onFailure { Log.w("Yanco", "GuideScreen.findLiveByTvgId(${snapshot.tvgId}) failed: ${it.message}", it) }
+                    .getOrNull()
             }
             if (real != null) actionsFor = real
         }
@@ -308,7 +321,11 @@ fun GuideScreen(
                 catchupItem = null
                 return@LaunchedEffect
             }
-            val resolved = withContext(Dispatchers.IO) { catchup.resolve(programme) }
+            val resolved = withContext(Dispatchers.IO) {
+                runCatching { catchup.resolve(programme) }
+                    .onFailure { Log.w("Yanco", "GuideScreen.catchup.resolve(${programme.id}) failed: ${it.message}", it) }
+                    .getOrNull()
+            }
             catchupItem = (resolved as? CatchupService.Resolution.Playable)?.item
         }
 

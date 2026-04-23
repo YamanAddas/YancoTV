@@ -42,6 +42,7 @@ import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
+import android.util.Log
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
@@ -224,7 +225,11 @@ fun BrowseShell(
 
     // Group load — drives the chip bar.
     LaunchedEffect(type) {
-        val loadedGroups = withContext(Dispatchers.IO) { repo.groups(type) }
+        val loadedGroups = withContext(Dispatchers.IO) {
+            runCatching { repo.groups(type) }
+                .onFailure { Log.w("Yanco", "BrowseShell.groups($type) failed: ${it.message}", it) }
+                .getOrElse { emptyList() }
+        }
         groupsState.clear()
         groupsState.addAll(loadedGroups)
     }
@@ -285,10 +290,16 @@ fun BrowseShell(
         LaunchedEffect(type, group) {
             items.clear()
             hasLoaded = false
-            total = withContext(Dispatchers.IO) { repo.count(type, groupFilter) }
+            total = withContext(Dispatchers.IO) {
+                runCatching { repo.count(type, groupFilter) }
+                    .onFailure { Log.w("Yanco", "BrowseShell.count($type) failed: ${it.message}", it) }
+                    .getOrElse { 0L }
+            }
             loaded = 0L
             val first = withContext(Dispatchers.IO) {
-                repo.page(type, groupFilter, 0L, PAGE_SIZE)
+                runCatching { repo.page(type, groupFilter, 0L, PAGE_SIZE) }
+                    .onFailure { Log.w("Yanco", "BrowseShell.page($type, first) failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
             }
             items.addAll(first)
             loaded += first.size
@@ -351,7 +362,11 @@ fun BrowseShell(
                 .collect { tvgIds ->
                     if (tvgIds.isEmpty()) return@collect
                     val ids = tvgIds.take(60) // cap the batch — no reason to fetch >60 at once
-                    nowNextMap = withContext(Dispatchers.IO) { epg.getNowNextBatch(ids) }
+                    nowNextMap = withContext(Dispatchers.IO) {
+                        runCatching { epg.getNowNextBatch(ids) }
+                            .onFailure { Log.w("Yanco", "BrowseShell.getNowNextBatch failed: ${it.message}", it) }
+                            .getOrElse { nowNextMap }
+                    }
                 }
         }
         LaunchedEffect(type) {
@@ -363,7 +378,11 @@ fun BrowseShell(
                     .distinct()
                     .take(60)
                 if (ids.isNotEmpty()) {
-                    nowNextMap = withContext(Dispatchers.IO) { epg.getNowNextBatch(ids) }
+                    nowNextMap = withContext(Dispatchers.IO) {
+                        runCatching { epg.getNowNextBatch(ids) }
+                            .onFailure { Log.w("Yanco", "BrowseShell.getNowNextBatch tick failed: ${it.message}", it) }
+                            .getOrElse { nowNextMap }
+                    }
                 }
             }
         }
@@ -433,7 +452,9 @@ fun BrowseShell(
         if (loading) return@LaunchedEffect
         loading = true
         val page = withContext(Dispatchers.IO) {
-            repo.page(type, groupFilter, loaded, PAGE_SIZE)
+            runCatching { repo.page(type, groupFilter, loaded, PAGE_SIZE) }
+                .onFailure { Log.w("Yanco", "BrowseShell.page($type, $loaded) failed: ${it.message}", it) }
+                .getOrElse { emptyList() }
         }
         items.addAll(page)
         loaded += page.size
@@ -603,7 +624,11 @@ fun BrowseShell(
                     val optimistic = !isFav
                     isFav = optimistic
                     scope.launch {
-                        val newState = withContext(Dispatchers.IO) { favorites.toggle(item.id) }
+                        val newState = withContext(Dispatchers.IO) {
+                            runCatching { favorites.toggle(item.id) }
+                                .onFailure { Log.w("Yanco", "BrowseShell.favorites.toggle(${item.id}) failed: ${it.message}", it) }
+                                .getOrElse { !optimistic }
+                        }
                         if (newState != optimistic) isFav = newState
                     }
                 },

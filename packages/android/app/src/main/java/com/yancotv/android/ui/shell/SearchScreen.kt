@@ -55,6 +55,7 @@ import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.theme.YancoPalette
+import android.util.Log
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.types.ContentItem
@@ -117,7 +118,11 @@ fun SearchScreen(
         }
         searching = true
         delay(220L)
-        val matches = withContext(Dispatchers.IO) { repo.search(trimmed, limit = 100) }
+        val matches = withContext(Dispatchers.IO) {
+            runCatching { repo.search(trimmed, limit = 100) }
+                .onFailure { Log.w("Yanco", "SearchScreen.search('$trimmed') failed: ${it.message}", it) }
+                .getOrElse { emptyList() }
+        }
         results.clear()
         results.addAll(matches)
         searching = false
