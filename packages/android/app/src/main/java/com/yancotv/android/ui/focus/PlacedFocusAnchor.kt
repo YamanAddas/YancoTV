@@ -54,6 +54,8 @@ class PlacedFocusAnchor internal constructor() {
         isPlaced = true
     }
 
+    fun reset() { isPlaced = false }
+
     /**
      * Suspend until the anchor's modified node has been placed, then
      * request focus. If already placed, fires immediately. Safe to call

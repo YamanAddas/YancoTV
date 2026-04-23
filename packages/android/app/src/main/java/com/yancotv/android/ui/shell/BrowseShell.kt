@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -207,6 +209,11 @@ fun BrowseShell(
     prefs: AppPreferences = koinInject(),
     modifier: Modifier = Modifier,
 ) {
+    // Declared first: both the stop LaunchedEffect(type, group) and the
+    // window-focus restore effect reference this anchor. Must precede any
+    // LaunchedEffect that calls firstItemAnchor.reset() / awaitAndRequest().
+    val firstItemAnchor = rememberPlacedFocusAnchor()
+
     // Catalogue state — rail data source depends on whether the user has
     // the synthetic "Favorites" chip active.
     val groupsState = remember(type) { mutableStateListOf<String>() }
@@ -246,8 +253,13 @@ fun BrowseShell(
     // previous preview bleeding into the new category while items reload and
     // the auto-preview debounce hasn't fired yet. Fires for both the paged
     // and favorites catalogue branches because it is outside the if/else.
+    //
+    // Also resets firstItemAnchor so awaitAndRequest() waits for the new
+    // card's onPlaced instead of firing against a stale isPlaced=true from
+    // the previous group — MB-67.
     LaunchedEffect(type, group) {
         if (controller.currentId != null) controller.stop()
+        firstItemAnchor.reset()
     }
 
     val lockedIds by parental.lockedIds.collectAsState()
@@ -330,7 +342,10 @@ fun BrowseShell(
     var nowNextMap by remember(type) { mutableStateOf<Map<String, NowNext>>(emptyMap()) }
     var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
     if (type == ContentType.LIVE) {
-        LaunchedEffect(type, items.size) {
+        // MB-95: key only on type (not items.size) so this effect doesn't restart
+        // on every paginated page load. The snapshotFlow observes items directly
+        // and distinctUntilChanged suppresses duplicate EPG fetches.
+        LaunchedEffect(type) {
             snapshotFlow { items.map { it.tvgId }.filterNotNull().distinct() }
                 .distinctUntilChanged()
                 .collect { tvgIds ->
@@ -368,19 +383,24 @@ fun BrowseShell(
     // these. Index math for activation must be done against this filtered
     // list, not the raw `items`, otherwise lockedIds → hidden rows would
     // shift the activation target.
-    val visible = applyParentalFilters(
-        items = items,
-        hiddenIds = hiddenIds,
-        hideAdult = parentalSettings.hideAdultContent,
-    )
+    //
+    // MB-97: derivedStateOf tracks only items/hiddenIds/hideAdultContent as
+    // snapshot dependencies, so EPG ticks, nowSeconds updates, and other
+    // unrelated state changes don't re-run this O(n) filter.
+    val visible by remember {
+        derivedStateOf {
+            applyParentalFilters(
+                items = items,
+                hiddenIds = hiddenIds,
+                hideAdult = parentalSettings.hideAdultContent,
+            )
+        }
+    }
 
-    // Focus requester that tracks the rail's current card. Must NOT re-key
-    // on (type, group): when the user zaps to a different group the rail
-    // recomposes with a new target card, but this requester itself stays
-    // stable and re-attaches to that card. Re-keying here produced the
-    // "orphan requester" crash when the window-focus restore loop fired
-    // against a disposed node.
-    val firstItemFocus = remember { FocusRequester() }
+    // firstItemAnchor is declared at the top of this function — it must
+    // precede LaunchedEffect(type, group) which calls anchor.reset().
+    // The anchor is stable (never re-keyed) so the requester it holds is
+    // never disposed while the BrowseShell is in composition. MB-67.
 
     // HomeScreen owns entryFocus and requests it on section/detail changes.
     // Attach that requester directly to the selected chip; wiring it to a
@@ -464,11 +484,10 @@ fun BrowseShell(
     // a real focusable leaf; it silently no-ops. The user still had to
     // press a key to light up any card.
     //
-    // Fix: call firstItemFocus.requestFocus() directly — it is attached to
-    // an actual .focusable() card at focusedIndex, so Compose emits a real
-    // Focus event to its MutableInteractionSource. Retry with backoff because
-    // the WheelRow recomposes immediately on window regain (controller state
-    // + EPG tick), temporarily detaching firstItemFocus from any node.
+    // Fix: use firstItemAnchor.awaitAndRequest() — waits for the card's
+    // onPlaced hook before calling requestFocus(), so the request is
+    // deterministic even when the WheelRow recomposes immediately on
+    // window regain (controller state + EPG tick). MB-67.
     val windowInfo = LocalWindowInfo.current
     // `restoreFocusOnWindowRegain` flips false while an overlay (detail,
     // search) is live — without this gate BrowseShell would steal focus
@@ -483,12 +502,9 @@ fun BrowseShell(
             } else if (seenUnfocused) {
                 seenUnfocused = false
                 if (!canRestore) return@collect
-                for (delayMs in longArrayOf(50L, 150L, 400L)) {
-                    delay(delayMs)
-                    if (!canRestore) break
-                    val ok = runCatching { firstItemFocus.requestFocus() }.isSuccess
-                    if (ok) break
-                }
+                // MB-67: awaitAndRequest() waits for the focused card's onPlaced
+                // hook before calling requestFocus — deterministic, no delay-ladder.
+                firstItemAnchor.awaitAndRequest()
             }
         }
     }
@@ -610,7 +626,7 @@ fun BrowseShell(
                     nowSeconds = nowSeconds,
                     lockedIds = lockedIds,
                     focusedIndex = focusedIndex.coerceIn(0, (visible.size - 1).coerceAtLeast(0)),
-                    firstItemFocus = firstItemFocus,
+                    firstItemAnchor = firstItemAnchor,
                     onFocus = { index, item ->
                         focusedIndex = index
                         focusedItem = item
@@ -631,10 +647,7 @@ fun BrowseShell(
             repo = parental,
             onDismiss = {
                 actionsFor = null
-                scope.launch {
-                    delay(80)
-                    runCatching { firstItemFocus.requestFocus() }
-                }
+                scope.launch { firstItemAnchor.awaitAndRequest() }
             },
         )
     }

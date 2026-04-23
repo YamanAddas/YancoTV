@@ -77,6 +77,10 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
+private val tileProgressBrush = Brush.horizontalGradient(
+    colors = listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
+)
+
 /**
  * Home landing dashboard. Six rails stacked on a cinematic canvas:
  *   1. Hero — single-slide feature card rotating through the top
@@ -656,7 +660,7 @@ private fun PosterRail(
                     locked = item.id in lockedIds,
                     resume = resumeByContent[item.id],
                     onClick = { onPlay(item) },
-                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
+                    modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
                 )
             }
         }
@@ -688,7 +692,7 @@ private fun OnNowRail(
                     pair = pair,
                     locked = pair.channel.id in lockedIds,
                     onClick = { onPlay(pair.channel) },
-                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
+                    modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
                 )
             }
         }
@@ -720,7 +724,7 @@ private fun UpNextRail(
                     pair = pair,
                     locked = pair.channel.id in lockedIds,
                     onClick = { onPlay(pair.channel) },
-                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
+                    modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
                 )
             }
         }
@@ -1139,11 +1143,7 @@ private fun ProgressStripe(progress: Float, modifier: Modifier) {
             modifier = Modifier
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
                 .fillMaxHeight()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
-                    ),
-                ),
+                .background(tileProgressBrush),
         )
     }
 }

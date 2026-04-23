@@ -37,8 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onPlaced
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -80,7 +82,7 @@ fun ContentRail(
     nowSeconds: Long,
     lockedIds: Set<String>,
     focusedIndex: Int,
-    firstItemFocus: FocusRequester,
+    firstItemAnchor: PlacedFocusAnchor,
     onFocus: (Int, ContentItem) -> Unit,
     onActivate: (Int) -> Unit,
     onLongPress: (ContentItem) -> Unit,
@@ -110,8 +112,18 @@ fun ContentRail(
     ) {
         val safeFocusedIndex = focusedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
         itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
-            val attach = if (index == safeFocusedIndex) firstItemFocus else null
-            val wheel = Modifier.wheelItemTransform(listState = listState, index = index)
+            val attach = if (index == safeFocusedIndex) firstItemAnchor.requester else null
+            // MB-66: memoize per stable key — graphicsLayer lambda creation is
+            // cheap but allocates a new Modifier chain every recompose otherwise.
+            val wheel = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) }
+            // MB-67: mark the anchor placed when the focused card's node lands in
+            // layout. PlacedFocusAnchor.awaitAndRequest() in BrowseShell waits for
+            // this signal instead of a delay-ladder, so focus restore is deterministic.
+            val anchorMod = if (index == safeFocusedIndex) {
+                Modifier.onPlaced { firstItemAnchor.markPlaced() }
+            } else {
+                Modifier
+            }
             when (type) {
                 ContentType.LIVE -> LiveCard(
                     item = item,
@@ -122,7 +134,7 @@ fun ContentRail(
                     onFocus = { onFocus(index, item) },
                     onActivate = { onActivate(index) },
                     onLongPress = { onLongPress(item) },
-                    modifier = wheel,
+                    modifier = wheel.then(anchorMod),
                 )
                 ContentType.MOVIE, ContentType.SERIES -> PosterCard(
                     item = item,
@@ -131,7 +143,7 @@ fun ContentRail(
                     onFocus = { onFocus(index, item) },
                     onActivate = { onActivate(index) },
                     onLongPress = { onLongPress(item) },
-                    modifier = wheel,
+                    modifier = wheel.then(anchorMod),
                 )
             }
         }

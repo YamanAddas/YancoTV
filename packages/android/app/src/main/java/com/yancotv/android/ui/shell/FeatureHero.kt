@@ -59,6 +59,12 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
 
+// MB-81: stable top-level val — palette colours never change at runtime so
+// there is no reason to allocate a new Brush on every EPG tick recomposition.
+private val heroProgressBrush = Brush.horizontalGradient(
+    listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
+)
+
 /**
  * Dominant hero at the top of the browse shell. Swaps its backdrop + copy
  * as the user moves through the rail beneath — moving focus is what creates
@@ -376,7 +382,9 @@ private fun HeroMetaChip(label: String) {
 
 @Composable
 private fun HeroProgress(start: Long, end: Long, now: Long) {
-    val span = (end - start).coerceAtLeast(1)
+    // MB-81: span depends only on start/end, not now — memoize so EPG ticks
+    // that update `now` every second don't recompute this on every frame.
+    val span = remember(start, end) { (end - start).coerceAtLeast(1) }
     val pct = ((now - start).toFloat() / span).coerceIn(0f, 1f)
     val remainingMin = ((end - now).coerceAtLeast(0) / 60).toInt()
     Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
@@ -391,15 +399,7 @@ private fun HeroProgress(start: Long, end: Long, now: Long) {
                 modifier = Modifier
                     .fillMaxWidth(pct)
                     .fillMaxHeight()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                YancoPalette.AccentDeep,
-                                YancoPalette.Accent,
-                                YancoPalette.AccentGlow,
-                            ),
-                        ),
-                    ),
+                    .background(heroProgressBrush),
             )
         }
         Text(
