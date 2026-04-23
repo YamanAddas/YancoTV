@@ -64,6 +64,17 @@ private const val PREFETCH_THRESHOLD = 20
 private const val EPG_TICK_MS = 60_000L
 
 /**
+ * Hard cap on how many [ContentItem]s the rail keeps in its
+ * SnapshotStateList. Beyond this we stop paginating — long sessions on a
+ * 5000-item Movies catalog otherwise pile up the full list of refs +
+ * Compose snapshot records, which compounds with the EPG / focus / hero
+ * recompositions the rail already runs. Users with catalogs larger than
+ * this are expected to narrow with category chips or search; this is
+ * the same UX trade desktop Live TV has used since v0.1.
+ */
+private const val MAX_ITEMS_IN_MEMORY = 1000
+
+/**
  * Debounce before the rail's focused LIVE card commits to actually
  * starting its stream in the hero MiniPlayer. Short enough that a
  * user who *settles* on a channel sees the preview come up almost
@@ -447,6 +458,8 @@ fun BrowseShell(
         if (isFavoritesFilter) return@LaunchedEffect
         if (loading) return@LaunchedEffect
         if (loaded >= total) return@LaunchedEffect
+        // Memory cap — see MAX_ITEMS_IN_MEMORY doc.
+        if (items.size >= MAX_ITEMS_IN_MEMORY) return@LaunchedEffect
         if (focusedIndex < (loaded - PREFETCH_THRESHOLD)) return@LaunchedEffect
         delay(100L) // debounce — cancelled if focus moves again before it fires
         if (loading) return@LaunchedEffect

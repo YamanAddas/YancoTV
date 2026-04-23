@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import androidx.media3.common.util.UnstableApi
+import androidx.work.WorkManager
 import coil3.SingletonImageLoader
 import com.yancotv.android.di.appModule
 import com.yancotv.android.player.PlaybackController
@@ -29,6 +30,12 @@ class YancoApp : Application() {
         SingletonImageLoader.setSafe { buildYancoImageLoader(this) }
         EpgSyncWorker.schedulePeriodic(this)
         ReminderNotificationChannel.ensureCreated(this)
+        // Drop SUCCEEDED/FAILED WorkInfo records that survive across app
+        // restarts. GuideSyncPanel observes the unique-work flow and the
+        // accumulated history slowly grows the in-memory list it renders
+        // from. pruneWork() only touches finished, dependency-free entries
+        // so in-flight syncs are unaffected.
+        WorkManager.getInstance(this).pruneWork()
 
         // Pause playback whenever the last visible Activity stops — pressing
         // Home or switching apps should silence the stream immediately. We

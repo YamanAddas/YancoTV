@@ -12,8 +12,10 @@ import okhttp3.OkHttpClient
 /**
  * Global Coil 3 [ImageLoader] for logos + posters.
  *
- *  * Memory cache sized to 25% of app heap — logos re-render on every scroll
- *    row so memory caching dominates the cost.
+ *  * Memory cache hard-capped at 32 MB — predictable budget on Fire TV Stick
+ *    (320 MB heap = ~10%). The previous 25%-of-heap default ballooned to
+ *    ~80 MB on Fire TV and competed with the player's video memory pool
+ *    during long sessions. Logos + posters cache-hit fine at 32 MB.
  *  * Disk LRU at 250MB in `cacheDir/yanco-images`; big enough for thousands
  *    of logos at typical 5–40KB each without blowing up the profile.
  *  * OkHttp network fetcher so requests share the same TLS/redirect stack
@@ -24,7 +26,7 @@ import okhttp3.OkHttpClient
 fun buildYancoImageLoader(context: Context): ImageLoader = ImageLoader.Builder(context)
     .memoryCache {
         MemoryCache.Builder()
-            .maxSizePercent(context, 0.25)
+            .maxSizeBytes(32L * 1024 * 1024)
             .build()
     }
     .diskCache {
