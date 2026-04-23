@@ -282,16 +282,20 @@ fun BrowseShell(
             focusedItem = null
             return@LaunchedEffect
         }
-        if (focusedItem == null || focusedItem !in items) {
-            // Prefer the currently-playing channel on initial landing
-            // (returning to LiveTv while a stream runs in the MiniPlayer
-            // must not zap focus to items[0] and restart playback on a
-            // different channel). Falls back to the saved index so
-            // section-to-section navigation restores the last position.
-            val idx = initialFocusIndex(items.toList(), focusedIndex, controller.currentId)
+        // Use the parental-filtered list so focusedItem is never set to a
+        // hidden item and the hero never briefly paints a hidden card.
+        val visibleNow = applyParentalFilters(items.toList(), hiddenIds, parentalSettings.hideAdultContent)
+        // Compare by id (not reference) — items list reallocates from DB
+        // after group/type changes, so the old ContentItem reference won't
+        // be `===` to any new object even when the same channel is present.
+        if (focusedItem == null || visibleNow.none { it.id == focusedItem?.id }) {
+            // Prefer the currently-playing item (paused or active) so
+            // returning to Live TV while a stream is running doesn't zap
+            // focus to items[0] and restart a different stream.
+            val idx = initialFocusIndex(visibleNow, focusedIndex, controller.currentItem.value?.id)
             if (idx >= 0) {
                 focusedIndex = idx
-                focusedItem = items[idx]
+                focusedItem = visibleNow[idx]
             }
         }
     }
@@ -465,7 +469,7 @@ fun BrowseShell(
             } else if (seenUnfocused) {
                 seenUnfocused = false
                 if (!canRestore) return@collect
-                for (delayMs in longArrayOf(80L, 250L, 500L)) {
+                for (delayMs in longArrayOf(50L, 150L, 400L)) {
                     delay(delayMs)
                     if (!canRestore) break
                     val ok = runCatching { firstItemFocus.requestFocus() }.isSuccess
