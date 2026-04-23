@@ -61,23 +61,26 @@ class PlaybackController(
         // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
         // don't oscillate between BUFFERING and READY on flaky sources.
         //
-        // MK.8.2 timeshift: retain 10 minutes of back-buffer + keep the
-        // last keyframe so the user can pause/rewind a non-DVR live
-        // stream. Back-buffer is encoded-sample-level (not decoded) and
-        // HLS chunk-backed where possible, so on Fire TV it lives in
-        // off-heap / chunk-cache memory rather than counting against
-        // the 320 MB heap cap. 10 min × 5 Mbps ≈ 375 MB of disk/cache —
-        // acceptable. 30 min would push it past 1 GB which is too much
-        // for low-end Fire TV Sticks.
+        // MK.8.2 timeshift retains a back-buffer so users can pause/rewind
+        // a non-DVR live stream. Sized at 2 minutes — covers the realistic
+        // "missed that line, rewind it" use case without piling up off-heap
+        // chunk cache during long viewing sessions. At ~5 Mbps that's ~75 MB
+        // of cache vs ~375 MB at the original 10-minute window; the bigger
+        // window made the app noticeably heavier the longer it ran on Fire
+        // TV Stick (320 MB heap, modest GPU memory pool).
+        //
+        // maxBufferMs trimmed from 30s → 20s for the same reason — saves
+        // ~6 MB per active stream at 5 Mbps, still gives plenty of headroom
+        // for HLS segment fetch latency.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 15_000,
-                /* maxBufferMs = */ 30_000,
+                /* maxBufferMs = */ 20_000,
                 /* bufferForPlaybackMs = */ 1_000,
                 /* bufferForPlaybackAfterRebufferMs = */ 2_500,
             )
             .setBackBuffer(
-                /* backBufferDurationMs = */ 10 * 60 * 1_000,
+                /* backBufferDurationMs = */ 2 * 60 * 1_000,
                 /* retainBackBufferFromKeyframe = */ true,
             )
             .build()
