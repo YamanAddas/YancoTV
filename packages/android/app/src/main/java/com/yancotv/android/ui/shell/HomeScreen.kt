@@ -49,10 +49,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
-internal fun shouldStopLivePreviewForSection(
-    section: AppSection,
-    playing: ContentItem?,
-): Boolean = section != AppSection.LiveTv && playing?.type == ContentType.LIVE
+// Kept internal for tests; stop any playing item when the section changes —
+// live, VOD, and episode previews must all stop so audio doesn't bleed.
+internal fun shouldStopPlaybackOnSectionChange(playing: ContentItem?): Boolean =
+    playing != null
 
 /**
  * Adaptive shell. The browse sections (Live / Movies / Series) now delegate
@@ -111,8 +111,7 @@ fun HomeScreen(
     val searchOverlayVisible by SearchOverlayState.visible.collectAsState()
 
     LaunchedEffect(section) {
-        val playing = controller.currentItem.value
-        if (shouldStopLivePreviewForSection(section, playing)) {
+        if (shouldStopPlaybackOnSectionChange(controller.currentItem.value)) {
             controller.stop()
         }
     }

@@ -241,6 +241,15 @@ fun BrowseShell(
     var hasLoaded by remember(type, group) { mutableStateOf(false) }
     val isFavoritesFilter = isFavoritesFilter(group)
 
+    // Stop any active playback immediately when the visible catalogue changes
+    // (section/type switch or group chip change). Prevents audio from a
+    // previous preview bleeding into the new category while items reload and
+    // the auto-preview debounce hasn't fired yet. Fires for both the paged
+    // and favorites catalogue branches because it is outside the if/else.
+    LaunchedEffect(type, group) {
+        if (controller.currentId != null) controller.stop()
+    }
+
     val lockedIds by parental.lockedIds.collectAsState()
     val hiddenIds by parental.hiddenIds.collectAsState()
     val parentalSettings by parental.settings.collectAsState()

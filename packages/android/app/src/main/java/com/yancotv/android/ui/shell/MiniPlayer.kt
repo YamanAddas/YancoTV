@@ -83,6 +83,13 @@ fun MiniPlayer(
             }
         }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycle.removeObserver(observer)
+            // Detach the surface so ExoPlayer stops rendering to this view
+            // after it leaves composition. Without this the player keeps a
+            // dangling reference, continues playing audio in the background,
+            // and crashes when the next MiniPlayer calls setVideoTextureView.
+            viewRef[0]?.let { controller.player.clearVideoTextureView(it) }
+        }
     }
 }
