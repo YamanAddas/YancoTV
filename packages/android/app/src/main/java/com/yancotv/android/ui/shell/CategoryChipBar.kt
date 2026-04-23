@@ -26,7 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,11 +73,23 @@ fun CategoryChipBar(
     val internalFirstFocus = remember { FocusRequester() }
     val firstItemFocus = externalSelectedFocus ?: internalFirstFocus
 
-    val selectedIndex = remember(groups, selected, showFavorites) {
-        selectedChipIndex(groups = groups, selected = selected, showFavorites = showFavorites)
+    // MB-88: indexOf (O(n)) runs only when groups/selected change, not on
+    // every showFavorites toggle.
+    val groupPos = remember(groups, selected) { groups.indexOf(selected) }
+    val selectedIndex = remember(groupPos, selected, showFavorites) {
+        val offset = if (showFavorites) 1 else 0
+        when (selected) {
+            FAVORITES_GROUP -> if (showFavorites) 0 else -1
+            ALL_GROUPS -> offset
+            else -> if (groupPos < 0) -1 else offset + 2 + groupPos
+        }
     }
+    // MB-72: guard scrollToItem so it only fires when selectedIndex
+    // actually changes, not on every recomposition.
+    var prevScrolledIndex by remember { mutableStateOf(-1) }
     LaunchedEffect(selectedIndex) {
-        if (selectedIndex >= 0) {
+        if (selectedIndex >= 0 && selectedIndex != prevScrolledIndex) {
+            prevScrolledIndex = selectedIndex
             runCatching { listState.scrollToItem(maxOf(0, selectedIndex - 1)) }
         }
     }
@@ -160,6 +174,11 @@ private fun Chip(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    // MB-73: self-request focus the moment this chip becomes selected so the
+    // focus ring appears without BrowseShell racing against composition.
+    LaunchedEffect(focusRequester) {
+        if (focusRequester != null) runCatching { focusRequester.requestFocus() }
+    }
     val bg = when {
         // Focused chip = colored selector — accent-tinted translucent wash
         // so the hero/backdrop still bleeds through and the ring + fill
