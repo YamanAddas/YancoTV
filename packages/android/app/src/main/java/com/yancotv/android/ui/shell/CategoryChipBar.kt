@@ -4,6 +4,10 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -179,13 +183,21 @@ private fun Chip(
     LaunchedEffect(focusRequester) {
         if (focusRequester != null) runCatching { focusRequester.requestFocus() }
     }
-    val bg = when {
-        // Focused chip = colored selector — accent-tinted translucent wash
-        // so the hero/backdrop still bleeds through and the ring + fill
-        // read as "picked" at 10 ft (2026-04-22).
-        focused -> YancoPalette.Accent.copy(alpha = 0.28f)
-        selected -> YancoPalette.Accent.copy(alpha = 0.18f)
-        else -> YancoPalette.BackgroundDeep.copy(alpha = 0.45f)
+    // Concept A chip fills: focused chips paint a saturated emerald gradient
+    // (top-down Accent → AccentDeep) so the picked state reads as a lit
+    // facet, not a flat tinted slab; selected-but-unfocused gets a softer
+    // wash; idle is a near-floor frosted plate.
+    val bg: Brush = when {
+        focused -> Brush.verticalGradient(
+            listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+        )
+        selected -> Brush.verticalGradient(
+            listOf(
+                YancoPalette.Accent.copy(alpha = 0.32f),
+                YancoPalette.AccentDeep.copy(alpha = 0.22f),
+            ),
+        )
+        else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
     }
     val border = when {
         focused -> YancoPalette.FocusRing
@@ -194,18 +206,24 @@ private fun Chip(
     }
     val fg by animateColorAsState(
         targetValue = when {
-            focused -> YancoPalette.TextPrimary
+            focused -> Color.Black
             selected -> YancoPalette.Accent
             else -> YancoPalette.TextSecondary
         },
         label = "chip-fg",
     )
     // Hex-inspired chip — leading angular bevel + rounded trailing cap so
-    // each chip reads as part of the shell's angular family. Selected chip
-    // picks up a 2dp accent rim and an LED-style dot on the leading edge.
+    // each chip reads as part of the shell's angular family. Focused chips
+    // pick up an emerald drop-shadow so the lift reads at 10 ft.
     Row(
         modifier = Modifier
-            .height(36.dp)
+            .height(38.dp)
+            .shadow(
+                elevation = if (focused) 14.dp else 0.dp,
+                shape = YancoShapes.ChipBevel,
+                ambientColor = YancoPalette.Accent,
+                spotColor = YancoPalette.Accent,
+            )
             .clip(YancoShapes.ChipBevel)
             .background(bg)
             .border(if (focused) 2.dp else 1.dp, border, YancoShapes.ChipBevel)

@@ -7,16 +7,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.YancoPalette
 
@@ -48,52 +53,63 @@ fun HexSurface(
     shape: Shape,
     focused: Boolean,
     modifier: Modifier = Modifier,
-    bevelInset: androidx.compose.ui.unit.Dp = 3.dp,
+    bevelInset: androidx.compose.ui.unit.Dp = 0.dp,
     shellGradient: Brush = Brush.verticalGradient(
         colors = listOf(
-            YancoPalette.BackgroundElevated.copy(alpha = 0.75f),
-            YancoPalette.BackgroundRaised.copy(alpha = 0.70f),
+            YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
+            YancoPalette.BackgroundRaised.copy(alpha = 0.72f),
         ),
     ),
     focusedShellGradient: Brush = Brush.verticalGradient(
         colors = listOf(
-            YancoPalette.AccentGlow.copy(alpha = 0.55f),
-            YancoPalette.Accent.copy(alpha = 0.35f),
-            YancoPalette.AccentDeep.copy(alpha = 0.30f),
+            YancoPalette.Accent,
+            YancoPalette.AccentDeep,
         ),
     ),
     innerFill: Color = YancoPalette.BackgroundDeep.copy(alpha = 0.78f),
     focusedInnerFill: Color = YancoPalette.Accent.copy(alpha = 0.14f),
-    liftScale: Float = 1.035f,
+    liftScale: Float = 1.06f,
+    liftDp: androidx.compose.ui.unit.Dp = 10.dp,
     raised: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val scale by animateFloatAsState(
         targetValue = if (focused) liftScale else 1f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 420f),
         label = "hex-scale",
     )
+    val translatePx = with(LocalDensity.current) { liftDp.toPx() }
+    val translate by animateFloatAsState(
+        targetValue = if (focused) -translatePx else 0f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 420f),
+        label = "hex-translate",
+    )
     val elevation by animateDpAsState(
-        targetValue = if (focused && raised) 16.dp else 0.dp,
+        targetValue = if (focused && raised) 28.dp else 6.dp,
         animationSpec = spring(dampingRatio = 0.9f, stiffness = 420f),
         label = "hex-elev",
     )
     val shellBorder by animateDpAsState(
-        targetValue = if (focused) 1.5.dp else 1.dp,
+        targetValue = if (focused) 2.dp else 1.dp,
         animationSpec = spring(dampingRatio = 0.9f, stiffness = 600f),
         label = "hex-shell-bw",
     )
 
     Box(
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = translate
+            }
             .shadow(
                 elevation = elevation,
                 shape = shape,
-                ambientColor = YancoPalette.Accent,
-                spotColor = YancoPalette.Accent,
+                ambientColor = if (focused) YancoPalette.Accent else Color.Black,
+                spotColor = if (focused) YancoPalette.Accent else Color.Black,
             )
-            // Outer shell — the "frame"
+            // Outer shell — the "frame". On focus it becomes a saturated
+            // emerald gradient ring; idle it's a subtle elevated surface.
             .clip(shape)
             .background(if (focused) focusedShellGradient else shellGradient)
             .border(
@@ -103,8 +119,8 @@ fun HexSurface(
             )
             .padding(bevelInset),
     ) {
-        // Inner content panel — the "recessed" surface. Also clipped to the
-        // same shape so the bevelled edge is preserved inside the frame.
+        // Inner content panel — the "recessed" surface. Clipped to the same
+        // shape so the bevelled edge is preserved inside the frame.
         Box(
             modifier = Modifier
                 .clip(shape)
@@ -114,7 +130,25 @@ fun HexSurface(
                     color = if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else Color.Transparent,
                     shape = shape,
                 ),
-            content = content,
-        )
+        ) {
+            content()
+            // Specular top facet — single hairline of warm white that traces
+            // the top edge to make the hex read as machined metal under light.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = if (focused) 0.55f else 0.18f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
+            )
+        }
     }
 }

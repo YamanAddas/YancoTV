@@ -36,17 +36,34 @@ object YancoShapes {
     /** Softer hex capsule — same silhouette but rounded points. */
     val HexCapsuleSoft: Shape = HexCapsuleShape(cutFraction = 0.30f, pointRoundDp = 3.dp)
 
-    /** Cut-corner poster — top-left + bottom-right bevelled, others rounded. */
-    val CutCornerCard: Shape = CutCornerCardShape(cut = 22.dp, round = 6.dp)
+    /**
+     * Cut-corner poster — top-right + bottom-left bevelled, the other two
+     * corners squared. Concept A signature shape (`hex-2cut` in the design
+     * CSS): clean diagonal cuts on opposite corners, no rounding so the
+     * facets read as crisp machined edges instead of softened pillows.
+     */
+    val CutCornerCard: Shape = CutCornerCardShape(cut = 22.dp, round = 0.dp)
 
-    /** Smaller cut-corner for compact cards (home rail tiles). */
-    val CutCornerCardSmall: Shape = CutCornerCardShape(cut = 16.dp, round = 5.dp)
+    /** Smaller cut-corner for compact cards (home rail tiles, sidebar rows). */
+    val CutCornerCardSmall: Shape = CutCornerCardShape(cut = 16.dp, round = 0.dp)
+
+    /** Larger cut-corner for hero panels and the live-TV preview pane. */
+    val CutCornerCardLarge: Shape = CutCornerCardShape(cut = 32.dp, round = 0.dp)
 
     /** Chip silhouette — angular cut on the leading edge, rounded trailing edge. */
     val ChipBevel: Shape = ChipBevelShape()
 
     /** Button silhouette — slim horizontal hex with symmetrical bevels. */
     val ButtonBevel: Shape = ButtonBevelShape()
+
+    /**
+     * Long horizontal hex pill — flat top + bottom edges, two short angled
+     * sides on the left + right. Used by the vertical category rail so a
+     * line of category text reads naturally inside the hex outline. Proportions
+     * tuned for a ~210dp × ~46dp pill: side caps end up ~22px wide (clamped),
+     * leaving the bulk of the width as a flat top/bottom border for the label.
+     */
+    val HexPill: Shape = HexCapsuleShape(cutFraction = 0.5f, pointRoundDp = 0.dp)
 }
 
 /**
@@ -100,9 +117,13 @@ internal class HexCapsuleShape(
 }
 
 /**
- * Rectangle with two opposing corners bevelled (top-left + bottom-right),
- * two soft-rounded (top-right + bottom-left). Posters and large cards
- * consume this so art stays un-cropped while the frame reads as crafted.
+ * Concept A `hex-2cut` shape — top-right + bottom-left corners bevelled,
+ * top-left + bottom-right left square. When `round` > 0 the bevelled
+ * corners are softened with a quarter-arc; at `round = 0` the cuts are
+ * crisp diagonals (the default in Concept A). Polygon spec from the
+ * design CSS:
+ *
+ *   `0 0, calc(100% - cut) 0, 100% cut, 100% 100%, cut 100%, 0 calc(100% - cut)`
  */
 internal class CutCornerCardShape(
     private val cut: Dp,
@@ -115,43 +136,35 @@ internal class CutCornerCardShape(
     ): Outline {
         val cap = minOf(size.width, size.height) * 0.4f
         val c = with(density) { cut.toPx() }.coerceAtMost(cap)
-        val r = with(density) { round.toPx() }.coerceAtMost(cap * 0.5f)
+        val r = with(density) { round.toPx() }.coerceAtMost(c * 0.5f)
 
         val path = Path().apply {
-            // Top edge starts past the top-left bevel
-            moveTo(c, 0f)
-            lineTo(size.width - r, 0f)
-            // Top-right rounded corner
-            arcTo(
-                rect = Rect(
-                    left = size.width - 2 * r,
-                    top = 0f,
-                    right = size.width,
-                    bottom = 2 * r,
-                ),
-                startAngleDegrees = -90f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false,
-            )
-            // Right edge to bottom-right bevel
-            lineTo(size.width, size.height - c)
-            lineTo(size.width - c, size.height)
-            // Bottom edge to bottom-left rounded corner
-            lineTo(r, size.height)
-            arcTo(
-                rect = Rect(
-                    left = 0f,
-                    top = size.height - 2 * r,
-                    right = 2 * r,
-                    bottom = size.height,
-                ),
-                startAngleDegrees = 90f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false,
-            )
-            // Left edge up to top-left bevel
-            lineTo(0f, c)
-            lineTo(c, 0f)
+            // Start at the top-left square corner.
+            moveTo(0f, 0f)
+            // Top edge to the start of the top-right bevel.
+            lineTo(size.width - c, 0f)
+            // Bevelled top-right — straight diagonal, optionally softened.
+            if (r <= 0.5f) {
+                lineTo(size.width, c)
+            } else {
+                lineTo(size.width - r, 0f)
+                quadraticBezierTo(size.width, 0f, size.width, r)
+                lineTo(size.width, c)
+            }
+            // Right edge to the bottom-right square corner.
+            lineTo(size.width, size.height)
+            // Bottom edge to the start of the bottom-left bevel.
+            lineTo(c, size.height)
+            // Bevelled bottom-left — straight diagonal, optionally softened.
+            if (r <= 0.5f) {
+                lineTo(0f, size.height - c)
+            } else {
+                lineTo(r, size.height)
+                quadraticBezierTo(0f, size.height, 0f, size.height - r)
+                lineTo(0f, size.height - c)
+            }
+            // Left edge back to the top-left square corner.
+            lineTo(0f, 0f)
             close()
         }
         return Outline.Generic(path)

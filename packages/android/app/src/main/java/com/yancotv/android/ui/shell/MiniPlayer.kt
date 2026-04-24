@@ -2,8 +2,6 @@ package com.yancotv.android.ui.shell
 
 import android.view.TextureView
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -11,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.util.UnstableApi
@@ -54,9 +51,14 @@ fun MiniPlayer(
         // look like they've lost their selector until the user blindly
         // wakes focus with an arrow key. See BrowseShell MiniPlayer focus
         // leak regression, 2026-04-22 fix.
+        //
+        // Sizing is delegated to the caller — sites that want the legacy
+        // 180dp strip can pass `Modifier.fillMaxWidth().height(180.dp)`,
+        // and sites that want a flexible preview pane (Live TV's split
+        // layout) can pass `Modifier.fillMaxSize()`. Hard-coding sizing
+        // here would override caller intent because Modifier chains apply
+        // last-wins for size constraints.
         modifier = modifier
-            .fillMaxWidth()
-            .height(180.dp)
             .focusProperties { canFocus = false },
         factory = { ctx ->
             TextureView(ctx).apply {

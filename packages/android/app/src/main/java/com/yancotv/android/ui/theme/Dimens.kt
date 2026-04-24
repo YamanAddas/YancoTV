@@ -41,7 +41,8 @@ object Radius {
  */
 object ShellDim {
     val sidebarCollapsed = 92.dp
-    val sidebarExpanded = 232.dp
+    val sidebarExpanded = 260.dp
+    val categoriesPanelWidth = 240.dp
     val groupsWidth = 256.dp
     val infoWidth = 320.dp
     val rowHeight = 78.dp

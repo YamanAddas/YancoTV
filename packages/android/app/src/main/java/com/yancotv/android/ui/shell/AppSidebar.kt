@@ -1,8 +1,14 @@
 package com.yancotv.android.ui.shell
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,7 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,6 +61,7 @@ import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
 /**
@@ -68,31 +81,56 @@ fun AppSidebar(
     current: AppSection,
     onSelect: (AppSection) -> Unit,
     modifier: Modifier = Modifier,
+    expanded: Boolean = true,
+    onMoveRight: () -> Unit = {},
 ) {
+    // Cascade-collapse: when focus moves into the categories rail or content
+    // panel, the sidebar shrinks to an icon strip so the user always knows
+    // exactly one panel "owns" the screen. Width animates so the layout
+    // doesn't snap; labels cross-fade so the transition reads as a graceful
+    // collapse rather than a jump cut.
+    val targetWidth = if (expanded) ShellDim.sidebarExpanded else ShellDim.sidebarCollapsed
+    val width by animateDpAsState(
+        targetValue = targetWidth,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+        label = "sidebar-width",
+    )
     // Rail background: a softly lit vertical gradient against the
     // cinematic canvas so the three-column shell has real edge
-    // definition without resorting to a hard divider line. Alpha so
-    // the hero preview / cinematic backdrop shows through — the rail
-    // frames the scene, it doesn't cover it (2026-04-22 translucent pass).
+    // definition without resorting to a hard divider line. Concept A
+    // tints it greener so the rail visibly belongs to the emerald
+    // palette, with a translucent floor so the cinematic backdrop
+    // shows through — the rail frames the scene, it doesn't cover it.
     val brush = remember {
         Brush.verticalGradient(
             colors = listOf(
-                YancoPalette.BackgroundRaised.copy(alpha = 0.72f),
-                YancoPalette.BackgroundDeep.copy(alpha = 0.82f),
+                YancoPalette.BackgroundElevated.copy(alpha = 0.86f),
+                YancoPalette.BackgroundRaised.copy(alpha = 0.78f),
+                YancoPalette.BackgroundDeep.copy(alpha = 0.88f),
             ),
         )
     }
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(ShellDim.sidebarExpanded)
+            .width(width)
             .background(brush)
             .border(1.dp, YancoPalette.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
             .padding(horizontal = Space.md, vertical = Space.md)
+            // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
+            // routes this into the categories rail; for non-browse sections
+            // it lands inside the section's content. The rail is vertical
+            // so RIGHT has no in-rail meaning.
+            .onPreviewKeyEvent { ev ->
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
+                    onMoveRight()
+                    true
+                } else false
+            }
             .focusRestorer()
             .focusGroup(),
     ) {
-        BrandMark()
+        BrandMark(showWordmark = expanded)
         Spacer(Modifier.height(Space.md))
         Column(
             verticalArrangement = Arrangement.spacedBy(Space.xxs),
@@ -102,6 +140,7 @@ fun AppSidebar(
                     section = section,
                     icon = iconFor(section),
                     selected = section == current,
+                    showLabel = expanded,
                     onClick = { onSelect(section) },
                 )
             }
@@ -135,17 +174,22 @@ private fun iconFor(section: AppSection): ImageVector = when (section) {
 }
 
 @Composable
-private fun BrandMark() {
+private fun BrandMark(showWordmark: Boolean) {
     // Shipped raster logo stretched to fill the sidebar width. Replaces the
     // old "Y tile + YancoTV / streaming suite" text block so the brand
     // reads as a crafted mark rather than a hand-wired monogram.
+    //
+    // When the sidebar collapses to icon-only mode the wordmark is too wide
+    // to read so we shrink the logo strip to a square brand mark — Image
+    // contentScale=Fit handles the rest. Height drops in lockstep so the
+    // sidebar header doesn't leave a tall empty band above the rows.
     Image(
         painter = painterResource(id = R.drawable.ic_logo),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(if (showWordmark) 96.dp else 56.dp)
             .padding(horizontal = Space.xs, vertical = Space.xs)
             .semantics { contentDescription = "YancoTV" },
     )
@@ -156,22 +200,38 @@ private fun SidebarRow(
     section: AppSection,
     icon: ImageVector,
     selected: Boolean,
+    showLabel: Boolean,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
-    // Three visual states stack left-to-right in priority:
-    //   focused  → accent-tinted translucent fill + bright ring + scale lift
-    //   selected → accent pill background (low alpha), no ring
+    // Three visual states layered onto the hex-cut active row:
+    //   focused  → emerald gradient + bright accent ring + lit edge
+    //   selected → softer emerald wash, glow bar lit, no ring
     //   idle     → transparent, muted foreground
-    val bg = when {
-        focused -> YancoPalette.Accent.copy(alpha = 0.22f)
-        selected -> YancoPalette.Accent.copy(alpha = 0.14f)
-        else -> Color.Transparent
+    val rowBrush = when {
+        focused -> Brush.horizontalGradient(
+            colors = listOf(
+                YancoPalette.Accent.copy(alpha = 0.40f),
+                YancoPalette.Accent.copy(alpha = 0.18f),
+                Color.Transparent,
+            ),
+        )
+        selected -> Brush.horizontalGradient(
+            colors = listOf(
+                YancoPalette.Accent.copy(alpha = 0.28f),
+                YancoPalette.Accent.copy(alpha = 0.10f),
+                Color.Transparent,
+            ),
+        )
+        else -> Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color.Transparent),
+        )
     }
     val border = when {
         focused -> YancoPalette.FocusRing
+        selected -> YancoPalette.Accent.copy(alpha = 0.45f)
         else -> Color.Transparent
     }
     val fg by animateColorAsState(
@@ -183,7 +243,7 @@ private fun SidebarRow(
         label = "sidebar-fg",
     )
     val accentBarHeight by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
+        targetValue = if (selected || focused) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
         label = "sidebar-bar",
     )
@@ -192,25 +252,40 @@ private fun SidebarRow(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp),
+            .height(52.dp),
     ) {
         // Accent rail on the left edge marks the selected section even
-        // when focus is elsewhere — TiviMate-style "you are here".
+        // when focus is elsewhere. Glow shadow makes the bar read as a
+        // lit edge, not a flat stripe (Concept A's "you are here" cue).
         Box(
             modifier = Modifier
-                .width(3.dp)
+                .width(4.dp)
                 .fillMaxHeight()
                 .padding(vertical = Space.sm * accentInsetFraction)
+                .shadow(
+                    elevation = if (selected || focused) 12.dp else 0.dp,
+                    shape = RoundedCornerShape(Radius.pill),
+                    ambientColor = YancoPalette.Accent,
+                    spotColor = YancoPalette.Accent,
+                )
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(if (selected) YancoPalette.Accent else Color.Transparent),
+                .background(
+                    if (selected || focused) {
+                        Brush.verticalGradient(
+                            listOf(YancoPalette.AccentSoft, YancoPalette.Accent, YancoPalette.AccentDeep),
+                        )
+                    } else {
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                    },
+                ),
         )
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = Space.sm)
-                .clip(RoundedCornerShape(Radius.control))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(Radius.control))
+                .clip(YancoShapes.CutCornerCardSmall)
+                .background(rowBrush)
+                .border(1.dp, border, YancoShapes.CutCornerCardSmall)
                 .focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick)
                 .padding(horizontal = Space.md, vertical = Space.sm),
@@ -219,15 +294,26 @@ private fun SidebarRow(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = if (showLabel) null else section.label,
                 tint = fg,
                 modifier = Modifier.size(22.dp),
             )
-            Text(
-                text = section.label,
-                color = fg,
-                style = if (selected || focused) YancoType.LabelStrong else YancoType.Label,
-            )
+            // Cross-fade the label so the collapsed icon-only state reads as
+            // a graceful shrink, not a label suddenly disappearing on rebuild.
+            // AnimatedVisibility keeps the icon stable while the label slides
+            // in/out from the leading edge.
+            AnimatedVisibility(
+                visible = showLabel,
+                enter = expandHorizontally() + fadeIn(),
+                exit = shrinkHorizontally() + fadeOut(),
+            ) {
+                Text(
+                    text = section.label,
+                    color = fg,
+                    style = if (selected || focused) YancoType.LabelStrong else YancoType.Label,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

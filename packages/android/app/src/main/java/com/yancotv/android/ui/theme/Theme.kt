@@ -4,53 +4,50 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Cinematic dark palette — obsidian surfaces + refined mint accent. Evolved
-// from the first-pass "admin utility" greens toward a streaming-app feel:
-// deeper blacks for contrast, a single brand accent used sparingly, ambient
-// glow reserved for focus and highlights.
+// Concept A — "Frosted Glass Emerald". Deep green-black canvases with a
+// single saturated emerald accent. Tuned in Claude Design (2026-04-23) to
+// match the hex-cut card vocabulary and the 3D coverflow Live TV view.
+// Color references: design CSS vars in YancoTV+Concept A.html.
 object YancoPalette {
-    // Base canvases. BackgroundDeep is near-black with a trace of cool green
-    // so the mint accent harmonises without sitting on pure grey.
-    val BackgroundDeep = Color(0xFF06090B)
-    val BackgroundRaised = Color(0xFF0D1216)
-    val BackgroundHover = Color(0xFF17232A)
-    val BackgroundElevated = Color(0xFF1B2A33)
+    // Base canvases. BackgroundDeep is the near-black floor; everything
+    // else sits above it. Each step adds a touch more green saturation so
+    // panels read as lit by the accent without changing hue.
+    val BackgroundDeep = Color(0xFF050A08)
+    val BackgroundRaised = Color(0xFF0A1410)
+    val BackgroundHover = Color(0xFF0F1C17)
+    val BackgroundElevated = Color(0xFF14251F)
 
-    // Hairline borders. Subtle by default, PanelBorder for stronger divides.
-    val BorderSubtle = Color(0xFF1F2D34)
-    val PanelBorder = Color(0xFF2A3B44)
+    // Hairline borders. Translucent so the green-black canvas bleeds through.
+    val BorderSubtle = Color(0x14FFFFFF)
+    val PanelBorder = Color(0x1FFFFFFF)
 
-    // Text ramp — warm off-white primary, desaturated cool secondary,
-    // dedicated muted tone for tertiary metadata so rails don't shout.
-    val TextPrimary = Color(0xFFECF4F1)
-    val TextSecondary = Color(0xFFB8C7C2)
-    val TextMuted = Color(0xFF7A8E88)
-    val TextFaint = Color(0xFF4C5B57)
+    // Text ramp — ivory primary, desaturated mint secondary, faded forest
+    // muted, near-floor faint for footer-style metadata.
+    val TextPrimary = Color(0xFFF0FFF6)
+    val TextSecondary = Color(0xFFA7B8AF)
+    val TextMuted = Color(0xFF5F7068)
+    val TextFaint = Color(0xFF3A4A43)
 
-    // Brand accent. The single signature colour; used for the logo mark,
-    // focus ring, selected-state highlights, progress fills. Everything
-    // else is neutral so this pops.
-    val Accent = Color(0xFF3DE5A8)
-    val AccentSoft = Color(0xFF8EFFD0)
-    val AccentDeep = Color(0xFF188F66)
-    val AccentGlow = Color(0xFF5CFFBD)
+    // Brand accent — saturated emerald, primary signal everywhere. Deep
+    // partner sits one step warmer/darker for gradients (top→bottom).
+    val Accent = Color(0xFF00E28A)
+    val AccentSoft = Color(0xFF66F0B5)
+    val AccentDeep = Color(0xFF00B872)
+    val AccentGlow = Color(0xFF66F0B5)
 
-    // Muted accent for lower-emphasis chips (HD badge, disabled buttons).
-    // Sits between AccentDeep and the panel borders so it reads as
-    // "accent family" without competing with the primary focus ring.
-    val AccentMuted = Color(0xFF2F8B6A)
+    // Muted accent — for lower-emphasis chips and idle progress fills.
+    val AccentMuted = Color(0xFF1C7A55)
 
-    // Warm amber for "live" indicators / recording dots so it reads as
-    // "signal" not "brand accent". Gold for 4K / premium badges.
-    val Live = Color(0xFFFF5E57)
+    // Warm red for live/recording dots; gold for 4K/premium badges.
+    val Live = Color(0xFFFF3B3B)
     val Premium = Color(0xFFD7B36A)
 
     // Feedback.
     val Error = Color(0xFFFF6B6B)
-    val FocusRing = Color(0xFF6BFFC8)
+    val FocusRing = Color(0xFF66F0B5)
 
-    // Semi-transparent layers derived once so composables don't hand-roll.
-    val Scrim = Color(0xCC050709)
+    // Semi-transparent layers — derived once so composables don't hand-roll.
+    val Scrim = Color(0xCC050A08)
     val Veil = Color(0x66000000)
 }
 

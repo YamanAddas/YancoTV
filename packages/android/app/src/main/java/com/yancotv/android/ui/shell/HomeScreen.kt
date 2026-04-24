@@ -14,11 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -150,10 +152,27 @@ fun HomeScreen(
 
     // Initial focus request. Without this, a user landing on any section
     // has to press a random d-pad key before the focus manager wakes up.
-    // For browse sections (Live / Movies / Series) the requester is wired
-    // into BrowseShell's chip bar — forward motion is sidebar → chips →
-    // rail → detail → player, matching the hierarchical BACK chain below.
+    // For non-browse sections (Home / Guide / Favorites / Search / Settings)
+    // mainContentFocus is the entry point. For browse sections (Live /
+    // Movies / Series), focus into the CategoryRail is owned by
+    // BrowseSection's PlacedFocusAnchor — we just flip panelFocus to
+    // Categories and that effect lands focus on the active pill.
     val mainContentFocus = remember { FocusRequester() }
+    // coverflowFocus moved INTO BrowseSection so it's re-created per type
+    // swap (BrowseSection is wrapped in key(contentType) below). Sharing a
+    // single FocusRequester across types meant requestFocus() targeted the
+    // previous type's now-unmounted leftmost orb; the press silently
+    // landed on no node, contributing to the "Movies retains Live TV
+    // category" symptom because the cascade transition completed without
+    // ever giving focus to the new section's coverflow.
+    // Cascade focus state. Sidebar full-width when focused; collapses to
+    // icon-only otherwise. Categories rail mounts only when focus is in
+    // the sidebar or the rail itself — content takes the floor when it
+    // owns focus. Hoisted above the section LaunchedEffect so that effect
+    // can flip panelFocus → Categories on browse-section entry.
+    // Persisted via rememberSaveable so process death keeps the user
+    // where they were.
+    var panelFocus by rememberSaveable { mutableStateOf(PanelFocus.Sidebar) }
     // MB-89: track the last section we focused so a same-section recomposition
     // (e.g. favorites flow update) doesn't yank focus back to main content.
     var lastFocusedSection by remember { mutableStateOf<AppSection?>(null) }
@@ -161,7 +180,17 @@ fun HomeScreen(
         if (section == lastFocusedSection) return@LaunchedEffect
         lastFocusedSection = section
         delay(120)
-        runCatching { mainContentFocus.requestFocus() }
+        // Browse sections enter via the CategoryRail so the user lands on
+        // a pill (one press away from the coverflow). Flipping panelFocus
+        // to Categories lets BrowseSection's PlacedFocusAnchor land focus
+        // on the actively-selected pill once it's placed in composition.
+        // Non-browse sections enter via mainContentFocus on their own Box.
+        if (contentType != null) {
+            panelFocus = PanelFocus.Categories
+        } else {
+            panelFocus = PanelFocus.Content
+            runCatching { mainContentFocus.requestFocus() }
+        }
     }
 
     // Sidebar focus + tracking. BACK from any non-sidebar zone (detail,
@@ -171,6 +200,9 @@ fun HomeScreen(
     // fire while the user is already on the sidebar.
     val sidebarFocus = remember { FocusRequester() }
     var sidebarHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(sidebarHasFocus) {
+        if (sidebarHasFocus) panelFocus = PanelFocus.Sidebar
+    }
 
     // Re-focus content when the detail overlay is dismissed. Compose
     // doesn't automatically reassign focus to the underlying rail / chip
@@ -230,25 +262,79 @@ fun HomeScreen(
         Row(modifier = Modifier.fillMaxSize()) {
             AppSidebar(
                 current = section,
-                onSelect = { section = it },
+                onSelect = { newSection ->
+                    // Click on a sidebar tab does TWO things:
+                    //   1. Switch section (no-op if same).
+                    //   2. Always navigate INTO the section — clicking the
+                    //      current tab while focused on sidebar must still
+                    //      pull focus to that section's content. Without
+                    //      step 2, clicking your already-active tab is a
+                    //      dead press, which is what the user hit.
+                    // For browse sections, BrowseSection's PlacedFocusAnchor
+                    // lands focus on the active pill once it's placed.
+                    section = newSection
+                    if (newSection.contentType != null) {
+                        panelFocus = PanelFocus.Categories
+                    } else {
+                        panelFocus = PanelFocus.Content
+                        // One frame so the section's content composable has
+                        // mounted before we try to focus it (esp. when
+                        // section actually changed and the old composable
+                        // just left composition).
+                        homeScope.launch {
+                            withFrameNanos { }
+                            runCatching { mainContentFocus.requestFocus() }
+                        }
+                    }
+                },
+                expanded = panelFocus == PanelFocus.Sidebar,
+                onMoveRight = {
+                    // RIGHT mirrors click — both navigate into the section.
+                    // Browse sections (Live/Movies/Series) advance to the
+                    // categories rail; non-browse sections jump straight
+                    // into their content. The sidebar collapses to icon-only
+                    // because expanded = (panelFocus == Sidebar).
+                    if (contentType != null) {
+                        panelFocus = PanelFocus.Categories
+                    } else {
+                        panelFocus = PanelFocus.Content
+                        homeScope.launch {
+                            withFrameNanos { }
+                            runCatching { mainContentFocus.requestFocus() }
+                        }
+                    }
+                },
                 modifier = Modifier
                     .focusRequester(sidebarFocus)
                     .onFocusChanged { sidebarHasFocus = it.hasFocus },
             )
 
             if (contentType != null) {
-                BrowseShell(
-                    type = contentType,
-                    repo = repo,
-                    onActivate = onBrowseActivate,
-                    onChipsFocusChanged = { /* unused — shell is flat now */ },
-                    onRailFocusChanged = { /* unused */ },
-                    entryFocus = mainContentFocus,
-                    onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
-                    restoreFocusOnWindowRegain =
-                        detailItem == null && !searchOverlayVisible && pendingPlay == null,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
+                // Concept A — Live TV / Movies / Series share the cascading
+                // sidebar→categories→content shell. CategoryRail (vertical
+                // hex pills) drives selection; the coverflow + preview pane
+                // live in CoverflowSectionScreen.
+                //
+                // key(contentType) forces a complete unmount/remount on
+                // every type swap. All `remember` / `rememberSaveable` /
+                // PlacedFocusAnchor / FocusRequester instances inside
+                // BrowseSection are guaranteed fresh — no anchor reused
+                // across types (was firing requestFocus on the wrong
+                // node), no stale selectedGroup leaking, no items list
+                // bleeding the previous type's content into the new
+                // section's coverflow during the recompose window.
+                key(contentType) {
+                    BrowseSection(
+                        type = contentType,
+                        panelFocus = panelFocus,
+                        onPanelFocusChanged = { panelFocus = it },
+                        onActivate = onBrowseActivate,
+                        onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
+                        restoreFocusOnWindowRegain =
+                            detailItem == null && !searchOverlayVisible && pendingPlay == null,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
             } else if (section == AppSection.Settings) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                     if (needsSettingsGate) {

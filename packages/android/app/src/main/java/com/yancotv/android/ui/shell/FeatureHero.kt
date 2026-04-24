@@ -171,7 +171,12 @@ private fun HeroBackdrop(
     when {
         playing != null && playing.type == ContentType.LIVE -> {
             Box(Modifier.fillMaxSize()) {
-                MiniPlayer(controller = controller)
+                // Hero backdrop wants the full 520dp lane behind metadata —
+                // fill the available space rather than the legacy 180dp strip.
+                MiniPlayer(
+                    modifier = Modifier.fillMaxSize(),
+                    controller = controller,
+                )
             }
         }
         debouncedUrl?.isNotBlank() == true -> {

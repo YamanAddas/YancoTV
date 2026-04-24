@@ -112,6 +112,27 @@ internal fun visibleGroupsFor(all: List<String>, hidden: Set<String>): List<Stri
     if (hidden.isEmpty()) all else all.filter { it !in hidden }
 
 /**
+ * Concept A category-priority sort: float Arabic + English (and their
+ * localised variants) to the front so the chip bar opens on the user's
+ * most-likely first picks, then preserve playlist declaration order for
+ * the rest. Pure / stable so the chip-bar scroll position stays sane.
+ */
+internal fun prioritizedGroupsFor(visible: List<String>): List<String> {
+    if (visible.isEmpty()) return visible
+    val priority: (String) -> Int = { g ->
+        val lower = g.lowercase()
+        when {
+            lower.contains("arabic") || lower.contains("عربي") -> 0
+            lower.contains("english") || lower.contains(" uk") || lower.contains(" usa") || lower.contains(" us ") -> 1
+            else -> 2
+        }
+    }
+    return visible.withIndex()
+        .sortedWith(compareBy({ priority(it.value) }, { it.index }))
+        .map { it.value }
+}
+
+/**
  * Apply parental-control filters to a catalogue list. `hiddenIds` drops
  * specific rows the user has hidden; `hideAdult` layers the adult-content
  * heuristic on top. Kept pure so the rail / hero index math works off the
@@ -247,7 +268,7 @@ fun BrowseShell(
 
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
     val visibleGroups = remember(groupsState.toList(), hiddenGroups) {
-        visibleGroupsFor(groupsState.toList(), hiddenGroups)
+        prioritizedGroupsFor(visibleGroupsFor(groupsState.toList(), hiddenGroups))
     }
 
     // Chip selection — persisted per section via rememberSaveable. If the
