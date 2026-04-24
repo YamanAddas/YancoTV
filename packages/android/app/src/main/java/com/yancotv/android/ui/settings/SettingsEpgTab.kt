@@ -1,6 +1,9 @@
 package com.yancotv.android.ui.settings
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.media3.common.util.UnstableApi
@@ -22,9 +25,15 @@ import com.yancotv.android.ui.shell.GuideSyncPanel
 @UnstableApi
 @Composable
 fun SettingsEpgTab(modifier: Modifier = Modifier) {
-    GuideSyncPanel(
-        compact = false,
-        onRefreshed = { /* Settings doesn't re-query guide data */ },
-        modifier = modifier.fillMaxSize(),
-    )
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+    ) {
+        GuideSyncPanel(
+            compact = false,
+            onRefreshed = { /* Settings doesn't re-query guide data */ },
+        )
+    }
 }

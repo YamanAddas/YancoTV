@@ -387,16 +387,22 @@ private fun ContentPane(
     ) {
         Breadcrumb(current = current)
         HairlineDivider()
-        Column(
+        // No outer scroll — each tab owns its own scroll (LazyColumn for lazy
+        // tabs like Parental/Groups/Sources, verticalScroll for the simple
+        // Column-based tabs). Wrapping in verticalScroll here crashes with
+        // "infinity maximum height constraints" the moment a child tab uses
+        // a LazyColumn. `key(current)` resets scroll state when the tab
+        // swaps, so switching away from a scrolled tab and back lands at
+        // top rather than keeping a stale offset.
+        Box(
             modifier =
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 44.dp, end = 44.dp, top = 32.dp, bottom = 32.dp),
+                    .fillMaxWidth(),
         ) {
-            TabContent(tab = current)
-            Spacer(modifier = Modifier.height(40.dp))
+            androidx.compose.runtime.key(current) {
+                TabContent(tab = current)
+            }
         }
     }
 }
