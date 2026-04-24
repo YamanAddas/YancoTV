@@ -1,0 +1,12 @@
+# Revisions to skip in `git blame` output.
+#
+# Tell git to use this file by running once per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# IDE integrations (IntelliJ, VS Code GitLens) read it automatically.
+# Only add commits that are pure mechanical reformat / rename — never
+# behavior changes. The point is to keep `blame` pointing at the
+# author who actually wrote the line.
+
+# D.1b — mechanical ktlint reformat across :app and :shared
+4c0b50d05d9e0e8611116557b44cfd532b4b93a5
