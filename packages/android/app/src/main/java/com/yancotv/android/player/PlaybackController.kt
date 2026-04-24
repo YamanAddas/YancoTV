@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -114,13 +115,27 @@ class PlaybackController(
                         // retainBackBufferFromKeyframe =
                         true,
                     ).build()
-            ExoPlayer
-                .Builder(context)
-                .setMediaSourceFactory(
-                    DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
-                ).setLoadControl(loadControl)
-                .setHandleAudioBecomingNoisy(true)
-                .build()
+            val exo =
+                ExoPlayer
+                    .Builder(context)
+                    .setMediaSourceFactory(
+                        DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
+                    ).setLoadControl(loadControl)
+                    .setHandleAudioBecomingNoisy(true)
+                    .build()
+            // MK.12a.2 — apply the user's persisted preferred audio language
+            // at construction so channels with multi-language audio default
+            // to their pick. ExoPlayer carries TrackSelectionParameters across
+            // MediaItem swaps, so one write here covers every channel zap.
+            val preferredAudio = prefs.playbackFlow.value.audioLanguage
+            if (preferredAudio.isNotBlank()) {
+                exo.trackSelectionParameters =
+                    exo.trackSelectionParameters
+                        .buildUpon()
+                        .setPreferredAudioLanguage(preferredAudio)
+                        .build()
+            }
+            exo
         }
 
     // Main-immediate so state mutations stay on the main thread; IO work

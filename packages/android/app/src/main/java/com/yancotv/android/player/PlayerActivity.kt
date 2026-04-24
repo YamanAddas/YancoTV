@@ -132,6 +132,7 @@ class PlayerActivity : AppCompatActivity() {
     // MK.12a.2+ land. Opened via KEYCODE_MENU or long-press CENTER.
     private var sheetOverlay: ComposeView? = null
     private var sheetVisible by mutableStateOf(false)
+    private var sheetMode by mutableStateOf(SheetMode.OPTIONS)
 
     private var listenerAttached = false
     private var controllerVisible = false
@@ -742,7 +743,11 @@ class PlayerActivity : AppCompatActivity() {
         inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         inflated.setContent {
             if (sheetVisible) {
-                PlayerOptionsSheet(onDismiss = { hideSheet() })
+                PlayerOptionsSheet(
+                    mode = sheetMode,
+                    onModeChange = { sheetMode = it },
+                    onDismiss = { hideSheet() },
+                )
             }
         }
         sheetOverlay = inflated
@@ -754,6 +759,7 @@ class PlayerActivity : AppCompatActivity() {
         // Hide the Media3 controller if it was up — the sheet sits over the
         // controls and a two-layer overlay reads as broken.
         playerView.hideController()
+        sheetMode = SheetMode.OPTIONS
         sheetVisible = true
         val v = ensureSheetOverlay()
         v.visibility = View.VISIBLE
@@ -763,6 +769,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun hideSheet() {
         if (!sheetVisible) return
         sheetVisible = false
+        sheetMode = SheetMode.OPTIONS
         sheetOverlay?.visibility = View.GONE
         playerView.requestFocus()
     }
@@ -820,7 +827,14 @@ class PlayerActivity : AppCompatActivity() {
         // Compose's own key handling gets the event.
         if (sheetVisible) {
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                hideSheet()
+                // BACK from a sub-view (audio / subs / speed / aspect) first
+                // returns to the top-level options list. Only a BACK from the
+                // top list dismisses the whole sheet.
+                if (sheetMode != SheetMode.OPTIONS) {
+                    sheetMode = SheetMode.OPTIONS
+                } else {
+                    hideSheet()
+                }
                 return true
             }
             return super.onKeyDown(keyCode, event)
