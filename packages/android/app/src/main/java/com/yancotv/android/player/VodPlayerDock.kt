@@ -128,6 +128,13 @@ fun VodPlayerDock(
     onOpenSheet: (SheetMode) -> Unit,
     onSeekTo: (Long) -> Unit,
     onUserInteraction: () -> Unit,
+    // True when the active queue has more than one item — i.e. prev/next can
+    // actually move to a sibling. False for VOD movies (one-item queue) and
+    // for the interim episode-play path (single-episode queue, until
+    // sibling-episode loading lands as a follow-up MK). The dock hides the
+    // ‹/› transport buttons entirely when this is false so the user isn't
+    // staring at controls that no-op when pressed.
+    hasSiblings: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (visibility != VodDockVisibility.VISIBLE) return
@@ -182,6 +189,7 @@ fun VodPlayerDock(
                     onNext = onNext,
                     onOpenSheet = onOpenSheet,
                     onUserInteraction = onUserInteraction,
+                    hasSiblings = hasSiblings,
                 )
                 Spacer(Modifier.height(26.dp))
                 VodDockHintRow()
@@ -381,21 +389,28 @@ private fun VodDockTransportRow(
     onNext: () -> Unit,
     onOpenSheet: (SheetMode) -> Unit,
     onUserInteraction: () -> Unit,
+    hasSiblings: Boolean,
 ) {
     Row(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        TransportButton(
-            label = "‹",
-            size = 52.dp,
-            onClick = {
-                onUserInteraction()
-                onPrevious()
-            },
-        )
-        Spacer(Modifier.width(14.dp))
+        // ‹ / › only render when the queue has more than one item — otherwise
+        // they're dead controls because PlaybackController.step coerces to a
+        // valid index and no-ops when target == current. Single-item queues
+        // happen for VOD movies and (interim) the per-episode play path.
+        if (hasSiblings) {
+            TransportButton(
+                label = "‹",
+                size = 52.dp,
+                onClick = {
+                    onUserInteraction()
+                    onPrevious()
+                },
+            )
+            Spacer(Modifier.width(14.dp))
+        }
         TransportButton(
             label = "-10",
             size = 58.dp,
@@ -424,15 +439,17 @@ private fun VodDockTransportRow(
                 onSkipForward()
             },
         )
-        Spacer(Modifier.width(14.dp))
-        TransportButton(
-            label = "›",
-            size = 52.dp,
-            onClick = {
-                onUserInteraction()
-                onNext()
-            },
-        )
+        if (hasSiblings) {
+            Spacer(Modifier.width(14.dp))
+            TransportButton(
+                label = "›",
+                size = 52.dp,
+                onClick = {
+                    onUserInteraction()
+                    onNext()
+                },
+            )
+        }
         Spacer(Modifier.width(30.dp))
         // Each secondary chip routes to the matching sheet tab. CC → SUBS
         // because the enum name is SUBS but the user-facing vocab is CC on

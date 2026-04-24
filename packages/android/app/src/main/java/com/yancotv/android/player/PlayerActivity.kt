@@ -18,6 +18,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -931,10 +932,17 @@ class PlayerActivity : AppCompatActivity() {
         val inflated = stub.inflate() as ComposeView
         inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         inflated.setContent {
+            // Reactively hide the prev/next buttons when the active queue is
+            // single-item (VOD movies, per-episode play). collectAsState here
+            // (not baked into dockData) keeps the visibility tied to the live
+            // queue StateFlow so Live TV → channel zap or future queue swaps
+            // recompute without a manual refresh.
+            val queueSnapshot by controller.queue.collectAsState()
             VodPlayerDock(
                 visibility = if (dockVisible) VodDockVisibility.VISIBLE else VodDockVisibility.HIDDEN,
                 data = dockData,
                 progress = dockProgress,
+                hasSiblings = queueSnapshot.size > 1,
                 onTogglePlayPause = {
                     val p = controller.player
                     p.playWhenReady = !p.playWhenReady
