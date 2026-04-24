@@ -254,6 +254,39 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 
 ---
 
+## D — Debugging & hardening (post-MK.11, runs in parallel with MK.12)
+
+Standing phase started 2026-04-24 after the cascade-nav focus bug shipped in `4a8a46e`. Goal: surface regressions in tooling instead of in user manual-test reports, before MK.12 distribution. **Scope was red-teamed** — `:macrobenchmark`, Crashlytics, Sentry, and a `scripts/logcat.sh` were all rejected as overkill / wrong-platform / not-needed-for-personal-app.
+
+**Active hooks (already wired):**
+- LeakCanary 2.14 — `debugImplementation` only (single-process, the optional `androidx.work:work-multiprocess` integration is intentionally absent)
+- StrictMode in `YancoApp.onCreate` behind `BuildConfig.DEBUG` — `penaltyLog` only, never `penaltyDeath` (Coil/Media3/WorkManager init paths trip false positives we still need to triage)
+- Compose compiler stability + recomposition reports — opt-in via `-PcomposeCompilerReports=true -PcomposeCompilerMetrics=true`, output at `app/build/compose_compiler/`
+
+**Compose baseline (2026-04-24, commit `7fa1bf9`)** — every D.* iteration that touches UI should re-run reports and compare:
+- 480 restartable composables, 218 skippable (45%) — half recompose unnecessarily
+- 14 inferred unstable classes, 186 unstable args — `@Stable`/`@Immutable` candidates
+- StrongSkipping: ON (Kotlin 2.1.0 + Compose plugin 2.1.0)
+
+| # | Task | DoD | Status |
+|---|---|---|---|
+| D.0 | Wire LeakCanary + StrictMode + Compose compiler reports flag (`buildFeatures { buildConfig = true }` for the DEBUG gate) | App boots clean, LeakCanary `InternalLeakCanary.invoke` runs at start, StrictMode logs at `adb logcat -s StrictMode:*`, reports generate to `app/build/compose_compiler/` on the opt-in flag | **DONE** `7fa1bf9` |
+| D.1 | Run `./gradlew :app:lint` once, capture baseline (`lintBaseline = file("lint-baseline.xml")` in `android.lint{}`) so every NEW warning fails the build. Then add ktlint via `org.jlleitschuh.gradle.ktlint`, run `./gradlew ktlintFormat` once, commit the mechanical reformat as a SEPARATE commit so `git blame` stays clean | One lint baseline file checked in; ktlint config + formatted tree in two distinct commits | pending |
+| D.2 | Stand up `app/src/androidTest/` with `androidx.compose.ui:ui-test-junit4` + `androidx.test.ext:junit` + `androidx.test:runner`. Write 3 focus tests covering the cascade we just fixed in `4a8a46e`: (a) Sidebar→Categories RIGHT, (b) Categories→Content RIGHT commits selected pill, (c) Live→Movies type swap remounts with fresh `pillAnchor` and lands focus on Movies' All pill — NOT a stale Live TV node | All 3 tests pass on Fire TV emulator + actual device. Locks the 4-bug cascade fix as a regression net | pending |
+| D.3 | Turn on R8 in release: `isMinifyEnabled = true`, `isShrinkResources = true`. Discover + write keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines. Do this UNDER NO DEADLINE PRESSURE, not during MK.12 | `./gradlew :app:assembleRelease` runs; resulting APK boots, plays a stream end-to-end, persists resume point. Per-ABI splits still under 60MB | pending |
+| D.4 | `Thread.setDefaultUncaughtExceptionHandler` in `YancoApp.onCreate` writing last-crash to `filesDir/crash.log` + Kermit. NO Crashlytics, NO Sentry — owns its own data, no DSN management for a personal app | Force a crash → next launch reads `filesDir/crash.log` and surfaces it (or just logs it for now) | pending |
+| D.5 | Behavioural tests for the two skill-checklist landmines: (a) `positionFor(contentId)` returns null for a series container with no content-level row (never an episode row), (b) `controller.currentId == target.id` short-circuit at every `controller.play(` call site — write a test fixture that calls each launch site twice with the same item, asserts the second call doesn't re-prepare the `MediaItem` | Both tests in `:shared:commonTest` (positionFor) and `app/src/test/` (currentId guard) | pending |
+| D.6 | Audit pass — read `logger/AndroidLogger.kt` (currently routes shared-module Logger to `android.util.Log`; CLAUDE.md claims "Kermit logging" but Android side doesn't actually use Kermit), grep all `BackHandler {` sites for missing back-stack handling, grep `controller.play(` sites for the two-tap guard, grep `AsyncImage(` for missing `contentDescription` | Punch list of findings written into a follow-up `D.7` task per finding | pending |
+
+**Explicitly out-of-scope (red-teamed and rejected):**
+- `:macrobenchmark` Gradle module + baseline-profile generator — weeks of yak-shaving for a personal IPTV app with no perf complaint on file. Use `dumpsys gfxinfo com.yancotv.android framestats` + the Compose recomposition reports above. Revisit only if a real jank report lands.
+- Crashlytics / Sentry — DSN management, GDPR'd SDKs, `google-services.json` bloat. D.4's local crash log is the cheaper win.
+- `scripts/logcat.sh` — wrong shell for a Windows-first repo (`scripts/` has `.ps1` + `.js`, no `.sh`). Personal-shell territory, not repo territory.
+
+**Reading order for a cold reader picking this up:** [packages/android/CLAUDE.md](packages/android/CLAUDE.md) → [`.claude/skills/native-android-mk/SKILL.md`](.claude/skills/native-android-mk/SKILL.md) → this section → `git log --oneline 7fa1bf9^..` to see what D.0 actually changed → `app/build/compose_compiler/app_debug-module.json` for the latest baseline numbers.
+
+---
+
 ## iOS / iPadOS (MK.iOS.* — post-Android 1.0)
 
 Scoped as a separate milestone block once Android ships. Rough shape:
