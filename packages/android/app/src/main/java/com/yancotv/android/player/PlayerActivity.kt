@@ -127,6 +127,12 @@ class PlayerActivity : AppCompatActivity() {
     private var surfOverlay: ComposeView? = null
     private var surfVisible by mutableStateOf(false)
 
+    // Player-options sheet (MK.12a.1) — same lazy-inflation pattern as the
+    // surf overlay. Hosts audio/subtitle/speed/aspect/sleep pickers as
+    // MK.12a.2+ land. Opened via KEYCODE_MENU or long-press CENTER.
+    private var sheetOverlay: ComposeView? = null
+    private var sheetVisible by mutableStateOf(false)
+
     private var listenerAttached = false
     private var controllerVisible = false
     private var currentProgramme: EpgProgramme? = null
@@ -727,6 +733,40 @@ class PlayerActivity : AppCompatActivity() {
         playerView.requestFocus()
     }
 
+    // ───── Player options sheet (MK.12a.1) ─────
+
+    private fun ensureSheetOverlay(): ComposeView {
+        sheetOverlay?.let { return it }
+        val stub = findViewById<android.view.ViewStub>(R.id.player_options_sheet_stub)
+        val inflated = stub.inflate() as ComposeView
+        inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        inflated.setContent {
+            if (sheetVisible) {
+                PlayerOptionsSheet(onDismiss = { hideSheet() })
+            }
+        }
+        sheetOverlay = inflated
+        return inflated
+    }
+
+    private fun showSheet() {
+        if (sheetVisible) return
+        // Hide the Media3 controller if it was up — the sheet sits over the
+        // controls and a two-layer overlay reads as broken.
+        playerView.hideController()
+        sheetVisible = true
+        val v = ensureSheetOverlay()
+        v.visibility = View.VISIBLE
+        v.post { v.requestFocus() }
+    }
+
+    private fun hideSheet() {
+        if (!sheetVisible) return
+        sheetVisible = false
+        sheetOverlay?.visibility = View.GONE
+        playerView.requestFocus()
+    }
+
     // ───── Keys ─────
 
     /**
@@ -775,6 +815,16 @@ class PlayerActivity : AppCompatActivity() {
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        // Options sheet takes precedence over surf — BACK dismisses it and
+        // D-pad drives its Compose focus. Everything else falls through so
+        // Compose's own key handling gets the event.
+        if (sheetVisible) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                hideSheet()
+                return true
+            }
+            return super.onKeyDown(keyCode, event)
+        }
         // Surf overlay swallows keys while visible — it has its own focus
         // traversal; only BACK dismisses it. Do this early so built-in
         // PlayerView handlers don't also act on the key press.
@@ -799,15 +849,19 @@ class PlayerActivity : AppCompatActivity() {
                 finish()
                 return true
             }
+            // MENU (Fire TV's 3-dot key / Android TV options key) opens the
+            // player-options sheet. Previously showed the Media3 controller,
+            // but CENTER/ENTER already does that — MENU now owns the deeper
+            // options surface (audio / subs / speed / aspect / sleep).
             KeyEvent.KEYCODE_MENU -> {
-                playerView.showController()
+                showSheet()
                 return true
             }
             // OK / ENTER toggles the controller — the user asked explicitly
             // for "controls hidden on open, OK to show, OK (or timeout) to
-            // hide" behaviour (2026-04-22). When the controller is already
-            // visible we let Media3 handle the key so the focused transport
-            // button (play/pause, seek) still works; otherwise we pop it.
+            // hide" behaviour (2026-04-22). Long-press CENTER → sheet is a
+            // follow-up; it needs event.startTracking() + onKeyLongPress
+            // plumbing that conflicts with the short-press path here.
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (!controllerVisible) {
                     playerView.showController()

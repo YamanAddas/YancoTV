@@ -296,6 +296,18 @@
         android:inflatedId="@+id/surf_overlay"
         android:layout="@layout/player_surf_overlay" />
 
+    <!-- Player-options bottom sheet (MK.12a.1). MENU on the remote / long-press
+         CENTER opens it; it hosts audio/subtitle/speed/aspect pickers + the
+         sleep timer from MK.12a.2–12a.5 + MK.12b. Inflated lazily like the
+         surf overlay — most sessions never open it. -->
+    <ViewStub
+        android:id="@+id/player_options_sheet_stub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="bottom"
+        android:inflatedId="@+id/player_options_sheet"
+        android:layout="@layout/player_options_sheet" />
+
     <!-- Stream error overlay: shown when ExoPlayer surfaces an unrecoverable
          error (connection failed, 403/404, codec gap). User can retry or
          back out to the shell. Hidden until onPlayerError fires. -->
