@@ -346,7 +346,8 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
-| MK.17.1 | **Wire `AppPreferences.networkFlow` into `PlaybackController`** — rebuild `OkHttpClient` on flow emission, pass UA header, apply connect + read timeouts. Existing prefs keys become functional | 🟢 wire | Change UA in Settings → next stream request uses new UA (verify via mitmproxy / curl parity); same for timeouts |
+| MK.17.1 | ~~**Wire `AppPreferences.networkFlow` into `PlaybackController`**~~ — **DONE `cff752d`** (2026-04-24). OkHttp interceptor reads `prefs.networkFlow.value` per request: UA via header rewrite, connect + read timeouts via `Chain.withConnectTimeout/withReadTimeout`. ExoPlayer stays constructed once | 🟢 wire | ✅ |
+| MK.17.1a | **UA preset dropdown** — replace free-text UA field with dropdown of 5–7 known-good IPTV UAs (VLC default, ExoPlayer, Kodi, Smart TV generic, Chrome Android) + "Custom…" escape hatch that reveals the existing text field. Typos silently fail today; presets fix that | 🟡 glue | Dropdown selection writes through to `AppPreferences.setUserAgent`, next stream request carries the selected UA (verify via logcat) |
 | MK.17.2 | "Test connection" button in Network tab — HEAD request to first active source using current settings; reports status / latency / UA echoed | 🔴 new | Misconfig caught before playback fails |
 | MK.17.3 | HW decoder preference + fallback toggle — `DefaultRenderersFactory.setEnableDecoderFallback(true)` + `setExtensionRendererMode()` surfacing | 🟢 wire | Toggle forces SW decode; visible in quick-info overlay |
 | MK.17.4 | Buffer tuning — 3 presets (Low-latency / Balanced / Stable) mapped to `DefaultLoadControl.Builder` params. No free sliders | 🟢 wire | Preset change rebuilds `ExoPlayer` LoadControl on next `prepare()` |
