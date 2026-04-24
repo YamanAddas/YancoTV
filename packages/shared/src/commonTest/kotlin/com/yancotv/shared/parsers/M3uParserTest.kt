@@ -10,7 +10,6 @@ import kotlin.test.assertTrue
  * ports of added cases land here in the same commit.
  */
 class M3uParserTest {
-
     @Test
     fun parsesBasicPlaylist() {
         val content = """#EXTM3U

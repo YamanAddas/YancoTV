@@ -61,7 +61,6 @@ class AndroidEpgImporter(
     private val writer: BulkEpgWriter,
     private val logger: Logger,
 ) {
-
     /** Progress callback — sent on phase transitions and every ~5 s during streaming. */
     fun interface Progress {
         suspend fun report(msg: String)
@@ -76,7 +75,9 @@ class AndroidEpgImporter(
             }
 
             val knownTvgIds = loadKnownTvgIds()
-            logger.info("EPG stream: user has ${knownTvgIds.size} live channels with tvg_id; EPG rows for unknown channels will be filtered out")
+            logger.info(
+                "EPG stream: user has ${knownTvgIds.size} live channels with tvg_id; EPG rows for unknown channels will be filtered out",
+            )
 
             val session = writer.openSession()
             val errors = mutableListOf<String>()
@@ -91,7 +92,7 @@ class AndroidEpgImporter(
                     try {
                         val dlStart = System.currentTimeMillis()
                         val bytes = downloadToFile(target.url, tempFile)
-                        logger.info("EPG stream: downloaded ${bytes} bytes in ${System.currentTimeMillis() - dlStart}ms from ${target.url}")
+                        logger.info("EPG stream: downloaded $bytes bytes in ${System.currentTimeMillis() - dlStart}ms from ${target.url}")
 
                         onProgress.report("Parsing EPG $label")
                         val parseStart = System.currentTimeMillis()
@@ -105,7 +106,9 @@ class AndroidEpgImporter(
                             onProgress = onProgress,
                         )
                         val written = session.rowsWritten - beforeRows
-                        logger.info("EPG stream: source ${target.sourceKey} ingested $written rows (filtered) in ${System.currentTimeMillis() - parseStart}ms")
+                        logger.info(
+                            "EPG stream: source ${target.sourceKey} ingested $written rows (filtered) in ${System.currentTimeMillis() - parseStart}ms",
+                        )
                         if (written > 0) anySucceeded = true else errors.add("${target.sourceKey}: 0 programmes after filter")
                     } catch (t: Throwable) {
                         val msg = t.message ?: t::class.simpleName ?: "unknown"
@@ -148,14 +151,19 @@ class AndroidEpgImporter(
 
     // ───── download ─────
 
-    private fun downloadToFile(url: String, dest: File): Long {
-        val client = HTTP.newCall(
-            Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .header("Accept-Encoding", "gzip")
-                .build(),
-        )
+    private fun downloadToFile(
+        url: String,
+        dest: File,
+    ): Long {
+        val client =
+            HTTP.newCall(
+                Request
+                    .Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept-Encoding", "gzip")
+                    .build(),
+            )
         client.execute().use { response ->
             if (!response.isSuccessful) {
                 throw RuntimeException("HTTP ${response.code} ${response.message}")
@@ -328,7 +336,10 @@ class AndroidEpgImporter(
     }
 
     /** Advance past the matching END_TAG for a [tagName] the caller just entered. */
-    private fun skipToEnd(parser: XmlPullParser, tagName: String) {
+    private fun skipToEnd(
+        parser: XmlPullParser,
+        tagName: String,
+    ) {
         var depth = 1
         while (depth > 0) {
             when (parser.next()) {
@@ -362,13 +373,20 @@ class AndroidEpgImporter(
             val url = s.epg_url?.trim().orEmpty()
             if (url.isNotEmpty()) out.add(EpgTarget(url = url, sourceKey = s.id))
         }
-        val global = db.settingsQueries.get(EpgRepository.GLOBAL_URL_KEY).executeAsOneOrNull()?.takeIf { it.isNotBlank() }
+        val global =
+            db.settingsQueries
+                .get(EpgRepository.GLOBAL_URL_KEY)
+                .executeAsOneOrNull()
+                ?.takeIf { it.isNotBlank() }
         if (global != null) out.add(EpgTarget(url = global, sourceKey = GLOBAL))
         return out
     }
 
     private fun loadKnownTvgIds(): Set<String> =
-        db.contentQueries.distinctLiveTvgIds().executeAsList().toHashSet()
+        db.contentQueries
+            .distinctLiveTvgIds()
+            .executeAsList()
+            .toHashSet()
 
     private fun recordError(msg: String?) {
         if (msg.isNullOrBlank()) {
@@ -378,7 +396,10 @@ class AndroidEpgImporter(
         }
     }
 
-    private data class EpgTarget(val url: String, val sourceKey: String)
+    private data class EpgTarget(
+        val url: String,
+        val sourceKey: String,
+    )
 
     companion object {
         private const val GLOBAL = EpgRepository.GLOBAL_SOURCE_KEY
@@ -389,12 +410,14 @@ class AndroidEpgImporter(
         // Shared OkHttp instance. Timeouts sized for multi-MB XMLTV files on
         // slow residential connections. Follow redirects so providers that
         // 302 to a CDN work.
-        private val HTTP: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(300, TimeUnit.SECONDS)
-            .callTimeout(600, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
+        private val HTTP: OkHttpClient =
+            OkHttpClient
+                .Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(300, TimeUnit.SECONDS)
+                .callTimeout(600, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
     }
 }

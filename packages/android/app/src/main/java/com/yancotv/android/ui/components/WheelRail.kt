@@ -50,32 +50,35 @@ fun Modifier.wheelItemTransform(
     maxRotationDegrees: Float = 38f,
     minScale: Float = 0.82f,
     minAlpha: Float = 0.6f,
-): Modifier = this.graphicsLayer {
-    val layoutInfo = listState.layoutInfo
-    val viewportWidth = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat()
-    if (viewportWidth <= 0f) return@graphicsLayer
-    val viewportCenter = layoutInfo.viewportStartOffset + viewportWidth / 2f
-    val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-        ?: return@graphicsLayer
-    val itemCenter = itemInfo.offset + itemInfo.size / 2f
-    val halfViewport = viewportWidth / 2f
-    val normalized = ((itemCenter - viewportCenter) / halfViewport).coerceIn(-1f, 1f)
-    val absN = abs(normalized)
+): Modifier =
+    this.graphicsLayer {
+        val layoutInfo = listState.layoutInfo
+        val viewportWidth = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat()
+        if (viewportWidth <= 0f) return@graphicsLayer
+        val viewportCenter = layoutInfo.viewportStartOffset + viewportWidth / 2f
+        val itemInfo =
+            layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+                ?: return@graphicsLayer
+        val itemCenter = itemInfo.offset + itemInfo.size / 2f
+        val halfViewport = viewportWidth / 2f
+        val normalized = ((itemCenter - viewportCenter) / halfViewport).coerceIn(-1f, 1f)
+        val absN = abs(normalized)
 
-    cameraDistance = 14f * density
-    rotationY = normalized * maxRotationDegrees
-    val s = 1f - (1f - minScale) * absN
-    scaleX = s
-    scaleY = s
-    alpha = 1f - (1f - minAlpha) * absN
-    // Pivot lerps from 0.5 (centre) at normalized=0 to the inner edge
-    // (0 or 1) at |normalized|=1. No sign-flip pop at zero-crossing.
-    val innerEdge = if (normalized < 0f) 1f else 0f
-    transformOrigin = TransformOrigin(
-        pivotFractionX = 0.5f + (innerEdge - 0.5f) * absN,
-        pivotFractionY = 0.5f,
-    )
-}
+        cameraDistance = 14f * density
+        rotationY = normalized * maxRotationDegrees
+        val s = 1f - (1f - minScale) * absN
+        scaleX = s
+        scaleY = s
+        alpha = 1f - (1f - minAlpha) * absN
+        // Pivot lerps from 0.5 (centre) at normalized=0 to the inner edge
+        // (0 or 1) at |normalized|=1. No sign-flip pop at zero-crossing.
+        val innerEdge = if (normalized < 0f) 1f else 0f
+        transformOrigin =
+            TransformOrigin(
+                pivotFractionX = 0.5f + (innerEdge - 0.5f) * absN,
+                pivotFractionY = 0.5f,
+            )
+    }
 
 /**
  * [BringIntoViewSpec] that asks the nearest scroll container to centre the
@@ -89,19 +92,20 @@ fun Modifier.wheelItemTransform(
  * this one.
  */
 @OptIn(ExperimentalFoundationApi::class)
-private val CenterBringIntoViewSpec = object : BringIntoViewSpec {
-    override fun calculateScrollDistance(
-        offset: Float,
-        size: Float,
-        containerSize: Float,
-    ): Float {
-        // offset is the item's start position within the container (post
-        // contentPadding). To centre, we want the item's centre to land at
-        // containerSize / 2. Return the delta the container should scroll.
-        val target = (containerSize - size) / 2f
-        return offset - target
+private val CenterBringIntoViewSpec =
+    object : BringIntoViewSpec {
+        override fun calculateScrollDistance(
+            offset: Float,
+            size: Float,
+            containerSize: Float,
+        ): Float {
+            // offset is the item's start position within the container (post
+            // contentPadding). To centre, we want the item's centre to land at
+            // containerSize / 2. Return the delta the container should scroll.
+            val target = (containerSize - size) / 2f
+            return offset - target
+        }
     }
-}
 
 /**
  * A [LazyRow] that renders like a horizontal wheel: the focused card sits
@@ -132,12 +136,13 @@ fun WheelRow(
             LazyRow(
                 state = listState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(
-                    start = sidePad,
-                    end = sidePad,
-                    top = verticalPadding,
-                    bottom = verticalPadding,
-                ),
+                contentPadding =
+                    PaddingValues(
+                        start = sidePad,
+                        end = sidePad,
+                        top = verticalPadding,
+                        bottom = verticalPadding,
+                    ),
                 horizontalArrangement = horizontalArrangement,
                 verticalAlignment = verticalAlignment,
                 content = content,

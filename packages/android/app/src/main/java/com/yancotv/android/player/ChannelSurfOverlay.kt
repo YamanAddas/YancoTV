@@ -73,31 +73,35 @@ fun ChannelSurfOverlay(
     // cover most personal lists without paying a paginated-load cost while
     // the overlay is open — surf sessions are typically a handful of rows.
     LaunchedEffect(Unit) {
-        val loaded = withContext(Dispatchers.IO) {
-            runCatching { repo.page(ContentType.LIVE, null, 0L, 200L) }
-                .getOrElse { emptyList() }
-        }
+        val loaded =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.page(ContentType.LIVE, null, 0L, 200L) }
+                    .getOrElse { emptyList() }
+            }
         items = loaded
         val tvgIds = loaded.mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
         if (tvgIds.isNotEmpty()) {
-            nowNext = withContext(Dispatchers.IO) {
-                runCatching { epg.getNowNextBatch(tvgIds) }.getOrElse { emptyMap() }
-            }
+            nowNext =
+                withContext(Dispatchers.IO) {
+                    runCatching { epg.getNowNextBatch(tvgIds) }.getOrElse { emptyMap() }
+                }
         }
     }
 
     // Seed focus on the currently-playing row so the user doesn't have to
     // scroll back to their own channel after opening the surf overlay.
-    val initialIndex = remember(items, currentContentId) {
-        items.indexOfFirst { it.id == currentContentId }.takeIf { it >= 0 } ?: 0
-    }
+    val initialIndex =
+        remember(items, currentContentId) {
+            items.indexOfFirst { it.id == currentContentId }.takeIf { it >= 0 } ?: 0
+        }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex.coerceAtLeast(0))
 
     Column(
-        modifier = Modifier
-            .fillMaxHeight()
-            .background(Color.Black.copy(alpha = 0.78f))
-            .padding(vertical = 16.dp),
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .background(Color.Black.copy(alpha = 0.78f))
+                .padding(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
@@ -120,7 +124,9 @@ fun ChannelSurfOverlay(
             state = listState,
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+            contentPadding =
+                androidx.compose.foundation.layout
+                    .PaddingValues(horizontal = 12.dp),
         ) {
             itemsIndexed(items, key = { _, it -> it.id }) { idx, item ->
                 SurfRow(
@@ -153,11 +159,12 @@ private fun SurfRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = when {
-        focused -> YancoPalette.Accent.copy(alpha = 0.28f)
-        playing -> YancoPalette.BackgroundRaised
-        else -> Color.Transparent
-    }
+    val bg =
+        when {
+            focused -> YancoPalette.Accent.copy(alpha = 0.28f)
+            playing -> YancoPalette.BackgroundRaised
+            else -> Color.Transparent
+        }
     val border = if (focused) YancoPalette.FocusRing else Color.Transparent
     val title = item.cleanTitle?.ifBlank { null } ?: item.title
 
@@ -165,24 +172,26 @@ private fun SurfRow(
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focusRequester.requestFocus() } }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(6.dp))
-            .focusRequester(focusRequester)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .border(1.dp, border, RoundedCornerShape(6.dp))
+                .focusRequester(focusRequester)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(YancoPalette.BackgroundDeep),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(YancoPalette.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
@@ -221,12 +230,12 @@ private fun SurfRow(
         if (playing) {
             Spacer(modifier = Modifier.width(2.dp))
             Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(YancoPalette.Accent, RoundedCornerShape(2.dp)),
+                modifier =
+                    Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(YancoPalette.Accent, RoundedCornerShape(2.dp)),
             )
         }
     }
 }
-

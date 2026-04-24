@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class QualityBadgeTest {
-
     @Test
     fun `extracts single tier`() {
         assertEquals(listOf(QualityBadge.UHD_4K), QualityBadge.parse("BBC News 4K"))

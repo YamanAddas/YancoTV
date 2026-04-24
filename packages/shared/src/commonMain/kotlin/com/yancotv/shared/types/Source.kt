@@ -5,10 +5,17 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class SourceType {
-    @SerialName("m3u_url") M3U_URL,
-    @SerialName("m3u_file") M3U_FILE,
-    @SerialName("xtream") XTREAM,
-    @SerialName("stalker") STALKER,
+    @SerialName("m3u_url")
+    M3U_URL,
+
+    @SerialName("m3u_file")
+    M3U_FILE,
+
+    @SerialName("xtream")
+    XTREAM,
+
+    @SerialName("stalker")
+    STALKER,
 }
 
 @Serializable

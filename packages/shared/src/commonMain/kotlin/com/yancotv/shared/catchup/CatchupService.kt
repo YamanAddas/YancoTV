@@ -34,7 +34,6 @@ class CatchupService(
     private val sourceRepo: SourceRepository,
     private val clock: () -> Long,
 ) {
-
     /** Lightweight reason codes so the caller can show a specific error toast. */
     enum class UnavailableReason {
         FUTURE_PROGRAMME,
@@ -46,8 +45,13 @@ class CatchupService(
     }
 
     sealed class Resolution {
-        data class Playable(val item: ContentItem) : Resolution()
-        data class Unavailable(val reason: UnavailableReason) : Resolution()
+        data class Playable(
+            val item: ContentItem,
+        ) : Resolution()
+
+        data class Unavailable(
+            val reason: UnavailableReason,
+        ) : Resolution()
     }
 
     /**
@@ -55,13 +59,17 @@ class CatchupService(
      * rather than pulled off [programme] so callers that already looked up
      * the programme can reuse the id string without a second field access.
      */
-    fun resolve(programme: EpgProgramme, channelTvgId: String = programme.channelTvgId): Resolution {
+    fun resolve(
+        programme: EpgProgramme,
+        channelTvgId: String = programme.channelTvgId,
+    ): Resolution {
         val nowSec = clock() / 1000L
         if (programme.startTime > nowSec) {
             return Resolution.Unavailable(UnavailableReason.FUTURE_PROGRAMME)
         }
-        val channel = contentRepo.findLiveByTvgId(channelTvgId)
-            ?: return Resolution.Unavailable(UnavailableReason.NO_MATCHING_CHANNEL)
+        val channel =
+            contentRepo.findLiveByTvgId(channelTvgId)
+                ?: return Resolution.Unavailable(UnavailableReason.NO_MATCHING_CHANNEL)
         val metadata = channel.metadataJson?.let { parseMetadata(it) }
 
         // Archive window check: Xtream's tvArchiveDuration is in days. If the
@@ -75,29 +83,36 @@ class CatchupService(
             }
         }
 
-        val source = sourceRepo.getById(channel.sourceId)
-            ?: return Resolution.Unavailable(UnavailableReason.UNSUPPORTED_SOURCE)
+        val source =
+            sourceRepo.getById(channel.sourceId)
+                ?: return Resolution.Unavailable(UnavailableReason.UNSUPPORTED_SOURCE)
 
         return when (source.type) {
             SourceType.XTREAM -> resolveXtream(channel, programme)
             SourceType.M3U_URL,
-            SourceType.M3U_FILE -> resolveM3u(channel, programme, metadata, nowSec)
+            SourceType.M3U_FILE,
+            -> resolveM3u(channel, programme, metadata, nowSec)
             SourceType.STALKER -> Resolution.Unavailable(UnavailableReason.UNSUPPORTED_SOURCE)
         }
     }
 
-    private fun resolveXtream(channel: ContentItem, programme: EpgProgramme): Resolution {
-        val creds = sourceRepo.xtreamCredentials(channel.sourceId)
-            ?: return Resolution.Unavailable(UnavailableReason.MISSING_CREDENTIALS)
+    private fun resolveXtream(
+        channel: ContentItem,
+        programme: EpgProgramme,
+    ): Resolution {
+        val creds =
+            sourceRepo.xtreamCredentials(channel.sourceId)
+                ?: return Resolution.Unavailable(UnavailableReason.MISSING_CREDENTIALS)
         val duration = (programme.endTime - programme.startTime).coerceAtLeast(0L)
-        val url = buildXtreamTimeshiftUrl(
-            baseUrl = creds.baseUrl,
-            username = creds.username,
-            password = creds.password,
-            originalStreamUrl = channel.streamUrl,
-            programmeStart = programme.startTime,
-            programmeDuration = duration,
-        )
+        val url =
+            buildXtreamTimeshiftUrl(
+                baseUrl = creds.baseUrl,
+                username = creds.username,
+                password = creds.password,
+                originalStreamUrl = channel.streamUrl,
+                programmeStart = programme.startTime,
+                programmeDuration = duration,
+            )
         return Resolution.Playable(channel.withCatchupUrl(url, programme))
     }
 
@@ -114,13 +129,14 @@ class CatchupService(
             return Resolution.Unavailable(UnavailableReason.MISSING_METADATA)
         }
         val duration = (programme.endTime - programme.startTime).coerceAtLeast(0L)
-        val url = buildM3uCatchupUrl(
-            originalUrl = channel.streamUrl,
-            metadata = mdMap,
-            programmeStart = programme.startTime,
-            programmeDuration = duration,
-            nowSecs = nowSec,
-        ) ?: return Resolution.Unavailable(UnavailableReason.MISSING_METADATA)
+        val url =
+            buildM3uCatchupUrl(
+                originalUrl = channel.streamUrl,
+                metadata = mdMap,
+                programmeStart = programme.startTime,
+                programmeDuration = duration,
+                nowSecs = nowSec,
+            ) ?: return Resolution.Unavailable(UnavailableReason.MISSING_METADATA)
         return Resolution.Playable(channel.withCatchupUrl(url, programme))
     }
 
@@ -135,7 +151,10 @@ class CatchupService(
      * encodes the programme. Needed so two back-to-back catchup plays on the
      * same channel don't collide with each other in history/resume lookups.
      */
-    private fun ContentItem.withCatchupUrl(url: String, programme: EpgProgramme): ContentItem =
+    private fun ContentItem.withCatchupUrl(
+        url: String,
+        programme: EpgProgramme,
+    ): ContentItem =
         copy(
             id = "catchup:$id:${programme.startTime}",
             streamUrl = url,

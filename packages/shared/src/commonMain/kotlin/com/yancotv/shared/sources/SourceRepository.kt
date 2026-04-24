@@ -53,7 +53,6 @@ class SourceRepository(
     private val idGenerator: () -> String = { defaultId(clock) },
     private val logger: Logger = NOOP_LOGGER,
 ) {
-
     fun addSource(input: AddSourceInput): Source {
         // Breadcrumbs so a silent hang shows up in logcat: each step logs
         // before it starts, so whichever message is last in the log is the
@@ -65,14 +64,20 @@ class SourceRepository(
         val now = clock()
 
         logger.info("addSource[$id] encrypt username")
-        val usernameBlob = input.username?.takeIf { it.isNotEmpty() }
-            ?.let { credentialStore.encrypt(it) }
+        val usernameBlob =
+            input.username
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { credentialStore.encrypt(it) }
         logger.info("addSource[$id] encrypt password")
-        val passwordBlob = input.password?.takeIf { it.isNotEmpty() }
-            ?.let { credentialStore.encrypt(it) }
+        val passwordBlob =
+            input.password
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { credentialStore.encrypt(it) }
         logger.info("addSource[$id] encrypt mac")
-        val macBlob = input.macAddress?.takeIf { it.isNotEmpty() }
-            ?.let { credentialStore.encrypt(it) }
+        val macBlob =
+            input.macAddress
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { credentialStore.encrypt(it) }
 
         logger.info("addSource[$id] next priority")
         val priority = nextPriority()
@@ -82,19 +87,22 @@ class SourceRepository(
         // EPG URL is just `xmltv.php` on the same host as `player_api.php` —
         // without this, Xtream sources land with no EPG and the Guide sits
         // empty until the user pokes at settings.
-        val derivedEpgUrl = input.epgUrl?.takeIf { it.isNotBlank() }
-            ?: if (input.type == SourceType.XTREAM &&
-                !input.url.isNullOrBlank() &&
-                !input.username.isNullOrBlank() &&
-                !input.password.isNullOrBlank()
-            ) {
-                XtreamClient(
-                    input.url,
-                    input.username,
-                    input.password,
-                    XtreamClientOptions(http, logger),
-                ).buildEpgUrl()
-            } else null
+        val derivedEpgUrl =
+            input.epgUrl?.takeIf { it.isNotBlank() }
+                ?: if (input.type == SourceType.XTREAM &&
+                    !input.url.isNullOrBlank() &&
+                    !input.username.isNullOrBlank() &&
+                    !input.password.isNullOrBlank()
+                ) {
+                    XtreamClient(
+                        input.url,
+                        input.username,
+                        input.password,
+                        XtreamClientOptions(http, logger),
+                    ).buildEpgUrl()
+                } else {
+                    null
+                }
 
         logger.info("addSource[$id] insert")
         db.sourcesQueries.insert(
@@ -125,22 +133,35 @@ class SourceRepository(
     }
 
     fun getAll(): List<Source> =
-        db.sourcesQueries.selectAll().executeAsList().map { it.toDomain() }
+        db.sourcesQueries
+            .selectAll()
+            .executeAsList()
+            .map { it.toDomain() }
 
     fun getById(id: String): Source? =
-        db.sourcesQueries.selectById(id).executeAsOneOrNull()?.toDomain()
+        db.sourcesQueries
+            .selectById(id)
+            .executeAsOneOrNull()
+            ?.toDomain()
 
     fun updateSource(input: UpdateSourceInput): Source {
-        val existing = db.sourcesQueries.selectById(input.id).executeAsOneOrNull()
-            ?: error("Source not found: ${input.id}")
+        val existing =
+            db.sourcesQueries.selectById(input.id).executeAsOneOrNull()
+                ?: error("Source not found: ${input.id}")
         val now = clock()
 
-        val usernameBlob = input.username?.takeIf { it.isNotEmpty() }
-            ?.let { credentialStore.encrypt(it) } ?: existing.username_encrypted
-        val passwordBlob = input.password?.takeIf { it.isNotEmpty() }
-            ?.let { credentialStore.encrypt(it) } ?: existing.password_encrypted
-        val macBlob = input.macAddress?.takeIf { it.isNotEmpty() }
-            ?.let { credentialStore.encrypt(it) } ?: existing.mac_address_encrypted
+        val usernameBlob =
+            input.username
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { credentialStore.encrypt(it) } ?: existing.username_encrypted
+        val passwordBlob =
+            input.password
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { credentialStore.encrypt(it) } ?: existing.password_encrypted
+        val macBlob =
+            input.macAddress
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { credentialStore.encrypt(it) } ?: existing.mac_address_encrypted
 
         db.sourcesQueries.updateFields(
             name = input.name ?: existing.name,
@@ -185,7 +206,10 @@ class SourceRepository(
         }
     }
 
-    fun setActive(id: String, active: Boolean) {
+    fun setActive(
+        id: String,
+        active: Boolean,
+    ) {
         db.sourcesQueries.setActive(active, clock(), id)
     }
 
@@ -205,62 +229,69 @@ class SourceRepository(
      * Uses [channelFlow] so parallel fetchers can emit progress concurrently
      * without racing a shared flow collector.
      */
-    fun syncSource(id: String): Flow<SyncProgress> = channelFlow {
-        val source = getById(id) ?: run {
-            logger.warn("syncSource[$id] not found")
-            send(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
-            return@channelFlow
-        }
+    fun syncSource(id: String): Flow<SyncProgress> =
+        channelFlow {
+            val source =
+                getById(id) ?: run {
+                    logger.warn("syncSource[$id] not found")
+                    send(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
+                    return@channelFlow
+                }
 
-        logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
-        try {
-            send(SyncProgress(SyncProgress.Phase.FETCHING, message = "Connecting"))
-            val writer = ContentWriter(db)
-            val now = clock()
-            val inserted = when (source.type) {
-                SourceType.M3U_URL -> syncM3uUrl(source, writer, now) { cur, total ->
-                    send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
-                }
-                SourceType.M3U_FILE -> syncM3uFile(source, writer, now) { cur, total ->
-                    send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
-                }
-                SourceType.XTREAM -> syncXtream(source, writer, now) { phase, cur, total, msg ->
-                    send(SyncProgress(phase, cur, total, msg))
-                }
-                SourceType.STALKER -> syncStalker(source, writer, now) { phase, cur, total, msg ->
-                    send(SyncProgress(phase, cur, total, msg))
-                }
+            logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
+            try {
+                send(SyncProgress(SyncProgress.Phase.FETCHING, message = "Connecting"))
+                val writer = ContentWriter(db)
+                val now = clock()
+                val inserted =
+                    when (source.type) {
+                        SourceType.M3U_URL ->
+                            syncM3uUrl(source, writer, now) { cur, total ->
+                                send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
+                            }
+                        SourceType.M3U_FILE ->
+                            syncM3uFile(source, writer, now) { cur, total ->
+                                send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
+                            }
+                        SourceType.XTREAM ->
+                            syncXtream(source, writer, now) { phase, cur, total, msg ->
+                                send(SyncProgress(phase, cur, total, msg))
+                            }
+                        SourceType.STALKER ->
+                            syncStalker(source, writer, now) { phase, cur, total, msg ->
+                                send(SyncProgress(phase, cur, total, msg))
+                            }
+                    }
+
+                db.sourcesQueries.updateSyncResult(
+                    last_synced = now,
+                    last_sync_error = null,
+                    channel_count = inserted.toLong(),
+                    updated_at = now,
+                    id = id,
+                )
+                logger.info("syncSource[$id] done inserted=$inserted")
+                send(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
+            } catch (ce: CancellationException) {
+                // User pressed Cancel (or scope was torn down). Leave the source's
+                // last-sync-error alone — cancellation isn't a "failure" the user
+                // needs to be told about on next open. Must rethrow so the Flow
+                // shuts down instead of being treated as a normal error emission.
+                logger.info("syncSource[$id] cancelled")
+                throw ce
+            } catch (t: Throwable) {
+                val msg = t.message ?: t.toString()
+                logger.error("sync failed for ${source.id}: $msg")
+                db.sourcesQueries.updateSyncResult(
+                    last_synced = source.lastSynced,
+                    last_sync_error = msg,
+                    channel_count = source.channelCount.toLong(),
+                    updated_at = clock(),
+                    id = id,
+                )
+                send(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
             }
-
-            db.sourcesQueries.updateSyncResult(
-                last_synced = now,
-                last_sync_error = null,
-                channel_count = inserted.toLong(),
-                updated_at = now,
-                id = id,
-            )
-            logger.info("syncSource[$id] done inserted=$inserted")
-            send(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
-        } catch (ce: CancellationException) {
-            // User pressed Cancel (or scope was torn down). Leave the source's
-            // last-sync-error alone — cancellation isn't a "failure" the user
-            // needs to be told about on next open. Must rethrow so the Flow
-            // shuts down instead of being treated as a normal error emission.
-            logger.info("syncSource[$id] cancelled")
-            throw ce
-        } catch (t: Throwable) {
-            val msg = t.message ?: t.toString()
-            logger.error("sync failed for ${source.id}: $msg")
-            db.sourcesQueries.updateSyncResult(
-                last_synced = source.lastSynced,
-                last_sync_error = msg,
-                channel_count = source.channelCount.toLong(),
-                updated_at = clock(),
-                id = id,
-            )
-            send(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
         }
-    }
 
     // ───── sync helpers ─────
 
@@ -271,13 +302,14 @@ class SourceRepository(
         onProgress: suspend (Int, Int) -> Unit,
     ): Int {
         val url = source.url ?: error("m3u_url source missing url")
-        val text = http.getText(
-            url,
-            HttpRequestOptions(
-                timeoutMs = 120_000,
-                headers = source.userAgent?.let { mapOf("User-Agent" to it) } ?: emptyMap(),
-            ),
-        )
+        val text =
+            http.getText(
+                url,
+                HttpRequestOptions(
+                    timeoutMs = 120_000,
+                    headers = source.userAgent?.let { mapOf("User-Agent" to it) } ?: emptyMap(),
+                ),
+            )
         val parsed = parseM3u(text, logger)
         adoptDiscoveredEpgUrl(source, parsed.epgUrl, now)
         return writeM3uBulk(source.id, parsed.entries, now, onProgress)
@@ -321,9 +353,10 @@ class SourceRepository(
             while (i < entries.size) {
                 val end = minOf(i + CHUNK_SIZE, entries.size)
                 val chunk = entries.subList(i, end)
-                val wrote = withContext(Dispatchers.IO) {
-                    bulk.writeM3uChunk(sourceId, chunk, now, sort)
-                }
+                val wrote =
+                    withContext(Dispatchers.IO) {
+                        bulk.writeM3uChunk(sourceId, chunk, now, sort)
+                    }
                 sort += wrote
                 written += wrote
                 onProgress(written, total)
@@ -343,7 +376,11 @@ class SourceRepository(
      * automatically. Many providers ship the right XMLTV URL in the header —
      * not using it means the user has to paste it by hand or live without EPG.
      */
-    private fun adoptDiscoveredEpgUrl(source: Source, discovered: String?, now: Long) {
+    private fun adoptDiscoveredEpgUrl(
+        source: Source,
+        discovered: String?,
+        now: Long,
+    ) {
         val d = discovered?.takeIf { it.isNotBlank() } ?: return
         if (!source.epgUrl.isNullOrBlank()) return
         logger.info("syncSource[${source.id}] adopting M3U-header EPG URL: $d")
@@ -393,14 +430,17 @@ class SourceRepository(
         if (auth is Result.Err) throw auth.error
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching categories")
-        val fetchMark = kotlin.time.TimeSource.Monotonic.markNow()
+        val fetchMark =
+            kotlin.time.TimeSource.Monotonic
+                .markNow()
 
-        val (liveCats, vodCats, seriesCats) = coroutineScope {
-            val a = async { client.getLiveCategories().unwrap().associate { it.categoryId to it.categoryName } }
-            val b = async { client.getVodCategories().unwrap().associate { it.categoryId to it.categoryName } }
-            val c = async { client.getSeriesCategories().unwrap().associate { it.categoryId to it.categoryName } }
-            Triple(a.await(), b.await(), c.await())
-        }
+        val (liveCats, vodCats, seriesCats) =
+            coroutineScope {
+                val a = async { client.getLiveCategories().unwrap().associate { it.categoryId to it.categoryName } }
+                val b = async { client.getVodCategories().unwrap().associate { it.categoryId to it.categoryName } }
+                val c = async { client.getSeriesCategories().unwrap().associate { it.categoryId to it.categoryName } }
+                Triple(a.await(), b.await(), c.await())
+            }
 
         bulk.prepareSource(source.id)
 
@@ -420,53 +460,62 @@ class SourceRepository(
             coroutineScope {
                 onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
 
-                val liveJob = async {
-                    var sort = ContentWriter.LIVE_BASE
-                    val res = client.streamLiveStreams(chunkSize = 500) { chunk ->
-                        writeMutex.withLock {
-                            val wrote = withContext(ioCtx) {
-                                bulk.writeLiveChunk(source.id, client, chunk, liveCats, now, sort)
+                val liveJob =
+                    async {
+                        var sort = ContentWriter.LIVE_BASE
+                        val res =
+                            client.streamLiveStreams(chunkSize = 500) { chunk ->
+                                writeMutex.withLock {
+                                    val wrote =
+                                        withContext(ioCtx) {
+                                            bulk.writeLiveChunk(source.id, client, chunk, liveCats, now, sort)
+                                        }
+                                    sort += wrote
+                                    liveWritten += wrote
+                                    total += wrote
+                                    onProgress(SyncProgress.Phase.WRITING, total, 0, "Live $liveWritten")
+                                }
                             }
-                            sort += wrote
-                            liveWritten += wrote
-                            total += wrote
-                            onProgress(SyncProgress.Phase.WRITING, total, 0, "Live $liveWritten")
-                        }
+                        if (res is Result.Err) throw res.error
                     }
-                    if (res is Result.Err) throw res.error
-                }
 
-                val vodJob = async {
-                    var sort = ContentWriter.VOD_BASE
-                    val res = client.streamVodStreams(chunkSize = 500) { chunk ->
-                        writeMutex.withLock {
-                            val wrote = withContext(ioCtx) {
-                                bulk.writeVodChunk(source.id, client, chunk, vodCats, now, sort)
+                val vodJob =
+                    async {
+                        var sort = ContentWriter.VOD_BASE
+                        val res =
+                            client.streamVodStreams(chunkSize = 500) { chunk ->
+                                writeMutex.withLock {
+                                    val wrote =
+                                        withContext(ioCtx) {
+                                            bulk.writeVodChunk(source.id, client, chunk, vodCats, now, sort)
+                                        }
+                                    sort += wrote
+                                    vodWritten += wrote
+                                    total += wrote
+                                    onProgress(SyncProgress.Phase.WRITING, total, 0, "Movies $vodWritten")
+                                }
                             }
-                            sort += wrote
-                            vodWritten += wrote
-                            total += wrote
-                            onProgress(SyncProgress.Phase.WRITING, total, 0, "Movies $vodWritten")
-                        }
+                        if (res is Result.Err) throw res.error
                     }
-                    if (res is Result.Err) throw res.error
-                }
 
-                val seriesJob = async {
-                    var sort = ContentWriter.SERIES_BASE
-                    val res = client.streamSeriesList(chunkSize = 500) { chunk ->
-                        writeMutex.withLock {
-                            val wrote = withContext(ioCtx) {
-                                bulk.writeSeriesChunk(source.id, chunk, seriesCats, now, sort)
+                val seriesJob =
+                    async {
+                        var sort = ContentWriter.SERIES_BASE
+                        val res =
+                            client.streamSeriesList(chunkSize = 500) { chunk ->
+                                writeMutex.withLock {
+                                    val wrote =
+                                        withContext(ioCtx) {
+                                            bulk.writeSeriesChunk(source.id, chunk, seriesCats, now, sort)
+                                        }
+                                    sort += wrote
+                                    seriesWritten += wrote
+                                    total += wrote
+                                    onProgress(SyncProgress.Phase.WRITING, total, 0, "Series $seriesWritten")
+                                }
                             }
-                            sort += wrote
-                            seriesWritten += wrote
-                            total += wrote
-                            onProgress(SyncProgress.Phase.WRITING, total, 0, "Series $seriesWritten")
-                        }
+                        if (res is Result.Err) throw res.error
                     }
-                    if (res is Result.Err) throw res.error
-                }
 
                 awaitAll(liveJob, vodJob, seriesJob)
             }
@@ -512,15 +561,16 @@ class SourceRepository(
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
 
-        val (liveCats, vodCats, seriesCats, live, vod, series) = coroutineScope {
-            val a = async { client.getLiveCategories().unwrap().associate { it.id to it.title } }
-            val b = async { client.getVodCategories().unwrap().associate { it.id to it.title } }
-            val c = async { client.getSeriesCategories().unwrap().associate { it.id to it.title } }
-            val d = async { client.getLiveChannels().unwrap() }
-            val e = async { client.getVodItems().unwrap() }
-            val f = async { client.getSeriesList().unwrap() }
-            StalkerFetch(a.await(), b.await(), c.await(), d.await(), e.await(), f.await())
-        }
+        val (liveCats, vodCats, seriesCats, live, vod, series) =
+            coroutineScope {
+                val a = async { client.getLiveCategories().unwrap().associate { it.id to it.title } }
+                val b = async { client.getVodCategories().unwrap().associate { it.id to it.title } }
+                val c = async { client.getSeriesCategories().unwrap().associate { it.id to it.title } }
+                val d = async { client.getLiveChannels().unwrap() }
+                val e = async { client.getVodItems().unwrap() }
+                val f = async { client.getSeriesList().unwrap() }
+                StalkerFetch(a.await(), b.await(), c.await(), d.await(), e.await(), f.await())
+            }
 
         val total = live.size + vod.size + series.size
         onProgress(SyncProgress.Phase.WRITING, 0, total, null)
@@ -532,30 +582,36 @@ class SourceRepository(
             var i = 0
             while (i < live.size) {
                 val end = minOf(i + CHUNK_SIZE, live.size)
-                val wrote = withContext(ioCtx) {
-                    bulk.writeStalkerLiveChunk(source.id, live.subList(i, end), liveCats, now, sort)
-                }
-                sort += wrote; written += wrote
+                val wrote =
+                    withContext(ioCtx) {
+                        bulk.writeStalkerLiveChunk(source.id, live.subList(i, end), liveCats, now, sort)
+                    }
+                sort += wrote
+                written += wrote
                 onProgress(SyncProgress.Phase.WRITING, written, total, "Live $written")
                 i = end
             }
             i = 0
             while (i < vod.size) {
                 val end = minOf(i + CHUNK_SIZE, vod.size)
-                val wrote = withContext(ioCtx) {
-                    bulk.writeStalkerVodChunk(source.id, vod.subList(i, end), vodCats, now, sort)
-                }
-                sort += wrote; written += wrote
+                val wrote =
+                    withContext(ioCtx) {
+                        bulk.writeStalkerVodChunk(source.id, vod.subList(i, end), vodCats, now, sort)
+                    }
+                sort += wrote
+                written += wrote
                 onProgress(SyncProgress.Phase.WRITING, written, total, "Movies $written")
                 i = end
             }
             i = 0
             while (i < series.size) {
                 val end = minOf(i + CHUNK_SIZE, series.size)
-                val wrote = withContext(ioCtx) {
-                    bulk.writeStalkerSeriesChunk(source.id, series.subList(i, end), seriesCats, now, sort)
-                }
-                sort += wrote; written += wrote
+                val wrote =
+                    withContext(ioCtx) {
+                        bulk.writeStalkerSeriesChunk(source.id, series.subList(i, end), seriesCats, now, sort)
+                    }
+                sort += wrote
+                written += wrote
                 onProgress(SyncProgress.Phase.WRITING, written, total, "Series $written")
                 i = end
             }
@@ -601,23 +657,24 @@ class SourceRepository(
         return credentialStore.decrypt(blob)
     }
 
-    private fun Sources.toDomain(): Source = Source(
-        id = id,
-        name = name,
-        type = deserializeType(type),
-        url = url,
-        filePath = file_path,
-        epgUrl = epg_url,
-        userAgent = user_agent,
-        lastSynced = last_synced,
-        isActive = is_active,
-        priority = priority.toInt(),
-        channelCount = channel_count.toInt(),
-        lastSyncError = last_sync_error,
-        autoSyncInterval = auto_sync_interval.toInt(),
-        createdAt = created_at,
-        updatedAt = updated_at,
-    )
+    private fun Sources.toDomain(): Source =
+        Source(
+            id = id,
+            name = name,
+            type = deserializeType(type),
+            url = url,
+            filePath = file_path,
+            epgUrl = epg_url,
+            userAgent = user_agent,
+            lastSynced = last_synced,
+            isActive = is_active,
+            priority = priority.toInt(),
+            channelCount = channel_count.toInt(),
+            lastSyncError = last_sync_error,
+            autoSyncInterval = auto_sync_interval.toInt(),
+            createdAt = created_at,
+            updatedAt = updated_at,
+        )
 
     private fun validate(input: AddSourceInput) {
         require(input.name.isNotBlank()) { "name is required" }
@@ -637,20 +694,22 @@ class SourceRepository(
     }
 
     companion object {
-        internal fun serializeType(t: SourceType): String = when (t) {
-            SourceType.M3U_URL -> "m3u_url"
-            SourceType.M3U_FILE -> "m3u_file"
-            SourceType.XTREAM -> "xtream"
-            SourceType.STALKER -> "stalker"
-        }
+        internal fun serializeType(t: SourceType): String =
+            when (t) {
+                SourceType.M3U_URL -> "m3u_url"
+                SourceType.M3U_FILE -> "m3u_file"
+                SourceType.XTREAM -> "xtream"
+                SourceType.STALKER -> "stalker"
+            }
 
-        internal fun deserializeType(s: String): SourceType = when (s) {
-            "m3u_url" -> SourceType.M3U_URL
-            "m3u_file" -> SourceType.M3U_FILE
-            "xtream" -> SourceType.XTREAM
-            "stalker" -> SourceType.STALKER
-            else -> error("unknown source type: $s")
-        }
+        internal fun deserializeType(s: String): SourceType =
+            when (s) {
+                "m3u_url" -> SourceType.M3U_URL
+                "m3u_file" -> SourceType.M3U_FILE
+                "xtream" -> SourceType.XTREAM
+                "stalker" -> SourceType.STALKER
+                else -> error("unknown source type: $s")
+            }
 
         private fun defaultId(clock: () -> Long): String {
             val ts = clock().toString(16)
@@ -668,8 +727,8 @@ class SourceRepository(
     }
 }
 
-private fun <T, E : Throwable> Result<T, E>.unwrap(): T = when (this) {
-    is Result.Ok -> value
-    is Result.Err -> throw error
-}
-
+private fun <T, E : Throwable> Result<T, E>.unwrap(): T =
+    when (this) {
+        is Result.Ok -> value
+        is Result.Err -> throw error
+    }

@@ -36,8 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import com.yancotv.android.ui.focus.PlacedFocusAnchor
-import com.yancotv.android.ui.focus.placedFocus
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -50,6 +48,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
@@ -99,14 +99,15 @@ fun CategoryRail(
     // at the head of the visual list, then a divider (rendered as a
     // contentPadding gap, not an item), then the prioritised groups.
     val groupPos = remember(groups, selected) { groups.indexOf(selected) }
-    val selectedIndex = remember(groupPos, selected, showFavorites) {
-        val offset = if (showFavorites) 1 else 0
-        when (selected) {
-            FAVORITES_GROUP -> if (showFavorites) 0 else -1
-            ALL_GROUPS -> offset
-            else -> if (groupPos < 0) -1 else offset + 1 + groupPos
+    val selectedIndex =
+        remember(groupPos, selected, showFavorites) {
+            val offset = if (showFavorites) 1 else 0
+            when (selected) {
+                FAVORITES_GROUP -> if (showFavorites) 0 else -1
+                ALL_GROUPS -> offset
+                else -> if (groupPos < 0) -1 else offset + 1 + groupPos
+            }
         }
-    }
     // Re-key on `groups` so the scroll-bias gate doesn't carry a stale
     // selectedIndex across sections — without this, switching from a Live
     // section where Sports was at index 5 to a Movies section where the
@@ -131,39 +132,40 @@ fun CategoryRail(
     BackHandler(enabled = hasFocus) { onExitToSidebar() }
 
     Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .width(ShellDim.categoriesPanelWidth)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
-                        YancoPalette.BackgroundRaised.copy(alpha = 0.70f),
-                        YancoPalette.BackgroundDeep.copy(alpha = 0.82f),
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .width(ShellDim.categoriesPanelWidth)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
+                            YancoPalette.BackgroundRaised.copy(alpha = 0.70f),
+                            YancoPalette.BackgroundDeep.copy(alpha = 0.82f),
+                        ),
                     ),
-                ),
-            )
-            .border(
-                width = 1.dp,
-                color = YancoPalette.BorderSubtle.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(0.dp),
-            )
-            .padding(top = Space.md)
-            // D-pad LEFT pops to the sidebar from anywhere in the rail.
-            // RIGHT is intentionally NOT handled here — it's owned by each
-            // HexPillRow so the pill's `group` is captured in the click
-            // closure and onSelect(group) commits atomically with
-            // onEnterContent(). Handling RIGHT at the Column level lost the
-            // pill identity, so onSelect relied on the LaunchedEffect-driven
-            // onFocused having already fired — which it hadn't, after a
-            // section switch (Live → Movies), so the previous section's
-            // selectedGroup leaked into the new section's content panel.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                    onExitToSidebar(); true
-                } else false
-            }
-            .focusGroup(),
+                ).border(
+                    width = 1.dp,
+                    color = YancoPalette.BorderSubtle.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(0.dp),
+                ).padding(top = Space.md)
+                // D-pad LEFT pops to the sidebar from anywhere in the rail.
+                // RIGHT is intentionally NOT handled here — it's owned by each
+                // HexPillRow so the pill's `group` is captured in the click
+                // closure and onSelect(group) commits atomically with
+                // onEnterContent(). Handling RIGHT at the Column level lost the
+                // pill identity, so onSelect relied on the LaunchedEffect-driven
+                // onFocused having already fired — which it hadn't, after a
+                // section switch (Live → Movies), so the previous section's
+                // selectedGroup leaked into the new section's content panel.
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                        onExitToSidebar()
+                        true
+                    } else {
+                        false
+                    }
+                }.focusGroup(),
     ) {
         // Header label — gives the rail a "you are here" anchor; collapses
         // out of focus traversal because it isn't focusable.
@@ -176,12 +178,13 @@ fun CategoryRail(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxHeight(),
-            contentPadding = PaddingValues(
-                start = Space.md,
-                end = Space.md,
-                top = Space.xs,
-                bottom = Space.section,
-            ),
+            contentPadding =
+                PaddingValues(
+                    start = Space.md,
+                    end = Space.md,
+                    top = Space.xs,
+                    bottom = Space.section,
+                ),
             verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
             if (showFavorites) {
@@ -264,67 +267,74 @@ private fun HexPillRow(
     val focused by interaction.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocused() }
 
-    val bg: Brush = when {
-        focused -> Brush.verticalGradient(
-            listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
-        )
-        selected -> Brush.verticalGradient(
-            listOf(
-                YancoPalette.Accent.copy(alpha = 0.22f),
-                YancoPalette.AccentDeep.copy(alpha = 0.14f),
-            ),
-        )
-        else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
-    }
-    val border = when {
-        focused -> YancoPalette.FocusRing
-        selected -> YancoPalette.Accent.copy(alpha = 0.55f)
-        else -> YancoPalette.BorderSubtle
-    }
+    val bg: Brush =
+        when {
+            focused ->
+                Brush.verticalGradient(
+                    listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                )
+            selected ->
+                Brush.verticalGradient(
+                    listOf(
+                        YancoPalette.Accent.copy(alpha = 0.22f),
+                        YancoPalette.AccentDeep.copy(alpha = 0.14f),
+                    ),
+                )
+            else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+        }
+    val border =
+        when {
+            focused -> YancoPalette.FocusRing
+            selected -> YancoPalette.Accent.copy(alpha = 0.55f)
+            else -> YancoPalette.BorderSubtle
+        }
     val fg by animateColorAsState(
-        targetValue = when {
-            focused -> Color.Black
-            selected -> YancoPalette.Accent
-            else -> YancoPalette.TextSecondary
-        },
+        targetValue =
+            when {
+                focused -> Color.Black
+                selected -> YancoPalette.Accent
+                else -> YancoPalette.TextSecondary
+            },
         label = "rail-pill-fg",
     )
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .shadow(
-                elevation = if (focused) 16.dp else 0.dp,
-                shape = YancoShapes.HexPill,
-                ambientColor = YancoPalette.Accent,
-                spotColor = YancoPalette.Accent,
-            )
-            .clip(YancoShapes.HexPill)
-            .background(bg)
-            .border(if (focused) 2.dp else 1.dp, border, YancoShapes.HexPill)
-            // PlacedFocusAnchor (per native-android-mk skill rule): waits for
-            // the pill's onPlaced callback before requestFocus(). Plain
-            // FocusRequester races a freshly-mounted rail and silently fails
-            // — exactly the bug the user hit when LEFT from the CTA opened
-            // the rail visually but left focus stuck on the CTA, so DOWN
-            // walked into the coverflow instead of the next pill.
-            .then(anchor?.let { Modifier.placedFocus(it) } ?: Modifier)
-            // RIGHT on a pill commits THIS pill's group + enters content.
-            // Owning RIGHT here (not on the rail's outer Column) ensures the
-            // pill identity is captured in scope — relying on the focused
-            // pill's onFocused → onSelect having already fired loses the
-            // race after a section switch (Live → Movies), where the rail
-            // re-mounts with the previous section's selectedGroup until the
-            // user navigates pills. Now RIGHT and CENTER share one path.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
-                    onCommitAndEnter(); true
-                } else false
-            }
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = "Category: $label" }
-            .padding(horizontal = Space.lg, vertical = Space.xs),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .shadow(
+                    elevation = if (focused) 16.dp else 0.dp,
+                    shape = YancoShapes.HexPill,
+                    ambientColor = YancoPalette.Accent,
+                    spotColor = YancoPalette.Accent,
+                ).clip(YancoShapes.HexPill)
+                .background(bg)
+                .border(if (focused) 2.dp else 1.dp, border, YancoShapes.HexPill)
+                // PlacedFocusAnchor (per native-android-mk skill rule): waits for
+                // the pill's onPlaced callback before requestFocus(). Plain
+                // FocusRequester races a freshly-mounted rail and silently fails
+                // — exactly the bug the user hit when LEFT from the CTA opened
+                // the rail visually but left focus stuck on the CTA, so DOWN
+                // walked into the coverflow instead of the next pill.
+                .then(anchor?.let { Modifier.placedFocus(it) } ?: Modifier)
+                // RIGHT on a pill commits THIS pill's group + enters content.
+                // Owning RIGHT here (not on the rail's outer Column) ensures the
+                // pill identity is captured in scope — relying on the focused
+                // pill's onFocused → onSelect having already fired loses the
+                // race after a section switch (Live → Movies), where the rail
+                // re-mounts with the previous section's selectedGroup until the
+                // user navigates pills. Now RIGHT and CENTER share one path.
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
+                        onCommitAndEnter()
+                        true
+                    } else {
+                        false
+                    }
+                }.focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = "Category: $label" }
+                .padding(horizontal = Space.lg, vertical = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -337,10 +347,11 @@ private fun HexPillRow(
             )
         } else if (selected) {
             Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(if (focused) Color.Black else YancoPalette.Accent),
+                modifier =
+                    Modifier
+                        .size(6.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(if (focused) Color.Black else YancoPalette.Accent),
             )
         }
         Text(

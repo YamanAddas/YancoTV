@@ -29,24 +29,50 @@ import kotlin.test.assertTrue
  * sync completes with the expected deduped row count + FTS consistency.
  */
 class BulkContentWriterTest {
+    private val noopHttp =
+        object : HttpClient {
+            override suspend fun getJson(
+                url: String,
+                options: HttpRequestOptions,
+            ): Any? = null
 
-    private val noopHttp = object : HttpClient {
-        override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = null
-        override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
-    }
+            override suspend fun getText(
+                url: String,
+                options: HttpRequestOptions,
+            ): String = ""
+        }
 
-    private fun insertSource(db: com.yancotv.shared.db.YancoDb, id: String = "s1") {
+    private fun insertSource(
+        db: com.yancotv.shared.db.YancoDb,
+        id: String = "s1",
+    ) {
         db.sourcesQueries.insert(
-            id = id, name = "Test", type = "m3u_url", url = "http://x",
-            file_path = null, username_encrypted = null, password_encrypted = null,
-            mac_address_encrypted = null, epg_url = null, user_agent = null,
-            last_synced = null, last_sync_error = null, is_active = true,
-            priority = 0, channel_count = 0, auto_sync_interval = 0,
-            created_at = 1L, updated_at = 1L,
+            id = id,
+            name = "Test",
+            type = "m3u_url",
+            url = "http://x",
+            file_path = null,
+            username_encrypted = null,
+            password_encrypted = null,
+            mac_address_encrypted = null,
+            epg_url = null,
+            user_agent = null,
+            last_synced = null,
+            last_sync_error = null,
+            is_active = true,
+            priority = 0,
+            channel_count = 0,
+            auto_sync_interval = 0,
+            created_at = 1L,
+            updated_at = 1L,
         )
     }
 
-    private fun m3uEntry(title: String, url: String, group: String = "News") = M3uEntry(
+    private fun m3uEntry(
+        title: String,
+        url: String,
+        group: String = "News",
+    ) = M3uEntry(
         duration = -1.0,
         title = title,
         groupTitle = group,
@@ -57,47 +83,105 @@ class BulkContentWriterTest {
         rawAttributes = "",
     )
 
-    private fun liveStream(id: Int, name: String) = XtreamLiveStream(
-        num = id, name = name, streamType = "live", streamId = id,
-        streamIcon = "", epgChannelId = "", added = "", categoryId = "1",
-        categoryIds = emptyList(), customSid = "", tvArchive = 0,
-        directSource = "", tvArchiveDuration = 0,
-    )
-
-    private fun vodStream(id: Int, name: String) = XtreamVodStream(
-        num = id, name = name, streamType = "movie", streamId = id,
-        streamIcon = "", rating = "", added = "", categoryId = "1",
-        containerExtension = "mp4", directSource = "",
-    )
-
-    private fun seriesInfo(id: Int, name: String) = XtreamSeriesInfo(
-        num = id, name = name, seriesId = id, cover = "", plot = "",
-        cast = "", director = "", genre = "", releaseDate = "",
-        rating = "", categoryId = "1", lastModified = "",
-    )
-
-    private fun stalkerChannel(id: Int, name: String) = StalkerChannel(
-        id = id, name = name, cmd = "http://s/$id", tvGenreId = "1",
-        logo = "", epgId = "", number = id, tvArchive = 0,
+    private fun liveStream(
+        id: Int,
+        name: String,
+    ) = XtreamLiveStream(
+        num = id,
+        name = name,
+        streamType = "live",
+        streamId = id,
+        streamIcon = "",
+        epgChannelId = "",
+        added = "",
+        categoryId = "1",
+        categoryIds = emptyList(),
+        customSid = "",
+        tvArchive = 0,
+        directSource = "",
         tvArchiveDuration = 0,
     )
 
-    private fun stalkerVod(id: Int, name: String) = StalkerVodItem(
-        id = id, name = name, cmd = "http://v/$id", categoryId = "1",
-        logo = "", description = "",
+    private fun vodStream(
+        id: Int,
+        name: String,
+    ) = XtreamVodStream(
+        num = id,
+        name = name,
+        streamType = "movie",
+        streamId = id,
+        streamIcon = "",
+        rating = "",
+        added = "",
+        categoryId = "1",
+        containerExtension = "mp4",
+        directSource = "",
     )
 
-    private fun stalkerSeries(id: Int, name: String) = StalkerSeriesItem(
-        id = id, name = name, categoryId = "1", cover = "", plot = "",
+    private fun seriesInfo(
+        id: Int,
+        name: String,
+    ) = XtreamSeriesInfo(
+        num = id,
+        name = name,
+        seriesId = id,
+        cover = "",
+        plot = "",
+        cast = "",
+        director = "",
+        genre = "",
+        releaseDate = "",
+        rating = "",
+        categoryId = "1",
+        lastModified = "",
+    )
+
+    private fun stalkerChannel(
+        id: Int,
+        name: String,
+    ) = StalkerChannel(
+        id = id,
+        name = name,
+        cmd = "http://s/$id",
+        tvGenreId = "1",
+        logo = "",
+        epgId = "",
+        number = id,
+        tvArchive = 0,
+        tvArchiveDuration = 0,
+    )
+
+    private fun stalkerVod(
+        id: Int,
+        name: String,
+    ) = StalkerVodItem(
+        id = id,
+        name = name,
+        cmd = "http://v/$id",
+        categoryId = "1",
+        logo = "",
+        description = "",
+    )
+
+    private fun stalkerSeries(
+        id: Int,
+        name: String,
+    ) = StalkerSeriesItem(
+        id = id,
+        name = name,
+        categoryId = "1",
+        cover = "",
+        plot = "",
         genre = "",
     )
 
-    private fun xtreamClient(sourceId: String = "s1") = XtreamClient(
-        url = "http://example.test",
-        username = "u",
-        password = "p",
-        options = XtreamClientOptions(http = noopHttp),
-    ).also { _ -> sourceId } // pin sourceId for symmetry with sut calls
+    private fun xtreamClient(sourceId: String = "s1") =
+        XtreamClient(
+            url = "http://example.test",
+            username = "u",
+            password = "p",
+            options = XtreamClientOptions(http = noopHttp),
+        ).also { _ -> sourceId } // pin sourceId for symmetry with sut calls
 
     // ───── M3U ─────
 
@@ -109,13 +193,14 @@ class BulkContentWriterTest {
         val writer = BulkContentWriter(database.driver)
 
         writer.prepareSource("s1")
-        val items = listOf(
-            m3uEntry("BBC News", "http://a/1.ts"),
-            m3uEntry("CNN", "http://a/2.ts"),
-            // Exact dupe — same hash → same ID. Without OR IGNORE this fails the whole chunk.
-            m3uEntry("BBC News", "http://a/1.ts"),
-            m3uEntry("Sky", "http://a/3.ts"),
-        )
+        val items =
+            listOf(
+                m3uEntry("BBC News", "http://a/1.ts"),
+                m3uEntry("CNN", "http://a/2.ts"),
+                // Exact dupe — same hash → same ID. Without OR IGNORE this fails the whole chunk.
+                m3uEntry("BBC News", "http://a/1.ts"),
+                m3uEntry("Sky", "http://a/3.ts"),
+            )
         val written = writer.writeM3uChunk("s1", items, now = 100L, sortOrderStart = 0L)
         writer.finishSource("s1")
 
@@ -138,12 +223,13 @@ class BulkContentWriterTest {
         val client = xtreamClient()
 
         writer.prepareSource("s1")
-        val items = listOf(
-            liveStream(1, "Channel 1"),
-            liveStream(2, "Channel 2"),
-            liveStream(1, "Channel 1 Duplicate"), // same stream_id → same content id
-            liveStream(3, "Channel 3"),
-        )
+        val items =
+            listOf(
+                liveStream(1, "Channel 1"),
+                liveStream(2, "Channel 2"),
+                liveStream(1, "Channel 1 Duplicate"), // same stream_id → same content id
+                liveStream(3, "Channel 3"),
+            )
         writer.writeLiveChunk(
             sourceId = "s1",
             client = client,
@@ -170,11 +256,12 @@ class BulkContentWriterTest {
         val client = xtreamClient()
 
         writer.prepareSource("s1")
-        val items = listOf(
-            vodStream(10, "Movie A"),
-            vodStream(10, "Movie A dupe"),
-            vodStream(11, "Movie B"),
-        )
+        val items =
+            listOf(
+                vodStream(10, "Movie A"),
+                vodStream(10, "Movie A dupe"),
+                vodStream(11, "Movie B"),
+            )
         writer.writeVodChunk(
             sourceId = "s1",
             client = client,
@@ -196,12 +283,13 @@ class BulkContentWriterTest {
         val writer = BulkContentWriter(database.driver)
 
         writer.prepareSource("s1")
-        val items = listOf(
-            seriesInfo(100, "Show A"),
-            seriesInfo(100, "Show A dupe"),
-            seriesInfo(101, "Show B"),
-            seriesInfo(102, "Show C"),
-        )
+        val items =
+            listOf(
+                seriesInfo(100, "Show A"),
+                seriesInfo(100, "Show A dupe"),
+                seriesInfo(101, "Show B"),
+                seriesInfo(102, "Show C"),
+            )
         writer.writeSeriesChunk(
             sourceId = "s1",
             items = items,
@@ -224,11 +312,12 @@ class BulkContentWriterTest {
         val writer = BulkContentWriter(database.driver)
 
         writer.prepareSource("s1")
-        val items = listOf(
-            stalkerChannel(1, "Ch1"),
-            stalkerChannel(2, "Ch2"),
-            stalkerChannel(1, "Ch1 dupe"),
-        )
+        val items =
+            listOf(
+                stalkerChannel(1, "Ch1"),
+                stalkerChannel(2, "Ch2"),
+                stalkerChannel(1, "Ch1 dupe"),
+            )
         writer.writeStalkerLiveChunk(
             sourceId = "s1",
             items = items,
@@ -249,11 +338,12 @@ class BulkContentWriterTest {
         val writer = BulkContentWriter(database.driver)
 
         writer.prepareSource("s1")
-        val items = listOf(
-            stalkerVod(1, "V1"),
-            stalkerVod(1, "V1 dupe"),
-            stalkerVod(2, "V2"),
-        )
+        val items =
+            listOf(
+                stalkerVod(1, "V1"),
+                stalkerVod(1, "V1 dupe"),
+                stalkerVod(2, "V2"),
+            )
         writer.writeStalkerVodChunk(
             sourceId = "s1",
             items = items,
@@ -274,11 +364,12 @@ class BulkContentWriterTest {
         val writer = BulkContentWriter(database.driver)
 
         writer.prepareSource("s1")
-        val items = listOf(
-            stalkerSeries(1, "S1"),
-            stalkerSeries(2, "S2"),
-            stalkerSeries(1, "S1 dupe"),
-        )
+        val items =
+            listOf(
+                stalkerSeries(1, "S1"),
+                stalkerSeries(2, "S2"),
+                stalkerSeries(1, "S1 dupe"),
+            )
         writer.writeStalkerSeriesChunk(
             sourceId = "s1",
             items = items,

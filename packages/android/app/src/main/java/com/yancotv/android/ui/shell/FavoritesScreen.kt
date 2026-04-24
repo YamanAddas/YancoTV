@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -49,8 +50,6 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.compose.ui.platform.LocalContext
 import org.koin.compose.koinInject
 
 /**
@@ -85,11 +84,12 @@ fun FavoritesScreen(
     val lockedIds by parental.lockedIds.collectAsState()
     val hiddenIds by parental.hiddenIds.collectAsState()
     val parentalSettings by parental.settings.collectAsState()
-    val items = remember(allItems, hiddenIds, parentalSettings.hideAdultContent) {
-        allItems
-            .let { if (hiddenIds.isEmpty()) it else it.filterNot { row -> row.id in hiddenIds } }
-            .let { if (!parentalSettings.hideAdultContent) it else it.filterNot(AdultContentFilter::isAdult) }
-    }
+    val items =
+        remember(allItems, hiddenIds, parentalSettings.hideAdultContent) {
+            allItems
+                .let { if (hiddenIds.isEmpty()) it else it.filterNot { row -> row.id in hiddenIds } }
+                .let { if (!parentalSettings.hideAdultContent) it else it.filterNot(AdultContentFilter::isAdult) }
+        }
     var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
     val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->
         if (id in lockedIds) pendingPlay = action else action()
@@ -106,10 +106,11 @@ fun FavoritesScreen(
 
     if (items.isEmpty() && !loading) {
         Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
-                .padding(32.dp),
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .background(YancoPalette.BackgroundDeep)
+                    .padding(32.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -125,10 +126,11 @@ fun FavoritesScreen(
 
     LazyColumn(
         state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(YancoPalette.BackgroundDeep)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Keep sections in a stable order (Live first — fastest to consume).
@@ -241,24 +243,27 @@ private fun FavoriteRow(
         shape = YancoShapes.HexCapsule,
         focused = focused,
         bevelInset = 2.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onActivate),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onActivate),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(YancoShapes.HexCapsule)
-                    .background(YancoPalette.BackgroundDeep),
+                modifier =
+                    Modifier
+                        .size(52.dp)
+                        .clip(YancoShapes.HexCapsule)
+                        .background(YancoPalette.BackgroundDeep),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!item.logoUrl.isNullOrBlank()) {
@@ -302,12 +307,13 @@ private fun UnstarButton(onClick: () -> Unit) {
     Text(
         text = "\u2606 Remove",
         color = YancoPalette.Accent,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(6.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .border(1.dp, border, RoundedCornerShape(6.dp))
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }

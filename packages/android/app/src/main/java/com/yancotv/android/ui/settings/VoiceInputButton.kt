@@ -42,20 +42,23 @@ fun VoiceInputButton(
     onResult: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val available = remember {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-        context.packageManager.resolveActivity(intent, 0) != null
-    }
+    val available =
+        remember {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            context.packageManager.resolveActivity(intent, 0) != null
+        }
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val spoken = result.data
-            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-            .orEmpty()
-        if (spoken.isNotBlank()) onResult(spoken)
-    }
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            val spoken =
+                result.data
+                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    ?.firstOrNull()
+                    .orEmpty()
+            if (spoken.isNotBlank()) onResult(spoken)
+        }
 
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -64,28 +67,30 @@ fun VoiceInputButton(
     val alphaValue = if (available) 1f else 0.4f
 
     Box(
-        modifier = modifier
-            .height(40.dp)
-            .widthIn(min = 56.dp)
-            .alpha(alphaValue)
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(6.dp))
-            .focusable(enabled = available, interactionSource = interaction)
-            .clickable(
-                enabled = available,
-                interactionSource = interaction,
-                indication = null,
-            ) {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(
-                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-                    )
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now")
-                }
-                launcher.launch(intent)
-            },
+        modifier =
+            modifier
+                .height(40.dp)
+                .widthIn(min = 56.dp)
+                .alpha(alphaValue)
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .border(1.dp, border, RoundedCornerShape(6.dp))
+                .focusable(enabled = available, interactionSource = interaction)
+                .clickable(
+                    enabled = available,
+                    interactionSource = interaction,
+                    indication = null,
+                ) {
+                    val intent =
+                        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(
+                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                            )
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now")
+                        }
+                    launcher.launch(intent)
+                },
         contentAlignment = Alignment.Center,
     ) {
         Text(

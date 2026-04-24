@@ -28,10 +28,16 @@ class HttpResponseError(
  */
 interface HttpClient {
     /** Fetch JSON from a URL. Throws on network error, non-2xx status, or invalid JSON. */
-    suspend fun getJson(url: String, options: HttpRequestOptions = HttpRequestOptions()): Any?
+    suspend fun getJson(
+        url: String,
+        options: HttpRequestOptions = HttpRequestOptions(),
+    ): Any?
 
     /** Fetch plain text (UTF-8) from a URL. Used for M3U playlist downloads. */
-    suspend fun getText(url: String, options: HttpRequestOptions = HttpRequestOptions()): String
+    suspend fun getText(
+        url: String,
+        options: HttpRequestOptions = HttpRequestOptions(),
+    ): String
 
     /**
      * Fetch raw bytes. Needed for binary payloads like `.xml.gz` EPG dumps
@@ -40,8 +46,10 @@ interface HttpClient {
      * Default falls back to UTF-8 encoding of [getText] so test fakes that
      * never serve binary content don't need to implement it.
      */
-    suspend fun getBytes(url: String, options: HttpRequestOptions = HttpRequestOptions()): ByteArray =
-        getText(url, options).encodeToByteArray()
+    suspend fun getBytes(
+        url: String,
+        options: HttpRequestOptions = HttpRequestOptions(),
+    ): ByteArray = getText(url, options).encodeToByteArray()
 
     /**
      * Stream the response body as a [Source]. The [block] is called with a

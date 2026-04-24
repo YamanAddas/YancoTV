@@ -84,23 +84,25 @@ sealed class Playable {
 fun ContentItem.toPlayable(): Playable? {
     if (streamUrl.isBlank()) return null
     return when (type) {
-        ContentType.LIVE -> Playable.Channel(
-            id = id,
-            title = cleanTitle?.ifBlank { null } ?: title,
-            streamUrl = streamUrl,
-            artworkUrl = logoUrl?.takeIf { it.isNotBlank() },
-            tvgId = tvgId,
-            groupName = groupName,
-            sourceId = sourceId,
-        )
-        ContentType.MOVIE -> Playable.Movie(
-            id = id,
-            title = cleanTitle?.ifBlank { null } ?: title,
-            streamUrl = streamUrl,
-            artworkUrl = logoUrl?.takeIf { it.isNotBlank() },
-            groupName = groupName,
-            sourceId = sourceId,
-        )
+        ContentType.LIVE ->
+            Playable.Channel(
+                id = id,
+                title = cleanTitle?.ifBlank { null } ?: title,
+                streamUrl = streamUrl,
+                artworkUrl = logoUrl?.takeIf { it.isNotBlank() },
+                tvgId = tvgId,
+                groupName = groupName,
+                sourceId = sourceId,
+            )
+        ContentType.MOVIE ->
+            Playable.Movie(
+                id = id,
+                title = cleanTitle?.ifBlank { null } ?: title,
+                streamUrl = streamUrl,
+                artworkUrl = logoUrl?.takeIf { it.isNotBlank() },
+                groupName = groupName,
+                sourceId = sourceId,
+            )
         // Series containers are not directly playable; callers must pick
         // an episode via ContentDetailService first. The detail overlay's
         // "Play" button falls back to the first episode when episodes
@@ -120,7 +122,7 @@ fun EpisodeInfo.toPlayable(series: ContentItem): Playable.Episode? {
         id = id,
         seriesId = series.id,
         title = "${series.cleanTitle?.ifBlank { null } ?: series.title} — ${
-            title.ifBlank { "S${seasonNumber}E${episodeNumber}" }
+            title.ifBlank { "S${seasonNumber}E$episodeNumber" }
         }",
         streamUrl = streamUrl,
         artworkUrl = series.logoUrl?.takeIf { it.isNotBlank() },

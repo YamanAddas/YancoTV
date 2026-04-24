@@ -58,8 +58,9 @@ fun MiniPlayer(
         // layout) can pass `Modifier.fillMaxSize()`. Hard-coding sizing
         // here would override caller intent because Modifier chains apply
         // last-wins for size constraints.
-        modifier = modifier
-            .focusProperties { canFocus = false },
+        modifier =
+            modifier
+                .focusProperties { canFocus = false },
         factory = { ctx ->
             TextureView(ctx).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
@@ -76,19 +77,20 @@ fun MiniPlayer(
     )
 
     DisposableEffect(lifecycle, controller) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewRef[0]?.let { v ->
-                    // Fullscreen activity may have taken the surface — reclaim it.
-                    // clearVideoSurface() first so the subsequent attach
-                    // doesn't block the main thread waiting for PlayerActivity's
-                    // SurfaceView to ack-detach (see PlayerLauncher comment +
-                    // ExoTimeoutException "Detaching surface timed out").
-                    controller.player.clearVideoSurface()
-                    controller.player.setVideoTextureView(v)
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    viewRef[0]?.let { v ->
+                        // Fullscreen activity may have taken the surface — reclaim it.
+                        // clearVideoSurface() first so the subsequent attach
+                        // doesn't block the main thread waiting for PlayerActivity's
+                        // SurfaceView to ack-detach (see PlayerLauncher comment +
+                        // ExoTimeoutException "Detaching surface timed out").
+                        controller.player.clearVideoSurface()
+                        controller.player.setVideoTextureView(v)
+                    }
                 }
             }
-        }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)

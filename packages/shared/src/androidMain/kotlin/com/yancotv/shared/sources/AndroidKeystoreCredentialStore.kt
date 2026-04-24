@@ -26,7 +26,6 @@ import javax.crypto.spec.GCMParameterSpec
 class AndroidKeystoreCredentialStore(
     private val keyAlias: String = DEFAULT_ALIAS,
 ) : CredentialStore {
-
     override fun encrypt(plaintext: String): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
@@ -55,11 +54,11 @@ class AndroidKeystoreCredentialStore(
 
         val kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         kg.init(
-            KeyGenParameterSpec.Builder(
-                keyAlias,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-            )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            KeyGenParameterSpec
+                .Builder(
+                    keyAlias,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
                 .setRandomizedEncryptionRequired(true)

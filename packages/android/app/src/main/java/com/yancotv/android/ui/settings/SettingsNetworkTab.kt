@@ -67,17 +67,21 @@ fun SettingsNetworkTab(
             var draft by remember(state.userAgentOverride) { mutableStateOf(state.userAgentOverride.orEmpty()) }
             OutlinedTextField(
                 value = draft,
-                onValueChange = { draft = it.take(256); scope.launch { prefs.setUserAgent(draft) } },
+                onValueChange = {
+                    draft = it.take(256)
+                    scope.launch { prefs.setUserAgent(draft) }
+                },
                 singleLine = true,
                 placeholder = { Text("VLC/3.0.20 LibVLC/3.0.20", color = YancoPalette.TextMuted) },
                 textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 13.sp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = YancoPalette.TextPrimary,
-                    unfocusedTextColor = YancoPalette.TextPrimary,
-                    focusedBorderColor = YancoPalette.Accent,
-                    unfocusedBorderColor = YancoPalette.BackgroundHover,
-                    cursorColor = YancoPalette.Accent,
-                ),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = YancoPalette.TextPrimary,
+                        unfocusedTextColor = YancoPalette.TextPrimary,
+                        focusedBorderColor = YancoPalette.Accent,
+                        unfocusedBorderColor = YancoPalette.BackgroundHover,
+                        cursorColor = YancoPalette.Accent,
+                    ),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -113,10 +117,11 @@ private fun TimeoutField(
 ) {
     var draft by remember(value) { mutableStateOf(value.toString()) }
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(text = label, color = YancoPalette.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -130,13 +135,14 @@ private fun TimeoutField(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 13.sp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = YancoPalette.TextPrimary,
-                unfocusedTextColor = YancoPalette.TextPrimary,
-                focusedBorderColor = YancoPalette.Accent,
-                unfocusedBorderColor = YancoPalette.BackgroundHover,
-                cursorColor = YancoPalette.Accent,
-            ),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = YancoPalette.TextPrimary,
+                    unfocusedTextColor = YancoPalette.TextPrimary,
+                    focusedBorderColor = YancoPalette.Accent,
+                    unfocusedBorderColor = YancoPalette.BackgroundHover,
+                    cursorColor = YancoPalette.Accent,
+                ),
         )
     }
 }
@@ -148,11 +154,12 @@ private fun PrefCard(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(title, color = YancoPalette.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)

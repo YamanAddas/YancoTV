@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,13 +73,17 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+private fun Section(
+    title: String,
+    content: @Composable () -> Unit,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(title, color = YancoPalette.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.1.sp)
@@ -89,7 +92,10 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Shortcut(label: String, keys: String) {
+private fun Shortcut(
+    label: String,
+    keys: String,
+) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(
             text = label,

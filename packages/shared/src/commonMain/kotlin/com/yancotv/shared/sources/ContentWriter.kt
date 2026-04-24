@@ -37,12 +37,14 @@ import kotlinx.serialization.json.Json
  * ([LIVE_BASE] / [VOD_BASE] / [SERIES_BASE] + running index), matching the
  * server-returned order of the single-endpoint response.
  */
-class ContentWriter(private val db: YancoDb) {
-
-    private val json = Json {
-        encodeDefaults = false
-        explicitNulls = false
-    }
+class ContentWriter(
+    private val db: YancoDb,
+) {
+    private val json =
+        Json {
+            encodeDefaults = false
+            explicitNulls = false
+        }
 
     /**
      * Encode [ContentMetadata] to JSON for the `metadata_json` column. Returns
@@ -75,11 +77,12 @@ class ContentWriter(private val db: YancoDb) {
                 // programme-tap "watch recording" affordance) can find them
                 // without re-parsing the playlist. `catchup-days` maps to the
                 // same "seek-back window" semantics as Xtream tv_archive_duration.
-                val meta = ContentMetadata(
-                    catchupType = entry.catchupType,
-                    catchupSource = entry.catchupSource,
-                    tvArchiveDuration = entry.catchupDays,
-                )
+                val meta =
+                    ContentMetadata(
+                        catchupType = entry.catchupType,
+                        catchupSource = entry.catchupSource,
+                        tvArchiveDuration = entry.catchupDays,
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -140,11 +143,12 @@ class ContentWriter(private val db: YancoDb) {
                 // UI can tell, per-channel, whether the "rewind programme"
                 // affordance is available and how far back it can seek.
                 // Pre-fix we threw these away and catchup silently no-op'd.
-                val meta = ContentMetadata(
-                    streamId = s.streamId.toLong(),
-                    tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
-                    tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
-                )
+                val meta =
+                    ContentMetadata(
+                        streamId = s.streamId.toLong(),
+                        tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
+                        tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -184,10 +188,11 @@ class ContentWriter(private val db: YancoDb) {
                 // too expensive to fan out for 20k+ titles at sync time, so
                 // it's fetched lazily on the detail screen and merged into
                 // this metadata then.
-                val meta = ContentMetadata(
-                    streamId = v.streamId.toLong(),
-                    rating = v.rating.ifBlank { null },
-                )
+                val meta =
+                    ContentMetadata(
+                        streamId = v.streamId.toLong(),
+                        rating = v.rating.ifBlank { null },
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -195,11 +200,12 @@ class ContentWriter(private val db: YancoDb) {
                     title = v.name,
                     clean_title = cleaned,
                     group_name = groupName,
-                    stream_url = client.buildStreamUrl(
-                        v.streamId,
-                        XtreamStreamType.MOVIE,
-                        v.containerExtension,
-                    ),
+                    stream_url =
+                        client.buildStreamUrl(
+                            v.streamId,
+                            XtreamStreamType.MOVIE,
+                            v.containerExtension,
+                        ),
                     logo_url = v.streamIcon.ifBlank { null },
                     tvg_id = null,
                     metadata_json = encodeMeta(meta),
@@ -231,15 +237,16 @@ class ContentWriter(private val db: YancoDb) {
                 // fired a per-series get_series_info). Persisting here means
                 // the grid can render a rich hover card without an extra
                 // round-trip per card.
-                val meta = ContentMetadata(
-                    seriesId = sr.seriesId.toLong(),
-                    plot = sr.plot.ifBlank { null },
-                    cast = sr.cast.ifBlank { null },
-                    director = sr.director.ifBlank { null },
-                    genre = sr.genre.ifBlank { null },
-                    releaseDate = sr.releaseDate.ifBlank { null },
-                    rating = sr.rating.ifBlank { null },
-                )
+                val meta =
+                    ContentMetadata(
+                        seriesId = sr.seriesId.toLong(),
+                        plot = sr.plot.ifBlank { null },
+                        cast = sr.cast.ifBlank { null },
+                        director = sr.director.ifBlank { null },
+                        genre = sr.genre.ifBlank { null },
+                        releaseDate = sr.releaseDate.ifBlank { null },
+                        rating = sr.rating.ifBlank { null },
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -281,11 +288,12 @@ class ContentWriter(private val db: YancoDb) {
                 val id = ContentIds.stalkerLive(sourceId, c.id.toString())
                 val cleaned = cleanTitle(c.name)
                 val groupName = live.categories[c.tvGenreId] ?: c.tvGenreId.ifBlank { null }
-                val meta = ContentMetadata(
-                    stalkerId = c.id.toString(),
-                    tvArchive = if (c.tvArchive != 0) c.tvArchive else null,
-                    tvArchiveDuration = if (c.tvArchiveDuration != 0) c.tvArchiveDuration else null,
-                )
+                val meta =
+                    ContentMetadata(
+                        stalkerId = c.id.toString(),
+                        tvArchive = if (c.tvArchive != 0) c.tvArchive else null,
+                        tvArchiveDuration = if (c.tvArchiveDuration != 0) c.tvArchiveDuration else null,
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -308,10 +316,11 @@ class ContentWriter(private val db: YancoDb) {
                 val id = ContentIds.stalkerVod(sourceId, v.id.toString())
                 val cleaned = cleanTitle(v.name)
                 val groupName = vod.categories[v.categoryId] ?: v.categoryId.ifBlank { null }
-                val meta = ContentMetadata(
-                    stalkerId = v.id.toString(),
-                    description = v.description.ifBlank { null },
-                )
+                val meta =
+                    ContentMetadata(
+                        stalkerId = v.id.toString(),
+                        description = v.description.ifBlank { null },
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -334,11 +343,12 @@ class ContentWriter(private val db: YancoDb) {
                 val id = ContentIds.stalkerSeries(sourceId, sr.id.toString())
                 val cleaned = cleanTitle(sr.name)
                 val groupName = series.categories[sr.categoryId] ?: sr.categoryId.ifBlank { null }
-                val meta = ContentMetadata(
-                    stalkerId = sr.id.toString(),
-                    plot = sr.plot.ifBlank { null },
-                    genre = sr.genre.ifBlank { null },
-                )
+                val meta =
+                    ContentMetadata(
+                        stalkerId = sr.id.toString(),
+                        plot = sr.plot.ifBlank { null },
+                        genre = sr.genre.ifBlank { null },
+                    )
                 db.contentQueries.insert(
                     id = id,
                     source_id = sourceId,
@@ -361,11 +371,12 @@ class ContentWriter(private val db: YancoDb) {
         return written
     }
 
-    private fun serializeType(type: ContentType): String = when (type) {
-        ContentType.LIVE -> "live"
-        ContentType.MOVIE -> "movie"
-        ContentType.SERIES -> "series"
-    }
+    private fun serializeType(type: ContentType): String =
+        when (type) {
+            ContentType.LIVE -> "live"
+            ContentType.MOVIE -> "movie"
+            ContentType.SERIES -> "series"
+        }
 
     companion object {
         const val LIVE_BASE = 0L
@@ -374,4 +385,7 @@ class ContentWriter(private val db: YancoDb) {
     }
 }
 
-data class StalkerBundle<T>(val items: List<T>, val categories: Map<String, String>)
+data class StalkerBundle<T>(
+    val items: List<T>,
+    val categories: Map<String, String>,
+)

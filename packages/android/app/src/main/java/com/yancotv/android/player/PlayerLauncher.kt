@@ -26,11 +26,12 @@ object PlayerLauncher {
             val controller = GlobalContext.get().get<PlaybackController>()
             controller.player.clearVideoSurface()
         }
-        val intent = Intent(ctx, PlayerActivity::class.java).apply {
-            if (ctx !is android.app.Activity) {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent =
+            Intent(ctx, PlayerActivity::class.java).apply {
+                if (ctx !is android.app.Activity) {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
             }
-        }
         ctx.startActivity(intent)
     }
 }

@@ -4,10 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -36,8 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
@@ -80,14 +80,15 @@ fun CategoryChipBar(
     // MB-88: indexOf (O(n)) runs only when groups/selected change, not on
     // every showFavorites toggle.
     val groupPos = remember(groups, selected) { groups.indexOf(selected) }
-    val selectedIndex = remember(groupPos, selected, showFavorites) {
-        val offset = if (showFavorites) 1 else 0
-        when (selected) {
-            FAVORITES_GROUP -> if (showFavorites) 0 else -1
-            ALL_GROUPS -> offset
-            else -> if (groupPos < 0) -1 else offset + 2 + groupPos
+    val selectedIndex =
+        remember(groupPos, selected, showFavorites) {
+            val offset = if (showFavorites) 1 else 0
+            when (selected) {
+                FAVORITES_GROUP -> if (showFavorites) 0 else -1
+                ALL_GROUPS -> offset
+                else -> if (groupPos < 0) -1 else offset + 2 + groupPos
+            }
         }
-    }
     // MB-72: guard scrollToItem so it only fires when selectedIndex
     // actually changes, not on every recomposition.
     var prevScrolledIndex by remember { mutableStateOf(-1) }
@@ -100,12 +101,14 @@ fun CategoryChipBar(
 
     LazyRow(
         state = listState,
-        modifier = modifier
-            .focusGroup(),
-        contentPadding = PaddingValues(
-            horizontal = Space.page,
-            vertical = Space.xs,
-        ),
+        modifier =
+            modifier
+                .focusGroup(),
+        contentPadding =
+            PaddingValues(
+                horizontal = Space.page,
+                vertical = Space.xs,
+            ),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -133,10 +136,11 @@ fun CategoryChipBar(
         }
         item(key = "__sep__") {
             Spacer(
-                modifier = Modifier
-                    .width(1.dp)
-                    .size(width = 1.dp, height = 20.dp)
-                    .background(YancoPalette.BorderSubtle),
+                modifier =
+                    Modifier
+                        .width(1.dp)
+                        .size(width = 1.dp, height = 20.dp)
+                        .background(YancoPalette.BorderSubtle),
             )
         }
         items(groups, key = { it }) { group ->
@@ -187,50 +191,55 @@ private fun Chip(
     // (top-down Accent → AccentDeep) so the picked state reads as a lit
     // facet, not a flat tinted slab; selected-but-unfocused gets a softer
     // wash; idle is a near-floor frosted plate.
-    val bg: Brush = when {
-        focused -> Brush.verticalGradient(
-            listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
-        )
-        selected -> Brush.verticalGradient(
-            listOf(
-                YancoPalette.Accent.copy(alpha = 0.32f),
-                YancoPalette.AccentDeep.copy(alpha = 0.22f),
-            ),
-        )
-        else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
-    }
-    val border = when {
-        focused -> YancoPalette.FocusRing
-        selected -> YancoPalette.Accent.copy(alpha = 0.55f)
-        else -> YancoPalette.BorderSubtle
-    }
+    val bg: Brush =
+        when {
+            focused ->
+                Brush.verticalGradient(
+                    listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                )
+            selected ->
+                Brush.verticalGradient(
+                    listOf(
+                        YancoPalette.Accent.copy(alpha = 0.32f),
+                        YancoPalette.AccentDeep.copy(alpha = 0.22f),
+                    ),
+                )
+            else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+        }
+    val border =
+        when {
+            focused -> YancoPalette.FocusRing
+            selected -> YancoPalette.Accent.copy(alpha = 0.55f)
+            else -> YancoPalette.BorderSubtle
+        }
     val fg by animateColorAsState(
-        targetValue = when {
-            focused -> Color.Black
-            selected -> YancoPalette.Accent
-            else -> YancoPalette.TextSecondary
-        },
+        targetValue =
+            when {
+                focused -> Color.Black
+                selected -> YancoPalette.Accent
+                else -> YancoPalette.TextSecondary
+            },
         label = "chip-fg",
     )
     // Hex-inspired chip — leading angular bevel + rounded trailing cap so
     // each chip reads as part of the shell's angular family. Focused chips
     // pick up an emerald drop-shadow so the lift reads at 10 ft.
     Row(
-        modifier = Modifier
-            .height(38.dp)
-            .shadow(
-                elevation = if (focused) 14.dp else 0.dp,
-                shape = YancoShapes.ChipBevel,
-                ambientColor = YancoPalette.Accent,
-                spotColor = YancoPalette.Accent,
-            )
-            .clip(YancoShapes.ChipBevel)
-            .background(bg)
-            .border(if (focused) 2.dp else 1.dp, border, YancoShapes.ChipBevel)
-            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
+        modifier =
+            Modifier
+                .height(38.dp)
+                .shadow(
+                    elevation = if (focused) 14.dp else 0.dp,
+                    shape = YancoShapes.ChipBevel,
+                    ambientColor = YancoPalette.Accent,
+                    spotColor = YancoPalette.Accent,
+                ).clip(YancoShapes.ChipBevel)
+                .background(bg)
+                .border(if (focused) 2.dp else 1.dp, border, YancoShapes.ChipBevel)
+                .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -245,10 +254,11 @@ private fun Chip(
             // Small accent pip instead of an icon. Reinforces "picked" with
             // a touch of colour without a generic leading glyph.
             Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(YancoPalette.Accent),
+                modifier =
+                    Modifier
+                        .size(6.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(YancoPalette.Accent),
             )
         }
         Text(

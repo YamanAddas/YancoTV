@@ -69,19 +69,20 @@ fun buildM3uCatchupUrl(
 
     val civil = civilFromEpochSeconds(programmeStart)
 
-    template = template
-        .replace(Regex("""\{start\}"""), programmeStart.toString())
-        .replace(Regex("""\{end\}"""), (programmeStart + programmeDuration).toString())
-        .replace(Regex("""\{duration\}"""), programmeDuration.toString())
-        .replace(Regex("""\{timestamp\}"""), programmeStart.toString())
-        .replace(Regex("""\{utc\}"""), programmeStart.toString())
-        .replace(Regex("""\{lutc\}"""), programmeStart.toString())
-        .replace(Regex("""\{Y\}"""), civil.year.toString())
-        .replace(Regex("""\{m\}"""), civil.month.toString().padStart(2, '0'))
-        .replace(Regex("""\{d\}"""), civil.day.toString().padStart(2, '0'))
-        .replace(Regex("""\{H\}"""), civil.hour.toString().padStart(2, '0'))
-        .replace(Regex("""\{M\}"""), civil.minute.toString().padStart(2, '0'))
-        .replace(Regex("""\{S\}"""), civil.second.toString().padStart(2, '0'))
+    template =
+        template
+            .replace(Regex("""\{start\}"""), programmeStart.toString())
+            .replace(Regex("""\{end\}"""), (programmeStart + programmeDuration).toString())
+            .replace(Regex("""\{duration\}"""), programmeDuration.toString())
+            .replace(Regex("""\{timestamp\}"""), programmeStart.toString())
+            .replace(Regex("""\{utc\}"""), programmeStart.toString())
+            .replace(Regex("""\{lutc\}"""), programmeStart.toString())
+            .replace(Regex("""\{Y\}"""), civil.year.toString())
+            .replace(Regex("""\{m\}"""), civil.month.toString().padStart(2, '0'))
+            .replace(Regex("""\{d\}"""), civil.day.toString().padStart(2, '0'))
+            .replace(Regex("""\{H\}"""), civil.hour.toString().padStart(2, '0'))
+            .replace(Regex("""\{M\}"""), civil.minute.toString().padStart(2, '0'))
+            .replace(Regex("""\{S\}"""), civil.second.toString().padStart(2, '0'))
 
     val streamIdMatch = Regex("""/(\d+)\.\w+$""").find(originalUrl)
     if (streamIdMatch != null) {

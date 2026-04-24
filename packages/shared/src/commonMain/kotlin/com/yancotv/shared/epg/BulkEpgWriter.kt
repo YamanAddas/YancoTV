@@ -24,7 +24,6 @@ class BulkEpgWriter(
     private val driver: SqlDriver,
     private val logger: Logger = NOOP_LOGGER,
 ) {
-
     data class ProgrammeBatch(
         /** Key used in the composite primary key `channelId|startTime|sourceKey`. */
         val sourceKey: String,
@@ -33,7 +32,10 @@ class BulkEpgWriter(
         val programmes: List<XmltvProgramme>,
     )
 
-    data class Result(val rowsWritten: Int, val channels: Int)
+    data class Result(
+        val rowsWritten: Int,
+        val channels: Int,
+    )
 
     /**
      * Atomically swap the whole `epg_programmes` table with the concatenated
@@ -237,12 +239,13 @@ class BulkEpgWriter(
             // semantics — collisions on the composite `channelId|start|source`
             // PK are rare but not impossible (provider sends duplicate
             // programme entries), and we want the last-wins behavior.
-            val sb = StringBuilder(
-                "INSERT OR REPLACE INTO epg_programmes (" +
-                    "id, source_id, channel_tvg_id, title, description, " +
-                    "start_time, end_time, category, icon_url" +
-                    ") VALUES ",
-            )
+            val sb =
+                StringBuilder(
+                    "INSERT OR REPLACE INTO epg_programmes (" +
+                        "id, source_id, channel_tvg_id, title, description, " +
+                        "start_time, end_time, category, icon_url" +
+                        ") VALUES ",
+                )
             for (r in 0 until rowCount) {
                 if (r > 0) sb.append(',')
                 sb.append("(?,?,?,?,?,?,?,?,?)")

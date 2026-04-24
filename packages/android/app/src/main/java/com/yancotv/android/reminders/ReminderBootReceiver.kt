@@ -17,14 +17,20 @@ import org.koin.core.component.inject
  * isn't readable until the user unlocks the device anyway.
  */
 @UnstableApi
-class ReminderBootReceiver : BroadcastReceiver(), KoinComponent {
-
+class ReminderBootReceiver :
+    BroadcastReceiver(),
+    KoinComponent {
     private val scheduler: ReminderScheduler by inject()
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
             intent.action != "android.intent.action.QUICKBOOT_POWERON"
-        ) return
+        ) {
+            return
+        }
         scheduler.rescheduleAll()
     }
 }

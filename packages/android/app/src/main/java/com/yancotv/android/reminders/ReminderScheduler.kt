@@ -27,13 +27,16 @@ class ReminderScheduler(
     private val context: Context,
     private val repo: ReminderRepository,
 ) {
-
     private val alarms: AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun isSet(programmeId: String): Boolean = repo.forProgramme(programmeId) != null
 
-    fun set(channelTvgId: String, programme: EpgProgramme, leadSeconds: Long = 0L): Reminder {
+    fun set(
+        channelTvgId: String,
+        programme: EpgProgramme,
+        leadSeconds: Long = 0L,
+    ): Reminder {
         val reminder = repo.upsert(channelTvgId, programme, leadSeconds)
         scheduleAlarm(reminder)
         return reminder
@@ -71,11 +74,12 @@ class ReminderScheduler(
         // be revoked, but on some OEM builds the check still fails — fall
         // back to an inexact while-idle alarm rather than crashing. Worst case
         // the reminder fires a few minutes late instead of to the second.
-        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            alarms.canScheduleExactAlarms()
-        } else {
-            true
-        }
+        val canExact =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                alarms.canScheduleExactAlarms()
+            } else {
+                true
+            }
         if (canExact) {
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
         } else {
@@ -92,12 +96,13 @@ class ReminderScheduler(
         programmeId: String?,
         title: String?,
     ): PendingIntent {
-        val intent = Intent(context, ReminderAlarmReceiver::class.java).apply {
-            action = ACTION_FIRE
-            putExtra(EXTRA_REMINDER_ID, reminderId)
-            if (programmeId != null) putExtra(EXTRA_PROGRAMME_ID, programmeId)
-            if (title != null) putExtra(EXTRA_TITLE, title)
-        }
+        val intent =
+            Intent(context, ReminderAlarmReceiver::class.java).apply {
+                action = ACTION_FIRE
+                putExtra(EXTRA_REMINDER_ID, reminderId)
+                if (programmeId != null) putExtra(EXTRA_PROGRAMME_ID, programmeId)
+                if (title != null) putExtra(EXTRA_TITLE, title)
+            }
         // FLAG_UPDATE_CURRENT so set() on the same programme replaces the
         // payload (e.g. if the user edits the lead time later).
         // FLAG_IMMUTABLE was added in API 23 (M); minSdk = 24 so the SDK_INT

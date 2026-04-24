@@ -2,12 +2,12 @@ package com.yancotv.android.ui.shell
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,7 +35,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,12 +57,14 @@ import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
+import kotlinx.coroutines.delay
 
 // MB-81: stable top-level val — palette colours never change at runtime so
 // there is no reason to allocate a new Brush on every EPG tick recomposition.
-private val heroProgressBrush = Brush.horizontalGradient(
-    listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
-)
+private val heroProgressBrush =
+    Brush.horizontalGradient(
+        listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
+    )
 
 /**
  * Dominant hero at the top of the browse shell. Swaps its backdrop + copy
@@ -107,22 +108,22 @@ fun FeatureHero(
         // readable, plus a subtle vertical bottom-fade so any card rail
         // behind reads as continuation of the canvas, not a hard edge.
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        0f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
-                        0.45f to YancoPalette.BackgroundDeep.copy(alpha = 0.45f),
-                        1f to Color.Transparent,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                            0.45f to YancoPalette.BackgroundDeep.copy(alpha = 0.45f),
+                            1f to Color.Transparent,
+                        ),
+                    ).background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.75f to Color.Transparent,
+                            1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
+                        ),
                     ),
-                )
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.75f to Color.Transparent,
-                        1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
-                    ),
-                ),
         )
 
         if (focused == null) {
@@ -140,10 +141,11 @@ fun FeatureHero(
             isLocked = isLocked,
             onPlay = onPlay,
             onToggleFavorite = onToggleFavorite,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = Space.page, end = Space.xxxl)
-                .widthIn(max = 620.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = Space.page, end = Space.xxxl)
+                    .widthIn(max = 620.dp),
         )
     }
 }
@@ -195,16 +197,18 @@ private fun HeroBackdrop(
         }
         else -> {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                YancoPalette.BackgroundHover,
-                                YancoPalette.BackgroundDeep,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors =
+                                    listOf(
+                                        YancoPalette.BackgroundHover,
+                                        YancoPalette.BackgroundDeep,
+                                    ),
                             ),
                         ),
-                    ),
             )
         }
     }
@@ -223,11 +227,12 @@ private fun HeroCopy(
     onToggleFavorite: () -> Unit,
     modifier: Modifier,
 ) {
-    val eyebrow = when (focused.type) {
-        ContentType.LIVE -> "LIVE CHANNEL"
-        ContentType.MOVIE -> "FEATURE"
-        ContentType.SERIES -> "SERIES"
-    }
+    val eyebrow =
+        when (focused.type) {
+            ContentType.LIVE -> "LIVE CHANNEL"
+            ContentType.MOVIE -> "FEATURE"
+            ContentType.SERIES -> "SERIES"
+        }
     val title = focused.cleanTitle?.ifBlank { null } ?: focused.title
     val nowProg = nowNext?.now
     val nextProg = nowNext?.next
@@ -265,17 +270,19 @@ private fun HeroCopy(
         // metadataJson — but that parse is lossy enough to skip here and
         // let Detail do its job, so we show category/source chips instead.
         when (focused.type) {
-            ContentType.LIVE -> LiveHeroMeta(
-                nowProg = nowProg,
-                nextProg = nextProg,
-                nowSeconds = nowSeconds,
-                group = focused.groupName,
-            )
-            ContentType.MOVIE, ContentType.SERIES -> VodHeroMeta(
-                group = focused.groupName,
-                sourceName = sourceName,
-                type = focused.type,
-            )
+            ContentType.LIVE ->
+                LiveHeroMeta(
+                    nowProg = nowProg,
+                    nextProg = nextProg,
+                    nowSeconds = nowSeconds,
+                    group = focused.groupName,
+                )
+            ContentType.MOVIE, ContentType.SERIES ->
+                VodHeroMeta(
+                    group = focused.groupName,
+                    sourceName = sourceName,
+                    type = focused.type,
+                )
         }
 
         Spacer(Modifier.height(Space.xs))
@@ -288,11 +295,12 @@ private fun HeroCopy(
                 // running (or about to, inside the 400ms debounce window).
                 // For movies/series no auto-preview fires; the OK press
                 // opens the detail overlay, which owns the real Play CTA.
-                label = when {
-                    focused.type == ContentType.LIVE -> "Open fullscreen"
-                    isCurrentlyPlaying -> "Open fullscreen"
-                    else -> "Play now"
-                },
+                label =
+                    when {
+                        focused.type == ContentType.LIVE -> "Open fullscreen"
+                        isCurrentlyPlaying -> "Open fullscreen"
+                        else -> "Play now"
+                    },
                 icon = YancoIcons.Play,
                 onClick = onPlay,
             )
@@ -338,12 +346,13 @@ private fun LiveHeroMeta(
             )
         }
         MetaChipRow(
-            chips = remember(group, nowProg?.category) {
-                buildList {
-                    group?.takeIf { it.isNotBlank() }?.let { add(it) }
-                    nowProg?.category?.takeIf { it.isNotBlank() }?.let { add(it) }
-                }
-            },
+            chips =
+                remember(group, nowProg?.category) {
+                    buildList {
+                        group?.takeIf { it.isNotBlank() }?.let { add(it) }
+                        nowProg?.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    }
+                },
         )
     }
 }
@@ -355,13 +364,14 @@ private fun VodHeroMeta(
     type: ContentType,
 ) {
     MetaChipRow(
-        chips = remember(type, group, sourceName) {
-            buildList {
-                add(if (type == ContentType.MOVIE) "Movie" else "Series")
-                group?.takeIf { it.isNotBlank() }?.let { add(it) }
-                sourceName?.takeIf { it.isNotBlank() }?.let { add(it) }
-            }
-        },
+        chips =
+            remember(type, group, sourceName) {
+                buildList {
+                    add(if (type == ContentType.MOVIE) "Movie" else "Series")
+                    group?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    sourceName?.takeIf { it.isNotBlank() }?.let { add(it) }
+                }
+            },
     )
 }
 
@@ -376,11 +386,12 @@ private fun MetaChipRow(chips: List<String>) {
 @Composable
 private fun HeroMetaChip(label: String) {
     Box(
-        modifier = Modifier
-            .clip(YancoShapes.ChipBevel)
-            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.65f))
-            .border(1.dp, YancoPalette.PanelBorder, YancoShapes.ChipBevel)
-            .padding(horizontal = Space.md, vertical = Space.xs),
+        modifier =
+            Modifier
+                .clip(YancoShapes.ChipBevel)
+                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.65f))
+                .border(1.dp, YancoPalette.PanelBorder, YancoShapes.ChipBevel)
+                .padding(horizontal = Space.md, vertical = Space.xs),
     ) {
         Text(
             text = label,
@@ -392,7 +403,11 @@ private fun HeroMetaChip(label: String) {
 }
 
 @Composable
-private fun HeroProgress(start: Long, end: Long, now: Long) {
+private fun HeroProgress(
+    start: Long,
+    end: Long,
+    now: Long,
+) {
     // MB-81: span depends only on start/end, not now — memoize so EPG ticks
     // that update `now` every second don't recompute this on every frame.
     val span = remember(start, end) { (end - start).coerceAtLeast(1) }
@@ -400,17 +415,19 @@ private fun HeroProgress(start: Long, end: Long, now: Long) {
     val remainingMin = ((end - now).coerceAtLeast(0) / 60).toInt()
     Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(YancoPalette.BorderSubtle),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(YancoPalette.BorderSubtle),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth(pct)
-                    .fillMaxHeight()
-                    .background(heroProgressBrush),
+                modifier =
+                    Modifier
+                        .fillMaxWidth(pct)
+                        .fillMaxHeight()
+                        .background(heroProgressBrush),
             )
         }
         Text(
@@ -422,7 +439,11 @@ private fun HeroProgress(start: Long, end: Long, now: Long) {
 }
 
 @Composable
-private fun PrimaryCta(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun PrimaryCta(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
@@ -435,18 +456,18 @@ private fun PrimaryCta(label: String, icon: ImageVector, onClick: () -> Unit) {
     // Bevelled hex button — accent-filled primary CTA. A hairline focus rim
     // rides the bevel so the shape reads as an angular playbill.
     Row(
-        modifier = Modifier
-            .clip(shape)
-            .background(bg)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) YancoPalette.FocusRing else YancoPalette.AccentDeep,
-                shape = shape,
-            )
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = label }
-            .padding(horizontal = Space.xxxl, vertical = Space.md),
+        modifier =
+            Modifier
+                .clip(shape)
+                .background(bg)
+                .border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) YancoPalette.FocusRing else YancoPalette.AccentDeep,
+                    shape = shape,
+                ).focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = label }
+                .padding(horizontal = Space.xxxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -470,32 +491,36 @@ private fun TonalCta(
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
     val bg by animateColorAsState(
-        targetValue = when {
-            focused -> YancoPalette.Accent.copy(alpha = 0.22f)
-            highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
-            else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
-        },
+        targetValue =
+            when {
+                focused -> YancoPalette.Accent.copy(alpha = 0.22f)
+                highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
+                else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
+            },
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "tonalCtaBg",
     )
-    val border = when {
-        focused -> YancoPalette.FocusRing
-        highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
-        else -> YancoPalette.PanelBorder
-    }
-    val fg = when {
-        highlighted -> YancoPalette.Accent
-        else -> YancoPalette.TextPrimary
-    }
+    val border =
+        when {
+            focused -> YancoPalette.FocusRing
+            highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
+            else -> YancoPalette.PanelBorder
+        }
+    val fg =
+        when {
+            highlighted -> YancoPalette.Accent
+            else -> YancoPalette.TextPrimary
+        }
     Row(
-        modifier = Modifier
-            .clip(shape)
-            .background(bg)
-            .border(if (focused) 2.dp else 1.dp, border, shape)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = label }
-            .padding(horizontal = Space.xxxl, vertical = Space.md),
+        modifier =
+            Modifier
+                .clip(shape)
+                .background(bg)
+                .border(if (focused) 2.dp else 1.dp, border, shape)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = label }
+                .padding(horizontal = Space.xxxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -511,18 +536,20 @@ private fun TonalCta(
 @Composable
 private fun HeroLivePill() {
     Row(
-        modifier = Modifier
-            .clip(YancoShapes.ChipBevel)
-            .background(YancoPalette.Live)
-            .padding(horizontal = Space.md, vertical = 4.dp),
+        modifier =
+            Modifier
+                .clip(YancoShapes.ChipBevel)
+                .background(YancoPalette.Live)
+                .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Box(
-            modifier = Modifier
-                .size(6.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(Color.White),
+            modifier =
+                Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(Color.White),
         )
         Text(text = "LIVE", color = Color.White, style = YancoType.Overline)
     }
@@ -531,11 +558,12 @@ private fun HeroLivePill() {
 @Composable
 private fun HeroLockChip() {
     Row(
-        modifier = Modifier
-            .clip(YancoShapes.ChipBevel)
-            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
-            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
-            .padding(horizontal = Space.md, vertical = 4.dp),
+        modifier =
+            Modifier
+                .clip(YancoShapes.ChipBevel)
+                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
+                .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
+                .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -552,9 +580,10 @@ private fun HeroLockChip() {
 @Composable
 private fun HeroIdlePlaceholder(modifier: Modifier) {
     Column(
-        modifier = modifier
-            .padding(start = Space.page, end = Space.xxxl)
-            .widthIn(max = 560.dp),
+        modifier =
+            modifier
+                .padding(start = Space.page, end = Space.xxxl)
+                .widthIn(max = 560.dp),
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         Text(

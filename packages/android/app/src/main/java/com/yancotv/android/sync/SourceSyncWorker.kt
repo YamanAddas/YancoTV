@@ -31,13 +31,14 @@ import java.util.concurrent.TimeUnit
 class SourceSyncWorker(
     appContext: Context,
     params: WorkerParameters,
-) : CoroutineWorker(appContext, params), KoinComponent {
-
+) : CoroutineWorker(appContext, params),
+    KoinComponent {
     private val repo: SourceRepository by inject()
 
     override suspend fun doWork(): Result {
-        val sourceId = inputData.getString(KEY_SOURCE_ID)
-            ?: return Result.failure(workDataOf(KEY_ERROR to "missing $KEY_SOURCE_ID"))
+        val sourceId =
+            inputData.getString(KEY_SOURCE_ID)
+                ?: return Result.failure(workDataOf(KEY_ERROR to "missing $KEY_SOURCE_ID"))
 
         val terminal = repo.syncSource(sourceId).lastOrNull()
         return when (terminal?.phase) {
@@ -45,8 +46,12 @@ class SourceSyncWorker(
             // Network hiccups get retried by WorkManager's exponential backoff.
             // Everything else (bad credentials, portal down for days) becomes
             // a terminal failure visible in `last_sync_error`.
-            SyncProgress.Phase.ERROR -> if (runAttemptCount < MAX_RETRIES) Result.retry()
-                else Result.failure(workDataOf(KEY_ERROR to (terminal.message ?: "sync failed")))
+            SyncProgress.Phase.ERROR ->
+                if (runAttemptCount < MAX_RETRIES) {
+                    Result.retry()
+                } else {
+                    Result.failure(workDataOf(KEY_ERROR to (terminal.message ?: "sync failed")))
+                }
             else -> Result.failure(workDataOf(KEY_ERROR to "sync produced no terminal event"))
         }
     }
@@ -62,16 +67,19 @@ class SourceSyncWorker(
             sourceId: String,
             intervalMinutes: Long,
         ) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
+            val constraints =
+                Constraints
+                    .Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
 
-            val request = PeriodicWorkRequestBuilder<SourceSyncWorker>(
-                intervalMinutes, TimeUnit.MINUTES,
-            )
-                .setInputData(workDataOf(KEY_SOURCE_ID to sourceId))
-                .setConstraints(constraints)
-                .build()
+            val request =
+                PeriodicWorkRequestBuilder<SourceSyncWorker>(
+                    intervalMinutes,
+                    TimeUnit.MINUTES,
+                ).setInputData(workDataOf(KEY_SOURCE_ID to sourceId))
+                    .setConstraints(constraints)
+                    .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_PREFIX + sourceId,
@@ -80,7 +88,10 @@ class SourceSyncWorker(
             )
         }
 
-        fun cancel(context: Context, sourceId: String) {
+        fun cancel(
+            context: Context,
+            sourceId: String,
+        ) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_PREFIX + sourceId)
         }
     }

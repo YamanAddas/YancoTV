@@ -56,11 +56,12 @@ fun SettingsGeneralTab(
         )
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -109,11 +110,12 @@ private fun ToggleRow(
     onChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -134,26 +136,32 @@ private fun ToggleRow(
         Switch(
             checked = checked,
             onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = YancoPalette.Accent,
-                checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                uncheckedThumbColor = YancoPalette.TextMuted,
-                uncheckedTrackColor = YancoPalette.BackgroundHover,
-            ),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = YancoPalette.Accent,
+                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = YancoPalette.TextMuted,
+                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                ),
         )
     }
 }
 
 @Composable
-private fun Chip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun Chip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     val bg = if (selected) YancoPalette.Accent.copy(alpha = 0.22f) else YancoPalette.BackgroundDeep
     val fg = if (selected) YancoPalette.TextPrimary else YancoPalette.TextMuted
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
             label,

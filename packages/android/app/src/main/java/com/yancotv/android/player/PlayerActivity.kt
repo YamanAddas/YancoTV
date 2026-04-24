@@ -16,6 +16,11 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -27,13 +32,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
@@ -67,12 +67,12 @@ import kotlin.math.roundToInt
  */
 @UnstableApi
 class PlayerActivity : AppCompatActivity() {
-
     companion object {
         private const val TAG = "YancoPlayerActivity"
         private const val CONTROLLER_TIMEOUT_MS = 4000
         private const val QUICK_INFO_AUTO_HIDE_MS = 10_000L
         private const val PROGRESS_TICK_MS = 15_000L
+
         // MK.8.2 — live-edge poll cadence and "you're behind live" floor.
         // 1 s is fine; the subsequent UI write is a single TextView update.
         // 8 s threshold ignores the normal ExoPlayer live latency (a few
@@ -135,34 +135,36 @@ class PlayerActivity : AppCompatActivity() {
     private var liveOffsetTickerJob: Job? = null
     private var inPip = false
 
-    private val playerListener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) {
-            Log.e(TAG, "onPlayerError ${error.errorCodeName}", error)
-            showStreamError(error)
-        }
-
-        override fun onPlaybackStateChanged(state: Int) {
-            val name = when (state) {
-                Player.STATE_IDLE -> "IDLE"
-                Player.STATE_BUFFERING -> "BUFFERING"
-                Player.STATE_READY -> "READY"
-                Player.STATE_ENDED -> "ENDED"
-                else -> "UNKNOWN"
+    private val playerListener =
+        object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e(TAG, "onPlayerError ${error.errorCodeName}", error)
+                showStreamError(error)
             }
-            Log.i(TAG, "onPlaybackStateChanged=$name")
-            if (quickInfo.visibility == View.VISIBLE) refreshQuickInfo()
-            // Clear any lingering error UI once a retry (or channel change)
-            // transitions back to READY. Keeps the overlay from sticking
-            // after a successful zap away from a failed stream.
-            if (state == Player.STATE_READY && streamErrorOverlay.visibility == View.VISIBLE) {
-                hideStreamError()
+
+            override fun onPlaybackStateChanged(state: Int) {
+                val name =
+                    when (state) {
+                        Player.STATE_IDLE -> "IDLE"
+                        Player.STATE_BUFFERING -> "BUFFERING"
+                        Player.STATE_READY -> "READY"
+                        Player.STATE_ENDED -> "ENDED"
+                        else -> "UNKNOWN"
+                    }
+                Log.i(TAG, "onPlaybackStateChanged=$name")
+                if (quickInfo.visibility == View.VISIBLE) refreshQuickInfo()
+                // Clear any lingering error UI once a retry (or channel change)
+                // transitions back to READY. Keeps the overlay from sticking
+                // after a successful zap away from a failed stream.
+                if (state == Player.STATE_READY && streamErrorOverlay.visibility == View.VISIBLE) {
+                    hideStreamError()
+                }
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                if (quickInfo.visibility == View.VISIBLE) refreshQuickInfo()
             }
         }
-
-        override fun onTracksChanged(tracks: Tracks) {
-            if (quickInfo.visibility == View.VISIBLE) refreshQuickInfo()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -248,11 +250,12 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun ResizeMode.toPlayerViewMode(): Int = when (this) {
-        ResizeMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        ResizeMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-        ResizeMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-    }
+    private fun ResizeMode.toPlayerViewMode(): Int =
+        when (this) {
+            ResizeMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+            ResizeMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+            ResizeMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        }
 
     override fun onStart() {
         super.onStart()
@@ -317,7 +320,10 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         inPip = isInPictureInPictureMode
         // While in PIP, the shrunken surface only needs the video — hide
@@ -434,12 +440,13 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
         lifecycleScope.launch {
-            val nn = try {
-                withContext(Dispatchers.IO) { epg.getNowNext(tvgId) }
-            } catch (t: Throwable) {
-                Log.w(TAG, "EPG lookup failed for tvgId=$tvgId", t)
-                null
-            }
+            val nn =
+                try {
+                    withContext(Dispatchers.IO) { epg.getNowNext(tvgId) }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "EPG lookup failed for tvgId=$tvgId", t)
+                    null
+                }
             // Dropped stale response if the user zapped again mid-flight.
             if (controller.currentId != item.id) return@launch
             val now = nn?.now
@@ -456,8 +463,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun applyOverlayVisibility() {
         zapBar.visibility = if (controllerVisible && controller.currentId != null) View.VISIBLE else View.GONE
-        val liveWithEpg = currentProgramme != null &&
-            controller.currentItem.value?.type == ContentType.LIVE
+        val liveWithEpg =
+            currentProgramme != null &&
+                controller.currentItem.value?.type == ContentType.LIVE
         progressRow.visibility = if (controllerVisible && liveWithEpg) View.VISIBLE else View.GONE
     }
 
@@ -465,19 +473,21 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun startProgressTicker() {
         progressTickerJob?.cancel()
-        progressTickerJob = lifecycleScope.launch {
-            while (isActive) {
-                renderProgramProgress()
-                delay(PROGRESS_TICK_MS)
+        progressTickerJob =
+            lifecycleScope.launch {
+                while (isActive) {
+                    renderProgramProgress()
+                    delay(PROGRESS_TICK_MS)
+                }
             }
-        }
     }
 
     private fun renderProgramProgress() {
-        val prog = currentProgramme ?: run {
-            progressRow.visibility = View.GONE
-            return
-        }
+        val prog =
+            currentProgramme ?: run {
+                progressRow.visibility = View.GONE
+                return
+            }
         val nowSec = System.currentTimeMillis() / 1000L
         val total = (prog.endTime - prog.startTime).coerceAtLeast(1)
         val elapsed = (nowSec - prog.startTime).coerceIn(0, total)
@@ -485,7 +495,7 @@ class PlayerActivity : AppCompatActivity() {
         val totalMin = ((total + 59L) / 60L).toInt()
         val pct = ((elapsed.toDouble() / total) * 1000.0).roundToInt().coerceIn(0, 1000)
         ppTitle.text = prog.title
-        ppTime.text = "${remainingMin} min left • ${totalMin} min"
+        ppTime.text = "$remainingMin min left • $totalMin min"
         ppBar.progress = pct
         if (nowSec >= prog.endTime) {
             // Programme rolled over — clear so next poll or next/next refresh
@@ -507,10 +517,11 @@ class PlayerActivity : AppCompatActivity() {
             refreshQuickInfo()
             quickInfo.visibility = View.VISIBLE
             quickInfoHideJob?.cancel()
-            quickInfoHideJob = lifecycleScope.launch {
-                delay(QUICK_INFO_AUTO_HIDE_MS)
-                quickInfo.visibility = View.GONE
-            }
+            quickInfoHideJob =
+                lifecycleScope.launch {
+                    delay(QUICK_INFO_AUTO_HIDE_MS)
+                    quickInfo.visibility = View.GONE
+                }
         }
     }
 
@@ -533,17 +544,26 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatCodec(v: Format?, a: Format?): String {
+    private fun formatCodec(
+        v: Format?,
+        a: Format?,
+    ): String {
         val vc = v?.sampleMimeType?.substringAfter('/')?.uppercase()
         val ac = a?.sampleMimeType?.substringAfter('/')?.uppercase()
         return listOfNotNull(vc, ac).joinToString(" / ").ifEmpty { "—" }
     }
 
-    private fun formatBitrate(v: Format?, a: Format?): String {
+    private fun formatBitrate(
+        v: Format?,
+        a: Format?,
+    ): String {
         val total = listOfNotNull(v?.bitrate, a?.bitrate).filter { it > 0 }.sum()
         if (total <= 0) return "—"
-        return if (total >= 1_000_000) String.format(Locale.ROOT, "%.1f Mbps", total / 1_000_000.0)
-        else String.format(Locale.ROOT, "%d kbps", total / 1000)
+        return if (total >= 1_000_000) {
+            String.format(Locale.ROOT, "%.1f Mbps", total / 1_000_000.0)
+        } else {
+            String.format(Locale.ROOT, "%d kbps", total / 1000)
+        }
     }
 
     private fun formatBuffer(p: Player): String {
@@ -562,12 +582,13 @@ class PlayerActivity : AppCompatActivity() {
      */
     private fun startLiveOffsetTicker() {
         liveOffsetTickerJob?.cancel()
-        liveOffsetTickerJob = lifecycleScope.launch {
-            while (isActive) {
-                renderLiveOffset()
-                delay(LIVE_OFFSET_TICK_MS)
+        liveOffsetTickerJob =
+            lifecycleScope.launch {
+                while (isActive) {
+                    renderLiveOffset()
+                    delay(LIVE_OFFSET_TICK_MS)
+                }
             }
-        }
     }
 
     private fun renderLiveOffset() {
@@ -623,21 +644,25 @@ class PlayerActivity : AppCompatActivity() {
         // Map the handful of common failure codes to something a normal user
         // can act on; anything unmapped falls through to the raw error name
         // + localized message so we're not hiding information.
-        val friendly = when (error.errorCode) {
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
-                "Can't reach the stream server. Check your connection and retry."
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-                "Server rejected the request — the stream may require a re-sync or the credentials are stale."
-            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
-            PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ->
-                "Stream not found or returned unexpected data."
-            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
-            PlaybackException.ERROR_CODE_DECODING_FAILED,
-            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
-                "This device can't decode the stream's codec."
-            else -> error.localizedMessage ?: error.errorCodeName
-        }
+        val friendly =
+            when (error.errorCode) {
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                ->
+                    "Can't reach the stream server. Check your connection and retry."
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                    "Server rejected the request — the stream may require a re-sync or the credentials are stale."
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
+                ->
+                    "Stream not found or returned unexpected data."
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+                ->
+                    "This device can't decode the stream's codec."
+                else -> error.localizedMessage ?: error.errorCodeName
+            }
         streamErrorMessage.text = friendly
         streamErrorOverlay.visibility = View.VISIBLE
         streamErrorRetry.requestFocus()
@@ -736,7 +761,8 @@ class PlayerActivity : AppCompatActivity() {
                     KeyEvent.KEYCODE_CHANNEL_DOWN,
                     KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                     KeyEvent.KEYCODE_SPACE,
-                    KeyEvent.KEYCODE_MEDIA_STOP -> {
+                    KeyEvent.KEYCODE_MEDIA_STOP,
+                    -> {
                         if (onKeyDown(event.keyCode, event)) return true
                     }
                 }
@@ -745,7 +771,10 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
         // Surf overlay swallows keys while visible — it has its own focus
         // traversal; only BACK dismisses it. Do this early so built-in
         // PlayerView handlers don't also act on the key press.

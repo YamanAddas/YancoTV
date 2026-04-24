@@ -12,12 +12,18 @@ import kotlin.test.assertTrue
  */
 
 private class DummyHttpClient : HttpClient {
-    override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = null
-    override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
+    override suspend fun getJson(
+        url: String,
+        options: HttpRequestOptions,
+    ): Any? = null
+
+    override suspend fun getText(
+        url: String,
+        options: HttpRequestOptions,
+    ): String = ""
 }
 
 class StalkerClientTest {
-
     private val http: HttpClient = DummyHttpClient()
 
     private fun makeClient(
@@ -29,20 +35,23 @@ class StalkerClientTest {
 
     @Test
     fun canBeInstantiatedWithRequiredParameters() {
-        val c = StalkerClient(
-            "http://portal.example.com", "00:1A:79:00:00:01",
-            StalkerClientOptions(http = http),
-        )
+        val c =
+            StalkerClient(
+                "http://portal.example.com",
+                "00:1A:79:00:00:01",
+                StalkerClientOptions(http = http),
+            )
         assertTrue(c is StalkerClient)
     }
 
     @Test
     fun stripsTrailingSlashesFromPortalUrl() {
-        val c = StalkerClient(
-            "http://portal.example.com/stalker_portal///",
-            "00:1A:79:00:00:01",
-            StalkerClientOptions(http = http),
-        )
+        val c =
+            StalkerClient(
+                "http://portal.example.com/stalker_portal///",
+                "00:1A:79:00:00:01",
+                StalkerClientOptions(http = http),
+            )
         assertEquals(
             "http://stream.example.com/live/123",
             c.buildStreamUrl("http://stream.example.com/live/123"),
@@ -51,10 +60,12 @@ class StalkerClientTest {
 
     @Test
     fun acceptsOptionalTimeoutParameter() {
-        val c = StalkerClient(
-            "http://portal.example.com", "00:1A:79:00:00:01",
-            StalkerClientOptions(http = http, timeoutMs = 30_000),
-        )
+        val c =
+            StalkerClient(
+                "http://portal.example.com",
+                "00:1A:79:00:00:01",
+                StalkerClientOptions(http = http, timeoutMs = 30_000),
+            )
         assertTrue(c is StalkerClient)
     }
 

@@ -117,25 +117,28 @@ fun BrowseSection(
     // pinned Favorites / All pills.
     val groupsState = remember(type) { mutableStateListOf<String>() }
     LaunchedEffect(type) {
-        val loaded = withContext(Dispatchers.IO) {
-            runCatching { repo.groups(type) }
-                .onFailure { Log.w("Yanco", "BrowseSection.groups($type) failed: ${it.message}", it) }
-                .getOrElse { emptyList() }
-        }
+        val loaded =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.groups(type) }
+                    .onFailure { Log.w("Yanco", "BrowseSection.groups($type) failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
+            }
         groupsState.clear()
         groupsState.addAll(loaded)
     }
 
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
-    val visibleGroups = remember(groupsState.toList(), hiddenGroups) {
-        prioritizedGroupsFor(visibleGroupsFor(groupsState.toList(), hiddenGroups))
-    }
+    val visibleGroups =
+        remember(groupsState.toList(), hiddenGroups) {
+            prioritizedGroupsFor(visibleGroupsFor(groupsState.toList(), hiddenGroups))
+        }
 
     // Selected group persists per type so flipping Live → Movies → Live
     // returns the user to whichever filter they had on Live last time.
     var selectedGroup by rememberSaveable(type) { mutableStateOf(ALL_GROUPS) }
     LaunchedEffect(hiddenGroups) {
-        if (selectedGroup != ALL_GROUPS && selectedGroup != FAVORITES_GROUP &&
+        if (selectedGroup != ALL_GROUPS &&
+            selectedGroup != FAVORITES_GROUP &&
             selectedGroup in hiddenGroups
         ) {
             selectedGroup = ALL_GROUPS

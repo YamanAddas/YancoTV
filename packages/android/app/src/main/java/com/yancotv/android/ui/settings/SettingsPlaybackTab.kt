@@ -18,7 +18,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,9 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.YancoPalette
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
@@ -75,11 +72,12 @@ fun SettingsPlaybackTab(
 
         // ── Resize mode ──
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
@@ -130,15 +128,20 @@ fun SettingsPlaybackTab(
 }
 
 @Composable
-private fun ResizeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ResizeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     val bg = if (selected) YancoPalette.Accent.copy(alpha = 0.22f) else YancoPalette.BackgroundDeep
     val fg = if (selected) YancoPalette.TextPrimary else YancoPalette.TextMuted
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(label, color = fg, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
@@ -156,11 +159,12 @@ private fun LangField(
     // blur semantics don't work well without explicit focus tracking on TV.
     var draft by remember(value) { mutableStateOf(value) }
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(text = label, color = YancoPalette.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -174,13 +178,14 @@ private fun LangField(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
             textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 13.sp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = YancoPalette.TextPrimary,
-                unfocusedTextColor = YancoPalette.TextPrimary,
-                focusedBorderColor = YancoPalette.Accent,
-                unfocusedBorderColor = YancoPalette.BackgroundHover,
-                cursorColor = YancoPalette.Accent,
-            ),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = YancoPalette.TextPrimary,
+                    unfocusedTextColor = YancoPalette.TextPrimary,
+                    focusedBorderColor = YancoPalette.Accent,
+                    unfocusedBorderColor = YancoPalette.BackgroundHover,
+                    cursorColor = YancoPalette.Accent,
+                ),
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -194,11 +199,12 @@ private fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -210,12 +216,13 @@ private fun ToggleRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = YancoPalette.Accent,
-                checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                uncheckedThumbColor = YancoPalette.TextMuted,
-                uncheckedTrackColor = YancoPalette.BackgroundHover,
-            ),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = YancoPalette.Accent,
+                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = YancoPalette.TextMuted,
+                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                ),
         )
     }
 }
@@ -223,5 +230,4 @@ private fun ToggleRow(
 // Small convenience — .collectAsState() returns State<T>, `by` delegates
 // to its `.value` via the `getValue` import at the top.
 @Composable
-private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateValue(): androidx.compose.runtime.State<T> =
-    collectAsState()
+private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateValue(): androidx.compose.runtime.State<T> = collectAsState()

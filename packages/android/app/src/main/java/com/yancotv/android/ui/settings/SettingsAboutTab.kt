@@ -34,9 +34,10 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
     val info = remember { buildInfo(ctx) }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
@@ -67,8 +68,9 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "Built with Media3 ExoPlayer, SQLDelight, Ktor, Coil, and Jetpack Compose. " +
-                "Shared business logic (parsers, clients, classifier, EPG) lives in packages/shared via Kotlin Multiplatform — the iOS app in MK.iOS.* will consume the same code.",
+            text =
+                "Built with Media3 ExoPlayer, SQLDelight, Ktor, Coil, and Jetpack Compose. " +
+                    "Shared business logic (parsers, clients, classifier, EPG) lives in packages/shared via Kotlin Multiplatform — the iOS app in MK.iOS.* will consume the same code.",
             color = YancoPalette.TextMuted,
             fontSize = 12.sp,
         )
@@ -88,12 +90,14 @@ private fun buildInfo(ctx: Context): BuildInfo {
     val pkg = ctx.packageName
     return try {
         val info = pm.getPackageInfo(pkg, 0)
+
         @Suppress("DEPRECATION")
-        val code: Long = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            info.longVersionCode
-        } else {
-            info.versionCode.toLong()
-        }
+        val code: Long =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                info.longVersionCode
+            } else {
+                info.versionCode.toLong()
+            }
         BuildInfo(
             version = info.versionName ?: "?",
             versionCode = code,
@@ -105,13 +109,17 @@ private fun buildInfo(ctx: Context): BuildInfo {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+private fun InfoRow(
+    label: String,
+    value: String,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Text(
             text = label,

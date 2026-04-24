@@ -1,12 +1,12 @@
 package com.yancotv.android.ui.shell
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,19 +30,18 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
-import android.util.Log
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
@@ -98,8 +97,7 @@ const val FAVORITES_GROUP = "__favorites__"
  * `ContentRepository.page`. The two synthetic chips return null (no group
  * filter); a real group name passes through verbatim.
  */
-internal fun resolveGroupFilter(group: String): String? =
-    group.takeIf { it != ALL_GROUPS && it != FAVORITES_GROUP }
+internal fun resolveGroupFilter(group: String): String? = group.takeIf { it != ALL_GROUPS && it != FAVORITES_GROUP }
 
 /** True when the user has the synthetic "Favorites" chip active. */
 internal fun isFavoritesFilter(group: String): Boolean = group == FAVORITES_GROUP
@@ -108,8 +106,10 @@ internal fun isFavoritesFilter(group: String): Boolean = group == FAVORITES_GROU
  * Filter the backing group list against the user's hidden-groups set. The
  * chip bar renders whatever this returns, preserving original order.
  */
-internal fun visibleGroupsFor(all: List<String>, hidden: Set<String>): List<String> =
-    if (hidden.isEmpty()) all else all.filter { it !in hidden }
+internal fun visibleGroupsFor(
+    all: List<String>,
+    hidden: Set<String>,
+): List<String> = if (hidden.isEmpty()) all else all.filter { it !in hidden }
 
 /**
  * Concept A category-priority sort: float Arabic + English (and their
@@ -127,7 +127,8 @@ internal fun prioritizedGroupsFor(visible: List<String>): List<String> {
             else -> 2
         }
     }
-    return visible.withIndex()
+    return visible
+        .withIndex()
         .sortedWith(compareBy({ priority(it.value) }, { it.index }))
         .map { it.value }
 }
@@ -257,19 +258,21 @@ fun BrowseShell(
 
     // Group load — drives the chip bar.
     LaunchedEffect(type) {
-        val loadedGroups = withContext(Dispatchers.IO) {
-            runCatching { repo.groups(type) }
-                .onFailure { Log.w("Yanco", "BrowseShell.groups($type) failed: ${it.message}", it) }
-                .getOrElse { emptyList() }
-        }
+        val loadedGroups =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.groups(type) }
+                    .onFailure { Log.w("Yanco", "BrowseShell.groups($type) failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
+            }
         groupsState.clear()
         groupsState.addAll(loadedGroups)
     }
 
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
-    val visibleGroups = remember(groupsState.toList(), hiddenGroups) {
-        prioritizedGroupsFor(visibleGroupsFor(groupsState.toList(), hiddenGroups))
-    }
+    val visibleGroups =
+        remember(groupsState.toList(), hiddenGroups) {
+            prioritizedGroupsFor(visibleGroupsFor(groupsState.toList(), hiddenGroups))
+        }
 
     // Chip selection — persisted per section via rememberSaveable. If the
     // saved selection goes hidden we snap back to All rather than stranding
@@ -322,17 +325,19 @@ fun BrowseShell(
         LaunchedEffect(type, group) {
             items.clear()
             hasLoaded = false
-            total = withContext(Dispatchers.IO) {
-                runCatching { repo.count(type, groupFilter) }
-                    .onFailure { Log.w("Yanco", "BrowseShell.count($type) failed: ${it.message}", it) }
-                    .getOrElse { 0L }
-            }
+            total =
+                withContext(Dispatchers.IO) {
+                    runCatching { repo.count(type, groupFilter) }
+                        .onFailure { Log.w("Yanco", "BrowseShell.count($type) failed: ${it.message}", it) }
+                        .getOrElse { 0L }
+                }
             loaded = 0L
-            val first = withContext(Dispatchers.IO) {
-                runCatching { repo.page(type, groupFilter, 0L, PAGE_SIZE) }
-                    .onFailure { Log.w("Yanco", "BrowseShell.page($type, first) failed: ${it.message}", it) }
-                    .getOrElse { emptyList() }
-            }
+            val first =
+                withContext(Dispatchers.IO) {
+                    runCatching { repo.page(type, groupFilter, 0L, PAGE_SIZE) }
+                        .onFailure { Log.w("Yanco", "BrowseShell.page($type, first) failed: ${it.message}", it) }
+                        .getOrElse { emptyList() }
+                }
             items.addAll(first)
             loaded += first.size
             hasLoaded = true
@@ -375,9 +380,14 @@ fun BrowseShell(
     var sourceName by remember(focusedItem?.sourceId) { mutableStateOf<String?>(null) }
     LaunchedEffect(focusedItem?.sourceId) {
         val sid = focusedItem?.sourceId
-        sourceName = if (sid.isNullOrBlank()) null else withContext(Dispatchers.IO) {
-            runCatching { sources.getById(sid)?.name }.getOrNull()
-        }
+        sourceName =
+            if (sid.isNullOrBlank()) {
+                null
+            } else {
+                withContext(Dispatchers.IO) {
+                    runCatching { sources.getById(sid)?.name }.getOrNull()
+                }
+            }
     }
 
     // Now/Next for live channels — keep it responsive so the hero reflects
@@ -394,11 +404,12 @@ fun BrowseShell(
                 .collect { tvgIds ->
                     if (tvgIds.isEmpty()) return@collect
                     val ids = tvgIds.take(60) // cap the batch — no reason to fetch >60 at once
-                    nowNextMap = withContext(Dispatchers.IO) {
-                        runCatching { epg.getNowNextBatch(ids) }
-                            .onFailure { Log.w("Yanco", "BrowseShell.getNowNextBatch failed: ${it.message}", it) }
-                            .getOrElse { nowNextMap }
-                    }
+                    nowNextMap =
+                        withContext(Dispatchers.IO) {
+                            runCatching { epg.getNowNextBatch(ids) }
+                                .onFailure { Log.w("Yanco", "BrowseShell.getNowNextBatch failed: ${it.message}", it) }
+                                .getOrElse { nowNextMap }
+                        }
                 }
         }
         LaunchedEffect(type) {
@@ -406,15 +417,18 @@ fun BrowseShell(
                 delay(EPG_TICK_MS)
                 if (!restoreFocusOnWindowRegain) continue // overlay is up — skip tick
                 nowSeconds = System.currentTimeMillis() / 1000L
-                val ids = items.mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
-                    .distinct()
-                    .take(60)
+                val ids =
+                    items
+                        .mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
+                        .distinct()
+                        .take(60)
                 if (ids.isNotEmpty()) {
-                    nowNextMap = withContext(Dispatchers.IO) {
-                        runCatching { epg.getNowNextBatch(ids) }
-                            .onFailure { Log.w("Yanco", "BrowseShell.getNowNextBatch tick failed: ${it.message}", it) }
-                            .getOrElse { nowNextMap }
-                    }
+                    nowNextMap =
+                        withContext(Dispatchers.IO) {
+                            runCatching { epg.getNowNextBatch(ids) }
+                                .onFailure { Log.w("Yanco", "BrowseShell.getNowNextBatch tick failed: ${it.message}", it) }
+                                .getOrElse { nowNextMap }
+                        }
                 }
             }
         }
@@ -425,7 +439,11 @@ fun BrowseShell(
     // round-trip.
     var isFav by remember(focusedItem?.id) { mutableStateOf(false) }
     LaunchedEffect(focusedItem?.id) {
-        val id = focusedItem?.id ?: run { isFav = false; return@LaunchedEffect }
+        val id =
+            focusedItem?.id ?: run {
+                isFav = false
+                return@LaunchedEffect
+            }
         favorites.isFavoriteFlow(id).collect { isFav = it }
     }
     val scope = rememberCoroutineScope()
@@ -485,11 +503,12 @@ fun BrowseShell(
         delay(100L) // debounce — cancelled if focus moves again before it fires
         if (loading) return@LaunchedEffect
         loading = true
-        val page = withContext(Dispatchers.IO) {
-            runCatching { repo.page(type, groupFilter, loaded, PAGE_SIZE) }
-                .onFailure { Log.w("Yanco", "BrowseShell.page($type, $loaded) failed: ${it.message}", it) }
-                .getOrElse { emptyList() }
-        }
+        val page =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.page(type, groupFilter, loaded, PAGE_SIZE) }
+                    .onFailure { Log.w("Yanco", "BrowseShell.page($type, $loaded) failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
+            }
         items.addAll(page)
         loaded += page.size
         loading = false
@@ -523,13 +542,14 @@ fun BrowseShell(
         ) ?: return@LaunchedEffect
         delay(AUTO_PREVIEW_DEBOUNCE_MS)
         val snapshot = visible.toList()
-        val idx = resolveAutoPreviewIndex(
-            type = type,
-            focusedId = focusedItem?.id,
-            visible = snapshot,
-            lockedIds = lockedIds,
-            currentlyPlayingId = controller.currentId,
-        ) ?: return@LaunchedEffect
+        val idx =
+            resolveAutoPreviewIndex(
+                type = type,
+                focusedId = focusedItem?.id,
+                visible = snapshot,
+                lockedIds = lockedIds,
+                currentlyPlayingId = controller.currentId,
+            ) ?: return@LaunchedEffect
         controller.play(snapshot, idx)
     }
 
@@ -612,13 +632,14 @@ fun BrowseShell(
         // the sidebar's forward-from-section handoff lands on a real leaf
         // (hierarchical forward: sidebar → chips → rail → detail → player).
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged {
-                    val has = it.hasFocus
-                    chipsHasFocus = has
-                    if (has) onChipsFocusChanged(true)
-                },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged {
+                        val has = it.hasFocus
+                        chipsHasFocus = has
+                        if (has) onChipsFocusChanged(true)
+                    },
         ) {
             CategoryChipBar(
                 groups = visibleGroups,
@@ -635,9 +656,10 @@ fun BrowseShell(
         // space. weight(1f) so it flexes with screen height and the rail
         // keeps its fixed ~230dp footprint.
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
         ) {
             FeatureHero(
                 focused = focusedItem,
@@ -658,11 +680,12 @@ fun BrowseShell(
                     val optimistic = !isFav
                     isFav = optimistic
                     scope.launch {
-                        val newState = withContext(Dispatchers.IO) {
-                            runCatching { favorites.toggle(item.id) }
-                                .onFailure { Log.w("Yanco", "BrowseShell.favorites.toggle(${item.id}) failed: ${it.message}", it) }
-                                .getOrElse { !optimistic }
-                        }
+                        val newState =
+                            withContext(Dispatchers.IO) {
+                                runCatching { favorites.toggle(item.id) }
+                                    .onFailure { Log.w("Yanco", "BrowseShell.favorites.toggle(${item.id}) failed: ${it.message}", it) }
+                                    .getOrElse { !optimistic }
+                            }
                         if (newState != optimistic) isFav = newState
                     }
                 },
@@ -673,32 +696,34 @@ fun BrowseShell(
         // Live TV cards are 120dp tall + chrome; posters are 124dp + title
         // line — 230dp accommodates both with focusStyle's scale lift.
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(230.dp)
-                .focusGroup()
-                .onFocusChanged {
-                    val has = it.hasFocus
-                    railHasFocus = has
-                    if (has) onRailFocusChanged(true)
-                },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(230.dp)
+                    .focusGroup()
+                    .onFocusChanged {
+                        val has = it.hasFocus
+                        railHasFocus = has
+                        if (has) onRailFocusChanged(true)
+                    },
         ) {
             when {
-                visible.isNotEmpty() -> ContentRail(
-                    type = type,
-                    items = visible,
-                    nowNextMap = nowNextMap,
-                    nowSeconds = nowSeconds,
-                    lockedIds = lockedIds,
-                    focusedIndex = focusedIndex.coerceIn(0, (visible.size - 1).coerceAtLeast(0)),
-                    firstItemAnchor = firstItemAnchor,
-                    onFocus = { index, item ->
-                        focusedIndex = index
-                        focusedItem = item
-                    },
-                    onActivate = { index -> onActivate(visible.toList(), index) },
-                    onLongPress = { actionsFor = it },
-                )
+                visible.isNotEmpty() ->
+                    ContentRail(
+                        type = type,
+                        items = visible,
+                        nowNextMap = nowNextMap,
+                        nowSeconds = nowSeconds,
+                        lockedIds = lockedIds,
+                        focusedIndex = focusedIndex.coerceIn(0, (visible.size - 1).coerceAtLeast(0)),
+                        firstItemAnchor = firstItemAnchor,
+                        onFocus = { index, item ->
+                            focusedIndex = index
+                            focusedItem = item
+                        },
+                        onActivate = { index -> onActivate(visible.toList(), index) },
+                        onLongPress = { actionsFor = it },
+                    )
                 // MB-96: only show the true empty state after the first page
                 // has loaded — suppresses the false "no videos" flash on entry.
                 hasLoaded -> BrowseEmptyState(type = type, favoritesFilter = isFavoritesFilter)
@@ -719,30 +744,36 @@ fun BrowseShell(
 }
 
 @Composable
-private fun BrowseEmptyState(type: ContentType, favoritesFilter: Boolean) {
+private fun BrowseEmptyState(
+    type: ContentType,
+    favoritesFilter: Boolean,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(Space.page),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Space.page),
         verticalArrangement = Arrangement.spacedBy(Space.sm),
         horizontalAlignment = Alignment.Start,
     ) {
         Spacer(Modifier.height(Space.xl))
         Text(
-            text = when {
-                favoritesFilter -> "No favorites yet"
-                type == ContentType.LIVE -> "No channels"
-                type == ContentType.MOVIE -> "No movies"
-                else -> "No series"
-            },
+            text =
+                when {
+                    favoritesFilter -> "No favorites yet"
+                    type == ContentType.LIVE -> "No channels"
+                    type == ContentType.MOVIE -> "No movies"
+                    else -> "No series"
+                },
             color = YancoPalette.TextPrimary,
             style = YancoType.TitleL,
         )
         Text(
-            text = when {
-                favoritesFilter -> "Star something from the hero and it'll land here."
-                else -> "Add a source in Settings → Sources to begin."
-            },
+            text =
+                when {
+                    favoritesFilter -> "Star something from the hero and it'll land here."
+                    else -> "Add a source in Settings → Sources to begin."
+                },
             color = YancoPalette.TextMuted,
             style = YancoType.Body,
         )

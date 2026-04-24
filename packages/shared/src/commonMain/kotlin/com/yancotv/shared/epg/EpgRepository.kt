@@ -7,7 +7,6 @@ import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
-import com.yancotv.shared.parsers.XmltvProgramme
 import com.yancotv.shared.parsers.parseXmltv
 import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
@@ -55,7 +54,6 @@ class EpgRepository(
      */
     private val gunzip: (ByteArray) -> ByteArray = { it },
 ) {
-
     private val bulkWriter = BulkEpgWriter(driver, logger)
 
     // ───── Queries ─────
@@ -76,9 +74,10 @@ class EpgRepository(
      */
     fun getNowNext(tvgId: String): NowNext {
         val now = nowSeconds()
-        val rows = db.epgProgrammesQueries
-            .nowNextForChannel(tvgId, now)
-            .executeAsList()
+        val rows =
+            db.epgProgrammesQueries
+                .nowNextForChannel(tvgId, now)
+                .executeAsList()
         return buildNowNext(tvgId, rows, now)
     }
 
@@ -101,7 +100,11 @@ class EpgRepository(
         return result
     }
 
-    fun getProgrammesForChannel(tvgId: String, startTime: Long, endTime: Long): List<EpgProgramme> =
+    fun getProgrammesForChannel(
+        tvgId: String,
+        startTime: Long,
+        endTime: Long,
+    ): List<EpgProgramme> =
         db.epgProgrammesQueries
             .forChannelRange(tvgId, startTime, endTime)
             .executeAsList()
@@ -124,15 +127,16 @@ class EpgRepository(
         limit: Long = 100L,
         offset: Long = 0L,
     ): EpgGuideData {
-        val channels = if (sourceId == null) {
-            db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
-                GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
+        val channels =
+            if (sourceId == null) {
+                db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
+                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
+                }
+            } else {
+                db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
+                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
+                }
             }
-        } else {
-            db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
-                GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
-            }
-        }
         if (channels.isEmpty()) {
             return EpgGuideData(channels = emptyList(), startTime = startTime, endTime = endTime)
         }
@@ -143,10 +147,11 @@ class EpgRepository(
         val result = ArrayList<EpgGuideChannel>(channels.size)
         for (ch in channels) {
             val tvgId = ch.tvgId ?: continue
-            val progs = db.epgProgrammesQueries
-                .forChannelRange(tvgId, startTime, endTime)
-                .executeAsList()
-                .map { it.toDomain() }
+            val progs =
+                db.epgProgrammesQueries
+                    .forChannelRange(tvgId, startTime, endTime)
+                    .executeAsList()
+                    .map { it.toDomain() }
             result.add(
                 EpgGuideChannel(
                     tvgId = tvgId,
@@ -161,7 +166,11 @@ class EpgRepository(
     }
 
     /** Total distinct live channels with guide data in the window. Used by the guide's "X of Y" header. */
-    fun countGuideChannels(startTime: Long, endTime: Long, sourceId: String? = null): Long =
+    fun countGuideChannels(
+        startTime: Long,
+        endTime: Long,
+        sourceId: String? = null,
+    ): Long =
         if (sourceId == null) {
             db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
         } else {
@@ -171,16 +180,26 @@ class EpgRepository(
     fun getStats(): EpgStats {
         val programmes = db.epgProgrammesQueries.countAll().executeAsOne()
         val channels = db.epgProgrammesQueries.countChannels().executeAsOne()
-        val lastRefreshed = db.settingsQueries.get(LAST_REFRESHED_KEY).executeAsOneOrNull()?.toLongOrNull()
+        val lastRefreshed =
+            db.settingsQueries
+                .get(LAST_REFRESHED_KEY)
+                .executeAsOneOrNull()
+                ?.toLongOrNull()
         return EpgStats(programmeCount = programmes, channelCount = channels, lastRefreshedAt = lastRefreshed)
     }
 
     fun getGlobalEpgUrl(): String? =
-        db.settingsQueries.get(GLOBAL_URL_KEY).executeAsOneOrNull()?.takeIf { it.isNotBlank() }
+        db.settingsQueries
+            .get(GLOBAL_URL_KEY)
+            .executeAsOneOrNull()
+            ?.takeIf { it.isNotBlank() }
 
     fun setGlobalEpgUrl(url: String?) {
-        if (url.isNullOrBlank()) db.settingsQueries.delete(GLOBAL_URL_KEY)
-        else db.settingsQueries.upsert(GLOBAL_URL_KEY, url)
+        if (url.isNullOrBlank()) {
+            db.settingsQueries.delete(GLOBAL_URL_KEY)
+        } else {
+            db.settingsQueries.upsert(GLOBAL_URL_KEY, url)
+        }
     }
 
     // ───── Refresh ─────
@@ -246,13 +265,14 @@ class EpgRepository(
         onProgress("Writing $total programmes (bulk-insert)")
 
         val writeStart = clock()
-        val result = withContext(Dispatchers.Default) {
-            bulkWriter.replaceAll(
-                batches = batches,
-                onBatch = { written, t -> onProgress("Writing $written/$t programmes") },
-                lastRefreshedMs = clock(),
-            )
-        }
+        val result =
+            withContext(Dispatchers.Default) {
+                bulkWriter.replaceAll(
+                    batches = batches,
+                    onBatch = { written, t -> onProgress("Writing $written/$t programmes") },
+                    lastRefreshedMs = clock(),
+                )
+            }
         val writeMs = clock() - writeStart
         logger.info("EPG bulk write: ${result.rowsWritten} rows across ${result.channels} channels in ${writeMs}ms")
 
@@ -272,7 +292,10 @@ class EpgRepository(
     }
 
     fun getLastError(): String? =
-        db.settingsQueries.get(LAST_ERROR_KEY).executeAsOneOrNull()?.takeIf { it.isNotBlank() }
+        db.settingsQueries
+            .get(LAST_ERROR_KEY)
+            .executeAsOneOrNull()
+            ?.takeIf { it.isNotBlank() }
 
     private fun setLastError(msg: String) {
         db.settingsQueries.upsert(LAST_ERROR_KEY, msg)
@@ -283,8 +306,7 @@ class EpgRepository(
     }
 
     /** Drop programmes whose end_time is before [cutoffSeconds]. */
-    fun deleteStale(cutoffSeconds: Long = nowSeconds()): Unit =
-        db.epgProgrammesQueries.deleteStale(cutoffSeconds)
+    fun deleteStale(cutoffSeconds: Long = nowSeconds()): Unit = db.epgProgrammesQueries.deleteStale(cutoffSeconds)
 
     // ───── internals ─────
 
@@ -301,17 +323,19 @@ class EpgRepository(
         // routinely gzips without sending `Content-Encoding: gzip`, so
         // `http.getText()` would UTF-8-decode binary bytes into mojibake and
         // the parser would report zero programmes — silently breaking EPG.
-        val options = HttpRequestOptions(
-            timeoutMs = FETCH_TIMEOUT_MS,
-            maxResponseBytes = MAX_EPG_BYTES,
-        )
+        val options =
+            HttpRequestOptions(
+                timeoutMs = FETCH_TIMEOUT_MS,
+                maxResponseBytes = MAX_EPG_BYTES,
+            )
         val bytes = http.getBytes(url, options)
-        val inflated = if (bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()) {
-            logger.info("EPG fetch: gzip detected at $url (${bytes.size} B compressed)")
-            gunzip(bytes)
-        } else {
-            bytes
-        }
+        val inflated =
+            if (bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()) {
+                logger.info("EPG fetch: gzip detected at $url (${bytes.size} B compressed)")
+                gunzip(bytes)
+            } else {
+                bytes
+            }
         return inflated.decodeToString()
     }
 
@@ -325,7 +349,11 @@ class EpgRepository(
         return out
     }
 
-    private fun buildNowNext(tvgId: String, rows: List<Epg_programmes>, now: Long): NowNext {
+    private fun buildNowNext(
+        tvgId: String,
+        rows: List<Epg_programmes>,
+        now: Long,
+    ): NowNext {
         if (rows.isEmpty()) return NowNext(channelTvgId = tvgId)
         val first = rows[0]
         return if (first.start_time <= now) {
@@ -341,18 +369,22 @@ class EpgRepository(
 
     private fun nowSeconds(): Long = clock() / 1000L
 
-    private fun Epg_programmes.toDomain(): EpgProgramme = EpgProgramme(
-        id = id,
-        channelTvgId = channel_tvg_id,
-        title = title,
-        description = description,
-        startTime = start_time,
-        endTime = end_time,
-        category = category,
-        iconUrl = icon_url,
-    )
+    private fun Epg_programmes.toDomain(): EpgProgramme =
+        EpgProgramme(
+            id = id,
+            channelTvgId = channel_tvg_id,
+            title = title,
+            description = description,
+            startTime = start_time,
+            endTime = end_time,
+            category = category,
+            iconUrl = icon_url,
+        )
 
-    private data class EpgTarget(val url: String, val sourceKey: String)
+    private data class EpgTarget(
+        val url: String,
+        val sourceKey: String,
+    )
 
     private data class GuideChannelRow(
         val tvgId: String?,

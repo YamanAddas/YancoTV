@@ -29,7 +29,6 @@ import org.koin.android.ext.android.inject
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
-
     // We silently accept whatever the user chooses. Reminders still schedule
     // either way — a denied permission just means the notification drops on
     // the floor when AlarmManager fires. The Guide's "Set reminder" state
@@ -45,11 +44,12 @@ class MainActivity : ComponentActivity() {
     // hosts playback. Without this the TV's inactivity timer puts the
     // screen to sleep mid-channel. Cleared on pause so the device can
     // sleep normally when nothing is on.
-    private val keepAwakeListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            setKeepScreenOn(isPlaying)
+    private val keepAwakeListener =
+        object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                setKeepScreenOn(isPlaying)
+            }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,11 +98,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setKeepScreenOn(on: Boolean) {
-        if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent?,
+    ): Boolean {
         // Global search hotkeys — work from anywhere in the shell without
         // first navigating to the Search sidebar destination. TV remotes
         // send KEYCODE_SEARCH; phone / bluetooth keyboards send Ctrl-K.
@@ -121,10 +127,11 @@ class MainActivity : ComponentActivity() {
         // POST_NOTIFICATIONS is a runtime permission on API 33+. Fire TV on
         // API 32 and below auto-grants it from the manifest declaration.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+        val granted =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             notificationsPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }

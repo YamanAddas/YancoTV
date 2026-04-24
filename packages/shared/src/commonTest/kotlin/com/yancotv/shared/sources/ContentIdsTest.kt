@@ -13,7 +13,6 @@ import kotlin.test.assertTrue
  * produce colliding IDs).
  */
 class ContentIdsTest {
-
     @Test fun m3uIdIsDeterministic() {
         val a = ContentIds.m3u("src-1", "CNN", "http://host/stream.ts")
         val b = ContentIds.m3u("src-1", "CNN", "http://host/stream.ts")

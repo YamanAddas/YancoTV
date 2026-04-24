@@ -1,8 +1,6 @@
 package com.yancotv.shared.http
 
-import io.ktor.client.HttpClient as KtorClient
 import io.ktor.client.statement.bodyAsChannel
-import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.jvm.javaio.copyTo
@@ -14,6 +12,7 @@ import kotlinx.io.buffered
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import io.ktor.client.HttpClient as KtorClient
 
 /**
  * Android variant of [KtorHttpClient] that streams large response bodies
@@ -46,46 +45,46 @@ class AndroidKtorHttpClient(
     perRequestReadTimeoutMs: () -> Long?,
     private val cacheDir: File,
 ) : KtorHttpClient(ktor, userAgentProvider, perRequestReadTimeoutMs) {
-
     override suspend fun <T> getSource(
         url: String,
         options: HttpRequestOptions,
         block: suspend (Source) -> T,
-    ): T = withContext(Dispatchers.IO) {
-        val response = performGet(url, options)
-        options.maxResponseBytes?.let { cap ->
-            response.headers["Content-Length"]?.toLongOrNull()?.let { declared ->
-                if (declared > cap) {
-                    throw HttpResponseError(
-                        status = HttpStatusCode.PayloadTooLarge.value,
-                        statusText = "Payload too large",
-                        message = "Response declared $declared bytes exceeds cap $cap bytes ($url)",
-                    )
-                }
-            }
-        }
-
-        val tempFile = File(cacheDir, "ktor-stream-${UUID.randomUUID()}.bin")
-        try {
-            val bytesWritten = streamToFile(response.bodyAsChannel(), tempFile, options.maxResponseBytes)
-            // Extra post-download guard in case the server omitted Content-Length.
+    ): T =
+        withContext(Dispatchers.IO) {
+            val response = performGet(url, options)
             options.maxResponseBytes?.let { cap ->
-                if (bytesWritten > cap) {
-                    throw HttpResponseError(
-                        status = HttpStatusCode.PayloadTooLarge.value,
-                        statusText = "Payload too large",
-                        message = "Response ${bytesWritten} bytes exceeds cap $cap bytes ($url)",
-                    )
+                response.headers["Content-Length"]?.toLongOrNull()?.let { declared ->
+                    if (declared > cap) {
+                        throw HttpResponseError(
+                            status = HttpStatusCode.PayloadTooLarge.value,
+                            statusText = "Payload too large",
+                            message = "Response declared $declared bytes exceeds cap $cap bytes ($url)",
+                        )
+                    }
                 }
             }
-            tempFile.inputStream().use { fis ->
-                val source: Source = fis.asSource().buffered()
-                source.use { block(it) }
+
+            val tempFile = File(cacheDir, "ktor-stream-${UUID.randomUUID()}.bin")
+            try {
+                val bytesWritten = streamToFile(response.bodyAsChannel(), tempFile, options.maxResponseBytes)
+                // Extra post-download guard in case the server omitted Content-Length.
+                options.maxResponseBytes?.let { cap ->
+                    if (bytesWritten > cap) {
+                        throw HttpResponseError(
+                            status = HttpStatusCode.PayloadTooLarge.value,
+                            statusText = "Payload too large",
+                            message = "Response $bytesWritten bytes exceeds cap $cap bytes ($url)",
+                        )
+                    }
+                }
+                tempFile.inputStream().use { fis ->
+                    val source: Source = fis.asSource().buffered()
+                    source.use { block(it) }
+                }
+            } finally {
+                runCatching { tempFile.delete() }
             }
-        } finally {
-            runCatching { tempFile.delete() }
         }
-    }
 
     private suspend fun streamToFile(
         channel: ByteReadChannel,

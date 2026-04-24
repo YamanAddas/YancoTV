@@ -37,7 +37,11 @@ class ContentDetailService(
     private val logger: Logger,
     private val clock: () -> Long,
 ) {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
     /**
      * What the detail screen renders. [item] carries the possibly-refreshed
@@ -56,40 +60,45 @@ class ContentDetailService(
         // Decide if a refresh is worth making the user wait for. A movie is
         // worth enriching only if we don't have a plot; a series if we
         // don't have episodes. Everything else renders on cache.
-        val needsFetch = when (item.type) {
-            ContentType.MOVIE -> cached.plot.isNullOrBlank() && cached.streamId != null
-            ContentType.SERIES -> cached.episodes.isNullOrEmpty() && cached.seriesId != null
-            else -> false
-        }
+        val needsFetch =
+            when (item.type) {
+                ContentType.MOVIE -> cached.plot.isNullOrBlank() && cached.streamId != null
+                ContentType.SERIES -> cached.episodes.isNullOrEmpty() && cached.seriesId != null
+                else -> false
+            }
 
         if (!needsFetch) {
             return Loaded(item, cached, cached.episodes.orEmpty())
         }
 
-        val creds = sources.xtreamCredentials(item.sourceId)
-            ?: return Loaded(item, cached, cached.episodes.orEmpty())
-        val client = XtreamClient(
-            creds.baseUrl,
-            creds.username,
-            creds.password,
-            XtreamClientOptions(http, logger),
-        )
+        val creds =
+            sources.xtreamCredentials(item.sourceId)
+                ?: return Loaded(item, cached, cached.episodes.orEmpty())
+        val client =
+            XtreamClient(
+                creds.baseUrl,
+                creds.username,
+                creds.password,
+                XtreamClientOptions(http, logger),
+            )
 
-        val enriched = when (item.type) {
-            ContentType.MOVIE -> loadMovieDetail(item, cached, client)
-            ContentType.SERIES -> loadSeriesDetail(item, cached, client)
-            else -> return Loaded(item, cached, emptyList())
-        }
+        val enriched =
+            when (item.type) {
+                ContentType.MOVIE -> loadMovieDetail(item, cached, client)
+                ContentType.SERIES -> loadSeriesDetail(item, cached, client)
+                else -> return Loaded(item, cached, emptyList())
+            }
 
         // Persist the enrichment so the next open is instant — and so
         // Continue-watching / Favorites surfaces that read metadataJson
         // later get the richer copy too.
-        val newLogoUrl = when {
-            !item.logoUrl.isNullOrBlank() -> item.logoUrl
-            !enriched.tmdbPosterUrl.isNullOrBlank() -> enriched.tmdbPosterUrl
-            !enriched.backdropUrl.isNullOrBlank() -> enriched.backdropUrl
-            else -> null
-        }
+        val newLogoUrl =
+            when {
+                !item.logoUrl.isNullOrBlank() -> item.logoUrl
+                !enriched.tmdbPosterUrl.isNullOrBlank() -> enriched.tmdbPosterUrl
+                !enriched.backdropUrl.isNullOrBlank() -> enriched.backdropUrl
+                else -> null
+            }
         runCatching {
             db.contentQueries.updateMetadataAndLogo(
                 metadataJson = encodeMetadata(enriched),
@@ -107,10 +116,11 @@ class ContentDetailService(
             persistEpisodes(item.id, enriched.episodes.orEmpty())
         }
 
-        val refreshedItem = item.copy(
-            logoUrl = newLogoUrl,
-            metadataJson = encodeMetadata(enriched),
-        )
+        val refreshedItem =
+            item.copy(
+                logoUrl = newLogoUrl,
+                metadataJson = encodeMetadata(enriched),
+            )
         return Loaded(refreshedItem, enriched, enriched.episodes.orEmpty())
     }
 
@@ -121,7 +131,10 @@ class ContentDetailService(
      * persistence is best-effort and a missing row only costs the user a
      * resume point on that one episode.
      */
-    private fun persistEpisodes(seriesId: String, episodes: List<EpisodeInfo>) {
+    private fun persistEpisodes(
+        seriesId: String,
+        episodes: List<EpisodeInfo>,
+    ) {
         if (episodes.isEmpty()) return
         episodes.forEach { ep ->
             runCatching {
@@ -160,9 +173,10 @@ class ContentDetailService(
                     backdropUrl = v.backdropUrl.ifBlank { cached.backdropUrl },
                     tagline = v.tagline.ifBlank { cached.tagline },
                     youtubeTrailer = v.youtubeTrailer.ifBlank { cached.youtubeTrailer },
-                    subtitles = v.subtitles
-                        .map { SubtitleTrack(language = it.language, url = it.url) }
-                        .takeIf { it.isNotEmpty() } ?: cached.subtitles,
+                    subtitles =
+                        v.subtitles
+                            .map { SubtitleTrack(language = it.language, url = it.url) }
+                            .takeIf { it.isNotEmpty() } ?: cached.subtitles,
                     tmdbId = v.tmdbId?.toLong() ?: cached.tmdbId,
                     tmdbType = cached.tmdbType ?: v.tmdbId?.let { TmdbType.MOVIE },
                     detailFetchedAt = nowMs(),
@@ -195,15 +209,16 @@ class ContentDetailService(
                         eps.sortedBy { it.episodeNum }.forEach { e ->
                             flat.add(
                                 EpisodeInfo(
-                                    id = e.id.ifBlank { "${item.id}-s${seasonNum}-e${e.episodeNum}" },
+                                    id = e.id.ifBlank { "${item.id}-s$seasonNum-e${e.episodeNum}" },
                                     seasonNumber = seasonNum,
                                     episodeNumber = e.episodeNum,
                                     title = e.title.ifBlank { "Episode ${e.episodeNum}" },
-                                    streamUrl = client.buildStreamUrl(
-                                        e.id.toIntOrNull() ?: 0,
-                                        XtreamStreamType.SERIES,
-                                        e.containerExtension,
-                                    ),
+                                    streamUrl =
+                                        client.buildStreamUrl(
+                                            e.id.toIntOrNull() ?: 0,
+                                            XtreamStreamType.SERIES,
+                                            e.containerExtension,
+                                        ),
                                     duration = e.info.duration?.takeIf { it.isNotBlank() },
                                 ),
                             )
@@ -227,12 +242,12 @@ class ContentDetailService(
         }
     }
 
-    private fun parseMetadata(raw: String): ContentMetadata? = runCatching {
-        json.decodeFromString(ContentMetadata.serializer(), raw)
-    }.getOrNull()
+    private fun parseMetadata(raw: String): ContentMetadata? =
+        runCatching {
+            json.decodeFromString(ContentMetadata.serializer(), raw)
+        }.getOrNull()
 
-    private fun encodeMetadata(meta: ContentMetadata): String =
-        json.encodeToString(ContentMetadata.serializer(), meta)
+    private fun encodeMetadata(meta: ContentMetadata): String = json.encodeToString(ContentMetadata.serializer(), meta)
 
     private fun nowMs(): Long = clock()
 }

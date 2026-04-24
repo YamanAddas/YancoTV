@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -66,9 +65,10 @@ fun SettingsGroupsTab(
     var query by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(selectedType) {
-        val loaded = withContext(Dispatchers.IO) {
-            runCatching { repo.groups(selectedType) }.getOrElse { emptyList() }
-        }
+        val loaded =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.groups(selectedType) }.getOrElse { emptyList() }
+            }
         groups.clear()
         groups.addAll(loaded.sorted())
     }
@@ -106,10 +106,14 @@ fun SettingsGroupsTab(
             }
         }
 
-        val visible = remember(groups.toList(), query) {
-            if (query.isBlank()) groups.toList()
-            else groups.filter { it.contains(query, ignoreCase = true) }
-        }
+        val visible =
+            remember(groups.toList(), query) {
+                if (query.isBlank()) {
+                    groups.toList()
+                } else {
+                    groups.filter { it.contains(query, ignoreCase = true) }
+                }
+            }
 
         if (groups.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -138,14 +142,19 @@ fun SettingsGroupsTab(
 }
 
 @Composable
-private fun GroupRow(name: String, hidden: Boolean, onToggle: (Boolean) -> Unit) {
+private fun GroupRow(
+    name: String,
+    hidden: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .clickable { onToggle(!hidden) }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .clickable { onToggle(!hidden) }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -164,26 +173,32 @@ private fun GroupRow(name: String, hidden: Boolean, onToggle: (Boolean) -> Unit)
         Switch(
             checked = !hidden,
             onCheckedChange = { checked -> onToggle(!checked) },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = YancoPalette.Accent,
-                checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                uncheckedThumbColor = YancoPalette.TextMuted,
-                uncheckedTrackColor = YancoPalette.BackgroundHover,
-            ),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = YancoPalette.Accent,
+                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = YancoPalette.TextMuted,
+                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                ),
         )
     }
 }
 
 @Composable
-private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun TypeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     val bg = if (selected) YancoPalette.Accent.copy(alpha = 0.22f) else YancoPalette.BackgroundDeep
     val fg = if (selected) YancoPalette.TextPrimary else YancoPalette.TextMuted
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -194,8 +209,9 @@ private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-private fun typeChipLabel(type: ContentType): String = when (type) {
-    ContentType.LIVE -> "Live TV"
-    ContentType.MOVIE -> "Movies"
-    ContentType.SERIES -> "Series"
-}
+private fun typeChipLabel(type: ContentType): String =
+    when (type) {
+        ContentType.LIVE -> "Live TV"
+        ContentType.MOVIE -> "Movies"
+        ContentType.SERIES -> "Series"
+    }

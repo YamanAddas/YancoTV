@@ -53,16 +53,17 @@ fun Modifier.focusStyle(
     // lets the backdrop bleed through so the focused card still feels
     // part of the scene.
     focusedBg: Color = YancoPalette.Accent.copy(alpha = 0.22f),
-): Modifier = this.focusStyle(
-    focused = focused,
-    shape = RoundedCornerShape(radius),
-    liftScale = liftScale,
-    raised = raised,
-    unfocusedBorder = unfocusedBorder,
-    focusedBorder = focusedBorder,
-    unfocusedBg = unfocusedBg,
-    focusedBg = focusedBg,
-)
+): Modifier =
+    this.focusStyle(
+        focused = focused,
+        shape = RoundedCornerShape(radius),
+        liftScale = liftScale,
+        raised = raised,
+        unfocusedBorder = unfocusedBorder,
+        focusedBorder = focusedBorder,
+        unfocusedBg = unfocusedBg,
+        focusedBg = focusedBg,
+    )
 
 /**
  * Shape-aware overload. Hex-frame tiles, cut-corner cards, and bevelled
@@ -102,8 +103,7 @@ fun Modifier.focusStyle(
             shape = shape,
             ambientColor = YancoPalette.Accent,
             spotColor = YancoPalette.Accent,
-        )
-        .clip(shape)
+        ).clip(shape)
         .background(if (focused) focusedBg else unfocusedBg)
         .border(borderWidth, if (focused) focusedBorder else unfocusedBorder, shape)
 }

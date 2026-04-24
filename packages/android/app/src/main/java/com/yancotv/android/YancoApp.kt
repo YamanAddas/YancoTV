@@ -18,7 +18,6 @@ import org.koin.core.context.startKoin
 
 @UnstableApi
 class YancoApp : Application() {
-
     private val playbackController: PlaybackController by inject()
     private var startedActivities = 0
 
@@ -33,7 +32,8 @@ class YancoApp : Application() {
         // in logcat and we triage. Filter with `adb logcat -s StrictMode:*`.
         if (BuildConfig.DEBUG) {
             StrictMode.setThreadPolicy(
-                StrictMode.ThreadPolicy.Builder()
+                StrictMode.ThreadPolicy
+                    .Builder()
                     .detectDiskReads()
                     .detectDiskWrites()
                     .detectNetwork()
@@ -42,7 +42,8 @@ class YancoApp : Application() {
                     .build(),
             )
             StrictMode.setVmPolicy(
-                StrictMode.VmPolicy.Builder()
+                StrictMode.VmPolicy
+                    .Builder()
                     .detectActivityLeaks()
                     .detectLeakedClosableObjects()
                     .detectLeakedRegistrationObjects()
@@ -73,22 +74,36 @@ class YancoApp : Application() {
         // background-state machine is gone; this is the replacement. Count
         // started activities rather than listening to a single one so the
         // mini→fullscreen handoff (both started briefly) doesn't trip it.
-        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityStarted(activity: Activity) {
-                startedActivities++
-            }
-            override fun onActivityStopped(activity: Activity) {
-                startedActivities--
-                if (startedActivities <= 0) {
-                    startedActivities = 0
-                    playbackController.player.pause()
+        registerActivityLifecycleCallbacks(
+            object : ActivityLifecycleCallbacks {
+                override fun onActivityStarted(activity: Activity) {
+                    startedActivities++
                 }
-            }
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-            override fun onActivityResumed(activity: Activity) {}
-            override fun onActivityPaused(activity: Activity) {}
-            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-            override fun onActivityDestroyed(activity: Activity) {}
-        })
+
+                override fun onActivityStopped(activity: Activity) {
+                    startedActivities--
+                    if (startedActivities <= 0) {
+                        startedActivities = 0
+                        playbackController.player.pause()
+                    }
+                }
+
+                override fun onActivityCreated(
+                    activity: Activity,
+                    savedInstanceState: Bundle?,
+                ) {}
+
+                override fun onActivityResumed(activity: Activity) {}
+
+                override fun onActivityPaused(activity: Activity) {}
+
+                override fun onActivitySaveInstanceState(
+                    activity: Activity,
+                    outState: Bundle,
+                ) {}
+
+                override fun onActivityDestroyed(activity: Activity) {}
+            },
+        )
     }
 }

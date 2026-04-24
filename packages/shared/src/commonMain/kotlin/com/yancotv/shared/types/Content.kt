@@ -5,24 +5,41 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class ContentType {
-    @SerialName("live") LIVE,
-    @SerialName("movie") MOVIE,
-    @SerialName("series") SERIES,
+    @SerialName("live")
+    LIVE,
+
+    @SerialName("movie")
+    MOVIE,
+
+    @SerialName("series")
+    SERIES,
 }
 
 @Serializable
 enum class SortOption {
-    @SerialName("provider") PROVIDER,
-    @SerialName("name-asc") NAME_ASC,
-    @SerialName("name-desc") NAME_DESC,
-    @SerialName("recent") RECENT,
-    @SerialName("group") GROUP,
+    @SerialName("provider")
+    PROVIDER,
+
+    @SerialName("name-asc")
+    NAME_ASC,
+
+    @SerialName("name-desc")
+    NAME_DESC,
+
+    @SerialName("recent")
+    RECENT,
+
+    @SerialName("group")
+    GROUP,
 }
 
 @Serializable
 enum class TmdbType {
-    @SerialName("movie") MOVIE,
-    @SerialName("tv") TV,
+    @SerialName("movie")
+    MOVIE,
+
+    @SerialName("tv")
+    TV,
 }
 
 @Serializable

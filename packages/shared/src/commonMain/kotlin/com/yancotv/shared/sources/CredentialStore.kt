@@ -17,6 +17,7 @@ package com.yancotv.shared.sources
  */
 interface CredentialStore {
     fun encrypt(plaintext: String): ByteArray
+
     fun decrypt(ciphertext: ByteArray): String
 }
 
@@ -27,5 +28,6 @@ interface CredentialStore {
  */
 class PlaintextCredentialStore : CredentialStore {
     override fun encrypt(plaintext: String): ByteArray = plaintext.encodeToByteArray()
+
     override fun decrypt(ciphertext: ByteArray): String = ciphertext.decodeToString()
 }

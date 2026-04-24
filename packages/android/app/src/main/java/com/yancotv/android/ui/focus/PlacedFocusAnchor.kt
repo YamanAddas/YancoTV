@@ -1,8 +1,8 @@
 package com.yancotv.android.ui.focus
 
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -54,7 +54,9 @@ class PlacedFocusAnchor internal constructor() {
         isPlaced = true
     }
 
-    fun reset() { isPlaced = false }
+    fun reset() {
+        isPlaced = false
+    }
 
     /**
      * Suspend until the anchor's modified node has been placed, then
@@ -68,8 +70,7 @@ class PlacedFocusAnchor internal constructor() {
 }
 
 @Composable
-fun rememberPlacedFocusAnchor(): PlacedFocusAnchor =
-    remember { PlacedFocusAnchor() }
+fun rememberPlacedFocusAnchor(): PlacedFocusAnchor = remember { PlacedFocusAnchor() }
 
 /**
  * Attach an anchor to this node: the anchor's [FocusRequester] is bound
@@ -96,9 +97,10 @@ fun Modifier.placedFocus(anchor: PlacedFocusAnchor): Modifier =
 @Composable
 fun FocusTrap(anchor: PlacedFocusAnchor) {
     Spacer(
-        modifier = Modifier
-            .size(0.dp)
-            .placedFocus(anchor)
-            .focusable(),
+        modifier =
+            Modifier
+                .size(0.dp)
+                .placedFocus(anchor)
+                .focusable(),
     )
 }

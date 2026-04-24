@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -20,8 +23,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,11 +49,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
 
 /**
  * Parental controls tab — set/change/remove PIN and toggle the two
@@ -85,18 +85,21 @@ fun SettingsParentalTab(
     // rather than rendering a ghost entry.
     val hiddenItems = remember { mutableStateListOf<ContentItem>() }
     LaunchedEffect(hiddenIds) {
-        val resolved = withContext(Dispatchers.IO) {
-            hiddenIds.mapNotNull { id -> runCatching { contentRepo.findById(id) }.getOrNull() }
-                .sortedBy { it.cleanTitle?.ifBlank { null } ?: it.title }
-        }
+        val resolved =
+            withContext(Dispatchers.IO) {
+                hiddenIds
+                    .mapNotNull { id -> runCatching { contentRepo.findById(id) }.getOrNull() }
+                    .sortedBy { it.cleanTitle?.ifBlank { null } ?: it.title }
+            }
         hiddenItems.clear()
         hiddenItems.addAll(resolved)
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -113,11 +116,12 @@ fun SettingsParentalTab(
 
         // ───── PIN section ─────
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -130,12 +134,18 @@ fun SettingsParentalTab(
             if (!settings.pinSet || awaitingNewPin) {
                 PinField(
                     value = newPin,
-                    onChange = { newPin = it; status = null },
+                    onChange = {
+                        newPin = it
+                        status = null
+                    },
                     label = if (awaitingNewPin) "New PIN" else "PIN",
                 )
                 PinField(
                     value = confirmPin,
-                    onChange = { confirmPin = it; status = null },
+                    onChange = {
+                        confirmPin = it
+                        status = null
+                    },
                     label = "Confirm PIN",
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -213,11 +223,12 @@ fun SettingsParentalTab(
         // Hidden-channels manager. Hide is one-way from list screens —
         // without this panel there's no way to unhide except reinstalling.
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -242,10 +253,12 @@ fun SettingsParentalTab(
                 }
             }
             Text(
-                text = if (hiddenIds.isEmpty())
-                    "No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it."
-                else
-                    "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back.",
+                text =
+                    if (hiddenIds.isEmpty()) {
+                        "No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it."
+                    } else {
+                        "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back."
+                    },
                 color = YancoPalette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -269,14 +282,16 @@ fun SettingsParentalTab(
     // current PIN first. On success, the gate closes and the action runs.
     showGate?.let { action ->
         PinEntryDialog(
-            title = when (action) {
-                GateAction.CHANGE -> "Enter current PIN"
-                GateAction.REMOVE -> "Confirm with current PIN"
-            },
-            body = when (action) {
-                GateAction.CHANGE -> "To change your PIN, confirm the current one first."
-                GateAction.REMOVE -> "Removing the PIN will disable parental controls."
-            },
+            title =
+                when (action) {
+                    GateAction.CHANGE -> "Enter current PIN"
+                    GateAction.REMOVE -> "Confirm with current PIN"
+                },
+            body =
+                when (action) {
+                    GateAction.CHANGE -> "To change your PIN, confirm the current one first."
+                    GateAction.REMOVE -> "Removing the PIN will disable parental controls."
+                },
             repo = repo,
             onSuccess = {
                 when (action) {
@@ -301,7 +316,11 @@ fun SettingsParentalTab(
 private enum class GateAction { CHANGE, REMOVE }
 
 @Composable
-private fun PinField(value: String, onChange: (String) -> Unit, label: String) {
+private fun PinField(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = { onChange(it.filter(Char::isDigit).take(8)) },
@@ -309,18 +328,20 @@ private fun PinField(value: String, onChange: (String) -> Unit, label: String) {
         label = { Text(label) },
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-        textStyle = TextStyle(
-            color = YancoPalette.TextPrimary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-        ),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = YancoPalette.TextPrimary,
-            unfocusedTextColor = YancoPalette.TextPrimary,
-            focusedBorderColor = YancoPalette.Accent,
-            unfocusedBorderColor = YancoPalette.BackgroundHover,
-            cursorColor = YancoPalette.Accent,
-        ),
+        textStyle =
+            TextStyle(
+                color = YancoPalette.TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = YancoPalette.TextPrimary,
+                unfocusedTextColor = YancoPalette.TextPrimary,
+                focusedBorderColor = YancoPalette.Accent,
+                unfocusedBorderColor = YancoPalette.BackgroundHover,
+                cursorColor = YancoPalette.Accent,
+            ),
         modifier = Modifier.fillMaxWidth(),
     )
 }
@@ -334,11 +355,12 @@ private fun ToggleRow(
     enabled: Boolean = true,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -360,24 +382,29 @@ private fun ToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = YancoPalette.Accent,
-                checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                uncheckedThumbColor = YancoPalette.TextMuted,
-                uncheckedTrackColor = YancoPalette.BackgroundHover,
-            ),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = YancoPalette.Accent,
+                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = YancoPalette.TextMuted,
+                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                ),
         )
     }
 }
 
 @Composable
-private fun HiddenRow(item: ContentItem, onUnhide: () -> Unit) {
+private fun HiddenRow(
+    item: ContentItem,
+    onUnhide: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(YancoPalette.BackgroundDeep)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(6.dp))
+                .background(YancoPalette.BackgroundDeep)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

@@ -51,11 +51,12 @@ class SourceSyncCoordinator(
      * [BufferOverflow.DROP_OLDEST] means a fresh failure always wins over
      * a stale one the user already ignored.
      */
-    private val _errors = MutableSharedFlow<String>(
-        replay = 0,
-        extraBufferCapacity = 4,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
+    private val _errors =
+        MutableSharedFlow<String>(
+            replay = 0,
+            extraBufferCapacity = 4,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     private var activeJob: Job? = null
@@ -67,65 +68,70 @@ class SourceSyncCoordinator(
         val startedAtMs: Long,
     )
 
-    fun start(sourceId: String, sourceName: String) {
+    fun start(
+        sourceId: String,
+        sourceName: String,
+    ) {
         if (_state.value != null) {
             logger.warn("syncCoordinator refusing start: another sync is active")
             return
         }
         val startedAt = System.currentTimeMillis()
-        _state.value = Active(
-            sourceId = sourceId,
-            sourceName = sourceName,
-            progress = SyncProgress(SyncProgress.Phase.FETCHING, message = "Starting"),
-            startedAtMs = startedAt,
-        )
+        _state.value =
+            Active(
+                sourceId = sourceId,
+                sourceName = sourceName,
+                progress = SyncProgress(SyncProgress.Phase.FETCHING, message = "Starting"),
+                startedAtMs = startedAt,
+            )
         logger.info("syncCoordinator start id=$sourceId name=$sourceName")
-        activeJob = scope.launch {
-            var completedOk = false
-            try {
-                repo.syncSource(sourceId).collect { p ->
-                    // Keep startedAtMs stable across progress updates so the
-                    // UI's elapsed-time ticker doesn't reset each time.
-                    _state.value = _state.value?.copy(progress = p)
-                    when (p.phase) {
-                        SyncProgress.Phase.DONE -> completedOk = true
-                        SyncProgress.Phase.ERROR -> {
-                            // The repository reports credential + network
-                            // failures as ERROR progress events rather than
-                            // throwing. Surface them on the error bus so the
-                            // Toast still fires when the user has navigated
-                            // away from Sources mid-sync.
-                            val reason = p.message?.takeIf { it.isNotBlank() } ?: "unknown error"
-                            _errors.tryEmit("Sync failed for $sourceName: $reason")
+        activeJob =
+            scope.launch {
+                var completedOk = false
+                try {
+                    repo.syncSource(sourceId).collect { p ->
+                        // Keep startedAtMs stable across progress updates so the
+                        // UI's elapsed-time ticker doesn't reset each time.
+                        _state.value = _state.value?.copy(progress = p)
+                        when (p.phase) {
+                            SyncProgress.Phase.DONE -> completedOk = true
+                            SyncProgress.Phase.ERROR -> {
+                                // The repository reports credential + network
+                                // failures as ERROR progress events rather than
+                                // throwing. Surface them on the error bus so the
+                                // Toast still fires when the user has navigated
+                                // away from Sources mid-sync.
+                                val reason = p.message?.takeIf { it.isNotBlank() } ?: "unknown error"
+                                _errors.tryEmit("Sync failed for $sourceName: $reason")
+                            }
+                            else -> Unit
                         }
-                        else -> Unit
                     }
+                    // Kick EPG off the moment the catalog lands. The source row
+                    // now carries either the user-provided `epg_url` or the
+                    // Xtream auto-derived `xmltv.php` URL, so `EpgRepository`
+                    // has a target to fetch. WorkManager dedupes with KEEP if a
+                    // run is already in flight.
+                    if (completedOk) {
+                        logger.info("syncCoordinator kicking EPG refresh after catalog sync id=$sourceId")
+                        runCatching { EpgSyncWorker.enqueueOnce(context) }
+                            .onFailure { logger.warn("EPG enqueue failed: ${it.message}") }
+                    }
+                } catch (ce: CancellationException) {
+                    // User pressed Cancel, or the app scope is being torn down —
+                    // never surface this as a sync error. Re-throw so structured
+                    // concurrency can clean up; the finally clears UI state.
+                    logger.info("syncCoordinator cancelled id=$sourceId")
+                    throw ce
+                } catch (t: Throwable) {
+                    logger.error("syncCoordinator crashed id=$sourceId: ${t.message}")
+                    val reason = t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
+                    _errors.tryEmit("Sync failed for $sourceName: $reason")
+                } finally {
+                    _state.value = null
+                    activeJob = null
                 }
-                // Kick EPG off the moment the catalog lands. The source row
-                // now carries either the user-provided `epg_url` or the
-                // Xtream auto-derived `xmltv.php` URL, so `EpgRepository`
-                // has a target to fetch. WorkManager dedupes with KEEP if a
-                // run is already in flight.
-                if (completedOk) {
-                    logger.info("syncCoordinator kicking EPG refresh after catalog sync id=$sourceId")
-                    runCatching { EpgSyncWorker.enqueueOnce(context) }
-                        .onFailure { logger.warn("EPG enqueue failed: ${it.message}") }
-                }
-            } catch (ce: CancellationException) {
-                // User pressed Cancel, or the app scope is being torn down —
-                // never surface this as a sync error. Re-throw so structured
-                // concurrency can clean up; the finally clears UI state.
-                logger.info("syncCoordinator cancelled id=$sourceId")
-                throw ce
-            } catch (t: Throwable) {
-                logger.error("syncCoordinator crashed id=$sourceId: ${t.message}")
-                val reason = t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
-                _errors.tryEmit("Sync failed for $sourceName: $reason")
-            } finally {
-                _state.value = null
-                activeJob = null
             }
-        }
     }
 
     fun cancel() {

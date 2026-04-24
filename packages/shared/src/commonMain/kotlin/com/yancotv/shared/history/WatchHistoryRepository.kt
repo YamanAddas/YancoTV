@@ -23,7 +23,6 @@ class WatchHistoryRepository(
     private val db: YancoDb,
     private val clock: () -> Long,
 ) {
-
     /**
      * Save a resume point. Pass [positionSeconds] = 0 (or equal to
      * [durationSeconds]) to effectively mark a title as watched; caller
@@ -70,9 +69,11 @@ class WatchHistoryRepository(
         // multiple tables requires a dedicated query file; keeping it here
         // avoids a migration just to grow `WatchHistory.sq`.
         val byContent = rows.groupBy { it.content_id }
-        val contents = byContent.keys.mapNotNull { id ->
-            db.contentQueries.selectById(id).executeAsOneOrNull()
-        }.associateBy { it.id }
+        val contents =
+            byContent.keys
+                .mapNotNull { id ->
+                    db.contentQueries.selectById(id).executeAsOneOrNull()
+                }.associateBy { it.id }
         return rows.mapNotNull { row ->
             val c = contents[row.content_id] ?: return@mapNotNull null
             HistoryEntry(
@@ -82,20 +83,21 @@ class WatchHistoryRepository(
                 positionSeconds = row.position_seconds.toDouble(),
                 durationSeconds = row.duration_seconds?.toDouble(),
                 watchedAt = row.watched_at,
-                content = ContentItem(
-                    id = c.id,
-                    sourceId = c.source_id,
-                    type = contentTypeFromDb(c.type),
-                    title = c.title,
-                    cleanTitle = c.clean_title,
-                    groupName = c.group_name,
-                    streamUrl = c.stream_url,
-                    logoUrl = c.logo_url,
-                    tvgId = c.tvg_id,
-                    metadataJson = c.metadata_json,
-                    sortOrder = c.sort_order.toInt(),
-                    createdAt = c.created_at,
-                ),
+                content =
+                    ContentItem(
+                        id = c.id,
+                        sourceId = c.source_id,
+                        type = contentTypeFromDb(c.type),
+                        title = c.title,
+                        cleanTitle = c.clean_title,
+                        groupName = c.group_name,
+                        streamUrl = c.stream_url,
+                        logoUrl = c.logo_url,
+                        tvgId = c.tvg_id,
+                        metadataJson = c.metadata_json,
+                        sortOrder = c.sort_order.toInt(),
+                        createdAt = c.created_at,
+                    ),
             )
         }
     }
@@ -122,9 +124,10 @@ class WatchHistoryRepository(
     }
 }
 
-private fun contentTypeFromDb(value: String): ContentType = when (value) {
-    "live" -> ContentType.LIVE
-    "movie" -> ContentType.MOVIE
-    "series" -> ContentType.SERIES
-    else -> error("Unknown content type: $value")
-}
+private fun contentTypeFromDb(value: String): ContentType =
+    when (value) {
+        "live" -> ContentType.LIVE
+        "movie" -> ContentType.MOVIE
+        "series" -> ContentType.SERIES
+        else -> error("Unknown content type: $value")
+    }

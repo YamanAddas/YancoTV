@@ -17,18 +17,29 @@ class ReminderRepository(
     private val db: YancoDb,
     private val clock: () -> Long,
 ) {
-
     fun all(): List<Reminder> =
-        db.remindersQueries.selectAll().executeAsList().map { it.toDomain() }
+        db.remindersQueries
+            .selectAll()
+            .executeAsList()
+            .map { it.toDomain() }
 
     fun allUnfired(): List<Reminder> =
-        db.remindersQueries.selectAllUnfired().executeAsList().map { it.toDomain() }
+        db.remindersQueries
+            .selectAllUnfired()
+            .executeAsList()
+            .map { it.toDomain() }
 
     fun forProgramme(programmeId: String): Reminder? =
-        db.remindersQueries.selectByProgrammeId(programmeId).executeAsOneOrNull()?.toDomain()
+        db.remindersQueries
+            .selectByProgrammeId(programmeId)
+            .executeAsOneOrNull()
+            ?.toDomain()
 
     fun dueAt(unixSeconds: Long): List<Reminder> =
-        db.remindersQueries.selectUnfiredDue(unixSeconds).executeAsList().map { it.toDomain() }
+        db.remindersQueries
+            .selectUnfiredDue(unixSeconds)
+            .executeAsList()
+            .map { it.toDomain() }
 
     /**
      * Create (or replace) a reminder for [programme] on [channelTvgId]. Lead
@@ -104,14 +115,15 @@ data class Reminder(
     val fired: Boolean,
 )
 
-private fun Reminders.toDomain(): Reminder = Reminder(
-    id = id,
-    programmeId = programme_id,
-    channelTvgId = channel_tvg_id,
-    title = title,
-    startTime = start_time,
-    endTime = end_time,
-    leadSeconds = lead_seconds,
-    fireAt = fire_at,
-    fired = fired,
-)
+private fun Reminders.toDomain(): Reminder =
+    Reminder(
+        id = id,
+        programmeId = programme_id,
+        channelTvgId = channel_tvg_id,
+        title = title,
+        startTime = start_time,
+        endTime = end_time,
+        leadSeconds = lead_seconds,
+        fireAt = fire_at,
+        fired = fired,
+    )

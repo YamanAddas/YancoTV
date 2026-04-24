@@ -68,10 +68,11 @@ android {
 
     packaging {
         resources {
-            excludes += setOf(
-                "/META-INF/{AL2.0,LGPL2.1}",
-                "/META-INF/DEPENDENCIES",
-            )
+            excludes +=
+                setOf(
+                    "/META-INF/{AL2.0,LGPL2.1}",
+                    "/META-INF/DEPENDENCIES",
+                )
         }
     }
 

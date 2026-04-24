@@ -53,13 +53,13 @@ class BulkContentWriter(
     private val driver: SqlDriver,
     private val logger: Logger = NOOP_LOGGER,
 ) {
-    private val json = Json {
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            encodeDefaults = false
+            explicitNulls = false
+        }
 
-    private fun encodeMeta(meta: ContentMetadata): String? =
-        if (meta == ContentMetadata()) null else json.encodeToString(meta)
+    private fun encodeMeta(meta: ContentMetadata): String? = if (meta == ContentMetadata()) null else json.encodeToString(meta)
 
     // ───── Sync lifecycle ─────
 
@@ -200,11 +200,12 @@ class BulkContentWriter(
                     var p = 0
                     for (k in i until end) {
                         val s = items[k]
-                        val meta = ContentMetadata(
-                            streamId = s.streamId.toLong(),
-                            tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
-                            tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
-                        )
+                        val meta =
+                            ContentMetadata(
+                                streamId = s.streamId.toLong(),
+                                tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
+                                tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
+                            )
                         val groupName = categoryNames[s.categoryId] ?: s.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.xtreamLive(sourceId, s.streamId.toString()))
                         bindString(p++, sourceId)
@@ -252,10 +253,11 @@ class BulkContentWriter(
                     var p = 0
                     for (k in i until end) {
                         val v = items[k]
-                        val meta = ContentMetadata(
-                            streamId = v.streamId.toLong(),
-                            rating = v.rating.ifBlank { null },
-                        )
+                        val meta =
+                            ContentMetadata(
+                                streamId = v.streamId.toLong(),
+                                rating = v.rating.ifBlank { null },
+                            )
                         val groupName = categoryNames[v.categoryId] ?: v.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.xtreamVod(sourceId, v.streamId.toString()))
                         bindString(p++, sourceId)
@@ -302,15 +304,16 @@ class BulkContentWriter(
                     var p = 0
                     for (k in i until end) {
                         val sr = items[k]
-                        val meta = ContentMetadata(
-                            seriesId = sr.seriesId.toLong(),
-                            plot = sr.plot.ifBlank { null },
-                            cast = sr.cast.ifBlank { null },
-                            director = sr.director.ifBlank { null },
-                            genre = sr.genre.ifBlank { null },
-                            releaseDate = sr.releaseDate.ifBlank { null },
-                            rating = sr.rating.ifBlank { null },
-                        )
+                        val meta =
+                            ContentMetadata(
+                                seriesId = sr.seriesId.toLong(),
+                                plot = sr.plot.ifBlank { null },
+                                cast = sr.cast.ifBlank { null },
+                                director = sr.director.ifBlank { null },
+                                genre = sr.genre.ifBlank { null },
+                                releaseDate = sr.releaseDate.ifBlank { null },
+                                rating = sr.rating.ifBlank { null },
+                            )
                         val groupName = categoryNames[sr.categoryId] ?: sr.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.xtreamSeries(sourceId, sr.seriesId.toString()))
                         bindString(p++, sourceId)
@@ -368,11 +371,12 @@ class BulkContentWriter(
                     for (k in i until end) {
                         val e = items[k]
                         val type = serializeType(classifyEntry(e))
-                        val meta = ContentMetadata(
-                            catchupType = e.catchupType,
-                            catchupSource = e.catchupSource,
-                            tvArchiveDuration = e.catchupDays,
-                        )
+                        val meta =
+                            ContentMetadata(
+                                catchupType = e.catchupType,
+                                catchupSource = e.catchupSource,
+                                tvArchiveDuration = e.catchupDays,
+                            )
                         bindString(p++, ContentIds.m3u(sourceId, e.title, e.streamUrl))
                         bindString(p++, sourceId)
                         bindString(p++, type)
@@ -418,11 +422,12 @@ class BulkContentWriter(
                     var p = 0
                     for (k in i until end) {
                         val c = items[k]
-                        val meta = ContentMetadata(
-                            stalkerId = c.id.toString(),
-                            tvArchive = if (c.tvArchive != 0) c.tvArchive else null,
-                            tvArchiveDuration = if (c.tvArchiveDuration != 0) c.tvArchiveDuration else null,
-                        )
+                        val meta =
+                            ContentMetadata(
+                                stalkerId = c.id.toString(),
+                                tvArchive = if (c.tvArchive != 0) c.tvArchive else null,
+                                tvArchiveDuration = if (c.tvArchiveDuration != 0) c.tvArchiveDuration else null,
+                            )
                         val groupName = categoryNames[c.tvGenreId] ?: c.tvGenreId.ifBlank { null }
                         bindString(p++, ContentIds.stalkerLive(sourceId, c.id.toString()))
                         bindString(p++, sourceId)
@@ -469,10 +474,11 @@ class BulkContentWriter(
                     var p = 0
                     for (k in i until end) {
                         val v = items[k]
-                        val meta = ContentMetadata(
-                            stalkerId = v.id.toString(),
-                            description = v.description.ifBlank { null },
-                        )
+                        val meta =
+                            ContentMetadata(
+                                stalkerId = v.id.toString(),
+                                description = v.description.ifBlank { null },
+                            )
                         val groupName = categoryNames[v.categoryId] ?: v.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.stalkerVod(sourceId, v.id.toString()))
                         bindString(p++, sourceId)
@@ -519,11 +525,12 @@ class BulkContentWriter(
                     var p = 0
                     for (k in i until end) {
                         val sr = items[k]
-                        val meta = ContentMetadata(
-                            stalkerId = sr.id.toString(),
-                            plot = sr.plot.ifBlank { null },
-                            genre = sr.genre.ifBlank { null },
-                        )
+                        val meta =
+                            ContentMetadata(
+                                stalkerId = sr.id.toString(),
+                                plot = sr.plot.ifBlank { null },
+                                genre = sr.genre.ifBlank { null },
+                            )
                         val groupName = categoryNames[sr.categoryId] ?: sr.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.stalkerSeries(sourceId, sr.id.toString()))
                         bindString(p++, sourceId)
@@ -550,11 +557,12 @@ class BulkContentWriter(
         }
     }
 
-    private fun serializeType(type: ContentType): String = when (type) {
-        ContentType.LIVE -> "live"
-        ContentType.MOVIE -> "movie"
-        ContentType.SERIES -> "series"
-    }
+    private fun serializeType(type: ContentType): String =
+        when (type) {
+            ContentType.LIVE -> "live"
+            ContentType.MOVIE -> "movie"
+            ContentType.SERIES -> "series"
+        }
 
     companion object {
         /**
@@ -579,12 +587,13 @@ class BulkContentWriter(
             // every row written so far — surfacing as a mysterious sync error.
             // prepareSource() already cleared this source's rows, so every ID
             // in the batch is fresh from the wire; IGNORE is correct.
-            val sb = StringBuilder(
-                "INSERT OR IGNORE INTO content (" +
-                    "id, source_id, type, title, clean_title, group_name, " +
-                    "stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at" +
-                    ") VALUES ",
-            )
+            val sb =
+                StringBuilder(
+                    "INSERT OR IGNORE INTO content (" +
+                        "id, source_id, type, title, clean_title, group_name, " +
+                        "stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at" +
+                        ") VALUES ",
+                )
             for (r in 0 until rowCount) {
                 if (r > 0) sb.append(',')
                 sb.append("(?,?,?,?,?,?,?,?,?,?,?,?)")

@@ -23,20 +23,21 @@ import okhttp3.OkHttpClient
  *  * Crossfade (120ms) so hot-cached frames don't flash on rapid focus
  *    changes.
  */
-fun buildYancoImageLoader(context: Context): ImageLoader = ImageLoader.Builder(context)
-    .memoryCache {
-        MemoryCache.Builder()
-            .maxSizeBytes(32L * 1024 * 1024)
-            .build()
-    }
-    .diskCache {
-        DiskCache.Builder()
-            .directory(context.cacheDir.resolve("yanco-images"))
-            .maxSizeBytes(250L * 1024 * 1024)
-            .build()
-    }
-    .components {
-        add(OkHttpNetworkFetcherFactory(OkHttpClient()))
-    }
-    .crossfade(120)
-    .build()
+fun buildYancoImageLoader(context: Context): ImageLoader =
+    ImageLoader
+        .Builder(context)
+        .memoryCache {
+            MemoryCache
+                .Builder()
+                .maxSizeBytes(32L * 1024 * 1024)
+                .build()
+        }.diskCache {
+            DiskCache
+                .Builder()
+                .directory(context.cacheDir.resolve("yanco-images"))
+                .maxSizeBytes(250L * 1024 * 1024)
+                .build()
+        }.components {
+            add(OkHttpNetworkFetcherFactory(OkHttpClient()))
+        }.crossfade(120)
+        .build()

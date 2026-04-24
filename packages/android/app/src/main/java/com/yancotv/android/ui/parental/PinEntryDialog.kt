@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -93,18 +92,20 @@ fun PinEntryDialog(
                     label = { Text("PIN") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    textStyle = TextStyle(
-                        color = YancoPalette.TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = YancoPalette.TextPrimary,
-                        unfocusedTextColor = YancoPalette.TextPrimary,
-                        focusedBorderColor = YancoPalette.Accent,
-                        unfocusedBorderColor = YancoPalette.BackgroundHover,
-                        cursorColor = YancoPalette.Accent,
-                    ),
+                    textStyle =
+                        TextStyle(
+                            color = YancoPalette.TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = YancoPalette.TextPrimary,
+                            unfocusedTextColor = YancoPalette.TextPrimary,
+                            focusedBorderColor = YancoPalette.Accent,
+                            unfocusedBorderColor = YancoPalette.BackgroundHover,
+                            cursorColor = YancoPalette.Accent,
+                        ),
                 )
                 if (lockoutSec > 0) {
                     Text(

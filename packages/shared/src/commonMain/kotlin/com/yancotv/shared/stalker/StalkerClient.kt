@@ -67,8 +67,8 @@ private const val STALKER_X_USER_AGENT = "Model: MAG254; Link: Ethernet"
 
 private val STREAM_CMD_PREFIX = Regex("""^(?:ffrt|ffmpeg|auto)\s+""", RegexOption.IGNORE_CASE)
 
-private fun isRetryableError(message: String): Boolean {
-    return message.contains("timed out") ||
+private fun isRetryableError(message: String): Boolean =
+    message.contains("timed out") ||
         message.contains("ECONNRESET") ||
         message.contains("ECONNREFUSED") ||
         message.contains("ETIMEDOUT") ||
@@ -78,11 +78,16 @@ private fun isRetryableError(message: String): Boolean {
         message.contains("HTTP 502") ||
         message.contains("HTTP 503") ||
         message.contains("HTTP 504")
-}
 
-private fun str(v: Any?, default: String = ""): String = if (v == null) default else v.toString()
+private fun str(
+    v: Any?,
+    default: String = "",
+): String = if (v == null) default else v.toString()
 
-private fun num(v: Any?, default: Int = 0): Int {
+private fun num(
+    v: Any?,
+    default: Int = 0,
+): Int {
     if (v == null) return default
     return when (v) {
         is Number -> v.toInt()
@@ -102,9 +107,18 @@ private fun enc(s: String): String {
     for (b in s.encodeToByteArray()) {
         val c = b.toInt() and 0xFF
         val ch = c.toChar()
-        if ((ch in 'A'..'Z') || (ch in 'a'..'z') || (ch in '0'..'9') ||
-            ch == '-' || ch == '_' || ch == '.' || ch == '!' ||
-            ch == '~' || ch == '*' || ch == '\'' || ch == '(' || ch == ')'
+        if ((ch in 'A'..'Z') ||
+            (ch in 'a'..'z') ||
+            (ch in '0'..'9') ||
+            ch == '-' ||
+            ch == '_' ||
+            ch == '.' ||
+            ch == '!' ||
+            ch == '~' ||
+            ch == '*' ||
+            ch == '\'' ||
+            ch == '(' ||
+            ch == ')'
         ) {
             sb.append(ch)
         } else {
@@ -116,8 +130,7 @@ private fun enc(s: String): String {
 }
 
 /** Build `application/x-www-form-urlencoded`-style query string from a LinkedHashMap, mirroring TS `URLSearchParams.toString()`. */
-private fun buildQuery(params: LinkedHashMap<String, String>): String =
-    params.entries.joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
+private fun buildQuery(params: LinkedHashMap<String, String>): String = params.entries.joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
 
 data class StalkerClientOptions(
     val http: HttpClient,
@@ -165,12 +178,13 @@ class StalkerClient(
         val data = request("itv", "get_genres")
         if (data !is Result.Ok) return data as Result<List<StalkerCategory>, Throwable>
         val raw = asList(asMap(data.value)?.get("js")) ?: emptyList()
-        val cats = raw.mapNotNull { asMap(it) }.map { c ->
-            StalkerCategory(
-                id = str(c["id"]),
-                title = str(c["title"] ?: c["name"]),
-            )
-        }
+        val cats =
+            raw.mapNotNull { asMap(it) }.map { c ->
+                StalkerCategory(
+                    id = str(c["id"]),
+                    title = str(c["title"] ?: c["name"]),
+                )
+            }
         return Result.Ok(cats)
     }
 
@@ -223,12 +237,13 @@ class StalkerClient(
         val data = request("vod", "get_categories")
         if (data !is Result.Ok) return data as Result<List<StalkerCategory>, Throwable>
         val raw = asList(asMap(data.value)?.get("js")) ?: emptyList()
-        val cats = raw.mapNotNull { asMap(it) }.map { c ->
-            StalkerCategory(
-                id = str(c["id"]),
-                title = str(c["title"] ?: c["name"]),
-            )
-        }
+        val cats =
+            raw.mapNotNull { asMap(it) }.map { c ->
+                StalkerCategory(
+                    id = str(c["id"]),
+                    title = str(c["title"] ?: c["name"]),
+                )
+            }
         return Result.Ok(cats)
     }
 
@@ -239,10 +254,12 @@ class StalkerClient(
 
         var page = 1
         while (page <= MAX_PAGES) {
-            val data = request(
-                "vod", "get_ordered_list",
-                mapOf("category" to "*", "p" to page.toString()),
-            )
+            val data =
+                request(
+                    "vod",
+                    "get_ordered_list",
+                    mapOf("category" to "*", "p" to page.toString()),
+                )
             if (data !is Result.Ok) return data as Result<List<StalkerVodItem>, Throwable>
 
             val js = asMap(asMap(data.value)?.get("js"))
@@ -281,12 +298,13 @@ class StalkerClient(
         val data = request("series", "get_categories")
         if (data !is Result.Ok) return data as Result<List<StalkerCategory>, Throwable>
         val raw = asList(asMap(data.value)?.get("js")) ?: emptyList()
-        val cats = raw.mapNotNull { asMap(it) }.map { c ->
-            StalkerCategory(
-                id = str(c["id"]),
-                title = str(c["title"] ?: c["name"]),
-            )
-        }
+        val cats =
+            raw.mapNotNull { asMap(it) }.map { c ->
+                StalkerCategory(
+                    id = str(c["id"]),
+                    title = str(c["title"] ?: c["name"]),
+                )
+            }
         return Result.Ok(cats)
     }
 
@@ -297,10 +315,12 @@ class StalkerClient(
 
         var page = 1
         while (page <= MAX_PAGES) {
-            val data = request(
-                "series", "get_ordered_list",
-                mapOf("category" to "*", "p" to page.toString()),
-            )
+            val data =
+                request(
+                    "series",
+                    "get_ordered_list",
+                    mapOf("category" to "*", "p" to page.toString()),
+                )
             if (data !is Result.Ok) return data as Result<List<StalkerSeriesItem>, Throwable>
 
             val js = asMap(asMap(data.value)?.get("js"))
@@ -353,11 +373,12 @@ class StalkerClient(
 
         val url = "$portalUrl/server/load.php?${buildQuery(params)}"
 
-        val headers = mutableMapOf<String, String>(
-            "User-Agent" to STALKER_USER_AGENT,
-            "Cookie" to "mac=${enc(macAddress)}; stb_lang=en; timezone=Europe/London",
-            "X-User-Agent" to STALKER_X_USER_AGENT,
-        )
+        val headers =
+            mutableMapOf<String, String>(
+                "User-Agent" to STALKER_USER_AGENT,
+                "Cookie" to "mac=${enc(macAddress)}; stb_lang=en; timezone=Europe/London",
+                "X-User-Agent" to STALKER_X_USER_AGENT,
+            )
         if (tok != null) {
             headers["Authorization"] = "Bearer $tok"
         }
@@ -365,14 +386,15 @@ class StalkerClient(
         var attempt = 0
         while (attempt <= MAX_RETRIES) {
             try {
-                val body = http.getJson(
-                    url,
-                    HttpRequestOptions(
-                        timeoutMs = timeoutMs,
-                        maxResponseBytes = MAX_RESPONSE_BYTES,
-                        headers = headers,
-                    ),
-                )
+                val body =
+                    http.getJson(
+                        url,
+                        HttpRequestOptions(
+                            timeoutMs = timeoutMs,
+                            maxResponseBytes = MAX_RESPONSE_BYTES,
+                            headers = headers,
+                        ),
+                    )
                 return Result.Ok(body)
             } catch (error: Throwable) {
                 val msg = error.message ?: error.toString()

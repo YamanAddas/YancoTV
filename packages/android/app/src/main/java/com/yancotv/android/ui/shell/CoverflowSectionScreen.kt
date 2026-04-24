@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -71,9 +70,9 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
-import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
@@ -176,17 +175,19 @@ fun CoverflowSectionScreen(
         LaunchedEffect(type, selectedGroup) {
             items.clear()
             hasLoaded = false
-            total = withContext(Dispatchers.IO) {
-                runCatching { repo.count(type, groupFilter) }
-                    .onFailure { Log.w("Yanco", "CoverflowSection.count failed: ${it.message}", it) }
-                    .getOrElse { 0L }
-            }
+            total =
+                withContext(Dispatchers.IO) {
+                    runCatching { repo.count(type, groupFilter) }
+                        .onFailure { Log.w("Yanco", "CoverflowSection.count failed: ${it.message}", it) }
+                        .getOrElse { 0L }
+                }
             loaded = 0L
-            val first = withContext(Dispatchers.IO) {
-                runCatching { repo.page(type, groupFilter, 0L, 100L) }
-                    .onFailure { Log.w("Yanco", "CoverflowSection.page first failed: ${it.message}", it) }
-                    .getOrElse { emptyList() }
-            }
+            val first =
+                withContext(Dispatchers.IO) {
+                    runCatching { repo.page(type, groupFilter, 0L, 100L) }
+                        .onFailure { Log.w("Yanco", "CoverflowSection.page first failed: ${it.message}", it) }
+                        .getOrElse { emptyList() }
+                }
             items.addAll(first)
             loaded += first.size
             hasLoaded = true
@@ -215,9 +216,12 @@ fun CoverflowSectionScreen(
             focusedItem = null
             return@LaunchedEffect
         }
-        val visibleNow = applyParentalFilters(
-            items.toList(), hiddenIds, parentalSettings.hideAdultContent,
-        )
+        val visibleNow =
+            applyParentalFilters(
+                items.toList(),
+                hiddenIds,
+                parentalSettings.hideAdultContent,
+            )
         if (focusedItem == null || visibleNow.none { it.id == focusedItem?.id }) {
             val idx = initialFocusIndex(visibleNow, focusedIndex, controller.currentItem.value?.id)
             if (idx >= 0) {
@@ -237,11 +241,12 @@ fun CoverflowSectionScreen(
                 .collect { tvgIds ->
                     if (tvgIds.isEmpty()) return@collect
                     val ids = tvgIds.take(60)
-                    nowNextMap = withContext(Dispatchers.IO) {
-                        runCatching { epg.getNowNextBatch(ids) }
-                            .onFailure { Log.w("Yanco", "CoverflowSection EPG batch failed: ${it.message}", it) }
-                            .getOrElse { nowNextMap }
-                    }
+                    nowNextMap =
+                        withContext(Dispatchers.IO) {
+                            runCatching { epg.getNowNextBatch(ids) }
+                                .onFailure { Log.w("Yanco", "CoverflowSection EPG batch failed: ${it.message}", it) }
+                                .getOrElse { nowNextMap }
+                        }
                 }
         }
         LaunchedEffect(Unit) {
@@ -249,14 +254,18 @@ fun CoverflowSectionScreen(
                 delay(60_000L)
                 if (!restoreFocusOnWindowRegain) continue
                 nowSeconds = System.currentTimeMillis() / 1000L
-                val ids = items.mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
-                    .distinct().take(60)
+                val ids =
+                    items
+                        .mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
+                        .distinct()
+                        .take(60)
                 if (ids.isNotEmpty()) {
-                    nowNextMap = withContext(Dispatchers.IO) {
-                        runCatching { epg.getNowNextBatch(ids) }
-                            .onFailure { Log.w("Yanco", "CoverflowSection EPG tick failed: ${it.message}", it) }
-                            .getOrElse { nowNextMap }
-                    }
+                    nowNextMap =
+                        withContext(Dispatchers.IO) {
+                            runCatching { epg.getNowNextBatch(ids) }
+                                .onFailure { Log.w("Yanco", "CoverflowSection EPG tick failed: ${it.message}", it) }
+                                .getOrElse { nowNextMap }
+                        }
                 }
             }
         }
@@ -271,11 +280,12 @@ fun CoverflowSectionScreen(
         delay(100L)
         if (loading) return@LaunchedEffect
         loading = true
-        val page = withContext(Dispatchers.IO) {
-            runCatching { repo.page(type, groupFilter, loaded, 100L) }
-                .onFailure { Log.w("Yanco", "CoverflowSection.page tail failed: ${it.message}", it) }
-                .getOrElse { emptyList() }
-        }
+        val page =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.page(type, groupFilter, loaded, 100L) }
+                    .onFailure { Log.w("Yanco", "CoverflowSection.page tail failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
+            }
         items.addAll(page)
         loaded += page.size
         loading = false
@@ -283,7 +293,11 @@ fun CoverflowSectionScreen(
 
     var isFav by remember(focusedItem?.id) { mutableStateOf(false) }
     LaunchedEffect(focusedItem?.id) {
-        val id = focusedItem?.id ?: run { isFav = false; return@LaunchedEffect }
+        val id =
+            focusedItem?.id ?: run {
+                isFav = false
+                return@LaunchedEffect
+            }
         favorites.isFavoriteFlow(id).collect { isFav = it }
     }
     val scope = rememberCoroutineScope()
@@ -301,13 +315,14 @@ fun CoverflowSectionScreen(
             ) ?: return@LaunchedEffect
             delay(AUTO_PREVIEW_DEBOUNCE_MS)
             val snapshot = visible.toList()
-            val idx = resolveAutoPreviewIndex(
-                type = ContentType.LIVE,
-                focusedId = focusedItem?.id,
-                visible = snapshot,
-                lockedIds = lockedIds,
-                currentlyPlayingId = controller.currentId,
-            ) ?: return@LaunchedEffect
+            val idx =
+                resolveAutoPreviewIndex(
+                    type = ContentType.LIVE,
+                    focusedId = focusedItem?.id,
+                    visible = snapshot,
+                    lockedIds = lockedIds,
+                    currentlyPlayingId = controller.currentId,
+                ) ?: return@LaunchedEffect
             controller.play(snapshot, idx)
         }
     }
@@ -336,19 +351,23 @@ fun CoverflowSectionScreen(
     val isPreviewPlaying = previewItem != null && playing?.id == previewItem.id
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .onFocusChanged { coverflowHasFocus = it.hasFocus }
-            // Catch LEFT presses that bubbled up because no child consumed
-            // them — i.e. focus is on the leftmost CTA ("Open fullscreen")
-            // or the leftmost orb. onKeyEvent fires after traversal, so
-            // navigating between Favorite ↔ Watch (siblings) still works
-            // naturally; we only intercept when there's nowhere left to go.
-            .onKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                    onExitToCategories(); true
-                } else false
-            },
+        modifier =
+            modifier
+                .fillMaxSize()
+                .onFocusChanged { coverflowHasFocus = it.hasFocus }
+                // Catch LEFT presses that bubbled up because no child consumed
+                // them — i.e. focus is on the leftmost CTA ("Open fullscreen")
+                // or the leftmost orb. onKeyEvent fires after traversal, so
+                // navigating between Favorite ↔ Watch (siblings) still works
+                // naturally; we only intercept when there's nowhere left to go.
+                .onKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                        onExitToCategories()
+                        true
+                    } else {
+                        false
+                    }
+                },
     ) {
         PreviewPane(
             type = type,
@@ -370,59 +389,67 @@ fun CoverflowSectionScreen(
                 val optimistic = !isFav
                 isFav = optimistic
                 scope.launch {
-                    val newState = withContext(Dispatchers.IO) {
-                        runCatching { favorites.toggle(item.id) }
-                            .onFailure { Log.w("Yanco", "CoverflowSection favorites.toggle failed", it) }
-                            .getOrElse { !optimistic }
-                    }
+                    val newState =
+                        withContext(Dispatchers.IO) {
+                            runCatching { favorites.toggle(item.id) }
+                                .onFailure { Log.w("Yanco", "CoverflowSection favorites.toggle failed", it) }
+                                .getOrElse { !optimistic }
+                        }
                     if (newState != optimistic) isFav = newState
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.62f),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(0.62f),
         )
 
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.38f)
-                // D-pad LEFT at the leftmost orb pops back to the categories
-                // rail. Inter-orb LEFT/RIGHT presses flow through to
-                // LazyRow's natural focus traversal — we only intercept
-                // when there's nowhere left to scroll inside the wheel.
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown &&
-                        ev.key == Key.DirectionLeft &&
-                        focusedIndex <= 0
-                    ) {
-                        onExitToCategories()
-                        true
-                    } else false
-                }
-                .focusGroup(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(0.38f)
+                    // D-pad LEFT at the leftmost orb pops back to the categories
+                    // rail. Inter-orb LEFT/RIGHT presses flow through to
+                    // LazyRow's natural focus traversal — we only intercept
+                    // when there's nowhere left to scroll inside the wheel.
+                    .onPreviewKeyEvent { ev ->
+                        if (ev.type == KeyEventType.KeyDown &&
+                            ev.key == Key.DirectionLeft &&
+                            focusedIndex <= 0
+                        ) {
+                            onExitToCategories()
+                            true
+                        } else {
+                            false
+                        }
+                    }.focusGroup(),
         ) {
             when {
-                visible.isNotEmpty() -> ContentCoverflow(
-                    items = visible,
-                    type = type,
-                    nowNextMap = nowNextMap,
-                    lockedIds = lockedIds,
-                    focusedIndex = focusedIndex.coerceIn(
-                        0, (visible.size - 1).coerceAtLeast(0),
-                    ),
-                    firstItemAnchor = firstItemAnchor,
-                    entryFocus = entryFocus,
-                    onFocus = { idx, item ->
-                        focusedIndex = idx
-                        focusedItem = item
-                    },
-                    onActivate = { idx -> onActivate(visible.toList(), idx) },
-                )
-                hasLoaded -> CoverflowEmptyState(
-                    type = type,
-                    favoritesFilter = isFavoritesFilter,
-                )
+                visible.isNotEmpty() ->
+                    ContentCoverflow(
+                        items = visible,
+                        type = type,
+                        nowNextMap = nowNextMap,
+                        lockedIds = lockedIds,
+                        focusedIndex =
+                            focusedIndex.coerceIn(
+                                0,
+                                (visible.size - 1).coerceAtLeast(0),
+                            ),
+                        firstItemAnchor = firstItemAnchor,
+                        entryFocus = entryFocus,
+                        onFocus = { idx, item ->
+                            focusedIndex = idx
+                            focusedItem = item
+                        },
+                        onActivate = { idx -> onActivate(visible.toList(), idx) },
+                    )
+                hasLoaded ->
+                    CoverflowEmptyState(
+                        type = type,
+                        favoritesFilter = isFavoritesFilter,
+                    )
             }
         }
     }
@@ -450,56 +477,66 @@ private fun PreviewPane(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.padding(
-            start = Space.page, end = Space.page, top = Space.lg, bottom = Space.lg,
-        ),
+        modifier =
+            modifier.padding(
+                start = Space.page,
+                end = Space.page,
+                top = Space.lg,
+                bottom = Space.lg,
+            ),
         horizontalArrangement = Arrangement.spacedBy(Space.xxxl),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .weight(0.6f)
-                .fillMaxHeight()
-                .clip(YancoShapes.CutCornerCardLarge)
-                .background(YancoPalette.BackgroundDeep)
-                .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            YancoPalette.Accent.copy(alpha = 0.45f),
-                            YancoPalette.PanelBorder,
-                        ),
+            modifier =
+                Modifier
+                    .weight(0.6f)
+                    .fillMaxHeight()
+                    .clip(YancoShapes.CutCornerCardLarge)
+                    .background(YancoPalette.BackgroundDeep)
+                    .border(
+                        width = 1.dp,
+                        brush =
+                            Brush.verticalGradient(
+                                listOf(
+                                    YancoPalette.Accent.copy(alpha = 0.45f),
+                                    YancoPalette.PanelBorder,
+                                ),
+                            ),
+                        shape = YancoShapes.CutCornerCardLarge,
                     ),
-                    shape = YancoShapes.CutCornerCardLarge,
-                ),
         ) {
             when {
                 // LIVE preview — share the running ExoPlayer surface.
-                type == ContentType.LIVE && isPlaying -> MiniPlayer(
-                    modifier = Modifier.fillMaxSize(),
-                    controller = controller,
-                )
+                type == ContentType.LIVE && isPlaying ->
+                    MiniPlayer(
+                        modifier = Modifier.fillMaxSize(),
+                        controller = controller,
+                    )
                 // Either no logo at all or LIVE-pre-preview: show artwork.
-                focused?.logoUrl?.isNotBlank() == true -> AsyncImage(
-                    model = focused.logoUrl,
-                    contentDescription = focused.cleanTitle?.ifBlank { null } ?: focused.title,
-                    contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(if (type == ContentType.LIVE) Space.section else 0.dp),
-                )
+                focused?.logoUrl?.isNotBlank() == true ->
+                    AsyncImage(
+                        model = focused.logoUrl,
+                        contentDescription = focused.cleanTitle?.ifBlank { null } ?: focused.title,
+                        contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(if (type == ContentType.LIVE) Space.section else 0.dp),
+                    )
                 else -> PreviewIdleArtwork(type = type)
             }
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.85f to Color.Transparent,
-                            1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.85f to Color.Transparent,
+                                1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
+                            ),
                         ),
-                    ),
             )
         }
 
@@ -513,31 +550,34 @@ private fun PreviewPane(
             nowSeconds = nowSeconds,
             onPlay = onPlay,
             onToggleFavorite = onToggleFavorite,
-            modifier = Modifier
-                .weight(0.4f)
-                .fillMaxHeight(),
+            modifier =
+                Modifier
+                    .weight(0.4f)
+                    .fillMaxHeight(),
         )
     }
 }
 
 @Composable
 private fun PreviewIdleArtwork(type: ContentType) {
-    val brand = when (type) {
-        ContentType.LIVE -> "YANCOTV+"
-        ContentType.MOVIE -> "MOVIES"
-        ContentType.SERIES -> "SERIES"
-    }
+    val brand =
+        when (type) {
+            ContentType.LIVE -> "YANCOTV+"
+            ContentType.MOVIE -> "MOVIES"
+            ContentType.SERIES -> "SERIES"
+        }
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        YancoPalette.BackgroundElevated,
-                        YancoPalette.BackgroundDeep,
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            YancoPalette.BackgroundElevated,
+                            YancoPalette.BackgroundDeep,
+                        ),
                     ),
                 ),
-            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -568,17 +608,19 @@ private fun MetaColumn(
     val title = focused.cleanTitle?.ifBlank { null } ?: focused.title
     val nowProg = nowNext?.now
     val nextProg = nowNext?.next
-    val overline = when (type) {
-        ContentType.LIVE -> "LIVE CHANNEL"
-        ContentType.MOVIE -> "MOVIE"
-        ContentType.SERIES -> "SERIES"
-    }
-    val watchLabel = when {
-        type == ContentType.LIVE && isPlaying -> "Open fullscreen"
-        type == ContentType.LIVE -> "Watch"
-        type == ContentType.MOVIE -> "Watch"
-        else -> "Open"
-    }
+    val overline =
+        when (type) {
+            ContentType.LIVE -> "LIVE CHANNEL"
+            ContentType.MOVIE -> "MOVIE"
+            ContentType.SERIES -> "SERIES"
+        }
+    val watchLabel =
+        when {
+            type == ContentType.LIVE && isPlaying -> "Open fullscreen"
+            type == ContentType.LIVE -> "Watch"
+            type == ContentType.MOVIE -> "Watch"
+            else -> "Open"
+        }
     // No widthIn cap here — the column needs to use whatever horizontal
     // space the meta side of the preview row has, otherwise a 520dp cap
     // pinches the two CTAs (Watch + Favorite) into a clipped row when the
@@ -649,24 +691,31 @@ private fun MetaColumn(
 }
 
 @Composable
-private fun EmptyMetaPrompt(type: ContentType, modifier: Modifier) {
-    val (overline, title, body) = when (type) {
-        ContentType.LIVE -> Triple(
-            "LIVE TV",
-            "Pick a channel from the wheel",
-            "The focused channel previews here. Press OK to go fullscreen.",
-        )
-        ContentType.MOVIE -> Triple(
-            "MOVIES",
-            "Pick a movie from the wheel",
-            "The focused movie shows here. Press OK to open details.",
-        )
-        ContentType.SERIES -> Triple(
-            "SERIES",
-            "Pick a series from the wheel",
-            "The focused series shows here. Press OK to open episodes.",
-        )
-    }
+private fun EmptyMetaPrompt(
+    type: ContentType,
+    modifier: Modifier,
+) {
+    val (overline, title, body) =
+        when (type) {
+            ContentType.LIVE ->
+                Triple(
+                    "LIVE TV",
+                    "Pick a channel from the wheel",
+                    "The focused channel previews here. Press OK to go fullscreen.",
+                )
+            ContentType.MOVIE ->
+                Triple(
+                    "MOVIES",
+                    "Pick a movie from the wheel",
+                    "The focused movie shows here. Press OK to open details.",
+                )
+            ContentType.SERIES ->
+                Triple(
+                    "SERIES",
+                    "Pick a series from the wheel",
+                    "The focused series shows here. Press OK to open episodes.",
+                )
+        }
     Column(modifier = modifier, verticalArrangement = Arrangement.Center) {
         Text(text = overline, color = YancoPalette.Accent, style = YancoType.Overline)
         Spacer(Modifier.height(Space.sm))
@@ -687,31 +736,37 @@ private fun EmptyMetaPrompt(type: ContentType, modifier: Modifier) {
 }
 
 @Composable
-private fun ProgressLine(start: Long, end: Long, now: Long) {
+private fun ProgressLine(
+    start: Long,
+    end: Long,
+    now: Long,
+) {
     val span = remember(start, end) { (end - start).coerceAtLeast(1) }
     val pct = ((now - start).toFloat() / span).coerceIn(0f, 1f)
     val remainingMin = ((end - now).coerceAtLeast(0) / 60).toInt()
     Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(YancoPalette.BorderSubtle),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(YancoPalette.BorderSubtle),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth(pct)
-                    .fillMaxHeight()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                YancoPalette.AccentDeep,
-                                YancoPalette.Accent,
-                                YancoPalette.AccentGlow,
+                modifier =
+                    Modifier
+                        .fillMaxWidth(pct)
+                        .fillMaxHeight()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    YancoPalette.AccentDeep,
+                                    YancoPalette.Accent,
+                                    YancoPalette.AccentGlow,
+                                ),
                             ),
                         ),
-                    ),
             )
         }
         Text(
@@ -734,45 +789,48 @@ private fun HexCta(
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
     val bg by animateColorAsState(
-        targetValue = when {
-            primary && focused -> YancoPalette.AccentGlow
-            primary -> YancoPalette.Accent
-            focused -> YancoPalette.Accent.copy(alpha = 0.22f)
-            highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
-            else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
-        },
+        targetValue =
+            when {
+                primary && focused -> YancoPalette.AccentGlow
+                primary -> YancoPalette.Accent
+                focused -> YancoPalette.Accent.copy(alpha = 0.22f)
+                highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
+                else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
+            },
         label = "hexCtaBg",
     )
-    val border = when {
-        focused -> YancoPalette.FocusRing
-        primary -> YancoPalette.AccentDeep
-        highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
-        else -> YancoPalette.PanelBorder
-    }
-    val fg = when {
-        primary -> YancoPalette.BackgroundDeep
-        highlighted -> YancoPalette.Accent
-        else -> YancoPalette.TextPrimary
-    }
+    val border =
+        when {
+            focused -> YancoPalette.FocusRing
+            primary -> YancoPalette.AccentDeep
+            highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
+            else -> YancoPalette.PanelBorder
+        }
+    val fg =
+        when {
+            primary -> YancoPalette.BackgroundDeep
+            highlighted -> YancoPalette.Accent
+            else -> YancoPalette.TextPrimary
+        }
     Row(
-        modifier = Modifier
-            .shadow(
-                elevation = if (focused) 14.dp else 0.dp,
-                shape = shape,
-                ambientColor = YancoPalette.Accent,
-                spotColor = YancoPalette.Accent,
-            )
-            .clip(shape)
-            .background(bg)
-            .border(if (focused) 2.dp else 1.dp, border, shape)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = label }
-            // xl horizontal padding (was xxxl) so two CTAs side-by-side
-            // always fit when the categories rail is mounted. Buttons stay
-            // generous-looking because the hex bevel + emerald glow do most
-            // of the visual lifting; the chrome doesn't need 32dp gutters.
-            .padding(horizontal = Space.xl, vertical = Space.md),
+        modifier =
+            Modifier
+                .shadow(
+                    elevation = if (focused) 14.dp else 0.dp,
+                    shape = shape,
+                    ambientColor = YancoPalette.Accent,
+                    spotColor = YancoPalette.Accent,
+                ).clip(shape)
+                .background(bg)
+                .border(if (focused) 2.dp else 1.dp, border, shape)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = label }
+                // xl horizontal padding (was xxxl) so two CTAs side-by-side
+                // always fit when the categories rail is mounted. Buttons stay
+                // generous-looking because the hex bevel + emerald glow do most
+                // of the visual lifting; the chrome doesn't need 32dp gutters.
+                .padding(horizontal = Space.xl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -790,18 +848,20 @@ private fun HexCta(
 @Composable
 private fun MetaLivePill() {
     Row(
-        modifier = Modifier
-            .clip(YancoShapes.ChipBevel)
-            .background(YancoPalette.Live)
-            .padding(horizontal = Space.md, vertical = 4.dp),
+        modifier =
+            Modifier
+                .clip(YancoShapes.ChipBevel)
+                .background(YancoPalette.Live)
+                .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Box(
-            modifier = Modifier
-                .size(6.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(Color.White),
+            modifier =
+                Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(Color.White),
         )
         Text(text = "LIVE", color = Color.White, style = YancoType.Overline)
     }
@@ -810,11 +870,12 @@ private fun MetaLivePill() {
 @Composable
 private fun MetaLockChip() {
     Row(
-        modifier = Modifier
-            .clip(YancoShapes.ChipBevel)
-            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
-            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
-            .padding(horizontal = Space.md, vertical = 4.dp),
+        modifier =
+            Modifier
+                .clip(YancoShapes.ChipBevel)
+                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
+                .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
+                .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -865,12 +926,13 @@ private fun ContentCoverflow(
         LazyRow(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = sidePaddingDp,
-                end = sidePaddingDp,
-                top = Space.lg,
-                bottom = Space.lg,
-            ),
+            contentPadding =
+                PaddingValues(
+                    start = sidePaddingDp,
+                    end = sidePaddingDp,
+                    top = Space.lg,
+                    bottom = Space.lg,
+                ),
             horizontalArrangement = Arrangement.spacedBy(OrbSpacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -920,52 +982,50 @@ private fun ContentOrb(
     val title = item.cleanTitle?.ifBlank { null } ?: item.title
 
     Column(
-        modifier = Modifier
-            .width(OrbWidth)
-            .height(OrbHeight)
-            .graphicsLayer {
-                this.rotationY = rotationY
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-                this.translationX = translationX
-                this.cameraDistance = cameraDist
-            },
+        modifier =
+            Modifier
+                .width(OrbWidth)
+                .height(OrbHeight)
+                .graphicsLayer {
+                    this.rotationY = rotationY
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                    this.translationX = translationX
+                    this.cameraDistance = cameraDist
+                },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         Box(
-            modifier = Modifier
-                .size(OrbWidth)
-                .shadow(
-                    elevation = if (focused) 28.dp else 6.dp,
-                    shape = YancoShapes.HexCapsule,
-                    ambientColor = YancoPalette.Accent,
-                    spotColor = YancoPalette.Accent,
-                )
-                .clip(YancoShapes.HexCapsule)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            YancoPalette.BackgroundElevated,
-                            YancoPalette.BackgroundDeep,
+            modifier =
+                Modifier
+                    .size(OrbWidth)
+                    .shadow(
+                        elevation = if (focused) 28.dp else 6.dp,
+                        shape = YancoShapes.HexCapsule,
+                        ambientColor = YancoPalette.Accent,
+                        spotColor = YancoPalette.Accent,
+                    ).clip(YancoShapes.HexCapsule)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                YancoPalette.BackgroundElevated,
+                                YancoPalette.BackgroundDeep,
+                            ),
                         ),
-                    ),
-                )
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) YancoPalette.FocusRing else YancoPalette.PanelBorder,
-                    shape = YancoShapes.HexCapsule,
-                )
-                .then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
-                .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    onClick = onActivate,
-                )
-                .semantics(mergeDescendants = true) { contentDescription = title },
+                    ).border(
+                        width = if (focused) 2.dp else 1.dp,
+                        color = if (focused) YancoPalette.FocusRing else YancoPalette.PanelBorder,
+                        shape = YancoShapes.HexCapsule,
+                    ).then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
+                    .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
+                    .focusable(interactionSource = interaction)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onActivate,
+                    ).semantics(mergeDescendants = true) { contentDescription = title },
             contentAlignment = Alignment.Center,
         ) {
             if (item.logoUrl?.isNotBlank() == true) {
@@ -973,9 +1033,10 @@ private fun ContentOrb(
                     model = item.logoUrl,
                     contentDescription = null,
                     contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(if (type == ContentType.LIVE) Space.lg else 0.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(if (type == ContentType.LIVE) Space.lg else 0.dp),
                 )
             } else {
                 Text(
@@ -986,17 +1047,18 @@ private fun ContentOrb(
             }
             if (isLocked) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Space.xs)
-                        .size(22.dp)
-                        .clip(RoundedCornerShape(Radius.pill))
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
-                        .border(
-                            1.dp,
-                            YancoPalette.Accent.copy(alpha = 0.55f),
-                            RoundedCornerShape(Radius.pill),
-                        ),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Space.xs)
+                            .size(22.dp)
+                            .clip(RoundedCornerShape(Radius.pill))
+                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
+                            .border(
+                                1.dp,
+                                YancoPalette.Accent.copy(alpha = 0.55f),
+                                RoundedCornerShape(Radius.pill),
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1015,11 +1077,13 @@ private fun ContentOrb(
             maxLines = 1,
         )
         // Secondary line: EPG now-title for LIVE, group name otherwise.
-        val sub = when (type) {
-            ContentType.LIVE -> nowNext?.now?.title?.takeIf { it.isNotBlank() }
-                ?: item.groupName.orEmpty()
-            else -> item.groupName.orEmpty()
-        }
+        val sub =
+            when (type) {
+                ContentType.LIVE ->
+                    nowNext?.now?.title?.takeIf { it.isNotBlank() }
+                        ?: item.groupName.orEmpty()
+                else -> item.groupName.orEmpty()
+            }
         if (sub.isNotBlank()) {
             Text(
                 text = sub,
@@ -1032,27 +1096,35 @@ private fun ContentOrb(
 }
 
 @Composable
-private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean) {
-    val title = when {
-        favoritesFilter -> when (type) {
-            ContentType.LIVE -> "No favorite channels"
-            ContentType.MOVIE -> "No favorite movies"
-            ContentType.SERIES -> "No favorite series"
+private fun CoverflowEmptyState(
+    type: ContentType,
+    favoritesFilter: Boolean,
+) {
+    val title =
+        when {
+            favoritesFilter ->
+                when (type) {
+                    ContentType.LIVE -> "No favorite channels"
+                    ContentType.MOVIE -> "No favorite movies"
+                    ContentType.SERIES -> "No favorite series"
+                }
+            else ->
+                when (type) {
+                    ContentType.LIVE -> "No channels"
+                    ContentType.MOVIE -> "No movies"
+                    ContentType.SERIES -> "No series"
+                }
         }
-        else -> when (type) {
-            ContentType.LIVE -> "No channels"
-            ContentType.MOVIE -> "No movies"
-            ContentType.SERIES -> "No series"
+    val body =
+        when {
+            favoritesFilter -> "Star something from the preview pane and it'll land here."
+            else -> "Add an IPTV source in Settings → Sources to start watching."
         }
-    }
-    val body = when {
-        favoritesFilter -> "Star something from the preview pane and it'll land here."
-        else -> "Add an IPTV source in Settings → Sources to start watching."
-    }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(Space.page),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Space.page),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.Start,
     ) {

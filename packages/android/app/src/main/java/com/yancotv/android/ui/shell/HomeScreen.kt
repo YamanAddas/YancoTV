@@ -28,7 +28,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.delay
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
@@ -40,7 +39,6 @@ import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
 import com.yancotv.android.ui.theme.YancoPalette
-import com.yancotv.shared.types.EpisodeInfo
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
@@ -49,14 +47,14 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgGuideChannel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 // Kept internal for tests; stop any playing item when the section changes —
 // live, VOD, and episode previews must all stop so audio doesn't bleed.
-internal fun shouldStopPlaybackOnSectionChange(playing: ContentItem?): Boolean =
-    playing != null
+internal fun shouldStopPlaybackOnSectionChange(playing: ContentItem?): Boolean = playing != null
 
 /**
  * Adaptive shell. The browse sections (Live / Movies / Series) now delegate
@@ -80,12 +78,13 @@ fun HomeScreen(
     history: WatchHistoryRepository = koinInject(),
 ) {
     val openOn = remember { prefs.generalSnapshot().openOn }
-    val initialSection = remember(openOn) {
-        when (openOn) {
-            OpenOn.LIVE_TV -> AppSection.LiveTv
-            OpenOn.LAST_USED, OpenOn.HOME -> AppSection.Home
+    val initialSection =
+        remember(openOn) {
+            when (openOn) {
+                OpenOn.LIVE_TV -> AppSection.LiveTv
+                OpenOn.LAST_USED, OpenOn.HOME -> AppSection.Home
+            }
         }
-    }
     var section by rememberSaveable { mutableStateOf(initialSection) }
 
     // "Open on last used" auto-warms the previously played item into the
@@ -95,10 +94,14 @@ fun HomeScreen(
     LaunchedEffect(openOn) {
         if (autoplayAttempted) return@LaunchedEffect
         if (openOn != OpenOn.LAST_USED) return@LaunchedEffect
-        if (controller.currentId != null) { autoplayAttempted = true; return@LaunchedEffect }
-        val entry = withContext(Dispatchers.IO) {
-            runCatching { history.recent(limit = 1).firstOrNull() }.getOrNull()
+        if (controller.currentId != null) {
+            autoplayAttempted = true
+            return@LaunchedEffect
         }
+        val entry =
+            withContext(Dispatchers.IO) {
+                runCatching { history.recent(limit = 1).firstOrNull() }.getOrNull()
+            }
         autoplayAttempted = true
         val item = entry?.content ?: return@LaunchedEffect
         if (item.id in parental.lockedIds.value) return@LaunchedEffect
@@ -226,15 +229,19 @@ fun HomeScreen(
     // Search / Settings): any BACK while content has focus returns to
     // the sidebar, and a further BACK on the sidebar exits.
     BackHandler(
-        enabled = !sidebarHasFocus &&
-            detailItem == null &&
-            !searchOverlayVisible &&
-            contentType == null,
+        enabled =
+            !sidebarHasFocus &&
+                detailItem == null &&
+                !searchOverlayVisible &&
+                contentType == null,
     ) {
         runCatching { sidebarFocus.requestFocus() }
     }
 
-    val onBrowseActivate = fun(list: List<ContentItem>, idx: Int) {
+    val onBrowseActivate = fun(
+        list: List<ContentItem>,
+        idx: Int,
+    ) {
         val target = list.getOrNull(idx) ?: return
         gatedPlay(target.id) {
             when (target.type) {
@@ -304,9 +311,10 @@ fun HomeScreen(
                         }
                     }
                 },
-                modifier = Modifier
-                    .focusRequester(sidebarFocus)
-                    .onFocusChanged { sidebarHasFocus = it.hasFocus },
+                modifier =
+                    Modifier
+                        .focusRequester(sidebarFocus)
+                        .onFocusChanged { sidebarHasFocus = it.hasFocus },
             )
 
             if (contentType != null) {
@@ -404,9 +412,10 @@ fun HomeScreen(
                                             return@gatedPlay
                                         }
                                         homeScope.launch(Dispatchers.IO) {
-                                            val episode = runCatching {
-                                                repo.episodeById(resumeEpisodeId)
-                                            }.getOrNull()
+                                            val episode =
+                                                runCatching {
+                                                    repo.episodeById(resumeEpisodeId)
+                                                }.getOrNull()
                                             val playable = episode?.toPlayable(target)
                                             withContext(Dispatchers.Main) {
                                                 if (playable == null) {
@@ -435,26 +444,28 @@ fun HomeScreen(
         // Search overlay — rides above the Row so it dims everything.
         if (searchOverlayVisible) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.72f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { SearchOverlayState.hide() },
-                    ),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(if (isTv) 0.6f else 1f)
-                        .fillMaxHeight()
-                        .background(YancoPalette.BackgroundDeep)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.72f))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { /* swallow */ },
+                            onClick = { SearchOverlayState.hide() },
                         ),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(if (isTv) 0.6f else 1f)
+                            .fillMaxHeight()
+                            .background(YancoPalette.BackgroundDeep)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { /* swallow */ },
+                            ),
                 ) {
                     SearchScreen(isTv = isTv)
                 }
@@ -531,9 +542,10 @@ fun HomeScreen(
 @Composable
 private fun SettingsLockedPlaceholder() {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(YancoPalette.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -570,9 +582,10 @@ private fun guideChannelToContentItem(channel: EpgGuideChannel): ContentItem? {
 @Composable
 private fun PlaceholderArea(section: AppSection) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(YancoPalette.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
         Text(

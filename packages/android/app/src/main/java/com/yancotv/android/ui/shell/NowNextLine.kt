@@ -36,15 +36,16 @@ fun NowNextLine(
     val now = nowNext.now
     val next = nowNext.next
 
-    val (label, progress) = when {
-        now != null -> {
-            val dur = (now.endTime - now.startTime).coerceAtLeast(1L)
-            val elapsed = (nowSeconds - now.startTime).coerceIn(0L, dur)
-            now.title to elapsed.toFloat() / dur.toFloat()
+    val (label, progress) =
+        when {
+            now != null -> {
+                val dur = (now.endTime - now.startTime).coerceAtLeast(1L)
+                val elapsed = (nowSeconds - now.startTime).coerceIn(0L, dur)
+                now.title to elapsed.toFloat() / dur.toFloat()
+            }
+            next != null -> "Next: ${next.title}" to 0f
+            else -> return
         }
-        next != null -> "Next: ${next.title}" to 0f
-        else -> return
-    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -57,18 +58,20 @@ fun NowNextLine(
         )
         if (now != null) {
             Box(
-                modifier = Modifier
-                    .padding(top = 3.dp)
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(YancoPalette.BorderSubtle),
+                modifier =
+                    Modifier
+                        .padding(top = 3.dp)
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(YancoPalette.BorderSubtle),
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .background(YancoPalette.Accent),
+                    modifier =
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress)
+                            .background(YancoPalette.Accent),
                 )
             }
         }

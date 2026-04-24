@@ -14,7 +14,6 @@ import androidx.work.workDataOf
 import com.yancotv.shared.epg.EpgRepository
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import androidx.work.ForegroundInfo
 import java.util.concurrent.TimeUnit
 
 /**
@@ -37,20 +36,21 @@ import java.util.concurrent.TimeUnit
 class EpgSyncWorker(
     appContext: Context,
     params: WorkerParameters,
-) : CoroutineWorker(appContext, params), KoinComponent {
-
+) : CoroutineWorker(appContext, params),
+    KoinComponent {
     private val epg: EpgRepository by inject()
     private val importer: AndroidEpgImporter by inject()
 
-    override suspend fun doWork(): Result {
-        return try {
+    override suspend fun doWork(): Result =
+        try {
             // Stream-based importer keeps peak memory bounded — the shared
             // [EpgRepository.refresh] path materialises the whole XML as a
             // String and OOMs on Fire TV when the provider's feed is large.
             // The importer uses XmlPullParser + incremental batched writes.
-            val result = importer.refresh { msg ->
-                setProgress(workDataOf(KEY_PROGRESS to msg))
-            }
+            val result =
+                importer.refresh { msg ->
+                    setProgress(workDataOf(KEY_PROGRESS to msg))
+                }
             if (result.ok) {
                 val cutoff = (System.currentTimeMillis() / 1000L) - STALE_WINDOW_SECONDS
                 runCatching { epg.deleteStale(cutoff) }
@@ -61,10 +61,12 @@ class EpgSyncWorker(
                 Result.failure(workDataOf(KEY_ERROR to (result.error ?: "EPG refresh failed")))
             }
         } catch (t: Throwable) {
-            if (runAttemptCount < MAX_RETRIES) Result.retry()
-            else Result.failure(workDataOf(KEY_ERROR to (t.message ?: t::class.simpleName ?: "unknown")))
+            if (runAttemptCount < MAX_RETRIES) {
+                Result.retry()
+            } else {
+                Result.failure(workDataOf(KEY_ERROR to (t.message ?: t::class.simpleName ?: "unknown")))
+            }
         }
-    }
 
     companion object {
         const val KEY_ERROR = "error"
@@ -73,19 +75,23 @@ class EpgSyncWorker(
         private const val UNIQUE_PERIODIC = "epg-sync-periodic"
         private const val UNIQUE_ONESHOT = "epg-sync-oneshot"
         private const val PERIODIC_HOURS = 6L
+
         // 24 hours of history kept on-device so Guide can show "just finished"
         // programmes; anything older is dead weight.
         private const val STALE_WINDOW_SECONDS = 24L * 60L * 60L
 
         fun schedulePeriodic(context: Context) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-            val request = PeriodicWorkRequestBuilder<EpgSyncWorker>(
-                PERIODIC_HOURS, TimeUnit.HOURS,
-            )
-                .setConstraints(constraints)
-                .build()
+            val constraints =
+                Constraints
+                    .Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            val request =
+                PeriodicWorkRequestBuilder<EpgSyncWorker>(
+                    PERIODIC_HOURS,
+                    TimeUnit.HOURS,
+                ).setConstraints(constraints)
+                    .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_PERIODIC,
                 // KEEP — don't reset the 6h window every app start. The user
@@ -96,12 +102,15 @@ class EpgSyncWorker(
         }
 
         fun enqueueOnce(context: Context) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-            val request = OneTimeWorkRequestBuilder<EpgSyncWorker>()
-                .setConstraints(constraints)
-                .build()
+            val constraints =
+                Constraints
+                    .Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            val request =
+                OneTimeWorkRequestBuilder<EpgSyncWorker>()
+                    .setConstraints(constraints)
+                    .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_ONESHOT,
                 // KEEP — if a refresh is already in flight, don't pile on.

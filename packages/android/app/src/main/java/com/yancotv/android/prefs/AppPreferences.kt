@@ -42,49 +42,59 @@ class AppPreferences(
 
     // ───── Playback ─────
 
-    suspend fun setResizeMode(mode: ResizeMode) = write(KEY_RESIZE, mode.key) {
-        _playback.value = _playback.value.copy(resizeMode = mode)
-    }
+    suspend fun setResizeMode(mode: ResizeMode) =
+        write(KEY_RESIZE, mode.key) {
+            _playback.value = _playback.value.copy(resizeMode = mode)
+        }
 
-    suspend fun setAutoPlayNext(enabled: Boolean) = write(KEY_AUTOPLAY, if (enabled) "1" else "0") {
-        _playback.value = _playback.value.copy(autoPlayNext = enabled)
-    }
+    suspend fun setAutoPlayNext(enabled: Boolean) =
+        write(KEY_AUTOPLAY, if (enabled) "1" else "0") {
+            _playback.value = _playback.value.copy(autoPlayNext = enabled)
+        }
 
-    suspend fun setAudioLanguage(lang: String) = write(KEY_AUDIO_LANG, lang) {
-        _playback.value = _playback.value.copy(audioLanguage = lang)
-    }
+    suspend fun setAudioLanguage(lang: String) =
+        write(KEY_AUDIO_LANG, lang) {
+            _playback.value = _playback.value.copy(audioLanguage = lang)
+        }
 
-    suspend fun setSubtitleLanguage(lang: String) = write(KEY_SUBTITLE_LANG, lang) {
-        _playback.value = _playback.value.copy(subtitleLanguage = lang)
-    }
+    suspend fun setSubtitleLanguage(lang: String) =
+        write(KEY_SUBTITLE_LANG, lang) {
+            _playback.value = _playback.value.copy(subtitleLanguage = lang)
+        }
 
     // ───── Network ─────
 
-    suspend fun setUserAgent(ua: String) = write(KEY_USER_AGENT, ua) {
-        _network.value = _network.value.copy(userAgentOverride = ua.takeIf { it.isNotBlank() })
-    }
+    suspend fun setUserAgent(ua: String) =
+        write(KEY_USER_AGENT, ua) {
+            _network.value = _network.value.copy(userAgentOverride = ua.takeIf { it.isNotBlank() })
+        }
 
-    suspend fun setConnectTimeout(sec: Int) = write(KEY_CONNECT_TIMEOUT, sec.toString()) {
-        _network.value = _network.value.copy(connectTimeoutSec = sec)
-    }
+    suspend fun setConnectTimeout(sec: Int) =
+        write(KEY_CONNECT_TIMEOUT, sec.toString()) {
+            _network.value = _network.value.copy(connectTimeoutSec = sec)
+        }
 
-    suspend fun setReadTimeout(sec: Int) = write(KEY_READ_TIMEOUT, sec.toString()) {
-        _network.value = _network.value.copy(readTimeoutSec = sec)
-    }
+    suspend fun setReadTimeout(sec: Int) =
+        write(KEY_READ_TIMEOUT, sec.toString()) {
+            _network.value = _network.value.copy(readTimeoutSec = sec)
+        }
 
     // ───── General ─────
 
-    suspend fun setOpenOn(section: OpenOn) = write(KEY_OPEN_ON, section.key) {
-        _general.value = _general.value.copy(openOn = section)
-    }
+    suspend fun setOpenOn(section: OpenOn) =
+        write(KEY_OPEN_ON, section.key) {
+            _general.value = _general.value.copy(openOn = section)
+        }
 
-    suspend fun setShowChannelNumbers(enabled: Boolean) = write(KEY_SHOW_NUMBERS, if (enabled) "1" else "0") {
-        _general.value = _general.value.copy(showChannelNumbers = enabled)
-    }
+    suspend fun setShowChannelNumbers(enabled: Boolean) =
+        write(KEY_SHOW_NUMBERS, if (enabled) "1" else "0") {
+            _general.value = _general.value.copy(showChannelNumbers = enabled)
+        }
 
-    suspend fun setSmartGrouping(enabled: Boolean) = write(KEY_SMART_GROUPING, if (enabled) "1" else "0") {
-        _general.value = _general.value.copy(smartGrouping = enabled)
-    }
+    suspend fun setSmartGrouping(enabled: Boolean) =
+        write(KEY_SMART_GROUPING, if (enabled) "1" else "0") {
+            _general.value = _general.value.copy(smartGrouping = enabled)
+        }
 
     // ───── Hidden groups ─────
     //
@@ -95,10 +105,14 @@ class AppPreferences(
     // Persisted as newline-joined names because category names can contain
     // commas/pipes but practically never newlines.
 
-    suspend fun setGroupHidden(name: String, hidden: Boolean) {
-        val next = _hiddenGroups.value.toMutableSet().apply {
-            if (hidden) add(name) else remove(name)
-        }
+    suspend fun setGroupHidden(
+        name: String,
+        hidden: Boolean,
+    ) {
+        val next =
+            _hiddenGroups.value.toMutableSet().apply {
+                if (hidden) add(name) else remove(name)
+            }
         writeHiddenGroups(next)
     }
 
@@ -107,46 +121,59 @@ class AppPreferences(
     private suspend fun writeHiddenGroups(next: Set<String>) {
         val value = next.joinToString("\n")
         withContext(Dispatchers.IO) {
-            if (next.isEmpty()) db.settingsQueries.delete(KEY_HIDDEN_GROUPS)
-            else db.settingsQueries.upsert(KEY_HIDDEN_GROUPS, value)
+            if (next.isEmpty()) {
+                db.settingsQueries.delete(KEY_HIDDEN_GROUPS)
+            } else {
+                db.settingsQueries.upsert(KEY_HIDDEN_GROUPS, value)
+            }
         }
         _hiddenGroups.value = next
     }
 
     // ───── internals ─────
 
-    private fun readPlayback(): PlaybackPrefs = PlaybackPrefs(
-        resizeMode = ResizeMode.fromKey(readString(KEY_RESIZE)),
-        autoPlayNext = readString(KEY_AUTOPLAY) == "1",
-        audioLanguage = readString(KEY_AUDIO_LANG).orEmpty(),
-        subtitleLanguage = readString(KEY_SUBTITLE_LANG).orEmpty(),
-    )
+    private fun readPlayback(): PlaybackPrefs =
+        PlaybackPrefs(
+            resizeMode = ResizeMode.fromKey(readString(KEY_RESIZE)),
+            autoPlayNext = readString(KEY_AUTOPLAY) == "1",
+            audioLanguage = readString(KEY_AUDIO_LANG).orEmpty(),
+            subtitleLanguage = readString(KEY_SUBTITLE_LANG).orEmpty(),
+        )
 
-    private fun readNetwork(): NetworkPrefs = NetworkPrefs(
-        userAgentOverride = readString(KEY_USER_AGENT)?.takeIf { it.isNotBlank() },
-        connectTimeoutSec = readString(KEY_CONNECT_TIMEOUT)?.toIntOrNull() ?: DEFAULT_CONNECT_TIMEOUT,
-        readTimeoutSec = readString(KEY_READ_TIMEOUT)?.toIntOrNull() ?: DEFAULT_READ_TIMEOUT,
-    )
+    private fun readNetwork(): NetworkPrefs =
+        NetworkPrefs(
+            userAgentOverride = readString(KEY_USER_AGENT)?.takeIf { it.isNotBlank() },
+            connectTimeoutSec = readString(KEY_CONNECT_TIMEOUT)?.toIntOrNull() ?: DEFAULT_CONNECT_TIMEOUT,
+            readTimeoutSec = readString(KEY_READ_TIMEOUT)?.toIntOrNull() ?: DEFAULT_READ_TIMEOUT,
+        )
 
-    private fun readGeneral(): GeneralPrefs = GeneralPrefs(
-        openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
-        showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
-        smartGrouping = readString(KEY_SMART_GROUPING) == "1",
-    )
+    private fun readGeneral(): GeneralPrefs =
+        GeneralPrefs(
+            openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
+            showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
+            smartGrouping = readString(KEY_SMART_GROUPING) == "1",
+        )
 
-    private fun readHiddenGroups(): Set<String> = readString(KEY_HIDDEN_GROUPS)
-        ?.split('\n')
-        ?.mapNotNull { it.takeIf(String::isNotBlank) }
-        ?.toSet()
-        ?: emptySet()
+    private fun readHiddenGroups(): Set<String> =
+        readString(KEY_HIDDEN_GROUPS)
+            ?.split('\n')
+            ?.mapNotNull { it.takeIf(String::isNotBlank) }
+            ?.toSet()
+            ?: emptySet()
 
-    private fun readString(key: String): String? =
-        db.settingsQueries.get(key).executeAsOneOrNull()
+    private fun readString(key: String): String? = db.settingsQueries.get(key).executeAsOneOrNull()
 
-    private suspend inline fun write(key: String, value: String, crossinline refresh: () -> Unit) {
+    private suspend inline fun write(
+        key: String,
+        value: String,
+        crossinline refresh: () -> Unit,
+    ) {
         withContext(Dispatchers.IO) {
-            if (value.isBlank()) db.settingsQueries.delete(key)
-            else db.settingsQueries.upsert(key, value)
+            if (value.isBlank()) {
+                db.settingsQueries.delete(key)
+            } else {
+                db.settingsQueries.upsert(key, value)
+            }
         }
         refresh()
     }
@@ -172,14 +199,17 @@ class AppPreferences(
 }
 
 /** Default section to land on when the app opens. TiviMate defaults to last-used. */
-enum class OpenOn(val key: String, val displayName: String) {
+enum class OpenOn(
+    val key: String,
+    val displayName: String,
+) {
     HOME("home", "Home"),
     LIVE_TV("live_tv", "Live TV"),
-    LAST_USED("last_used", "Last used");
+    LAST_USED("last_used", "Last used"),
+    ;
 
     companion object {
-        fun fromKey(key: String?): OpenOn =
-            values().firstOrNull { it.key == key } ?: HOME
+        fun fromKey(key: String?): OpenOn = values().firstOrNull { it.key == key } ?: HOME
     }
 }
 
@@ -195,14 +225,17 @@ data class GeneralPrefs(
     val smartGrouping: Boolean = false,
 )
 
-enum class ResizeMode(val key: String, val displayName: String) {
+enum class ResizeMode(
+    val key: String,
+    val displayName: String,
+) {
     FIT("fit", "Fit"),
     FILL("fill", "Fill"),
-    ZOOM("zoom", "Zoom");
+    ZOOM("zoom", "Zoom"),
+    ;
 
     companion object {
-        fun fromKey(key: String?): ResizeMode =
-            values().firstOrNull { it.key == key } ?: FIT
+        fun fromKey(key: String?): ResizeMode = values().firstOrNull { it.key == key } ?: FIT
     }
 }
 

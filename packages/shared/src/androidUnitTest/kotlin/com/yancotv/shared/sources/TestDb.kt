@@ -2,8 +2,8 @@ package com.yancotv.shared.sources
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.db.YancoDatabase
+import com.yancotv.shared.db.YancoDb
 
 /**
  * Spins up a fresh in-memory SQLite DB for JVM unit tests. `IN_MEMORY` is

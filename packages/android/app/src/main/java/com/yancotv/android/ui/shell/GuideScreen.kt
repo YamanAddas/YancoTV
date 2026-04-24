@@ -1,9 +1,11 @@
 package com.yancotv.android.ui.shell
 
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -54,14 +56,12 @@ import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
-import android.util.Log
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
 import com.yancotv.shared.types.EpgProgramme
-import androidx.compose.foundation.combinedClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -142,25 +142,26 @@ fun GuideScreen(
         windowStartState = windowStart
         windowEndState = windowEnd
 
-        val loaded = withContext(Dispatchers.IO) {
-            val total = runCatching {
-                epg.countGuideChannels(startTime = windowStart, endTime = windowEnd)
+        val loaded =
+            withContext(Dispatchers.IO) {
+                val total =
+                    runCatching {
+                        epg.countGuideChannels(startTime = windowStart, endTime = windowEnd)
+                    }.onFailure { Log.w("Yanco", "GuideScreen.countGuideChannels failed: ${it.message}", it) }
+                        .getOrElse { 0L }
+                val page =
+                    runCatching {
+                        epg.getGuideData(
+                            startTime = windowStart,
+                            endTime = windowEnd,
+                            sourceId = null,
+                            limit = GUIDE_PAGE_SIZE,
+                            offset = 0L,
+                        )
+                    }.onFailure { Log.w("Yanco", "GuideScreen.getGuideData(initial) failed: ${it.message}", it) }
+                        .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStart, endTime = windowEnd) }
+                total to page
             }
-                .onFailure { Log.w("Yanco", "GuideScreen.countGuideChannels failed: ${it.message}", it) }
-                .getOrElse { 0L }
-            val page = runCatching {
-                epg.getGuideData(
-                    startTime = windowStart,
-                    endTime = windowEnd,
-                    sourceId = null,
-                    limit = GUIDE_PAGE_SIZE,
-                    offset = 0L,
-                )
-            }
-                .onFailure { Log.w("Yanco", "GuideScreen.getGuideData(initial) failed: ${it.message}", it) }
-                .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStart, endTime = windowEnd) }
-            total to page
-        }
         totalChannels = loaded.first
         // Defensive dedup: LazyColumn crashes hard on duplicate keys, and the
         // SQL is supposed to return one row per tvg_id — but this belt-and-
@@ -182,19 +183,19 @@ fun GuideScreen(
         if (allLoaded || loadingMore || channels.isEmpty()) return@LaunchedEffect
         if (lastVisibleIndex < channels.size - PREFETCH_THRESHOLD) return@LaunchedEffect
         loadingMore = true
-        val nextPage = withContext(Dispatchers.IO) {
-            runCatching {
-                epg.getGuideData(
-                    startTime = windowStartState,
-                    endTime = windowEndState,
-                    sourceId = null,
-                    limit = GUIDE_PAGE_SIZE,
-                    offset = channels.size.toLong(),
-                )
+        val nextPage =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    epg.getGuideData(
+                        startTime = windowStartState,
+                        endTime = windowEndState,
+                        sourceId = null,
+                        limit = GUIDE_PAGE_SIZE,
+                        offset = channels.size.toLong(),
+                    )
+                }.onFailure { Log.w("Yanco", "GuideScreen.getGuideData(more) failed: ${it.message}", it) }
+                    .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStartState, endTime = windowEndState) }
             }
-                .onFailure { Log.w("Yanco", "GuideScreen.getGuideData(more) failed: ${it.message}", it) }
-                .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStartState, endTime = windowEndState) }
-        }
         // Same defensive dedup: if a page overlaps with what's already loaded
         // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
         // we drop the duplicates so LazyColumn keys stay unique.
@@ -213,11 +214,16 @@ fun GuideScreen(
         }
     }
 
-    val guide = if (channels.isEmpty()) null else EpgGuideData(
-        channels = channels,
-        startTime = windowStartState,
-        endTime = windowEndState,
-    )
+    val guide =
+        if (channels.isEmpty()) {
+            null
+        } else {
+            EpgGuideData(
+                channels = channels,
+                startTime = windowStartState,
+                endTime = windowEndState,
+            )
+        }
     val guideEmpty = guide == null
 
     // MK.8.7.c — channel long-press action menu. Resolve the Guide's
@@ -233,20 +239,21 @@ fun GuideScreen(
         if (tvg.isNotBlank()) {
             // Set a placeholder immediately; the LaunchedEffect below
             // upgrades it to the real DB-resolved ContentItem.
-            actionsFor = ContentItem(
-                id = "guide:${tvg}",
-                sourceId = "",
-                type = com.yancotv.shared.types.ContentType.LIVE,
-                title = channel.name,
-                cleanTitle = channel.name,
-                groupName = null,
-                streamUrl = channel.streamUrl ?: "",
-                logoUrl = channel.logoUrl,
-                tvgId = tvg,
-                metadataJson = null,
-                sortOrder = 0,
-                createdAt = 0L,
-            )
+            actionsFor =
+                ContentItem(
+                    id = "guide:$tvg",
+                    sourceId = "",
+                    type = com.yancotv.shared.types.ContentType.LIVE,
+                    title = channel.name,
+                    cleanTitle = channel.name,
+                    groupName = null,
+                    streamUrl = channel.streamUrl ?: "",
+                    logoUrl = channel.logoUrl,
+                    tvgId = tvg,
+                    metadataJson = null,
+                    sortOrder = 0,
+                    createdAt = 0L,
+                )
         }
     }
 
@@ -255,11 +262,12 @@ fun GuideScreen(
     LaunchedEffect(actionsFor?.tvgId) {
         val snapshot = actionsFor ?: return@LaunchedEffect
         if (snapshot.id.startsWith("guide:")) {
-            val real = withContext(Dispatchers.IO) {
-                runCatching { snapshot.tvgId?.let { contentRepo.findLiveByTvgId(it) } }
-                    .onFailure { Log.w("Yanco", "GuideScreen.findLiveByTvgId(${snapshot.tvgId}) failed: ${it.message}", it) }
-                    .getOrNull()
-            }
+            val real =
+                withContext(Dispatchers.IO) {
+                    runCatching { snapshot.tvgId?.let { contentRepo.findLiveByTvgId(it) } }
+                        .onFailure { Log.w("Yanco", "GuideScreen.findLiveByTvgId(${snapshot.tvgId}) failed: ${it.message}", it) }
+                        .getOrNull()
+                }
             if (real != null) actionsFor = real
         }
     }
@@ -321,11 +329,12 @@ fun GuideScreen(
                 catchupItem = null
                 return@LaunchedEffect
             }
-            val resolved = withContext(Dispatchers.IO) {
-                runCatching { catchup.resolve(programme) }
-                    .onFailure { Log.w("Yanco", "GuideScreen.catchup.resolve(${programme.id}) failed: ${it.message}", it) }
-                    .getOrNull()
-            }
+            val resolved =
+                withContext(Dispatchers.IO) {
+                    runCatching { catchup.resolve(programme) }
+                        .onFailure { Log.w("Yanco", "GuideScreen.catchup.resolve(${programme.id}) failed: ${it.message}", it) }
+                        .getOrNull()
+                }
             catchupItem = (resolved as? CatchupService.Resolution.Playable)?.item
         }
 
@@ -379,9 +388,10 @@ private fun GuideGrid(
     val timelineWidth = (totalMinutes * PX_PER_MIN).dp
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(YancoPalette.BackgroundDeep),
     ) {
         TimeHeader(
             startTime = guide.startTime,
@@ -392,16 +402,19 @@ private fun GuideGrid(
 
         if (totalCount > guide.channels.size) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(YancoPalette.BackgroundRaised)
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(YancoPalette.BackgroundRaised)
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
             ) {
                 androidx.compose.material3.Text(
-                    text = if (loadingMore)
-                        "Showing ${guide.channels.size} of $totalCount channels · loading more…"
-                    else
-                        "Showing ${guide.channels.size} of $totalCount channels",
+                    text =
+                        if (loadingMore) {
+                            "Showing ${guide.channels.size} of $totalCount channels · loading more…"
+                        } else {
+                            "Showing ${guide.channels.size} of $totalCount channels"
+                        },
                     color = YancoPalette.TextMuted,
                     fontSize = 11.sp,
                 )
@@ -436,15 +449,17 @@ private fun GuideGrid(
             val nowOffsetMin = ((nowSeconds - guide.startTime) / 60L).toInt()
             if (nowOffsetMin in 0..totalMinutes) {
                 val density = LocalDensity.current
-                val leftPx = with(density) {
-                    CHANNEL_COL_WIDTH.toPx() + (nowOffsetMin * PX_PER_MIN).dp.toPx() - hScroll.value
-                }
+                val leftPx =
+                    with(density) {
+                        CHANNEL_COL_WIDTH.toPx() + (nowOffsetMin * PX_PER_MIN).dp.toPx() - hScroll.value
+                    }
                 Box(
-                    modifier = Modifier
-                        .offset { IntOffset(leftPx.toInt(), 0) }
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .background(Color(0xFFE25555)),
+                    modifier =
+                        Modifier
+                            .offset { IntOffset(leftPx.toInt(), 0) }
+                            .width(2.dp)
+                            .fillMaxHeight()
+                            .background(Color(0xFFE25555)),
                 )
             }
         }
@@ -459,18 +474,20 @@ private fun TimeHeader(
     hScroll: androidx.compose.foundation.ScrollState,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(HEADER_HEIGHT)
-            .background(YancoPalette.BackgroundRaised),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(HEADER_HEIGHT)
+                .background(YancoPalette.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.width(CHANNEL_COL_WIDTH))
         Row(
-            modifier = Modifier
-                .horizontalScroll(hScroll)
-                .width(timelineWidth)
-                .fillMaxHeight(),
+            modifier =
+                Modifier
+                    .horizontalScroll(hScroll)
+                    .width(timelineWidth)
+                    .fillMaxHeight(),
         ) {
             // Ticks every 30 min. Each tick owns its 30-min slice width so
             // the label stays left-aligned with the tick line.
@@ -479,10 +496,11 @@ private fun TimeHeader(
                 val slice = minOf(30, totalMinutes - minute)
                 val label = formatHourMinute(startTime + minute * 60L)
                 Box(
-                    modifier = Modifier
-                        .width((slice * PX_PER_MIN).dp)
-                        .fillMaxHeight()
-                        .border(0.5.dp, YancoPalette.BorderSubtle),
+                    modifier =
+                        Modifier
+                            .width((slice * PX_PER_MIN).dp)
+                            .fillMaxHeight()
+                            .border(0.5.dp, YancoPalette.BorderSubtle),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
@@ -511,10 +529,11 @@ private fun ChannelRow(
     onProgrammeAction: (EpgProgramme) -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(ROW_HEIGHT)
-            .background(YancoPalette.BackgroundRaised),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(ROW_HEIGHT)
+                .background(YancoPalette.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Sticky channel cell — stays visible even as the timeline scrolls.
@@ -528,10 +547,11 @@ private fun ChannelRow(
         // Spacer-ish gap, then a clickable block sized to its duration. Any
         // trailing empty space after the last programme is left blank.
         Row(
-            modifier = Modifier
-                .horizontalScroll(hScroll)
-                .width(timelineWidth)
-                .fillMaxHeight(),
+            modifier =
+                Modifier
+                    .horizontalScroll(hScroll)
+                    .width(timelineWidth)
+                    .fillMaxHeight(),
         ) {
             var cursor = windowStart
             for (prog in channel.programmes) {
@@ -556,34 +576,39 @@ private fun ChannelRow(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPress: () -> Unit) {
+private fun ChannelCell(
+    channel: EpgGuideChannel,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
     val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
 
     Row(
-        modifier = Modifier
-            .width(CHANNEL_COL_WIDTH)
-            .fillMaxHeight()
-            .background(bg)
-            .border(0.5.dp, border)
-            .focusable(interactionSource = interaction)
-            .combinedClickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-                onLongClick = onLongPress,
-            )
-            .padding(horizontal = 8.dp),
+        modifier =
+            Modifier
+                .width(CHANNEL_COL_WIDTH)
+                .fillMaxHeight()
+                .background(bg)
+                .border(0.5.dp, border)
+                .focusable(interactionSource = interaction)
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
+                    onLongClick = onLongPress,
+                ).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(YancoPalette.BackgroundDeep),
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(YancoPalette.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!channel.logoUrl.isNullOrBlank()) {
@@ -617,16 +642,17 @@ private fun ProgrammeBlock(
     val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
 
     Column(
-        modifier = Modifier
-            .width(widthDp)
-            .fillMaxHeight()
-            .padding(1.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(bg)
-            .border(0.5.dp, border, RoundedCornerShape(4.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+        modifier =
+            Modifier
+                .width(widthDp)
+                .fillMaxHeight()
+                .padding(1.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(bg)
+                .border(0.5.dp, border, RoundedCornerShape(4.dp))
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
@@ -647,7 +673,10 @@ private fun ProgrammeBlock(
 }
 
 @Composable
-private fun GuideEmptyState(text: String, modifier: Modifier) {
+private fun GuideEmptyState(
+    text: String,
+    modifier: Modifier,
+) {
     Box(
         modifier = modifier.fillMaxSize().background(YancoPalette.BackgroundDeep),
         contentAlignment = Alignment.Center,
@@ -736,13 +765,17 @@ private fun ProgrammeActionDialog(
 
 /** Formats a unix-second timestamp in the device's local HH:mm form. */
 private fun formatHourMinute(unixSeconds: Long): String {
-    val calendar = java.util.Calendar.getInstance().apply {
-        timeInMillis = unixSeconds * 1000L
-    }
+    val calendar =
+        java.util.Calendar.getInstance().apply {
+            timeInMillis = unixSeconds * 1000L
+        }
     val h = calendar.get(java.util.Calendar.HOUR_OF_DAY)
     val m = calendar.get(java.util.Calendar.MINUTE)
     return buildString {
-        if (h < 10) append('0'); append(h); append(':')
-        if (m < 10) append('0'); append(m)
+        if (h < 10) append('0')
+        append(h)
+        append(':')
+        if (m < 10) append('0')
+        append(m)
     }
 }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -54,18 +53,22 @@ fun HexSurface(
     focused: Boolean,
     modifier: Modifier = Modifier,
     bevelInset: androidx.compose.ui.unit.Dp = 0.dp,
-    shellGradient: Brush = Brush.verticalGradient(
-        colors = listOf(
-            YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
-            YancoPalette.BackgroundRaised.copy(alpha = 0.72f),
+    shellGradient: Brush =
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
+                    YancoPalette.BackgroundRaised.copy(alpha = 0.72f),
+                ),
         ),
-    ),
-    focusedShellGradient: Brush = Brush.verticalGradient(
-        colors = listOf(
-            YancoPalette.Accent,
-            YancoPalette.AccentDeep,
+    focusedShellGradient: Brush =
+        Brush.verticalGradient(
+            colors =
+                listOf(
+                    YancoPalette.Accent,
+                    YancoPalette.AccentDeep,
+                ),
         ),
-    ),
     innerFill: Color = YancoPalette.BackgroundDeep.copy(alpha = 0.78f),
     focusedInnerFill: Color = YancoPalette.Accent.copy(alpha = 0.14f),
     liftScale: Float = 1.06f,
@@ -96,58 +99,60 @@ fun HexSurface(
     )
 
     Box(
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = translate
-            }
-            .shadow(
-                elevation = elevation,
-                shape = shape,
-                ambientColor = if (focused) YancoPalette.Accent else Color.Black,
-                spotColor = if (focused) YancoPalette.Accent else Color.Black,
-            )
-            // Outer shell — the "frame". On focus it becomes a saturated
-            // emerald gradient ring; idle it's a subtle elevated surface.
-            .clip(shape)
-            .background(if (focused) focusedShellGradient else shellGradient)
-            .border(
-                width = shellBorder,
-                color = if (focused) YancoPalette.FocusRing else YancoPalette.PanelBorder,
-                shape = shape,
-            )
-            .padding(bevelInset),
+        modifier =
+            modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = translate
+                }.shadow(
+                    elevation = elevation,
+                    shape = shape,
+                    ambientColor = if (focused) YancoPalette.Accent else Color.Black,
+                    spotColor = if (focused) YancoPalette.Accent else Color.Black,
+                )
+                // Outer shell — the "frame". On focus it becomes a saturated
+                // emerald gradient ring; idle it's a subtle elevated surface.
+                .clip(shape)
+                .background(if (focused) focusedShellGradient else shellGradient)
+                .border(
+                    width = shellBorder,
+                    color = if (focused) YancoPalette.FocusRing else YancoPalette.PanelBorder,
+                    shape = shape,
+                ).padding(bevelInset),
     ) {
         // Inner content panel — the "recessed" surface. Clipped to the same
         // shape so the bevelled edge is preserved inside the frame.
         Box(
-            modifier = Modifier
-                .clip(shape)
-                .background(if (focused) focusedInnerFill else innerFill)
-                .border(
-                    width = 1.dp,
-                    color = if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else Color.Transparent,
-                    shape = shape,
-                ),
+            modifier =
+                Modifier
+                    .clip(shape)
+                    .background(if (focused) focusedInnerFill else innerFill)
+                    .border(
+                        width = 1.dp,
+                        color = if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else Color.Transparent,
+                        shape = shape,
+                    ),
         ) {
             content()
             // Specular top facet — single hairline of warm white that traces
             // the top edge to make the hex read as machined metal under light.
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .align(Alignment.TopCenter)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = if (focused) 0.55f else 0.18f),
-                                Color.Transparent,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors =
+                                    listOf(
+                                        Color.Transparent,
+                                        Color.White.copy(alpha = if (focused) 0.55f else 0.18f),
+                                        Color.Transparent,
+                                    ),
                             ),
                         ),
-                    ),
             )
         }
     }

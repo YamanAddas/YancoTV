@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,11 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import com.yancotv.android.ui.focus.placedFocus
-import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -54,8 +50,9 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.YancoPalette
-import android.util.Log
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.types.ContentItem
@@ -96,14 +93,19 @@ fun SearchScreen(
     val lockedIds by parental.lockedIds.collectAsState()
     val hiddenIds by parental.hiddenIds.collectAsState()
     val parentalSettings by parental.settings.collectAsState()
-    val visible = remember(results.toList(), hiddenIds, parentalSettings.hideAdultContent) {
-        results.toList()
-            .let { if (hiddenIds.isEmpty()) it else it.filter { row -> row.id !in hiddenIds } }
-            .let {
-                if (!parentalSettings.hideAdultContent) it
-                else it.filterNot(com.yancotv.shared.parental.AdultContentFilter::isAdult)
-            }
-    }
+    val visible =
+        remember(results.toList(), hiddenIds, parentalSettings.hideAdultContent) {
+            results
+                .toList()
+                .let { if (hiddenIds.isEmpty()) it else it.filter { row -> row.id !in hiddenIds } }
+                .let {
+                    if (!parentalSettings.hideAdultContent) {
+                        it
+                    } else {
+                        it.filterNot(com.yancotv.shared.parental.AdultContentFilter::isAdult)
+                    }
+                }
+        }
     var pendingPlay by remember { mutableStateOf<(() -> Unit)?>(null) }
     val gatedPlay: (String, () -> Unit) -> Unit = { id, action ->
         if (id in lockedIds) pendingPlay = action else action()
@@ -118,56 +120,62 @@ fun SearchScreen(
         }
         searching = true
         delay(220L)
-        val matches = withContext(Dispatchers.IO) {
-            runCatching { repo.search(trimmed, limit = 100) }
-                .onFailure { Log.w("Yanco", "SearchScreen.search('$trimmed') failed: ${it.message}", it) }
-                .getOrElse { emptyList() }
-        }
+        val matches =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.search(trimmed, limit = 100) }
+                    .onFailure { Log.w("Yanco", "SearchScreen.search('$trimmed') failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
+            }
         results.clear()
         results.addAll(matches)
         searching = false
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(YancoPalette.BackgroundDeep)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SearchField(value = query, onValueChange = { query = it })
 
         when {
-            query.isBlank() -> EmptyState(
-                title = "Search your library",
-                subtitle = "Type a channel name, movie, or show to begin.",
-            )
-            searching && results.isEmpty() -> EmptyState(
-                title = "Searching…",
-                subtitle = "Searching for \"${query.trim()}\"…",
-            )
-            results.isEmpty() -> EmptyState(
-                title = "No matches",
-                subtitle = "Try a shorter word or a different spelling.",
-            )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(visible, key = { it.id }) { row ->
-                    SearchRow(
-                        item = row,
-                        onActivate = {
-                            gatedPlay(row.id) {
-                                val idx = visible.indexOf(row)
-                                val alreadyPlaying = controller.currentId == row.id
-                                if (!alreadyPlaying) controller.play(visible, idx)
-                                if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
-                            }
-                        },
-                    )
+            query.isBlank() ->
+                EmptyState(
+                    title = "Search your library",
+                    subtitle = "Type a channel name, movie, or show to begin.",
+                )
+            searching && results.isEmpty() ->
+                EmptyState(
+                    title = "Searching…",
+                    subtitle = "Searching for \"${query.trim()}\"…",
+                )
+            results.isEmpty() ->
+                EmptyState(
+                    title = "No matches",
+                    subtitle = "Try a shorter word or a different spelling.",
+                )
+            else ->
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(visible, key = { it.id }) { row ->
+                        SearchRow(
+                            item = row,
+                            onActivate = {
+                                gatedPlay(row.id) {
+                                    val idx = visible.indexOf(row)
+                                    val alreadyPlaying = controller.currentId == row.id
+                                    if (!alreadyPlaying) controller.play(visible, idx)
+                                    if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                                }
+                            },
+                        )
+                    }
                 }
-            }
         }
     }
 
@@ -186,7 +194,10 @@ fun SearchScreen(
 }
 
 @Composable
-private fun SearchField(value: String, onValueChange: (String) -> Unit) {
+private fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
@@ -200,12 +211,13 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     LaunchedEffect(Unit) { fieldAnchor.awaitAndRequest() }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .border(1.dp, border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .border(1.dp, border, RoundedCornerShape(8.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         BasicTextField(
             value = value,
@@ -219,10 +231,11 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             // on `query` already drives the actual FTS call after the 220ms
             // debounce, so there's nothing extra to fire here.
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .placedFocus(fieldAnchor)
-                .semantics { contentDescription = "Search channels, movies, and series" },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .placedFocus(fieldAnchor)
+                    .semantics { contentDescription = "Search channels, movies, and series" },
             decorationBox = { inner ->
                 if (value.isEmpty()) {
                     Text(
@@ -237,11 +250,15 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
 }
 
 @Composable
-private fun EmptyState(title: String, subtitle: String) {
+private fun EmptyState(
+    title: String,
+    subtitle: String,
+) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -252,7 +269,10 @@ private fun EmptyState(title: String, subtitle: String) {
 }
 
 @Composable
-private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
+private fun SearchRow(
+    item: ContentItem,
+    onActivate: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
@@ -261,23 +281,25 @@ private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(8.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(bg)
+                .border(1.dp, border, RoundedCornerShape(8.dp))
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(YancoPalette.BackgroundDeep),
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(YancoPalette.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
@@ -318,8 +340,9 @@ private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
     }
 }
 
-private fun typeLabel(type: ContentType): String = when (type) {
-    ContentType.LIVE -> "LIVE"
-    ContentType.MOVIE -> "MOVIE"
-    ContentType.SERIES -> "SERIES"
-}
+private fun typeLabel(type: ContentType): String =
+    when (type) {
+        ContentType.LIVE -> "LIVE"
+        ContentType.MOVIE -> "MOVIE"
+        ContentType.SERIES -> "SERIES"
+    }

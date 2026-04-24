@@ -1,10 +1,10 @@
 package com.yancotv.android.ui.shell
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,14 +41,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -101,34 +101,38 @@ fun AppSidebar(
     // tints it greener so the rail visibly belongs to the emerald
     // palette, with a translucent floor so the cinematic backdrop
     // shows through — the rail frames the scene, it doesn't cover it.
-    val brush = remember {
-        Brush.verticalGradient(
-            colors = listOf(
-                YancoPalette.BackgroundElevated.copy(alpha = 0.86f),
-                YancoPalette.BackgroundRaised.copy(alpha = 0.78f),
-                YancoPalette.BackgroundDeep.copy(alpha = 0.88f),
-            ),
-        )
-    }
+    val brush =
+        remember {
+            Brush.verticalGradient(
+                colors =
+                    listOf(
+                        YancoPalette.BackgroundElevated.copy(alpha = 0.86f),
+                        YancoPalette.BackgroundRaised.copy(alpha = 0.78f),
+                        YancoPalette.BackgroundDeep.copy(alpha = 0.88f),
+                    ),
+            )
+        }
     Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .width(width)
-            .background(brush)
-            .border(1.dp, YancoPalette.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
-            .padding(horizontal = Space.md, vertical = Space.md)
-            // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
-            // routes this into the categories rail; for non-browse sections
-            // it lands inside the section's content. The rail is vertical
-            // so RIGHT has no in-rail meaning.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
-                    onMoveRight()
-                    true
-                } else false
-            }
-            .focusRestorer()
-            .focusGroup(),
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .width(width)
+                .background(brush)
+                .border(1.dp, YancoPalette.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
+                .padding(horizontal = Space.md, vertical = Space.md)
+                // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
+                // routes this into the categories rail; for non-browse sections
+                // it lands inside the section's content. The rail is vertical
+                // so RIGHT has no in-rail meaning.
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
+                        onMoveRight()
+                        true
+                    } else {
+                        false
+                    }
+                }.focusRestorer()
+                .focusGroup(),
     ) {
         BrandMark(showWordmark = expanded)
         Spacer(Modifier.height(Space.md))
@@ -159,19 +163,19 @@ fun AppSidebar(
  * Pulled out of the composable so it's unit-testable without spinning up
  * the Compose runtime.
  */
-internal fun accentInsetFraction(springProgress: Float): Float =
-    (1f - springProgress).coerceIn(0f, 1f)
+internal fun accentInsetFraction(springProgress: Float): Float = (1f - springProgress).coerceIn(0f, 1f)
 
-private fun iconFor(section: AppSection): ImageVector = when (section) {
-    AppSection.Home -> YancoIcons.Home
-    AppSection.LiveTv -> YancoIcons.Live
-    AppSection.Guide -> YancoIcons.Guide
-    AppSection.Movies -> YancoIcons.Movies
-    AppSection.Series -> YancoIcons.Series
-    AppSection.Favorites -> YancoIcons.Favorites
-    AppSection.Search -> YancoIcons.Search
-    AppSection.Settings -> YancoIcons.Settings
-}
+private fun iconFor(section: AppSection): ImageVector =
+    when (section) {
+        AppSection.Home -> YancoIcons.Home
+        AppSection.LiveTv -> YancoIcons.Live
+        AppSection.Guide -> YancoIcons.Guide
+        AppSection.Movies -> YancoIcons.Movies
+        AppSection.Series -> YancoIcons.Series
+        AppSection.Favorites -> YancoIcons.Favorites
+        AppSection.Search -> YancoIcons.Search
+        AppSection.Settings -> YancoIcons.Settings
+    }
 
 @Composable
 private fun BrandMark(showWordmark: Boolean) {
@@ -187,11 +191,12 @@ private fun BrandMark(showWordmark: Boolean) {
         painter = painterResource(id = R.drawable.ic_logo),
         contentDescription = null,
         contentScale = ContentScale.Fit,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (showWordmark) 96.dp else 56.dp)
-            .padding(horizontal = Space.xs, vertical = Space.xs)
-            .semantics { contentDescription = "YancoTV" },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(if (showWordmark) 96.dp else 56.dp)
+                .padding(horizontal = Space.xs, vertical = Space.xs)
+                .semantics { contentDescription = "YancoTV" },
     )
 }
 
@@ -210,36 +215,44 @@ private fun SidebarRow(
     //   focused  → emerald gradient + bright accent ring + lit edge
     //   selected → softer emerald wash, glow bar lit, no ring
     //   idle     → transparent, muted foreground
-    val rowBrush = when {
-        focused -> Brush.horizontalGradient(
-            colors = listOf(
-                YancoPalette.Accent.copy(alpha = 0.40f),
-                YancoPalette.Accent.copy(alpha = 0.18f),
-                Color.Transparent,
-            ),
-        )
-        selected -> Brush.horizontalGradient(
-            colors = listOf(
-                YancoPalette.Accent.copy(alpha = 0.28f),
-                YancoPalette.Accent.copy(alpha = 0.10f),
-                Color.Transparent,
-            ),
-        )
-        else -> Brush.horizontalGradient(
-            colors = listOf(Color.Transparent, Color.Transparent),
-        )
-    }
-    val border = when {
-        focused -> YancoPalette.FocusRing
-        selected -> YancoPalette.Accent.copy(alpha = 0.45f)
-        else -> Color.Transparent
-    }
+    val rowBrush =
+        when {
+            focused ->
+                Brush.horizontalGradient(
+                    colors =
+                        listOf(
+                            YancoPalette.Accent.copy(alpha = 0.40f),
+                            YancoPalette.Accent.copy(alpha = 0.18f),
+                            Color.Transparent,
+                        ),
+                )
+            selected ->
+                Brush.horizontalGradient(
+                    colors =
+                        listOf(
+                            YancoPalette.Accent.copy(alpha = 0.28f),
+                            YancoPalette.Accent.copy(alpha = 0.10f),
+                            Color.Transparent,
+                        ),
+                )
+            else ->
+                Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent, Color.Transparent),
+                )
+        }
+    val border =
+        when {
+            focused -> YancoPalette.FocusRing
+            selected -> YancoPalette.Accent.copy(alpha = 0.45f)
+            else -> Color.Transparent
+        }
     val fg by animateColorAsState(
-        targetValue = when {
-            focused -> YancoPalette.TextPrimary
-            selected -> YancoPalette.Accent
-            else -> YancoPalette.TextSecondary
-        },
+        targetValue =
+            when {
+                focused -> YancoPalette.TextPrimary
+                selected -> YancoPalette.Accent
+                else -> YancoPalette.TextSecondary
+            },
         label = "sidebar-fg",
     )
     val accentBarHeight by animateFloatAsState(
@@ -250,45 +263,47 @@ private fun SidebarRow(
     val accentInsetFraction = accentInsetFraction(accentBarHeight)
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp),
     ) {
         // Accent rail on the left edge marks the selected section even
         // when focus is elsewhere. Glow shadow makes the bar read as a
         // lit edge, not a flat stripe (Concept A's "you are here" cue).
         Box(
-            modifier = Modifier
-                .width(4.dp)
-                .fillMaxHeight()
-                .padding(vertical = Space.sm * accentInsetFraction)
-                .shadow(
-                    elevation = if (selected || focused) 12.dp else 0.dp,
-                    shape = RoundedCornerShape(Radius.pill),
-                    ambientColor = YancoPalette.Accent,
-                    spotColor = YancoPalette.Accent,
-                )
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(
-                    if (selected || focused) {
-                        Brush.verticalGradient(
-                            listOf(YancoPalette.AccentSoft, YancoPalette.Accent, YancoPalette.AccentDeep),
-                        )
-                    } else {
-                        Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
-                    },
-                ),
+            modifier =
+                Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .padding(vertical = Space.sm * accentInsetFraction)
+                    .shadow(
+                        elevation = if (selected || focused) 12.dp else 0.dp,
+                        shape = RoundedCornerShape(Radius.pill),
+                        ambientColor = YancoPalette.Accent,
+                        spotColor = YancoPalette.Accent,
+                    ).clip(RoundedCornerShape(Radius.pill))
+                    .background(
+                        if (selected || focused) {
+                            Brush.verticalGradient(
+                                listOf(YancoPalette.AccentSoft, YancoPalette.Accent, YancoPalette.AccentDeep),
+                            )
+                        } else {
+                            Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                        },
+                    ),
         )
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = Space.sm)
-                .clip(YancoShapes.CutCornerCardSmall)
-                .background(rowBrush)
-                .border(1.dp, border, YancoShapes.CutCornerCardSmall)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = Space.md, vertical = Space.sm),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = Space.sm)
+                    .clip(YancoShapes.CutCornerCardSmall)
+                    .background(rowBrush)
+                    .border(1.dp, border, YancoShapes.CutCornerCardSmall)
+                    .focusable(interactionSource = interaction)
+                    .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                    .padding(horizontal = Space.md, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.md),
         ) {

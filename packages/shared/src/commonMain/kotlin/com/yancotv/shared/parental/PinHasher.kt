@@ -19,8 +19,9 @@ package com.yancotv.shared.parental
  * add a legacy code path at that point.
  */
 interface PinHasher {
-
-    data class VerifyResult(val ok: Boolean)
+    data class VerifyResult(
+        val ok: Boolean,
+    )
 
     /**
      * Hash [pin] with a fresh random salt at the current iteration count.
@@ -40,5 +41,8 @@ interface PinHasher {
      * than throwing, so callers don't need to try/catch around every
      * verify site.
      */
-    suspend fun verify(pin: String, encoded: String): VerifyResult
+    suspend fun verify(
+        pin: String,
+        encoded: String,
+    ): VerifyResult
 }

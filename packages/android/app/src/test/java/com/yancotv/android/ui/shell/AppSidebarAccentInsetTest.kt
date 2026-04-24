@@ -19,7 +19,6 @@ import kotlin.test.assertTrue
  * the crash; the logcat trace always pointed at AppSidebar.kt:220.
  */
 class AppSidebarAccentInsetTest {
-
     @Test fun zeroProgressGivesFullInset() {
         assertEquals(1f, accentInsetFraction(0f))
     }

@@ -20,7 +20,15 @@ object SearchOverlayState {
     private val _visible = MutableStateFlow(false)
     val visible: StateFlow<Boolean> = _visible.asStateFlow()
 
-    fun show() { _visible.value = true }
-    fun hide() { _visible.value = false }
-    fun toggle() { _visible.value = !_visible.value }
+    fun show() {
+        _visible.value = true
+    }
+
+    fun hide() {
+        _visible.value = false
+    }
+
+    fun toggle() {
+        _visible.value = !_visible.value
+    }
 }

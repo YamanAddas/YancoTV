@@ -60,7 +60,10 @@ private const val CLOSE_CHAN = "</channel>"
 // -----------------------------------------------------------------------------
 
 /** Parse an XMLTV string into channels + programmes. */
-fun parseXmltvString(xml: String, logger: Logger = NOOP_LOGGER): XmltvResult {
+fun parseXmltvString(
+    xml: String,
+    logger: Logger = NOOP_LOGGER,
+): XmltvResult {
     val channels = parseChannels(xml)
     val programmes = parseProgrammes(xml)
     logger.info("XMLTV parsed: ${channels.size} channels, ${programmes.size} programmes")
@@ -68,15 +71,19 @@ fun parseXmltvString(xml: String, logger: Logger = NOOP_LOGGER): XmltvResult {
 }
 
 /** Entry point accepting a plain XML string. Convenience. */
-fun parseXmltv(input: String, logger: Logger = NOOP_LOGGER): XmltvResult =
-    parseXmltvString(input, logger)
+fun parseXmltv(
+    input: String,
+    logger: Logger = NOOP_LOGGER,
+): XmltvResult = parseXmltvString(input, logger)
 
 /**
  * Entry point accepting a UTF-8 byte array. Gzip/zlib NOT supported —
  * caller must decompress first. See deviations note at top of file.
  */
-fun parseXmltv(input: ByteArray, logger: Logger = NOOP_LOGGER): XmltvResult =
-    parseXmltvString(input.decodeToString(), logger)
+fun parseXmltv(
+    input: ByteArray,
+    logger: Logger = NOOP_LOGGER,
+): XmltvResult = parseXmltvString(input.decodeToString(), logger)
 
 // -----------------------------------------------------------------------------
 // XMLTV timestamp parsing — pure string math, no java.time/kotlinx.datetime.
@@ -126,18 +133,26 @@ fun parseXmltvTimestamp(ts: String): Long {
 
 private fun isLeap(y: Int): Boolean = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
 
-private fun daysInMonth(year: Int, month: Int): Int = when (month) {
-    1, 3, 5, 7, 8, 10, 12 -> 31
-    4, 6, 9, 11 -> 30
-    2 -> if (isLeap(year)) 29 else 28
-    else -> 0
-}
+private fun daysInMonth(
+    year: Int,
+    month: Int,
+): Int =
+    when (month) {
+        1, 3, 5, 7, 8, 10, 12 -> 31
+        4, 6, 9, 11 -> 30
+        2 -> if (isLeap(year)) 29 else 28
+        else -> 0
+    }
 
 /**
  * Civil date -> days since 1970-01-01 (Howard Hinnant, public domain).
  * Works for any proleptic Gregorian date.
  */
-private fun civilToDays(y: Int, m: Int, d: Int): Long {
+private fun civilToDays(
+    y: Int,
+    m: Int,
+    d: Int,
+): Long {
     val year = if (m <= 2) y - 1 else y
     val era = (if (year >= 0) year else year - 399) / 400
     val yoe = (year - era * 400).toLong() // [0, 399]
@@ -243,7 +258,10 @@ private fun parseProgrammes(xml: String): List<XmltvProgramme> {
 // -----------------------------------------------------------------------------
 
 /** Extract an attribute value from an attribute-string slice. */
-private fun extractAttrFast(attrs: String, name: String): String? {
+private fun extractAttrFast(
+    attrs: String,
+    name: String,
+): String? {
     val search = "$name=\""
     val idx = attrs.indexOf(search)
     if (idx == -1) return null
@@ -254,7 +272,10 @@ private fun extractAttrFast(attrs: String, name: String): String? {
 }
 
 /** Extract the text content of the first matching element. */
-private fun extractTagFast(body: String, tagName: String): String? {
+private fun extractTagFast(
+    body: String,
+    tagName: String,
+): String? {
     val open = "<$tagName"
     val close = "</$tagName>"
 
@@ -273,7 +294,11 @@ private fun extractTagFast(body: String, tagName: String): String? {
 }
 
 /** Extract an attribute from a child tag within a body string. */
-private fun extractAttrFromTag(body: String, tagName: String, attrName: String): String? {
+private fun extractAttrFromTag(
+    body: String,
+    tagName: String,
+    attrName: String,
+): String? {
     val open = "<$tagName"
     val idx = body.indexOf(open)
     if (idx == -1) return null
@@ -286,90 +311,91 @@ private fun extractAttrFromTag(body: String, tagName: String, attrName: String):
 // XML entity decoding
 // -----------------------------------------------------------------------------
 
-private val NAMED_ENTITIES: Map<String, String> = mapOf(
-    // XML-defined
-    "amp" to "&",
-    "lt" to "<",
-    "gt" to ">",
-    "quot" to "\"",
-    "apos" to "'",
-    // Whitespace & punctuation
-    "nbsp" to "\u00A0",
-    "ensp" to "\u2002",
-    "emsp" to "\u2003",
-    "thinsp" to "\u2009",
-    "ndash" to "\u2013",
-    "mdash" to "\u2014",
-    "hellip" to "\u2026",
-    "lsquo" to "\u2018",
-    "rsquo" to "\u2019",
-    "ldquo" to "\u201C",
-    "rdquo" to "\u201D",
-    "laquo" to "\u00AB",
-    "raquo" to "\u00BB",
-    "middot" to "\u00B7",
-    "bull" to "\u2022",
-    // Symbols
-    "copy" to "\u00A9",
-    "reg" to "\u00AE",
-    "trade" to "\u2122",
-    "deg" to "\u00B0",
-    "plusmn" to "\u00B1",
-    "times" to "\u00D7",
-    "divide" to "\u00F7",
-    "pound" to "\u00A3",
-    "euro" to "\u20AC",
-    "yen" to "\u00A5",
-    "cent" to "\u00A2",
-    "sect" to "\u00A7",
-    "para" to "\u00B6",
-    // Latin-1 accents
-    "agrave" to "\u00E0",
-    "aacute" to "\u00E1",
-    "acirc" to "\u00E2",
-    "atilde" to "\u00E3",
-    "auml" to "\u00E4",
-    "aring" to "\u00E5",
-    "aelig" to "\u00E6",
-    "ccedil" to "\u00E7",
-    "egrave" to "\u00E8",
-    "eacute" to "\u00E9",
-    "ecirc" to "\u00EA",
-    "euml" to "\u00EB",
-    "igrave" to "\u00EC",
-    "iacute" to "\u00ED",
-    "icirc" to "\u00EE",
-    "iuml" to "\u00EF",
-    "ntilde" to "\u00F1",
-    "ograve" to "\u00F2",
-    "oacute" to "\u00F3",
-    "ocirc" to "\u00F4",
-    "otilde" to "\u00F5",
-    "ouml" to "\u00F6",
-    "oslash" to "\u00F8",
-    "ugrave" to "\u00F9",
-    "uacute" to "\u00FA",
-    "ucirc" to "\u00FB",
-    "uuml" to "\u00FC",
-    "yacute" to "\u00FD",
-    "szlig" to "\u00DF",
-    "Agrave" to "\u00C0",
-    "Aacute" to "\u00C1",
-    "Acirc" to "\u00C2",
-    "Atilde" to "\u00C3",
-    "Auml" to "\u00C4",
-    "Aring" to "\u00C5",
-    "AElig" to "\u00C6",
-    "Ccedil" to "\u00C7",
-    "Egrave" to "\u00C8",
-    "Eacute" to "\u00C9",
-    "Ecirc" to "\u00CA",
-    "Euml" to "\u00CB",
-    "Ntilde" to "\u00D1",
-    "Oacute" to "\u00D3",
-    "Ouml" to "\u00D6",
-    "Uuml" to "\u00DC",
-)
+private val NAMED_ENTITIES: Map<String, String> =
+    mapOf(
+        // XML-defined
+        "amp" to "&",
+        "lt" to "<",
+        "gt" to ">",
+        "quot" to "\"",
+        "apos" to "'",
+        // Whitespace & punctuation
+        "nbsp" to "\u00A0",
+        "ensp" to "\u2002",
+        "emsp" to "\u2003",
+        "thinsp" to "\u2009",
+        "ndash" to "\u2013",
+        "mdash" to "\u2014",
+        "hellip" to "\u2026",
+        "lsquo" to "\u2018",
+        "rsquo" to "\u2019",
+        "ldquo" to "\u201C",
+        "rdquo" to "\u201D",
+        "laquo" to "\u00AB",
+        "raquo" to "\u00BB",
+        "middot" to "\u00B7",
+        "bull" to "\u2022",
+        // Symbols
+        "copy" to "\u00A9",
+        "reg" to "\u00AE",
+        "trade" to "\u2122",
+        "deg" to "\u00B0",
+        "plusmn" to "\u00B1",
+        "times" to "\u00D7",
+        "divide" to "\u00F7",
+        "pound" to "\u00A3",
+        "euro" to "\u20AC",
+        "yen" to "\u00A5",
+        "cent" to "\u00A2",
+        "sect" to "\u00A7",
+        "para" to "\u00B6",
+        // Latin-1 accents
+        "agrave" to "\u00E0",
+        "aacute" to "\u00E1",
+        "acirc" to "\u00E2",
+        "atilde" to "\u00E3",
+        "auml" to "\u00E4",
+        "aring" to "\u00E5",
+        "aelig" to "\u00E6",
+        "ccedil" to "\u00E7",
+        "egrave" to "\u00E8",
+        "eacute" to "\u00E9",
+        "ecirc" to "\u00EA",
+        "euml" to "\u00EB",
+        "igrave" to "\u00EC",
+        "iacute" to "\u00ED",
+        "icirc" to "\u00EE",
+        "iuml" to "\u00EF",
+        "ntilde" to "\u00F1",
+        "ograve" to "\u00F2",
+        "oacute" to "\u00F3",
+        "ocirc" to "\u00F4",
+        "otilde" to "\u00F5",
+        "ouml" to "\u00F6",
+        "oslash" to "\u00F8",
+        "ugrave" to "\u00F9",
+        "uacute" to "\u00FA",
+        "ucirc" to "\u00FB",
+        "uuml" to "\u00FC",
+        "yacute" to "\u00FD",
+        "szlig" to "\u00DF",
+        "Agrave" to "\u00C0",
+        "Aacute" to "\u00C1",
+        "Acirc" to "\u00C2",
+        "Atilde" to "\u00C3",
+        "Auml" to "\u00C4",
+        "Aring" to "\u00C5",
+        "AElig" to "\u00C6",
+        "Ccedil" to "\u00C7",
+        "Egrave" to "\u00C8",
+        "Eacute" to "\u00C9",
+        "Ecirc" to "\u00CA",
+        "Euml" to "\u00CB",
+        "Ntilde" to "\u00D1",
+        "Oacute" to "\u00D3",
+        "Ouml" to "\u00D6",
+        "Uuml" to "\u00DC",
+    )
 
 private val ENTITY_REGEX = Regex("""&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z][a-zA-Z0-9]*);""")
 
@@ -383,11 +409,12 @@ private fun decodeXmlEntities(str: String): String {
     return ENTITY_REGEX.replace(str) { match ->
         val ref = match.groupValues[1]
         if (ref[0] == '#') {
-            val code = if (ref.length >= 2 && (ref[1] == 'x' || ref[1] == 'X')) {
-                ref.substring(2).toIntOrNull(16)
-            } else {
-                ref.substring(1).toIntOrNull(10)
-            }
+            val code =
+                if (ref.length >= 2 && (ref[1] == 'x' || ref[1] == 'X')) {
+                    ref.substring(2).toIntOrNull(16)
+                } else {
+                    ref.substring(1).toIntOrNull(10)
+                }
             if (code == null || code < 0 || code > 0x10FFFF) {
                 match.value
             } else {

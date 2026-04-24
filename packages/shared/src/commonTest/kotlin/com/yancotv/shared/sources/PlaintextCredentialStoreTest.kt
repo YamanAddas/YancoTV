@@ -5,7 +5,6 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class PlaintextCredentialStoreTest {
-
     @Test
     fun `encrypt is reversible`() {
         val store = PlaintextCredentialStore()

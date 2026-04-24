@@ -21,7 +21,10 @@ import com.yancotv.shared.content.QualityBadge
  * [QualityBadge.parse] so we never render the same chip twice.
  */
 @Composable
-fun QualityChips(badges: List<QualityBadge>, modifier: Modifier = Modifier) {
+fun QualityChips(
+    badges: List<QualityBadge>,
+    modifier: Modifier = Modifier,
+) {
     if (badges.isEmpty()) return
     Row(
         modifier = modifier,
@@ -38,18 +41,20 @@ private fun Chip(badge: QualityBadge) {
         text = badge.label,
         color = fg,
         fontSize = 10.sp,
-        modifier = Modifier
-            .clip(RoundedCornerShape(3.dp))
-            .background(bg)
-            .padding(horizontal = 5.dp, vertical = 1.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(3.dp))
+                .background(bg)
+                .padding(horizontal = 5.dp, vertical = 1.dp),
     )
 }
 
-private fun colorsFor(badge: QualityBadge): Pair<Color, Color> = when (badge) {
-    QualityBadge.UHD_8K, QualityBadge.UHD_4K -> Color(0xFFD4A74A) to Color.Black
-    QualityBadge.FHD -> YancoPalette.Accent to Color.Black
-    QualityBadge.HD -> YancoPalette.AccentMuted to YancoPalette.TextPrimary
-    QualityBadge.SD -> Color(0xFF4A4A4A) to YancoPalette.TextPrimary
-    QualityBadge.HDR -> Color(0xFFFF8A4A) to Color.Black
-    QualityBadge.HEVC, QualityBadge.H264 -> YancoPalette.BackgroundHover to YancoPalette.TextMuted
-}
+private fun colorsFor(badge: QualityBadge): Pair<Color, Color> =
+    when (badge) {
+        QualityBadge.UHD_8K, QualityBadge.UHD_4K -> Color(0xFFD4A74A) to Color.Black
+        QualityBadge.FHD -> YancoPalette.Accent to Color.Black
+        QualityBadge.HD -> YancoPalette.AccentMuted to YancoPalette.TextPrimary
+        QualityBadge.SD -> Color(0xFF4A4A4A) to YancoPalette.TextPrimary
+        QualityBadge.HDR -> Color(0xFFFF8A4A) to Color.Black
+        QualityBadge.HEVC, QualityBadge.H264 -> YancoPalette.BackgroundHover to YancoPalette.TextMuted
+    }

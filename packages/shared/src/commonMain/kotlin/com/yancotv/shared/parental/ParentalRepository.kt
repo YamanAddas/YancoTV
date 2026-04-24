@@ -25,7 +25,6 @@ class ParentalRepository(
     private val hasher: PinHasher,
     private val clock: () -> Long,
 ) {
-
     // In-memory lockout state. Matches desktop — survives across verify
     // calls within one process but resets on app restart (acceptable: an
     // attacker with app kill access has bigger problems). Protected by a
@@ -36,6 +35,7 @@ class ParentalRepository(
     private var lockoutUntilMs = 0L
 
     private val _settings = MutableStateFlow(readSettings())
+
     /** Observable settings flow — Settings screen `collectAsState` on this. */
     val settings: StateFlow<ParentalSettings> = _settings.asStateFlow()
 
@@ -48,9 +48,10 @@ class ParentalRepository(
     // ───── PIN ─────
 
     /** Returns ms remaining on the current brute-force cooldown, or 0 if not locked. */
-    suspend fun lockoutRemainingMs(): Long = lockoutMutex.withLock {
-        (lockoutUntilMs - clock()).coerceAtLeast(0L)
-    }
+    suspend fun lockoutRemainingMs(): Long =
+        lockoutMutex.withLock {
+            (lockoutUntilMs - clock()).coerceAtLeast(0L)
+        }
 
     suspend fun setPin(pin: String) {
         val encoded = hasher.hash(pin)
@@ -137,8 +138,7 @@ class ParentalRepository(
         _lockedIds.value = _lockedIds.value - contentId
     }
 
-    fun isChannelLocked(contentId: String): Boolean =
-        db.parentalQueries.isLocked(contentId).executeAsOne()
+    fun isChannelLocked(contentId: String): Boolean = db.parentalQueries.isLocked(contentId).executeAsOne()
 
     // ───── Channel hide ─────
 
@@ -154,18 +154,25 @@ class ParentalRepository(
 
     // ───── internals ─────
 
-    private fun readSettings(): ParentalSettings = ParentalSettings(
-        pinSet = db.settingsQueries.get(KEY_PIN_HASH).executeAsOneOrNull() != null,
-        pinEnabled = db.settingsQueries.get(KEY_PIN_ENABLED).executeAsOneOrNull() == "1",
-        hideAdultContent = db.settingsQueries.get(KEY_HIDE_ADULT).executeAsOneOrNull() == "1",
-        requirePinForSettings = db.settingsQueries.get(KEY_REQUIRE_PIN_SETTINGS).executeAsOneOrNull() == "1",
-    )
+    private fun readSettings(): ParentalSettings =
+        ParentalSettings(
+            pinSet = db.settingsQueries.get(KEY_PIN_HASH).executeAsOneOrNull() != null,
+            pinEnabled = db.settingsQueries.get(KEY_PIN_ENABLED).executeAsOneOrNull() == "1",
+            hideAdultContent = db.settingsQueries.get(KEY_HIDE_ADULT).executeAsOneOrNull() == "1",
+            requirePinForSettings = db.settingsQueries.get(KEY_REQUIRE_PIN_SETTINGS).executeAsOneOrNull() == "1",
+        )
 
     private fun loadLockedIds(): Set<String> =
-        db.parentalQueries.selectLocked().executeAsList().toHashSet()
+        db.parentalQueries
+            .selectLocked()
+            .executeAsList()
+            .toHashSet()
 
     private fun loadHiddenIds(): Set<String> =
-        db.parentalQueries.selectHidden().executeAsList().toHashSet()
+        db.parentalQueries
+            .selectHidden()
+            .executeAsList()
+            .toHashSet()
 
     companion object {
         const val KEY_PIN_HASH = "parental_pin_hash"

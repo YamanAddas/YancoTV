@@ -10,7 +10,6 @@ import kotlin.test.assertTrue
  * reset the state at the end of every test to keep them isolated.
  */
 class SearchOverlayStateTest {
-
     @AfterTest fun reset() = SearchOverlayState.hide()
 
     @Test fun startsHidden() {

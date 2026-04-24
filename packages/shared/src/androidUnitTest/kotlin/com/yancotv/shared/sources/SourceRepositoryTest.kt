@@ -15,19 +15,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SourceRepositoryTest {
-
     private class FakeHttpClient(
         private val textResponses: Map<String, String> = emptyMap(),
     ) : HttpClient {
-        override suspend fun getJson(url: String, options: HttpRequestOptions): Any? =
-            error("getJson not used in these tests")
-        override suspend fun getText(url: String, options: HttpRequestOptions): String =
-            textResponses[url] ?: error("unmocked URL: $url")
+        override suspend fun getJson(
+            url: String,
+            options: HttpRequestOptions,
+        ): Any? = error("getJson not used in these tests")
+
+        override suspend fun getText(
+            url: String,
+            options: HttpRequestOptions,
+        ): String = textResponses[url] ?: error("unmocked URL: $url")
     }
 
-    private class FakeFileReader(private val contents: Map<String, String>) : FileContentReader {
-        override suspend fun readText(path: String): String =
-            contents[path] ?: error("unmocked file: $path")
+    private class FakeFileReader(
+        private val contents: Map<String, String>,
+    ) : FileContentReader {
+        override suspend fun readText(path: String): String = contents[path] ?: error("unmocked file: $path")
     }
 
     private fun repo(
@@ -43,19 +48,21 @@ class SourceRepositoryTest {
             http = http,
             fileReader = reader,
             clock = { now },
-            idGenerator = run {
-                var n = 0
-                { "id-${++n}" }
-            },
+            idGenerator =
+                run {
+                    var n = 0
+                    { "id-${++n}" }
+                },
         )
     }
 
     @Test
     fun `add + get round-trip`() {
         val r = repo()
-        val s = r.addSource(
-            AddSourceInput(name = "Main", type = SourceType.M3U_URL, url = "http://a/list.m3u"),
-        )
+        val s =
+            r.addSource(
+                AddSourceInput(name = "Main", type = SourceType.M3U_URL, url = "http://a/list.m3u"),
+            )
         assertEquals("id-1", s.id)
         assertEquals("Main", s.name)
         assertEquals(SourceType.M3U_URL, s.type)
@@ -68,8 +75,11 @@ class SourceRepositoryTest {
         val r = repo()
         r.addSource(
             AddSourceInput(
-                name = "X", type = SourceType.XTREAM,
-                url = "http://x", username = "user1", password = "p@ss",
+                name = "X",
+                type = SourceType.XTREAM,
+                url = "http://x",
+                username = "user1",
+                password = "p@ss",
             ),
         )
         // Plaintext store makes the BLOB equal to the plaintext bytes — but
@@ -77,19 +87,25 @@ class SourceRepositoryTest {
         // What we check here is that the repo actually wrote the credential
         // through the store (not as plaintext in a string column).
         val row = r.getAll().single()
-        assertNull(row.url?.let { if (it.contains("user1")) "leak" else null },
-            "URL column must not contain credentials")
+        assertNull(
+            row.url?.let { if (it.contains("user1")) "leak" else null },
+            "URL column must not contain credentials",
+        )
     }
 
     @Test
     fun `updateSource preserves existing credentials when input is null`() {
         val r = repo()
-        val s = r.addSource(
-            AddSourceInput(
-                name = "X", type = SourceType.XTREAM,
-                url = "http://x", username = "user1", password = "pw1",
-            ),
-        )
+        val s =
+            r.addSource(
+                AddSourceInput(
+                    name = "X",
+                    type = SourceType.XTREAM,
+                    url = "http://x",
+                    username = "user1",
+                    password = "pw1",
+                ),
+            )
         r.updateSource(UpdateSourceInput(id = s.id, name = "X-renamed"))
         val after = r.getById(s.id)
         assertEquals("X-renamed", after?.name)
@@ -116,101 +132,116 @@ class SourceRepositoryTest {
     }
 
     @Test
-    fun `removeSource cascades content rows`() = runTest {
-        val playlist = """
-            #EXTM3U
-            #EXTINF:-1 tvg-id="bbc" group-title="News",BBC One
-            http://a/1.ts
-            #EXTINF:-1 tvg-id="cnn" group-title="News",CNN
-            http://a/2.ts
-        """.trimIndent()
-        val r = repo(http = FakeHttpClient(mapOf("http://a/list.m3u" to playlist)))
-        val s = r.addSource(AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://a/list.m3u"))
-        r.syncSource(s.id).toList()
-        r.removeSource(s.id)
-        assertNull(r.getById(s.id))
-    }
+    fun `removeSource cascades content rows`() =
+        runTest {
+            val playlist =
+                """
+                #EXTM3U
+                #EXTINF:-1 tvg-id="bbc" group-title="News",BBC One
+                http://a/1.ts
+                #EXTINF:-1 tvg-id="cnn" group-title="News",CNN
+                http://a/2.ts
+                """.trimIndent()
+            val r = repo(http = FakeHttpClient(mapOf("http://a/list.m3u" to playlist)))
+            val s = r.addSource(AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://a/list.m3u"))
+            r.syncSource(s.id).toList()
+            r.removeSource(s.id)
+            assertNull(r.getById(s.id))
+        }
 
     @Test
-    fun `syncSource M3U URL emits FETCHING, WRITING, DONE and persists content`() = runTest {
-        val playlist = """
-            #EXTM3U
-            #EXTINF:-1 tvg-id="bbc" group-title="News",BBC One
-            http://a/1.ts
-            #EXTINF:-1 tvg-id="cnn" group-title="News",CNN
-            http://a/2.ts
-        """.trimIndent()
-        val http = FakeHttpClient(mapOf("http://a/list.m3u" to playlist))
-        val r = repo(http = http)
+    fun `syncSource M3U URL emits FETCHING, WRITING, DONE and persists content`() =
+        runTest {
+            val playlist =
+                """
+                #EXTM3U
+                #EXTINF:-1 tvg-id="bbc" group-title="News",BBC One
+                http://a/1.ts
+                #EXTINF:-1 tvg-id="cnn" group-title="News",CNN
+                http://a/2.ts
+                """.trimIndent()
+            val http = FakeHttpClient(mapOf("http://a/list.m3u" to playlist))
+            val r = repo(http = http)
 
-        val s = r.addSource(AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://a/list.m3u"))
-        val events = r.syncSource(s.id).toList()
+            val s = r.addSource(AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://a/list.m3u"))
+            val events = r.syncSource(s.id).toList()
 
-        val phases = events.map { it.phase }
-        assertTrue(SyncProgress.Phase.FETCHING in phases)
-        assertTrue(SyncProgress.Phase.WRITING in phases)
-        assertEquals(SyncProgress.Phase.DONE, events.last().phase)
-        assertEquals(2, events.last().current)
+            val phases = events.map { it.phase }
+            assertTrue(SyncProgress.Phase.FETCHING in phases)
+            assertTrue(SyncProgress.Phase.WRITING in phases)
+            assertEquals(SyncProgress.Phase.DONE, events.last().phase)
+            assertEquals(2, events.last().current)
 
-        val reloaded = r.getById(s.id)
-        assertNotNull(reloaded)
-        assertEquals(2, reloaded.channelCount)
-        assertNull(reloaded.lastSyncError)
-        assertEquals(1_000L, reloaded.lastSynced)
-    }
-
-    @Test
-    fun `syncSource emits ERROR and preserves previous channel_count on failure`() = runTest {
-        val r = repo(http = FakeHttpClient(emptyMap())) // any URL throws
-        val s = r.addSource(AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://nowhere/list.m3u"))
-        val events = r.syncSource(s.id).toList()
-        assertEquals(SyncProgress.Phase.ERROR, events.last().phase)
-        val reloaded = r.getById(s.id)
-        assertNotNull(reloaded)
-        assertEquals(0, reloaded.channelCount) // stayed at initial
-        assertFalse(reloaded.lastSyncError.isNullOrBlank())
-    }
+            val reloaded = r.getById(s.id)
+            assertNotNull(reloaded)
+            assertEquals(2, reloaded.channelCount)
+            assertNull(reloaded.lastSyncError)
+            assertEquals(1_000L, reloaded.lastSynced)
+        }
 
     @Test
-    fun `syncSource on missing id emits ERROR without throwing`() = runTest {
-        val r = repo()
-        val events = r.syncSource("does-not-exist").toList()
-        assertEquals(1, events.size)
-        assertEquals(SyncProgress.Phase.ERROR, events[0].phase)
-    }
+    fun `syncSource emits ERROR and preserves previous channel_count on failure`() =
+        runTest {
+            val r = repo(http = FakeHttpClient(emptyMap())) // any URL throws
+            val s = r.addSource(AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://nowhere/list.m3u"))
+            val events = r.syncSource(s.id).toList()
+            assertEquals(SyncProgress.Phase.ERROR, events.last().phase)
+            val reloaded = r.getById(s.id)
+            assertNotNull(reloaded)
+            assertEquals(0, reloaded.channelCount) // stayed at initial
+            assertFalse(reloaded.lastSyncError.isNullOrBlank())
+        }
 
     @Test
-    fun `m3u_file reads through FileContentReader`() = runTest {
-        val playlist = """
-            #EXTM3U
-            #EXTINF:-1,Only Channel
-            http://a/x.ts
-        """.trimIndent()
-        val r = repo(reader = FakeFileReader(mapOf("content://playlist" to playlist)))
-        val s = r.addSource(
-            AddSourceInput(name = "Local", type = SourceType.M3U_FILE, filePath = "content://playlist"),
-        )
-        r.syncSource(s.id).toList()
-        assertEquals(1, r.getById(s.id)?.channelCount)
-    }
+    fun `syncSource on missing id emits ERROR without throwing`() =
+        runTest {
+            val r = repo()
+            val events = r.syncSource("does-not-exist").toList()
+            assertEquals(1, events.size)
+            assertEquals(SyncProgress.Phase.ERROR, events[0].phase)
+        }
+
+    @Test
+    fun `m3u_file reads through FileContentReader`() =
+        runTest {
+            val playlist =
+                """
+                #EXTM3U
+                #EXTINF:-1,Only Channel
+                http://a/x.ts
+                """.trimIndent()
+            val r = repo(reader = FakeFileReader(mapOf("content://playlist" to playlist)))
+            val s =
+                r.addSource(
+                    AddSourceInput(name = "Local", type = SourceType.M3U_FILE, filePath = "content://playlist"),
+                )
+            r.syncSource(s.id).toList()
+            assertEquals(1, r.getById(s.id)?.channelCount)
+        }
 
     @Test
     fun `removeSource cascades to content rows`() {
         // Build the repo with a known db handle so we can poke content_fts
         // via the same driver. Keeps the test focused on cascade behaviour.
         val bundle = testDatabase()
-        val repo = SourceRepository(
-            db = bundle.db,
-            driver = bundle.driver,
-            credentialStore = PlaintextCredentialStore(),
-            http = FakeHttpClient(),
-            fileReader = FakeFileReader(emptyMap()),
-            clock = { 1_000L },
-            idGenerator = run { var n = 0; { "cascade-id-${++n}" } },
-        )
-        val saved = repo.addSource(
-            AddSourceInput(name = "S", type = SourceType.M3U_URL, url = "http://s"),
-        )
+        val repo =
+            SourceRepository(
+                db = bundle.db,
+                driver = bundle.driver,
+                credentialStore = PlaintextCredentialStore(),
+                http = FakeHttpClient(),
+                fileReader = FakeFileReader(emptyMap()),
+                clock = { 1_000L },
+                idGenerator =
+                    run {
+                        var n = 0;
+                        { "cascade-id-${++n}" }
+                    },
+            )
+        val saved =
+            repo.addSource(
+                AddSourceInput(name = "S", type = SourceType.M3U_URL, url = "http://s"),
+            )
         bundle.db.contentQueries.insert(
             id = "ch-1",
             source_id = saved.id,
@@ -225,13 +256,20 @@ class SourceRepositoryTest {
             sort_order = 0L,
             created_at = 0L,
         )
-        assertEquals(1L, bundle.db.contentQueries.countByType("live").executeAsOne())
+        assertEquals(
+            1L,
+            bundle.db.contentQueries
+                .countByType("live")
+                .executeAsOne(),
+        )
 
         repo.removeSource(saved.id)
 
         assertEquals(
             0L,
-            bundle.db.contentQueries.countByType("live").executeAsOne(),
+            bundle.db.contentQueries
+                .countByType("live")
+                .executeAsOne(),
             "removeSource must cascade-delete content rows via the FK",
         )
         assertEquals(0, repo.getAll().size)
@@ -239,7 +277,11 @@ class SourceRepositoryTest {
 
     private fun assertFails(block: () -> Unit) {
         var threw = false
-        try { block() } catch (_: Throwable) { threw = true }
+        try {
+            block()
+        } catch (_: Throwable) {
+            threw = true
+        }
         assertTrue(threw, "expected block to throw")
     }
 }

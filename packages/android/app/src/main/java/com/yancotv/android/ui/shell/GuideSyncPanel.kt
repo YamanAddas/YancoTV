@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,7 +20,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,7 +47,6 @@ import com.yancotv.shared.types.Source
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -94,14 +89,15 @@ fun GuideSyncPanel(
     var reloadTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(reloadTick) {
-        val snapshot = withContext(Dispatchers.IO) {
-            Snapshot(
-                stats = runCatching { epg.getStats() }.getOrNull(),
-                sources = runCatching { sourceRepo.getAll() }.getOrElse { emptyList() },
-                globalUrl = runCatching { epg.getGlobalEpgUrl() }.getOrNull(),
-                lastError = runCatching { epg.getLastError() }.getOrNull(),
-            )
-        }
+        val snapshot =
+            withContext(Dispatchers.IO) {
+                Snapshot(
+                    stats = runCatching { epg.getStats() }.getOrNull(),
+                    sources = runCatching { sourceRepo.getAll() }.getOrElse { emptyList() },
+                    globalUrl = runCatching { epg.getGlobalEpgUrl() }.getOrNull(),
+                    lastError = runCatching { epg.getLastError() }.getOrNull(),
+                )
+            }
         stats = snapshot.stats
         sources = snapshot.sources
         savedGlobalUrl = snapshot.globalUrl
@@ -158,11 +154,12 @@ fun GuideSyncPanel(
     val channels = stats?.channelCount ?: 0L
 
     val syncing = coordinatorState != null
-    val busyLabel = when {
-        running -> "Refreshing EPG…"
-        syncing -> "Re-syncing ${coordinatorState?.sourceName ?: "source"}…"
-        else -> null
-    }
+    val busyLabel =
+        when {
+            running -> "Refreshing EPG…"
+            syncing -> "Re-syncing ${coordinatorState?.sourceName ?: "source"}…"
+            else -> null
+        }
 
     val doRefreshEpg = { EpgSyncWorker.enqueueOnce(context) }
     val doResyncSources = {
@@ -178,10 +175,11 @@ fun GuideSyncPanel(
 
     if (compact) {
         Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .background(YancoPalette.BackgroundRaised)
-                .padding(horizontal = 24.dp, vertical = 10.dp),
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -217,17 +215,19 @@ fun GuideSyncPanel(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(YancoPalette.BackgroundDeep)
-            .padding(32.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(YancoPalette.BackgroundDeep)
+                .padding(32.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(YancoPalette.BackgroundRaised)
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(YancoPalette.BackgroundRaised)
+                    .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -264,11 +264,12 @@ fun GuideSyncPanel(
                         val hasEpg = !src.epgUrl.isNullOrBlank()
                         val err = src.lastSyncError
                         Text(
-                            text = buildString {
-                                append("• ${src.name}  ·  ${src.channelCount} channels  ·  ")
-                                append(if (hasEpg) "EPG URL set" else "no EPG URL")
-                                if (!err.isNullOrBlank()) append("  ·  err: $err")
-                            },
+                            text =
+                                buildString {
+                                    append("• ${src.name}  ·  ${src.channelCount} channels  ·  ")
+                                    append(if (hasEpg) "EPG URL set" else "no EPG URL")
+                                    if (!err.isNullOrBlank()) append("  ·  err: $err")
+                                },
                             color = if (!err.isNullOrBlank() || !hasEpg) YancoPalette.Error else YancoPalette.TextMuted,
                             fontSize = 12.sp,
                         )
@@ -322,27 +323,30 @@ fun GuideSyncPanel(
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     placeholder = { Text("https://example.com/xmltv.xml", fontSize = 12.sp) },
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        color = YancoPalette.TextPrimary,
-                        fontSize = 13.sp,
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = YancoPalette.TextPrimary,
-                        unfocusedTextColor = YancoPalette.TextPrimary,
-                        focusedBorderColor = YancoPalette.Accent,
-                        unfocusedBorderColor = YancoPalette.BackgroundHover,
-                        cursorColor = YancoPalette.Accent,
-                    ),
+                    textStyle =
+                        androidx.compose.ui.text.TextStyle(
+                            color = YancoPalette.TextPrimary,
+                            fontSize = 13.sp,
+                        ),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = YancoPalette.TextPrimary,
+                            unfocusedTextColor = YancoPalette.TextPrimary,
+                            focusedBorderColor = YancoPalette.Accent,
+                            unfocusedBorderColor = YancoPalette.BackgroundHover,
+                            cursorColor = YancoPalette.Accent,
+                        ),
                 )
                 Button(
                     onClick = {
                         scope.launch {
                             val cleaned = globalUrlDraft.trim().ifBlank { null }
-                            val ok = withContext(Dispatchers.IO) {
-                                runCatching { epg.setGlobalEpgUrl(cleaned) }
-                                    .onFailure { Log.w("Yanco", "GuideSyncPanel.setGlobalEpgUrl failed: ${it.message}", it) }
-                                    .isSuccess
-                            }
+                            val ok =
+                                withContext(Dispatchers.IO) {
+                                    runCatching { epg.setGlobalEpgUrl(cleaned) }
+                                        .onFailure { Log.w("Yanco", "GuideSyncPanel.setGlobalEpgUrl failed: ${it.message}", it) }
+                                        .isSuccess
+                                }
                             if (!ok) return@launch
                             savedGlobalUrl = cleaned
                             // Kick a refresh right after save so the user sees
@@ -359,7 +363,7 @@ fun GuideSyncPanel(
             }
             if (savedGlobalUrl != null) {
                 Text(
-                    text = "Current: ${savedGlobalUrl}",
+                    text = "Current: $savedGlobalUrl",
                     color = YancoPalette.TextMuted,
                     fontSize = 11.sp,
                 )
@@ -375,15 +379,22 @@ private data class Snapshot(
     val lastError: String?,
 )
 
-private fun subtitleFor(lastRefreshedMs: Long?, totalSources: Int, withEpg: Int, lastError: String?): String {
-    val refreshed = when (lastRefreshedMs) {
-        null -> "never refreshed"
-        else -> "last refreshed ${formatRelative(lastRefreshedMs)}"
-    }
-    val srcPart = when (totalSources) {
-        0 -> "no active sources"
-        else -> "$withEpg of $totalSources source(s) have an EPG URL"
-    }
+private fun subtitleFor(
+    lastRefreshedMs: Long?,
+    totalSources: Int,
+    withEpg: Int,
+    lastError: String?,
+): String {
+    val refreshed =
+        when (lastRefreshedMs) {
+            null -> "never refreshed"
+            else -> "last refreshed ${formatRelative(lastRefreshedMs)}"
+        }
+    val srcPart =
+        when (totalSources) {
+            0 -> "no active sources"
+            else -> "$withEpg of $totalSources source(s) have an EPG URL"
+        }
     val tail = if (lastError != null) " · last error: $lastError" else ""
     return "$refreshed · $srcPart$tail"
 }
@@ -402,6 +413,7 @@ private fun formatRelative(epochMs: Long): String {
 }
 
 @Composable
-private fun rememberEpgWorkFlow(context: android.content.Context): Flow<List<WorkInfo>> = remember {
-    WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("epg-sync-oneshot")
-}
+private fun rememberEpgWorkFlow(context: android.content.Context): Flow<List<WorkInfo>> =
+    remember {
+        WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("epg-sync-oneshot")
+    }

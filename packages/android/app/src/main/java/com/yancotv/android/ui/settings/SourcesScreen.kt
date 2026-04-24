@@ -22,10 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -82,11 +82,12 @@ fun SourcesScreen(
     }
 
     suspend fun refresh() {
-        val loaded = withContext(Dispatchers.IO) {
-            runCatching { repo.getAll() }
-                .onFailure { Log.w("Yanco", "SourcesScreen.refresh failed: ${it.message}", it) }
-                .getOrElse { return@withContext null }
-        } ?: return
+        val loaded =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.getAll() }
+                    .onFailure { Log.w("Yanco", "SourcesScreen.refresh failed: ${it.message}", it) }
+                    .getOrElse { return@withContext null }
+            } ?: return
         sources.clear()
         sources.addAll(loaded)
     }
@@ -97,10 +98,11 @@ fun SourcesScreen(
         if (active == null) refresh()
     }
 
-    val syncMessage = active?.let { a ->
-        val elapsed = ((tick.coerceAtLeast(a.startedAtMs) - a.startedAtMs) / 1000).coerceAtLeast(0)
-        phaseLabel(a.sourceName, a.progress, elapsedSec = elapsed)
-    }
+    val syncMessage =
+        active?.let { a ->
+            val elapsed = ((tick.coerceAtLeast(a.startedAtMs) - a.startedAtMs) / 1000).coerceAtLeast(0)
+            phaseLabel(a.sourceName, a.progress, elapsedSec = elapsed)
+        }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -176,23 +178,26 @@ fun SourcesScreen(
                     // real error instead of a forever-"Saving…" spinner. Most
                     // addSource() runs finish in <100ms; anything >15s is a
                     // hang worth surfacing.
-                    val result = runCatching {
-                        withTimeout(15_000L) {
-                            withContext(Dispatchers.IO) { repo.addSource(input) }
+                    val result =
+                        runCatching {
+                            withTimeout(15_000L) {
+                                withContext(Dispatchers.IO) { repo.addSource(input) }
+                            }
                         }
-                    }
                     addSaving = false
-                    result.onSuccess {
-                        showAdd = false
-                        addError = null
-                        refresh()
-                    }.onFailure { t ->
-                        addError = when (t) {
-                            is TimeoutCancellationException ->
-                                "Save timed out after 15s — DB or Keystore is stuck. Restart the app and try again; logcat (adb logcat -s Yanco:*) shows which step stalled."
-                            else -> t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "Unknown error"
+                    result
+                        .onSuccess {
+                            showAdd = false
+                            addError = null
+                            refresh()
+                        }.onFailure { t ->
+                            addError =
+                                when (t) {
+                                    is TimeoutCancellationException ->
+                                        "Save timed out after 15s — DB or Keystore is stuck. Restart the app and try again; logcat (adb logcat -s Yanco:*) shows which step stalled."
+                                    else -> t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "Unknown error"
+                                }
                         }
-                    }
                 }
             },
         )
@@ -208,11 +213,12 @@ private fun SourceRow(
     onDelete: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(YancoPalette.BackgroundRaised)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(YancoPalette.BackgroundRaised)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -234,32 +240,41 @@ private fun SourceRow(
 }
 
 @Composable
-fun ActionButton(label: String, onClick: () -> Unit) {
+fun ActionButton(
+    label: String,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) YancoPalette.Accent else YancoPalette.BackgroundHover
     val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(6.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .border(1.dp, border, RoundedCornerShape(6.dp))
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(text = label, color = YancoPalette.TextPrimary)
     }
 }
 
-private fun typeLabel(type: SourceType): String = when (type) {
-    SourceType.XTREAM -> "Xtream"
-    SourceType.M3U_URL -> "M3U URL"
-    SourceType.M3U_FILE -> "M3U File"
-    SourceType.STALKER -> "Stalker"
-}
+private fun typeLabel(type: SourceType): String =
+    when (type) {
+        SourceType.XTREAM -> "Xtream"
+        SourceType.M3U_URL -> "M3U URL"
+        SourceType.M3U_FILE -> "M3U File"
+        SourceType.STALKER -> "Stalker"
+    }
 
-private fun phaseLabel(name: String, p: SyncProgress, elapsedSec: Long = 0): String {
+private fun phaseLabel(
+    name: String,
+    p: SyncProgress,
+    elapsedSec: Long = 0,
+): String {
     // Surface `p.message` during FETCHING and WRITING so the user sees which
     // sub-step is live ("Authenticating" / "Live categories" / "Movie
     // categories" / "Series categories" / "Live channels" / "Movies" /

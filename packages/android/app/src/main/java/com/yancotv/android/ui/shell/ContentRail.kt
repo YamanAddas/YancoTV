@@ -37,10 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.layout.onPlaced
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -48,12 +44,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.components.WheelRow
 import com.yancotv.android.ui.components.wheelItemTransform
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
@@ -63,6 +61,8 @@ import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Horizontal rail of content cards docked beneath the hero. Live channels
@@ -95,10 +95,11 @@ fun ContentRail(
     // keyed on focusedIndex — it would race with bringIntoView and stack
     // two animations, which is exactly the lag we removed.
 
-    val itemWidth = when (type) {
-        ContentType.LIVE -> 300.dp
-        ContentType.MOVIE, ContentType.SERIES -> 240.dp
-    }
+    val itemWidth =
+        when (type) {
+            ContentType.LIVE -> 300.dp
+            ContentType.MOVIE, ContentType.SERIES -> 240.dp
+        }
 
     WheelRow(
         itemWidth = itemWidth,
@@ -106,9 +107,10 @@ fun ContentRail(
         horizontalArrangement = Arrangement.spacedBy(Space.lg),
         verticalPadding = Space.xl,
         minSidePadding = Space.page,
-        modifier = modifier
-            .fillMaxWidth()
-            .focusGroup(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .focusGroup(),
     ) {
         val safeFocusedIndex = focusedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
         itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
@@ -119,32 +121,35 @@ fun ContentRail(
             // MB-67: mark the anchor placed when the focused card's node lands in
             // layout. PlacedFocusAnchor.awaitAndRequest() in BrowseShell waits for
             // this signal instead of a delay-ladder, so focus restore is deterministic.
-            val anchorMod = if (index == safeFocusedIndex) {
-                Modifier.onPlaced { firstItemAnchor.markPlaced() }
-            } else {
-                Modifier
-            }
+            val anchorMod =
+                if (index == safeFocusedIndex) {
+                    Modifier.onPlaced { firstItemAnchor.markPlaced() }
+                } else {
+                    Modifier
+                }
             when (type) {
-                ContentType.LIVE -> LiveCard(
-                    item = item,
-                    nowNext = item.tvgId?.let { nowNextMap[it] },
-                    nowSeconds = nowSeconds,
-                    locked = item.id in lockedIds,
-                    focusRequester = attach,
-                    onFocus = { onFocus(index, item) },
-                    onActivate = { onActivate(index) },
-                    onLongPress = { onLongPress(item) },
-                    modifier = wheel.then(anchorMod),
-                )
-                ContentType.MOVIE, ContentType.SERIES -> PosterCard(
-                    item = item,
-                    locked = item.id in lockedIds,
-                    focusRequester = attach,
-                    onFocus = { onFocus(index, item) },
-                    onActivate = { onActivate(index) },
-                    onLongPress = { onLongPress(item) },
-                    modifier = wheel.then(anchorMod),
-                )
+                ContentType.LIVE ->
+                    LiveCard(
+                        item = item,
+                        nowNext = item.tvgId?.let { nowNextMap[it] },
+                        nowSeconds = nowSeconds,
+                        locked = item.id in lockedIds,
+                        focusRequester = attach,
+                        onFocus = { onFocus(index, item) },
+                        onActivate = { onActivate(index) },
+                        onLongPress = { onLongPress(item) },
+                        modifier = wheel.then(anchorMod),
+                    )
+                ContentType.MOVIE, ContentType.SERIES ->
+                    PosterCard(
+                        item = item,
+                        locked = item.id in lockedIds,
+                        focusRequester = attach,
+                        onFocus = { onFocus(index, item) },
+                        onActivate = { onActivate(index) },
+                        onLongPress = { onLongPress(item) },
+                        modifier = wheel.then(anchorMod),
+                    )
             }
         }
     }
@@ -177,22 +182,25 @@ private fun LiveCard(
     // Progress 0..1 through the NOW programme. Null when we have no EPG for
     // this channel — the ring falls back to an outline-only state so the card
     // doesn't look broken on ungauge-able channels (news feeds, 24/7 etc.).
-    val progress: Float? = nowProg?.let {
-        val span = (it.endTime - it.startTime).coerceAtLeast(1L)
-        ((nowSeconds - it.startTime).toFloat() / span).coerceIn(0f, 1f)
-    }
-    // Minutes remaining in NOW programme, for the top-right "Xm left" chip.
-    val minutesLeft: Int? = nowProg?.let {
-        val remaining = (it.endTime - nowSeconds).coerceAtLeast(0L)
-        (remaining / 60L).toInt()
-    }
-    val timeLeftLabel: String? = minutesLeft?.let { m ->
-        when {
-            m <= 0 -> null
-            m < 60 -> "${m}m left"
-            else -> "${m / 60}h ${m % 60}m"
+    val progress: Float? =
+        nowProg?.let {
+            val span = (it.endTime - it.startTime).coerceAtLeast(1L)
+            ((nowSeconds - it.startTime).toFloat() / span).coerceIn(0f, 1f)
         }
-    }
+    // Minutes remaining in NOW programme, for the top-right "Xm left" chip.
+    val minutesLeft: Int? =
+        nowProg?.let {
+            val remaining = (it.endTime - nowSeconds).coerceAtLeast(0L)
+            (remaining / 60L).toInt()
+        }
+    val timeLeftLabel: String? =
+        minutesLeft?.let { m ->
+            when {
+                m <= 0 -> null
+                m < 60 -> "${m}m left"
+                else -> "${m / 60}h ${m % 60}m"
+            }
+        }
 
     // Console-strip layout: logo disc + radial progress ring on the left,
     // text column on the right, time-left chip pinned to the top-right. The
@@ -207,30 +215,32 @@ private fun LiveCard(
         // Wheel transform applied by the caller via [modifier] — keep it on
         // the outer surface so the tilt/scale wraps the entire hex frame,
         // not just the content Row inside.
-        modifier = modifier
-            .width(300.dp)
-            .height(120.dp)
-            .focusRequester(selfRequester)
-            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
-            .focusable(interactionSource = interaction)
-            .combinedClickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = {
-                    onActivate()
-                    scope.launch {
-                        delay(80)
-                        runCatching { selfRequester.requestFocus() }
-                    }
-                },
-                onLongClick = onLongPress,
-            ),
+        modifier =
+            modifier
+                .width(300.dp)
+                .height(120.dp)
+                .focusRequester(selfRequester)
+                .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+                .focusable(interactionSource = interaction)
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = {
+                        onActivate()
+                        scope.launch {
+                            delay(80)
+                            runCatching { selfRequester.requestFocus() }
+                        }
+                    },
+                    onLongClick = onLongPress,
+                ),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 20.dp, end = 16.dp, top = Space.sm, bottom = Space.sm),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(start = 20.dp, end = 16.dp, top = Space.sm, bottom = Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Space.md),
             ) {
@@ -286,17 +296,17 @@ private fun LiveCard(
             // to its content without reserving space for the chip.
             if (timeLeftLabel != null) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 10.dp, end = 14.dp)
-                        .clip(YancoShapes.ChipBevel)
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
-                        .border(
-                            1.dp,
-                            YancoPalette.Accent.copy(alpha = 0.35f),
-                            YancoShapes.ChipBevel,
-                        )
-                        .padding(horizontal = Space.sm, vertical = 2.dp),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 10.dp, end = 14.dp)
+                            .clip(YancoShapes.ChipBevel)
+                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
+                            .border(
+                                1.dp,
+                                YancoPalette.Accent.copy(alpha = 0.35f),
+                                YancoShapes.ChipBevel,
+                            ).padding(horizontal = Space.sm, vertical = 2.dp),
                 ) {
                     Text(
                         text = timeLeftLabel,
@@ -368,17 +378,17 @@ private fun LogoDisc(
 
         // Logo disc — the rounded square that replaces the old inner hex.
         Box(
-            modifier = Modifier
-                .size(discSize)
-                .clip(discShape)
-                .background(
-                    if (focused) YancoPalette.BackgroundElevated else YancoPalette.BackgroundDeep,
-                )
-                .border(
-                    1.dp,
-                    if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else YancoPalette.PanelBorder,
-                    discShape,
-                ),
+            modifier =
+                Modifier
+                    .size(discSize)
+                    .clip(discShape)
+                    .background(
+                        if (focused) YancoPalette.BackgroundElevated else YancoPalette.BackgroundDeep,
+                    ).border(
+                        1.dp,
+                        if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else YancoPalette.PanelBorder,
+                        discShape,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             if (!url.isNullOrBlank()) {
@@ -402,35 +412,38 @@ private fun LogoDisc(
         // sees "this is a live broadcast" independently of whether we have
         // EPG data for the progress sweep.
         Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-1).dp)
-                .size(12.dp)
-                .clip(RoundedCornerShape(50))
-                .background(YancoPalette.BackgroundDeep)
-                .border(1.dp, YancoPalette.Accent, RoundedCornerShape(50)),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-1).dp)
+                    .size(12.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(YancoPalette.BackgroundDeep)
+                    .border(1.dp, YancoPalette.Accent, RoundedCornerShape(50)),
             contentAlignment = Alignment.Center,
         ) {
             Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFFF4D4D)),
+                modifier =
+                    Modifier
+                        .size(5.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFFFF4D4D)),
             )
         }
 
         if (locked) {
             Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(20.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(YancoPalette.BackgroundDeep.copy(alpha = 0.92f))
-                    .border(
-                        1.dp,
-                        YancoPalette.Accent.copy(alpha = 0.55f),
-                        RoundedCornerShape(Radius.pill),
-                    ),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.92f))
+                        .border(
+                            1.dp,
+                            YancoPalette.Accent.copy(alpha = 0.55f),
+                            RoundedCornerShape(Radius.pill),
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -471,29 +484,31 @@ private fun PosterCard(
         shape = YancoShapes.CutCornerCard,
         focused = focused,
         bevelInset = 3.dp,
-        modifier = modifier
-            .width(240.dp)
-            .focusRequester(selfRequester)
-            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
-            .focusable(interactionSource = interaction)
-            .combinedClickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = {
-                    onActivate()
-                    scope.launch {
-                        delay(80)
-                        runCatching { selfRequester.requestFocus() }
-                    }
-                },
-                onLongClick = onLongPress,
-            ),
+        modifier =
+            modifier
+                .width(240.dp)
+                .focusRequester(selfRequester)
+                .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+                .focusable(interactionSource = interaction)
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = {
+                        onActivate()
+                        scope.launch {
+                            delay(80)
+                            runCatching { selfRequester.requestFocus() }
+                        }
+                    },
+                    onLongClick = onLongPress,
+                ),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f),
             ) {
                 if (!item.logoUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -504,16 +519,17 @@ private fun PosterCard(
                     )
                 } else {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        YancoPalette.BackgroundHover,
-                                        YancoPalette.BackgroundElevated,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            YancoPalette.BackgroundHover,
+                                            YancoPalette.BackgroundElevated,
+                                        ),
                                     ),
                                 ),
-                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -526,24 +542,26 @@ private fun PosterCard(
                 }
                 // Darken the bottom so the title line integrates with the art.
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                0.55f to Color.Transparent,
-                                1f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color.Transparent,
+                                    0.55f to Color.Transparent,
+                                    1f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                                ),
                             ),
-                        ),
                 )
                 if (locked) {
                     Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(Space.sm)
-                            .size(22.dp)
-                            .clip(RoundedCornerShape(Radius.pill))
-                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f)),
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopStart)
+                                .padding(Space.sm)
+                                .size(22.dp)
+                                .clip(RoundedCornerShape(Radius.pill))
+                                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -555,13 +573,14 @@ private fun PosterCard(
                     }
                 }
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Space.sm)
-                        .clip(YancoShapes.ChipBevel)
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
-                        .border(1.dp, YancoPalette.Accent.copy(alpha = 0.35f), YancoShapes.ChipBevel)
-                        .padding(horizontal = Space.sm, vertical = 2.dp),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Space.sm)
+                            .clip(YancoShapes.ChipBevel)
+                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
+                            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.35f), YancoShapes.ChipBevel)
+                            .padding(horizontal = Space.sm, vertical = 2.dp),
                 ) {
                     Text(
                         text = if (item.type == ContentType.MOVIE) "MOVIE" else "SERIES",
@@ -573,10 +592,11 @@ private fun PosterCard(
             // Title strip integrated into the shell — reads as the card's
             // lower band rather than detached text.
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
-                    .padding(horizontal = Space.md, vertical = Space.sm),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                        .padding(horizontal = Space.md, vertical = Space.sm),
             ) {
                 Text(
                     text = title,

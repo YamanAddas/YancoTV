@@ -19,20 +19,37 @@ import com.yancotv.shared.types.ContentItem
  * <100 rows per page) that an O(n × markers) scan is cheap.
  */
 object AdultContentFilter {
-
     // Token list — matches the lowercased, punctuation-stripped
     // input against the whole set. Keep narrow: "adult" alone would
     // eat "Young Adult" family content, so we pair it with a category
     // context check.
-    private val STRONG_MARKERS = setOf(
-        "xxx", "xxxadult", "adultsonly", "18plus", "adults18",
-        "erotic", "erotica", "porn", "pornstar", "hentai", "playboy",
-        "hustler", "brazzers", "vivid", "penthouse",
-    )
+    private val STRONG_MARKERS =
+        setOf(
+            "xxx",
+            "xxxadult",
+            "adultsonly",
+            "18plus",
+            "adults18",
+            "erotic",
+            "erotica",
+            "porn",
+            "pornstar",
+            "hentai",
+            "playboy",
+            "hustler",
+            "brazzers",
+            "vivid",
+            "penthouse",
+        )
 
-    private val CATEGORY_ONLY_MARKERS = setOf(
-        "adult", "adults", "18+", "+18", "21+",
-    )
+    private val CATEGORY_ONLY_MARKERS =
+        setOf(
+            "adult",
+            "adults",
+            "18+",
+            "+18",
+            "21+",
+        )
 
     /** True if the item's category or title text smells like adult content. */
     fun isAdult(item: ContentItem): Boolean {
@@ -49,7 +66,10 @@ object AdultContentFilter {
      * channel literally named "Adult Swim" being hidden when the user
      * toggles the filter).
      */
-    private fun looksAdult(text: String, includeCategoryOnly: Boolean): Boolean {
+    private fun looksAdult(
+        text: String,
+        includeCategoryOnly: Boolean,
+    ): Boolean {
         val tokens = text.split(' ').filter { it.isNotEmpty() }
         for (tok in tokens) {
             if (tok in STRONG_MARKERS) return true
@@ -78,10 +98,11 @@ object AdultContentFilter {
                     buf.append(ch)
                     lastWasSpace = false
                 }
-                else -> if (!lastWasSpace) {
-                    buf.append(' ')
-                    lastWasSpace = true
-                }
+                else ->
+                    if (!lastWasSpace) {
+                        buf.append(' ')
+                        lastWasSpace = true
+                    }
             }
         }
         return buf.toString().trim()

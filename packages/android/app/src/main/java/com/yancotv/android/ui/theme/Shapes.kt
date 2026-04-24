@@ -86,32 +86,33 @@ internal class HexCapsuleShape(
         val r = with(density) { pointRoundDp.toPx() }.coerceAtMost(cut * 0.7f)
         val mid = h / 2f
 
-        val path = Path().apply {
-            if (r <= 0.5f) {
-                moveTo(cut, 0f)
-                lineTo(w - cut, 0f)
-                lineTo(w, mid)
-                lineTo(w - cut, h)
-                lineTo(cut, h)
-                lineTo(0f, mid)
-                close()
-            } else {
-                moveTo(cut + r, 0f)
-                lineTo(w - cut - r, 0f)
-                quadraticBezierTo(w - cut, 0f, w - cut + r * 0.5f, r * 0.5f)
-                lineTo(w - r * 0.5f, mid - r)
-                quadraticBezierTo(w, mid, w - r * 0.5f, mid + r)
-                lineTo(w - cut + r * 0.5f, h - r * 0.5f)
-                quadraticBezierTo(w - cut, h, w - cut - r, h)
-                lineTo(cut + r, h)
-                quadraticBezierTo(cut, h, cut - r * 0.5f, h - r * 0.5f)
-                lineTo(r * 0.5f, mid + r)
-                quadraticBezierTo(0f, mid, r * 0.5f, mid - r)
-                lineTo(cut - r * 0.5f, r * 0.5f)
-                quadraticBezierTo(cut, 0f, cut + r, 0f)
-                close()
+        val path =
+            Path().apply {
+                if (r <= 0.5f) {
+                    moveTo(cut, 0f)
+                    lineTo(w - cut, 0f)
+                    lineTo(w, mid)
+                    lineTo(w - cut, h)
+                    lineTo(cut, h)
+                    lineTo(0f, mid)
+                    close()
+                } else {
+                    moveTo(cut + r, 0f)
+                    lineTo(w - cut - r, 0f)
+                    quadraticBezierTo(w - cut, 0f, w - cut + r * 0.5f, r * 0.5f)
+                    lineTo(w - r * 0.5f, mid - r)
+                    quadraticBezierTo(w, mid, w - r * 0.5f, mid + r)
+                    lineTo(w - cut + r * 0.5f, h - r * 0.5f)
+                    quadraticBezierTo(w - cut, h, w - cut - r, h)
+                    lineTo(cut + r, h)
+                    quadraticBezierTo(cut, h, cut - r * 0.5f, h - r * 0.5f)
+                    lineTo(r * 0.5f, mid + r)
+                    quadraticBezierTo(0f, mid, r * 0.5f, mid - r)
+                    lineTo(cut - r * 0.5f, r * 0.5f)
+                    quadraticBezierTo(cut, 0f, cut + r, 0f)
+                    close()
+                }
             }
-        }
         return Outline.Generic(path)
     }
 }
@@ -138,35 +139,36 @@ internal class CutCornerCardShape(
         val c = with(density) { cut.toPx() }.coerceAtMost(cap)
         val r = with(density) { round.toPx() }.coerceAtMost(c * 0.5f)
 
-        val path = Path().apply {
-            // Start at the top-left square corner.
-            moveTo(0f, 0f)
-            // Top edge to the start of the top-right bevel.
-            lineTo(size.width - c, 0f)
-            // Bevelled top-right — straight diagonal, optionally softened.
-            if (r <= 0.5f) {
-                lineTo(size.width, c)
-            } else {
-                lineTo(size.width - r, 0f)
-                quadraticBezierTo(size.width, 0f, size.width, r)
-                lineTo(size.width, c)
+        val path =
+            Path().apply {
+                // Start at the top-left square corner.
+                moveTo(0f, 0f)
+                // Top edge to the start of the top-right bevel.
+                lineTo(size.width - c, 0f)
+                // Bevelled top-right — straight diagonal, optionally softened.
+                if (r <= 0.5f) {
+                    lineTo(size.width, c)
+                } else {
+                    lineTo(size.width - r, 0f)
+                    quadraticBezierTo(size.width, 0f, size.width, r)
+                    lineTo(size.width, c)
+                }
+                // Right edge to the bottom-right square corner.
+                lineTo(size.width, size.height)
+                // Bottom edge to the start of the bottom-left bevel.
+                lineTo(c, size.height)
+                // Bevelled bottom-left — straight diagonal, optionally softened.
+                if (r <= 0.5f) {
+                    lineTo(0f, size.height - c)
+                } else {
+                    lineTo(r, size.height)
+                    quadraticBezierTo(0f, size.height, 0f, size.height - r)
+                    lineTo(0f, size.height - c)
+                }
+                // Left edge back to the top-left square corner.
+                lineTo(0f, 0f)
+                close()
             }
-            // Right edge to the bottom-right square corner.
-            lineTo(size.width, size.height)
-            // Bottom edge to the start of the bottom-left bevel.
-            lineTo(c, size.height)
-            // Bevelled bottom-left — straight diagonal, optionally softened.
-            if (r <= 0.5f) {
-                lineTo(0f, size.height - c)
-            } else {
-                lineTo(r, size.height)
-                quadraticBezierTo(0f, size.height, 0f, size.height - r)
-                lineTo(0f, size.height - c)
-            }
-            // Left edge back to the top-left square corner.
-            lineTo(0f, 0f)
-            close()
-        }
         return Outline.Generic(path)
     }
 }
@@ -185,24 +187,26 @@ internal class ChipBevelShape : Shape {
         val h = size.height
         val cut = (h * 0.42f).coerceIn(8f, 16f)
         val r = h / 2f
-        val path = Path().apply {
-            moveTo(cut, 0f)
-            lineTo(size.width - r, 0f)
-            arcTo(
-                rect = Rect(
-                    left = size.width - h,
-                    top = 0f,
-                    right = size.width,
-                    bottom = h,
-                ),
-                startAngleDegrees = -90f,
-                sweepAngleDegrees = 180f,
-                forceMoveTo = false,
-            )
-            lineTo(cut, h)
-            lineTo(0f, h / 2f)
-            close()
-        }
+        val path =
+            Path().apply {
+                moveTo(cut, 0f)
+                lineTo(size.width - r, 0f)
+                arcTo(
+                    rect =
+                        Rect(
+                            left = size.width - h,
+                            top = 0f,
+                            right = size.width,
+                            bottom = h,
+                        ),
+                    startAngleDegrees = -90f,
+                    sweepAngleDegrees = 180f,
+                    forceMoveTo = false,
+                )
+                lineTo(cut, h)
+                lineTo(0f, h / 2f)
+                close()
+            }
         return Outline.Generic(path)
     }
 }
@@ -220,15 +224,16 @@ internal class ButtonBevelShape : Shape {
         val h = size.height
         val cut = (h * 0.42f).coerceIn(10f, 22f)
         val mid = h / 2f
-        val path = Path().apply {
-            moveTo(cut, 0f)
-            lineTo(size.width - cut, 0f)
-            lineTo(size.width, mid)
-            lineTo(size.width - cut, h)
-            lineTo(cut, h)
-            lineTo(0f, mid)
-            close()
-        }
+        val path =
+            Path().apply {
+                moveTo(cut, 0f)
+                lineTo(size.width - cut, 0f)
+                lineTo(size.width, mid)
+                lineTo(size.width - cut, h)
+                lineTo(cut, h)
+                lineTo(0f, mid)
+                close()
+            }
         return Outline.Generic(path)
     }
 }

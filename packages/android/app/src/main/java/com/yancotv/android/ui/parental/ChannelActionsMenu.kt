@@ -57,8 +57,12 @@ fun ChannelActionsMenu(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = if (locked) "This channel is locked. Unlock to allow anyone to watch without a PIN."
-                    else "Lock this channel to require a PIN before playing, or hide it from lists entirely.",
+                    text =
+                        if (locked) {
+                            "This channel is locked. Unlock to allow anyone to watch without a PIN."
+                        } else {
+                            "Lock this channel to require a PIN before playing, or hide it from lists entirely."
+                        },
                     color = YancoPalette.TextMuted,
                     fontSize = 12.sp,
                 )

@@ -23,11 +23,15 @@ import org.koin.core.component.inject
  * taps the notification to open the app and select the channel manually.
  */
 @UnstableApi
-class ReminderAlarmReceiver : BroadcastReceiver(), KoinComponent {
-
+class ReminderAlarmReceiver :
+    BroadcastReceiver(),
+    KoinComponent {
     private val repo: ReminderRepository by inject()
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (intent.action != ReminderScheduler.ACTION_FIRE) return
         val reminderId = intent.getStringExtra(ReminderScheduler.EXTRA_REMINDER_ID) ?: return
         val programmeId = intent.getStringExtra(ReminderScheduler.EXTRA_PROGRAMME_ID)
@@ -43,28 +47,31 @@ class ReminderAlarmReceiver : BroadcastReceiver(), KoinComponent {
         programmeId: String?,
         title: String,
     ) {
-        val tapIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(EXTRA_TAP_PROGRAMME_ID, programmeId)
-        }
+        val tapIntent =
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_TAP_PROGRAMME_ID, programmeId)
+            }
         // FLAG_IMMUTABLE was added in API 23 (M); minSdk = 24 so the gate is
         // dead. Targeting Android 12+ requires FLAG_IMMUTABLE on every
         // PendingIntent or the system throws on creation.
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pending = PendingIntent.getActivity(context, reminderId.hashCode(), tapIntent, flags)
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            // Proper app icon lands in MK.12 with the rest of the launcher
-            // assets. Using the platform reminder icon keeps notifications
-            // functional without polluting res/drawable with placeholder art.
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setContentTitle(title)
-            .setContentText("Starting now on YancoTV")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setAutoCancel(true)
-            .setContentIntent(pending)
-            .build()
+        val notification =
+            NotificationCompat
+                .Builder(context, CHANNEL_ID)
+                // Proper app icon lands in MK.12 with the rest of the launcher
+                // assets. Using the platform reminder icon keeps notifications
+                // functional without polluting res/drawable with placeholder art.
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(title)
+                .setContentText("Starting now on YancoTV")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(pending)
+                .build()
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(reminderId.hashCode(), notification)

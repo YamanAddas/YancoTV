@@ -23,48 +23,13 @@ class FavoritesRepository(
     private val db: YancoDb,
     private val clock: () -> Long,
 ) {
-
     fun all(): List<FavoriteEntry> =
         db.favoritesQueries.selectAll().executeAsList().map { row ->
             FavoriteEntry(
                 favoriteId = row.favorite_id,
                 addedAt = row.added_at,
-                content = ContentItem(
-                    id = row.id,
-                    sourceId = row.source_id,
-                    type = contentTypeFromDb(row.type),
-                    title = row.title,
-                    cleanTitle = row.clean_title,
-                    groupName = row.group_name,
-                    streamUrl = row.stream_url,
-                    logoUrl = row.logo_url,
-                    tvgId = row.tvg_id,
-                    metadataJson = row.metadata_json,
-                    sortOrder = row.sort_order.toInt(),
-                    createdAt = row.created_at,
-                ),
-            )
-        }
-
-    fun allForType(type: ContentType): List<FavoriteEntry> =
-        all().filter { it.content.type == type }
-
-    fun isFavorite(contentId: String): Boolean =
-        db.favoritesQueries.isFavorite(contentId).executeAsOne()
-
-    /**
-     * Reactive [all] — backed by SQLDelight's [asFlow]. Emits the current
-     * snapshot immediately on collection, then re-emits every time a write
-     * through any `favoritesQueries` binding fires a notifier. Dispatches
-     * the terminal query to IO so collectors on Main.immediate don't block.
-     */
-    fun allFlow(): Flow<List<FavoriteEntry>> =
-        db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.IO).map { rows ->
-            rows.map { row ->
-                FavoriteEntry(
-                    favoriteId = row.favorite_id,
-                    addedAt = row.added_at,
-                    content = ContentItem(
+                content =
+                    ContentItem(
                         id = row.id,
                         sourceId = row.source_id,
                         type = contentTypeFromDb(row.type),
@@ -78,6 +43,40 @@ class FavoritesRepository(
                         sortOrder = row.sort_order.toInt(),
                         createdAt = row.created_at,
                     ),
+            )
+        }
+
+    fun allForType(type: ContentType): List<FavoriteEntry> = all().filter { it.content.type == type }
+
+    fun isFavorite(contentId: String): Boolean = db.favoritesQueries.isFavorite(contentId).executeAsOne()
+
+    /**
+     * Reactive [all] — backed by SQLDelight's [asFlow]. Emits the current
+     * snapshot immediately on collection, then re-emits every time a write
+     * through any `favoritesQueries` binding fires a notifier. Dispatches
+     * the terminal query to IO so collectors on Main.immediate don't block.
+     */
+    fun allFlow(): Flow<List<FavoriteEntry>> =
+        db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.IO).map { rows ->
+            rows.map { row ->
+                FavoriteEntry(
+                    favoriteId = row.favorite_id,
+                    addedAt = row.added_at,
+                    content =
+                        ContentItem(
+                            id = row.id,
+                            sourceId = row.source_id,
+                            type = contentTypeFromDb(row.type),
+                            title = row.title,
+                            cleanTitle = row.clean_title,
+                            groupName = row.group_name,
+                            streamUrl = row.stream_url,
+                            logoUrl = row.logo_url,
+                            tvgId = row.tvg_id,
+                            metadataJson = row.metadata_json,
+                            sortOrder = row.sort_order.toInt(),
+                            createdAt = row.created_at,
+                        ),
                 )
             }
         }
@@ -87,7 +86,10 @@ class FavoritesRepository(
      * reflect state changes made from other screens without a focus round-trip.
      */
     fun isFavoriteFlow(contentId: String): Flow<Boolean> =
-        db.favoritesQueries.isFavorite(contentId).asFlow().mapToOne(Dispatchers.IO)
+        db.favoritesQueries
+            .isFavorite(contentId)
+            .asFlow()
+            .mapToOne(Dispatchers.IO)
 
     fun toggle(contentId: String): Boolean {
         // Returns the new state — caller can flip a UI star without re-querying.
@@ -109,9 +111,10 @@ class FavoritesRepository(
     }
 }
 
-private fun contentTypeFromDb(value: String): ContentType = when (value) {
-    "live" -> ContentType.LIVE
-    "movie" -> ContentType.MOVIE
-    "series" -> ContentType.SERIES
-    else -> error("Unknown content type: $value")
-}
+private fun contentTypeFromDb(value: String): ContentType =
+    when (value) {
+        "live" -> ContentType.LIVE
+        "movie" -> ContentType.MOVIE
+        "series" -> ContentType.SERIES
+        else -> error("Unknown content type: $value")
+    }

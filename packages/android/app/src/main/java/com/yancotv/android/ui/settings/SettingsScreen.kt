@@ -52,7 +52,9 @@ import com.yancotv.android.ui.theme.YancoType
  * panel shell) is the shared "settings shell" language — the inner
  * tab bodies decide their own content layout.
  */
-enum class SettingsTab(val label: String) {
+enum class SettingsTab(
+    val label: String,
+) {
     Sources("Sources"),
     General("General"),
     Groups("Groups"),
@@ -76,10 +78,11 @@ fun SettingsScreen(
     var tab by rememberSaveable { mutableStateOf(initialTab) }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(YancoPalette.BackgroundDeep)
-            .padding(horizontal = Space.page, vertical = Space.xxl),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(YancoPalette.BackgroundDeep)
+                .padding(horizontal = Space.page, vertical = Space.xxl),
         verticalArrangement = Arrangement.spacedBy(Space.xl),
     ) {
         SettingsHeader()
@@ -133,22 +136,25 @@ private fun TabRail(
     onSelect: (SettingsTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val brush = remember {
-        Brush.verticalGradient(
-            colors = listOf(
-                YancoPalette.BackgroundRaised,
-                YancoPalette.BackgroundDeep,
-            ),
-        )
-    }
+    val brush =
+        remember {
+            Brush.verticalGradient(
+                colors =
+                    listOf(
+                        YancoPalette.BackgroundRaised,
+                        YancoPalette.BackgroundDeep,
+                    ),
+            )
+        }
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(Radius.panel))
-            .background(brush)
-            .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(Radius.panel))
-            .padding(Space.sm)
-            .focusRestorer()
-            .focusGroup(),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radius.panel))
+                .background(brush)
+                .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(Radius.panel))
+                .padding(Space.sm)
+                .focusRestorer()
+                .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(Space.xxs),
     ) {
         for (entry in SettingsTab.entries) {
@@ -169,46 +175,51 @@ private fun TabRailItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = when {
-        focused -> YancoPalette.BackgroundHover
-        selected -> YancoPalette.Accent.copy(alpha = 0.14f)
-        else -> Color.Transparent
-    }
+    val bg =
+        when {
+            focused -> YancoPalette.BackgroundHover
+            selected -> YancoPalette.Accent.copy(alpha = 0.14f)
+            else -> Color.Transparent
+        }
     val border = if (focused) YancoPalette.FocusRing else Color.Transparent
     val fg by animateColorAsState(
-        targetValue = when {
-            focused -> YancoPalette.TextPrimary
-            selected -> YancoPalette.Accent
-            else -> YancoPalette.TextSecondary
-        },
+        targetValue =
+            when {
+                focused -> YancoPalette.TextPrimary
+                selected -> YancoPalette.Accent
+                else -> YancoPalette.TextSecondary
+            },
         label = "settings-tab-fg",
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(42.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(42.dp),
     ) {
         // Left accent bar marks the currently-selected tab even when focus
         // is elsewhere — matches the sidebar/groups language.
         Box(
-            modifier = Modifier
-                .width(3.dp)
-                .fillMaxHeight()
-                .padding(vertical = Space.sm)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(if (selected) YancoPalette.Accent else Color.Transparent),
+            modifier =
+                Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .padding(vertical = Space.sm)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(if (selected) YancoPalette.Accent else Color.Transparent),
         )
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = Space.sm)
-                .clip(RoundedCornerShape(Radius.control))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(Radius.control))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = Space.md, vertical = Space.sm),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = Space.sm)
+                    .clip(RoundedCornerShape(Radius.control))
+                    .background(bg)
+                    .border(1.dp, border, RoundedCornerShape(Radius.control))
+                    .focusable(interactionSource = interaction)
+                    .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                    .padding(horizontal = Space.md, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -221,15 +232,19 @@ private fun TabRailItem(
 }
 
 @Composable
-private fun ContentFrame(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun ContentFrame(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     // Consistent panel chrome so each tab body lives inside the same
     // card treatment without every tab having to repeat the background +
     // border dance.
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(Radius.panel))
-            .background(YancoPalette.BackgroundRaised)
-            .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(Radius.panel)),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radius.panel))
+                .background(YancoPalette.BackgroundRaised)
+                .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(Radius.panel)),
     ) {
         content()
     }

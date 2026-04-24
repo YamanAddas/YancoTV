@@ -47,51 +47,61 @@ class PlaybackController(
     context: Context,
     private val history: WatchHistoryRepository? = null,
 ) {
-
-    val player: ExoPlayer = run {
-        val okHttp = OkHttpClient.Builder()
-            .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
-            .readTimeout(READ_TIMEOUT_SEC, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
-        val dataSourceFactory = OkHttpDataSource.Factory(okHttp)
-            .setUserAgent(DEFAULT_USER_AGENT)
-        // Tuned for channel-zap UX — start playing at 1s buffered instead
-        // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
-        // don't oscillate between BUFFERING and READY on flaky sources.
-        //
-        // MK.8.2 timeshift retains a back-buffer so users can pause/rewind
-        // a non-DVR live stream. Sized at 2 minutes — covers the realistic
-        // "missed that line, rewind it" use case without piling up off-heap
-        // chunk cache during long viewing sessions. At ~5 Mbps that's ~75 MB
-        // of cache vs ~375 MB at the original 10-minute window; the bigger
-        // window made the app noticeably heavier the longer it ran on Fire
-        // TV Stick (320 MB heap, modest GPU memory pool).
-        //
-        // maxBufferMs trimmed from 30s → 20s for the same reason — saves
-        // ~6 MB per active stream at 5 Mbps, still gives plenty of headroom
-        // for HLS segment fetch latency.
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                /* minBufferMs = */ 15_000,
-                /* maxBufferMs = */ 20_000,
-                /* bufferForPlaybackMs = */ 1_000,
-                /* bufferForPlaybackAfterRebufferMs = */ 2_500,
-            )
-            .setBackBuffer(
-                /* backBufferDurationMs = */ 2 * 60 * 1_000,
-                /* retainBackBufferFromKeyframe = */ true,
-            )
-            .build()
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(
-                DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
-            )
-            .setLoadControl(loadControl)
-            .setHandleAudioBecomingNoisy(true)
-            .build()
-    }
+    val player: ExoPlayer =
+        run {
+            val okHttp =
+                OkHttpClient
+                    .Builder()
+                    .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
+                    .readTimeout(READ_TIMEOUT_SEC, TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .build()
+            val dataSourceFactory =
+                OkHttpDataSource
+                    .Factory(okHttp)
+                    .setUserAgent(DEFAULT_USER_AGENT)
+            // Tuned for channel-zap UX — start playing at 1s buffered instead
+            // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
+            // don't oscillate between BUFFERING and READY on flaky sources.
+            //
+            // MK.8.2 timeshift retains a back-buffer so users can pause/rewind
+            // a non-DVR live stream. Sized at 2 minutes — covers the realistic
+            // "missed that line, rewind it" use case without piling up off-heap
+            // chunk cache during long viewing sessions. At ~5 Mbps that's ~75 MB
+            // of cache vs ~375 MB at the original 10-minute window; the bigger
+            // window made the app noticeably heavier the longer it ran on Fire
+            // TV Stick (320 MB heap, modest GPU memory pool).
+            //
+            // maxBufferMs trimmed from 30s → 20s for the same reason — saves
+            // ~6 MB per active stream at 5 Mbps, still gives plenty of headroom
+            // for HLS segment fetch latency.
+            val loadControl =
+                DefaultLoadControl
+                    .Builder()
+                    .setBufferDurationsMs(
+                        // minBufferMs =
+                        15_000,
+                        // maxBufferMs =
+                        20_000,
+                        // bufferForPlaybackMs =
+                        1_000,
+                        // bufferForPlaybackAfterRebufferMs =
+                        2_500,
+                    ).setBackBuffer(
+                        // backBufferDurationMs =
+                        2 * 60 * 1_000,
+                        // retainBackBufferFromKeyframe =
+                        true,
+                    ).build()
+            ExoPlayer
+                .Builder(context)
+                .setMediaSourceFactory(
+                    DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
+                ).setLoadControl(loadControl)
+                .setHandleAudioBecomingNoisy(true)
+                .build()
+        }
 
     // Main-immediate so state mutations stay on the main thread; IO work
     // (SQLDelight reads/writes for resume points) dispatches to IO via
@@ -101,6 +111,7 @@ class PlaybackController(
     private val _queue = MutableStateFlow<List<ContentItem>>(emptyList())
     private val _index = MutableStateFlow(-1)
     private val _currentItem = MutableStateFlow<ContentItem?>(null)
+
     // Tracks the originating Playable.Episode for an episode play so
     // persistResumePoint can write watch_history with the *series* id as
     // content_id (FK target) and the episode id in the nullable episode_id
@@ -129,7 +140,10 @@ class PlaybackController(
      *     point so VOD mid-seeks aren't lost when the user zaps between titles
      *     without hitting a lifecycle hook.
      */
-    fun play(list: List<ContentItem>, startIndex: Int) {
+    fun play(
+        list: List<ContentItem>,
+        startIndex: Int,
+    ) {
         if (startIndex !in list.indices) return
         val target = list[startIndex]
         // Sealed-type gate — rejects Series containers and blank URLs.
@@ -189,22 +203,24 @@ class PlaybackController(
      * VOD file, resume-point logic behaves correctly, and
      * `type == ContentType.LIVE` checks around the app correctly read false.
      */
-    private fun Playable.Episode.toContentItemView(): ContentItem = ContentItem(
-        id = id,
-        sourceId = sourceId,
-        type = ContentType.MOVIE,
-        title = title,
-        cleanTitle = title,
-        groupName = null,
-        streamUrl = streamUrl,
-        logoUrl = artworkUrl,
-        tvgId = null,
-        metadataJson = null,
-        sortOrder = 0,
-        createdAt = 0L,
-    )
+    private fun Playable.Episode.toContentItemView(): ContentItem =
+        ContentItem(
+            id = id,
+            sourceId = sourceId,
+            type = ContentType.MOVIE,
+            title = title,
+            cleanTitle = title,
+            groupName = null,
+            streamUrl = streamUrl,
+            logoUrl = artworkUrl,
+            tvgId = null,
+            metadataJson = null,
+            sortOrder = 0,
+            createdAt = 0L,
+        )
 
     fun next(): Boolean = step(+1)
+
     fun previous(): Boolean = step(-1)
 
     fun stop() {
@@ -240,17 +256,19 @@ class PlaybackController(
     private fun loadCurrent() {
         val item = _queue.value.getOrNull(_index.value) ?: return
         _currentItem.value = item
-        val mediaItem = MediaItem.Builder()
-            .setUri(item.streamUrl)
-            .setMediaId(item.id)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(item.cleanTitle?.ifBlank { null } ?: item.title)
-                    .setArtist(item.groupName)
-                    .setArtworkUri(item.logoUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
-                    .build(),
-            )
-            .build()
+        val mediaItem =
+            MediaItem
+                .Builder()
+                .setUri(item.streamUrl)
+                .setMediaId(item.id)
+                .setMediaMetadata(
+                    MediaMetadata
+                        .Builder()
+                        .setTitle(item.cleanTitle?.ifBlank { null } ?: item.title)
+                        .setArtist(item.groupName)
+                        .setArtworkUri(item.logoUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+                        .build(),
+                ).build()
         val repo = history
         if (item.type == ContentType.LIVE || repo == null) {
             player.setMediaItem(mediaItem)
@@ -263,9 +281,10 @@ class PlaybackController(
         // we were awaiting the IO read, drop this result — a newer
         // loadCurrent will have kicked off a fresh lookup for the new item.
         scope.launch {
-            val resumeMs = withContext(Dispatchers.IO) {
-                (repo.positionFor(item.id) ?: 0L) * 1000L
-            }
+            val resumeMs =
+                withContext(Dispatchers.IO) {
+                    (repo.positionFor(item.id) ?: 0L) * 1000L
+                }
             if (_currentItem.value?.id != item.id) return@launch
             if (resumeMs > 0) player.setMediaItem(mediaItem, resumeMs) else player.setMediaItem(mediaItem)
             player.prepare()

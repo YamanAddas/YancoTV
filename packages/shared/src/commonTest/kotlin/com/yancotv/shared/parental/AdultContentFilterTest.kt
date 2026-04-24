@@ -13,7 +13,6 @@ import kotlin.test.assertTrue
  * "XXX Adults Only" MUST be.
  */
 class AdultContentFilterTest {
-
     @Test fun flagsStrongMarkerInCategory() {
         assertTrue(AdultContentFilter.isAdult(item(group = "XXX Adults Only")))
         assertTrue(AdultContentFilter.isAdult(item(group = "ADULTS ONLY")))

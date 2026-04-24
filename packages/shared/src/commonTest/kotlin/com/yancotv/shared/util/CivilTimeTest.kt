@@ -14,7 +14,6 @@ import kotlin.test.assertEquals
  *  - End-of-day rollovers
  */
 class CivilTimeTest {
-
     @Test fun epochIsJan1_1970() {
         val c = civilFromEpochSeconds(0)
         assertEquals(1970, c.year)
@@ -94,15 +93,21 @@ class CivilTimeTest {
         // 1900-02-28 23:59:59 UTC == -2203891201
         // 1900-03-01 00:00:00 UTC == -2203891200
         val before = civilFromEpochSeconds(-2203891201L)
-        assertEquals(1900, before.year); assertEquals(2, before.month); assertEquals(28, before.day)
+        assertEquals(1900, before.year)
+        assertEquals(2, before.month)
+        assertEquals(28, before.day)
         val after = civilFromEpochSeconds(-2203891200L)
-        assertEquals(1900, after.year); assertEquals(3, after.month); assertEquals(1, after.day)
+        assertEquals(1900, after.year)
+        assertEquals(3, after.month)
+        assertEquals(1, after.day)
     }
 
     @Test fun leap2000() {
         // 2000 WAS a leap year (divisible by 400).
         // 2000-02-29 00:00:00 UTC == 951782400
         val c = civilFromEpochSeconds(951782400L)
-        assertEquals(2000, c.year); assertEquals(2, c.month); assertEquals(29, c.day)
+        assertEquals(2000, c.year)
+        assertEquals(2, c.month)
+        assertEquals(29, c.day)
     }
 }

@@ -24,16 +24,19 @@ import javax.crypto.spec.PBEKeySpec
  * (verify reads the stored iters).
  */
 class AndroidPinHasher : PinHasher {
-
     private val rng = SecureRandom()
 
-    override suspend fun hash(pin: String): String = withContext(Dispatchers.Default) {
-        val salt = ByteArray(SALT_BYTES).also(rng::nextBytes)
-        val derived = derive(pin, salt, ITERATIONS)
-        "pbkdf2:$ITERATIONS:${salt.toHex()}:${derived.toHex()}"
-    }
+    override suspend fun hash(pin: String): String =
+        withContext(Dispatchers.Default) {
+            val salt = ByteArray(SALT_BYTES).also(rng::nextBytes)
+            val derived = derive(pin, salt, ITERATIONS)
+            "pbkdf2:$ITERATIONS:${salt.toHex()}:${derived.toHex()}"
+        }
 
-    override suspend fun verify(pin: String, encoded: String): PinHasher.VerifyResult =
+    override suspend fun verify(
+        pin: String,
+        encoded: String,
+    ): PinHasher.VerifyResult =
         withContext(Dispatchers.Default) {
             val trimmed = encoded.trim()
             if (!trimmed.startsWith("pbkdf2:")) return@withContext PinHasher.VerifyResult(ok = false)
@@ -47,7 +50,11 @@ class AndroidPinHasher : PinHasher {
             PinHasher.VerifyResult(ok = timingSafeEqual(actual, expected))
         }
 
-    private fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray {
+    private fun derive(
+        pin: String,
+        salt: ByteArray,
+        iterations: Int,
+    ): ByteArray {
         // PBEKeySpec wipes its internal char[] when `clearPassword()` is
         // called; we do that in the finally so the PIN can't linger as
         // plaintext in heap waiting for GC.
@@ -61,6 +68,7 @@ class AndroidPinHasher : PinHasher {
 
     private companion object {
         const val ITERATIONS = 100_000
+
         // Sanity ceiling — prevents a corrupted stored blob from triggering
         // a multi-minute hang at verify.
         const val MAX_ITERATIONS = 1_000_000
@@ -91,7 +99,10 @@ class AndroidPinHasher : PinHasher {
             return out
         }
 
-        fun timingSafeEqual(a: ByteArray, b: ByteArray): Boolean {
+        fun timingSafeEqual(
+            a: ByteArray,
+            b: ByteArray,
+        ): Boolean {
             if (a.size != b.size) return false
             var diff = 0
             for (i in a.indices) diff = diff or (a[i].toInt() xor b[i].toInt())

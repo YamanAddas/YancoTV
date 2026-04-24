@@ -13,26 +13,41 @@ package com.yancotv.shared.sources
  *   - compact enough to index cheaply
  */
 internal object ContentIds {
-    fun m3u(sourceId: String, title: String, streamUrl: String): String =
-        "$sourceId-${fnv1a("$title|$streamUrl")}"
+    fun m3u(
+        sourceId: String,
+        title: String,
+        streamUrl: String,
+    ): String = "$sourceId-${fnv1a("$title|$streamUrl")}"
 
-    fun xtreamLive(sourceId: String, streamId: String): String =
-        "$sourceId-xt-live-$streamId"
+    fun xtreamLive(
+        sourceId: String,
+        streamId: String,
+    ): String = "$sourceId-xt-live-$streamId"
 
-    fun xtreamVod(sourceId: String, streamId: String): String =
-        "$sourceId-xt-vod-$streamId"
+    fun xtreamVod(
+        sourceId: String,
+        streamId: String,
+    ): String = "$sourceId-xt-vod-$streamId"
 
-    fun xtreamSeries(sourceId: String, seriesId: String): String =
-        "$sourceId-xt-series-$seriesId"
+    fun xtreamSeries(
+        sourceId: String,
+        seriesId: String,
+    ): String = "$sourceId-xt-series-$seriesId"
 
-    fun stalkerLive(sourceId: String, channelId: String): String =
-        "$sourceId-stk-live-$channelId"
+    fun stalkerLive(
+        sourceId: String,
+        channelId: String,
+    ): String = "$sourceId-stk-live-$channelId"
 
-    fun stalkerVod(sourceId: String, itemId: String): String =
-        "$sourceId-stk-vod-$itemId"
+    fun stalkerVod(
+        sourceId: String,
+        itemId: String,
+    ): String = "$sourceId-stk-vod-$itemId"
 
-    fun stalkerSeries(sourceId: String, seriesId: String): String =
-        "$sourceId-stk-series-$seriesId"
+    fun stalkerSeries(
+        sourceId: String,
+        seriesId: String,
+    ): String = "$sourceId-stk-series-$seriesId"
 
     private fun fnv1a(s: String): String {
         var h = 0x811c9dc5.toInt()

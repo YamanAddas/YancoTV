@@ -51,36 +51,41 @@ object YancoPalette {
     val Veil = Color(0x66000000)
 }
 
-private val PhoneDarkScheme = darkColorScheme(
-    primary = YancoPalette.Accent,
-    onPrimary = Color.Black,
-    secondary = YancoPalette.AccentDeep,
-    background = YancoPalette.BackgroundDeep,
-    surface = YancoPalette.BackgroundRaised,
-    surfaceVariant = YancoPalette.BackgroundHover,
-    onBackground = YancoPalette.TextPrimary,
-    onSurface = YancoPalette.TextPrimary,
-    onSurfaceVariant = YancoPalette.TextSecondary,
-    outline = YancoPalette.BorderSubtle,
-    error = YancoPalette.Error,
-)
+private val PhoneDarkScheme =
+    darkColorScheme(
+        primary = YancoPalette.Accent,
+        onPrimary = Color.Black,
+        secondary = YancoPalette.AccentDeep,
+        background = YancoPalette.BackgroundDeep,
+        surface = YancoPalette.BackgroundRaised,
+        surfaceVariant = YancoPalette.BackgroundHover,
+        onBackground = YancoPalette.TextPrimary,
+        onSurface = YancoPalette.TextPrimary,
+        onSurfaceVariant = YancoPalette.TextSecondary,
+        outline = YancoPalette.BorderSubtle,
+        error = YancoPalette.Error,
+    )
 
-private val TvDarkScheme = androidx.tv.material3.darkColorScheme(
-    primary = YancoPalette.Accent,
-    onPrimary = Color.Black,
-    secondary = YancoPalette.AccentDeep,
-    background = YancoPalette.BackgroundDeep,
-    surface = YancoPalette.BackgroundRaised,
-    surfaceVariant = YancoPalette.BackgroundHover,
-    onBackground = YancoPalette.TextPrimary,
-    onSurface = YancoPalette.TextPrimary,
-    onSurfaceVariant = YancoPalette.TextSecondary,
-    border = YancoPalette.BorderSubtle,
-    error = YancoPalette.Error,
-)
+private val TvDarkScheme =
+    androidx.tv.material3.darkColorScheme(
+        primary = YancoPalette.Accent,
+        onPrimary = Color.Black,
+        secondary = YancoPalette.AccentDeep,
+        background = YancoPalette.BackgroundDeep,
+        surface = YancoPalette.BackgroundRaised,
+        surfaceVariant = YancoPalette.BackgroundHover,
+        onBackground = YancoPalette.TextPrimary,
+        onSurface = YancoPalette.TextPrimary,
+        onSurfaceVariant = YancoPalette.TextSecondary,
+        border = YancoPalette.BorderSubtle,
+        error = YancoPalette.Error,
+    )
 
 @Composable
-fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
+fun YancoTheme(
+    isTv: Boolean,
+    content: @Composable () -> Unit,
+) {
     if (isTv) {
         androidx.tv.material3.MaterialTheme(
             colorScheme = TvDarkScheme,

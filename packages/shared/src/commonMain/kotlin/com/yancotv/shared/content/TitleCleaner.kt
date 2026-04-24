@@ -8,32 +8,27 @@ package com.yancotv.shared.content
  * a clean title suitable for display and metadata matching.
  */
 
-private val STRIP_PATTERNS: List<Regex> = listOf(
-    // Bracketed tags FIRST (before quality tags strip inner content):
-    // [HD], [MULTI], [4K], (HD), {HD}, etc.
-    Regex("""\s*[\[({][^\])}\n]*[\])}]"""),
-
-    // Quality/resolution tags: HD, FHD, UHD, 4K, SD, 720p, 1080p, etc.
-    Regex("""\b(?:4K|8K|UHD|FHD|HD|SD|H\.?265|H\.?264|HEVC|HDR(?:10)?|MULTI)\b""", RegexOption.IGNORE_CASE),
-    Regex("""\b(?:\d{3,4}[pi])\b""", RegexOption.IGNORE_CASE),
-
-    // Country prefix patterns: "US:", "US |", "UK:" (2-3 letter codes with : or |)
-    Regex("""^[A-Z]{2,3}\s*[:|]\s*"""),
-    // Country prefix with dash: only 2-letter codes (to avoid matching "CNN -")
-    Regex("""^[A-Z]{2}\s+-\s+"""),
-
-    // Country/region with pipe: "| US", "| UK" at end
-    Regex("""\s*\|\s*[A-Z]{2,3}$"""),
-
-    // Provider channel numbering: "001.", "CH 001:", etc.
-    Regex("""^(?:CH\s*)?\d{1,4}[.:]\s*""", RegexOption.IGNORE_CASE),
-
-    // Trailing provider noise: "- Backup", "| S2", "| Server 3"
-    Regex("""\s*[-|]\s*(?:backup|bk|s\d+|server\s*\d+)$""", RegexOption.IGNORE_CASE),
-
-    // Double/triple spaces from removals
-    Regex("""\s{2,}"""),
-)
+private val STRIP_PATTERNS: List<Regex> =
+    listOf(
+        // Bracketed tags FIRST (before quality tags strip inner content):
+        // [HD], [MULTI], [4K], (HD), {HD}, etc.
+        Regex("""\s*[\[({][^\])}\n]*[\])}]"""),
+        // Quality/resolution tags: HD, FHD, UHD, 4K, SD, 720p, 1080p, etc.
+        Regex("""\b(?:4K|8K|UHD|FHD|HD|SD|H\.?265|H\.?264|HEVC|HDR(?:10)?|MULTI)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:\d{3,4}[pi])\b""", RegexOption.IGNORE_CASE),
+        // Country prefix patterns: "US:", "US |", "UK:" (2-3 letter codes with : or |)
+        Regex("""^[A-Z]{2,3}\s*[:|]\s*"""),
+        // Country prefix with dash: only 2-letter codes (to avoid matching "CNN -")
+        Regex("""^[A-Z]{2}\s+-\s+"""),
+        // Country/region with pipe: "| US", "| UK" at end
+        Regex("""\s*\|\s*[A-Z]{2,3}$"""),
+        // Provider channel numbering: "001.", "CH 001:", etc.
+        Regex("""^(?:CH\s*)?\d{1,4}[.:]\s*""", RegexOption.IGNORE_CASE),
+        // Trailing provider noise: "- Backup", "| S2", "| Server 3"
+        Regex("""\s*[-|]\s*(?:backup|bk|s\d+|server\s*\d+)$""", RegexOption.IGNORE_CASE),
+        // Double/triple spaces from removals
+        Regex("""\s{2,}"""),
+    )
 
 /** Clean an IPTV title by removing provider noise. */
 fun cleanTitle(rawTitle: String): String {
@@ -56,7 +51,10 @@ fun cleanTitle(rawTitle: String): String {
  * `currentYear` defaults to a generous upper bound so callers can omit it;
  * pass the real current year when stricter rejection of future years matters.
  */
-fun extractYear(title: String, currentYear: Int = 9999): Int? {
+fun extractYear(
+    title: String,
+    currentYear: Int = 9999,
+): Int? {
     val parenMatch = Regex("""\((\d{4})\)""").find(title)
     if (parenMatch != null) {
         val year = parenMatch.groupValues[1].toInt()
@@ -72,7 +70,10 @@ fun extractYear(title: String, currentYear: Int = 9999): Int? {
     return null
 }
 
-data class SeasonEpisode(val season: Int, val episode: Int)
+data class SeasonEpisode(
+    val season: Int,
+    val episode: Int,
+)
 
 /** Extract season and episode numbers from a title. */
 fun extractSeasonEpisode(title: String): SeasonEpisode? {
@@ -104,4 +105,3 @@ fun extractShowName(title: String): String {
     showName = cleanTitle(showName)
     return showName.ifEmpty { title }
 }
-
