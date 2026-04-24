@@ -3,6 +3,18 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.ktlint)
+}
+
+// Same wiring as :app — see packages/android/app/build.gradle.kts for
+// why we apply per-module instead of via root subprojects {}.
+ktlint {
+    version.set(libs.versions.ktlintCli.get())
+    android.set(false) // KMP module — Android-specific rules don't apply
+    ignoreFailures.set(true)
+    filter {
+        exclude { it.file.toString().contains("/build/generated/") }
+    }
 }
 
 kotlin {

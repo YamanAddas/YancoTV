@@ -2,6 +2,23 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.ktlint)
+}
+
+// ktlint applied per-module (the version-catalog `libs` accessor isn't
+// available inside root `subprojects {}` blocks in Kotlin DSL, so each
+// module wires it directly). ignoreFailures while we burn down style
+// debt — flip to false in a later D.x once ktlintCheck is empty.
+ktlint {
+    version.set(libs.versions.ktlintCli.get())
+    android.set(true)
+    ignoreFailures.set(true)
+    filter {
+        // Don't lint generated code (Compose, KSP, R-class, etc.) —
+        // generators don't follow human style and we don't want those
+        // diffs in our reports.
+        exclude { it.file.toString().contains("/build/generated/") }
+    }
 }
 
 android {
