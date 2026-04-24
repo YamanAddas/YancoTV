@@ -246,23 +246,50 @@ class PlayerActivity : AppCompatActivity() {
                 controller.currentItem.collect { item -> onItemChanged(item) }
             }
         }
-        // Settings → Playback → Aspect. Re-applies whenever the user flips
-        // the chip row so a fullscreen session can change between Fit / Fill
-        // / Zoom without restarting. PlayerView reads the mode on the next
+        // Settings → Playback → Aspect + MK.12a.5 sheet picker. Re-applies
+        // whenever the user flips the chip row or picks a new ratio so a
+        // fullscreen session can change between Fit / Fill / Zoom / 16:9 /
+        // 4:3 without restarting. PlayerView reads the mode on the next
         // frame layout pass.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                prefs.playbackFlow.collect { playerView.resizeMode = it.resizeMode.toPlayerViewMode() }
+                prefs.playbackFlow.collect { applyResizeMode(it.resizeMode) }
             }
         }
     }
 
-    private fun ResizeMode.toPlayerViewMode(): Int =
-        when (this) {
-            ResizeMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-            ResizeMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-            ResizeMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+    /**
+     * Translate a [ResizeMode] to the pair of knobs Media3 exposes:
+     * [PlayerView.setResizeMode] for the fit/fill/zoom choice, and
+     * [AspectRatioFrameLayout.setAspectRatio] (on the inner content frame)
+     * for forcing a specific ratio. Passing 0 to setAspectRatio reverts to
+     * automatic detection from the video's own size.
+     */
+    private fun applyResizeMode(mode: ResizeMode) {
+        val frame = playerView.findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+        when (mode) {
+            ResizeMode.FIT -> {
+                frame?.setAspectRatio(0f)
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+            ResizeMode.FILL -> {
+                frame?.setAspectRatio(0f)
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+            }
+            ResizeMode.ZOOM -> {
+                frame?.setAspectRatio(0f)
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            }
+            ResizeMode.RATIO_16_9 -> {
+                frame?.setAspectRatio(16f / 9f)
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+            ResizeMode.RATIO_4_3 -> {
+                frame?.setAspectRatio(4f / 3f)
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
         }
+    }
 
     override fun onStart() {
         super.onStart()

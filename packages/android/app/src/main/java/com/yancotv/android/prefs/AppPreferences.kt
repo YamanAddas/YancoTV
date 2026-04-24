@@ -232,6 +232,11 @@ enum class ResizeMode(
     FIT("fit", "Fit"),
     FILL("fill", "Fill"),
     ZOOM("zoom", "Zoom"),
+    // MK.12a.5 — forced aspect ratios. These override the stream's reported
+    // aspect; useful when a provider tags the stream incorrectly (SD 4:3
+    // content served in a 16:9 container, letterboxed 16:9 in a 4:3 frame).
+    RATIO_16_9("16_9", "16:9"),
+    RATIO_4_3("4_3", "4:3"),
     ;
 
     companion object {

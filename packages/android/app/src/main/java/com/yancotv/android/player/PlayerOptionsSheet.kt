@@ -41,6 +41,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.YancoPalette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ import java.util.Locale
 /** Which panel the options sheet is currently showing. Top-level so
  *  [PlayerActivity] can hoist the state and route BACK from a sub-view
  *  back to [OPTIONS] before dismissing the sheet entirely. */
-enum class SheetMode { OPTIONS, AUDIO }
+enum class SheetMode { OPTIONS, AUDIO, ASPECT }
 
 @UnstableApi
 @Composable
@@ -110,11 +111,17 @@ fun PlayerOptionsSheet(
                         controller = controller,
                         prefs = prefs,
                         onOpenAudio = { onModeChange(SheetMode.AUDIO) },
+                        onOpenAspect = { onModeChange(SheetMode.ASPECT) },
                         onDismiss = onDismiss,
                     )
                 SheetMode.AUDIO ->
                     AudioView(
                         controller = controller,
+                        prefs = prefs,
+                        onBack = { onModeChange(SheetMode.OPTIONS) },
+                    )
+                SheetMode.ASPECT ->
+                    AspectView(
                         prefs = prefs,
                         onBack = { onModeChange(SheetMode.OPTIONS) },
                     )
@@ -129,6 +136,7 @@ private fun OptionsView(
     controller: PlaybackController,
     prefs: AppPreferences,
     onOpenAudio: () -> Unit,
+    onOpenAspect: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
@@ -177,9 +185,8 @@ private fun OptionsView(
     )
     OptionRow(
         label = "Aspect ratio",
-        value = "Coming in MK.12a.5",
-        enabled = false,
-        onClick = onDismiss,
+        value = playback.resizeMode.displayName,
+        onClick = onOpenAspect,
     )
     OptionRow(
         label = "Sleep timer",
@@ -255,6 +262,85 @@ private fun AudioView(
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
     )
+}
+
+@Composable
+private fun AspectView(
+    prefs: AppPreferences,
+    onBack: () -> Unit,
+) {
+    val firstRowFocus = remember { FocusRequester() }
+    val playback by prefs.playbackFlow.collectAsState()
+    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
+
+    Text(
+        text = "ASPECT RATIO",
+        color = YancoPalette.Accent,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 2.sp,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+    ResizeMode.values().forEachIndexed { idx, rm ->
+        AspectRow(
+            mode = rm,
+            selected = playback.resizeMode == rm,
+            focusRequester = if (idx == 0) firstRowFocus else null,
+            onPick = {
+                // Write through prefs — PlayerActivity's lifecycle collector
+                // applies the new mode on the next emission. One source of
+                // truth, no direct PlayerView mutation from the sheet.
+                scope.launch { prefs.setResizeMode(rm) }
+                onBack()
+            },
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = "BACK to options",
+        color = YancoPalette.TextMuted,
+        fontSize = 10.sp,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+@Composable
+private fun AspectRow(
+    mode: ResizeMode,
+    selected: Boolean,
+    focusRequester: FocusRequester?,
+    onPick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val modifier =
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (focused) YancoPalette.BackgroundElevated else Color.Transparent)
+            .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null) { onPick() }
+            .semantics { contentDescription = mode.displayName + if (selected) ", selected" else "" }
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = if (selected) "●" else "○",
+            color = if (selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(end = 12.dp),
+        )
+        Text(
+            text = mode.displayName,
+            color = YancoPalette.TextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
 }
 
 /**
