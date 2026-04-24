@@ -58,7 +58,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -354,21 +353,19 @@ fun CoverflowSectionScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .onFocusChanged { coverflowHasFocus = it.hasFocus }
-                // Catch LEFT presses that bubbled up because no child consumed
-                // them — i.e. focus is on the leftmost CTA ("Open fullscreen")
-                // or the leftmost orb. onKeyEvent fires after traversal, so
-                // navigating between Favorite ↔ Watch (siblings) still works
-                // naturally; we only intercept when there's nowhere left to go.
-                .onKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                        onExitToCategories()
-                        true
-                    } else {
-                        false
-                    }
-                },
+                .onFocusChanged { coverflowHasFocus = it.hasFocus },
     ) {
+        // Compose key dispatch order is preview (top-down) → onKeyEvent
+        // (bottom-up) → default focus navigation. An .onKeyEvent on the outer
+        // Column still fires BEFORE focus-nav, so hoisting the "LEFT exits to
+        // categories" handler here intercepts every LEFT and defeats the
+        // LazyRow's orb-to-orb scroll. The correct placement is scoped:
+        //   1. PreviewPane's Watch CTA — LEFT from leftmost CTA exits (see
+        //      onExit wiring below; preview handler only fires when Watch is
+        //      the focused node, so Favorite → Watch via focus-nav is
+        //      untouched).
+        //   2. Coverflow Box — onPreviewKeyEvent gated on shouldExitCoverflowOnLeft
+        //      (focusedIndex <= 0). Inter-orb LEFT/RIGHT flow naturally.
         PreviewPane(
             type = type,
             focused = previewItem,
@@ -379,6 +376,7 @@ fun CoverflowSectionScreen(
             nowNext = previewItem?.tvgId?.let { nowNextMap[it] },
             nowSeconds = nowSeconds,
             controller = controller,
+            onExitLeft = onExitToCategories,
             onPlay = {
                 val item = previewItem ?: return@PreviewPane
                 val idx = visible.indexOfFirst { it.id == item.id }
@@ -416,7 +414,7 @@ fun CoverflowSectionScreen(
                     .onPreviewKeyEvent { ev ->
                         if (ev.type == KeyEventType.KeyDown &&
                             ev.key == Key.DirectionLeft &&
-                            focusedIndex <= 0
+                            shouldExitCoverflowOnLeft(focusedIndex)
                         ) {
                             onExitToCategories()
                             true
@@ -455,11 +453,25 @@ fun CoverflowSectionScreen(
     }
 }
 
+/**
+ * LEFT-key decision for the coverflow wheel. Extracted so the key-dispatch
+ * rule is a pure function pinned by a JVM unit test (`CoverflowLeftActionTest`)
+ * — the regression fixed by the Watch-scoped preview handler was that LEFT
+ * intercepted every press, which wasn't catchable by that test alone; this
+ * one locks down the "only at index 0" half of the contract.
+ *
+ * Returns true when LEFT on the coverflow Box should consume the event and
+ * pop back to the categories rail — i.e. focus is on (or before) the first
+ * orb, so there's nothing to scroll to on the left.
+ */
+internal fun shouldExitCoverflowOnLeft(focusedIndex: Int): Boolean = focusedIndex <= 0
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Preview pane — type-aware. LIVE shows the MiniPlayer (or focused channel's
 // logo when not yet playing); VOD shows the focused poster + meta + Open CTA.
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
 private fun PreviewPane(
@@ -472,6 +484,7 @@ private fun PreviewPane(
     nowNext: NowNext?,
     nowSeconds: Long,
     controller: PlaybackController,
+    onExitLeft: () -> Unit,
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
@@ -548,6 +561,7 @@ private fun PreviewPane(
             isLocked = isLocked,
             nowNext = nowNext,
             nowSeconds = nowSeconds,
+            onExitLeft = onExitLeft,
             onPlay = onPlay,
             onToggleFavorite = onToggleFavorite,
             modifier =
@@ -588,6 +602,7 @@ private fun PreviewIdleArtwork(type: ContentType) {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun MetaColumn(
     type: ContentType,
@@ -597,6 +612,7 @@ private fun MetaColumn(
     isLocked: Boolean,
     nowNext: NowNext?,
     nowSeconds: Long,
+    onExitLeft: () -> Unit,
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
@@ -673,12 +689,30 @@ private fun MetaColumn(
         }
         Spacer(Modifier.height(Space.xs))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            HexCta(
-                label = watchLabel,
-                icon = YancoIcons.Play,
-                primary = true,
-                onClick = onPlay,
-            )
+            // Only the Watch CTA gets the LEFT-exits-to-categories preview
+            // handler. Scoping it to this subtree (not MetaColumn / Row) is
+            // deliberate: onPreviewKeyEvent fires top-down along the focused
+            // path, so wrapping the whole row would swallow Favorite→Watch
+            // focus-nav too. Wrapped at Watch-only level, the handler is
+            // only reachable when Watch itself owns focus.
+            Box(
+                modifier =
+                    Modifier.onPreviewKeyEvent { ev ->
+                        if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                            onExitLeft()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+            ) {
+                HexCta(
+                    label = watchLabel,
+                    icon = YancoIcons.Play,
+                    primary = true,
+                    onClick = onPlay,
+                )
+            }
             HexCta(
                 label = if (isFavorite) "In favorites" else "Favorite",
                 icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
