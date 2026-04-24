@@ -1,0 +1,4 @@
+interface:
+  display_name: "IPTV Domain"
+  short_description: "Use for IPTV parsing and content logic."
+  default_prompt: "Use this skill for M3U, Xtream, Stalker, XMLTV, catch-up, subtitles, classification, or title-cleaning work."

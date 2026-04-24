@@ -1,0 +1,55 @@
+# YancoTV Codex rules.
+# These are intentionally prompt-only. They speed up repeated native workflows
+# without importing Claude Code's broad local allow list.
+
+prefix_rule(
+    pattern = [".\\gradlew.bat", ":app:compileDebugKotlin"],
+    decision = "prompt",
+    justification = "Compile the Android app with approval",
+    match = [".\\gradlew.bat :app:compileDebugKotlin"],
+)
+
+prefix_rule(
+    pattern = [".\\gradlew.bat", ":app:assembleDebug"],
+    decision = "prompt",
+    justification = "Build the Android debug APK with approval",
+    match = [".\\gradlew.bat :app:assembleDebug"],
+)
+
+prefix_rule(
+    pattern = [".\\gradlew.bat", ":app:installDebug"],
+    decision = "prompt",
+    justification = "Install the Android debug APK to a connected device with approval",
+    match = [".\\gradlew.bat :app:installDebug"],
+)
+
+prefix_rule(
+    pattern = [".\\gradlew.bat", ":shared:commonTest"],
+    decision = "prompt",
+    justification = "Run shared KMP tests with approval",
+    match = [".\\gradlew.bat :shared:commonTest :shared:androidUnitTest"],
+)
+
+prefix_rule(
+    pattern = ["C:\\Users\\dryam\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe", "-s", "192.168.68.56:5555"],
+    decision = "prompt",
+    justification = "Use the canonical Fire TV test device with approval",
+    match = [
+        "C:\\Users\\dryam\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe -s 192.168.68.56:5555 devices",
+        "C:\\Users\\dryam\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe -s 192.168.68.56:5555 install -r app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "YancoTV policy requires explicit confirmation before pushing",
+    match = ["git push origin master"],
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "prompt",
+    justification = "Destructive git reset requires explicit confirmation",
+    match = ["git reset --hard HEAD"],
+)

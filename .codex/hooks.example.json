@@ -1,0 +1,28 @@
+{
+  "_note": "Example only. Do not rename this to hooks.json on Windows. Codex hooks are experimental and currently disabled on Windows. If hooks become enabled, keep them deterministic and repo-local.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/user_prompt_submit.py\"",
+            "statusMessage": "Checking YancoTV prompt context"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/stop_validation.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking YancoTV validation expectations"
+          }
+        ]
+      }
+    ]
+  }
+}

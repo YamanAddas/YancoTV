@@ -1,0 +1,4 @@
+interface:
+  display_name: "Native Android MK"
+  short_description: "Use before YancoTV native Android and KMP work."
+  default_prompt: "Use this skill before editing, reviewing, testing, or debugging packages/android or packages/shared."

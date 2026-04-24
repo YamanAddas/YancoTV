@@ -1,0 +1,21 @@
+# Project-scoped Codex configuration for YancoTV.
+# Keep this file Codex-only. Do not mirror or modify Claude Code config here.
+
+project_doc_max_bytes = 65536
+
+developer_instructions = """
+YancoTV Codex overlay:
+- Treat root AGENTS.md as the canonical cross-tool guide.
+- Do not edit CLAUDE.md, packages/**/CLAUDE.md, or .claude/** unless the user explicitly asks to update Claude Code guidance.
+- For work under packages/android or packages/shared, use the native-android-mk skill before editing, reviewing, testing, or debugging.
+- For M3U, Xtream, Stalker, XMLTV, catch-up, subtitles, content classification, or title-cleaning work, use the iptv-domain skill.
+- Do not import .claude/settings.local.json command permissions into Codex rules wholesale.
+- Do not push without an explicit user request.
+- Keep Android/native changes mapped to PRODUCTION_PLAN_NATIVE.md and the relevant MK.* task.
+"""
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+enabled = true
+startup_timeout_sec = 10
+tool_timeout_sec = 60
