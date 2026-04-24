@@ -19,8 +19,10 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +30,37 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+
+/**
+ * Sleep-timer presets (MK.12b.1). Fixed durations are stored in
+ * milliseconds; [END_OF_PROGRAM] has no fixed duration — the duration is
+ * computed at pick time from the channel's current EPG programme end time
+ * and passed to [PlaybackController.setSleepTimer] explicitly.
+ */
+enum class SleepTimerOption(val durationMs: Long?) {
+    MIN_15(15L * 60_000L),
+    MIN_30(30L * 60_000L),
+    MIN_45(45L * 60_000L),
+    MIN_60(60L * 60_000L),
+
+    /** End of currently-airing EPG programme. Duration computed by caller. */
+    END_OF_PROGRAM(null),
+}
+
+/**
+ * Snapshot of the active sleep timer. UI observes [PlaybackController.sleepTimer]
+ * to render the current selection (and its remaining time) in the options
+ * sheet's SLEEP tab.
+ */
+sealed interface SleepTimerState {
+    data object Off : SleepTimerState
+
+    data class Active(
+        /** Wall-clock instant when the timer fires, ms since epoch. */
+        val deadlineMs: Long,
+        val option: SleepTimerOption,
+    ) : SleepTimerState
+}
 
 /**
  * App-scoped playback holder. Owns the single [ExoPlayer] shared between
@@ -160,9 +193,18 @@ class PlaybackController(
     // title's captions onto a new stream.
     private var _externalSubtitle: Pair<Uri, String?>? = null
 
+    // MK.12b.1 — sleep timer. Coroutine job lives on `scope`; cancellation
+    // happens via [cancelSleepTimer], lifecycle [release], or — for the
+    // END_OF_PROGRAM option only — when [loadCurrent] runs for a new item
+    // (a new channel has different EPG, so the program-end deadline no
+    // longer makes sense). Fixed-duration timers persist across zap.
+    private val _sleepTimer = MutableStateFlow<SleepTimerState>(SleepTimerState.Off)
+    private var sleepJob: Job? = null
+
     val queue: StateFlow<List<ContentItem>> = _queue.asStateFlow()
     val index: StateFlow<Int> = _index.asStateFlow()
     val currentItem: StateFlow<ContentItem?> = _currentItem.asStateFlow()
+    val sleepTimer: StateFlow<SleepTimerState> = _sleepTimer.asStateFlow()
 
     /** Stable id of whatever is loaded in the player right now, for fast identity checks. */
     val currentId: String? get() = _currentItem.value?.id
@@ -274,6 +316,9 @@ class PlaybackController(
         _queue.value = emptyList()
         _index.value = -1
         _currentItem.value = null
+        // User explicitly stopped — any sleep timer that was about to fire
+        // would now pause an already-stopped player. Clear it.
+        cancelSleepTimer()
         player.stop()
         player.clearMediaItems()
     }
@@ -282,8 +327,50 @@ class PlaybackController(
         persistResumePoint()
         _currentEpisode = null
         _externalSubtitle = null
+        cancelSleepTimer()
         player.release()
         scope.cancel()
+    }
+
+    /**
+     * MK.12b.1 — arm a sleep timer. For fixed presets ([SleepTimerOption.MIN_15],
+     * [SleepTimerOption.MIN_30], [SleepTimerOption.MIN_45], [SleepTimerOption.MIN_60])
+     * the duration is read from [SleepTimerOption.durationMs]. For
+     * [SleepTimerOption.END_OF_PROGRAM] the caller computes the duration
+     * from the channel's EPG (programme end_time minus now) and passes it
+     * via [endOfProgramMs]; if that value is null or non-positive the call
+     * is a no-op.
+     *
+     * Replacing an existing timer is supported — the previous job is
+     * cancelled before a fresh deadline is computed.
+     *
+     * On expiry the player is paused (not stopped — leaving the queue and
+     * resume point intact lets the user hit play again without re-loading
+     * the title). Sleep state resets to [SleepTimerState.Off].
+     */
+    fun setSleepTimer(
+        option: SleepTimerOption,
+        endOfProgramMs: Long? = null,
+    ) {
+        val durationMs = option.durationMs ?: endOfProgramMs ?: return
+        if (durationMs <= 0L) return
+        sleepJob?.cancel()
+        val deadline = System.currentTimeMillis() + durationMs
+        _sleepTimer.value = SleepTimerState.Active(deadline, option)
+        sleepJob =
+            scope.launch {
+                delay(durationMs)
+                player.pause()
+                _sleepTimer.value = SleepTimerState.Off
+                sleepJob = null
+            }
+    }
+
+    /** MK.12b.1 — cancel any active sleep timer. Idempotent. */
+    fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        sleepJob = null
+        _sleepTimer.value = SleepTimerState.Off
     }
 
     private fun step(delta: Int): Boolean {
@@ -335,6 +422,14 @@ class PlaybackController(
 
     private fun loadCurrent() {
         val item = _queue.value.getOrNull(_index.value) ?: return
+        // MK.12b.1 — end-of-program timers tie to the *current* channel's
+        // EPG. Zapping to a different channel invalidates the deadline; cancel.
+        // Fixed-duration timers stay armed because their deadline is
+        // wall-clock and not channel-bound.
+        val sleep = _sleepTimer.value
+        if (sleep is SleepTimerState.Active && sleep.option == SleepTimerOption.END_OF_PROGRAM) {
+            cancelSleepTimer()
+        }
         _currentItem.value = item
         val mediaItem = buildMediaItem(item)
         // MK.12a.4 — apply playback speed gated by content type. Live always

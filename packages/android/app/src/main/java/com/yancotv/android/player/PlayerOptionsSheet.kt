@@ -63,8 +63,11 @@ import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
+import com.yancotv.shared.epg.EpgRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import org.koin.compose.koinInject
@@ -289,10 +292,10 @@ fun PlayerOptionsSheet(
                     SheetMode.ASPECT ->
                         AspectPanel(prefs = prefs, onBack = onDismiss, onEscapeUp = escapeToTabs)
                     SheetMode.SLEEP ->
-                        StubPanel(
-                            heading = "Sleep timer",
-                            body = "Pick a duration and playback stops, returning to home. Cloud + local backups of partial progress.",
-                            milestone = "MK.12b.1",
+                        SleepPanel(
+                            controller = controller,
+                            onBack = onDismiss,
+                            onEscapeUp = escapeToTabs,
                         )
                     SheetMode.RECORD ->
                         StubPanel(
@@ -1135,6 +1138,232 @@ private fun aspectSublabel(mode: ResizeMode): String =
         "STRETCH" -> "Distort — not recommended"
         else -> ""
     }
+
+// ───── Sleep panel (MK.12b.1) ─────
+
+/**
+ * Sleep-timer picker. Off + four fixed durations (15 / 30 / 45 / 60 min)
+ * + End-of-program. The fixed presets persist across channel zap; the
+ * End-of-program option is only offered when the current item has a
+ * `tvgId` and [EpgRepository.getNowProgramme] returns a programme — and
+ * the timer is auto-cancelled by [PlaybackController.loadCurrent] when
+ * the user zaps to a different channel (the program-end deadline only
+ * makes sense for the channel it was set on).
+ *
+ * The active-timer callout above the rows mirrors [CurrentSpeedCallout]
+ * — large numerals, accent gradient — so SLEEP feels visually parallel
+ * to SPEED. Remaining time recomputes once per second from the
+ * controller's deadline; no per-tick controller writes.
+ */
+@UnstableApi
+@Composable
+private fun SleepPanel(
+    controller: PlaybackController,
+    onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
+    epg: EpgRepository = koinInject(),
+) {
+    val firstRowFocus = remember { FocusRequester() }
+    val sleepState by controller.sleepTimer.collectAsState()
+    val currentItem by controller.currentItem.collectAsState()
+    val ioScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    // End-of-program is only meaningful for live channels with a tvgId
+    // AND a programme that covers "now". Look it up off the main thread
+    // (SQLDelight blocks). null `endOfProgramMs` means the row is hidden.
+    var endOfProgramMs by remember { mutableStateOf<Long?>(null) }
+    val tvgId = currentItem?.tvgId?.takeIf { it.isNotBlank() }
+    LaunchedEffect(tvgId) {
+        endOfProgramMs =
+            if (tvgId == null) {
+                null
+            } else {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val now = System.currentTimeMillis()
+                        // EPG endTime is Unix seconds; convert to ms before subtracting.
+                        epg.getNowProgramme(tvgId)?.let { (it.endTime * 1000L) - now }?.takeIf { it > 0L }
+                    }
+                }.getOrNull()
+            }
+    }
+
+    // Panel initial focus lands on Off (the first row). DPAD UP escapes
+    // to the tab strip — same pattern as Audio/Subs/Speed/Aspect.
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
+
+    SleepActiveCallout(state = sleepState)
+
+    SectionKicker(text = "DURATION")
+    HexOptionRow(
+        leading = null,
+        label = "Off",
+        sub = "No sleep timer",
+        selected = sleepState is SleepTimerState.Off,
+        focusRequester = firstRowFocus,
+        onEscapeUp = onEscapeUp,
+        onPick = {
+            controller.cancelSleepTimer()
+            onBack()
+        },
+    )
+
+    val presets =
+        listOf(
+            SleepTimerOption.MIN_15 to ("15 minutes" to "Pause after 15 min"),
+            SleepTimerOption.MIN_30 to ("30 minutes" to "Pause after 30 min"),
+            SleepTimerOption.MIN_45 to ("45 minutes" to "Pause after 45 min"),
+            SleepTimerOption.MIN_60 to ("1 hour" to "Pause after 60 min"),
+        )
+    presets.forEach { (option, labels) ->
+        val active = sleepState
+        val isSelected = active is SleepTimerState.Active && active.option == option
+        HexOptionRow(
+            leading = null,
+            label = labels.first,
+            sub = labels.second,
+            selected = isSelected,
+            focusRequester = null,
+            onPick = {
+                controller.setSleepTimer(option)
+                onBack()
+            },
+        )
+    }
+
+    val eopMs = endOfProgramMs
+    if (eopMs != null) {
+        val active = sleepState
+        val isSelected =
+            active is SleepTimerState.Active && active.option == SleepTimerOption.END_OF_PROGRAM
+        HexOptionRow(
+            leading = null,
+            label = "End of programme",
+            sub = "Pause when this show ends · ${formatSleepDuration(eopMs)} remaining",
+            selected = isSelected,
+            focusRequester = null,
+            onPick = {
+                // Re-read at pick time — the LaunchedEffect-cached value
+                // can be a few seconds stale; freshness matters when the
+                // programme is about to end.
+                ioScope.launch {
+                    val freshMs =
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                val now = System.currentTimeMillis()
+                                epg.getNowProgramme(tvgId ?: return@withContext null)
+                                    ?.let { (it.endTime * 1000L) - now }
+                                    ?.takeIf { it > 0L }
+                            }
+                        }.getOrNull()
+                    if (freshMs != null) {
+                        controller.setSleepTimer(SleepTimerOption.END_OF_PROGRAM, freshMs)
+                    }
+                    onBack()
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SleepActiveCallout(state: SleepTimerState) {
+    val pal = LocalYancoPalette.current
+    if (state !is SleepTimerState.Active) return
+
+    // Re-tick once per second so the countdown stays live without touching
+    // the controller. State recomputes locally from the (immutable) deadline.
+    var remainingMs by remember(state.deadlineMs) {
+        mutableStateOf((state.deadlineMs - System.currentTimeMillis()).coerceAtLeast(0L))
+    }
+    LaunchedEffect(state.deadlineMs) {
+        while (true) {
+            remainingMs = (state.deadlineMs - System.currentTimeMillis()).coerceAtLeast(0L)
+            if (remainingMs <= 0L) break
+            delay(1_000L)
+        }
+    }
+    val calloutBrush =
+        remember(pal) {
+            Brush.linearGradient(
+                colors =
+                    listOf(
+                        pal.Accent.copy(alpha = 0.12f),
+                        pal.Accent.copy(alpha = 0.02f),
+                    ),
+            )
+        }
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(hexRowShape(HexCardCornerDp))
+                .background(calloutBrush)
+                .border(1.dp, pal.Accent.copy(alpha = 0.3f), hexRowShape(HexCardCornerDp))
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "TIMER · ${sleepOptionLabel(state.option)}",
+                color = pal.TextMuted,
+                fontSize = 10.sp,
+                letterSpacing = 1.8.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = formatSleepCountdown(remainingMs),
+                color = pal.Accent,
+                fontSize = 56.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-1.8).sp,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "PLAYBACK PAUSES WHEN THIS HITS ZERO",
+                color = pal.TextMuted,
+                fontSize = 10.sp,
+                letterSpacing = 1.6.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+private fun sleepOptionLabel(option: SleepTimerOption): String =
+    when (option) {
+        SleepTimerOption.MIN_15 -> "15 MIN"
+        SleepTimerOption.MIN_30 -> "30 MIN"
+        SleepTimerOption.MIN_45 -> "45 MIN"
+        SleepTimerOption.MIN_60 -> "1 HOUR"
+        SleepTimerOption.END_OF_PROGRAM -> "END OF PROGRAMME"
+    }
+
+/** Compact "X min" / "Y h Z min" style for an option's remaining duration. */
+private fun formatSleepDuration(ms: Long): String {
+    val totalMinutes = (ms / 60_000L).coerceAtLeast(0L)
+    if (totalMinutes < 60L) return "$totalMinutes min"
+    val hours = totalMinutes / 60L
+    val mins = totalMinutes % 60L
+    return if (mins == 0L) "$hours h" else "$hours h $mins min"
+}
+
+/** mm:ss / h:mm:ss countdown for the active-timer callout. */
+private fun formatSleepCountdown(ms: Long): String {
+    val totalSeconds = (ms / 1_000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0L) {
+        String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
+    }
+}
 
 // ───── Stub panel (placeholder for future-milestone tabs) ─────
 
