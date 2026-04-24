@@ -273,6 +273,17 @@ class PlayerActivity : AppCompatActivity() {
         liveOffsetTickerJob?.cancel()
         liveOffsetTickerJob = null
         playerView.player = null
+        // VOD audio bleed fix: nothing reclaims the surface for movies /
+        // episodes after fullscreen exit (the LIVE-only MiniPlayer in the
+        // hero won't bind), so the shared ExoPlayer happily keeps decoding
+        // audio in the background. Pause on the way out — resume position
+        // was just persisted in onPause(), so a re-entry restores it.
+        // LIVE keeps playing because the BrowseShell hero MiniPlayer takes
+        // the surface back and the channel needs to stay current.
+        val current = controller.currentItem.value
+        if (current != null && current.type != com.yancotv.shared.types.ContentType.LIVE) {
+            controller.player.playWhenReady = false
+        }
     }
 
     override fun onDestroy() {

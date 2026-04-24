@@ -292,8 +292,19 @@ fun HomeScreen(
                         onPlay = { list, idx ->
                             val target = list.getOrNull(idx) ?: return@HomeContent
                             gatedPlay(target.id) {
-                                if (controller.currentId != target.id) controller.play(list, idx)
-                                PlayerLauncher.launch(context)
+                                // Series containers have no playable stream URL —
+                                // PlaybackController.play() rejects them and the
+                                // fullscreen activity opens onto whatever stale
+                                // state the player had. Route series through the
+                                // detail overlay so the user picks an episode.
+                                // Live + movies start directly.
+                                when (target.type) {
+                                    ContentType.SERIES -> detailItem = target
+                                    ContentType.LIVE, ContentType.MOVIE -> {
+                                        if (controller.currentId != target.id) controller.play(list, idx)
+                                        PlayerLauncher.launch(context)
+                                    }
+                                }
                             }
                         },
                     )
