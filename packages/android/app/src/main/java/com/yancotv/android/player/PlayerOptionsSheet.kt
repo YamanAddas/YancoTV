@@ -3,7 +3,7 @@ package com.yancotv.android.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -220,10 +221,11 @@ fun PlayerOptionsSheet(
                 // right 720dp. Tap anywhere in the scrim (outside the sheet)
                 // to dismiss.
                 .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onDismiss() },
+                // Scrim dismiss must NOT pollute the focus tree — `.clickable`
+                // creates a focusable target on TV that can swallow CENTER
+                // before the sheet's tabs/rows ever see it. `pointerInput`
+                // gives us touch dismiss without registering a focus target.
+                .pointerInput(Unit) { detectTapGestures { onDismiss() } },
         contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
@@ -237,12 +239,11 @@ fun PlayerOptionsSheet(
                     // hardware — opaque-ish is the pragmatic fallback.
                     .background(Color(0xEE0A1410))
                     .border(1.dp, pal.BorderSubtle)
-                    // Swallow scrim-level clicks when they originate inside
-                    // the sheet.
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { /* consume */ },
+                    // Swallow scrim-level taps that originate inside the
+                    // sheet — same focus-tree caveat as the scrim above:
+                    // `.clickable` here would register a focus target that
+                    // wins over the inner tabs/rows on TV.
+                    .pointerInput(Unit) { detectTapGestures { /* consume — block scrim dismiss */ } },
         ) {
             SheetHead(
                 mode = mode,
@@ -461,11 +462,19 @@ private fun HexCapsule(
                 .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
                 .let { m ->
                     if (onClick != null) {
-                        m.focusable(interactionSource = interaction)
-                            .clickable(
-                                interactionSource = interaction,
-                                indication = null,
-                            ) { onClick() }
+                        // Single focus target only — `.clickable` already
+                        // makes the node focusable AND emits FocusInteraction
+                        // events through the shared `interaction` source, so
+                        // `collectIsFocusedAsState()` still works. Stacking an
+                        // explicit `.focusable(interactionSource = …)` on top
+                        // creates two siblings; the outer wins focus, so
+                        // CENTER never reaches the clickable that owns
+                        // `onClick`. That was the symptom: tabs visibly took
+                        // focus but CENTER did nothing.
+                        m.clickable(
+                            interactionSource = interaction,
+                            indication = null,
+                        ) { onClick() }
                     } else {
                         m
                     }
@@ -1223,7 +1232,11 @@ private fun HexOptionRow(
                         m
                     }
                 }
-                .focusable(interactionSource = interaction)
+                // Single focus target — see HexCapsule for the rationale.
+                // `.clickable` is already focusable; double-stacking with
+                // `.focusable(interactionSource = …)` made CENTER no-op
+                // because the outer `.focusable` won focus and never
+                // routed activation to the inner clickable.
                 .clickable(interactionSource = interaction, indication = null) { onPick() }
                 .semantics { contentDescription = label + if (selected) ", selected" else "" }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
