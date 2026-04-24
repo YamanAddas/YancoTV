@@ -65,7 +65,7 @@ import java.util.Locale
 /** Which panel the options sheet is currently showing. Top-level so
  *  [PlayerActivity] can hoist the state and route BACK from a sub-view
  *  back to [OPTIONS] before dismissing the sheet entirely. */
-enum class SheetMode { OPTIONS, AUDIO, ASPECT }
+enum class SheetMode { OPTIONS, AUDIO, ASPECT, SPEED }
 
 @UnstableApi
 @Composable
@@ -112,6 +112,7 @@ fun PlayerOptionsSheet(
                         prefs = prefs,
                         onOpenAudio = { onModeChange(SheetMode.AUDIO) },
                         onOpenAspect = { onModeChange(SheetMode.ASPECT) },
+                        onOpenSpeed = { onModeChange(SheetMode.SPEED) },
                         onDismiss = onDismiss,
                     )
                 SheetMode.AUDIO ->
@@ -122,6 +123,12 @@ fun PlayerOptionsSheet(
                     )
                 SheetMode.ASPECT ->
                     AspectView(
+                        prefs = prefs,
+                        onBack = { onModeChange(SheetMode.OPTIONS) },
+                    )
+                SheetMode.SPEED ->
+                    SpeedView(
+                        controller = controller,
                         prefs = prefs,
                         onBack = { onModeChange(SheetMode.OPTIONS) },
                     )
@@ -137,6 +144,7 @@ private fun OptionsView(
     prefs: AppPreferences,
     onOpenAudio: () -> Unit,
     onOpenAspect: () -> Unit,
+    onOpenSpeed: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
@@ -177,11 +185,15 @@ private fun OptionsView(
         enabled = false,
         onClick = onDismiss,
     )
+    // Read the live player value rather than the pref — on LIVE channels
+    // the pref still reflects the user's last VOD pick, but the player is
+    // running at 1.0× (reset on channel zap). Showing what's actually
+    // playing is less surprising than showing a stale pref value.
+    val currentSpeed = currentPlayerSpeed(controller.player)
     OptionRow(
         label = "Playback speed",
-        value = "Coming in MK.12a.4",
-        enabled = false,
-        onClick = onDismiss,
+        value = formatSpeed(currentSpeed),
+        onClick = onOpenSpeed,
     )
     OptionRow(
         label = "Aspect ratio",
@@ -262,6 +274,128 @@ private fun AudioView(
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
     )
+}
+
+/**
+ * Playback speed picker (MK.12a.4). Always writes through to the player,
+ * but only persists the pick when the current item is VOD / Episode —
+ * live channels get a transient speed-shift that clears on channel zap
+ * (see PlaybackController.loadCurrent).
+ */
+@UnstableApi
+@Composable
+private fun SpeedView(
+    controller: PlaybackController,
+    prefs: AppPreferences,
+    onBack: () -> Unit,
+) {
+    val firstRowFocus = remember { FocusRequester() }
+    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    // Observe the player's current speed so the ● marker stays in sync if
+    // something else mutates playbackParameters (currently nothing does,
+    // but rememberUpdatedState is cheap insurance).
+    var currentSpeed by remember { mutableStateOf(currentPlayerSpeed(controller.player)) }
+    DisposableEffect(controller.player) {
+        val listener =
+            object : Player.Listener {
+                override fun onPlaybackParametersChanged(params: androidx.media3.common.PlaybackParameters) {
+                    currentSpeed = params.speed
+                }
+            }
+        controller.player.addListener(listener)
+        onDispose { controller.player.removeListener(listener) }
+    }
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
+
+    Text(
+        text = "PLAYBACK SPEED",
+        color = YancoPalette.Accent,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 2.sp,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+    SPEED_PRESETS.forEachIndexed { idx, speed ->
+        SpeedRow(
+            speed = speed,
+            selected = kotlin.math.abs(currentSpeed - speed) < 0.01f,
+            focusRequester = if (idx == 0) firstRowFocus else null,
+            onPick = {
+                controller.player.setPlaybackSpeed(speed)
+                // Only persist for non-live content — live sessions get a
+                // transient speed-shift that doesn't pollute the saved VOD
+                // preference. Controller.loadCurrent resets live to 1.0×.
+                val item = controller.currentItem.value
+                if (item != null && item.type != com.yancotv.shared.types.ContentType.LIVE) {
+                    scope.launch { prefs.setSpeed(speed) }
+                }
+                onBack()
+            },
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = "BACK to options",
+        color = YancoPalette.TextMuted,
+        fontSize = 10.sp,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+@Composable
+private fun SpeedRow(
+    speed: Float,
+    selected: Boolean,
+    focusRequester: FocusRequester?,
+    onPick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val label = formatSpeed(speed)
+    val modifier =
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (focused) YancoPalette.BackgroundElevated else Color.Transparent)
+            .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null) { onPick() }
+            .semantics { contentDescription = label + if (selected) ", selected" else "" }
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = if (selected) "●" else "○",
+            color = if (selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(end = 12.dp),
+        )
+        Text(
+            text = label,
+            color = YancoPalette.TextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+/** The presets shown in the sheet. 1.0× is the "normal speed" anchor. */
+private val SPEED_PRESETS = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+
+@UnstableApi
+private fun currentPlayerSpeed(player: Player): Float = player.playbackParameters.speed
+
+private fun formatSpeed(speed: Float): String {
+    val rounded = (speed * 100f).toInt() / 100f
+    return if (rounded == rounded.toInt().toFloat()) {
+        "${rounded.toInt()}×"
+    } else {
+        // Strip trailing zero: 1.50 → 1.5×
+        val s = String.format(Locale.ROOT, "%.2f", rounded).trimEnd('0').trimEnd('.')
+        "$s×"
+    }
 }
 
 @Composable

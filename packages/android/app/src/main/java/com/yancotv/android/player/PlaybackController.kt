@@ -304,6 +304,15 @@ class PlaybackController(
                         .setArtworkUri(item.logoUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
                         .build(),
                 ).build()
+        // MK.12a.4 — apply playback speed gated by content type. Live always
+        // resets to 1.0× on a new MediaItem (a temporary speed-shift on live
+        // is OK but it shouldn't survive channel zap); VOD / Episodes restore
+        // the persisted pref so a user who watched at 1.25× yesterday picks
+        // up where they left off.
+        val targetSpeed = if (item.type == ContentType.LIVE) 1.0f else prefs.playbackFlow.value.speed
+        if (player.playbackParameters.speed != targetSpeed) {
+            player.setPlaybackSpeed(targetSpeed)
+        }
         val repo = history
         if (item.type == ContentType.LIVE || repo == null) {
             player.setMediaItem(mediaItem)

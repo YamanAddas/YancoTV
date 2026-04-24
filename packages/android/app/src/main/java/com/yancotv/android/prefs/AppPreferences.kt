@@ -62,6 +62,15 @@ class AppPreferences(
             _playback.value = _playback.value.copy(subtitleLanguage = lang)
         }
 
+    // MK.12a.4 — Playback speed. Persisted as a plain float ("1.25") so a
+    // future schema audit can read it in place. Only applied automatically
+    // to VOD; live channels always reset to 1.0× at loadCurrent() time (the
+    // user can still bump speed live, but zapping channels clears it).
+    suspend fun setSpeed(speed: Float) =
+        write(KEY_SPEED, speed.toString()) {
+            _playback.value = _playback.value.copy(speed = speed)
+        }
+
     // ───── Network ─────
 
     suspend fun setUserAgent(ua: String) =
@@ -138,6 +147,7 @@ class AppPreferences(
             autoPlayNext = readString(KEY_AUTOPLAY) == "1",
             audioLanguage = readString(KEY_AUDIO_LANG).orEmpty(),
             subtitleLanguage = readString(KEY_SUBTITLE_LANG).orEmpty(),
+            speed = readString(KEY_SPEED)?.toFloatOrNull() ?: 1.0f,
         )
 
     private fun readNetwork(): NetworkPrefs =
@@ -195,6 +205,7 @@ class AppPreferences(
         private const val KEY_SHOW_NUMBERS = "pref_general_show_channel_numbers"
         private const val KEY_HIDDEN_GROUPS = "pref_hidden_groups"
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
+        private const val KEY_SPEED = "pref_playback_speed"
     }
 }
 
@@ -249,6 +260,12 @@ data class PlaybackPrefs(
     val autoPlayNext: Boolean = false,
     val audioLanguage: String = "",
     val subtitleLanguage: String = "",
+    /**
+     * Playback rate. Applied automatically on VOD loads; live channels
+     * always reset to 1.0× at load time (live + speed-shift is a transient
+     * override, not a persisted pref).
+     */
+    val speed: Float = 1.0f,
 )
 
 data class NetworkPrefs(
