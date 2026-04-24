@@ -134,7 +134,7 @@ class PlayerActivity : AppCompatActivity() {
     // MK.12a.2+ land. Opened via KEYCODE_MENU or long-press CENTER.
     private var sheetOverlay: ComposeView? = null
     private var sheetVisible by mutableStateOf(false)
-    private var sheetMode by mutableStateOf(SheetMode.OPTIONS)
+    private var sheetMode by mutableStateOf(SheetMode.AUDIO)
 
     // MK.12a.3 — SAF picker for external subtitle files. Registered in
     // onCreate (must happen before STARTED) and dispatched via
@@ -832,7 +832,12 @@ class PlayerActivity : AppCompatActivity() {
         // Hide the Media3 controller if it was up — the sheet sits over the
         // controls and a two-layer overlay reads as broken.
         playerView.hideController()
-        sheetMode = SheetMode.OPTIONS
+        // Open directly on AUDIO — the MK.16.sheet Concept A port dropped
+        // the old root "OPTIONS" list in favour of tab-driven navigation,
+        // and audio is both the most-used tab and the one that was shown
+        // first in the old root list. Persisting the last-used tab across
+        // opens ships with MK.16.2.
+        sheetMode = SheetMode.AUDIO
         sheetVisible = true
         val v = ensureSheetOverlay()
         v.visibility = View.VISIBLE
@@ -842,7 +847,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun hideSheet() {
         if (!sheetVisible) return
         sheetVisible = false
-        sheetMode = SheetMode.OPTIONS
+        sheetMode = SheetMode.AUDIO
         sheetOverlay?.visibility = View.GONE
         playerView.requestFocus()
     }
@@ -900,14 +905,12 @@ class PlayerActivity : AppCompatActivity() {
         // Compose's own key handling gets the event.
         if (sheetVisible) {
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                // BACK from a sub-view (audio / subs / speed / aspect) first
-                // returns to the top-level options list. Only a BACK from the
-                // top list dismisses the whole sheet.
-                if (sheetMode != SheetMode.OPTIONS) {
-                    sheetMode = SheetMode.OPTIONS
-                } else {
-                    hideSheet()
-                }
+                // MK.16.sheet: the Concept A port made the sheet a
+                // tab-driven side panel with no root list, so BACK
+                // dismisses directly from any tab. Tabs are their own
+                // focus targets — users move between them with D-pad, not
+                // BACK.
+                hideSheet()
                 return true
             }
             return super.onKeyDown(keyCode, event)
