@@ -78,7 +78,7 @@ val appModule =
             )
         }
         single { SourceSyncCoordinator(context = androidContext(), repo = get(), logger = get()) }
-        single { PlaybackController(context = androidContext(), history = get()) }
+        single { PlaybackController(context = androidContext(), prefs = get(), history = get()) }
         single {
             EpgRepository(
                 db = get(),

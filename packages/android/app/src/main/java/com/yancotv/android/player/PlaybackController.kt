@@ -9,6 +9,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.playback.toPlayable
@@ -45,22 +46,41 @@ import java.util.concurrent.TimeUnit
 @UnstableApi
 class PlaybackController(
     context: Context,
+    private val prefs: AppPreferences,
     private val history: WatchHistoryRepository? = null,
 ) {
     val player: ExoPlayer =
         run {
+            // Dynamic network prefs — UA + per-call timeouts are read from
+            // AppPreferences.networkFlow on every request via an interceptor.
+            // The ExoPlayer itself is constructed once; the next MediaItem
+            // picks up changes without a player rebuild.
             val okHttp =
                 OkHttpClient
                     .Builder()
-                    .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
-                    .readTimeout(READ_TIMEOUT_SEC, TimeUnit.SECONDS)
                     .followRedirects(true)
                     .followSslRedirects(true)
-                    .build()
-            val dataSourceFactory =
-                OkHttpDataSource
-                    .Factory(okHttp)
-                    .setUserAgent(DEFAULT_USER_AGENT)
+                    .addInterceptor { chain ->
+                        val net = prefs.networkFlow.value
+                        val ua =
+                            net.userAgentOverride
+                                ?.takeIf { it.isNotBlank() }
+                                ?: DEFAULT_USER_AGENT
+                        val connect = net.connectTimeoutSec.takeIf { it > 0 } ?: DEFAULT_CONNECT_TIMEOUT_SEC
+                        val read = net.readTimeoutSec.takeIf { it > 0 } ?: DEFAULT_READ_TIMEOUT_SEC
+                        val req =
+                            chain.request().newBuilder()
+                                .header("User-Agent", ua)
+                                .build()
+                        chain
+                            .withConnectTimeout(connect, TimeUnit.SECONDS)
+                            .withReadTimeout(read, TimeUnit.SECONDS)
+                            .proceed(req)
+                    }.build()
+            // OkHttpDataSource.Factory.setUserAgent is intentionally NOT called —
+            // the interceptor above is the sole source of the UA so user
+            // overrides from Settings actually take effect per request.
+            val dataSourceFactory = OkHttpDataSource.Factory(okHttp)
             // Tuned for channel-zap UX — start playing at 1s buffered instead
             // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
             // don't oscillate between BUFFERING and READY on flaky sources.
@@ -339,7 +359,9 @@ class PlaybackController(
         // what the shell's OkHttp source clients send so provider-side UA
         // checks don't flip streams to audio-only.
         private const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
-        private const val CONNECT_TIMEOUT_SEC = 15L
-        private const val READ_TIMEOUT_SEC = 30L
+        // Fallbacks for when AppPreferences returns 0/blank — kept here so
+        // the controller has a safe floor independent of the prefs defaults.
+        private const val DEFAULT_CONNECT_TIMEOUT_SEC = 15
+        private const val DEFAULT_READ_TIMEOUT_SEC = 30
     }
 }
