@@ -265,11 +265,11 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
-| MK.12a.1 | Player long-press / MENU / `KEYCODE_MENU` → single Compose bottom-sheet overlay (`ComposeView` child of `PlayerActivity`'s root). Sheet hosts 12a.2–12a.5 + 12b tasks | 🔴 new | Long-press opens sheet; Back closes; doesn't pause playback |
-| MK.12a.2 | Audio track picker via `TrackSelectionParameters`; persist pick to `AppPreferences.audioLang` (key already exists) | 🟢 wire | Streams with ≥2 audio tracks show chooser; restart of same channel restores language |
+| MK.12a.1 | ~~Player MENU / `KEYCODE_MENU` → single Compose bottom-sheet overlay (`ComposeView` child of `PlayerActivity`'s root). Sheet hosts 12a.2–12a.5 + 12b tasks~~ — **DONE `9c40c15`** (2026-04-24). Long-press CENTER deferred: needs `event.startTracking()` + `onKeyLongPress` plumbing that conflicts with the short-press show-controller path | 🔴 new | ✅ |
+| MK.12a.2 | ~~Audio track picker via `TrackSelectionParameters`; persist pick to `AppPreferences.audioLang` (key already exists)~~ — **DONE `fdbe117`** (2026-04-24) | 🟢 wire | ✅ |
 | MK.12a.3 | Subtitle track picker + "off" + "load external file" row. External file triggers `MediaItem` rebuild → gated behind `currentId` / resume-point persistence check per native-android-mk rule | 🟢 wire | Subtitle on/off/external works; resume position preserved across the rebuild |
-| MK.12a.4 | Playback speed picker (0.5 / 0.75 / 1.0 / 1.25 / 1.5 / 2.0×) via `player.setPlaybackSpeed()`; persisted per content-type | 🟢 wire | Live TV always resets to 1.0× on new channel; VOD restores last chosen speed |
-| MK.12a.5 | Aspect-ratio quick-cycle (Fit / Fill / Zoom / 16:9 / 4:3). Extend `AppPreferences.ResizeMode` enum; `PlayerView.resizeMode` already reactive | 🟢 wire | Remote-mapped hotkey cycles modes; last used persists |
+| MK.12a.4 | ~~Playback speed picker (0.5 / 0.75 / 1.0 / 1.25 / 1.5 / 2.0×) via `player.setPlaybackSpeed()`; persisted per content-type~~ — **DONE** (2026-04-24). `PlaybackController.loadCurrent` resets LIVE to 1.0× and restores persisted speed on VOD/Episodes. Sheet reads live `player.playbackParameters.speed` so the ● marker stays in sync | 🟢 wire | ✅ |
+| MK.12a.5 | ~~Aspect-ratio quick-cycle (Fit / Fill / Zoom / 16:9 / 4:3). Extend `AppPreferences.ResizeMode` enum; `PlayerView.resizeMode` already reactive~~ — **DONE `b1d09d3`** (2026-04-24). Sheet picker + `AspectRatioFrameLayout.setAspectRatio` for forced 16:9 / 4:3. Remote hotkey deferred — no obvious unbound Fire TV key | 🟢 wire | ✅ |
 
 **MK.12b — heavier items** (~4 days)
 
