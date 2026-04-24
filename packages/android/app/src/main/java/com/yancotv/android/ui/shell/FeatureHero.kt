@@ -162,8 +162,14 @@ private fun HeroBackdrop(
         delay(300L)
         debouncedUrl = focused?.logoUrl
     }
+    // Only LIVE channels surface the MiniPlayer in the hero — for VOD
+    // (Movies / Series) the playing video bleeding into the focused
+    // movie's hero (or worse, into a sibling section's hero after a
+    // section swap) reads as a glitch. Keep the poster instead. Live
+    // channels still get the cinematic mini-stream because their whole
+    // value prop is "what's on right now".
     when {
-        playing != null -> {
+        playing != null && playing.type == ContentType.LIVE -> {
             Box(Modifier.fillMaxSize()) {
                 MiniPlayer(controller = controller)
             }

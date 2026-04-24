@@ -292,9 +292,8 @@ fun HomeScreen(
                         onPlay = { list, idx ->
                             val target = list.getOrNull(idx) ?: return@HomeContent
                             gatedPlay(target.id) {
-                                val alreadyPlaying = controller.currentId == target.id
-                                if (!alreadyPlaying) controller.play(list, idx)
-                                if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                                if (controller.currentId != target.id) controller.play(list, idx)
+                                PlayerLauncher.launch(context)
                             }
                         },
                     )
