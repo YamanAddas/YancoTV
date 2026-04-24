@@ -63,6 +63,17 @@ android {
         // already documents the placeholder state. Keeping this as a
         // blocking lint error would fail CI on every run until then.
         disable += "MissingTvBanner"
+        // D.1a baseline (2026-04-24): captures the 113 warnings that
+        // existed at commit time so NEW warnings fail the build but
+        // old ones don't block. To regenerate after intentional cleanup:
+        //   ./gradlew :app:updateLintBaseline
+        // Categories in the baseline today (top 5):
+        //   57 GradleDependency  — out-of-date deps, MK.12 bump
+        //   8  DefaultLocale     — toLowerCase() / format() w/o Locale
+        //   7  HardcodedText     — UI strings, MK.10 i18n pass
+        //   6  AndroidGradlePluginVersion — AGP bump is its own decision
+        //   5  IconLauncherShape — MK.12 launcher work
+        baseline = file("lint-baseline.xml")
     }
 }
 

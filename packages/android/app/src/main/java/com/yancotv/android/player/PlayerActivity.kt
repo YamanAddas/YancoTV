@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -362,6 +363,13 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // @RequiresApi documents the contract that lint can't infer across the
+    // function boundary: every caller (enterPictureInPictureMode in
+    // tryEnterPip + the onUserLeaveHint path) is already gated on
+    // SDK_INT >= O via shouldEnterPip(). Without the annotation lint
+    // sees PictureInPictureParams.Builder() (API 26) being called from a
+    // function legal on minSdk=24 and reports it as an error.
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun pipParams(): PictureInPictureParams {
         val fmt = controller.player.videoFormat
         val builder = PictureInPictureParams.Builder()
