@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
@@ -48,11 +47,10 @@ class ReminderAlarmReceiver : BroadcastReceiver(), KoinComponent {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(EXTRA_TAP_PROGRAMME_ID, programmeId)
         }
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        // FLAG_IMMUTABLE was added in API 23 (M); minSdk = 24 so the gate is
+        // dead. Targeting Android 12+ requires FLAG_IMMUTABLE on every
+        // PendingIntent or the system throws on creation.
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pending = PendingIntent.getActivity(context, reminderId.hashCode(), tapIntent, flags)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)

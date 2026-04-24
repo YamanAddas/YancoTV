@@ -2,101 +2,13 @@
 <issues format="6" by="lint 8.7.3" type="baseline" client="gradle" dependencies="false" name="AGP (8.7.3)" variant="all" version="8.7.3">
 
     <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="        String.format(&quot;%d:%02d:%02d&quot;, h, mm, r)"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/HomeContent.kt"
-            line="1222"
-            column="9"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="        String.format(&quot;%d:%02d&quot;, m, r)"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/HomeContent.kt"
-            line="1224"
-            column="9"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="    return String.format(&quot;%d:%02d %s&quot;, hour12, minute, suffix)"
-        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/HomeContent.kt"
-            line="1235"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="        val fps = f.frameRate.takeIf { it > 0f }?.let { String.format(&quot;%.0f&quot;, it) }"
-        errorLine2="                                                        ~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="528"
-            column="57"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="        return if (total >= 1_000_000) String.format(&quot;%.1f Mbps&quot;, total / 1_000_000.0)"
-        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="544"
-            column="40"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="        else String.format(&quot;%d kbps&quot;, total / 1000)"
-        errorLine2="             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="545"
-            column="14"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="            h > 0 -> String.format(&quot;-%d:%02d:%02d&quot;, h, m, s)"
-        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="598"
-            column="22"/>
-    </issue>
-
-    <issue
-        id="DefaultLocale"
-        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
-        errorLine1="            else -> String.format(&quot;-%d:%02d&quot;, m, s)"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="599"
-            column="21"/>
-    </issue>
-
-    <issue
         id="NewApi"
         message="Call requires API level 26 (current min is 24): `pipParams`"
         errorLine1="            val params = pipParams()"
         errorLine2="                         ~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="352"
+            line="353"
             column="26"/>
     </issue>
 
@@ -855,7 +767,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="64"
+            line="65"
             column="13"/>
     </issue>
 
@@ -879,28 +791,6 @@
             file="src/main/AndroidManifest.xml"
             line="35"
             column="30"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; SDK_INT is always >= 24"
-        errorLine1="        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
-        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/reminders/ReminderAlarmReceiver.kt"
-            line="51"
-            column="25"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; SDK_INT is always >= 24"
-        errorLine1="        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
-        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/reminders/ReminderScheduler.kt"
-            line="103"
-            column="25"/>
     </issue>
 
     <issue
@@ -1097,7 +987,7 @@
         errorLine2="                                         ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/HomeContent.kt"
-            line="404"
+            line="405"
             column="42"/>
     </issue>
 
@@ -1132,50 +1022,6 @@
             file="src/main/res/layout/activity_player.xml"
             line="6"
             column="5"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.color.black` appears to be unused"
-        errorLine1="    &lt;color name=&quot;black&quot;>#FF000000&lt;/color>"
-        errorLine2="           ~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/colors.xml"
-            line="3"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.color.white` appears to be unused"
-        errorLine1="    &lt;color name=&quot;white&quot;>#FFFFFFFF&lt;/color>"
-        errorLine2="           ~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/colors.xml"
-            line="4"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.color.yanco_surface` appears to be unused"
-        errorLine1="    &lt;color name=&quot;yanco_surface&quot;>#FF10161D&lt;/color>"
-        errorLine2="           ~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/colors.xml"
-            line="6"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.color.yanco_on_surface` appears to be unused"
-        errorLine1="    &lt;color name=&quot;yanco_on_surface&quot;>#FFE6EDF3&lt;/color>"
-        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/colors.xml"
-            line="7"
-            column="12"/>
     </issue>
 
     <issue
@@ -1241,7 +1087,7 @@
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="487"
+            line="488"
             column="23"/>
     </issue>
 
@@ -1252,7 +1098,7 @@
         errorLine2="                                      ~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="487"
+            line="488"
             column="39"/>
     </issue>
 
@@ -1263,7 +1109,7 @@
         errorLine2="                                                             ~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="487"
+            line="488"
             column="62"/>
     </issue>
 
@@ -1274,7 +1120,7 @@
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="520"
+            line="521"
             column="29"/>
     </issue>
 
@@ -1285,7 +1131,7 @@
         errorLine2="                             ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="520"
+            line="521"
             column="30"/>
     </issue>
 
@@ -1296,7 +1142,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="521"
+            line="522"
             column="24"/>
     </issue>
 
@@ -1307,7 +1153,7 @@
         errorLine2="                        ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="521"
+            line="522"
             column="25"/>
     </issue>
 
@@ -1318,7 +1164,7 @@
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="522"
+            line="523"
             column="26"/>
     </issue>
 
@@ -1329,7 +1175,7 @@
         errorLine2="                          ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="522"
+            line="523"
             column="27"/>
     </issue>
 
@@ -1340,7 +1186,7 @@
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="523"
+            line="524"
             column="25"/>
     </issue>
 
@@ -1351,7 +1197,7 @@
         errorLine2="                         ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="523"
+            line="524"
             column="26"/>
     </issue>
 
@@ -1430,13 +1276,6 @@
             file="src/main/res/layout/activity_player.xml"
             line="359"
             column="17"/>
-    </issue>
-
-    <issue
-        id="RtlEnabled"
-        message="The project references RTL attributes, but does not explicitly enable or disable RTL support with `android:supportsRtl` in the manifest">
-        <location
-            file="src/main/AndroidManifest.xml"/>
     </issue>
 
 </issues>

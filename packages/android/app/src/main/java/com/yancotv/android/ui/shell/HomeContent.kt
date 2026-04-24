@@ -75,6 +75,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private val tileProgressBrush = Brush.horizontalGradient(
@@ -1219,9 +1220,9 @@ private fun formatMmSs(sec: Int): String {
     return if (m >= 60) {
         val h = m / 60
         val mm = m % 60
-        String.format("%d:%02d:%02d", h, mm, r)
+        String.format(Locale.ROOT, "%d:%02d:%02d", h, mm, r)
     } else {
-        String.format("%d:%02d", m, r)
+        String.format(Locale.ROOT, "%d:%02d", m, r)
     }
 }
 
@@ -1232,7 +1233,7 @@ private fun formatClock(unixSeconds: Long): String {
     val minute = cal.get(java.util.Calendar.MINUTE)
     val hour12 = ((hour24 + 11) % 12) + 1
     val suffix = if (hour24 < 12) "AM" else "PM"
-    return String.format("%d:%02d %s", hour12, minute, suffix)
+    return String.format(Locale.ROOT, "%d:%02d %s", hour12, minute, suffix)
 }
 
 private fun formatTimeWindow(programme: EpgProgramme): String {

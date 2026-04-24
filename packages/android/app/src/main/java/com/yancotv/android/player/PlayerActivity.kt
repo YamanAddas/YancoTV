@@ -48,6 +48,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -525,7 +526,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun formatResolution(f: Format?): String {
         if (f == null || f.width <= 0 || f.height <= 0) return "—"
-        val fps = f.frameRate.takeIf { it > 0f }?.let { String.format("%.0f", it) }
+        val fps = f.frameRate.takeIf { it > 0f }?.let { String.format(Locale.ROOT, "%.0f", it) }
         return buildString {
             append(f.width).append('x').append(f.height)
             if (fps != null) append(" @").append(fps).append("fps")
@@ -541,8 +542,8 @@ class PlayerActivity : AppCompatActivity() {
     private fun formatBitrate(v: Format?, a: Format?): String {
         val total = listOfNotNull(v?.bitrate, a?.bitrate).filter { it > 0 }.sum()
         if (total <= 0) return "—"
-        return if (total >= 1_000_000) String.format("%.1f Mbps", total / 1_000_000.0)
-        else String.format("%d kbps", total / 1000)
+        return if (total >= 1_000_000) String.format(Locale.ROOT, "%.1f Mbps", total / 1_000_000.0)
+        else String.format(Locale.ROOT, "%d kbps", total / 1000)
     }
 
     private fun formatBuffer(p: Player): String {
@@ -595,8 +596,8 @@ class PlayerActivity : AppCompatActivity() {
         val m = (totalSec % 3600L) / 60L
         val s = totalSec % 60L
         return when {
-            h > 0 -> String.format("-%d:%02d:%02d", h, m, s)
-            else -> String.format("-%d:%02d", m, s)
+            h > 0 -> String.format(Locale.ROOT, "-%d:%02d:%02d", h, m, s)
+            else -> String.format(Locale.ROOT, "-%d:%02d", m, s)
         }
     }
 

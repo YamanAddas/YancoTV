@@ -100,11 +100,9 @@ class ReminderScheduler(
         }
         // FLAG_UPDATE_CURRENT so set() on the same programme replaces the
         // payload (e.g. if the user edits the lead time later).
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        // FLAG_IMMUTABLE was added in API 23 (M); minSdk = 24 so the SDK_INT
+        // gate is dead. Required on Android 12+ or the system throws.
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getBroadcast(context, reminderId.hashCode(), intent, flags)
     }
 

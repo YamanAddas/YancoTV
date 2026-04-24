@@ -38,6 +38,7 @@
         android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:largeHeap="true"
+        android:supportsRtl="true"
         android:theme="@style/Theme.YancoTV"
         android:usesCleartextTraffic="true">
 
