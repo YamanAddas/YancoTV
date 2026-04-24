@@ -204,6 +204,47 @@ internal fun heroPlaybackForFocused(
 ): ContentItem? = playing?.takeIf { focused?.id == it.id }
 
 /**
+ * Describes what the app should do when the user activates a content row.
+ *
+ * @param shouldCallPlay true → call `controller.play(list, index)`.
+ *   False when the target is already loaded — calling play() again would
+ *   re-prepare the ExoPlayer, rebuffer, and stutter the stream.
+ * @param shouldLaunchFullscreen true → open [com.yancotv.android.player.PlayerLauncher].
+ *   On TV a first-tap only starts loading (shouldLaunchFullscreen = false);
+ *   the second tap (or a phone tap) opens fullscreen.
+ */
+internal data class ActivationAction(
+    val shouldCallPlay: Boolean,
+    val shouldLaunchFullscreen: Boolean,
+)
+
+/**
+ * Pure routing helper for the two-tap TV activation pattern. Extracted
+ * so call sites in [BrowseShell], [com.yancotv.android.ui.shell.FavoritesScreen],
+ * and future screens can share the same logic without duplicating the
+ * inline `alreadyPlaying` conditional and so the contract can be unit-tested.
+ *
+ * Rule (from native-android-mk skill):
+ *   "Every launch site checks `controller.currentId == target.id` first.
+ *   If already playing, go straight to fullscreen — do NOT call
+ *   controller.play() again (re-creates the MediaItem, rebuffers)."
+ */
+internal fun resolveActivation(
+    currentId: String?,
+    targetId: String,
+    isTv: Boolean,
+): ActivationAction {
+    val alreadyPlaying = currentId == targetId
+    return ActivationAction(
+        // Guard: skip play() when the item is already loaded.
+        shouldCallPlay = !alreadyPlaying,
+        // TV: first tap → load only. Second tap (alreadyPlaying) → fullscreen.
+        // Phone: always launch fullscreen (single-tap UX).
+        shouldLaunchFullscreen = !isTv || alreadyPlaying,
+    )
+}
+
+/**
  * Browse orchestrator for Live / Movies / Series. Composes the three pieces
  * of the new shell — category chips, a cinematic feature hero driven by the
  * focused rail card, and the horizontal content rail — into a single column

@@ -141,9 +141,9 @@ fun FavoritesScreen(
                     item = row,
                     onActivate = {
                         gatedPlay(row.id) {
-                            val alreadyPlaying = controller.currentId == row.id
-                            if (!alreadyPlaying) controller.play(live, live.indexOf(row))
-                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                            val action = resolveActivation(controller.currentId, row.id, isTv)
+                            if (action.shouldCallPlay) controller.play(live, live.indexOf(row))
+                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
                         }
                     },
                     onRemove = { removeFavorite(row, scope, favorites) },
@@ -157,14 +157,9 @@ fun FavoritesScreen(
                     item = row,
                     onActivate = {
                         gatedPlay(row.id) {
-                            // Mirror HomeScreen's two-tap flow: first tap loads
-                            // the item (if not already current), second tap (or
-                            // phone tap) launches fullscreen. Tapping the
-                            // currently-playing row goes straight to fullscreen
-                            // instead of rebuffering.
-                            val alreadyPlaying = controller.currentId == row.id
-                            if (!alreadyPlaying) controller.play(movies, movies.indexOf(row))
-                            if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                            val action = resolveActivation(controller.currentId, row.id, isTv)
+                            if (action.shouldCallPlay) controller.play(movies, movies.indexOf(row))
+                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
                         }
                     },
                     onRemove = { removeFavorite(row, scope, favorites) },
