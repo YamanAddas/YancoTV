@@ -3,6 +3,7 @@ package com.yancotv.shared.content
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.EpisodeInfo
 
 /**
  * Read-side facade over the `content` table for shell screens. Writes
@@ -82,6 +83,26 @@ class ContentRepository(private val db: YancoDb) {
         if (tvgId.isBlank()) return null
         return db.contentQueries.selectLiveByTvgId(tvgId).executeAsOneOrNull()?.toDomain()
     }
+
+    /**
+     * Direct lookup of an episode by its stable id. Backs the Home
+     * Continue Watching rail's series-resume path: when watch_history
+     * carries a non-null episode_id, we resolve it here and hand the
+     * row off to PlaybackController.play(Playable.Episode) so the
+     * resume offset is honoured. Returns null when the episode row
+     * isn't cached locally — caller falls back to opening detail.
+     */
+    fun episodeById(id: String): EpisodeInfo? =
+        db.episodesQueries.selectById(id).executeAsOneOrNull()?.let { row ->
+            EpisodeInfo(
+                id = row.id,
+                seasonNumber = row.season_number?.toInt() ?: 0,
+                episodeNumber = row.episode_number?.toInt() ?: 0,
+                title = row.title.orEmpty(),
+                streamUrl = row.stream_url,
+                duration = row.duration?.toString(),
+            )
+        }
 }
 
 private fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(

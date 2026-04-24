@@ -101,7 +101,14 @@ private val tileProgressBrush = Brush.horizontalGradient(
 @UnstableApi
 @Composable
 fun HomeContent(
-    onPlay: (List<ContentItem>, Int) -> Unit,
+    /**
+     * Activated card. The third arg is a resume hint — non-null when the
+     * tile carried a watch_history row with an episode_id (i.e. user was
+     * mid-series). HomeScreen uses it to resume that exact episode at its
+     * stored offset instead of opening the detail overlay. Channels and
+     * movies always pass null.
+     */
+    onPlay: (List<ContentItem>, Int, String?) -> Unit,
     modifier: Modifier = Modifier,
     history: WatchHistoryRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
@@ -256,7 +263,9 @@ fun HomeContent(
             HomeHero(
                 slides = heroSlides,
                 lockedIds = lockedIds,
-                onPlay = { slide -> onPlay(listOf(slide.item), 0) },
+                onPlay = { slide ->
+                    onPlay(listOf(slide.item), 0, resumeByContent.value[slide.item.id]?.episodeId)
+                },
                 modifier = Modifier.padding(horizontal = Space.section),
             )
         }
@@ -272,7 +281,7 @@ fun HomeContent(
                 onPlay = { item ->
                     val snapshot = continueWatching.toList()
                     val idx = snapshot.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(snapshot, idx)
+                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent.value[item.id]?.episodeId)
                 },
             )
         }
@@ -284,7 +293,7 @@ fun HomeContent(
                     val snapshot = onNowItems.toList()
                     val list = snapshot.map { it.channel }
                     val idx = list.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(list, idx)
+                    if (idx >= 0) onPlay(list, idx, null)
                 },
             )
         }
@@ -298,7 +307,7 @@ fun HomeContent(
                 resumeByContent = resumeByContent.value,
                 onPlay = { item ->
                     val idx = nonLiveFavorites.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(nonLiveFavorites, idx)
+                    if (idx >= 0) onPlay(nonLiveFavorites, idx, resumeByContent.value[item.id]?.episodeId)
                 },
             )
         }
@@ -310,7 +319,7 @@ fun HomeContent(
                     val snapshot = upNextItems.toList()
                     val list = snapshot.map { it.channel }
                     val idx = list.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(list, idx)
+                    if (idx >= 0) onPlay(list, idx, null)
                 },
             )
         }
@@ -325,7 +334,7 @@ fun HomeContent(
                 onPlay = { item ->
                     val snapshot = recentlyAdded.toList()
                     val idx = snapshot.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(snapshot, idx)
+                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent.value[item.id]?.episodeId)
                 },
             )
         }

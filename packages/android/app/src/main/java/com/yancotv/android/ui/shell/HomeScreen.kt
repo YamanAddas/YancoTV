@@ -16,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgGuideChannel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -109,6 +111,9 @@ fun HomeScreen(
     val contentType = section.contentType
     val context = LocalContext.current
     val searchOverlayVisible by SearchOverlayState.visible.collectAsState()
+    // Used by the Home Continue Watching → series resume flow to dispatch
+    // the episode lookup to IO without blocking the click lambda.
+    val homeScope = rememberCoroutineScope()
 
     LaunchedEffect(section) {
         if (shouldStopPlaybackOnSectionChange(controller.currentItem.value)) {
@@ -289,20 +294,45 @@ fun HomeScreen(
             } else if (section == AppSection.Home) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
                     HomeContent(
-                        onPlay = { list, idx ->
+                        onPlay = { list, idx, resumeEpisodeId ->
                             val target = list.getOrNull(idx) ?: return@HomeContent
                             gatedPlay(target.id) {
-                                // Series containers have no playable stream URL —
-                                // PlaybackController.play() rejects them and the
-                                // fullscreen activity opens onto whatever stale
-                                // state the player had. Route series through the
-                                // detail overlay so the user picks an episode.
-                                // Live + movies start directly.
                                 when (target.type) {
-                                    ContentType.SERIES -> detailItem = target
                                     ContentType.LIVE, ContentType.MOVIE -> {
                                         if (controller.currentId != target.id) controller.play(list, idx)
                                         PlayerLauncher.launch(context)
+                                    }
+                                    ContentType.SERIES -> {
+                                        // Continue Watching path: when watch_history
+                                        // carries a non-null episode_id for this
+                                        // series, resume that exact episode at its
+                                        // stored offset. PlaybackController.play(
+                                        // Playable.Episode) reads the resume offset
+                                        // off the episode's own id (not the series),
+                                        // which is what the rail's "Xm left" badge
+                                        // already reflects. Falls back to the detail
+                                        // overlay when no episode hint exists or the
+                                        // episode row isn't cached locally yet.
+                                        if (resumeEpisodeId == null) {
+                                            detailItem = target
+                                            return@gatedPlay
+                                        }
+                                        homeScope.launch(Dispatchers.IO) {
+                                            val episode = runCatching {
+                                                repo.episodeById(resumeEpisodeId)
+                                            }.getOrNull()
+                                            val playable = episode?.toPlayable(target)
+                                            withContext(Dispatchers.Main) {
+                                                if (playable == null) {
+                                                    detailItem = target
+                                                } else {
+                                                    if (controller.currentId != playable.id) {
+                                                        controller.play(playable)
+                                                    }
+                                                    PlayerLauncher.launch(context)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
