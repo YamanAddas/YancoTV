@@ -3,6 +3,7 @@ package com.yancotv.android
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.os.StrictMode
 import androidx.media3.common.util.UnstableApi
 import androidx.work.WorkManager
 import coil3.SingletonImageLoader
@@ -22,6 +23,35 @@ class YancoApp : Application() {
     private var startedActivities = 0
 
     override fun onCreate() {
+        // StrictMode FIRST — before Koin starts, before any IO. Debug-only.
+        // Native-android-mk skill: "Never call a packages/shared/ repository
+        // directly from a Compose lambda. SQLDelight blocks." StrictMode
+        // is the policeman for that rule. We use penaltyLog (not Death) so
+        // false positives in third-party libs (Coil disk cache warm-up,
+        // Media3's first preparation, WorkManager init) don't kill debug
+        // builds; instead they show up as "StrictMode policy violation"
+        // in logcat and we triage. Filter with `adb logcat -s StrictMode:*`.
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .detectCustomSlowCalls()
+                    .penaltyLog()
+                    .build(),
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectActivityLeaks()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedRegistrationObjects()
+                    .detectLeakedSqlLiteObjects()
+                    .detectFileUriExposure()
+                    .penaltyLog()
+                    .build(),
+            )
+        }
         super.onCreate()
         startKoin {
             androidContext(this@YancoApp)

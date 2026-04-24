@@ -35,6 +35,9 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig.DEBUG gates StrictMode + future debug-only diagnostics
+        // in YancoApp. Off by default in AGP 8 — has to be opted in.
+        buildConfig = true
     }
 
     compileOptions {
@@ -60,6 +63,22 @@ android {
         // already documents the placeholder state. Keeping this as a
         // blocking lint error would fail CI on every run until then.
         disable += "MissingTvBanner"
+    }
+}
+
+// Compose compiler stability + recomposition reports. Off by default —
+// every build would otherwise litter `build/compose_compiler/` with
+// markdown/csv. Enable with:
+//   ./gradlew :app:assembleDebug -PcomposeCompilerReports=true -PcomposeCompilerMetrics=true
+// Then read app/build/compose_compiler/*-classes.txt for "unstable" hits
+// and *-composables.txt for "restartable but not skippable" composables.
+// First red flag is anything in ui/shell/* showing as unstable.
+composeCompiler {
+    if (project.findProperty("composeCompilerReports") == "true") {
+        reportsDestination = layout.buildDirectory.dir("compose_compiler")
+    }
+    if (project.findProperty("composeCompilerMetrics") == "true") {
+        metricsDestination = layout.buildDirectory.dir("compose_compiler")
     }
 }
 
@@ -104,6 +123,13 @@ dependencies {
 
     // WorkManager — background sync for sources (MK.3.3)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // LeakCanary — debug-only. Installs its own ContentProvider, watches
+    // every Activity/Fragment/ViewModel for retained references after
+    // destroy, dumps a heap when one survives. Pure additive; release
+    // APK is untouched. Triage tip: ExoPlayer + Coil generate noisy false
+    // positives during type-switches — use IgnoredReferences if needed.
+    debugImplementation(libs.leakcanary.android)
 
     // ───── test ─────
     testImplementation(kotlin("test"))
