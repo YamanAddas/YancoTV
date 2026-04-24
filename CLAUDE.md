@@ -18,6 +18,16 @@ Everything above is the cross-tool guide. The rest of this file is Claude Code-s
 - **Don't push** without an explicit ask. Build + install + commit is fine; `git push` is not.
 - **Fire TV is the canonical test target for native.** `adb connect 192.168.68.56:5555`, `./gradlew :app:installDebug` from `packages/android/`. Test on the phone (HT74J0206349) too for phone-specific code.
 
+## Self-checks before calling something "done"
+
+Lessons from real session red-teams. Run through these before declaring a task complete.
+
+- **Plan drives the work, not the available tool.** When a skill loads or an MCP surfaces mid-task, finish the active plan slice first. Do not pivot to "use the new tool because it's loaded." The skill stays loaded; pull it in when it's actually relevant. Real example (2026-04-24): `iptv-domain` skill loaded mid-D.1, I almost pivoted to a parser audit instead of finishing the lint baseline.
+- **"Technically working" ≠ done.** If you wrote a commit that passes the build but the commit message contains "worth fixing later" or "should be cleaned up in a future pass," the deferred items are usually cheap and you're being lazy. Triage them now. The user catching this is a sign the work wasn't actually done. Real example: D.1a baselined 8 `DefaultLocale` lint hits I knew were real bugs (Arabic users see Arabic-Indic digits in time codes); D.1a-fixes had to go back and fix them in place.
+- **Lint baselines need three buckets, not two.** When baselining: (1) cheap real bugs → fix inline; (2) expensive real bugs → file `MB-*` and baseline with comment; (3) genuinely deferred decisions (planned milestone work, conscious style picks) → baseline. Do not blanket-baseline everything that isn't an error. Same rule applies to ESLint on desktop and ktlint when we add it.
+- **Honest cost estimates.** Don't lowball to win approval. If reading 1300 lines of parser is 2–3 hours, say 2–3 hours. "30–60 minutes" sells the work as cheap and undermines trust when it overruns. Bias toward over-estimating; under-promising leaves room to surprise.
+- **Red-team your own answer before delivering.** Especially when proposing a pivot or a scope change. Ask: "Is this the right next step, or just a tool-driven detour?" "Did I lowball the cost?" "Is there a real-bug-vs-noise distinction I'm collapsing?"
+
 ## Editing conventions
 
 - TypeScript strict, no `any` unless unavoidable. Named exports (except framework-required defaults).
