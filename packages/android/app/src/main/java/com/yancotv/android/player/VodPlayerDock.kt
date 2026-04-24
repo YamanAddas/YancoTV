@@ -27,24 +27,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import java.util.Locale
 
 /**
@@ -219,6 +224,33 @@ private fun hexRowShape(corner: Dp): Shape {
             close()
         }
     }
+}
+
+/**
+ * Pointy-top hexagon — vertices at top-center and bottom-center, flat
+ * sides at H/4 and 3H/4 on left/right. Inscribed in the button's WxH box.
+ *
+ *      .             ← top vertex
+ *     / \
+ *    |   |           ← flat verticals between H/4 and 3H/4
+ *     \ /
+ *      '             ← bottom vertex
+ *
+ * Matches the YancoVerse lobby-orb silhouette from the user's reference
+ * photo. Used by transport buttons (single-symbol labels) — secondary
+ * chips use the wider [YancoShapes.HexCapsule] so multi-letter labels
+ * fit in the runway.
+ */
+private val PointyHexShape: Shape = GenericShape { size, _ ->
+    val w = size.width
+    val h = size.height
+    moveTo(w / 2f, 0f)
+    lineTo(w, h / 4f)
+    lineTo(w, 3f * h / 4f)
+    lineTo(w / 2f, h)
+    lineTo(0f, 3f * h / 4f)
+    lineTo(0f, h / 4f)
+    close()
 }
 
 // ---------------------------------------------------------------------
@@ -403,6 +435,7 @@ private fun VodDockTransportRow(
         if (hasSiblings) {
             TransportButton(
                 label = "‹",
+                contentLabel = "Previous",
                 size = 52.dp,
                 onClick = {
                     onUserInteraction()
@@ -413,6 +446,7 @@ private fun VodDockTransportRow(
         }
         TransportButton(
             label = "-10",
+            contentLabel = "Rewind 10 seconds",
             size = 58.dp,
             onClick = {
                 onUserInteraction()
@@ -422,6 +456,7 @@ private fun VodDockTransportRow(
         Spacer(Modifier.width(14.dp))
         TransportButton(
             label = if (isPlaying) "||" else "▶",
+            contentLabel = if (isPlaying) "Pause" else "Play",
             size = 88.dp,
             primary = true,
             focusRequester = playPauseFocus,
@@ -433,6 +468,7 @@ private fun VodDockTransportRow(
         Spacer(Modifier.width(14.dp))
         TransportButton(
             label = "+10",
+            contentLabel = "Forward 10 seconds",
             size = 58.dp,
             onClick = {
                 onUserInteraction()
@@ -443,6 +479,7 @@ private fun VodDockTransportRow(
             Spacer(Modifier.width(14.dp))
             TransportButton(
                 label = "›",
+                contentLabel = "Next",
                 size = 52.dp,
                 onClick = {
                     onUserInteraction()
@@ -471,6 +508,23 @@ private fun VodDockTransportRow(
     }
 }
 
+/**
+ * Hex-orb transport button. Pointy-top hex silhouette with a luminous
+ * accent glow on focus / primary, matching the YancoVerse lobby orb
+ * language (the user's reference photo). The visual weight order is
+ * primary > focused > idle:
+ *
+ *   - primary      → solid Accent → AccentDeep gradient, max glow,
+ *                    black foreground (the play-pause hero)
+ *   - focused      → dim accent wash + accent border + smaller glow
+ *                    (the current cursor)
+ *   - idle         → BackgroundElevated → BackgroundDeep gradient,
+ *                    BorderSubtle hairline, no glow
+ *
+ * Glow uses the canonical CategoryRail pattern: `.shadow()` with
+ * accent-tinted ambient + spot colors, applied BEFORE `.clip()` so it
+ * radiates outside the hex outline.
+ */
 @Composable
 private fun TransportButton(
     label: String,
@@ -478,16 +532,30 @@ private fun TransportButton(
     onClick: () -> Unit,
     primary: Boolean = false,
     focusRequester: FocusRequester? = null,
+    contentLabel: String = label,
 ) {
     val palette = LocalYancoPalette.current
-    val shape = hexRowShape(if (size >= 80.dp) 18.dp else 12.dp)
+    val shape = PointyHexShape
     val interaction = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
-    val baseBg =
+    val bgBrush =
         when {
-            primary -> palette.Accent
-            isFocused -> palette.BackgroundElevated
-            else -> palette.BackgroundRaised
+            primary ->
+                Brush.verticalGradient(listOf(palette.Accent, palette.AccentDeep))
+            isFocused ->
+                Brush.verticalGradient(
+                    listOf(
+                        palette.Accent.copy(alpha = 0.28f),
+                        palette.AccentDeep.copy(alpha = 0.18f),
+                    ),
+                )
+            else ->
+                Brush.verticalGradient(
+                    listOf(
+                        palette.BackgroundElevated,
+                        palette.BackgroundDeep.copy(alpha = 0.92f),
+                    ),
+                )
         }
     val borderColor =
         when {
@@ -495,59 +563,109 @@ private fun TransportButton(
             isFocused -> palette.Accent
             else -> palette.BorderSubtle
         }
-    val fgColor = if (primary) Color.Black else palette.TextPrimary
+    val fgColor =
+        when {
+            primary -> Color(0xFF04130C)
+            isFocused -> palette.Accent
+            else -> palette.TextPrimary
+        }
+    val glowElevation =
+        when {
+            primary -> 24.dp
+            isFocused -> 16.dp
+            else -> 0.dp
+        }
     val baseModifier =
         Modifier
             .size(size)
+            .shadow(
+                elevation = glowElevation,
+                shape = shape,
+                ambientColor = palette.Accent,
+                spotColor = palette.Accent,
+            )
             .clip(shape)
-            .background(baseBg)
+            .background(bgBrush)
             .border(if (isFocused || primary) 2.dp else 1.dp, borderColor, shape)
             .onFocusChanged { isFocused = it.isFocused }
     val finalModifier =
         if (focusRequester != null) baseModifier.focusRequester(focusRequester) else baseModifier
     Box(
-        modifier = finalModifier.clickable(
-            interactionSource = interaction,
-            indication = null,
-            onClick = onClick,
-        ),
+        modifier = finalModifier
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = contentLabel },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             color = fgColor,
             fontSize = if (size >= 80.dp) 26.sp else 18.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Black,
         )
     }
 }
 
+/**
+ * Hex-pill secondary chip — same orb language as [TransportButton] but
+ * silhouetted as a horizontal [YancoShapes.HexCapsule] so multi-letter
+ * labels (CC / AUDIO / SPEED / FIT / FAV / MENU) fit the middle runway
+ * cleanly. Idle = dim BackgroundElevated; focused = soft accent wash +
+ * accent border + accent glow. No "primary" state — these are all peers.
+ */
 @Composable
 private fun SecondaryChip(
     label: String,
     onClick: () -> Unit,
 ) {
     val palette = LocalYancoPalette.current
-    val shape = hexRowShape(10.dp)
+    val shape = YancoShapes.HexCapsule
+    val interaction = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
+    val bgBrush =
+        if (isFocused) {
+            Brush.verticalGradient(
+                listOf(
+                    palette.Accent.copy(alpha = 0.28f),
+                    palette.AccentDeep.copy(alpha = 0.18f),
+                ),
+            )
+        } else {
+            SolidColor(palette.BackgroundElevated)
+        }
     val borderColor = if (isFocused) palette.Accent else palette.BorderSubtle
+    val fgColor = if (isFocused) palette.Accent else palette.TextPrimary
     Box(
         modifier = Modifier
             .height(42.dp)
+            .shadow(
+                elevation = if (isFocused) 14.dp else 0.dp,
+                shape = shape,
+                ambientColor = palette.Accent,
+                spotColor = palette.Accent,
+            )
             .clip(shape)
-            .background(palette.BackgroundRaised)
+            .background(bgBrush)
             .border(if (isFocused) 2.dp else 1.dp, borderColor, shape)
             .onFocusChanged { isFocused = it.isFocused }
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = label }
+            .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            color = if (isFocused) palette.Accent else palette.TextPrimary,
+            color = fgColor,
             fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.4.sp,
             fontFamily = FontFamily.Monospace,
         )
     }
