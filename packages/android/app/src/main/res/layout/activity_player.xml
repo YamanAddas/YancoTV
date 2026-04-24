@@ -280,13 +280,21 @@
          rides over the live stream. Hosted as a ComposeView so the list,
          focus, and now/next reuse existing Compose code paths. Anchored
          right-edge, fixed width, never full-screen — the video stays
-         visible beneath it. -->
-    <androidx.compose.ui.platform.ComposeView
-        android:id="@+id/surf_overlay"
+         visible beneath it.
+
+         Wrapped in a ViewStub so the ComposeView's Compose owner /
+         Recomposer / saveable state registry isn't built during
+         PlayerActivity.onCreate. Most fullscreen sessions never open the
+         surf overlay; deferring the inflation drops ~150 ms off the
+         launch path on Fire TV Stick. PlayerActivity.showSurf() inflates
+         the stub on first use. -->
+    <ViewStub
+        android:id="@+id/surf_overlay_stub"
         android:layout_width="360dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
-        android:visibility="gone" />
+        android:inflatedId="@+id/surf_overlay"
+        android:layout="@layout/player_surf_overlay" />
 
     <!-- Stream error overlay: shown when ExoPlayer surfaces an unrecoverable
          error (connection failed, 403/404, codec gap). User can retry or

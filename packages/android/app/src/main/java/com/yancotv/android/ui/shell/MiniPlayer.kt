@@ -78,6 +78,11 @@ fun MiniPlayer(
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewRef[0]?.let { v ->
                     // Fullscreen activity may have taken the surface — reclaim it.
+                    // clearVideoSurface() first so the subsequent attach
+                    // doesn't block the main thread waiting for PlayerActivity's
+                    // SurfaceView to ack-detach (see PlayerLauncher comment +
+                    // ExoTimeoutException "Detaching surface timed out").
+                    controller.player.clearVideoSurface()
                     controller.player.setVideoTextureView(v)
                 }
             }

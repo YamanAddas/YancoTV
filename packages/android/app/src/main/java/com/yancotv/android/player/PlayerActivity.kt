@@ -118,10 +118,11 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var streamErrorRetry: Button
     private lateinit var streamErrorBack: Button
 
-    // Channel-surf overlay (ComposeView). Holding a Compose-owned mutable
-    // state lets the inner composable observe show/hide without Activity ↔
-    // Compose round-trips.
-    private lateinit var surfOverlay: ComposeView
+    // Channel-surf overlay (ComposeView), inflated on first showSurf() via
+    // ViewStub so Compose owner setup is off the activity launch path.
+    // surfOverlay stays null until first use; everything downstream guards
+    // on surfVisible / null-checks the field.
+    private var surfOverlay: ComposeView? = null
     private var surfVisible by mutableStateOf(false)
 
     private var listenerAttached = false
@@ -205,20 +206,8 @@ class PlayerActivity : AppCompatActivity() {
         streamErrorRetry.setOnClickListener { retryCurrent() }
         streamErrorBack.setOnClickListener { finish() }
 
-        surfOverlay = findViewById(R.id.surf_overlay)
-        surfOverlay.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        surfOverlay.setContent {
-            if (surfVisible) {
-                ChannelSurfOverlay(
-                    currentContentId = controller.currentId,
-                    onPick = { list, idx ->
-                        hideSurf()
-                        controller.play(list, idx)
-                        playerView.requestFocus()
-                    },
-                )
-            }
-        }
+        // surfOverlay stays null — inflated lazily on first showSurf() via
+        // the ViewStub. Keeps Compose owner setup off the launch path.
 
         playerView.useController = true
         // Controls must stay hidden on fullscreen entry. Media3's default
@@ -382,6 +371,14 @@ class PlayerActivity : AppCompatActivity() {
             target.addListener(playerListener)
             listenerAttached = true
         }
+        // Drop any prior surface (the MiniPlayer's TextureView when the user
+        // launched fullscreen from the shell) before binding to the local
+        // PlayerView. PlayerView.setPlayer eventually calls
+        // setVideoSurfaceView, which blocks the main thread waiting for the
+        // previous output to ack-detach — without this pre-clear we hit
+        // ExoTimeoutException "Detaching surface timed out" and the player
+        // drops to IDLE. Mirrored on the way out by PlayerLauncher.
+        target.clearVideoSurface()
         playerView.player = target
         playerView.requestFocus()
     }
@@ -645,19 +642,43 @@ class PlayerActivity : AppCompatActivity() {
 
     // ───── Channel surf ─────
 
+    private fun ensureSurfOverlay(): ComposeView {
+        surfOverlay?.let { return it }
+        // Inflate the ViewStub on first use. AppCompatActivity guarantees
+        // setContentView ran first so the stub is in the view tree.
+        val stub = findViewById<android.view.ViewStub>(R.id.surf_overlay_stub)
+        val inflated = stub.inflate() as ComposeView
+        inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        inflated.setContent {
+            if (surfVisible) {
+                ChannelSurfOverlay(
+                    currentContentId = controller.currentId,
+                    onPick = { list, idx ->
+                        hideSurf()
+                        controller.play(list, idx)
+                        playerView.requestFocus()
+                    },
+                )
+            }
+        }
+        surfOverlay = inflated
+        return inflated
+    }
+
     private fun showSurf() {
         if (surfVisible) return
         surfVisible = true
-        surfOverlay.visibility = View.VISIBLE
+        val v = ensureSurfOverlay()
+        v.visibility = View.VISIBLE
         // Let Compose populate the list, then steal focus to the overlay so
         // D-pad input drives it and not the (possibly stale) PlayerView.
-        surfOverlay.post { surfOverlay.requestFocus() }
+        v.post { v.requestFocus() }
     }
 
     private fun hideSurf() {
         if (!surfVisible) return
         surfVisible = false
-        surfOverlay.visibility = View.GONE
+        surfOverlay?.visibility = View.GONE
         playerView.requestFocus()
     }
 
