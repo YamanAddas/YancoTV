@@ -440,18 +440,33 @@ private fun HexCapsule(
     val pal = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    // Visual model:
+    //   focused  → bright accent fill   (the cursor — where the D-pad is)
+    //   active   → outline frame on raised bg (the selection — what's set)
+    //   neither  → raised bg, muted text
+    // Picker (cursor) reads as the loud signal; picked (selection) reads
+    // as a quiet persistent frame. Previous model had it inverted: the
+    // picked tab was a solid accent fill while the focused/cursor tab was
+    // a frame, which conflated "this is set" with "this is where I am" —
+    // moving the cursor away from the active tab made the sheet look
+    // unselected. This swap makes both states legible at the same time.
     val bgBrush =
         when {
-            active -> Brush.verticalGradient(listOf(pal.Accent, pal.AccentDeep))
-            focused -> Brush.verticalGradient(listOf(pal.BackgroundElevated, pal.BackgroundHover))
+            focused -> Brush.verticalGradient(listOf(pal.Accent, pal.AccentDeep))
             else -> Brush.verticalGradient(listOf(pal.BackgroundRaised, pal.BackgroundRaised))
         }
     val fg =
         when {
-            active -> Color(0xFF04130C)
-            else -> if (focused) pal.TextPrimary else pal.TextMuted
+            focused -> Color(0xFF04130C)
+            active -> pal.Accent
+            else -> pal.TextMuted
         }
-    val borderColor = if (active || focused) pal.Accent else pal.BorderSubtle
+    val borderColor =
+        when {
+            focused -> pal.Accent
+            active -> pal.Accent
+            else -> pal.BorderSubtle
+        }
     Box(
         modifier =
             modifier
@@ -488,7 +503,10 @@ private fun HexCapsule(
             color = fg,
             fontSize = 9.sp,
             letterSpacing = 1.4.sp,
-            fontWeight = if (active) FontWeight.Black else FontWeight.Bold,
+            // Both the cursor (focused) and the selection (active) get a
+            // heavier weight so the sheet doesn't look "unselected" when
+            // the cursor moves to a different tab.
+            fontWeight = if (active || focused) FontWeight.Black else FontWeight.Bold,
         )
     }
 }
