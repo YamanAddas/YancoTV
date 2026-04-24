@@ -111,7 +111,9 @@ YancoTV/                        # pnpm workspace root (desktop stays pnpm)
 
 ---
 
-## Milestones — MK.0 → MK.12
+## Milestones — MK.0 → MK.19
+
+> **Next up (2026-04-24):** MK.8 + D-phase are closed. Start MK.12 with **MK.12a (fast wires)** — see the block below for the ~1-week sequence that closes ~60% of the TiviMate control-surface gap before heavier work in MK.12b → MK.18.
 
 Each milestone ends in a tagged APK (and later TestFlight build) + a commit series. "Delete-before-add" rule from the RN plan carries over.
 
@@ -239,18 +241,189 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.11.2 | Gesture seek / volume / brightness on phone player | feels native |
 | MK.11.3 | Chromecast sender via Media3's `CastPlayer` | cast to Google TV / Chromecast |
 
-### **MK.12 — Distribution + QA + launch** *(~1 week)*
+---
+
+## MK.12 → MK.18 — TiviMate gap-close (added 2026-04-24)
+
+Post-MK.11 audit found that YancoTV Android has a solid core (one shared `ExoPlayer`, reactive SQLDelight repos, KMP business logic) but a thin user-facing control surface vs TiviMate 5.1.6. MK.12–MK.18 close that gap. Every sub-task is labelled:
+
+- 🟢 **wire** — code already exists, connect it (fast)
+- 🟡 **glue** — schema/repo exists, needs service + UI
+- 🔴 **new** — greenfield
+
+Old MK.12 (Distribution + QA + launch) moved to **MK.19** — unchanged scope.
+
+**Red-team cuts already applied** (see bottom of this block): audio delay downgraded to "external player", auto-series recording replaced with manual series bind, DLNA cut, SOCKS proxy cut, cross-source user groups deferred to phase 2. Total post-cut estimate: **~4 focused weeks** for MK.12–MK.18.
+
+**Schema-migration budget:** 6 SQLDelight migrations expected across this block (`Content.sq`, `Sources.sq`, `Favorites.sq` + new tables `channel_prefs`, `favorite_lists`, `recording_schedules`). Each migration lands in the same commit as its `commonTest` upgrade test on a populated fixture. Apply the native-android-mk skill's "schema units" rule (ms vs seconds) on every new timestamp column.
+
+### **MK.12 — In-player control surface** *(~1 week)*
+
+Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMate users live in the player menu. Split into two sub-phases so fast wires ship first.
+
+**MK.12a — fast wires** (ship first, ~3 days, each 🟢 except 12a.1)
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.12a.1 | Player long-press / MENU / `KEYCODE_MENU` → single Compose bottom-sheet overlay (`ComposeView` child of `PlayerActivity`'s root). Sheet hosts 12a.2–12a.5 + 12b tasks | 🔴 new | Long-press opens sheet; Back closes; doesn't pause playback |
+| MK.12a.2 | Audio track picker via `TrackSelectionParameters`; persist pick to `AppPreferences.audioLang` (key already exists) | 🟢 wire | Streams with ≥2 audio tracks show chooser; restart of same channel restores language |
+| MK.12a.3 | Subtitle track picker + "off" + "load external file" row. External file triggers `MediaItem` rebuild → gated behind `currentId` / resume-point persistence check per native-android-mk rule | 🟢 wire | Subtitle on/off/external works; resume position preserved across the rebuild |
+| MK.12a.4 | Playback speed picker (0.5 / 0.75 / 1.0 / 1.25 / 1.5 / 2.0×) via `player.setPlaybackSpeed()`; persisted per content-type | 🟢 wire | Live TV always resets to 1.0× on new channel; VOD restores last chosen speed |
+| MK.12a.5 | Aspect-ratio quick-cycle (Fit / Fill / Zoom / 16:9 / 4:3). Extend `AppPreferences.ResizeMode` enum; `PlayerView.resizeMode` already reactive | 🟢 wire | Remote-mapped hotkey cycles modes; last used persists |
+
+**MK.12b — heavier items** (~4 days)
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.12b.1 | Sleep timer (15 / 30 / 45 / 60 min / end-of-program / off). Coroutine ticker owned by `PlaybackController`; "end-of-program" reads `EpgRepository.currentProgramme(channelId).endTimeMs` | 🔴 new | Timer visible in sheet; fires `player.pause()` at expiry; cancellable |
+| MK.12b.2 | **`channel_prefs` SQLDelight table + repo** — keyed on `content_id`; columns `audio_lang`, `subtitle_lang`, `speed`, `resize_mode`, `updated_at` (ms). Replaces the global-prefs fallback in 12a.2/12a.4/12a.5 with per-channel memory | 🔴 new | Channel A remembers Arabic audio, Channel B remembers English; global pref is the default when `channel_prefs` row is null |
+| MK.12b.3 | ~~Audio delay~~ — **cut**; documented in sheet as "use external player (MK.18) for sync issues". Media3 has no first-class setter, `AudioProcessor` insert is week-plus with side effects | — | N/A (out of scope) |
+
+**Innovation beyond TiviMate:** per-channel preference memory (12b.2). TiviMate resets audio/sub selection each session.
+
+### **MK.13 — Channel ops + favorites reach** *(~3 days)*
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.13.1 | Add-to-favorites button in MK.12 bottom sheet; reactive star in zap bar + channel rows via `FavoritesRepository.isFavoriteFlow(contentId)` | 🟢 wire | Toggle from player → FavoritesScreen updates without navigation round-trip (MK.8 rule applies) |
+| MK.13.2 | **Schema: `Content.sq` migration `0002_content_overrides.sqm`** — add `name_override TEXT`, `logo_override TEXT` nullable. Read-through in `ContentItem.displayTitle` / `displayLogoUrl`. Both optional, source-of-truth remains M3U fields | 🟡 glue | Rename + custom logo round-trip; upgrade test from schema v1 |
+| MK.13.3 | Extend `ChannelActionsMenu` from 3 items → full set: Favorite / Rename / Custom logo (URL paste or pick from device) / Lock (existing) / Hide (existing) / Share stream URL. Drop "Cancel" row (Back handles it) | 🟡 glue | All 6 actions reach the repo; semantics applied per native-android-mk (contentDescription on every row) |
+| MK.13.4 | **Multi-favorite-lists** — new tables `favorite_lists(id, name, sort_order)` + add `list_id FK` to `Favorites.sq`. Migration seeds a default list (`id=1, name="Favorites"`) and sets all existing favorites to it | 🔴 new | FavoritesScreen shows tab bar of lists; add-to-favorites from MK.13.1 prompts which list when >1 exists |
+| MK.13.5 | ~~Move to cross-source user group~~ — **deferred to MK.20+** | — | Out of scope for v1 gap-close |
+
+**Innovation beyond TiviMate:** multi-favorite-lists (13.4). TiviMate has one flat favorites list.
+
+### **MK.14 — Recording + scheduling** *(~1 week, HLS-only in phase 1)*
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.14.1 | `RecordingService` (`ForegroundService` type `mediaProjection`-less variant, `FOREGROUND_SERVICE_TYPE_DATA_SYNC`) — HLS segment tee via OkHttp interceptor; writes to `MediaStore.Video` (scoped storage); updates `Recordings.sq` status column | 🟡 glue | 5-min HLS recording lands on disk; row moves `started → running → done`; file plays back via existing `PlaybackController` |
+| MK.14.2 | "Record now" button in MK.12 bottom sheet + ongoing notification with Stop action | 🔴 new | Tap → service starts; notification persists until Stop; PlaybackController unaffected |
+| MK.14.3 | **Schema: `recording_schedules.sq`** — `id, content_id, start_at_ms, end_at_ms, padding_pre_s, padding_post_s, repeat_rule (NONE/DAILY/WEEKLY), created_at_ms`. `WorkManager` one-shot `OneTimeWorkRequest` per schedule at `start_at_ms − padding_pre_s` | 🟡 glue | Schedule a recording for T+2 min → fires → completes |
+| MK.14.4 | Record-from-EPG long-press in GuidePanel programme cell (uses 14.3's schema with pre/post paddings from prefs, default 0/+60s) | 🔴 new | Long-press any programme → "Record" row → schedule row created |
+| MK.14.5 | `RecordingsScreen` in main nav — list / play / delete. Play via existing `PlaybackController.play(filePath)` | 🟡 glue | Screen shows past + in-progress recordings; delete removes row + file |
+| MK.14.6 | ~~Auto series recording (XMLTV `episode-num` heuristic)~~ — **replaced** with manual series binding: user long-presses a programme → "Record all programmes with this title on this channel" → creates N schedules based on EPG lookahead window | 🔴 new | Binding one series produces ≥1 scheduled row for next 7 days |
+| MK.14.7 | ~~MPEG-TS / DASH / encrypted-segment support~~ — **phase 2**; surface "HLS-only in v1" in the record button's disabled-state tooltip for non-HLS streams | — | Button disabled with reason-text on non-HLS |
+
+**Innovation beyond TiviMate:** recording stays device-local (no cloud cost) + optional SMB push to NAS via `jcifs-ng` (post-record hook, MK.14.8 follow-up if time). TiviMate Premium's cloud archive costs $0 here.
+
+### **MK.15 — EPG display + timeline prefs** *(~4 days)*
+
+Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we wire the 80% that use existing data.
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.15.1 | EPG days forward / back (1–14 each; two `IntPref`s in `AppPreferences`) | 🟢 wire | `EpgRepository.programmesInRange` already filters; settings tab slider updates visible window |
+| MK.15.2 | Timeline duration visible (30 / 60 / 90 / 120 / 180 min) | 🟢 wire | `GuidePanel` density multiplier; presets only, no free slider |
+| MK.15.3 | Row height (Compact / Normal / Spacious) — dp-driven via theme (needs MK.16.1 first) | 🟢 wire | Pref persists; applied on `GuidePanel` recomposition |
+| MK.15.4 | Now-line + "jump to now" button in guide | 🟢 wire | Uses existing `nowMs` state; scrolls guide grid to current x |
+| MK.15.5 | Programme details dialog — synopsis / categories / cast. XMLTV fields already parsed in shared, just unused in UI | 🟢 wire | CENTER on programme cell opens dialog; Back closes |
+| MK.15.6 | Catch-up badge on past programmes + "play from here" — `CatchupService` + `UrlBuilder` exist in shared, wiring only. Source must advertise catch-up in `sources.catchup_type` | 🟢 wire | Past programme with catchup shows badge; play builds URL via existing `UrlBuilder` |
+| MK.15.7 | Multi-EPG merge conflict resolution — add `Sources.sq` column `epg_priority INTEGER DEFAULT 0`; when two sources provide programmes for the same `tvg_id`, higher priority wins | 🔴 new | UI to reorder sources for EPG priority; conflict test with two fixtures passes |
+
+**Depends on MK.16.1** (theme refactor) for 15.3.
+
+**Innovation beyond TiviMate:** adaptive timeline zoom — D-pad ↑/↓ in guide (pinch on phone) changes visible duration live; TiviMate is fixed at 90 min.
+
+### **MK.16 — Appearance, themes, typography** *(~3 days)*
+
+**`Theme.kt` is currently `object YancoPalette` with `val` colors → cannot swap at runtime.** Refactor to state-driven theme **before** MK.15.3, MK.16.2+.
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.16.1 | **Theme refactor** — convert `YancoPalette` from `object` → `data class`; pass via a new `LocalYancoPalette` `CompositionLocalProvider`; drive from `StateFlow<ThemeId>` in a new `ThemeController`. Existing direct `YancoPalette.*` call sites rewritten to `LocalYancoPalette.current.*` | 🔴 new | Build green; switching `ThemeId` in ThemeController recomposes entire UI to new palette without restart |
+| MK.16.2 | 4 built-in themes — Frosted Emerald (existing baseline), Midnight Sapphire, Warm Amber, Monochrome. Picker in `SettingsScreen` new "Appearance" tab | 🔴 new | Each theme renders without color conflicts; focus ring and accent remain accessible |
+| MK.16.3 | Accent picker — 4 presets (emerald / sapphire / amber / red). ~~Custom hex~~ **cut**; presets cover 90% | 🔴 new | Accent overlays on selected base theme |
+| MK.16.4 | Font size scale (90 / 100 / 110 / 125 %) via `LocalDensity` override | 🟢 wire | Scales apply to all typography |
+| MK.16.5 | Channel number display toggle + digit-grouping format. `KEY_SHOW_NUMBERS` pref exists; format is new | 🟡 glue | Numbers render only when enabled |
+| MK.16.6 | App icon variants via `activity-alias` in manifest — 3 alternates (Emerald default, Mono, Amber) | 🔴 new | Icon change requires relaunch (standard Android behavior); documented |
+
+**Innovation beyond TiviMate:** on Android 12+ phone, the default theme respects **Material You** (wallpaper-derived accent); TV always stays branded.
+
+### **MK.17 — Network wiring + advanced playback** *(~3 days)*
+
+**P0 latent bug found in audit**: `SettingsNetworkTab` writes to `AppPreferences.networkFlow` but `PlaybackController` hardcodes `CONNECT_TIMEOUT_SEC=15L`, `READ_TIMEOUT_SEC=30L`, UA `VLC/3.0.20 LibVLC/3.0.20`. Settings today are decorative. **MK.17.1 ships first as its own commit.**
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.17.1 | **Wire `AppPreferences.networkFlow` into `PlaybackController`** — rebuild `OkHttpClient` on flow emission, pass UA header, apply connect + read timeouts. Existing prefs keys become functional | 🟢 wire | Change UA in Settings → next stream request uses new UA (verify via mitmproxy / curl parity); same for timeouts |
+| MK.17.2 | "Test connection" button in Network tab — HEAD request to first active source using current settings; reports status / latency / UA echoed | 🔴 new | Misconfig caught before playback fails |
+| MK.17.3 | HW decoder preference + fallback toggle — `DefaultRenderersFactory.setEnableDecoderFallback(true)` + `setExtensionRendererMode()` surfacing | 🟢 wire | Toggle forces SW decode; visible in quick-info overlay |
+| MK.17.4 | Buffer tuning — 3 presets (Low-latency / Balanced / Stable) mapped to `DefaultLoadControl.Builder` params. No free sliders | 🟢 wire | Preset change rebuilds `ExoPlayer` LoadControl on next `prepare()` |
+| MK.17.5 | Per-source `user_agent` + `referer` columns on `Sources.sq`. When set, overrides the global UA from 17.1 for that source's streams | 🟡 glue | Per-source UA test with two sources passes |
+| MK.17.6 | ~~SOCKS proxy~~ — **cut**. HTTP proxy only if user demand surfaces | — | Out of scope |
+
+**Innovation beyond TiviMate:** "connection profiles" is **deferred to phase 2**; v1 ships per-source UA override which already covers the main use case.
+
+### **MK.18 — External player + Cast** *(~2 days after cuts)*
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.18.1 | "Open in external" action in MK.12 sheet — `Intent.ACTION_VIEW` with package hints for VLC / MX Player / Just Player; detect installed apps via `PackageManager` | 🔴 new | Launches external player with current stream URL; falls back to chooser if none installed |
+| MK.18.2 | Persist default external player per content-type (Live / Movie / Series) in prefs | 🟡 glue | Live defaults to VLC, VOD to internal (example); honored on next launch |
+| MK.18.3 | Chromecast sender via Media3 `CastPlayer` — MK.11.3 scope continuation. `MediaRouteButton` in MK.12 sheet | 🔴 new | Cast button appears when a receiver is visible; session transfer with current `MediaItem` + position |
+| MK.18.4 | ~~DLNA / UPnP~~ — **cut**. 5% user value, 2-week library bloat cost | — | Out of scope |
+| MK.18.5 | Cross-device handoff — **deferred to phase 2**. Schema already supports it (shared `watch_history` in SQLDelight on each device); needs QR-signed-blob transport layer | — | Out of scope for v1 gap-close |
+
+---
+
+### **MK.19 — Distribution + QA + launch** *(~1 week)* *(was MK.12)*
 
 | # | Task | DoD |
 |---|---|---|
-| MK.12.1 | R8/ProGuard config, APK-size audit | <60MB per split |
-| MK.12.2 | Play Console listing (TV + phone), screenshots, description | internal track first |
-| MK.12.3 | Amazon Appstore submission (Fire TV) | pending review |
-| MK.12.4 | GitHub Releases sideload APK (signed, versioned) | one-click install |
-| MK.12.5 | Firebase Crashlytics wired (replaces Sentry on Android; Sentry keeps desktop) | crash-free sessions ≥ 99.5% |
-| MK.12.6 | Manual QA checklist against 5 devices: Fire TV Stick 4K, Insignia Fire TV, NVIDIA Shield, Pixel phone, Android tablet | `packages/android/tests/MANUAL_QA.md` |
+| MK.19.1 | R8/ProGuard config, APK-size audit. Inherits the D.3 deferral — keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines | `./gradlew :app:assembleRelease` runs; APK plays end-to-end; per-ABI splits under 60MB |
+| MK.19.2 | Play Console listing (TV + phone), screenshots, description | internal track first |
+| MK.19.3 | Amazon Appstore submission (Fire TV) | pending review |
+| MK.19.4 | GitHub Releases sideload APK (signed, versioned) | one-click install |
+| MK.19.5 | Firebase Crashlytics wired (replaces Sentry on Android; Sentry keeps desktop) | crash-free sessions ≥ 99.5% |
+| MK.19.6 | Manual QA checklist against 5 devices: Fire TV Stick 4K, Insignia Fire TV, NVIDIA Shield, Pixel phone, Android tablet | `packages/android/tests/MANUAL_QA.md` |
 
-**Ship criterion for v1.0:** installable via Play Store + Fire TV Appstore + direct APK. Crash-free ≥99.5% over 7 days. All RN-plan feature parity reached + TiviMate-style mini preview works + TV launcher integration live.
+**Ship criterion for v1.0:** installable via Play Store + Fire TV Appstore + direct APK. Crash-free ≥99.5% over 7 days. All RN-plan feature parity reached + TiviMate-style mini preview works + TV launcher integration live + TiviMate control-surface parity (MK.12–MK.18) shipped.
+
+---
+
+## Red-team summary (MK.12 → MK.18)
+
+What survived, what got cut, and what stands if time shrinks. Full reasoning captured in the 2026-04-24 planning session.
+
+**Already cut in the plan above:**
+- Audio delay (MK.12b.3) — Media3 has no setter; external player covers it
+- Auto series recording via XMLTV heuristic (MK.14.6) — replaced with manual series bind
+- MPEG-TS / DASH / encrypted recording (MK.14.7) — phase 2
+- Cross-source user groups (MK.13.5) — phase 2
+- SOCKS proxy (MK.17.6) — phase 2
+- Connection profiles (MK.17) — phase 2
+- DLNA / UPnP (MK.18.4) — out
+- Cross-device handoff (MK.18.5) — phase 2
+- Custom hex accent (MK.16.3) — 4 presets only
+
+**Ordering constraints** (deviate = rework):
+1. **MK.12a ships before MK.12b** — the fast wires alone close ~60% of the visible gap in ~3 days and surface whether the bottom-sheet UX itself works before committing to heavier items.
+2. **MK.16.1 (theme refactor) ships before MK.15.3 and MK.16.2+** — driving row-height and palettes from state requires the `object → data class + CompositionLocal` refactor landed first.
+3. **MK.17.1 ships as its own commit, first in MK.17** — it's a latent P0 that makes existing Settings real.
+
+**Schema-migration discipline** (6 migrations across this block):
+- Each migration lands in the same commit as a `commonTest` upgrade test with populated fixture rows.
+- Every new timestamp column documents `-- ms since epoch` per native-android-mk rule.
+- Manual populated-DB check on Fire TV with ≥5k content rows before moving on.
+
+**If time shrinks, cut in this order:**
+1. MK.14 phase 1 entirely (recording is a 1-week slot; users have external tools)
+2. MK.16.6 (alternate app icons — cosmetic)
+3. MK.18.3 (Cast — keep only if MK.11.3 already landed)
+4. MK.17.5 (per-source UA — useful but rare)
+5. MK.13.4 (multi-favorite-lists — nice-to-have; can default to single list)
+
+**Keep even under pressure:**
+- MK.17.1 — fixes latent bug
+- MK.16.1 — unlocks future work
+- MK.12a — the single biggest UX jump
+- MK.13.1 + MK.13.2 — favorites from player + rename/logo are top user requests
+
+**Known risk zones:**
+- HLS recording (MK.14.1) — segment tee handles most streams; TS-discontinuities and encrypted segments are known failure modes, flagged in the plan with phase-2 deferral.
+- `MediaItem` rebuilds in 12a.3 (external subs) and 14.1 (recording interceptor) must persist resume point before re-prepare, per native-android-mk "resume-point" rule — regression-test both.
+- Theme refactor (16.1) blast radius = every `YancoPalette.*` reference. Mitigation: do it in one commit with a scripted rewrite, run full smoke before MK.16.2.
 
 ---
 
@@ -273,7 +446,7 @@ Standing phase started 2026-04-24 after the cascade-nav focus bug shipped in `4a
 | D.0 | Wire LeakCanary + StrictMode + Compose compiler reports flag (`buildFeatures { buildConfig = true }` for the DEBUG gate) | App boots clean, LeakCanary `InternalLeakCanary.invoke` runs at start, StrictMode logs at `adb logcat -s StrictMode:*`, reports generate to `app/build/compose_compiler/` on the opt-in flag | **DONE** `7fa1bf9` |
 | D.1 | Run `./gradlew :app:lint` once, capture baseline (`lintBaseline = file("lint-baseline.xml")` in `android.lint{}`) so every NEW warning fails the build. Then add ktlint via `org.jlleitschuh.gradle.ktlint`, run `./gradlew ktlintFormat` once, commit the mechanical reformat as a SEPARATE commit so `git blame` stays clean | One lint baseline file checked in; ktlint config + formatted tree in two distinct commits | **DONE** — D.1a `6c31685` (lint baseline 135 issues + PiP NewApi @RequiresApi fix), D.1a-fixes `419ee85` (triaged 15 cheap real bugs in place; baseline 135→120; lessons in CLAUDE.md `1984c20`), D.1b `a8779af` (ktlint plugin per-module — root `subprojects {}` can't see `libs` accessor in Kotlin DSL) + `4c0b50d` (mechanical reformat across 127 files, Compose `@Composable PascalCase` triggers non-fixable warnings, ignoreFailures=true accepts them) + `5a8e7e3` (`.git-blame-ignore-revs` so the reformat doesn't poison blame). Catalog keys: `ktlintCli` + `ktlintPlugin` (camelCase, flat — `ktlint` + `ktlint-plugin` collide via hyphen-nesting). When flipping `ignoreFailures=false` later, add `.editorconfig` rule disabling `function-naming` for `@Composable`. |
 | D.2 | **Reframed (2026-04-24)** from instrumented `:androidTest` to JVM unit tests + skill checklist after red-team — Compose UI test scaffolding is 2–4h for a single-tester personal app; the underlying mechanism (`PlacedFocusAnchor`'s await-then-request contract) is fully testable in JVM and the wiring layer (`key(contentType)` boundary) is more durable as a checklist + smoke-test entry than as instrumented tests. Existing test pattern in `BrowseShellLogicTest` already established this trade-off. | `PlacedFocusAnchorTest` (6 tests, all green) covers: suspends-until-placed, fires-immediately-when-already-placed, reset semantics, multiple concurrent calls, idempotent markPlaced. Native-android-mk skill gained: (1) "every `key(...)` boundary that scopes focus state holds its own anchor + requester" rule with the `4a8a46e` worked example, (2) 3-step cascade-nav smoke test for the human-loop check before merging HomeScreen/BrowseSection touches. Also fixed pre-existing test breakage in `BrowseShellLogicTest` from the `f432524` rename of `shouldStopLivePreviewForSection` → `shouldStopPlaybackOnSectionChange`. | **DONE** — see commit |
-| D.3 | Turn on R8 in release: `isMinifyEnabled = true`, `isShrinkResources = true`. Discover + write keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines. | `./gradlew :app:assembleRelease` runs; resulting APK boots, plays a stream end-to-end, persists resume point. Per-ABI splits still under 60MB | **DEFERRED → MK.12.1** — same DoD, same work, right home for it. Not needed for stability; needed before any store submission. Removed as a D-phase blocker 2026-04-24. |
+| D.3 | Turn on R8 in release: `isMinifyEnabled = true`, `isShrinkResources = true`. Discover + write keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines. | `./gradlew :app:assembleRelease` runs; resulting APK boots, plays a stream end-to-end, persists resume point. Per-ABI splits still under 60MB | **DEFERRED → MK.19.1** (renumbered from MK.12.1 when MK.12→18 gap-close was inserted 2026-04-24) — same DoD, same work, right home for it. Not needed for stability; needed before any store submission. Removed as a D-phase blocker 2026-04-24. |
 | D.4 | `Thread.setDefaultUncaughtExceptionHandler` in `YancoApp.onCreate` writing last-crash to `filesDir/crash.log` + Kermit. NO Crashlytics, NO Sentry — owns its own data, no DSN management for a personal app | Force a crash → next launch reads `filesDir/crash.log` and surfaces it (or just logs it for now) | **DONE** `1e69da0` — `CrashReporter` singleton; atomic write (tmp→rename); reads+clears on next launch via `Log.e(TAG="YancoCrash")`; uses `android.util.Log` not Kermit (runs before shared module init) |
 | D.5 | Behavioural tests for the two skill-checklist landmines: (a) `positionFor(contentId)` returns null for a series container with no content-level row (never an episode row), (b) `controller.currentId == target.id` short-circuit at every `controller.play(` call site — write a test fixture that calls each launch site twice with the same item, asserts the second call doesn't re-prepare the `MediaItem` | Both tests in `:shared:commonTest` (positionFor) and `app/src/test/` (currentId guard) | **DONE** `a8bc63a` — (a) already covered by `WatchHistoryRepositoryTest.positionFor_ignoresEpisodeRowsWhenNoContainerRow` (MB-41 guard). (b) extracted `resolveActivation(currentId, targetId, isTv) → ActivationAction` into `BrowseShell.kt`; updated `FavoritesScreen` two call sites to use it; `ActivationGuardTest` (6 tests) pins TV first-tap/second-tap/null and phone single-tap/already-playing/different-item routing. `PlaybackController.play()` also has the same guard internally (lines 153-157) — belt + suspenders. Auto-preview paths guarded via `resolveAutoPreviewIndex()` (already tested). |
 | D.6 | Audit pass — read `logger/AndroidLogger.kt` (currently routes shared-module Logger to `android.util.Log`; CLAUDE.md claims "Kermit logging" but Android side doesn't actually use Kermit), grep all `BackHandler {` sites for missing back-stack handling, grep `controller.play(` sites for the two-tap guard, grep `AsyncImage(` for missing `contentDescription` | Punch list of findings written into a follow-up `D.7` task per finding | **DONE** — Audit clean across all three categories. (1) BackHandler: 7 instances (HomeScreen ×3, BrowseShell ×3, CoverflowSectionScreen ×1), all properly enabled-guarded with real handlers — no empty blocks. (2) controller.play(): 15 call sites, 15/15 guarded — HomeScreen uses explicit `currentId != target.id`, auto-preview uses `resolveAutoPreviewIndex()`, FavoritesScreen uses `resolveActivation()`, SearchScreen has inline alreadyPlaying guard. (3) AsyncImage: 15 call sites, 15/15 have `contentDescription` param (13 explicit null with paired text, 2 semantic string descriptions). No D.7 punch list needed. |
@@ -365,9 +538,16 @@ Updated in [bugs.md](bugs.md):
 | MK.9 Codec gap | 1 | 8.75 |
 | MK.10 TV launcher | 1 | 9.75 |
 | MK.11 Phone-native | 1 | 10.75 |
-| MK.12 Distribution | 1 | 11.75 |
-| **Android v1.0 total** | | **~12 weeks** |
-| MK.iOS.* | 6–8 | 18–20 |
+| MK.12 In-player control surface | 1 | 11.75 |
+| MK.13 Channel ops + favorites reach | 0.6 | 12.35 |
+| MK.14 Recording (HLS v1) | 1 | 13.35 |
+| MK.15 EPG display + timeline | 0.8 | 14.15 |
+| MK.16 Appearance + themes | 0.6 | 14.75 |
+| MK.17 Network wiring + advanced playback | 0.6 | 15.35 |
+| MK.18 External player + Cast | 0.4 | 15.75 |
+| MK.19 Distribution | 1 | 16.75 |
+| **Android v1.0 total** | | **~17 weeks** |
+| MK.iOS.* | 6–8 | 23–25 |
 
 ---
 
