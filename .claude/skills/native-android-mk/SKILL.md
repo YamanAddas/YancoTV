@@ -44,6 +44,24 @@ Self-audit every edit under `packages/android/` or `packages/shared/` against th
 - **Use `PlacedFocusAnchor` + `Modifier.placedFocus(anchor)`** for focus-on-open flows. It waits for `onPlaced` before requesting focus — the delay-ladder pattern is a race and has silently failed in production.
 - **`FocusTrap` is a 0-dp `Spacer` with `.focusable()`**, not `.clickable`. CENTER presses on a clickable trap swallow child `onClick`s (the episode-row freeze bug).
 - **TV focus targets use `androidx.tv.material`** — Material3 clickables don't integrate with leanback focus.
+- **Every `key(...)` boundary that scopes focus state holds its OWN `rememberPlacedFocusAnchor()` and `FocusRequester`.** Don't hoist them above the boundary. Cascade fix `4a8a46e`: hoisting the `coverflowFocus` requester above `key(contentType)` meant after Live → Movies the requester was still bound to Live's now-unmounted node; `requestFocus()` silently no-op'd and the type-swap appeared to "swallow" the press. Pattern:
+  ```kotlin
+  key(contentType) {
+      // owned here — fresh per type swap
+      val coverflowFocus = remember { FocusRequester() }
+      val pillAnchor = rememberPlacedFocusAnchor()
+      // ...
+  }
+  ```
+  Tested by `PlacedFocusAnchorTest` (the primitive); the wiring layer is in the smoke-test list below.
+
+## Cascade-nav smoke test (do before merging anything that touches HomeScreen / BrowseSection / CategoryRail / sidebar)
+
+Three flows. ~60 seconds total on Fire TV. If any one is silent or lands on the wrong node, you re-introduced one of the 4 bugs from `4a8a46e`:
+
+1. **Sidebar → Categories RIGHT** — from sidebar focused on Live, press D-pad RIGHT once. Focus must land on the active category pill in the rail. (Bug shape: focus stays in sidebar, sidebar collapses anyway.)
+2. **Categories → Content (RIGHT or CENTER)** — with a non-All pill focused (e.g. "Sports"), press RIGHT or CENTER. Focus must move into the coverflow AND the selected group must commit (coverflow shows the filtered set, not All). (Bug shape: focus moves but coverflow still shows All; or focus stays on pill and only group commits.)
+3. **Live → Movies type swap** — from Movies sidebar item, after the previous flows had you in Live's coverflow, press D-pad CENTER on Movies. The categories rail must remount with focus landing on **Movies' "All" pill** — never a stale node from Live. (Bug shape: pill rail visually opens but no pill is focused; or focus is on a phantom Live pill.)
 
 ## Accessibility
 

@@ -1,6 +1,5 @@
 package com.yancotv.android.ui.shell
 
-import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlin.test.Test
@@ -387,27 +386,18 @@ class BrowseShellLogicTest {
         assertNull(heroPlaybackForFocused(focused, playing))
     }
 
-    @Test fun homeSectionStopsLivePreviewWhenLeavingLiveTv() {
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Movies, liveChannel("c1")))
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Series, liveChannel("c1")))
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Home, liveChannel("c1")))
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Guide, liveChannel("c1")))
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Favorites, liveChannel("c1")))
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Search, liveChannel("c1")))
-        assertTrue(shouldStopLivePreviewForSection(AppSection.Settings, liveChannel("c1")))
+    // Refactored in `f432524` (fix: stop all playback on section/group
+    // change). The old per-section, type-aware predicate was replaced
+    // with a single rule: if anything is playing, stop it on a section
+    // change. The 10 prior tests are gone with the function they tested;
+    // these 2 cover the new contract.
+    @Test fun shouldStopPlaybackReturnsTrueWhenSomethingPlaying() {
+        assertTrue(shouldStopPlaybackOnSectionChange(liveChannel("c1")))
+        assertTrue(shouldStopPlaybackOnSectionChange(movie(id = "m1", title = "The Matrix")))
     }
 
-    @Test fun homeSectionKeepsLivePreviewInsideLiveTv() {
-        assertFalse(shouldStopLivePreviewForSection(AppSection.LiveTv, liveChannel("c1")))
-    }
-
-    @Test fun homeSectionDoesNotStopVodWhenLeavingLiveTv() {
-        assertFalse(
-            shouldStopLivePreviewForSection(
-                AppSection.Movies,
-                movie(id = "m1", title = "The Matrix"),
-            ),
-        )
+    @Test fun shouldStopPlaybackReturnsFalseWhenNothingPlaying() {
+        assertFalse(shouldStopPlaybackOnSectionChange(null))
     }
 
     // ---- helpers ----

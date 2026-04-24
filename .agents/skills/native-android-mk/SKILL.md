@@ -31,6 +31,22 @@ Use this skill as the pre-flight checklist for YancoTV native work. It keeps the
 - TV focus targets use `androidx.tv.material`. Do not use Material3 clickables as TV focus targets.
 - Use `PlacedFocusAnchor` plus `Modifier.placedFocus(anchor)` for focus-on-open flows.
 - `FocusTrap` is a 0-dp `Spacer` with `.focusable()`, not `.clickable()`.
+- Every `key(...)` boundary that scopes focus state must hold its OWN `rememberPlacedFocusAnchor()` and `FocusRequester`. Do not hoist them above the boundary. The `4a8a46e` cascade fix landed because the previous `key(contentType)` hoisted the requesters above, leaving them bound to unmounted nodes after a type swap. Pattern:
+  ```
+  key(contentType) {
+      val coverflowFocus = remember { FocusRequester() }
+      val pillAnchor = rememberPlacedFocusAnchor()
+  }
+  ```
+  Tested by `PlacedFocusAnchorTest`. The wiring layer is verified by the cascade-nav smoke test below.
+
+## Cascade-nav smoke test
+
+Run before merging anything that touches `HomeScreen`, `BrowseSection`, `CategoryRail`, or the sidebar. About 60 seconds on Fire TV. Failure of any flow means a `4a8a46e`-class regression.
+
+1. Sidebar to Categories RIGHT — from sidebar focused on Live, press D-pad RIGHT once. Focus must land on the active category pill.
+2. Categories to Content RIGHT or CENTER — with a non-All pill focused (for example "Sports"), press RIGHT or CENTER. Focus must move into the coverflow AND the selected group must commit.
+3. Live to Movies type swap — from Movies sidebar item, after the previous flows had you in Live's coverflow, press CENTER on Movies. The categories rail must remount and focus must land on Movies' "All" pill (not a stale Live node).
 - Use `rememberSaveable` for user input, focused IDs, scroll offsets, search queries, and form fields.
 - Every user-visible `AsyncImage` needs `contentDescription`, or `null` only when paired with nearby text.
 - Every custom interactive `Row` or `Box` needs `Modifier.semantics { contentDescription = ... }`.
