@@ -479,7 +479,18 @@ private fun readTextTracks(player: Player): List<TextTrack> {
     for (group in groups) {
         if (group.type != C.TRACK_TYPE_TEXT) continue
         for (i in 0 until group.length) {
-            if (!group.isTrackSupported(i)) continue
+            // Deliberately don't gate on Tracks.Group.isTrackSupported(i) —
+            // the strict variant returns false for any track whose exact
+            // MIME the text renderer doesn't advertise as FORMAT_HANDLED.
+            // For IPTV VOD that excludes PGS / VobSub / DVB subs embedded in
+            // MKV containers: the decoder *does* exist in Media3's
+            // TextRenderer chain but the capability report is conservative,
+            // and the user was left staring at a picker with only "Off" +
+            // "Load external" even on streams that clearly had burned-in
+            // subtitle tracks. Listing every advertised text track matches
+            // what TiviMate does; a pick that the renderer actually can't
+            // decode simply renders no on-screen caption — no worse than
+            // hiding the track entirely, and the user can drop back to Off.
             val fmt = group.getTrackFormat(i)
             val lang = fmt.language?.takeIf { it.isNotBlank() && it != C.LANGUAGE_UNDETERMINED }
             val label = fmt.label?.takeIf { it.isNotBlank() }
