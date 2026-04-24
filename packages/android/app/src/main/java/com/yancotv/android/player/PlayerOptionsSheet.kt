@@ -39,6 +39,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -194,16 +199,19 @@ fun PlayerOptionsSheet(
 ) {
     val pal = LocalYancoPalette.current
     // Sheet-level FocusRequester attached to the currently active tab in
-    // the head's TabStrip. On open (or whenever `mode` changes — e.g. when
-    // a VOD dock chip opens the sheet on SUBS / SPEED / ASPECT / FAV) we
-    // request focus on the active tab so the tab strip is immediately
-    // navigable with DPAD LEFT/RIGHT. Previously each panel's own
-    // `LaunchedEffect` grabbed focus into the panel body, leaving the tabs
-    // greyed-out and unreachable via D-pad.
+    // the head's TabStrip. Used by each panel's *first row* to route DPAD
+    // UP back to the tab strip — that's the escape hatch users need to
+    // switch tabs after the panel auto-focus has grabbed initial focus.
+    //
+    // We deliberately do NOT auto-request focus here on open. Each panel's
+    // LaunchedEffect focuses its first row so users can pick immediately
+    // without any extra key press. UP from the first row comes back here.
+    // That split keeps "open → click first option" a single action AND
+    // keeps the tab strip reachable (press UP once from any panel's first
+    // row; then LEFT/RIGHT to switch tabs; DOWN to re-enter the panel via
+    // Compose's natural focus search).
     val activeTabFocus = remember { FocusRequester() }
-    LaunchedEffect(mode) {
-        runCatching { activeTabFocus.requestFocus() }
-    }
+    val escapeToTabs: () -> Unit = { runCatching { activeTabFocus.requestFocus() } }
     Box(
         modifier =
             Modifier
@@ -253,18 +261,29 @@ fun PlayerOptionsSheet(
             ) {
                 when (mode) {
                     SheetMode.AUDIO ->
-                        AudioPanel(controller = controller, prefs = prefs, onBack = onDismiss)
+                        AudioPanel(
+                            controller = controller,
+                            prefs = prefs,
+                            onBack = onDismiss,
+                            onEscapeUp = escapeToTabs,
+                        )
                     SheetMode.SUBS ->
                         SubtitlesPanel(
                             controller = controller,
                             prefs = prefs,
                             onBack = onDismiss,
                             onPickExternal = onPickSubtitleFile,
+                            onEscapeUp = escapeToTabs,
                         )
                     SheetMode.SPEED ->
-                        SpeedPanel(controller = controller, prefs = prefs, onBack = onDismiss)
+                        SpeedPanel(
+                            controller = controller,
+                            prefs = prefs,
+                            onBack = onDismiss,
+                            onEscapeUp = escapeToTabs,
+                        )
                     SheetMode.ASPECT ->
-                        AspectPanel(prefs = prefs, onBack = onDismiss)
+                        AspectPanel(prefs = prefs, onBack = onDismiss, onEscapeUp = escapeToTabs)
                     SheetMode.SLEEP ->
                         StubPanel(
                             heading = "Sleep timer",
@@ -536,16 +555,22 @@ private fun AudioPanel(
     controller: PlaybackController,
     prefs: AppPreferences,
     onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
     val audioTracks = rememberAudioTracks(controller.player)
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
 
-    // Panel-body initial focus removed so [PlayerOptionsSheet]'s
-    // sheet-level tab-focus request wins. User enters the panel with
-    // D-pad DOWN from the tab row. `firstRowFocus` stays declared so the
-    // first track row still receives the requester (preserves the
-    // focus-marker row highlight and any future explicit focus jumps).
+    // Panel initial focus lands on the first row so the user can pick
+    // immediately without extra key presses. The sheet-level
+    // [PlayerOptionsSheet] no longer auto-requests the active tab on open
+    // (which raced with this request); instead the first row consumes
+    // DPAD UP via `onEscapeUp` to route focus back to the tab strip when
+    // the user wants to switch tabs. See the focus model note in the
+    // sheet composable.
+    LaunchedEffect(audioTracks) {
+        if (audioTracks.isNotEmpty()) runCatching { firstRowFocus.requestFocus() }
+    }
     SectionKicker(text = "TRACKS · ${audioTracks.size} AVAILABLE")
     if (audioTracks.isEmpty()) {
         EmptyPanelLine("No audio tracks reported yet. Try again once playback starts.")
@@ -554,6 +579,7 @@ private fun AudioPanel(
             AudioTrackRow(
                 track = track,
                 focusRequester = if (idx == 0) firstRowFocus else null,
+                onEscapeUp = if (idx == 0) onEscapeUp else null,
                 onPick = {
                     applyAudioTrack(controller.player, track)
                     val lang = track.language
@@ -571,6 +597,7 @@ private fun AudioPanel(
 private fun AudioTrackRow(
     track: AudioTrack,
     focusRequester: FocusRequester?,
+    onEscapeUp: (() -> Unit)?,
     onPick: () -> Unit,
 ) {
     HexOptionRow(
@@ -604,6 +631,7 @@ private fun AudioTrackRow(
         sub = track.displayName.substringAfter("  ·  ", missingDelimiterValue = ""),
         selected = track.selected,
         focusRequester = focusRequester,
+        onEscapeUp = onEscapeUp,
         onPick = onPick,
     )
 }
@@ -707,13 +735,19 @@ private fun SubtitlesPanel(
     prefs: AppPreferences,
     onBack: () -> Unit,
     onPickExternal: () -> Unit,
+    onEscapeUp: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
     val textTracks = rememberTextTracks(controller.player)
     val textDisabled = rememberTextDisabled(controller.player)
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
 
-    // Panel-body initial focus removed — see AudioPanel note.
+    // Panel initial focus lands on the first row ("Off"). See AudioPanel
+    // for the model note — DPAD UP on the first row escapes to the tab
+    // strip.
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
     SectionKicker(text = "LANGUAGE · ${textTracks.size} EMBEDDED")
 
     val offSelected = textDisabled || textTracks.none { it.selected }
@@ -723,6 +757,7 @@ private fun SubtitlesPanel(
         sub = "No subtitles",
         selected = offSelected,
         focusRequester = firstRowFocus,
+        onEscapeUp = onEscapeUp,
         onPick = {
             applyTextSelection(controller.player, null)
             scope.launch { prefs.setSubtitleLanguage("") }
@@ -878,6 +913,7 @@ private fun SpeedPanel(
     controller: PlaybackController,
     prefs: AppPreferences,
     onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
@@ -892,7 +928,13 @@ private fun SpeedPanel(
         controller.player.addListener(listener)
         onDispose { controller.player.removeListener(listener) }
     }
-    // Panel-body initial focus removed — see AudioPanel note.
+    // Panel initial focus lands on the first preset row. See AudioPanel
+    // for the model note — DPAD UP on the first row escapes to the tab
+    // strip. The CurrentSpeedCallout above it is display-only (no
+    // `focusable`) so focus search skips it cleanly.
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
 
     // Current-speed callout card (hex-cut, gradient accent tint).
     CurrentSpeedCallout(current = currentSpeed)
@@ -909,6 +951,7 @@ private fun SpeedPanel(
                 },
             selected = kotlin.math.abs(currentSpeed - speed) < 0.01f,
             focusRequester = if (idx == 0) firstRowFocus else null,
+            onEscapeUp = if (idx == 0) onEscapeUp else null,
             onPick = {
                 controller.player.setPlaybackSpeed(speed)
                 val item = controller.currentItem.value
@@ -994,11 +1037,17 @@ private fun formatSpeed(speed: Float): String {
 private fun AspectPanel(
     prefs: AppPreferences,
     onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
     val playback by prefs.playbackFlow.collectAsState()
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
-    // Panel-body initial focus removed — see AudioPanel note.
+    // Panel initial focus lands on the first fit-mode row. See AudioPanel
+    // for the model note — DPAD UP on the first row escapes to the tab
+    // strip.
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
 
     SectionKicker(text = "FIT MODES")
     ResizeMode.values().forEachIndexed { idx, rm ->
@@ -1008,6 +1057,7 @@ private fun AspectPanel(
             sub = aspectSublabel(rm),
             selected = playback.resizeMode == rm,
             focusRequester = if (idx == 0) firstRowFocus else null,
+            onEscapeUp = if (idx == 0) onEscapeUp else null,
             onPick = {
                 scope.launch { prefs.setResizeMode(rm) }
                 onBack()
@@ -1122,6 +1172,7 @@ private fun HexOptionRow(
     selected: Boolean,
     focusRequester: FocusRequester?,
     onPick: () -> Unit,
+    onEscapeUp: (() -> Unit)? = null,
 ) {
     val pal = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -1152,6 +1203,26 @@ private fun HexOptionRow(
                 .background(bgBrush)
                 .border(if (focused) 1.5.dp else 1.dp, borderColor, shape)
                 .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
+                // DPAD UP escape: first-row rows (focusRequester != null)
+                // route UP back to the active tab. Without this, Compose's
+                // natural focus search from the top row of a panel has no
+                // up-sibling and the user is stranded in the panel body.
+                // Non-first rows leave `onEscapeUp` null so UP travels to
+                // the row above via normal focus traversal.
+                .let { m ->
+                    if (onEscapeUp != null) {
+                        m.onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                onEscapeUp()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                    } else {
+                        m
+                    }
+                }
                 .focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null) { onPick() }
                 .semantics { contentDescription = label + if (selected) ", selected" else "" }

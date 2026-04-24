@@ -1212,9 +1212,13 @@ class PlayerActivity : AppCompatActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             // While the controller is hidden, don't let PlayerView silently
-            // eat the press — run our own handler first. Dock acts as its
-            // own controller for VOD, so we also bypass when it's visible.
-            if (!controllerVisible && !surfVisible && !dockVisible) {
+            // eat the press — run our own handler first. Dock / sheet /
+            // surf are their own controllers; we also bypass when one of
+            // them is visible so its Compose focus traversal sees the keys
+            // cleanly. Without the `!sheetVisible` guard we were racing
+            // Compose's pressed-state tracking on CENTER and the picks
+            // looked dead.
+            if (!controllerVisible && !surfVisible && !dockVisible && !sheetVisible) {
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_CENTER,
                     KeyEvent.KEYCODE_ENTER,
@@ -1222,6 +1226,7 @@ class PlayerActivity : AppCompatActivity() {
                     KeyEvent.KEYCODE_INFO,
                     KeyEvent.KEYCODE_GUIDE,
                     KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
                     KeyEvent.KEYCODE_TV_CONTENTS_MENU,
                     KeyEvent.KEYCODE_DPAD_UP,
                     KeyEvent.KEYCODE_CHANNEL_UP,
@@ -1295,12 +1300,48 @@ class PlayerActivity : AppCompatActivity() {
             return super.onKeyDown(keyCode, event)
         }
         // Dedicated CHANNEL_LIST key + LEFT (when the Media3 controller is
-        // hidden) trigger the surf overlay. LEFT is the canonical TiviMate
-        // gesture; CHANNEL_LIST is what TV remotes with a guide button emit.
+        // hidden) trigger the surf overlay on LIVE. LEFT is the canonical
+        // TiviMate gesture; CHANNEL_LIST is what TV remotes with a guide
+        // button emit.
+        //
+        // VOD behaviour diverges (MK.16.player.vod.dock follow-up): surf is
+        // channel-zapping and doesn't apply to movies / episodes, so LEFT/
+        // RIGHT with no overlay up become ±10 s seeks — matching the dock's
+        // progress-row seek but saving the user a hop through the dock
+        // transport row. This is what "seek from the main controller" means
+        // in the Concept A port: LEFT/RIGHT always seek, the dock is just
+        // the visual confirmation.
         if (!controllerVisible) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_TV_CONTENTS_MENU) {
-                showSurf()
-                return true
+            val isLive = controller.currentItem.value?.type == ContentType.LIVE
+            when (keyCode) {
+                KeyEvent.KEYCODE_TV_CONTENTS_MENU -> {
+                    if (isLive) {
+                        showSurf()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (isLive) {
+                        showSurf()
+                        return true
+                    } else {
+                        // Silent seek — stay on the plain video surface so
+                        // the user can press LEFT/RIGHT repeatedly without
+                        // the dock auto-hide timer gating each press. The
+                        // dock only opens on explicit OK/CENTER.
+                        val p = controller.player
+                        p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (!isLive) {
+                        val p = controller.player
+                        val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+                        p.seekTo((p.currentPosition + 10_000L).coerceAtMost(dur))
+                        return true
+                    }
+                }
             }
         }
         when (keyCode) {
