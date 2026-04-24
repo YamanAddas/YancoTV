@@ -47,6 +47,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -63,6 +64,7 @@ import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
+import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.types.ContentType
@@ -312,10 +314,10 @@ fun PlayerOptionsSheet(
                             onEscapeUp = escapeToTabs,
                         )
                     SheetMode.EXT ->
-                        StubPanel(
-                            heading = "Open in external",
-                            body = "Hand off the URL to VLC, MX Player, Kodi, or a custom intent. Position is passed along; return picks up where you left off.",
-                            milestone = "MK.18.1",
+                        ExternalPanel(
+                            controller = controller,
+                            onBack = onDismiss,
+                            onEscapeUp = escapeToTabs,
                         )
                     SheetMode.CAST ->
                         StubPanel(
@@ -1485,6 +1487,109 @@ private fun FavoritesPanel(
             ioScope.launch(Dispatchers.IO) {
                 runCatching { favorites.toggle(favoriteId) }
             }
+            onBack()
+        },
+    )
+}
+
+// ───── External player panel (MK.18.1) ─────
+
+/**
+ * "Open in external" — hands the current stream URL off to a third-party
+ * video player via `Intent.ACTION_VIEW`. See [ExternalPlayer] for the
+ * curated set (VLC / MX Player / Just Player) plus a chooser fallback.
+ *
+ * For VOD content the local position (ms) is passed as the `position`
+ * extra — VLC and MX Player honour it for resume. Live streams pass null
+ * (no offset to honour).
+ *
+ * The internal player is paused on hand-off so two streams aren't
+ * consuming the network at once; the user returns to a paused player
+ * which they can resume or stop. [onBack] dismisses the sheet after
+ * launching.
+ */
+@UnstableApi
+@Composable
+private fun ExternalPanel(
+    controller: PlaybackController,
+    onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
+) {
+    val context = LocalContext.current
+    val firstRowFocus = remember { FocusRequester() }
+    val currentItem by controller.currentItem.collectAsState()
+    // Re-query installed apps each time the sheet opens — the user could
+    // have side-loaded VLC since the last time. `remember(currentItem?.id)`
+    // would be too aggressive (the list doesn't depend on the title), but
+    // a one-shot per panel-open via remember(Unit) is the right cadence.
+    val installed = remember { ExternalPlayer.installed(context) }
+    val streamUrl = currentItem?.streamUrl?.takeIf { it.isNotBlank() }
+
+    LaunchedEffect(streamUrl) {
+        if (streamUrl != null) runCatching { firstRowFocus.requestFocus() }
+    }
+
+    if (streamUrl == null) {
+        EmptyPanelLine("Nothing playing — start a stream to hand it off to another player.")
+        return
+    }
+
+    val isLive = currentItem?.type == ContentType.LIVE
+    val positionMs =
+        if (isLive) {
+            null
+        } else {
+            controller.player.currentPosition.takeIf { it > 0L }
+        }
+
+    SectionKicker(
+        text =
+            if (installed.isEmpty()) {
+                "NO KNOWN PLAYERS DETECTED"
+            } else {
+                "INSTALLED · ${installed.size} OPTION${if (installed.size == 1) "" else "S"}"
+            },
+    )
+
+    installed.forEachIndexed { idx, app ->
+        HexOptionRow(
+            leading = null,
+            label = app.displayName,
+            sub = app.sub,
+            selected = false,
+            focusRequester = if (idx == 0) firstRowFocus else null,
+            onEscapeUp = if (idx == 0) onEscapeUp else null,
+            onPick = {
+                // Pause the local stream before the external player gets
+                // network priority — saves bandwidth and lets the user
+                // come back to a stopped point.
+                controller.player.pause()
+                ExternalPlayer.launch(
+                    context = context,
+                    streamUrl = streamUrl,
+                    positionMs = positionMs,
+                    app = app,
+                )
+                onBack()
+            },
+        )
+    }
+
+    HexOptionRow(
+        leading = null,
+        label = "Choose another player…",
+        sub = "Pick from any video app installed on this device",
+        selected = false,
+        focusRequester = if (installed.isEmpty()) firstRowFocus else null,
+        onEscapeUp = if (installed.isEmpty()) onEscapeUp else null,
+        onPick = {
+            controller.player.pause()
+            ExternalPlayer.launch(
+                context = context,
+                streamUrl = streamUrl,
+                positionMs = positionMs,
+                app = null,
+            )
             onBack()
         },
     )

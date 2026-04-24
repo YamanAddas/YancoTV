@@ -23,11 +23,35 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Android 11+ package visibility: lets us resolve the speech recognizer
-         intent used by the voice-input buttons on Fire TV remotes. -->
+         intent used by the voice-input buttons on Fire TV remotes, AND query
+         installed external video players for the MK.18.1 "Open in external"
+         action. The explicit <package> entries cover the direct-detection
+         path (PackageInfo lookup); the <intent> filters cover the chooser
+         fallback for any other installed video player. -->
     <queries>
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="rtsp" />
+        </intent>
+        <package android:name="org.videolan.vlc" />
+        <package android:name="com.mxtech.videoplayer.ad" />
+        <package android:name="com.mxtech.videoplayer.pro" />
+        <package android:name="com.brouken.player" />
     </queries>
 
     <application
