@@ -308,76 +308,17 @@
         android:inflatedId="@+id/player_options_sheet"
         android:layout="@layout/player_options_sheet" />
 
-    <!-- Stream error overlay: shown when ExoPlayer surfaces an unrecoverable
-         error (connection failed, 403/404, codec gap). User can retry or
-         back out to the shell. Hidden until onPlayerError fires. -->
-    <LinearLayout
-        android:id="@+id/stream_error_overlay"
+    <!-- VOD player chrome (MK.16.player.vod.chrome). Hosts Compose overlays
+         for buffering + error states — the Concept A port of the "Tuning
+         the stream" + "Couldn't open this stream" screens. Replaces the
+         earlier `stream_error_overlay` LinearLayout. Inflated lazily from
+         `PlayerActivity.ensureChromeOverlay()` on first buffer/error —
+         most playback sessions never trigger either state. -->
+    <ViewStub
+        android:id="@+id/vod_chrome_stub"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#CC000000"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="48dp"
-        android:visibility="gone"
-        android:clickable="true"
-        android:focusable="true">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Stream unavailable"
-            android:textColor="@android:color/white"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="10dp" />
-
-        <TextView
-            android:id="@+id/stream_error_message"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFE6EDF3"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:maxLines="3"
-            android:ellipsize="end"
-            android:layout_marginBottom="24dp" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/stream_error_retry"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Retry"
-                android:textColor="@android:color/white"
-                android:textStyle="bold"
-                android:background="@drawable/player_overlay_pill"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:layout_marginEnd="12dp"
-                android:focusable="true"
-                android:focusableInTouchMode="true" />
-
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/stream_error_back"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Back"
-                android:textColor="#FFE6EDF3"
-                android:background="@drawable/player_overlay_pill"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:focusable="true"
-                android:focusableInTouchMode="true" />
-        </LinearLayout>
-    </LinearLayout>
+        android:inflatedId="@+id/vod_chrome"
+        android:layout="@layout/player_vod_chrome" />
 
 </FrameLayout>

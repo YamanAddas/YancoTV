@@ -116,11 +116,26 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var liveOffsetLabel: TextView
     private lateinit var liveJumpButton: Button
 
-    // Stream error overlay
-    private lateinit var streamErrorOverlay: View
-    private lateinit var streamErrorMessage: TextView
-    private lateinit var streamErrorRetry: Button
-    private lateinit var streamErrorBack: Button
+    // VOD chrome overlay (MK.16.player.vod.chrome). Hosts the Compose
+    // BUFFERING / ERROR states — see VodPlayerChrome.kt. Inflated lazily
+    // from the `vod_chrome_stub` ViewStub on first show; most sessions
+    // never trigger either state so we keep the Compose owner off the
+    // launch path. `chromeState` drives rendering; `chromeBuffering` and
+    // `chromeError` carry pre-formatted display data.
+    private var chromeOverlay: ComposeView? = null
+    private var chromeState by mutableStateOf(VodChromeState.NONE)
+    private var chromeBuffering by mutableStateOf(VodChromeBuffering())
+    private var chromeError by mutableStateOf(VodChromeError())
+
+    // 500 ms debounce so every micro-buffer doesn't flash the overlay.
+    // Reset alongside `hasBeenReady` on each new MediaItem.
+    private var bufferingShowJob: Job? = null
+
+    // Gate for the buffering overlay: only surfaces once the current item
+    // has reached STATE_READY at least once. Keeps the initial prepare's
+    // BUFFERING (where the dimmed PlayerView is already the right signal)
+    // from flashing the overlay on cold start / zap.
+    private var hasBeenReady = false
 
     // Channel-surf overlay (ComposeView), inflated on first showSurf() via
     // ViewStub so Compose owner setup is off the activity launch path.
@@ -171,11 +186,34 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 Log.i(TAG, "onPlaybackStateChanged=$name")
                 if (quickInfo.visibility == View.VISIBLE) refreshQuickInfo()
-                // Clear any lingering error UI once a retry (or channel change)
-                // transitions back to READY. Keeps the overlay from sticking
-                // after a successful zap away from a failed stream.
-                if (state == Player.STATE_READY && streamErrorOverlay.visibility == View.VISIBLE) {
-                    hideStreamError()
+                when (state) {
+                    Player.STATE_READY -> {
+                        hasBeenReady = true
+                        bufferingShowJob?.cancel()
+                        bufferingShowJob = null
+                        // Any non-error overlay clears on READY; the error
+                        // state has its own retry flow and shouldn't auto-
+                        // clear until the retry fires and we actually hit
+                        // READY on the new prepare — which is this branch.
+                        if (chromeState != VodChromeState.NONE) hideChrome()
+                    }
+                    Player.STATE_BUFFERING -> {
+                        // Don't stack a buffering overlay on top of an
+                        // error the user hasn't dismissed, and skip the
+                        // initial prepare's BUFFERING (hasBeenReady=false).
+                        if (hasBeenReady && chromeState != VodChromeState.ERROR) {
+                            bufferingShowJob?.cancel()
+                            bufferingShowJob =
+                                lifecycleScope.launch {
+                                    delay(500L)
+                                    showBuffering()
+                                }
+                        }
+                    }
+                    Player.STATE_IDLE, Player.STATE_ENDED -> {
+                        bufferingShowJob?.cancel()
+                        bufferingShowJob = null
+                    }
                 }
             }
 
@@ -221,15 +259,9 @@ class PlayerActivity : AppCompatActivity() {
         liveJumpButton = findViewById(R.id.live_jump_button)
         liveJumpButton.setOnClickListener { jumpToLive() }
 
-        streamErrorOverlay = findViewById(R.id.stream_error_overlay)
-        streamErrorMessage = findViewById(R.id.stream_error_message)
-        streamErrorRetry = findViewById(R.id.stream_error_retry)
-        streamErrorBack = findViewById(R.id.stream_error_back)
-        streamErrorRetry.setOnClickListener { retryCurrent() }
-        streamErrorBack.setOnClickListener { finish() }
-
-        // surfOverlay stays null — inflated lazily on first showSurf() via
-        // the ViewStub. Keeps Compose owner setup off the launch path.
+        // surfOverlay / chromeOverlay stay null — inflated lazily on first
+        // show via their ViewStubs. Keeps Compose owner setup off the
+        // launch path (MK.16.player.vod.chrome).
 
         playerView.useController = true
         // Controls must stay hidden on fullscreen entry. Media3's default
@@ -458,10 +490,14 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun onItemChanged(item: ContentItem?) {
         currentProgramme = null
-        // A new MediaItem means any error from the previous stream is now
-        // stale — hide the overlay so the user sees the new stream's
-        // BUFFERING/READY transition, not the last channel's failure.
-        hideStreamError()
+        // Fresh MediaItem: drop any stale chrome and reset the buffering
+        // gate so the *new* item's initial prepare doesn't flash the
+        // "Tuning the stream" overlay — the dimmed PlayerView is already
+        // the right signal for the cold-start / zap case.
+        hideChrome()
+        hasBeenReady = false
+        bufferingShowJob?.cancel()
+        bufferingShowJob = null
         if (item == null) {
             zapBar.visibility = View.GONE
             progressRow.visibility = View.GONE
@@ -683,47 +719,167 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ───── Stream error ─────
+    // ───── VOD chrome (buffering + error) ─────
 
+    /**
+     * Inflate the `vod_chrome_stub` ViewStub on first use and wire the
+     * ComposeView to [VodPlayerChrome]. Mirrors the surf / sheet lazy
+     * inflation pattern.
+     *
+     * Action callbacks map to the same primitives the removed XML overlay
+     * used (`retryCurrent()`, `finish()`) plus the new hooks needed by the
+     * Concept A error copy: `onPlaybackOptions` cross-opens the sheet,
+     * and `onSwitchQuality` / `onTrySource` / `onReport` are stubbed for
+     * the follow-up metadata + controls slices — for now they just
+     * dismiss the overlay so the user isn't stuck.
+     */
+    private fun ensureChromeOverlay(): ComposeView {
+        chromeOverlay?.let { return it }
+        val stub = findViewById<android.view.ViewStub>(R.id.vod_chrome_stub)
+        val inflated = stub.inflate() as ComposeView
+        inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        inflated.setContent {
+            VodPlayerChrome(
+                state = chromeState,
+                buffering = chromeBuffering,
+                error = chromeError,
+                onRetry = { retryCurrent() },
+                onBack = {
+                    hideChrome()
+                    finish()
+                },
+                onPlaybackOptions = {
+                    hideChrome()
+                    showSheet()
+                },
+                onSwitchQuality = { hideChrome() },
+                onTrySource = { hideChrome() },
+                onReport = { hideChrome() },
+            )
+        }
+        chromeOverlay = inflated
+        return inflated
+    }
+
+    /**
+     * Present the BUFFERING overlay. Called after the 500 ms debounce
+     * in the player listener so a micro-buffer doesn't flash. Refreshes
+     * the diagnostic tile data once — live updates while the overlay is
+     * visible land with the controls slice.
+     */
+    private fun showBuffering() {
+        if (chromeState == VodChromeState.ERROR) return
+        chromeBuffering = buildBufferingData()
+        chromeState = VodChromeState.BUFFERING
+        val v = ensureChromeOverlay()
+        v.visibility = View.VISIBLE
+        v.post { v.requestFocus() }
+    }
+
+    /**
+     * Present the ERROR overlay with a user-readable title pulled from the
+     * PlaybackException code. Hides the built-in Media3 controller so the
+     * two UIs don't stack.
+     */
     private fun showStreamError(error: PlaybackException) {
-        // Map the handful of common failure codes to something a normal user
-        // can act on; anything unmapped falls through to the raw error name
-        // + localized message so we're not hiding information.
-        val friendly =
+        bufferingShowJob?.cancel()
+        bufferingShowJob = null
+        chromeError = buildErrorData(error)
+        chromeState = VodChromeState.ERROR
+        val v = ensureChromeOverlay()
+        v.visibility = View.VISIBLE
+        playerView.hideController()
+        v.post { v.requestFocus() }
+    }
+
+    /**
+     * Dismiss whatever chrome is up. Returns focus to the PlayerView so
+     * D-pad drives the Media3 controller again.
+     */
+    private fun hideChrome() {
+        if (chromeState == VodChromeState.NONE) return
+        chromeState = VodChromeState.NONE
+        chromeOverlay?.visibility = View.GONE
+        playerView.requestFocus()
+    }
+
+    /**
+     * Build the diagnostic tile payload from whatever the ExoPlayer can
+     * tell us *right now*. All reads (`videoFormat`, `audioFormat`,
+     * `bufferedPosition`, `currentPosition`) are main-thread-safe because
+     * the shared ExoPlayer is main-thread-confined per the PlaybackController
+     * contract.
+     */
+    private fun buildBufferingData(): VodChromeBuffering {
+        val p = controller.player
+        val videoFmt = p.videoFormat
+        val audioFmt = p.audioFormat
+        val aheadMs = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L)
+        val bufferLabel = String.format(Locale.ROOT, "%.1f s", aheadMs / 1000.0)
+        val resLabel =
+            if (videoFmt != null && videoFmt.width > 0 && videoFmt.height > 0) {
+                "${videoFmt.width}×${videoFmt.height}"
+            } else {
+                "—"
+            }
+        val bitrateSum =
+            listOfNotNull(videoFmt?.bitrate, audioFmt?.bitrate).filter { it > 0 }.sum()
+        val bitrateLabel =
+            when {
+                bitrateSum <= 0 -> "—"
+                bitrateSum >= 1_000_000 ->
+                    String.format(Locale.ROOT, "%.1f Mbps", bitrateSum / 1_000_000.0)
+                else -> String.format(Locale.ROOT, "%d kbps", bitrateSum / 1000)
+            }
+        return VodChromeBuffering(
+            bitrate = bitrateLabel,
+            bufferFill = bufferLabel,
+            latency = "—",
+            resolution = resLabel,
+            progressLabel = "BUFFERING",
+        )
+    }
+
+    /**
+     * Translate a PlaybackException into the display payload the error
+     * overlay renders. Diagnostic block fields (source / stream / remote)
+     * are left blank for this slice to avoid leaking raw IDs or stream
+     * URLs to the UI — MK.16.player.vod.metadata resolves the source
+     * display name via SourceRepository.nameFor and sanitizes the URL.
+     */
+    private fun buildErrorData(error: PlaybackException): VodChromeError {
+        val title =
             when (error.errorCode) {
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-                ->
-                    "Can't reach the stream server. Check your connection and retry."
+                -> "Can't reach the stream"
                 PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-                    "Server rejected the request — the stream may require a re-sync or the credentials are stale."
+                    "Server refused the request"
                 PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
                 PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
-                ->
-                    "Stream not found or returned unexpected data."
+                -> "Stream not found"
                 PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
                 PlaybackException.ERROR_CODE_DECODING_FAILED,
                 PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
-                ->
-                    "This device can't decode the stream's codec."
-                else -> error.localizedMessage ?: error.errorCodeName
+                -> "This device can't decode the stream"
+                else -> "Couldn't open this stream"
             }
-        streamErrorMessage.text = friendly
-        streamErrorOverlay.visibility = View.VISIBLE
-        streamErrorRetry.requestFocus()
-        // Hide the built-in controller so the error overlay doesn't
-        // overlap the transport controls.
-        playerView.hideController()
-    }
-
-    private fun hideStreamError() {
-        if (streamErrorOverlay.visibility != View.GONE) {
-            streamErrorOverlay.visibility = View.GONE
-        }
+        val description =
+            error.localizedMessage ?: "Check your connection or try another source."
+        return VodChromeError(
+            codeName = error.errorCodeName,
+            codeNumeric = error.errorCode.toString(),
+            title = title,
+            description = description,
+            sourceName = "",
+            streamPath = "",
+            remote = "",
+            attempt = "1",
+        )
     }
 
     private fun retryCurrent() {
-        hideStreamError()
+        hideChrome()
         val p = controller.player
         p.prepare()
         p.playWhenReady = true
@@ -900,6 +1056,20 @@ class PlayerActivity : AppCompatActivity() {
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        // Chrome (buffering / error) overlay takes precedence over
+        // everything. BACK dismisses; on ERROR it also exits the player
+        // because the overlay is blocking — the user is saying "I'm done
+        // with this stream". Other keys fall through to the Compose
+        // focus traversal inside VodPlayerChrome.
+        if (chromeState != VodChromeState.NONE) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                val wasError = chromeState == VodChromeState.ERROR
+                hideChrome()
+                if (wasError) finish()
+                return true
+            }
+            return super.onKeyDown(keyCode, event)
+        }
         // Options sheet takes precedence over surf — BACK dismisses it and
         // D-pad drives its Compose focus. Everything else falls through so
         // Compose's own key handling gets the event.
