@@ -109,7 +109,17 @@ fun BrowseSection(
     // previous composition; isPlaced is true and awaitAndRequest fires
     // immediately. Both paths converge cleanly.
     LaunchedEffect(type, panelFocus) {
-        if (panelFocus != PanelFocus.Categories) return@LaunchedEffect
+        // When focus leaves Categories, the rail unmounts. Reset the anchor
+        // so re-entry (LEFT from coverflow / leftmost CTA) waits for the
+        // freshly-placed pill's onPlaced before requesting focus. Without
+        // this reset, `isPlaced` is stale-true from the previous mount and
+        // `awaitAndRequest` fires immediately against a detached
+        // FocusRequester — request silently fails, no pill has focus, LEFT
+        // and BACK both land nowhere and the next BACK closes the app.
+        if (panelFocus != PanelFocus.Categories) {
+            pillAnchor.reset()
+            return@LaunchedEffect
+        }
         pillAnchor.awaitAndRequest()
     }
     // Group catalogue per type. One-shot per type switch — failures degrade
