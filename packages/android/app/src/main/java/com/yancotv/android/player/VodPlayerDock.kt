@@ -125,8 +125,7 @@ fun VodPlayerDock(
     onSkipForward: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onOpenSheet: () -> Unit,
-    onToggleFavorite: () -> Unit,
+    onOpenSheet: (SheetMode) -> Unit,
     onSeekTo: (Long) -> Unit,
     onUserInteraction: () -> Unit,
     modifier: Modifier = Modifier,
@@ -182,7 +181,6 @@ fun VodPlayerDock(
                     onPrevious = onPrevious,
                     onNext = onNext,
                     onOpenSheet = onOpenSheet,
-                    onToggleFavorite = onToggleFavorite,
                     onUserInteraction = onUserInteraction,
                 )
                 Spacer(Modifier.height(26.dp))
@@ -381,8 +379,7 @@ private fun VodDockTransportRow(
     onSkipForward: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onOpenSheet: () -> Unit,
-    onToggleFavorite: () -> Unit,
+    onOpenSheet: (SheetMode) -> Unit,
     onUserInteraction: () -> Unit,
 ) {
     Row(
@@ -437,17 +434,23 @@ private fun VodDockTransportRow(
             },
         )
         Spacer(Modifier.width(30.dp))
-        SecondaryChip(label = "CC", onClick = { onUserInteraction(); onOpenSheet() })
+        // Each secondary chip routes to the matching sheet tab. CC → SUBS
+        // because the enum name is SUBS but the user-facing vocab is CC on
+        // remotes. FAV opens the sheet's FAV tab even though it's a stub —
+        // the "COMING IN MK.XX" placeholder is more informative than a
+        // button that silently does nothing. MENU opens on AUDIO as the
+        // default landing, matching the MENU key behaviour elsewhere.
+        SecondaryChip(label = "CC", onClick = { onUserInteraction(); onOpenSheet(SheetMode.SUBS) })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "AUDIO", onClick = { onUserInteraction(); onOpenSheet() })
+        SecondaryChip(label = "AUDIO", onClick = { onUserInteraction(); onOpenSheet(SheetMode.AUDIO) })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "SPEED", onClick = { onUserInteraction(); onOpenSheet() })
+        SecondaryChip(label = "SPEED", onClick = { onUserInteraction(); onOpenSheet(SheetMode.SPEED) })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "FIT", onClick = { onUserInteraction(); onOpenSheet() })
+        SecondaryChip(label = "FIT", onClick = { onUserInteraction(); onOpenSheet(SheetMode.ASPECT) })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "FAV", onClick = { onUserInteraction(); onToggleFavorite() })
+        SecondaryChip(label = "FAV", onClick = { onUserInteraction(); onOpenSheet(SheetMode.FAV) })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "MENU", onClick = { onUserInteraction(); onOpenSheet() })
+        SecondaryChip(label = "MENU", onClick = { onUserInteraction(); onOpenSheet(SheetMode.AUDIO) })
     }
 }
 

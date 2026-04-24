@@ -960,16 +960,9 @@ class PlayerActivity : AppCompatActivity() {
                     controller.next()
                     resetDockAutoHide()
                 },
-                onOpenSheet = {
+                onOpenSheet = { mode ->
                     hideVodDock()
-                    showSheet()
-                },
-                onToggleFavorite = {
-                    // Favorite wiring lives with the MK.16.player.vod.metadata
-                    // follow-up (needs FavoritesRepository hookup + state
-                    // flow). For the dock slice, keep the chip operable — it
-                    // just resets the auto-hide so focus stays on the dock.
-                    resetDockAutoHide()
+                    showSheet(mode)
                 },
                 onSeekTo = { offsetMs ->
                     val p = controller.player
@@ -1174,17 +1167,19 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun showSheet() {
+    private fun showSheet(initialMode: SheetMode = SheetMode.AUDIO) {
         if (sheetVisible) return
         // Hide the Media3 controller if it was up — the sheet sits over the
         // controls and a two-layer overlay reads as broken.
         playerView.hideController()
-        // Open directly on AUDIO — the MK.16.sheet Concept A port dropped
-        // the old root "OPTIONS" list in favour of tab-driven navigation,
-        // and audio is both the most-used tab and the one that was shown
-        // first in the old root list. Persisting the last-used tab across
-        // opens ships with MK.16.2.
-        sheetMode = SheetMode.AUDIO
+        // Open on the requested tab. Default is AUDIO: the MK.16.sheet
+        // Concept A port dropped the old root "OPTIONS" list in favour of
+        // tab-driven navigation, and audio is both the most-used tab and
+        // the one shown first in the old root list. The VOD dock's
+        // secondary chips pass their own tab (CC → SUBS, SPEED → SPEED,
+        // etc.) so each chip lands the user directly on the relevant
+        // panel. Persisting the last-used tab ships with MK.16.2.
+        sheetMode = initialMode
         sheetVisible = true
         val v = ensureSheetOverlay()
         v.visibility = View.VISIBLE
