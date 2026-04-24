@@ -7,6 +7,7 @@ import android.os.StrictMode
 import androidx.media3.common.util.UnstableApi
 import androidx.work.WorkManager
 import coil3.SingletonImageLoader
+import com.yancotv.android.crash.CrashReporter
 import com.yancotv.android.di.appModule
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderNotificationChannel
@@ -30,6 +31,11 @@ class YancoApp : Application() {
         // Media3's first preparation, WorkManager init) don't kill debug
         // builds; instead they show up as "StrictMode policy violation"
         // in logcat and we triage. Filter with `adb logcat -s StrictMode:*`.
+        // Crash reporter: install BEFORE super.onCreate so crashes in Koin
+        // startup are caught. filesDir is accessible because the Application
+        // context is partially ready at this point even before super fires.
+        CrashReporter.install(this)
+
         if (BuildConfig.DEBUG) {
             StrictMode.setThreadPolicy(
                 StrictMode.ThreadPolicy
@@ -58,6 +64,10 @@ class YancoApp : Application() {
             androidContext(this@YancoApp)
             modules(appModule)
         }
+        // Read + clear the previous session's crash.log (if any) so it
+        // shows up in adb logcat -s YancoCrash immediately after launch.
+        CrashReporter.readAndClear(this)
+
         SingletonImageLoader.setSafe { buildYancoImageLoader(this) }
         EpgSyncWorker.schedulePeriodic(this)
         ReminderNotificationChannel.ensureCreated(this)
