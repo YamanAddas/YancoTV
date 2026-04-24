@@ -226,32 +226,9 @@ private fun hexRowShape(corner: Dp): Shape {
     }
 }
 
-/**
- * Pointy-top hexagon — vertices at top-center and bottom-center, flat
- * sides at H/4 and 3H/4 on left/right. Inscribed in the button's WxH box.
- *
- *      .             ← top vertex
- *     / \
- *    |   |           ← flat verticals between H/4 and 3H/4
- *     \ /
- *      '             ← bottom vertex
- *
- * Matches the YancoVerse lobby-orb silhouette from the user's reference
- * photo. Used by transport buttons (single-symbol labels) — secondary
- * chips use the wider [YancoShapes.HexCapsule] so multi-letter labels
- * fit in the runway.
- */
-private val PointyHexShape: Shape = GenericShape { size, _ ->
-    val w = size.width
-    val h = size.height
-    moveTo(w / 2f, 0f)
-    lineTo(w, h / 4f)
-    lineTo(w, 3f * h / 4f)
-    lineTo(w / 2f, h)
-    lineTo(0f, 3f * h / 4f)
-    lineTo(0f, h / 4f)
-    close()
-}
+// Pointy-top hex orb silhouette is now [YancoShapes.PointyHex] — shared
+// with the player options sheet so both surfaces drift together when the
+// orb language is tuned.
 
 // ---------------------------------------------------------------------
 // Metadata block — kicker + gradient title + chip row. Sits above the
@@ -535,7 +512,7 @@ private fun TransportButton(
     contentLabel: String = label,
 ) {
     val palette = LocalYancoPalette.current
-    val shape = PointyHexShape
+    val shape = YancoShapes.PointyHex
     val interaction = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
     val bgBrush =

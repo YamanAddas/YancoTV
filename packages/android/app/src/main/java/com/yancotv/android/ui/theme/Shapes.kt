@@ -64,6 +64,15 @@ object YancoShapes {
      * leaving the bulk of the width as a flat top/bottom border for the label.
      */
     val HexPill: Shape = HexCapsuleShape(cutFraction = 0.5f, pointRoundDp = 0.dp)
+
+    /**
+     * Pointy-top hexagon — vertices at top-center and bottom-center, flat
+     * sides at H/4 and 3H/4 left/right. Inscribed in the host's WxH box.
+     * Matches the YancoVerse lobby-orb silhouette; used by transport buttons,
+     * small badges (audio language code), and selected-check chips inside
+     * the player options sheet.
+     */
+    val PointyHex: Shape = PointyHexShape()
 }
 
 /**
@@ -232,6 +241,44 @@ internal class ButtonBevelShape : Shape {
                 lineTo(size.width - cut, h)
                 lineTo(cut, h)
                 lineTo(0f, mid)
+                close()
+            }
+        return Outline.Generic(path)
+    }
+}
+
+/**
+ * Pointy-top hexagon — six vertices arranged with points at top-center
+ * and bottom-center, flat verticals at H/4 and 3H/4 on left and right.
+ * Silhouette:
+ *
+ *      .             ← top vertex (W/2, 0)
+ *     / \
+ *    |   |           ← flat verticals at H/4 → 3H/4
+ *     \ /
+ *      '             ← bottom vertex (W/2, H)
+ *
+ * The shape is symmetric, so it reads identically at every WxH ratio.
+ * Square hosts (W == H) produce a regular pointy-top hex; tall hosts
+ * stretch it vertically into an elongated lozenge — useful for slim
+ * transport buttons that need to slot under a progress bar.
+ */
+internal class PointyHexShape : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val w = size.width
+        val h = size.height
+        val path =
+            Path().apply {
+                moveTo(w / 2f, 0f)
+                lineTo(w, h / 4f)
+                lineTo(w, 3f * h / 4f)
+                lineTo(w / 2f, h)
+                lineTo(0f, 3f * h / 4f)
+                lineTo(0f, h / 4f)
                 close()
             }
         return Outline.Generic(path)

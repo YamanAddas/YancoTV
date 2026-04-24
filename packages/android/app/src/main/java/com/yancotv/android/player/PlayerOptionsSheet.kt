@@ -34,11 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -60,6 +62,7 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -429,6 +432,29 @@ private fun TabStrip(
     }
 }
 
+/**
+ * Hex-orb tab / chrome chip. Aligns with the player dock's transport
+ * orb language so the whole player surface reads as one visual family:
+ *
+ *   - focused → solid Accent → AccentDeep gradient + 16dp accent glow +
+ *               accent border + black foreground (the cursor pulses)
+ *   - active  → soft accent wash + accent-tinted border + 6dp glow +
+ *               accent foreground (the selection sits)
+ *   - idle    → translucent BackgroundDeep, hairline border, muted text
+ *               (the rest fade into the sheet)
+ *
+ * Silhouette is now [YancoShapes.HexCapsule] — true horizontal hex with
+ * angled side caps, matching CategoryRail pills + the player dock's
+ * SecondaryChip. Glow uses the canonical .shadow(ambient/spot=Accent)
+ * pattern applied BEFORE clip so it radiates outside the hex outline.
+ *
+ * Single focus target — `.clickable` already makes the node focusable
+ * AND emits FocusInteraction events through the shared interaction
+ * source, so `collectIsFocusedAsState()` still works. Stacking
+ * `.focusable(interactionSource = …)` on top creates two siblings; the
+ * outer wins focus, so CENTER never reaches the clickable that owns
+ * `onClick` (the bug fixed in `da159cc`).
+ */
 @Composable
 private fun HexCapsule(
     label: String,
@@ -440,20 +466,18 @@ private fun HexCapsule(
     val pal = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    // Visual model:
-    //   focused  → bright accent fill   (the cursor — where the D-pad is)
-    //   active   → outline frame on raised bg (the selection — what's set)
-    //   neither  → raised bg, muted text
-    // Picker (cursor) reads as the loud signal; picked (selection) reads
-    // as a quiet persistent frame. Previous model had it inverted: the
-    // picked tab was a solid accent fill while the focused/cursor tab was
-    // a frame, which conflated "this is set" with "this is where I am" —
-    // moving the cursor away from the active tab made the sheet look
-    // unselected. This swap makes both states legible at the same time.
+    val shape = YancoShapes.HexCapsule
     val bgBrush =
         when {
             focused -> Brush.verticalGradient(listOf(pal.Accent, pal.AccentDeep))
-            else -> Brush.verticalGradient(listOf(pal.BackgroundRaised, pal.BackgroundRaised))
+            active ->
+                Brush.verticalGradient(
+                    listOf(
+                        pal.Accent.copy(alpha = 0.22f),
+                        pal.AccentDeep.copy(alpha = 0.14f),
+                    ),
+                )
+            else -> SolidColor(pal.BackgroundDeep.copy(alpha = 0.55f))
         }
     val fg =
         when {
@@ -464,28 +488,31 @@ private fun HexCapsule(
     val borderColor =
         when {
             focused -> pal.Accent
-            active -> pal.Accent
+            active -> pal.Accent.copy(alpha = 0.55f)
             else -> pal.BorderSubtle
+        }
+    val glowElevation =
+        when {
+            focused -> 16.dp
+            active -> 6.dp
+            else -> 0.dp
         }
     Box(
         modifier =
             modifier
                 .height(34.dp)
-                .clip(hexRowShape(HexRowCornerDp))
+                .shadow(
+                    elevation = glowElevation,
+                    shape = shape,
+                    ambientColor = pal.Accent,
+                    spotColor = pal.Accent,
+                )
+                .clip(shape)
                 .background(bgBrush)
-                .border(1.dp, borderColor, hexRowShape(HexRowCornerDp))
+                .border(if (focused) 2.dp else 1.dp, borderColor, shape)
                 .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
                 .let { m ->
                     if (onClick != null) {
-                        // Single focus target only — `.clickable` already
-                        // makes the node focusable AND emits FocusInteraction
-                        // events through the shared `interaction` source, so
-                        // `collectIsFocusedAsState()` still works. Stacking an
-                        // explicit `.focusable(interactionSource = …)` on top
-                        // creates two siblings; the outer wins focus, so
-                        // CENTER never reaches the clickable that owns
-                        // `onClick`. That was the symptom: tabs visibly took
-                        // focus but CENTER did nothing.
                         m.clickable(
                             interactionSource = interaction,
                             indication = null,
@@ -495,7 +522,7 @@ private fun HexCapsule(
                     }
                 }
                 .semantics { contentDescription = label + if (active) ", selected" else "" }
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -503,9 +530,6 @@ private fun HexCapsule(
             color = fg,
             fontSize = 9.sp,
             letterSpacing = 1.4.sp,
-            // Both the cursor (focused) and the selection (active) get a
-            // heavier weight so the sheet doesn't look "unselected" when
-            // the cursor moves to a different tab.
             fontWeight = if (active || focused) FontWeight.Black else FontWeight.Bold,
         )
     }
@@ -629,25 +653,35 @@ private fun AudioTrackRow(
 ) {
     HexOptionRow(
         leading = {
+            // Mini PointyHex orb — same silhouette as the dock transport
+            // buttons, scaled down to a 38dp leading badge. Matches the
+            // YancoShapes.PointyHex check chip on the right side of the
+            // row, so the row reads as "orb · text · orb".
             val pal = LocalYancoPalette.current
             Box(
                 modifier =
                     Modifier
-                        .size(42.dp)
-                        .clip(hexRowShape(HexRowCornerDp))
+                        .size(38.dp)
+                        .clip(YancoShapes.PointyHex)
                         .background(
-                            if (track.selected) pal.Accent.copy(alpha = 0.22f) else pal.BackgroundElevated,
+                            if (track.selected) {
+                                Brush.verticalGradient(listOf(pal.Accent, pal.AccentDeep))
+                            } else {
+                                Brush.verticalGradient(
+                                    listOf(pal.BackgroundElevated, pal.BackgroundDeep),
+                                )
+                            },
                         )
                         .border(
                             1.dp,
                             if (track.selected) pal.Accent else pal.BorderSubtle,
-                            hexRowShape(HexRowCornerDp),
+                            YancoShapes.PointyHex,
                         ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = track.language?.uppercase(Locale.ROOT)?.take(2) ?: "—",
-                    color = if (track.selected) pal.Accent else pal.TextSecondary,
+                    color = if (track.selected) Color(0xFF04130C) else pal.TextSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 0.5.sp,
@@ -1185,11 +1219,25 @@ private fun EmptyPanelLine(text: String) {
 }
 
 /**
- * Canonical hex-cut list row used across every wired panel. Layout:
- * `[leading?]  [label + sub]  <check>`. Focus visual = accent border +
- * accent-tinted gradient fill. Selected visual = steady accent border
- * and a filled check chip. Both can co-exist (focused on the currently
- * selected item).
+ * Hex-orb option row used across every wired panel. Layout:
+ * `[leading?]  [label + sub]  <check?>`.
+ *
+ * Visual model parallels the dock's TransportButton + the tab strip's
+ * HexCapsule so the whole player feels like one orb family:
+ *
+ *   - focused          → bright Accent → AccentDeep gradient + 18dp glow
+ *                        + accent border + black foreground
+ *   - selected (idle)  → soft accent wash + accent-tinted border +
+ *                        6dp glow (the persistent "this is set" signal)
+ *   - idle             → BackgroundElevated → BackgroundHover gradient,
+ *                        hairline BorderSubtle, no glow
+ *
+ * Silhouette is [YancoShapes.HexCapsule] — angled side caps on a
+ * full-width hex pill. The selected check chip is a [YancoShapes.PointyHex]
+ * mini-orb so the badge inside the row reads as "the same family,
+ * smaller scale" rather than a distinct glyph.
+ *
+ * Single focus target — see HexCapsule for the rationale.
  */
 @Composable
 private fun HexOptionRow(
@@ -1204,14 +1252,15 @@ private fun HexOptionRow(
     val pal = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val shape = hexRowShape(HexRowCornerDp)
+    val shape = YancoShapes.HexCapsule
     val bgBrush =
         when {
-            focused ->
-                Brush.horizontalGradient(
+            focused -> Brush.verticalGradient(listOf(pal.Accent, pal.AccentDeep))
+            selected ->
+                Brush.verticalGradient(
                     listOf(
                         pal.Accent.copy(alpha = 0.22f),
-                        pal.Accent.copy(alpha = 0.04f),
+                        pal.AccentDeep.copy(alpha = 0.14f),
                     ),
                 )
             else -> Brush.verticalGradient(listOf(pal.BackgroundElevated, pal.BackgroundHover))
@@ -1219,16 +1268,30 @@ private fun HexOptionRow(
     val borderColor =
         when {
             focused -> pal.Accent
-            selected -> pal.Accent.copy(alpha = 0.8f)
+            selected -> pal.Accent.copy(alpha = 0.55f)
             else -> pal.BorderSubtle
+        }
+    val labelColor = if (focused) Color(0xFF04130C) else pal.TextPrimary
+    val subColor = if (focused) Color(0xFF04130C).copy(alpha = 0.72f) else pal.TextMuted
+    val glowElevation =
+        when {
+            focused -> 18.dp
+            selected -> 6.dp
+            else -> 0.dp
         }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .shadow(
+                    elevation = glowElevation,
+                    shape = shape,
+                    ambientColor = pal.Accent,
+                    spotColor = pal.Accent,
+                )
                 .clip(shape)
                 .background(bgBrush)
-                .border(if (focused) 1.5.dp else 1.dp, borderColor, shape)
+                .border(if (focused) 2.dp else 1.dp, borderColor, shape)
                 .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
                 // DPAD UP escape: first-row rows (focusRequester != null)
                 // route UP back to the active tab. Without this, Compose's
@@ -1250,14 +1313,9 @@ private fun HexOptionRow(
                         m
                     }
                 }
-                // Single focus target — see HexCapsule for the rationale.
-                // `.clickable` is already focusable; double-stacking with
-                // `.focusable(interactionSource = …)` made CENTER no-op
-                // because the outer `.focusable` won focus and never
-                // routed activation to the inner clickable.
                 .clickable(interactionSource = interaction, indication = null) { onPick() }
                 .semantics { contentDescription = label + if (selected) ", selected" else "" }
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {
@@ -1267,7 +1325,7 @@ private fun HexOptionRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                color = pal.TextPrimary,
+                color = labelColor,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.1).sp,
@@ -1276,7 +1334,7 @@ private fun HexOptionRow(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = sub,
-                    color = pal.TextMuted,
+                    color = subColor,
                     fontSize = 11.sp,
                     letterSpacing = 1.0.sp,
                     fontWeight = FontWeight.Medium,
@@ -1288,8 +1346,8 @@ private fun HexOptionRow(
             Box(
                 modifier =
                     Modifier
-                        .size(26.dp)
-                        .clip(hexRowShape(8.dp))
+                        .size(28.dp)
+                        .clip(YancoShapes.PointyHex)
                         .background(
                             Brush.verticalGradient(listOf(pal.Accent, pal.AccentDeep)),
                         ),
@@ -1304,7 +1362,7 @@ private fun HexOptionRow(
             }
         }
     }
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(8.dp))
 }
 
 private fun languageDisplayName(code: String): String {
