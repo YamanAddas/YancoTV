@@ -185,7 +185,12 @@ class PlaybackController(
     // persistResumePoint can write watch_history with the *series* id as
     // content_id (FK target) and the episode id in the nullable episode_id
     // column. Cleared on every non-episode load and on stop/release.
-    private var _currentEpisode: Playable.Episode? = null
+    //
+    // Exposed as a StateFlow because MK.13.1 (favorites toggle in the
+    // sheet) needs to favourite the *series* id, not the episode-as-view
+    // id — `favorites.content_id` is FK'd to `content(id)` and episodes
+    // don't have content rows.
+    private val _currentEpisode = MutableStateFlow<Playable.Episode?>(null)
 
     // MK.12a.3 — external subtitle side-loaded into the current MediaItem.
     // Cleared whenever the item changes (zap, next/prev, stop) because the
@@ -204,6 +209,7 @@ class PlaybackController(
     val queue: StateFlow<List<ContentItem>> = _queue.asStateFlow()
     val index: StateFlow<Int> = _index.asStateFlow()
     val currentItem: StateFlow<ContentItem?> = _currentItem.asStateFlow()
+    val currentEpisode: StateFlow<Playable.Episode?> = _currentEpisode.asStateFlow()
     val sleepTimer: StateFlow<SleepTimerState> = _sleepTimer.asStateFlow()
 
     /** Stable id of whatever is loaded in the player right now, for fast identity checks. */
@@ -241,7 +247,7 @@ class PlaybackController(
         }
         // Different item: capture the outgoing offset before the queue swap.
         if (_currentItem.value != null) persistResumePoint()
-        _currentEpisode = null
+        _currentEpisode.value = null
         _externalSubtitle = null
         _queue.value = list
         _index.value = startIndex
@@ -268,13 +274,13 @@ class PlaybackController(
         if (episode.streamUrl.isBlank()) return
         val view = episode.toContentItemView()
         if (_currentItem.value?.id == view.id) {
-            _currentEpisode = episode
+            _currentEpisode.value = episode
             _queue.value = listOf(view)
             _index.value = 0
             return
         }
         if (_currentItem.value != null) persistResumePoint()
-        _currentEpisode = episode
+        _currentEpisode.value = episode
         _externalSubtitle = null
         _queue.value = listOf(view)
         _index.value = 0
@@ -311,7 +317,7 @@ class PlaybackController(
 
     fun stop() {
         persistResumePoint()
-        _currentEpisode = null
+        _currentEpisode.value = null
         _externalSubtitle = null
         _queue.value = emptyList()
         _index.value = -1
@@ -325,7 +331,7 @@ class PlaybackController(
 
     fun release() {
         persistResumePoint()
-        _currentEpisode = null
+        _currentEpisode.value = null
         _externalSubtitle = null
         cancelSleepTimer()
         player.release()
@@ -522,7 +528,7 @@ class PlaybackController(
         // through to the simple item.id path. Snapshot the episode on the
         // main thread before launching IO; the field can be cleared by the
         // next loadCurrent() before the coroutine runs.
-        val episode = _currentEpisode
+        val episode = _currentEpisode.value
         scope.launch(Dispatchers.IO) {
             if (episode != null) {
                 repo.upsert(

@@ -64,6 +64,8 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.shared.epg.EpgRepository
+import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -304,10 +306,10 @@ fun PlayerOptionsSheet(
                             milestone = "MK.14",
                         )
                     SheetMode.FAV ->
-                        StubPanel(
-                            heading = "Add to favorites",
-                            body = "Add this title to one or more playlists. Top-level shortcut from Home.",
-                            milestone = "MK.13.1",
+                        FavoritesPanel(
+                            controller = controller,
+                            onBack = onDismiss,
+                            onEscapeUp = escapeToTabs,
                         )
                     SheetMode.EXT ->
                         StubPanel(
@@ -1363,6 +1365,129 @@ private fun formatSleepCountdown(ms: Long): String {
     } else {
         String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
     }
+}
+
+// ───── Favorites panel (MK.13.1) ─────
+
+/**
+ * Add-to-favorites parity inside the player options sheet. The Home/Browse
+ * star buttons already toggle via [FavoritesRepository.toggle]; this panel
+ * exposes the same affordance from inside the player so the user doesn't
+ * have to leave fullscreen to bookmark a title.
+ *
+ * Episode-aware: when the controller is playing a [Playable.Episode] the
+ * synthesized "view" item's id is the episode id, which would FK-violate
+ * `favorites.content_id` (FK'd to `content(id)`; episodes live in their
+ * own table). The panel toggles the *series* id in that case — exactly
+ * what the user means when they say "favourite this".
+ *
+ * Reactive — `isFavoriteFlow(id)` emits a fresh value every time any
+ * write to the favorites table fires the SQLDelight notifier, so a
+ * toggle from Browse/Home or this panel reflects everywhere immediately.
+ */
+@UnstableApi
+@Composable
+private fun FavoritesPanel(
+    controller: PlaybackController,
+    onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
+    favorites: FavoritesRepository = koinInject(),
+) {
+    val pal = LocalYancoPalette.current
+    val firstRowFocus = remember { FocusRequester() }
+    val currentItem by controller.currentItem.collectAsState()
+    val currentEpisode by controller.currentEpisode.collectAsState()
+    val ioScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    // Pick the FK-safe content id for the current playback context:
+    //   - Episode play → the *series* id (episodes have no content row)
+    //   - Live channel / Movie → the item's own id
+    //   - Nothing playing → null (panel renders empty state)
+    val favoriteId =
+        currentEpisode?.seriesId
+            ?: currentItem?.id
+
+    val displayTitle =
+        currentEpisode?.let { ep ->
+            // For episodes, prefer "<Series> · <Episode>" if the series
+            // title is on the synthesized item. Fall back to the episode
+            // title alone if not.
+            val ep_title = ep.title
+            currentItem?.cleanTitle?.takeIf { it.isNotBlank() }?.let { "$it · $ep_title" } ?: ep_title
+        } ?: currentItem?.cleanTitle?.takeIf { it.isNotBlank() }
+            ?: currentItem?.title
+
+    // Pull `isFavorite` reactively so toggles from this panel OR from any
+    // other surface (Home star button, Browse hover toggle) refresh the
+    // displayed state without a focus round-trip. SQLDelight's `asFlow`
+    // dispatches the underlying read to IO inside the repo.
+    val isFav by remember(favoriteId) {
+        if (favoriteId != null) {
+            favorites.isFavoriteFlow(favoriteId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(false)
+        }
+    }.collectAsState(initial = false)
+
+    LaunchedEffect(favoriteId) {
+        if (favoriteId != null) runCatching { firstRowFocus.requestFocus() }
+    }
+
+    if (favoriteId == null) {
+        EmptyPanelLine("Nothing playing — start a stream to add it to favourites.")
+        return
+    }
+
+    SectionKicker(text = "CURRENT TITLE")
+    Text(
+        text = displayTitle ?: "Unknown",
+        color = pal.TextPrimary,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.2).sp,
+        modifier = Modifier.padding(bottom = 6.dp),
+    )
+    val typeHint =
+        when (currentItem?.type) {
+            ContentType.LIVE -> "Live channel"
+            ContentType.MOVIE -> if (currentEpisode != null) "Series" else "Movie"
+            ContentType.SERIES -> "Series"
+            null -> ""
+        }
+    if (typeHint.isNotBlank()) {
+        Text(
+            text = typeHint.uppercase(Locale.ROOT),
+            color = pal.TextMuted,
+            fontSize = 10.sp,
+            letterSpacing = 1.6.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+    }
+
+    SectionKicker(text = if (isFav) "IN YOUR FAVOURITES" else "ADD TO FAVOURITES")
+    HexOptionRow(
+        leading = null,
+        label = if (isFav) "Remove from favourites" else "Add to favourites",
+        sub =
+            if (isFav) {
+                "Tap to remove · also in the Favourites rail"
+            } else {
+                "Pinned to the Favourites rail on Home"
+            },
+        selected = isFav,
+        focusRequester = firstRowFocus,
+        onEscapeUp = onEscapeUp,
+        onPick = {
+            // SQLDelight write — must dispatch to IO. The reactive
+            // isFavoriteFlow above re-emits the new state, so this
+            // composable re-renders without a manual refresh.
+            ioScope.launch(Dispatchers.IO) {
+                runCatching { favorites.toggle(favoriteId) }
+            }
+            onBack()
+        },
+    )
 }
 
 // ───── Stub panel (placeholder for future-milestone tabs) ─────
