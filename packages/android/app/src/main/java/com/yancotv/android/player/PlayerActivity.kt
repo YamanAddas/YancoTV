@@ -137,6 +137,16 @@ class PlayerActivity : AppCompatActivity() {
     // from flashing the overlay on cold start / zap.
     private var hasBeenReady = false
 
+    // VOD dock (MK.16.player.vod.dock). Replaces Media3's built-in
+    // PlayerControlView for non-live items. Lazy-inflated via the
+    // `vod_dock_stub` ViewStub on first show.
+    private var vodDockOverlay: ComposeView? = null
+    private var dockVisible by mutableStateOf(false)
+    private var dockData by mutableStateOf(VodDockData())
+    private var dockProgress by mutableStateOf(VodDockProgress())
+    private var dockAutoHideJob: Job? = null
+    private var dockProgressTickJob: Job? = null
+
     // Channel-surf overlay (ComposeView), inflated on first showSurf() via
     // ViewStub so Compose owner setup is off the activity launch path.
     // surfOverlay stays null until first use; everything downstream guards
@@ -354,6 +364,10 @@ class PlayerActivity : AppCompatActivity() {
         quickInfoHideJob = null
         liveOffsetTickerJob?.cancel()
         liveOffsetTickerJob = null
+        dockProgressTickJob?.cancel()
+        dockProgressTickJob = null
+        dockAutoHideJob?.cancel()
+        dockAutoHideJob = null
         playerView.player = null
         // VOD audio bleed fix: nothing reclaims the surface for movies /
         // episodes after fullscreen exit (the LIVE-only MiniPlayer in the
@@ -495,9 +509,17 @@ class PlayerActivity : AppCompatActivity() {
         // "Tuning the stream" overlay — the dimmed PlayerView is already
         // the right signal for the cold-start / zap case.
         hideChrome()
+        hideVodDock()
         hasBeenReady = false
         bufferingShowJob?.cancel()
         bufferingShowJob = null
+        // MK.16.player.vod.dock — LIVE keeps Media3's built-in controller
+        // (needed for the zap bar / program-progress overlays to ride
+        // alongside it). VOD (movie / episode) disables the built-in one
+        // because the Compose dock replaces it. Re-apply on every item
+        // change so a zap from VOD → LIVE or back flips the control surface.
+        val isLive = item?.type == ContentType.LIVE
+        playerView.useController = (item == null) || isLive
         if (item == null) {
             zapBar.visibility = View.GONE
             progressRow.visibility = View.GONE
@@ -505,7 +527,6 @@ class PlayerActivity : AppCompatActivity() {
         }
         val displayTitle = item.cleanTitle?.ifBlank { null } ?: item.title
         zapChannelName.text = displayTitle
-        val isLive = item.type == ContentType.LIVE
         zapLiveDot.visibility = if (isLive) View.VISIBLE else View.GONE
         zapLiveLabel.visibility = if (isLive) View.VISIBLE else View.GONE
         zapNow.visibility = View.GONE
@@ -886,6 +907,176 @@ class PlayerActivity : AppCompatActivity() {
         playerView.requestFocus()
     }
 
+    // ───── VOD dock (MK.16.player.vod.dock) ─────
+
+    /**
+     * Inflate the `vod_dock_stub` on first show and wire the ComposeView to
+     * [VodPlayerDock]. Mirrors the sheet / chrome / surf lazy inflation
+     * pattern.
+     *
+     * Callback wiring:
+     *  - toggle play-pause drives [Player.playWhenReady]
+     *  - skip ±10 s seeks the shared player directly
+     *  - previous / next delegate to the controller queue traversal
+     *  - open-sheet cross-opens the options sheet
+     *  - favorite is a stub for the follow-up slice
+     *  - onSeekTo is used by the progress-bar scrub-focus path (DPAD LEFT /
+     *    RIGHT on the bar), also ±10 s for v1
+     *  - onUserInteraction resets the 4 s auto-hide job so focus-wander
+     *    doesn't clip the dock before the user decides what to press
+     */
+    private fun ensureVodDockOverlay(): ComposeView {
+        vodDockOverlay?.let { return it }
+        val stub = findViewById<android.view.ViewStub>(R.id.vod_dock_stub)
+        val inflated = stub.inflate() as ComposeView
+        inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        inflated.setContent {
+            VodPlayerDock(
+                visibility = if (dockVisible) VodDockVisibility.VISIBLE else VodDockVisibility.HIDDEN,
+                data = dockData,
+                progress = dockProgress,
+                onTogglePlayPause = {
+                    val p = controller.player
+                    p.playWhenReady = !p.playWhenReady
+                    dockData = dockData.copy(isPlaying = p.playWhenReady)
+                    resetDockAutoHide()
+                },
+                onSkipBack = {
+                    val p = controller.player
+                    p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                    resetDockAutoHide()
+                },
+                onSkipForward = {
+                    val p = controller.player
+                    val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+                    p.seekTo((p.currentPosition + 10_000L).coerceAtMost(dur))
+                    resetDockAutoHide()
+                },
+                onPrevious = {
+                    controller.previous()
+                    resetDockAutoHide()
+                },
+                onNext = {
+                    controller.next()
+                    resetDockAutoHide()
+                },
+                onOpenSheet = {
+                    hideVodDock()
+                    showSheet()
+                },
+                onToggleFavorite = {
+                    // Favorite wiring lives with the MK.16.player.vod.metadata
+                    // follow-up (needs FavoritesRepository hookup + state
+                    // flow). For the dock slice, keep the chip operable — it
+                    // just resets the auto-hide so focus stays on the dock.
+                    resetDockAutoHide()
+                },
+                onSeekTo = { offsetMs ->
+                    val p = controller.player
+                    val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+                    p.seekTo(offsetMs.coerceIn(0L, dur))
+                    resetDockAutoHide()
+                },
+                onUserInteraction = { resetDockAutoHide() },
+            )
+        }
+        vodDockOverlay = inflated
+        return inflated
+    }
+
+    /**
+     * Surface the VOD dock. Hides Media3's built-in controller first (both
+     * can't be up at once). Starts the 500 ms progress ticker and arms the
+     * 4 s auto-hide timer — matches Media3's [CONTROLLER_TIMEOUT_MS].
+     */
+    private fun showVodDock() {
+        if (dockVisible) return
+        playerView.hideController()
+        dockData = buildDockData(controller.currentItem.value)
+        dockProgress = readDockProgress()
+        dockVisible = true
+        val v = ensureVodDockOverlay()
+        v.visibility = View.VISIBLE
+        v.post { v.requestFocus() }
+        startDockProgressTicker()
+        resetDockAutoHide()
+    }
+
+    private fun hideVodDock() {
+        if (!dockVisible) return
+        dockVisible = false
+        vodDockOverlay?.visibility = View.GONE
+        stopDockProgressTicker()
+        dockAutoHideJob?.cancel()
+        dockAutoHideJob = null
+        playerView.requestFocus()
+    }
+
+    private fun resetDockAutoHide() {
+        dockAutoHideJob?.cancel()
+        dockAutoHideJob =
+            lifecycleScope.launch {
+                delay(CONTROLLER_TIMEOUT_MS.toLong())
+                hideVodDock()
+            }
+    }
+
+    private fun startDockProgressTicker() {
+        dockProgressTickJob?.cancel()
+        dockProgressTickJob =
+            lifecycleScope.launch {
+                while (isActive) {
+                    dockProgress = readDockProgress()
+                    val playing = controller.player.playWhenReady
+                    if (playing != dockData.isPlaying) {
+                        dockData = dockData.copy(isPlaying = playing)
+                    }
+                    delay(500L)
+                }
+            }
+    }
+
+    private fun stopDockProgressTicker() {
+        dockProgressTickJob?.cancel()
+        dockProgressTickJob = null
+    }
+
+    private fun readDockProgress(): VodDockProgress {
+        val p = controller.player
+        return VodDockProgress(
+            playedMs = p.currentPosition.coerceAtLeast(0L),
+            bufferedMs = p.bufferedPosition.coerceAtLeast(0L),
+            durationMs = p.duration.coerceAtLeast(0L),
+        )
+    }
+
+    /**
+     * Build the VOD dock metadata payload from the active [ContentItem].
+     * Chip list keeps v1 minimal — type badge + group — so the dock lands
+     * visibly without a dependency on the metadata / source-lookup work
+     * deferred to MK.16.player.vod.metadata.
+     */
+    private fun buildDockData(item: ContentItem?): VodDockData {
+        if (item == null) return VodDockData(isPlaying = controller.player.playWhenReady)
+        val title = item.cleanTitle?.ifBlank { null } ?: item.title
+        val chips = mutableListOf<VodDockChip>()
+        val typeLabel =
+            when (item.type) {
+                ContentType.MOVIE -> "MOVIE"
+                ContentType.SERIES -> "EPISODE"
+                ContentType.LIVE -> "LIVE"
+            }
+        chips += VodDockChip(label = typeLabel, tone = VodDockChipTone.PREMIUM)
+        item.groupName?.takeIf { it.isNotBlank() }?.let {
+            chips += VodDockChip(label = it.uppercase(Locale.ROOT))
+        }
+        return VodDockData(
+            title = title,
+            chips = chips,
+            isPlaying = controller.player.playWhenReady,
+        )
+    }
+
     // ───── Channel surf ─────
 
     private fun ensureSurfOverlay(): ComposeView {
@@ -1026,8 +1217,9 @@ class PlayerActivity : AppCompatActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             // While the controller is hidden, don't let PlayerView silently
-            // eat the press — run our own handler first.
-            if (!controllerVisible && !surfVisible) {
+            // eat the press — run our own handler first. Dock acts as its
+            // own controller for VOD, so we also bypass when it's visible.
+            if (!controllerVisible && !surfVisible && !dockVisible) {
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_CENTER,
                     KeyEvent.KEYCODE_ENTER,
@@ -1066,6 +1258,18 @@ class PlayerActivity : AppCompatActivity() {
                 val wasError = chromeState == VodChromeState.ERROR
                 hideChrome()
                 if (wasError) finish()
+                return true
+            }
+            return super.onKeyDown(keyCode, event)
+        }
+        // VOD dock takes precedence over the options sheet and surf overlay
+        // (it's the surface the user just opened). BACK dismisses and
+        // returns focus to the PlayerView; everything else falls through so
+        // the dock's own Compose focus traversal gets the event (progress
+        // bar ±10 s, transport buttons, secondary chips).
+        if (dockVisible) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                hideVodDock()
                 return true
             }
             return super.onKeyDown(keyCode, event)
@@ -1117,14 +1321,25 @@ class PlayerActivity : AppCompatActivity() {
                 showSheet()
                 return true
             }
-            // OK / ENTER toggles the controller — the user asked explicitly
-            // for "controls hidden on open, OK to show, OK (or timeout) to
-            // hide" behaviour (2026-04-22). Long-press CENTER → sheet is a
-            // follow-up; it needs event.startTracking() + onKeyLongPress
-            // plumbing that conflicts with the short-press path here.
+            // OK / ENTER toggles the control surface. LIVE keeps Media3's
+            // built-in PlayerControlView (zap bar + program-progress ride
+            // alongside it); VOD surfaces the Compose dock
+            // (MK.16.player.vod.dock). `useController` is set per item in
+            // onItemChanged so a single `showController()` call on LIVE is
+            // sufficient — for VOD PlayerView ignores it anyway.
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (!controllerVisible) {
-                    playerView.showController()
+                val isLive = controller.currentItem.value?.type == ContentType.LIVE
+                if (isLive) {
+                    if (!controllerVisible) {
+                        playerView.showController()
+                        return true
+                    }
+                } else {
+                    if (!dockVisible) {
+                        showVodDock()
+                    } else {
+                        hideVodDock()
+                    }
                     return true
                 }
             }

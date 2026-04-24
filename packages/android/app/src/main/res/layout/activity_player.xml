@@ -308,6 +308,17 @@
         android:inflatedId="@+id/player_options_sheet"
         android:layout="@layout/player_options_sheet" />
 
+    <!-- VOD dock (MK.16.player.vod.dock). Compose replacement for Media3's
+         built-in PlayerControlView when the current item is non-live.
+         Inflated lazily from `PlayerActivity.ensureVodDockOverlay()` on
+         the first OK/CENTER press during VOD playback. -->
+    <ViewStub
+        android:id="@+id/vod_dock_stub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:inflatedId="@+id/vod_dock"
+        android:layout="@layout/player_vod_dock" />
+
     <!-- VOD player chrome (MK.16.player.vod.chrome). Hosts Compose overlays
          for buffering + error states — the Concept A port of the "Tuning
          the stream" + "Couldn't open this stream" screens. Replaces the
