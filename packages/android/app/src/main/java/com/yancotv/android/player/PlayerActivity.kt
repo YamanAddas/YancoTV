@@ -4,6 +4,7 @@ import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -14,6 +15,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
@@ -133,6 +135,15 @@ class PlayerActivity : AppCompatActivity() {
     private var sheetOverlay: ComposeView? = null
     private var sheetVisible by mutableStateOf(false)
     private var sheetMode by mutableStateOf(SheetMode.OPTIONS)
+
+    // MK.12a.3 — SAF picker for external subtitle files. Registered in
+    // onCreate (must happen before STARTED) and dispatched via
+    // launchSubtitlePicker(). Returns null when the user dismisses without
+    // picking, in which case the sheet stays closed and nothing else fires.
+    private val subtitlePicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) onSubtitleUriPicked(uri)
+        }
 
     private var listenerAttached = false
     private var controllerVisible = false
@@ -774,11 +785,46 @@ class PlayerActivity : AppCompatActivity() {
                     mode = sheetMode,
                     onModeChange = { sheetMode = it },
                     onDismiss = { hideSheet() },
+                    onPickSubtitleFile = { launchSubtitlePicker() },
                 )
             }
         }
         sheetOverlay = inflated
         return inflated
+    }
+
+    /**
+     * Launch the SAF "Open document" picker filtered to common subtitle
+     * MIME types. Hide the sheet first — the picker opens as a new activity
+     * and seeing the sheet still up when we return reads as broken. The
+     * callback [onSubtitleUriPicked] applies the pick.
+     */
+    private fun launchSubtitlePicker() {
+        hideSheet()
+        // Wildcard because most file explorers don't claim a MIME for .srt/
+        // .vtt/.ass — filtering on explicit MIMEs hides most user files.
+        // Sniffing happens downstream off the file extension.
+        subtitlePicker.launch(arrayOf("*/*"))
+    }
+
+    /**
+     * Receive the picked subtitle URI, sniff a MIME from the file name,
+     * and hand off to the controller to rebuild the current MediaItem.
+     * Controller rejects if the current item is live.
+     */
+    private fun onSubtitleUriPicked(uri: Uri) {
+        val mime = sniffSubtitleMime(uri)
+        controller.applyExternalSubtitle(uri, mime)
+    }
+
+    private fun sniffSubtitleMime(uri: Uri): String? {
+        val name = uri.lastPathSegment?.lowercase(Locale.ROOT) ?: return null
+        return when {
+            name.endsWith(".srt") -> androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
+            name.endsWith(".vtt") -> androidx.media3.common.MimeTypes.TEXT_VTT
+            name.endsWith(".ass") || name.endsWith(".ssa") -> androidx.media3.common.MimeTypes.TEXT_SSA
+            else -> null
+        }
     }
 
     private fun showSheet() {

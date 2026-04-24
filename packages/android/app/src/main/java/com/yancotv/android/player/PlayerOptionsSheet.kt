@@ -65,7 +65,7 @@ import java.util.Locale
 /** Which panel the options sheet is currently showing. Top-level so
  *  [PlayerActivity] can hoist the state and route BACK from a sub-view
  *  back to [OPTIONS] before dismissing the sheet entirely. */
-enum class SheetMode { OPTIONS, AUDIO, ASPECT, SPEED }
+enum class SheetMode { OPTIONS, AUDIO, SUBS, ASPECT, SPEED }
 
 @UnstableApi
 @Composable
@@ -73,6 +73,7 @@ fun PlayerOptionsSheet(
     mode: SheetMode,
     onModeChange: (SheetMode) -> Unit,
     onDismiss: () -> Unit,
+    onPickSubtitleFile: () -> Unit,
     controller: PlaybackController = koinInject(),
     prefs: AppPreferences = koinInject(),
 ) {
@@ -111,6 +112,7 @@ fun PlayerOptionsSheet(
                         controller = controller,
                         prefs = prefs,
                         onOpenAudio = { onModeChange(SheetMode.AUDIO) },
+                        onOpenSubs = { onModeChange(SheetMode.SUBS) },
                         onOpenAspect = { onModeChange(SheetMode.ASPECT) },
                         onOpenSpeed = { onModeChange(SheetMode.SPEED) },
                         onDismiss = onDismiss,
@@ -120,6 +122,13 @@ fun PlayerOptionsSheet(
                         controller = controller,
                         prefs = prefs,
                         onBack = { onModeChange(SheetMode.OPTIONS) },
+                    )
+                SheetMode.SUBS ->
+                    SubtitlesView(
+                        controller = controller,
+                        prefs = prefs,
+                        onBack = { onModeChange(SheetMode.OPTIONS) },
+                        onPickExternal = onPickSubtitleFile,
                     )
                 SheetMode.ASPECT ->
                     AspectView(
@@ -143,6 +152,7 @@ private fun OptionsView(
     controller: PlaybackController,
     prefs: AppPreferences,
     onOpenAudio: () -> Unit,
+    onOpenSubs: () -> Unit,
     onOpenAspect: () -> Unit,
     onOpenSpeed: () -> Unit,
     onDismiss: () -> Unit,
@@ -154,6 +164,8 @@ private fun OptionsView(
     // Current audio language label — read live from the player's selected
     // audio track if any, else from the persisted pref, else "—".
     val audioTracks = rememberAudioTracks(controller.player)
+    val textTracks = rememberTextTracks(controller.player)
+    val textDisabled = rememberTextDisabled(controller.player)
     val playback by prefs.playbackFlow.collectAsState()
     val activeAudioLabel =
         audioTracks.firstOrNull { it.selected }?.displayName
@@ -161,6 +173,13 @@ private fun OptionsView(
                 .takeIf { it.isNotBlank() }
                 ?.let { languageDisplayName(it) }
             ?: "—"
+    val activeSubsLabel =
+        when {
+            textDisabled -> "Off"
+            else ->
+                textTracks.firstOrNull { it.selected }?.displayName
+                    ?: "Off"
+        }
 
     Text(
         text = "PLAYER OPTIONS",
@@ -181,9 +200,8 @@ private fun OptionsView(
     )
     OptionRow(
         label = "Subtitles",
-        value = "Coming in MK.12a.3",
-        enabled = false,
-        onClick = onDismiss,
+        value = activeSubsLabel,
+        onClick = onOpenSubs,
     )
     // Read the live player value rather than the pref — on LIVE channels
     // the pref still reflects the user's last VOD pick, but the player is
@@ -274,6 +292,249 @@ private fun AudioView(
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
     )
+}
+
+/**
+ * Subtitle track picker (MK.12a.3). Lists:
+ *  - **Off** — disables text tracks entirely (disabling clears any active
+ *    selection; it does NOT clear an external subtitle attached to the
+ *    MediaItem, so flipping Off → a track won't re-buffer).
+ *  - **Each embedded text track** reported by the player.
+ *  - **Load external file…** — delegates to [onPickExternal], which the
+ *    Activity wires to a SAF [androidx.activity.result.contract.ActivityResultContracts.OpenDocument]
+ *    picker. The returned URI goes back through
+ *    [PlaybackController.applyExternalSubtitle] which rebuilds the
+ *    MediaItem at the current position — live streams reject it, and the
+ *    rebuild persists the resume point first (native-android-mk rule).
+ *
+ * Picked language is persisted via [AppPreferences.setSubtitleLanguage] so
+ * the same language auto-selects on the next VOD. Off writes a blank so
+ * "no subs by default" persists across sessions.
+ */
+@UnstableApi
+@Composable
+private fun SubtitlesView(
+    controller: PlaybackController,
+    prefs: AppPreferences,
+    onBack: () -> Unit,
+    onPickExternal: () -> Unit,
+) {
+    val firstRowFocus = remember { FocusRequester() }
+    val textTracks = rememberTextTracks(controller.player)
+    val textDisabled = rememberTextDisabled(controller.player)
+    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    LaunchedEffect(Unit) {
+        runCatching { firstRowFocus.requestFocus() }
+    }
+
+    Text(
+        text = "SUBTITLES",
+        color = YancoPalette.Accent,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 2.sp,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+
+    // Off row — always present. Selected when either text is explicitly
+    // disabled or no track is currently selected.
+    val offSelected = textDisabled || textTracks.none { it.selected }
+    TextTrackRow(
+        label = "Off",
+        selected = offSelected,
+        focusRequester = firstRowFocus,
+        onPick = {
+            applyTextSelection(controller.player, null)
+            scope.launch { prefs.setSubtitleLanguage("") }
+            onBack()
+        },
+    )
+
+    textTracks.forEach { track ->
+        TextTrackRow(
+            label = track.displayName,
+            selected = !textDisabled && track.selected,
+            focusRequester = null,
+            onPick = {
+                applyTextSelection(controller.player, track)
+                val lang = track.language
+                if (!lang.isNullOrBlank()) {
+                    scope.launch { prefs.setSubtitleLanguage(lang) }
+                }
+                onBack()
+            },
+        )
+    }
+
+    // External file — rebuild of the MediaItem is delegated to the Activity
+    // so it can own the ActivityResultLauncher (Compose can't register one
+    // without a LocalActivity). Dismiss the sheet so the picker UI has
+    // full focus; when it returns the subs apply silently.
+    TextTrackRow(
+        label = "Load external file…",
+        selected = false,
+        focusRequester = null,
+        onPick = { onPickExternal() },
+    )
+
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = "BACK to options",
+        color = YancoPalette.TextMuted,
+        fontSize = 10.sp,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+@Composable
+private fun TextTrackRow(
+    label: String,
+    selected: Boolean,
+    focusRequester: FocusRequester?,
+    onPick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val modifier =
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (focused) YancoPalette.BackgroundElevated else Color.Transparent)
+            .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null) { onPick() }
+            .semantics { contentDescription = label + if (selected) ", selected" else "" }
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = if (selected) "●" else "○",
+            color = if (selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(end = 12.dp),
+        )
+        Text(
+            text = label,
+            color = YancoPalette.TextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+private data class TextTrack(
+    val group: Tracks.Group,
+    val trackIndex: Int,
+    val language: String?,
+    val label: String?,
+    val displayName: String,
+    val selected: Boolean,
+)
+
+@UnstableApi
+@Composable
+private fun rememberTextTracks(player: Player): List<TextTrack> {
+    var tracks by remember { mutableStateOf(readTextTracks(player)) }
+    DisposableEffect(player) {
+        val listener =
+            object : Player.Listener {
+                override fun onTracksChanged(t: Tracks) {
+                    tracks = readTextTracks(player)
+                }
+            }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+    return tracks
+}
+
+@UnstableApi
+@Composable
+private fun rememberTextDisabled(player: Player): Boolean {
+    var disabled by remember { mutableStateOf(readTextDisabled(player)) }
+    DisposableEffect(player) {
+        val listener =
+            object : Player.Listener {
+                override fun onTrackSelectionParametersChanged(
+                    params: androidx.media3.common.TrackSelectionParameters,
+                ) {
+                    disabled = params.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+                }
+            }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+    return disabled
+}
+
+@UnstableApi
+private fun readTextDisabled(player: Player): Boolean =
+    player.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+
+@UnstableApi
+private fun readTextTracks(player: Player): List<TextTrack> {
+    val groups = player.currentTracks.groups
+    val out = mutableListOf<TextTrack>()
+    for (group in groups) {
+        if (group.type != C.TRACK_TYPE_TEXT) continue
+        for (i in 0 until group.length) {
+            if (!group.isTrackSupported(i)) continue
+            val fmt = group.getTrackFormat(i)
+            val lang = fmt.language?.takeIf { it.isNotBlank() && it != C.LANGUAGE_UNDETERMINED }
+            val label = fmt.label?.takeIf { it.isNotBlank() }
+            val langName = lang?.let { languageDisplayName(it) }
+            val base = label ?: langName ?: "Track ${out.size + 1}"
+            val suffix =
+                buildList {
+                    if (label != null && langName != null && langName != label) add(langName)
+                }.joinToString(" · ")
+            val displayName = if (suffix.isEmpty()) base else "$base  ·  $suffix"
+            out +=
+                TextTrack(
+                    group = group,
+                    trackIndex = i,
+                    language = lang,
+                    label = label,
+                    displayName = displayName,
+                    selected = group.isTrackSelected(i),
+                )
+        }
+    }
+    return out
+}
+
+@UnstableApi
+private fun applyTextSelection(
+    player: Player,
+    track: TextTrack?,
+) {
+    val params = player.trackSelectionParameters.buildUpon()
+    if (track == null) {
+        // Off — disable the text type AND clear any overrides so nothing
+        // re-enables on the next tracks-changed callback. The preferred-
+        // text-language pref is NOT cleared here; it's a persisted user
+        // intent ("when subs exist in <lang>, pick them") that shouldn't
+        // die just because the user disabled subs for one session.
+        params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+    } else {
+        params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        val lang = track.language
+        if (!lang.isNullOrBlank()) {
+            params.setPreferredTextLanguage(lang)
+            params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        } else {
+            params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            params.addOverride(
+                androidx.media3.common.TrackSelectionOverride(
+                    track.group.mediaTrackGroup,
+                    track.trackIndex,
+                ),
+            )
+        }
+    }
+    player.trackSelectionParameters = params.build()
 }
 
 /**

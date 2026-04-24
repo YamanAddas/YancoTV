@@ -2,6 +2,7 @@ package com.yancotv.android.player
 
 import android.content.Context
 import android.net.Uri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.TrackSelectionParameters
@@ -153,6 +154,12 @@ class PlaybackController(
     // column. Cleared on every non-episode load and on stop/release.
     private var _currentEpisode: Playable.Episode? = null
 
+    // MK.12a.3 — external subtitle side-loaded into the current MediaItem.
+    // Cleared whenever the item changes (zap, next/prev, stop) because the
+    // URI is per-title; holding it across zaps would layer the previous
+    // title's captions onto a new stream.
+    private var _externalSubtitle: Pair<Uri, String?>? = null
+
     val queue: StateFlow<List<ContentItem>> = _queue.asStateFlow()
     val index: StateFlow<Int> = _index.asStateFlow()
     val currentItem: StateFlow<ContentItem?> = _currentItem.asStateFlow()
@@ -193,6 +200,7 @@ class PlaybackController(
         // Different item: capture the outgoing offset before the queue swap.
         if (_currentItem.value != null) persistResumePoint()
         _currentEpisode = null
+        _externalSubtitle = null
         _queue.value = list
         _index.value = startIndex
         loadCurrent()
@@ -225,6 +233,7 @@ class PlaybackController(
         }
         if (_currentItem.value != null) persistResumePoint()
         _currentEpisode = episode
+        _externalSubtitle = null
         _queue.value = listOf(view)
         _index.value = 0
         loadCurrent()
@@ -261,6 +270,7 @@ class PlaybackController(
     fun stop() {
         persistResumePoint()
         _currentEpisode = null
+        _externalSubtitle = null
         _queue.value = emptyList()
         _index.value = -1
         _currentItem.value = null
@@ -271,6 +281,7 @@ class PlaybackController(
     fun release() {
         persistResumePoint()
         _currentEpisode = null
+        _externalSubtitle = null
         player.release()
         scope.cancel()
     }
@@ -283,27 +294,49 @@ class PlaybackController(
         // Persist before mutating _index so the snapshot still reads the
         // outgoing item.
         persistResumePoint()
+        _externalSubtitle = null
         _index.value = target
         loadCurrent()
         return true
     }
 
+    /**
+     * MK.12a.3 — side-load an external subtitle file into the current
+     * item and resume at the exact same offset. Rebuilding the [MediaItem]
+     * is the only way to register a subtitle URI with the media source, so
+     * we pay one buffer to do it. Live streams are rejected (subtitles for
+     * live IPTV aren't a real workflow and rebuilding them mid-zap is
+     * noisy).
+     *
+     * Per the native-android-mk rule, every transition that replaces a
+     * MediaItem must first persist the resume point — we do that before
+     * swapping, and seek back to [Player.getCurrentPosition] after so the
+     * user sees the same frame they were on.
+     */
+    fun applyExternalSubtitle(
+        uri: Uri,
+        mime: String?,
+    ) {
+        val item = _currentItem.value ?: return
+        if (item.type == ContentType.LIVE) return
+        val pos = player.currentPosition.coerceAtLeast(0L)
+        persistResumePoint()
+        _externalSubtitle = uri to mime
+        player.setMediaItem(buildMediaItem(item), pos)
+        player.prepare()
+        player.playWhenReady = true
+        // Ensure text tracks aren't still disabled from a previous "Off" pick.
+        player.trackSelectionParameters =
+            player.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .build()
+    }
+
     private fun loadCurrent() {
         val item = _queue.value.getOrNull(_index.value) ?: return
         _currentItem.value = item
-        val mediaItem =
-            MediaItem
-                .Builder()
-                .setUri(item.streamUrl)
-                .setMediaId(item.id)
-                .setMediaMetadata(
-                    MediaMetadata
-                        .Builder()
-                        .setTitle(item.cleanTitle?.ifBlank { null } ?: item.title)
-                        .setArtist(item.groupName)
-                        .setArtworkUri(item.logoUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
-                        .build(),
-                ).build()
+        val mediaItem = buildMediaItem(item)
         // MK.12a.4 — apply playback speed gated by content type. Live always
         // resets to 1.0× on a new MediaItem (a temporary speed-shift on live
         // is OK but it shouldn't survive channel zap); VOD / Episodes restore
@@ -334,6 +367,41 @@ class PlaybackController(
             player.prepare()
             player.playWhenReady = true
         }
+    }
+
+    /**
+     * Build the [MediaItem] for [item], layering in an external subtitle
+     * configuration when [_externalSubtitle] is set. Used by both
+     * [loadCurrent] (normal queue load) and [applyExternalSubtitle] (subtitle
+     * rebuild at current position), so side-loaded subs survive lifecycle
+     * re-creates that don't clear the external-sub state.
+     */
+    private fun buildMediaItem(item: ContentItem): MediaItem {
+        val builder =
+            MediaItem
+                .Builder()
+                .setUri(item.streamUrl)
+                .setMediaId(item.id)
+                .setMediaMetadata(
+                    MediaMetadata
+                        .Builder()
+                        .setTitle(item.cleanTitle?.ifBlank { null } ?: item.title)
+                        .setArtist(item.groupName)
+                        .setArtworkUri(item.logoUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+                        .build(),
+                )
+        _externalSubtitle?.let { (uri, mime) ->
+            val cfg =
+                MediaItem.SubtitleConfiguration
+                    .Builder(uri)
+                    .apply { if (!mime.isNullOrBlank()) setMimeType(mime) }
+                    .setLanguage("und")
+                    .setLabel(uri.lastPathSegment ?: "External")
+                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    .build()
+            builder.setSubtitleConfigurations(listOf(cfg))
+        }
+        return builder.build()
     }
 
     /**
