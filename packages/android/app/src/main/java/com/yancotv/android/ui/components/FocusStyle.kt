@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * Focus visual style — the one place in the app that decides how "this row
@@ -42,17 +42,17 @@ fun Modifier.focusStyle(
     radius: Dp,
     liftScale: Float = 1.035f,
     raised: Boolean = true,
-    unfocusedBorder: Color = YancoPalette.BorderSubtle,
-    focusedBorder: Color = YancoPalette.FocusRing,
+    unfocusedBorder: Color = LocalYancoPalette.current.BorderSubtle,
+    focusedBorder: Color = LocalYancoPalette.current.FocusRing,
     // Translucent unfocused surface so the cinematic hero / preview shows
     // through the rail and chip strip — TiviMate-style shell where the
     // container frames the video, it doesn't cover it.
-    unfocusedBg: Color = YancoPalette.BackgroundRaised.copy(alpha = 0.55f),
+    unfocusedBg: Color = LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.55f),
     // Focus state reads as a tinted accent wash rather than a neutral
     // slate fill so the selector is clearly "colored" at 10 ft. The alpha
     // lets the backdrop bleed through so the focused card still feels
     // part of the scene.
-    focusedBg: Color = YancoPalette.Accent.copy(alpha = 0.22f),
+    focusedBg: Color = LocalYancoPalette.current.Accent.copy(alpha = 0.22f),
 ): Modifier =
     this.focusStyle(
         focused = focused,
@@ -76,10 +76,10 @@ fun Modifier.focusStyle(
     shape: Shape,
     liftScale: Float = 1.035f,
     raised: Boolean = true,
-    unfocusedBorder: Color = YancoPalette.BorderSubtle,
-    focusedBorder: Color = YancoPalette.FocusRing,
-    unfocusedBg: Color = YancoPalette.BackgroundRaised.copy(alpha = 0.55f),
-    focusedBg: Color = YancoPalette.Accent.copy(alpha = 0.22f),
+    unfocusedBorder: Color = LocalYancoPalette.current.BorderSubtle,
+    focusedBorder: Color = LocalYancoPalette.current.FocusRing,
+    unfocusedBg: Color = LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.55f),
+    focusedBg: Color = LocalYancoPalette.current.Accent.copy(alpha = 0.22f),
 ): Modifier {
     val scale by animateFloatAsState(
         targetValue = if (focused) liftScale else 1f,
@@ -101,8 +101,8 @@ fun Modifier.focusStyle(
         .shadow(
             elevation = elevation,
             shape = shape,
-            ambientColor = YancoPalette.Accent,
-            spotColor = YancoPalette.Accent,
+            ambientColor = LocalYancoPalette.current.Accent,
+            spotColor = LocalYancoPalette.current.Accent,
         ).clip(shape)
         .background(if (focused) focusedBg else unfocusedBg)
         .border(borderWidth, if (focused) focusedBorder else unfocusedBorder, shape)

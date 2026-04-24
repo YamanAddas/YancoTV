@@ -53,7 +53,7 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.parental.ChannelActionsMenu
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
@@ -391,7 +391,7 @@ private fun GuideGrid(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep),
+                .background(LocalYancoPalette.current.BackgroundDeep),
     ) {
         TimeHeader(
             startTime = guide.startTime,
@@ -405,7 +405,7 @@ private fun GuideGrid(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(YancoPalette.BackgroundRaised)
+                        .background(LocalYancoPalette.current.BackgroundRaised)
                         .padding(horizontal = 24.dp, vertical = 4.dp),
             ) {
                 androidx.compose.material3.Text(
@@ -415,7 +415,7 @@ private fun GuideGrid(
                         } else {
                             "Showing ${guide.channels.size} of $totalCount channels"
                         },
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
                 )
             }
@@ -478,7 +478,7 @@ private fun TimeHeader(
             Modifier
                 .fillMaxWidth()
                 .height(HEADER_HEIGHT)
-                .background(YancoPalette.BackgroundRaised),
+                .background(LocalYancoPalette.current.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.width(CHANNEL_COL_WIDTH))
@@ -500,12 +500,12 @@ private fun TimeHeader(
                         Modifier
                             .width((slice * PX_PER_MIN).dp)
                             .fillMaxHeight()
-                            .border(0.5.dp, YancoPalette.BorderSubtle),
+                            .border(0.5.dp, LocalYancoPalette.current.BorderSubtle),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
                         text = label,
-                        color = YancoPalette.TextMuted,
+                        color = LocalYancoPalette.current.TextMuted,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(start = 6.dp),
@@ -533,7 +533,7 @@ private fun ChannelRow(
             Modifier
                 .fillMaxWidth()
                 .height(ROW_HEIGHT)
-                .background(YancoPalette.BackgroundRaised),
+                .background(LocalYancoPalette.current.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Sticky channel cell — stays visible even as the timeline scrolls.
@@ -583,8 +583,8 @@ private fun ChannelCell(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
 
     Row(
         modifier =
@@ -608,7 +608,7 @@ private fun ChannelCell(
                 Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(YancoPalette.BackgroundDeep),
+                    .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!channel.logoUrl.isNullOrBlank()) {
@@ -622,7 +622,7 @@ private fun ChannelCell(
         }
         Text(
             text = channel.name,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 13.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -638,8 +638,8 @@ private fun ProgrammeBlock(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundDeep
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundDeep
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
 
     Column(
         modifier =
@@ -657,7 +657,7 @@ private fun ProgrammeBlock(
     ) {
         Text(
             text = programme.title,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -665,7 +665,7 @@ private fun ProgrammeBlock(
         )
         Text(
             text = formatHourMinute(programme.startTime),
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 10.sp,
             maxLines = 1,
         )
@@ -678,10 +678,10 @@ private fun GuideEmptyState(
     modifier: Modifier,
 ) {
     Box(
-        modifier = modifier.fillMaxSize().background(YancoPalette.BackgroundDeep),
+        modifier = modifier.fillMaxSize().background(LocalYancoPalette.current.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, color = YancoPalette.TextMuted)
+        Text(text = text, color = LocalYancoPalette.current.TextMuted)
     }
 }
 
@@ -705,20 +705,20 @@ private fun ProgrammeActionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = YancoPalette.BackgroundRaised,
+        containerColor = LocalYancoPalette.current.BackgroundRaised,
         title = {
-            Text(text = programme.title, color = YancoPalette.TextPrimary)
+            Text(text = programme.title, color = LocalYancoPalette.current.TextPrimary)
         },
         text = {
             Column {
                 Text(
                     text = channel.name,
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 13.sp,
                 )
                 Text(
                     text = "${formatHourMinute(programme.startTime)} – ${formatHourMinute(programme.endTime)}",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
             }
@@ -731,11 +731,11 @@ private fun ProgrammeActionDialog(
             // user can still bail out to live playback.
             if (isPast && catchupItem != null) {
                 TextButton(onClick = { onPlayCatchup(catchupItem) }) {
-                    Text(text = "Play catch-up", color = YancoPalette.Accent)
+                    Text(text = "Play catch-up", color = LocalYancoPalette.current.Accent)
                 }
             } else {
                 TextButton(onClick = onWatch) {
-                    Text(text = "Watch channel", color = YancoPalette.Accent)
+                    Text(text = "Watch channel", color = LocalYancoPalette.current.Accent)
                 }
             }
         },
@@ -744,17 +744,17 @@ private fun ProgrammeActionDialog(
                 isFuture -> {
                     if (isReminderSet) {
                         TextButton(onClick = onCancelReminder) {
-                            Text(text = "Cancel reminder", color = YancoPalette.TextPrimary)
+                            Text(text = "Cancel reminder", color = LocalYancoPalette.current.TextPrimary)
                         }
                     } else {
                         TextButton(onClick = onSetReminder) {
-                            Text(text = "Set reminder", color = YancoPalette.TextPrimary)
+                            Text(text = "Set reminder", color = LocalYancoPalette.current.TextPrimary)
                         }
                     }
                 }
                 isPast && catchupItem != null -> {
                     TextButton(onClick = onWatch) {
-                        Text(text = "Watch channel", color = YancoPalette.TextPrimary)
+                        Text(text = "Watch channel", color = LocalYancoPalette.current.TextPrimary)
                     }
                 }
                 else -> Unit

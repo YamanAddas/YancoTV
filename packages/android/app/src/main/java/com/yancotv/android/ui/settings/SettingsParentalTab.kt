@@ -41,7 +41,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.parental.PinEntryDialog
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
@@ -104,13 +104,13 @@ fun SettingsParentalTab(
     ) {
         Text(
             text = "Parental controls",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "Protect sensitive content behind a numeric PIN. Set once, changed later from this screen.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
 
@@ -120,13 +120,13 @@ fun SettingsParentalTab(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(YancoPalette.BackgroundRaised)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
                     .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = if (settings.pinSet) "PIN — set" else "PIN — not set",
-                color = if (settings.pinSet) YancoPalette.Accent else YancoPalette.TextMuted,
+                color = if (settings.pinSet) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -160,7 +160,7 @@ fun SettingsParentalTab(
                                 status = "PIN saved"
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = YancoPalette.Accent),
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                     ) {
                         Text(if (awaitingNewPin) "Save new PIN" else "Set PIN")
                     }
@@ -172,28 +172,28 @@ fun SettingsParentalTab(
                                 confirmPin = ""
                                 status = null
                             },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.TextPrimary),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                         ) {
                             Text("Cancel")
                         }
                     }
                 }
                 if (newPin.isNotEmpty() && newPin.length !in 4..8) {
-                    Text("PIN must be 4–8 digits.", color = YancoPalette.Error, fontSize = 11.sp)
+                    Text("PIN must be 4–8 digits.", color = LocalYancoPalette.current.Error, fontSize = 11.sp)
                 } else if (newPin.isNotEmpty() && newPin != confirmPin) {
-                    Text("PIN entries don't match.", color = YancoPalette.Error, fontSize = 11.sp)
+                    Text("PIN entries don't match.", color = LocalYancoPalette.current.Error, fontSize = 11.sp)
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { showGate = GateAction.CHANGE },
-                        colors = ButtonDefaults.buttonColors(containerColor = YancoPalette.Accent),
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                     ) {
                         Text("Change PIN")
                     }
                     OutlinedButton(
                         onClick = { showGate = GateAction.REMOVE },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.TextPrimary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                     ) {
                         Text("Remove PIN")
                     }
@@ -201,7 +201,7 @@ fun SettingsParentalTab(
             }
 
             status?.let {
-                Text(text = it, color = YancoPalette.Accent, fontSize = 12.sp)
+                Text(text = it, color = LocalYancoPalette.current.Accent, fontSize = 12.sp)
             }
         }
 
@@ -227,14 +227,14 @@ fun SettingsParentalTab(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(YancoPalette.BackgroundRaised)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
                     .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Hidden channels",
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
@@ -246,7 +246,7 @@ fun SettingsParentalTab(
                             // remove doesn't ConcurrentModification the set.
                             hiddenIds.toList().forEach(repo::unhideChannel)
                         },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.TextPrimary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                     ) {
                         Text("Unhide all", fontSize = 12.sp)
                     }
@@ -259,7 +259,7 @@ fun SettingsParentalTab(
                     } else {
                         "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back."
                     },
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
             )
             if (hiddenItems.isNotEmpty()) {
@@ -330,17 +330,17 @@ private fun PinField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         textStyle =
             TextStyle(
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
             ),
         colors =
             OutlinedTextFieldDefaults.colors(
-                focusedTextColor = YancoPalette.TextPrimary,
-                unfocusedTextColor = YancoPalette.TextPrimary,
-                focusedBorderColor = YancoPalette.Accent,
-                unfocusedBorderColor = YancoPalette.BackgroundHover,
-                cursorColor = YancoPalette.Accent,
+                focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                focusedBorderColor = LocalYancoPalette.current.Accent,
+                unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                cursorColor = LocalYancoPalette.current.Accent,
             ),
         modifier = Modifier.fillMaxWidth(),
     )
@@ -359,7 +359,7 @@ private fun ToggleRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -367,14 +367,14 @@ private fun ToggleRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                color = if (enabled) YancoPalette.TextPrimary else YancoPalette.TextMuted,
+                color = if (enabled) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = description,
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 11.sp,
             )
         }
@@ -384,10 +384,10 @@ private fun ToggleRow(
             enabled = enabled,
             colors =
                 SwitchDefaults.colors(
-                    checkedThumbColor = YancoPalette.Accent,
-                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = YancoPalette.TextMuted,
-                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                    checkedThumbColor = LocalYancoPalette.current.Accent,
+                    checkedTrackColor = LocalYancoPalette.current.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = LocalYancoPalette.current.TextMuted,
+                    uncheckedTrackColor = LocalYancoPalette.current.BackgroundHover,
                 ),
         )
     }
@@ -403,7 +403,7 @@ private fun HiddenRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(6.dp))
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -411,17 +411,17 @@ private fun HiddenRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.cleanTitle?.ifBlank { null } ?: item.title,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 13.sp,
                 maxLines = 1,
             )
             item.groupName?.takeIf { it.isNotBlank() }?.let {
-                Text(text = it, color = YancoPalette.TextMuted, fontSize = 11.sp, maxLines = 1)
+                Text(text = it, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp, maxLines = 1)
             }
         }
         OutlinedButton(
             onClick = onUnhide,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.Accent),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.Accent),
         ) {
             Text("Unhide", fontSize = 11.sp)
         }

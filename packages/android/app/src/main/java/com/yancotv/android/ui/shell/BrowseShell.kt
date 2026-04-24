@@ -38,7 +38,7 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.Space
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
@@ -806,7 +806,7 @@ private fun BrowseEmptyState(
                     type == ContentType.MOVIE -> "No movies"
                     else -> "No series"
                 },
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.TitleL,
         )
         Text(
@@ -815,7 +815,7 @@ private fun BrowseEmptyState(
                     favoritesFilter -> "Star something from the hero and it'll land here."
                     else -> "Add a source in Settings → Sources to begin."
                 },
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Body,
         )
     }

@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * Layered hex-inspired surface. Every tile, chip, and button in the shell
@@ -57,20 +57,20 @@ fun HexSurface(
         Brush.verticalGradient(
             colors =
                 listOf(
-                    YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
-                    YancoPalette.BackgroundRaised.copy(alpha = 0.72f),
+                    LocalYancoPalette.current.BackgroundElevated.copy(alpha = 0.78f),
+                    LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.72f),
                 ),
         ),
     focusedShellGradient: Brush =
         Brush.verticalGradient(
             colors =
                 listOf(
-                    YancoPalette.Accent,
-                    YancoPalette.AccentDeep,
+                    LocalYancoPalette.current.Accent,
+                    LocalYancoPalette.current.AccentDeep,
                 ),
         ),
-    innerFill: Color = YancoPalette.BackgroundDeep.copy(alpha = 0.78f),
-    focusedInnerFill: Color = YancoPalette.Accent.copy(alpha = 0.14f),
+    innerFill: Color = LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.78f),
+    focusedInnerFill: Color = LocalYancoPalette.current.Accent.copy(alpha = 0.14f),
     liftScale: Float = 1.06f,
     liftDp: androidx.compose.ui.unit.Dp = 10.dp,
     raised: Boolean = true,
@@ -108,8 +108,8 @@ fun HexSurface(
                 }.shadow(
                     elevation = elevation,
                     shape = shape,
-                    ambientColor = if (focused) YancoPalette.Accent else Color.Black,
-                    spotColor = if (focused) YancoPalette.Accent else Color.Black,
+                    ambientColor = if (focused) LocalYancoPalette.current.Accent else Color.Black,
+                    spotColor = if (focused) LocalYancoPalette.current.Accent else Color.Black,
                 )
                 // Outer shell — the "frame". On focus it becomes a saturated
                 // emerald gradient ring; idle it's a subtle elevated surface.
@@ -117,7 +117,7 @@ fun HexSurface(
                 .background(if (focused) focusedShellGradient else shellGradient)
                 .border(
                     width = shellBorder,
-                    color = if (focused) YancoPalette.FocusRing else YancoPalette.PanelBorder,
+                    color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
                     shape = shape,
                 ).padding(bevelInset),
     ) {
@@ -130,7 +130,7 @@ fun HexSurface(
                     .background(if (focused) focusedInnerFill else innerFill)
                     .border(
                         width = 1.dp,
-                        color = if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else Color.Transparent,
+                        color = if (focused) LocalYancoPalette.current.Accent.copy(alpha = 0.55f) else Color.Transparent,
                         shape = shape,
                     ),
         ) {

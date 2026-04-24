@@ -39,7 +39,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.EpgSyncWorker
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.EpgStats
 import com.yancotv.shared.sources.SourceRepository
@@ -178,27 +178,27 @@ fun GuideSyncPanel(
             modifier =
                 modifier
                     .fillMaxWidth()
-                    .background(YancoPalette.BackgroundRaised)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
                     .padding(horizontal = 24.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "$programmes programmes · $channels channels",
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = busyLabel ?: subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
-                    color = if (displayError != null && !running) YancoPalette.Error else YancoPalette.TextMuted,
+                    color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
                 )
             }
             if (running || syncing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = YancoPalette.Accent,
+                    color = LocalYancoPalette.current.Accent,
                     strokeWidth = 2.dp,
                 )
                 Spacer(modifier = Modifier.width(12.dp))
@@ -206,7 +206,7 @@ fun GuideSyncPanel(
             OutlinedButton(
                 onClick = { doRefreshEpg() },
                 enabled = !running && !syncing,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.Accent),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.Accent),
             ) {
                 Text("Refresh EPG", fontSize = 12.sp)
             }
@@ -218,7 +218,7 @@ fun GuideSyncPanel(
         modifier =
             modifier
                 .fillMaxWidth()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .padding(32.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -226,36 +226,36 @@ fun GuideSyncPanel(
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(YancoPalette.BackgroundRaised)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
                     .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = if (programmes == 0L) "No guide data yet" else "Guide diagnostics",
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
-                color = if (displayError != null && !running) YancoPalette.Error else YancoPalette.TextMuted,
+                color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                 fontSize = 13.sp,
             )
             if (busyLabel != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
-                        color = YancoPalette.Accent,
+                        color = LocalYancoPalette.current.Accent,
                         strokeWidth = 2.dp,
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(busyLabel, color = YancoPalette.TextPrimary, fontSize = 13.sp)
+                    Text(busyLabel, color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp)
                 }
             }
             if (activeSources.isEmpty()) {
                 Text(
                     text = "Add a source in Settings → Sources to get started.",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
             } else {
@@ -270,7 +270,7 @@ fun GuideSyncPanel(
                                     append(if (hasEpg) "EPG URL set" else "no EPG URL")
                                     if (!err.isNullOrBlank()) append("  ·  err: $err")
                                 },
-                            color = if (!err.isNullOrBlank() || !hasEpg) YancoPalette.Error else YancoPalette.TextMuted,
+                            color = if (!err.isNullOrBlank() || !hasEpg) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                             fontSize = 12.sp,
                         )
                     }
@@ -281,14 +281,14 @@ fun GuideSyncPanel(
                 Button(
                     onClick = { doRefreshEpg() },
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = YancoPalette.Accent),
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text("Refresh EPG now")
                 }
                 OutlinedButton(
                     onClick = { doResyncSources() },
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = YancoPalette.TextPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
                     Text("Re-sync sources")
                 }
@@ -296,7 +296,7 @@ fun GuideSyncPanel(
             if (brokenSources.isNotEmpty() && !running && !syncing) {
                 Text(
                     text = "${brokenSources.size} source(s) last failed. Re-sync them to retry.",
-                    color = YancoPalette.Error,
+                    color = LocalYancoPalette.current.Error,
                     fontSize = 11.sp,
                 )
             }
@@ -304,13 +304,13 @@ fun GuideSyncPanel(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "ADD / OVERRIDE EPG URL",
-                color = YancoPalette.Accent,
+                color = LocalYancoPalette.current.Accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = "Paste an XMLTV URL to load EPG from. Used in addition to per-source URLs — useful when a provider's feed is broken or you want a better schedule.",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 11.sp,
             )
             Row(
@@ -325,16 +325,16 @@ fun GuideSyncPanel(
                     placeholder = { Text("https://example.com/xmltv.xml", fontSize = 12.sp) },
                     textStyle =
                         androidx.compose.ui.text.TextStyle(
-                            color = YancoPalette.TextPrimary,
+                            color = LocalYancoPalette.current.TextPrimary,
                             fontSize = 13.sp,
                         ),
                     colors =
                         OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = YancoPalette.TextPrimary,
-                            unfocusedTextColor = YancoPalette.TextPrimary,
-                            focusedBorderColor = YancoPalette.Accent,
-                            unfocusedBorderColor = YancoPalette.BackgroundHover,
-                            cursorColor = YancoPalette.Accent,
+                            focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                            unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                            focusedBorderColor = LocalYancoPalette.current.Accent,
+                            unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                            cursorColor = LocalYancoPalette.current.Accent,
                         ),
                 )
                 Button(
@@ -356,7 +356,7 @@ fun GuideSyncPanel(
                         }
                     },
                     enabled = globalUrlDraft.trim() != (savedGlobalUrl ?: ""),
-                    colors = ButtonDefaults.buttonColors(containerColor = YancoPalette.Accent),
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text(if (globalUrlDraft.isBlank() && savedGlobalUrl != null) "Clear" else "Save")
                 }
@@ -364,7 +364,7 @@ fun GuideSyncPanel(
             if (savedGlobalUrl != null) {
                 Text(
                     text = "Current: $savedGlobalUrl",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
                 )
             }

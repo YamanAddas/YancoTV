@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
@@ -79,13 +79,13 @@ fun SettingsGroupsTab(
     ) {
         Text(
             text = "Groups",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "Hide categories you never watch — keeps the channel sidebar short. Changes take effect immediately.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -119,7 +119,7 @@ fun SettingsGroupsTab(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = "No groups found for ${typeChipLabel(selectedType).lowercase()}. Sync a source first.",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
             }
@@ -152,7 +152,7 @@ private fun GroupRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .clickable { onToggle(!hidden) }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -160,14 +160,14 @@ private fun GroupRow(
     ) {
         Text(
             text = name,
-            color = if (hidden) YancoPalette.TextMuted else YancoPalette.TextPrimary,
+            color = if (hidden) LocalYancoPalette.current.TextMuted else LocalYancoPalette.current.TextPrimary,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
         Text(
             text = if (hidden) "Hidden" else "Visible",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 11.sp,
         )
         Switch(
@@ -175,10 +175,10 @@ private fun GroupRow(
             onCheckedChange = { checked -> onToggle(!checked) },
             colors =
                 SwitchDefaults.colors(
-                    checkedThumbColor = YancoPalette.Accent,
-                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = YancoPalette.TextMuted,
-                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                    checkedThumbColor = LocalYancoPalette.current.Accent,
+                    checkedTrackColor = LocalYancoPalette.current.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = LocalYancoPalette.current.TextMuted,
+                    uncheckedTrackColor = LocalYancoPalette.current.BackgroundHover,
                 ),
         )
     }
@@ -190,8 +190,8 @@ private fun TypeChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bg = if (selected) YancoPalette.Accent.copy(alpha = 0.22f) else YancoPalette.BackgroundDeep
-    val fg = if (selected) YancoPalette.TextPrimary else YancoPalette.TextMuted
+    val bg = if (selected) LocalYancoPalette.current.Accent.copy(alpha = 0.22f) else LocalYancoPalette.current.BackgroundDeep
+    val fg = if (selected) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted
     Row(
         modifier =
             Modifier

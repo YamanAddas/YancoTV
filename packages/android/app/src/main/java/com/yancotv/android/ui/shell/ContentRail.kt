@@ -55,7 +55,7 @@ import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.types.ContentItem
@@ -256,7 +256,7 @@ private fun LiveCard(
                 ) {
                     Text(
                         text = displayTitle,
-                        color = YancoPalette.TextPrimary,
+                        color = LocalYancoPalette.current.TextPrimary,
                         style = YancoType.TitleS,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -264,7 +264,7 @@ private fun LiveCard(
                     if (nowProg != null) {
                         Text(
                             text = nowProg.title,
-                            color = YancoPalette.TextSecondary,
+                            color = LocalYancoPalette.current.TextSecondary,
                             style = YancoType.Caption,
                             maxLines = 1,
                             modifier = Modifier.padding(top = Space.xxs),
@@ -272,7 +272,7 @@ private fun LiveCard(
                         nextProg?.let { next ->
                             Text(
                                 text = "Next · ${next.title}",
-                                color = YancoPalette.TextMuted,
+                                color = LocalYancoPalette.current.TextMuted,
                                 style = YancoType.Overline,
                                 maxLines = 1,
                                 modifier = Modifier.padding(top = Space.xxs),
@@ -282,7 +282,7 @@ private fun LiveCard(
                         item.groupName?.takeIf { it.isNotBlank() }?.let {
                             Text(
                                 text = it,
-                                color = YancoPalette.TextMuted,
+                                color = LocalYancoPalette.current.TextMuted,
                                 style = YancoType.Caption,
                                 maxLines = 1,
                                 modifier = Modifier.padding(top = Space.xxs),
@@ -301,16 +301,16 @@ private fun LiveCard(
                             .align(Alignment.TopEnd)
                             .padding(top = 10.dp, end = 14.dp)
                             .clip(YancoShapes.ChipBevel)
-                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
+                            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.72f))
                             .border(
                                 1.dp,
-                                YancoPalette.Accent.copy(alpha = 0.35f),
+                                LocalYancoPalette.current.Accent.copy(alpha = 0.35f),
                                 YancoShapes.ChipBevel,
                             ).padding(horizontal = Space.sm, vertical = 2.dp),
                 ) {
                     Text(
                         text = timeLeftLabel,
-                        color = YancoPalette.Accent,
+                        color = LocalYancoPalette.current.Accent,
                         style = YancoType.Overline,
                     )
                 }
@@ -342,6 +342,10 @@ private fun LogoDisc(
     val ringStroke = 2.5.dp
     val discShape = RoundedCornerShape(16.dp)
 
+    // Hoist palette reads out of the DrawScope lambda — `Canvas { }`
+    // is not composable (MK.16.1).
+    val trackColor = LocalYancoPalette.current.BorderSubtle
+    val fillColor = LocalYancoPalette.current.Accent
     Box(
         modifier = Modifier.size(totalSize),
         contentAlignment = Alignment.Center,
@@ -355,7 +359,7 @@ private fun LogoDisc(
             val arcTopLeft = Offset(strokePx / 2f, strokePx / 2f)
             val arcSize = Size(size.width - strokePx, size.height - strokePx)
             drawArc(
-                color = YancoPalette.BorderSubtle,
+                color = trackColor,
                 startAngle = -90f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -365,7 +369,7 @@ private fun LogoDisc(
             )
             if (progress != null && progress > 0f) {
                 drawArc(
-                    color = YancoPalette.Accent,
+                    color = fillColor,
                     startAngle = -90f,
                     sweepAngle = 360f * progress,
                     useCenter = false,
@@ -383,10 +387,10 @@ private fun LogoDisc(
                     .size(discSize)
                     .clip(discShape)
                     .background(
-                        if (focused) YancoPalette.BackgroundElevated else YancoPalette.BackgroundDeep,
+                        if (focused) LocalYancoPalette.current.BackgroundElevated else LocalYancoPalette.current.BackgroundDeep,
                     ).border(
                         1.dp,
-                        if (focused) YancoPalette.Accent.copy(alpha = 0.55f) else YancoPalette.PanelBorder,
+                        if (focused) LocalYancoPalette.current.Accent.copy(alpha = 0.55f) else LocalYancoPalette.current.PanelBorder,
                         discShape,
                     ),
             contentAlignment = Alignment.Center,
@@ -401,7 +405,7 @@ private fun LogoDisc(
             } else {
                 Text(
                     text = "Y",
-                    color = YancoPalette.Accent.copy(alpha = 0.7f),
+                    color = LocalYancoPalette.current.Accent.copy(alpha = 0.7f),
                     style = YancoType.DisplayS,
                     fontWeight = FontWeight.Black,
                 )
@@ -418,8 +422,8 @@ private fun LogoDisc(
                     .offset(y = (-1).dp)
                     .size(12.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(YancoPalette.BackgroundDeep)
-                    .border(1.dp, YancoPalette.Accent, RoundedCornerShape(50)),
+                    .background(LocalYancoPalette.current.BackgroundDeep)
+                    .border(1.dp, LocalYancoPalette.current.Accent, RoundedCornerShape(50)),
             contentAlignment = Alignment.Center,
         ) {
             Box(
@@ -438,10 +442,10 @@ private fun LogoDisc(
                         .align(Alignment.BottomEnd)
                         .size(20.dp)
                         .clip(RoundedCornerShape(Radius.pill))
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.92f))
+                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f))
                         .border(
                             1.dp,
-                            YancoPalette.Accent.copy(alpha = 0.55f),
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.55f),
                             RoundedCornerShape(Radius.pill),
                         ),
                 contentAlignment = Alignment.Center,
@@ -449,7 +453,7 @@ private fun LogoDisc(
                 Icon(
                     imageVector = YancoIcons.Lock,
                     contentDescription = "Locked",
-                    tint = YancoPalette.Accent,
+                    tint = LocalYancoPalette.current.Accent,
                     modifier = Modifier.size(11.dp),
                 )
             }
@@ -525,8 +529,8 @@ private fun PosterCard(
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
-                                            YancoPalette.BackgroundHover,
-                                            YancoPalette.BackgroundElevated,
+                                            LocalYancoPalette.current.BackgroundHover,
+                                            LocalYancoPalette.current.BackgroundElevated,
                                         ),
                                     ),
                                 ),
@@ -534,7 +538,7 @@ private fun PosterCard(
                     ) {
                         Text(
                             text = title.take(2).uppercase(),
-                            color = if (focused) YancoPalette.Accent else YancoPalette.TextSecondary,
+                            color = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextSecondary,
                             style = YancoType.DisplayS,
                             fontWeight = FontWeight.Black,
                         )
@@ -549,7 +553,7 @@ private fun PosterCard(
                                 Brush.verticalGradient(
                                     0f to Color.Transparent,
                                     0.55f to Color.Transparent,
-                                    1f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                                    1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
                                 ),
                             ),
                 )
@@ -561,13 +565,13 @@ private fun PosterCard(
                                 .padding(Space.sm)
                                 .size(22.dp)
                                 .clip(RoundedCornerShape(Radius.pill))
-                                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f)),
+                                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = YancoIcons.Lock,
                             contentDescription = "Locked",
-                            tint = YancoPalette.Accent,
+                            tint = LocalYancoPalette.current.Accent,
                             modifier = Modifier.size(12.dp),
                         )
                     }
@@ -578,13 +582,13 @@ private fun PosterCard(
                             .align(Alignment.TopEnd)
                             .padding(Space.sm)
                             .clip(YancoShapes.ChipBevel)
-                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
-                            .border(1.dp, YancoPalette.Accent.copy(alpha = 0.35f), YancoShapes.ChipBevel)
+                            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.72f))
+                            .border(1.dp, LocalYancoPalette.current.Accent.copy(alpha = 0.35f), YancoShapes.ChipBevel)
                             .padding(horizontal = Space.sm, vertical = 2.dp),
                 ) {
                     Text(
                         text = if (item.type == ContentType.MOVIE) "MOVIE" else "SERIES",
-                        color = YancoPalette.Accent,
+                        color = LocalYancoPalette.current.Accent,
                         style = YancoType.Overline,
                     )
                 }
@@ -595,12 +599,12 @@ private fun PosterCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
                         .padding(horizontal = Space.md, vertical = Space.sm),
             ) {
                 Text(
                     text = title,
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
                 )

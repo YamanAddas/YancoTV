@@ -52,7 +52,7 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.types.ContentItem
@@ -135,7 +135,7 @@ fun SearchScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -200,7 +200,7 @@ private fun SearchField(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     val fieldAnchor = rememberPlacedFocusAnchor()
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -215,7 +215,7 @@ private fun SearchField(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .border(1.dp, border, RoundedCornerShape(8.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
@@ -223,8 +223,8 @@ private fun SearchField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 16.sp),
-            cursorBrush = SolidColor(YancoPalette.Accent),
+            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 16.sp),
+            cursorBrush = SolidColor(LocalYancoPalette.current.Accent),
             interactionSource = interaction,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             // Search IME button just hides the keyboard — the LaunchedEffect
@@ -240,7 +240,7 @@ private fun SearchField(
                 if (value.isEmpty()) {
                     Text(
                         text = "Search channels, movies, series…",
-                        color = YancoPalette.TextMuted,
+                        color = LocalYancoPalette.current.TextMuted,
                     )
                 }
                 inner()
@@ -262,8 +262,8 @@ private fun EmptyState(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = title, color = YancoPalette.TextPrimary)
-            Text(text = subtitle, color = YancoPalette.TextMuted)
+            Text(text = title, color = LocalYancoPalette.current.TextPrimary)
+            Text(text = subtitle, color = LocalYancoPalette.current.TextMuted)
         }
     }
 }
@@ -275,8 +275,8 @@ private fun SearchRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     val badges = remember(item.id) { QualityBadge.parse(item.title) }
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
@@ -299,7 +299,7 @@ private fun SearchRow(
                 Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(YancoPalette.BackgroundDeep),
+                    .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
@@ -317,7 +317,7 @@ private fun SearchRow(
         ) {
             Text(
                 text = displayTitle,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -325,11 +325,11 @@ private fun SearchRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(text = typeLabel(item.type), color = YancoPalette.Accent)
+                Text(text = typeLabel(item.type), color = LocalYancoPalette.current.Accent)
                 item.groupName?.let {
                     Text(
                         text = it,
-                        color = YancoPalette.TextMuted,
+                        color = LocalYancoPalette.current.TextMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

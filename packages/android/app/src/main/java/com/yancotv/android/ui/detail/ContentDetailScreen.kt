@@ -55,7 +55,7 @@ import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.favorites.FavoritesRepository
@@ -142,7 +142,7 @@ fun ContentDetailScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .focusGroup(),
     ) {
         Spacer(Modifier.size(0.dp).focusRequester(trapFocus).focusable())
@@ -219,7 +219,7 @@ fun ContentDetailScreen(
                         ) {
                             Text(
                                 text = "No episodes available.",
-                                color = YancoPalette.TextMuted,
+                                color = LocalYancoPalette.current.TextMuted,
                                 style = YancoType.Body,
                             )
                         }
@@ -305,20 +305,20 @@ private fun HeroBlock(
                     if (!item.groupName.isNullOrBlank()) {
                         Text(
                             text = item.groupName!!.uppercase(),
-                            color = YancoPalette.Accent,
+                            color = LocalYancoPalette.current.Accent,
                             style = YancoType.Overline,
                         )
                     }
                     Text(
                         text = item.cleanTitle?.ifBlank { null } ?: item.title,
-                        color = YancoPalette.TextPrimary,
+                        color = LocalYancoPalette.current.TextPrimary,
                         style = YancoType.DisplayCinematic,
                         maxLines = 2,
                     )
                     metadata.tagline?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
-                            color = YancoPalette.AccentGlow,
+                            color = LocalYancoPalette.current.AccentGlow,
                             style = YancoType.BodyLong,
                         )
                     }
@@ -326,7 +326,7 @@ private fun HeroBlock(
                     metadata.plot?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             text = it,
-                            color = YancoPalette.TextSecondary,
+                            color = LocalYancoPalette.current.TextSecondary,
                             style = YancoType.BodyLong,
                             maxLines = 4,
                         )
@@ -377,7 +377,7 @@ private fun BackdropHero(url: String?) {
             Modifier
                 .fillMaxWidth()
                 .height(ShellDim.heroHeight)
-                .background(YancoPalette.BackgroundRaised),
+                .background(LocalYancoPalette.current.BackgroundRaised),
     ) {
         if (!url.isNullOrBlank()) {
             AsyncImage(
@@ -398,8 +398,8 @@ private fun BackdropHero(url: String?) {
                         Brush.horizontalGradient(
                             colors =
                                 listOf(
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.85f),
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.3f),
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f),
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.3f),
                                     Color.Transparent,
                                 ),
                         ),
@@ -414,8 +414,8 @@ private fun BackdropHero(url: String?) {
                             colors =
                                 listOf(
                                     Color.Transparent,
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.6f),
-                                    YancoPalette.BackgroundDeep,
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f),
+                                    LocalYancoPalette.current.BackgroundDeep,
                                 ),
                         ),
                     ),
@@ -431,8 +431,8 @@ private fun Poster(url: String?) {
                 .width(ShellDim.detailPosterWidth)
                 .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(Radius.panel))
-                .background(YancoPalette.BackgroundRaised)
-                .border(1.dp, YancoPalette.PanelBorder, RoundedCornerShape(Radius.panel)),
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, RoundedCornerShape(Radius.panel)),
         contentAlignment = Alignment.Center,
     ) {
         if (!url.isNullOrBlank()) {
@@ -445,7 +445,7 @@ private fun Poster(url: String?) {
         } else {
             Text(
                 text = "No artwork",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
             )
         }
@@ -478,12 +478,12 @@ private fun MetaLine(
                         Modifier
                             .size(3.dp)
                             .clip(RoundedCornerShape(Radius.pill))
-                            .background(YancoPalette.TextFaint),
+                            .background(LocalYancoPalette.current.TextFaint),
                 )
             }
             Text(
                 text = text,
-                color = YancoPalette.TextSecondary,
+                color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.CaptionStrong,
             )
         }
@@ -498,13 +498,13 @@ private fun CreditRow(
     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
         Text(
             text = label.uppercase(),
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Overline,
             modifier = Modifier.width(72.dp),
         )
         Text(
             text = value,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.Body,
         )
     }
@@ -551,7 +551,7 @@ private fun PrimaryButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent
+    val bg = if (focused) LocalYancoPalette.current.AccentGlow else LocalYancoPalette.current.Accent
     Row(
         modifier =
             Modifier
@@ -567,12 +567,12 @@ private fun PrimaryButton(
         Icon(
             imageVector = YancoIcons.Play,
             contentDescription = null,
-            tint = YancoPalette.BackgroundDeep,
+            tint = LocalYancoPalette.current.BackgroundDeep,
             modifier = Modifier.size(14.dp),
         )
         Text(
             text = label,
-            color = YancoPalette.BackgroundDeep,
+            color = LocalYancoPalette.current.BackgroundDeep,
             style = YancoType.LabelStrong,
         )
     }
@@ -589,21 +589,21 @@ private fun SecondaryButton(
     val focused by interaction.collectIsFocusedAsState()
     val bg =
         when {
-            focused -> YancoPalette.BackgroundHover
-            accent -> YancoPalette.Accent.copy(alpha = 0.18f)
+            focused -> LocalYancoPalette.current.BackgroundHover
+            accent -> LocalYancoPalette.current.Accent.copy(alpha = 0.18f)
             else -> Color.Transparent
         }
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            accent -> YancoPalette.Accent.copy(alpha = 0.5f)
-            else -> YancoPalette.PanelBorder
+            focused -> LocalYancoPalette.current.FocusRing
+            accent -> LocalYancoPalette.current.Accent.copy(alpha = 0.5f)
+            else -> LocalYancoPalette.current.PanelBorder
         }
     val textColor =
         when {
-            accent -> YancoPalette.Accent
-            focused -> YancoPalette.TextPrimary
-            else -> YancoPalette.TextSecondary
+            accent -> LocalYancoPalette.current.Accent
+            focused -> LocalYancoPalette.current.TextPrimary
+            else -> LocalYancoPalette.current.TextSecondary
         }
     Row(
         modifier =
@@ -648,19 +648,19 @@ private fun EpisodesSectionHeader(
     ) {
         Text(
             text = "EPISODES",
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
         if (loading && episodeCount == 0) {
             CircularProgressIndicator(
-                color = YancoPalette.Accent,
+                color = LocalYancoPalette.current.Accent,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(14.dp),
             )
         } else {
             Text(
                 text = "$episodeCount total",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
             )
         }
@@ -678,15 +678,15 @@ private fun SeasonChip(
     val focused by interaction.collectIsFocusedAsState()
     val bg =
         when {
-            focused -> YancoPalette.BackgroundHover
-            selected -> YancoPalette.Accent.copy(alpha = 0.22f)
-            else -> YancoPalette.BackgroundRaised
+            focused -> LocalYancoPalette.current.BackgroundHover
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+            else -> LocalYancoPalette.current.BackgroundRaised
         }
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            selected -> YancoPalette.Accent.copy(alpha = 0.5f)
-            else -> YancoPalette.PanelBorder
+            focused -> LocalYancoPalette.current.FocusRing
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.5f)
+            else -> LocalYancoPalette.current.PanelBorder
         }
     Row(
         modifier =
@@ -702,19 +702,19 @@ private fun SeasonChip(
     ) {
         Text(
             text = label,
-            color = if (selected || focused) YancoPalette.Accent else YancoPalette.TextPrimary,
+            color = if (selected || focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextPrimary,
             style = YancoType.Label,
         )
         Box(
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(Radius.pill))
-                    .background(YancoPalette.BackgroundDeep.copy(alpha = 0.5f))
+                    .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.5f))
                     .padding(horizontal = Space.sm, vertical = 2.dp),
         ) {
             Text(
                 text = count.toString(),
-                color = YancoPalette.TextSecondary,
+                color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.Caption,
             )
         }
@@ -746,16 +746,16 @@ private fun EpisodeRow(
                     .clip(RoundedCornerShape(Radius.chip))
                     .background(
                         if (focused) {
-                            YancoPalette.Accent.copy(alpha = 0.22f)
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
                         } else {
-                            YancoPalette.BackgroundElevated
+                            LocalYancoPalette.current.BackgroundElevated
                         },
                     ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "E%02d".format(ep.episodeNumber),
-                color = YancoPalette.Accent,
+                color = LocalYancoPalette.current.Accent,
                 style = YancoType.LabelStrong,
             )
         }
@@ -765,7 +765,7 @@ private fun EpisodeRow(
         ) {
             Text(
                 text = ep.title.takeIf { it.isNotBlank() } ?: "Episode ${ep.episodeNumber}",
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleS,
                 maxLines = 1,
             )
@@ -775,18 +775,18 @@ private fun EpisodeRow(
             ) {
                 Text(
                     text = "Season ${ep.seasonNumber}",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                 )
                 ep.duration?.takeIf { it.isNotBlank() }?.let {
                     Text(
                         text = "\u00b7",
-                        color = YancoPalette.TextFaint,
+                        color = LocalYancoPalette.current.TextFaint,
                         style = YancoType.Caption,
                     )
                     Text(
                         text = it,
-                        color = YancoPalette.TextMuted,
+                        color = LocalYancoPalette.current.TextMuted,
                         style = YancoType.Caption,
                     )
                 }
@@ -795,7 +795,7 @@ private fun EpisodeRow(
         Icon(
             imageVector = YancoIcons.Play,
             contentDescription = null,
-            tint = if (focused) YancoPalette.Accent else YancoPalette.TextFaint,
+            tint = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextFaint,
             modifier = Modifier.size(16.dp),
         )
     }

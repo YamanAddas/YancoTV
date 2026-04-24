@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.OpenOn
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -56,7 +56,7 @@ fun SettingsGeneralTab(
     ) {
         Text(
             text = "General",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -66,19 +66,19 @@ fun SettingsGeneralTab(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(YancoPalette.BackgroundRaised)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
                     .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = "Open app on",
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = "Which section greets you when you launch YancoTV.",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 11.sp,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -120,7 +120,7 @@ private fun ToggleRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -128,14 +128,14 @@ private fun ToggleRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = body,
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 11.sp,
             )
         }
@@ -144,10 +144,10 @@ private fun ToggleRow(
             onCheckedChange = onChange,
             colors =
                 SwitchDefaults.colors(
-                    checkedThumbColor = YancoPalette.Accent,
-                    checkedTrackColor = YancoPalette.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = YancoPalette.TextMuted,
-                    uncheckedTrackColor = YancoPalette.BackgroundHover,
+                    checkedThumbColor = LocalYancoPalette.current.Accent,
+                    checkedTrackColor = LocalYancoPalette.current.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = LocalYancoPalette.current.TextMuted,
+                    uncheckedTrackColor = LocalYancoPalette.current.BackgroundHover,
                 ),
         )
     }
@@ -159,8 +159,8 @@ private fun Chip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bg = if (selected) YancoPalette.Accent.copy(alpha = 0.22f) else YancoPalette.BackgroundDeep
-    val fg = if (selected) YancoPalette.TextPrimary else YancoPalette.TextMuted
+    val bg = if (selected) LocalYancoPalette.current.Accent.copy(alpha = 0.22f) else LocalYancoPalette.current.BackgroundDeep
+    val fg = if (selected) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted
     Row(
         modifier =
             Modifier

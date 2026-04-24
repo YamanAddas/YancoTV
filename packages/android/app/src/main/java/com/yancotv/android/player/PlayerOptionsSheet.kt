@@ -42,7 +42,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -97,7 +97,7 @@ fun PlayerOptionsSheet(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                    .background(YancoPalette.BackgroundRaised)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
                     // Swallow scrim-level clicks when they originate inside the sheet.
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -183,7 +183,7 @@ private fun OptionsView(
 
     Text(
         text = "PLAYER OPTIONS",
-        color = YancoPalette.Accent,
+        color = LocalYancoPalette.current.Accent,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 2.sp,
@@ -227,7 +227,7 @@ private fun OptionsView(
     Spacer(Modifier.height(6.dp))
     Text(
         text = "BACK to close",
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         fontSize = 10.sp,
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
@@ -253,7 +253,7 @@ private fun AudioView(
 
     Text(
         text = "AUDIO TRACK",
-        color = YancoPalette.Accent,
+        color = LocalYancoPalette.current.Accent,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 2.sp,
@@ -262,7 +262,7 @@ private fun AudioView(
     if (audioTracks.isEmpty()) {
         Text(
             text = "No audio tracks reported yet. Try again once playback starts.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 13.sp,
             modifier = Modifier.padding(vertical = 8.dp),
         )
@@ -287,7 +287,7 @@ private fun AudioView(
     Spacer(Modifier.height(6.dp))
     Text(
         text = "BACK to options",
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         fontSize = 10.sp,
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
@@ -330,7 +330,7 @@ private fun SubtitlesView(
 
     Text(
         text = "SUBTITLES",
-        color = YancoPalette.Accent,
+        color = LocalYancoPalette.current.Accent,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 2.sp,
@@ -381,7 +381,7 @@ private fun SubtitlesView(
     Spacer(Modifier.height(6.dp))
     Text(
         text = "BACK to options",
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         fontSize = 10.sp,
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
@@ -401,7 +401,7 @@ private fun TextTrackRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) YancoPalette.BackgroundElevated else Color.Transparent)
+            .background(if (focused) LocalYancoPalette.current.BackgroundElevated else Color.Transparent)
             .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null) { onPick() }
@@ -410,13 +410,13 @@ private fun TextTrackRow(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = if (selected) "●" else "○",
-            color = if (selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            color = if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
             fontSize = 14.sp,
             modifier = Modifier.padding(end = 12.dp),
         )
         Text(
             text = label,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -583,7 +583,7 @@ private fun SpeedView(
 
     Text(
         text = "PLAYBACK SPEED",
-        color = YancoPalette.Accent,
+        color = LocalYancoPalette.current.Accent,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 2.sp,
@@ -610,7 +610,7 @@ private fun SpeedView(
     Spacer(Modifier.height(6.dp))
     Text(
         text = "BACK to options",
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         fontSize = 10.sp,
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
@@ -631,7 +631,7 @@ private fun SpeedRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) YancoPalette.BackgroundElevated else Color.Transparent)
+            .background(if (focused) LocalYancoPalette.current.BackgroundElevated else Color.Transparent)
             .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null) { onPick() }
@@ -640,13 +640,13 @@ private fun SpeedRow(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = if (selected) "●" else "○",
-            color = if (selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            color = if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
             fontSize = 14.sp,
             modifier = Modifier.padding(end = 12.dp),
         )
         Text(
             text = label,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -684,7 +684,7 @@ private fun AspectView(
 
     Text(
         text = "ASPECT RATIO",
-        color = YancoPalette.Accent,
+        color = LocalYancoPalette.current.Accent,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 2.sp,
@@ -707,7 +707,7 @@ private fun AspectView(
     Spacer(Modifier.height(6.dp))
     Text(
         text = "BACK to options",
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         fontSize = 10.sp,
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp),
@@ -727,7 +727,7 @@ private fun AspectRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) YancoPalette.BackgroundElevated else Color.Transparent)
+            .background(if (focused) LocalYancoPalette.current.BackgroundElevated else Color.Transparent)
             .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null) { onPick() }
@@ -736,13 +736,13 @@ private fun AspectRow(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = if (selected) "●" else "○",
-            color = if (selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            color = if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
             fontSize = 14.sp,
             modifier = Modifier.padding(end = 12.dp),
         )
         Text(
             text = mode.displayName,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -861,7 +861,7 @@ private fun AudioTrackRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (focused) YancoPalette.BackgroundElevated else Color.Transparent,
+                if (focused) LocalYancoPalette.current.BackgroundElevated else Color.Transparent,
             ).let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null) { onPick() }
@@ -870,13 +870,13 @@ private fun AudioTrackRow(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = if (track.selected) "●" else "○",
-            color = if (track.selected) YancoPalette.Accent else YancoPalette.TextMuted,
+            color = if (track.selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
             fontSize = 14.sp,
             modifier = Modifier.padding(end = 12.dp),
         )
         Text(
             text = track.displayName,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -898,7 +898,7 @@ private fun OptionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (focused) YancoPalette.BackgroundElevated else Color.Transparent,
+                if (focused) LocalYancoPalette.current.BackgroundElevated else Color.Transparent,
             ).let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
             .focusable(enabled = enabled, interactionSource = interaction)
             .clickable(
@@ -914,7 +914,7 @@ private fun OptionRow(
     ) {
         Text(
             text = label,
-            color = if (enabled) YancoPalette.TextPrimary else YancoPalette.TextMuted,
+            color = if (enabled) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -922,7 +922,7 @@ private fun OptionRow(
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             Text(
                 text = value,
-                color = if (enabled) YancoPalette.Accent else YancoPalette.TextMuted,
+                color = if (enabled) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
             )
         }

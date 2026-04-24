@@ -40,7 +40,7 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.parental.PinEntryDialog
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.favorites.FavoritesRepository
@@ -109,15 +109,15 @@ fun FavoritesScreen(
             modifier =
                 modifier
                     .fillMaxSize()
-                    .background(YancoPalette.BackgroundDeep)
+                    .background(LocalYancoPalette.current.BackgroundDeep)
                     .padding(32.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "No favourites yet", color = YancoPalette.TextPrimary)
+                Text(text = "No favourites yet", color = LocalYancoPalette.current.TextPrimary)
                 Text(
                     text = "Focus a channel or title and press the star in the info panel.",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                 )
             }
         }
@@ -129,7 +129,7 @@ fun FavoritesScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -218,7 +218,7 @@ private fun removeFavorite(
 private fun SectionHeader(text: String) {
     Text(
         text = text,
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         modifier = Modifier.padding(top = 8.dp),
     )
 }
@@ -258,7 +258,7 @@ private fun FavoriteRow(
                     Modifier
                         .size(52.dp)
                         .clip(YancoShapes.HexCapsule)
-                        .background(YancoPalette.BackgroundDeep),
+                        .background(LocalYancoPalette.current.BackgroundDeep),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!item.logoUrl.isNullOrBlank()) {
@@ -274,13 +274,13 @@ private fun FavoriteRow(
                 modifier = Modifier.fillMaxWidth(0.7f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(text = displayTitle, color = YancoPalette.TextPrimary, maxLines = 1)
+                Text(text = displayTitle, color = LocalYancoPalette.current.TextPrimary, maxLines = 1)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item.groupName?.let {
-                        Text(text = it, color = YancoPalette.TextMuted, maxLines = 1)
+                        Text(text = it, color = LocalYancoPalette.current.TextMuted, maxLines = 1)
                     }
                     QualityChips(badges = badges)
                 }
@@ -294,14 +294,14 @@ private fun FavoriteRow(
 private fun UnstarButton(onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.BackgroundHover else Color.Transparent
-    val border = if (focused) YancoPalette.FocusRing else Color.Transparent
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else Color.Transparent
+    val border = if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
     // Hollow star glyph (\u2606) semantically matches the remove action —
     // tapping it will make the row "no longer favorited". The filled \u2605
     // is reserved for "currently starred" state in InfoPanel.
     Text(
         text = "\u2606 Remove",
-        color = YancoPalette.Accent,
+        color = LocalYancoPalette.current.Accent,
         modifier =
             Modifier
                 .clip(RoundedCornerShape(6.dp))

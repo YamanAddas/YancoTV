@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -140,7 +140,7 @@ fun CategoryChipBar(
                     Modifier
                         .width(1.dp)
                         .size(width = 1.dp, height = 20.dp)
-                        .background(YancoPalette.BorderSubtle),
+                        .background(LocalYancoPalette.current.BorderSubtle),
             )
         }
         items(groups, key = { it }) { group ->
@@ -195,29 +195,29 @@ private fun Chip(
         when {
             focused ->
                 Brush.verticalGradient(
-                    listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                    listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
                 )
             selected ->
                 Brush.verticalGradient(
                     listOf(
-                        YancoPalette.Accent.copy(alpha = 0.32f),
-                        YancoPalette.AccentDeep.copy(alpha = 0.22f),
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.32f),
+                        LocalYancoPalette.current.AccentDeep.copy(alpha = 0.22f),
                     ),
                 )
-            else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+            else -> SolidColor(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
         }
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            selected -> YancoPalette.Accent.copy(alpha = 0.55f)
-            else -> YancoPalette.BorderSubtle
+            focused -> LocalYancoPalette.current.FocusRing
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.55f)
+            else -> LocalYancoPalette.current.BorderSubtle
         }
     val fg by animateColorAsState(
         targetValue =
             when {
                 focused -> Color.Black
-                selected -> YancoPalette.Accent
-                else -> YancoPalette.TextSecondary
+                selected -> LocalYancoPalette.current.Accent
+                else -> LocalYancoPalette.current.TextSecondary
             },
         label = "chip-fg",
     )
@@ -231,8 +231,8 @@ private fun Chip(
                 .shadow(
                     elevation = if (focused) 14.dp else 0.dp,
                     shape = YancoShapes.ChipBevel,
-                    ambientColor = YancoPalette.Accent,
-                    spotColor = YancoPalette.Accent,
+                    ambientColor = LocalYancoPalette.current.Accent,
+                    spotColor = LocalYancoPalette.current.Accent,
                 ).clip(YancoShapes.ChipBevel)
                 .background(bg)
                 .border(if (focused) 2.dp else 1.dp, border, YancoShapes.ChipBevel)
@@ -258,7 +258,7 @@ private fun Chip(
                     Modifier
                         .size(6.dp)
                         .clip(RoundedCornerShape(Radius.pill))
-                        .background(YancoPalette.Accent),
+                        .background(LocalYancoPalette.current.Accent),
             )
         }
         Text(

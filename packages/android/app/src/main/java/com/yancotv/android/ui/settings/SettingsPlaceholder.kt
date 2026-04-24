@@ -20,7 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.Space
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -49,12 +49,12 @@ fun SettingsPlaceholder(
     ) {
         Text(
             text = kicker.uppercase(),
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
         Text(
             text = title,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayS,
         )
         // Thin accent gradient divider — mirrors the Section rule from
@@ -67,7 +67,7 @@ fun SettingsPlaceholder(
                     .clip(YancoShapes.ChipBevel)
                     .background(
                         Brush.horizontalGradient(
-                            listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                            listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
                         ),
                     ),
         )
@@ -77,19 +77,19 @@ fun SettingsPlaceholder(
                 Modifier
                     .fillMaxWidth()
                     .clip(YancoShapes.CutCornerCardSmall)
-                    .background(YancoPalette.BackgroundRaised)
-                    .border(1.dp, YancoPalette.BorderSubtle, YancoShapes.CutCornerCardSmall)
+                    .background(LocalYancoPalette.current.BackgroundRaised)
+                    .border(1.dp, LocalYancoPalette.current.BorderSubtle, YancoShapes.CutCornerCardSmall)
                     .padding(horizontal = Space.xxl, vertical = Space.lg),
         ) {
             Text(
                 text = "Pending implementation",
-                color = YancoPalette.TextSecondary,
+                color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.LabelStrong,
             )
             Spacer(modifier = Modifier.height(Space.xs))
             Text(
                 text = body,
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.BodyLong,
             )
         }

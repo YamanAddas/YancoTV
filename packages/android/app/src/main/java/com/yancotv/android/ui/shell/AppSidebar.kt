@@ -60,7 +60,7 @@ import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -101,14 +101,18 @@ fun AppSidebar(
     // tints it greener so the rail visibly belongs to the emerald
     // palette, with a translucent floor so the cinematic backdrop
     // shows through — the rail frames the scene, it doesn't cover it.
+    // Palette read is a composable op — hoist out of the `remember {}`
+    // calculation lambda (MK.16.1). Brush re-derives only on palette
+    // swap, so the MB-81 allocation concern still holds for steady state.
+    val pal = LocalYancoPalette.current
     val brush =
-        remember {
+        remember(pal) {
             Brush.verticalGradient(
                 colors =
                     listOf(
-                        YancoPalette.BackgroundElevated.copy(alpha = 0.86f),
-                        YancoPalette.BackgroundRaised.copy(alpha = 0.78f),
-                        YancoPalette.BackgroundDeep.copy(alpha = 0.88f),
+                        pal.BackgroundElevated.copy(alpha = 0.86f),
+                        pal.BackgroundRaised.copy(alpha = 0.78f),
+                        pal.BackgroundDeep.copy(alpha = 0.88f),
                     ),
             )
         }
@@ -118,7 +122,7 @@ fun AppSidebar(
                 .fillMaxHeight()
                 .width(width)
                 .background(brush)
-                .border(1.dp, YancoPalette.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
+                .border(1.dp, LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
                 .padding(horizontal = Space.md, vertical = Space.md)
                 // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
                 // routes this into the categories rail; for non-browse sections
@@ -221,8 +225,8 @@ private fun SidebarRow(
                 Brush.horizontalGradient(
                     colors =
                         listOf(
-                            YancoPalette.Accent.copy(alpha = 0.40f),
-                            YancoPalette.Accent.copy(alpha = 0.18f),
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.40f),
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.18f),
                             Color.Transparent,
                         ),
                 )
@@ -230,8 +234,8 @@ private fun SidebarRow(
                 Brush.horizontalGradient(
                     colors =
                         listOf(
-                            YancoPalette.Accent.copy(alpha = 0.28f),
-                            YancoPalette.Accent.copy(alpha = 0.10f),
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.28f),
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.10f),
                             Color.Transparent,
                         ),
                 )
@@ -242,16 +246,16 @@ private fun SidebarRow(
         }
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            selected -> YancoPalette.Accent.copy(alpha = 0.45f)
+            focused -> LocalYancoPalette.current.FocusRing
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.45f)
             else -> Color.Transparent
         }
     val fg by animateColorAsState(
         targetValue =
             when {
-                focused -> YancoPalette.TextPrimary
-                selected -> YancoPalette.Accent
-                else -> YancoPalette.TextSecondary
+                focused -> LocalYancoPalette.current.TextPrimary
+                selected -> LocalYancoPalette.current.Accent
+                else -> LocalYancoPalette.current.TextSecondary
             },
         label = "sidebar-fg",
     )
@@ -280,13 +284,13 @@ private fun SidebarRow(
                     .shadow(
                         elevation = if (selected || focused) 12.dp else 0.dp,
                         shape = RoundedCornerShape(Radius.pill),
-                        ambientColor = YancoPalette.Accent,
-                        spotColor = YancoPalette.Accent,
+                        ambientColor = LocalYancoPalette.current.Accent,
+                        spotColor = LocalYancoPalette.current.Accent,
                     ).clip(RoundedCornerShape(Radius.pill))
                     .background(
                         if (selected || focused) {
                             Brush.verticalGradient(
-                                listOf(YancoPalette.AccentSoft, YancoPalette.Accent, YancoPalette.AccentDeep),
+                                listOf(LocalYancoPalette.current.AccentSoft, LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
                             )
                         } else {
                             Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))

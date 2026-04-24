@@ -23,7 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * About tab — version, milestone, and short build info. Everything here
@@ -45,13 +45,13 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
     ) {
         Text(
             text = "YancoTV",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
         )
         Text(
             text = "IPTV for Android TV + Fire TV + phone",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 13.sp,
         )
 
@@ -66,7 +66,7 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
 
         Text(
             text = "Credits",
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -74,7 +74,7 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
             text =
                 "Built with Media3 ExoPlayer, SQLDelight, Ktor, Coil, and Jetpack Compose. " +
                     "Shared business logic (parsers, clients, classifier, EPG) lives in packages/shared via Kotlin Multiplatform — the iOS app in MK.iOS.* will consume the same code.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
     }
@@ -121,18 +121,18 @@ private fun InfoRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Text(
             text = label,
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
             modifier = Modifier.width(110.dp),
         )
         Text(
             text = value,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
         )

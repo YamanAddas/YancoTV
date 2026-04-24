@@ -34,7 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.sources.SourceSyncCoordinator
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.sources.SyncProgress
 import com.yancotv.shared.types.Source
@@ -113,12 +113,12 @@ fun SourcesScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = "Sources", color = YancoPalette.TextPrimary)
+            Text(text = "Sources", color = LocalYancoPalette.current.TextPrimary)
             ActionButton(label = "Add source", onClick = { showAdd = true })
         }
 
         syncMessage?.let {
-            Text(text = it, color = YancoPalette.TextMuted)
+            Text(text = it, color = LocalYancoPalette.current.TextMuted)
         }
 
         if (sources.isEmpty()) {
@@ -128,7 +128,7 @@ fun SourcesScreen(
             ) {
                 Text(
                     text = "No sources yet. Add an Xtream or M3U URL to start.",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                 )
             }
         } else {
@@ -217,16 +217,16 @@ private fun SourceRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth(0.6f)) {
-            Text(text = source.name, color = YancoPalette.TextPrimary)
+            Text(text = source.name, color = LocalYancoPalette.current.TextPrimary)
             Text(
                 text = "${typeLabel(source.type)} · ${source.channelCount} items",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
             )
         }
         Spacer(Modifier.height(0.dp))
@@ -246,8 +246,8 @@ fun ActionButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.Accent else YancoPalette.BackgroundHover
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.BackgroundHover
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     Box(
         modifier =
             Modifier
@@ -258,7 +258,7 @@ fun ActionButton(
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        Text(text = label, color = YancoPalette.TextPrimary)
+        Text(text = label, color = LocalYancoPalette.current.TextPrimary)
     }
 }
 

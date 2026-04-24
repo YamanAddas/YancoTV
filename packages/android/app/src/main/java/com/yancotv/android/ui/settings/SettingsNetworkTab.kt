@@ -29,7 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -61,7 +61,7 @@ fun SettingsNetworkTab(
     ) {
         Text(
             text = "Network",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -78,15 +78,15 @@ fun SettingsNetworkTab(
                     scope.launch { prefs.setUserAgent(draft) }
                 },
                 singleLine = true,
-                placeholder = { Text("VLC/3.0.20 LibVLC/3.0.20", color = YancoPalette.TextMuted) },
-                textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 13.sp),
+                placeholder = { Text("VLC/3.0.20 LibVLC/3.0.20", color = LocalYancoPalette.current.TextMuted) },
+                textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp),
                 colors =
                     OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = YancoPalette.TextPrimary,
-                        unfocusedTextColor = YancoPalette.TextPrimary,
-                        focusedBorderColor = YancoPalette.Accent,
-                        unfocusedBorderColor = YancoPalette.BackgroundHover,
-                        cursorColor = YancoPalette.Accent,
+                        focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                        unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                        focusedBorderColor = LocalYancoPalette.current.Accent,
+                        unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                        cursorColor = LocalYancoPalette.current.Accent,
                     ),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -108,7 +108,7 @@ fun SettingsNetworkTab(
         }
         Text(
             text = "Changes apply to new HTTP requests — restart playback or re-sync a source to pick them up for in-flight connections.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 11.sp,
         )
     }
@@ -126,11 +126,11 @@ private fun TimeoutField(
         modifier =
             modifier
                 .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(text = label, color = YancoPalette.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(text = label, color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(
             value = draft,
             onValueChange = { input ->
@@ -140,14 +140,14 @@ private fun TimeoutField(
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 13.sp),
+            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp),
             colors =
                 OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = YancoPalette.TextPrimary,
-                    unfocusedTextColor = YancoPalette.TextPrimary,
-                    focusedBorderColor = YancoPalette.Accent,
-                    unfocusedBorderColor = YancoPalette.BackgroundHover,
-                    cursorColor = YancoPalette.Accent,
+                    focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                    unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                    focusedBorderColor = LocalYancoPalette.current.Accent,
+                    unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                    cursorColor = LocalYancoPalette.current.Accent,
                 ),
         )
     }
@@ -164,12 +164,12 @@ private fun PrefCard(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(title, color = YancoPalette.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text(description, color = YancoPalette.TextMuted, fontSize = 11.sp)
+        Text(title, color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(description, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp)
         content()
     }
 }

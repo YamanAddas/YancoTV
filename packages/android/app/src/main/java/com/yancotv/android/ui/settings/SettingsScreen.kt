@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -107,7 +107,7 @@ fun SettingsScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .padding(
                     start = Space.page,
                     top = Space.section,
@@ -142,8 +142,8 @@ private fun Sidebar(
         modifier =
             modifier
                 .clip(YancoShapes.CutCornerCardLarge)
-                .background(YancoPalette.BackgroundRaised)
-                .border(1.dp, YancoPalette.PanelBorder, YancoShapes.CutCornerCardLarge)
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, YancoShapes.CutCornerCardLarge)
                 .focusGroup()
                 .focusRestorer(),
     ) {
@@ -181,13 +181,13 @@ private fun SidebarHeader() {
     ) {
         Text(
             text = "YANCOTV · SETTINGS",
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "Configure",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 34.sp,
             lineHeight = 36.sp,
             fontWeight = FontWeight.Black,
@@ -196,7 +196,7 @@ private fun SidebarHeader() {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Preferences apply instantly and sync across restarts.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
             lineHeight = 18.sp,
         )
@@ -217,7 +217,7 @@ private fun SidebarFooter() {
     ) {
         Text(
             text = "v$version · MK.16.shell",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = 1.4.sp,
@@ -242,14 +242,14 @@ private fun TabItem(
             focused ->
                 Brush.horizontalGradient(
                     listOf(
-                        YancoPalette.Accent.copy(alpha = 0.22f),
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f),
                         Color.Transparent,
                     ),
                 )
             selected ->
                 Brush.horizontalGradient(
                     listOf(
-                        YancoPalette.Accent.copy(alpha = 0.14f),
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.14f),
                         Color.Transparent,
                     ),
                 )
@@ -259,22 +259,22 @@ private fun TabItem(
     val iconBg =
         if (selected) {
             Brush.verticalGradient(
-                listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
             )
         } else {
             Brush.verticalGradient(
                 listOf(Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.04f)),
             )
         }
-    val iconTint = if (selected) OnAccentInk else YancoPalette.TextMuted
+    val iconTint = if (selected) OnAccentInk else LocalYancoPalette.current.TextMuted
     val labelColor =
         when {
-            focused -> YancoPalette.TextPrimary
-            selected -> YancoPalette.TextPrimary
-            else -> YancoPalette.TextSecondary
+            focused -> LocalYancoPalette.current.TextPrimary
+            selected -> LocalYancoPalette.current.TextPrimary
+            else -> LocalYancoPalette.current.TextSecondary
         }
-    val subColor = if (selected) YancoPalette.Accent else YancoPalette.TextMuted
-    val borderColor = if (focused) YancoPalette.FocusRing else Color.Transparent
+    val subColor = if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted
+    val borderColor = if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
 
     Box(
         modifier =
@@ -306,7 +306,7 @@ private fun TabItem(
                         .padding(vertical = 10.dp)
                         .background(
                             Brush.verticalGradient(
-                                listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                                listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
                             ),
                         ),
             )
@@ -355,7 +355,7 @@ private fun TabItem(
             }
             Text(
                 text = twoDigit(entry.ordinal + 1),
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
@@ -364,7 +364,7 @@ private fun TabItem(
                 Icon(
                     imageVector = YancoIcons.ChevronRight,
                     contentDescription = null,
-                    tint = YancoPalette.Accent,
+                    tint = LocalYancoPalette.current.Accent,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -382,8 +382,8 @@ private fun ContentPane(
         modifier =
             modifier
                 .clip(YancoShapes.CutCornerCardLarge)
-                .background(YancoPalette.BackgroundRaised)
-                .border(1.dp, YancoPalette.PanelBorder, YancoShapes.CutCornerCardLarge),
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, YancoShapes.CutCornerCardLarge),
     ) {
         Breadcrumb(current = current)
         HairlineDivider()
@@ -421,7 +421,7 @@ private fun Breadcrumb(current: SettingsTab) {
         Icon(
             imageVector = YancoIcons.ChevronRight,
             contentDescription = null,
-            tint = YancoPalette.TextMuted,
+            tint = LocalYancoPalette.current.TextMuted,
             modifier = Modifier.size(12.dp),
         )
         HexChip(
@@ -432,7 +432,7 @@ private fun Breadcrumb(current: SettingsTab) {
         Spacer(modifier = Modifier.weight(1f))
         Text(
             text = current.sub.uppercase(),
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.8.sp,
@@ -470,14 +470,14 @@ private fun HexChip(
     val bg =
         if (active) {
             Brush.verticalGradient(
-                listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
             )
         } else {
             Brush.verticalGradient(
-                listOf(YancoPalette.BackgroundElevated, YancoPalette.BackgroundElevated),
+                listOf(LocalYancoPalette.current.BackgroundElevated, LocalYancoPalette.current.BackgroundElevated),
             )
         }
-    val fg = if (active) OnAccentInk else YancoPalette.TextMuted
+    val fg = if (active) OnAccentInk else LocalYancoPalette.current.TextMuted
     Row(
         modifier =
             Modifier
@@ -486,7 +486,7 @@ private fun HexChip(
                 .background(bg)
                 .border(
                     1.dp,
-                    if (active) Color.Transparent else YancoPalette.BorderSubtle,
+                    if (active) Color.Transparent else LocalYancoPalette.current.BorderSubtle,
                     YancoShapes.ChipBevel,
                 ).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -517,7 +517,7 @@ private fun HairlineDivider() {
             Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(YancoPalette.BorderSubtle),
+                .background(LocalYancoPalette.current.BorderSubtle),
     )
 }
 

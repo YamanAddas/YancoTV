@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * Ambient app-wide background. A radial wash plus a subtle vertical
@@ -20,13 +20,13 @@ fun CinematicBackground(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .background(
                     Brush.radialGradient(
                         colors =
                             listOf(
-                                YancoPalette.Accent.copy(alpha = 0.05f),
-                                YancoPalette.BackgroundDeep.copy(alpha = 0f),
+                                LocalYancoPalette.current.Accent.copy(alpha = 0.05f),
+                                LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0f),
                             ),
                         center = Offset(260f, 220f),
                         radius = 1400f,
@@ -35,8 +35,8 @@ fun CinematicBackground(modifier: Modifier = Modifier) {
                     Brush.verticalGradient(
                         colors =
                             listOf(
-                                YancoPalette.BackgroundDeep.copy(alpha = 0f),
-                                YancoPalette.BackgroundDeep.copy(alpha = 0.35f),
+                                LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0f),
+                                LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.35f),
                             ),
                     ),
                 ),

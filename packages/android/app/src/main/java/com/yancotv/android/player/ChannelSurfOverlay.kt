@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.types.ContentItem
@@ -106,7 +106,7 @@ fun ChannelSurfOverlay(
     ) {
         Text(
             text = "Channels",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -114,7 +114,7 @@ fun ChannelSurfOverlay(
         if (items.isEmpty()) {
             Text(
                 text = "No channels yet. Add a source in Settings.",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
@@ -140,7 +140,7 @@ fun ChannelSurfOverlay(
         }
         Text(
             text = "BACK to close",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 10.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         )
@@ -161,11 +161,11 @@ private fun SurfRow(
     val focused by interaction.collectIsFocusedAsState()
     val bg =
         when {
-            focused -> YancoPalette.Accent.copy(alpha = 0.28f)
-            playing -> YancoPalette.BackgroundRaised
+            focused -> LocalYancoPalette.current.Accent.copy(alpha = 0.28f)
+            playing -> LocalYancoPalette.current.BackgroundRaised
             else -> Color.Transparent
         }
-    val border = if (focused) YancoPalette.FocusRing else Color.Transparent
+    val border = if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
     val title = item.cleanTitle?.ifBlank { null } ?: item.title
 
     val focusRequester = remember { FocusRequester() }
@@ -191,7 +191,7 @@ private fun SurfRow(
                 Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(YancoPalette.BackgroundDeep),
+                    .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
@@ -204,7 +204,7 @@ private fun SurfRow(
             } else {
                 Text(
                     text = title.take(2),
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -213,7 +213,7 @@ private fun SurfRow(
         Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
             Text(
                 text = title,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 13.sp,
                 fontWeight = if (playing) FontWeight.Bold else FontWeight.SemiBold,
                 maxLines = 1,
@@ -221,7 +221,7 @@ private fun SurfRow(
             if (!now.isNullOrBlank()) {
                 Text(
                     text = now,
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
                     maxLines = 1,
                 )
@@ -234,7 +234,7 @@ private fun SurfRow(
                     Modifier
                         .width(4.dp)
                         .fillMaxHeight()
-                        .background(YancoPalette.Accent, RoundedCornerShape(2.dp)),
+                        .background(LocalYancoPalette.current.Accent, RoundedCornerShape(2.dp)),
             )
         }
     }

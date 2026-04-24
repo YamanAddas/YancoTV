@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.types.NowNext
 
 /**
@@ -50,7 +50,7 @@ fun NowNextLine(
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = label,
-            color = if (now != null) YancoPalette.Accent else YancoPalette.TextMuted,
+            color = if (now != null) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -64,14 +64,14 @@ fun NowNextLine(
                         .fillMaxWidth()
                         .height(2.dp)
                         .clip(RoundedCornerShape(1.dp))
-                        .background(YancoPalette.BorderSubtle),
+                        .background(LocalYancoPalette.current.BorderSubtle),
             ) {
                 Box(
                     modifier =
                         Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(progress)
-                            .background(YancoPalette.Accent),
+                            .background(LocalYancoPalette.current.Accent),
                 )
             }
         }

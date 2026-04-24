@@ -17,7 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * Static key reference. No wiring — each entry documents a binding
@@ -37,13 +37,13 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
     ) {
         Text(
             text = "Shortcuts",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "Quick reference for TV remote + keyboard bindings. Shortcuts are not user-configurable yet — let us know in the issues if something clashes with your remote.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
 
@@ -88,11 +88,11 @@ private fun Section(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(YancoPalette.BackgroundRaised)
+                .background(LocalYancoPalette.current.BackgroundRaised)
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(title, color = YancoPalette.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.1.sp)
+        Text(title, color = LocalYancoPalette.current.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.1.sp)
         content()
     }
 }
@@ -105,13 +105,13 @@ private fun Shortcut(
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(
             text = label,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 13.sp,
             modifier = Modifier.weight(1f),
         )
         Text(
             text = keys,
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
     }

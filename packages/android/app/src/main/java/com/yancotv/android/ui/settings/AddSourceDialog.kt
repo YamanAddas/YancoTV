@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.types.AddSourceInput
 import com.yancotv.shared.types.SourceType
 
@@ -123,8 +123,8 @@ fun AddSourceDialog(
                     .widthIn(min = 560.dp, max = 720.dp)
                     .heightIn(max = 640.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(YancoPalette.BackgroundRaised)
-                    .border(1.dp, YancoPalette.BorderSubtle, RoundedCornerShape(16.dp)),
+                    .background(LocalYancoPalette.current.BackgroundRaised)
+                    .border(1.dp, LocalYancoPalette.current.BorderSubtle, RoundedCornerShape(16.dp)),
         ) {
             // Header
             Column(
@@ -136,13 +136,13 @@ fun AddSourceDialog(
             ) {
                 Text(
                     text = "Add source",
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = "Scroll with the D-pad. Press OK on a field to type. Credentials are encrypted on-device.",
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 13.sp,
                 )
             }
@@ -250,7 +250,7 @@ private fun Divider() {
             Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(YancoPalette.BorderSubtle),
+                .background(LocalYancoPalette.current.BorderSubtle),
     )
 }
 
@@ -258,7 +258,7 @@ private fun Divider() {
 private fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        color = YancoPalette.TextMuted,
+        color = LocalYancoPalette.current.TextMuted,
         fontSize = 10.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.sp,
@@ -272,12 +272,12 @@ private fun ErrorBanner(text: String) {
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(YancoPalette.Error.copy(alpha = 0.12f))
-                .border(1.dp, YancoPalette.Error.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                .background(LocalYancoPalette.current.Error.copy(alpha = 0.12f))
+                .border(1.dp, LocalYancoPalette.current.Error.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = text, color = YancoPalette.Error, fontSize = 12.sp)
+        Text(text = text, color = LocalYancoPalette.current.Error, fontSize = 12.sp)
     }
 }
 
@@ -317,12 +317,12 @@ private fun ClickToEditField(
         ) {
             Text(
                 text = label,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             )
             if (!hint.isNullOrBlank() && !editing) {
-                Text(text = hint, color = YancoPalette.TextMuted, fontSize = 11.sp)
+                Text(text = hint, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp)
             }
         }
         if (editing) {
@@ -354,8 +354,8 @@ private fun ReadOnlyBody(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundDeep
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundDeep
     Box(
         modifier =
             Modifier
@@ -371,7 +371,7 @@ private fun ReadOnlyBody(
     ) {
         Text(
             text = if (empty) placeholder else display,
-            color = if (empty) YancoPalette.TextMuted else YancoPalette.TextPrimary,
+            color = if (empty) LocalYancoPalette.current.TextMuted else LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
         )
     }
@@ -393,8 +393,8 @@ private fun EditableBody(
                 .fillMaxWidth()
                 .height(44.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(YancoPalette.BackgroundHover)
-                .border(1.dp, YancoPalette.FocusRing, RoundedCornerShape(8.dp))
+                .background(LocalYancoPalette.current.BackgroundHover)
+                .border(1.dp, LocalYancoPalette.current.FocusRing, RoundedCornerShape(8.dp))
                 .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -403,8 +403,8 @@ private fun EditableBody(
             onValueChange = onValueChange,
             singleLine = true,
             interactionSource = interaction,
-            textStyle = TextStyle(color = YancoPalette.TextPrimary, fontSize = 14.sp),
-            cursorBrush = SolidColor(YancoPalette.FocusRing),
+            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp),
+            cursorBrush = SolidColor(LocalYancoPalette.current.FocusRing),
             visualTransformation = transformation,
             keyboardOptions =
                 KeyboardOptions(
@@ -440,15 +440,15 @@ private fun TypeChip(
     val focused by interaction.collectIsFocusedAsState()
     val bg =
         when {
-            selected -> YancoPalette.Accent.copy(alpha = 0.18f)
-            focused -> YancoPalette.BackgroundHover
-            else -> YancoPalette.BackgroundDeep
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.18f)
+            focused -> LocalYancoPalette.current.BackgroundHover
+            else -> LocalYancoPalette.current.BackgroundDeep
         }
     val borderColor =
         when {
-            selected -> YancoPalette.Accent
-            focused -> YancoPalette.FocusRing
-            else -> YancoPalette.BorderSubtle
+            selected -> LocalYancoPalette.current.Accent
+            focused -> LocalYancoPalette.current.FocusRing
+            else -> LocalYancoPalette.current.BorderSubtle
         }
     Column(
         modifier =
@@ -464,13 +464,13 @@ private fun TypeChip(
     ) {
         Text(
             text = label,
-            color = if (selected) YancoPalette.Accent else YancoPalette.TextPrimary,
+            color = if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = description,
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             fontSize = 11.sp,
         )
     }
@@ -486,11 +486,11 @@ private fun PrimaryButton(
     val focused by interaction.collectIsFocusedAsState()
     val bg =
         when {
-            !enabled -> YancoPalette.AccentMuted.copy(alpha = 0.4f)
-            focused -> YancoPalette.AccentGlow
-            else -> YancoPalette.Accent
+            !enabled -> LocalYancoPalette.current.AccentMuted.copy(alpha = 0.4f)
+            focused -> LocalYancoPalette.current.AccentGlow
+            else -> LocalYancoPalette.current.Accent
         }
-    val borderColor = if (focused) YancoPalette.TextPrimary else bg
+    val borderColor = if (focused) LocalYancoPalette.current.TextPrimary else bg
     Box(
         modifier =
             Modifier
@@ -511,7 +511,7 @@ private fun PrimaryButton(
     ) {
         Text(
             text = label,
-            color = YancoPalette.BackgroundDeep,
+            color = LocalYancoPalette.current.BackgroundDeep,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -526,8 +526,8 @@ private fun GhostButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val borderColor = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
-    val bg = if (focused) YancoPalette.BackgroundHover else YancoPalette.BackgroundRaised
+    val borderColor = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
     Box(
         modifier =
             Modifier
@@ -548,7 +548,7 @@ private fun GhostButton(
     ) {
         Text(
             text = label,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
         )
     }

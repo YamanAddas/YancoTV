@@ -14,7 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import kotlinx.coroutines.launch
@@ -47,11 +47,11 @@ fun ChannelActionsMenu(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = YancoPalette.BackgroundRaised,
+        containerColor = LocalYancoPalette.current.BackgroundRaised,
         title = {
             Text(
                 text = item.cleanTitle?.ifBlank { null } ?: item.title,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
             )
         },
         text = {
@@ -63,7 +63,7 @@ fun ChannelActionsMenu(
                         } else {
                             "Lock this channel to require a PIN before playing, or hide it from lists entirely."
                         },
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
             }
@@ -81,7 +81,7 @@ fun ChannelActionsMenu(
             ) {
                 Text(
                     text = if (locked) "Unlock (PIN)" else "Lock",
-                    color = YancoPalette.Accent,
+                    color = LocalYancoPalette.current.Accent,
                 )
             }
         },
@@ -93,10 +93,10 @@ fun ChannelActionsMenu(
                         onDismiss()
                     },
                 ) {
-                    Text("Hide from lists", color = YancoPalette.TextPrimary)
+                    Text("Hide from lists", color = LocalYancoPalette.current.TextPrimary)
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = YancoPalette.TextMuted)
+                    Text("Cancel", color = LocalYancoPalette.current.TextMuted)
                 }
             }
         },

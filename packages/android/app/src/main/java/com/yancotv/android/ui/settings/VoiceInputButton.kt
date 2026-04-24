@@ -25,7 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * Voice button that launches the platform speech recognizer. Fire TV's voice
@@ -62,8 +62,8 @@ fun VoiceInputButton(
 
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) YancoPalette.Accent else YancoPalette.BackgroundRaised
-    val border = if (focused) YancoPalette.FocusRing else YancoPalette.BorderSubtle
+    val bg = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.BackgroundRaised
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     val alphaValue = if (available) 1f else 0.4f
 
     Box(
@@ -95,7 +95,7 @@ fun VoiceInputButton(
     ) {
         Text(
             text = "VOICE",
-            color = if (focused) YancoPalette.TextPrimary else YancoPalette.TextMuted,
+            color = if (focused) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted,
             fontSize = 11.sp,
         )
     }

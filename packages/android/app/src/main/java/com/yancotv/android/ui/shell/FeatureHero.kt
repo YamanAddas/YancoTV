@@ -51,20 +51,13 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
 import kotlinx.coroutines.delay
-
-// MB-81: stable top-level val — palette colours never change at runtime so
-// there is no reason to allocate a new Brush on every EPG tick recomposition.
-private val heroProgressBrush =
-    Brush.horizontalGradient(
-        listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
-    )
 
 /**
  * Dominant hero at the top of the browse shell. Swaps its backdrop + copy
@@ -113,15 +106,15 @@ fun FeatureHero(
                     .fillMaxSize()
                     .background(
                         Brush.horizontalGradient(
-                            0f to YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
-                            0.45f to YancoPalette.BackgroundDeep.copy(alpha = 0.45f),
+                            0f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
+                            0.45f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.45f),
                             1f to Color.Transparent,
                         ),
                     ).background(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
                             0.75f to Color.Transparent,
-                            1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
+                            1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f),
                         ),
                     ),
         )
@@ -204,8 +197,8 @@ private fun HeroBackdrop(
                             Brush.linearGradient(
                                 colors =
                                     listOf(
-                                        YancoPalette.BackgroundHover,
-                                        YancoPalette.BackgroundDeep,
+                                        LocalYancoPalette.current.BackgroundHover,
+                                        LocalYancoPalette.current.BackgroundDeep,
                                     ),
                             ),
                         ),
@@ -249,7 +242,7 @@ private fun HeroCopy(
         ) {
             Text(
                 text = eyebrow,
-                color = YancoPalette.Accent,
+                color = LocalYancoPalette.current.Accent,
                 style = YancoType.Overline,
             )
             if (isCurrentlyPlaying) HeroLivePill()
@@ -260,7 +253,7 @@ private fun HeroCopy(
         // horizontal, not a detail page.
         Text(
             text = title,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayCinematic,
             maxLines = 2,
         )
@@ -325,7 +318,7 @@ private fun LiveHeroMeta(
         if (nowProg != null) {
             Text(
                 text = "Now: ${nowProg.title}",
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleM,
                 maxLines = 2,
             )
@@ -340,7 +333,7 @@ private fun LiveHeroMeta(
         if (nextProg != null) {
             Text(
                 text = "Up next: ${nextProg.title}",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
             )
@@ -389,13 +382,13 @@ private fun HeroMetaChip(label: String) {
         modifier =
             Modifier
                 .clip(YancoShapes.ChipBevel)
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.65f))
-                .border(1.dp, YancoPalette.PanelBorder, YancoShapes.ChipBevel)
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.65f))
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, YancoShapes.ChipBevel)
                 .padding(horizontal = Space.md, vertical = Space.xs),
     ) {
         Text(
             text = label,
-            color = YancoPalette.TextSecondary,
+            color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.Caption,
             maxLines = 1,
         )
@@ -413,6 +406,15 @@ private fun HeroProgress(
     val span = remember(start, end) { (end - start).coerceAtLeast(1) }
     val pct = ((now - start).toFloat() / span).coerceIn(0f, 1f)
     val remainingMin = ((end - now).coerceAtLeast(0) / 60).toInt()
+    // MB-81 holds post-MK.16.1: palette changes rarely (only on theme swap),
+    // so `remember(pal)` rebuilds the brush only then — not on every EPG tick.
+    val pal = LocalYancoPalette.current
+    val heroProgressBrush =
+        remember(pal) {
+            Brush.horizontalGradient(
+                listOf(pal.AccentDeep, pal.Accent, pal.AccentGlow),
+            )
+        }
     Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
         Box(
             modifier =
@@ -420,7 +422,7 @@ private fun HeroProgress(
                     .fillMaxWidth()
                     .height(3.dp)
                     .clip(RoundedCornerShape(Radius.pill))
-                    .background(YancoPalette.BorderSubtle),
+                    .background(pal.BorderSubtle),
         ) {
             Box(
                 modifier =
@@ -432,7 +434,7 @@ private fun HeroProgress(
         }
         Text(
             text = if (remainingMin > 0) "$remainingMin min left" else "Ending now",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Caption,
         )
     }
@@ -448,11 +450,11 @@ private fun PrimaryCta(
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
     val bg by animateColorAsState(
-        targetValue = if (focused) YancoPalette.AccentGlow else YancoPalette.Accent,
+        targetValue = if (focused) LocalYancoPalette.current.AccentGlow else LocalYancoPalette.current.Accent,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "primaryCtaBg",
     )
-    val fg = YancoPalette.BackgroundDeep
+    val fg = LocalYancoPalette.current.BackgroundDeep
     // Bevelled hex button — accent-filled primary CTA. A hairline focus rim
     // rides the bevel so the shape reads as an angular playbill.
     Row(
@@ -462,7 +464,7 @@ private fun PrimaryCta(
                 .background(bg)
                 .border(
                     width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) YancoPalette.FocusRing else YancoPalette.AccentDeep,
+                    color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.AccentDeep,
                     shape = shape,
                 ).focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick)
@@ -493,23 +495,23 @@ private fun TonalCta(
     val bg by animateColorAsState(
         targetValue =
             when {
-                focused -> YancoPalette.Accent.copy(alpha = 0.22f)
-                highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
-                else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
+                focused -> LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+                highlighted -> LocalYancoPalette.current.Accent.copy(alpha = 0.14f)
+                else -> LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f)
             },
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "tonalCtaBg",
     )
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
-            else -> YancoPalette.PanelBorder
+            focused -> LocalYancoPalette.current.FocusRing
+            highlighted -> LocalYancoPalette.current.Accent.copy(alpha = 0.55f)
+            else -> LocalYancoPalette.current.PanelBorder
         }
     val fg =
         when {
-            highlighted -> YancoPalette.Accent
-            else -> YancoPalette.TextPrimary
+            highlighted -> LocalYancoPalette.current.Accent
+            else -> LocalYancoPalette.current.TextPrimary
         }
     Row(
         modifier =
@@ -539,7 +541,7 @@ private fun HeroLivePill() {
         modifier =
             Modifier
                 .clip(YancoShapes.ChipBevel)
-                .background(YancoPalette.Live)
+                .background(LocalYancoPalette.current.Live)
                 .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -561,8 +563,8 @@ private fun HeroLockChip() {
         modifier =
             Modifier
                 .clip(YancoShapes.ChipBevel)
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
-                .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
+                .border(1.dp, LocalYancoPalette.current.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
                 .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -570,10 +572,10 @@ private fun HeroLockChip() {
         Icon(
             imageVector = YancoIcons.Lock,
             contentDescription = null,
-            tint = YancoPalette.Accent,
+            tint = LocalYancoPalette.current.Accent,
             modifier = Modifier.size(10.dp),
         )
-        Text(text = "LOCKED", color = YancoPalette.Accent, style = YancoType.Overline)
+        Text(text = "LOCKED", color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
     }
 }
 
@@ -588,17 +590,17 @@ private fun HeroIdlePlaceholder(modifier: Modifier) {
     ) {
         Text(
             text = "YANCOTV+",
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
         Text(
             text = "Move through the rail to preview",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayS,
         )
         Text(
             text = "The focused title becomes the hero — browse, then press OK to watch.",
-            color = YancoPalette.TextSecondary,
+            color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.BodyLong,
         )
     }

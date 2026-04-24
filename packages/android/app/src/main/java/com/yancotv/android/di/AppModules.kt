@@ -8,6 +8,7 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.AndroidEpgImporter
+import com.yancotv.android.ui.theme.ThemeController
 import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.content.ContentRepository
@@ -123,6 +124,10 @@ val appModule =
             )
         }
         single { AppPreferences(db = get()) }
+        // MK.16.1 — theme controller. Singleton so every composable
+        // in the app reads from the same StateFlow<ThemeId>. Pref
+        // persistence (AppPreferences-backed) wires in MK.16.2.
+        single { ThemeController() }
         single {
             ContentDetailService(
                 db = get(),

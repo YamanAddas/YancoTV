@@ -21,7 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.parental.ParentalRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -69,14 +69,14 @@ fun PinEntryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = YancoPalette.BackgroundRaised,
+        containerColor = LocalYancoPalette.current.BackgroundRaised,
         title = {
-            Text(text = title, color = YancoPalette.TextPrimary)
+            Text(text = title, color = LocalYancoPalette.current.TextPrimary)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (body != null) {
-                    Text(text = body, color = YancoPalette.TextMuted, fontSize = 12.sp)
+                    Text(text = body, color = LocalYancoPalette.current.TextMuted, fontSize = 12.sp)
                 }
                 OutlinedTextField(
                     value = pin,
@@ -94,27 +94,27 @@ fun PinEntryDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     textStyle =
                         TextStyle(
-                            color = YancoPalette.TextPrimary,
+                            color = LocalYancoPalette.current.TextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
                         ),
                     colors =
                         OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = YancoPalette.TextPrimary,
-                            unfocusedTextColor = YancoPalette.TextPrimary,
-                            focusedBorderColor = YancoPalette.Accent,
-                            unfocusedBorderColor = YancoPalette.BackgroundHover,
-                            cursorColor = YancoPalette.Accent,
+                            focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                            unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                            focusedBorderColor = LocalYancoPalette.current.Accent,
+                            unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                            cursorColor = LocalYancoPalette.current.Accent,
                         ),
                 )
                 if (lockoutSec > 0) {
                     Text(
                         text = "Too many attempts. Try again in ${lockoutSec}s.",
-                        color = YancoPalette.Error,
+                        color = LocalYancoPalette.current.Error,
                         fontSize = 12.sp,
                     )
                 } else if (error != null) {
-                    Text(text = error!!, color = YancoPalette.Error, fontSize = 12.sp)
+                    Text(text = error!!, color = LocalYancoPalette.current.Error, fontSize = 12.sp)
                 }
             }
         },
@@ -139,12 +139,12 @@ fun PinEntryDialog(
                     }
                 },
             ) {
-                Text("Unlock", color = YancoPalette.Accent)
+                Text("Unlock", color = LocalYancoPalette.current.Accent)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = YancoPalette.TextPrimary)
+                Text("Cancel", color = LocalYancoPalette.current.TextPrimary)
             }
         },
     )

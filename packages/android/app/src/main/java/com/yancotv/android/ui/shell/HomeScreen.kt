@@ -38,7 +38,7 @@ import com.yancotv.android.ui.detail.ContentDetailScreen
 import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.settings.SettingsScreen
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.parental.ParentalRepository
@@ -460,7 +460,7 @@ fun HomeScreen(
                         Modifier
                             .fillMaxWidth(if (isTv) 0.6f else 1f)
                             .fillMaxHeight()
-                            .background(YancoPalette.BackgroundDeep)
+                            .background(LocalYancoPalette.current.BackgroundDeep)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -545,12 +545,12 @@ private fun SettingsLockedPlaceholder() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep),
+                .background(LocalYancoPalette.current.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = "Enter PIN to access Settings.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
         )
     }
 }
@@ -585,12 +585,12 @@ private fun PlaceholderArea(section: AppSection) {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep),
+                .background(LocalYancoPalette.current.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = "${section.label} — coming in a later milestone.",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
         )
     }
 }

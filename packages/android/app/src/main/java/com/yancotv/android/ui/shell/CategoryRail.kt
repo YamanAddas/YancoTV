@@ -54,7 +54,7 @@ import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -139,14 +139,14 @@ fun CategoryRail(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            YancoPalette.BackgroundElevated.copy(alpha = 0.78f),
-                            YancoPalette.BackgroundRaised.copy(alpha = 0.70f),
-                            YancoPalette.BackgroundDeep.copy(alpha = 0.82f),
+                            LocalYancoPalette.current.BackgroundElevated.copy(alpha = 0.78f),
+                            LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.70f),
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.82f),
                         ),
                     ),
                 ).border(
                     width = 1.dp,
-                    color = YancoPalette.BorderSubtle.copy(alpha = 0.35f),
+                    color = LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.35f),
                     shape = RoundedCornerShape(0.dp),
                 ).padding(top = Space.md)
                 // D-pad LEFT pops to the sidebar from anywhere in the rail.
@@ -171,7 +171,7 @@ fun CategoryRail(
         // out of focus traversal because it isn't focusable.
         Text(
             text = "CATEGORIES",
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
             modifier = Modifier.padding(start = Space.lg, end = Space.lg, bottom = Space.sm),
         )
@@ -271,29 +271,29 @@ private fun HexPillRow(
         when {
             focused ->
                 Brush.verticalGradient(
-                    listOf(YancoPalette.Accent, YancoPalette.AccentDeep),
+                    listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
                 )
             selected ->
                 Brush.verticalGradient(
                     listOf(
-                        YancoPalette.Accent.copy(alpha = 0.22f),
-                        YancoPalette.AccentDeep.copy(alpha = 0.14f),
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f),
+                        LocalYancoPalette.current.AccentDeep.copy(alpha = 0.14f),
                     ),
                 )
-            else -> SolidColor(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+            else -> SolidColor(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
         }
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            selected -> YancoPalette.Accent.copy(alpha = 0.55f)
-            else -> YancoPalette.BorderSubtle
+            focused -> LocalYancoPalette.current.FocusRing
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.55f)
+            else -> LocalYancoPalette.current.BorderSubtle
         }
     val fg by animateColorAsState(
         targetValue =
             when {
                 focused -> Color.Black
-                selected -> YancoPalette.Accent
-                else -> YancoPalette.TextSecondary
+                selected -> LocalYancoPalette.current.Accent
+                else -> LocalYancoPalette.current.TextSecondary
             },
         label = "rail-pill-fg",
     )
@@ -305,8 +305,8 @@ private fun HexPillRow(
                 .shadow(
                     elevation = if (focused) 16.dp else 0.dp,
                     shape = YancoShapes.HexPill,
-                    ambientColor = YancoPalette.Accent,
-                    spotColor = YancoPalette.Accent,
+                    ambientColor = LocalYancoPalette.current.Accent,
+                    spotColor = LocalYancoPalette.current.Accent,
                 ).clip(YancoShapes.HexPill)
                 .background(bg)
                 .border(if (focused) 2.dp else 1.dp, border, YancoShapes.HexPill)
@@ -351,7 +351,7 @@ private fun HexPillRow(
                     Modifier
                         .size(6.dp)
                         .clip(RoundedCornerShape(Radius.pill))
-                        .background(if (focused) Color.Black else YancoPalette.Accent),
+                        .background(if (focused) Color.Black else LocalYancoPalette.current.Accent),
             )
         }
         Text(

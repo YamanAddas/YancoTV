@@ -75,7 +75,7 @@ import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
@@ -506,14 +506,14 @@ private fun PreviewPane(
                     .weight(0.6f)
                     .fillMaxHeight()
                     .clip(YancoShapes.CutCornerCardLarge)
-                    .background(YancoPalette.BackgroundDeep)
+                    .background(LocalYancoPalette.current.BackgroundDeep)
                     .border(
                         width = 1.dp,
                         brush =
                             Brush.verticalGradient(
                                 listOf(
-                                    YancoPalette.Accent.copy(alpha = 0.45f),
-                                    YancoPalette.PanelBorder,
+                                    LocalYancoPalette.current.Accent.copy(alpha = 0.45f),
+                                    LocalYancoPalette.current.PanelBorder,
                                 ),
                             ),
                         shape = YancoShapes.CutCornerCardLarge,
@@ -547,7 +547,7 @@ private fun PreviewPane(
                             Brush.verticalGradient(
                                 0f to Color.Transparent,
                                 0.85f to Color.Transparent,
-                                1f to YancoPalette.BackgroundDeep.copy(alpha = 0.55f),
+                                1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f),
                             ),
                         ),
             )
@@ -587,8 +587,8 @@ private fun PreviewIdleArtwork(type: ContentType) {
                 .background(
                     Brush.linearGradient(
                         listOf(
-                            YancoPalette.BackgroundElevated,
-                            YancoPalette.BackgroundDeep,
+                            LocalYancoPalette.current.BackgroundElevated,
+                            LocalYancoPalette.current.BackgroundDeep,
                         ),
                     ),
                 ),
@@ -596,7 +596,7 @@ private fun PreviewIdleArtwork(type: ContentType) {
     ) {
         Text(
             text = brand,
-            color = YancoPalette.Accent.copy(alpha = 0.45f),
+            color = LocalYancoPalette.current.Accent.copy(alpha = 0.45f),
             style = YancoType.DisplayS,
         )
     }
@@ -649,20 +649,20 @@ private fun MetaColumn(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.md),
         ) {
-            Text(text = overline, color = YancoPalette.Accent, style = YancoType.Overline)
+            Text(text = overline, color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
             if (isPlaying) MetaLivePill()
             if (isLocked) MetaLockChip()
         }
         Text(
             text = title,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayM,
             maxLines = 2,
         )
         if (type == ContentType.LIVE && nowProg != null) {
             Text(
                 text = "Now: ${nowProg.title}",
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleM,
                 maxLines = 2,
             )
@@ -673,7 +673,7 @@ private fun MetaColumn(
             if (!grp.isNullOrBlank()) {
                 Text(
                     text = grp,
-                    color = YancoPalette.TextSecondary,
+                    color = LocalYancoPalette.current.TextSecondary,
                     style = YancoType.Body,
                     maxLines = 1,
                 )
@@ -682,7 +682,7 @@ private fun MetaColumn(
         if (type == ContentType.LIVE && nextProg != null) {
             Text(
                 text = "Up next: ${nextProg.title}",
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
             )
@@ -751,18 +751,18 @@ private fun EmptyMetaPrompt(
                 )
         }
     Column(modifier = modifier, verticalArrangement = Arrangement.Center) {
-        Text(text = overline, color = YancoPalette.Accent, style = YancoType.Overline)
+        Text(text = overline, color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
         Spacer(Modifier.height(Space.sm))
         Text(
             text = title,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayS,
             maxLines = 2,
         )
         Spacer(Modifier.height(Space.sm))
         Text(
             text = body,
-            color = YancoPalette.TextSecondary,
+            color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.BodyLong,
             maxLines = 3,
         )
@@ -785,7 +785,7 @@ private fun ProgressLine(
                     .fillMaxWidth()
                     .height(3.dp)
                     .clip(RoundedCornerShape(Radius.pill))
-                    .background(YancoPalette.BorderSubtle),
+                    .background(LocalYancoPalette.current.BorderSubtle),
         ) {
             Box(
                 modifier =
@@ -795,9 +795,9 @@ private fun ProgressLine(
                         .background(
                             Brush.horizontalGradient(
                                 listOf(
-                                    YancoPalette.AccentDeep,
-                                    YancoPalette.Accent,
-                                    YancoPalette.AccentGlow,
+                                    LocalYancoPalette.current.AccentDeep,
+                                    LocalYancoPalette.current.Accent,
+                                    LocalYancoPalette.current.AccentGlow,
                                 ),
                             ),
                         ),
@@ -805,7 +805,7 @@ private fun ProgressLine(
         }
         Text(
             text = if (remainingMin > 0) "$remainingMin min left" else "Ending now",
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Caption,
         )
     }
@@ -825,26 +825,26 @@ private fun HexCta(
     val bg by animateColorAsState(
         targetValue =
             when {
-                primary && focused -> YancoPalette.AccentGlow
-                primary -> YancoPalette.Accent
-                focused -> YancoPalette.Accent.copy(alpha = 0.22f)
-                highlighted -> YancoPalette.Accent.copy(alpha = 0.14f)
-                else -> YancoPalette.BackgroundDeep.copy(alpha = 0.6f)
+                primary && focused -> LocalYancoPalette.current.AccentGlow
+                primary -> LocalYancoPalette.current.Accent
+                focused -> LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+                highlighted -> LocalYancoPalette.current.Accent.copy(alpha = 0.14f)
+                else -> LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f)
             },
         label = "hexCtaBg",
     )
     val border =
         when {
-            focused -> YancoPalette.FocusRing
-            primary -> YancoPalette.AccentDeep
-            highlighted -> YancoPalette.Accent.copy(alpha = 0.55f)
-            else -> YancoPalette.PanelBorder
+            focused -> LocalYancoPalette.current.FocusRing
+            primary -> LocalYancoPalette.current.AccentDeep
+            highlighted -> LocalYancoPalette.current.Accent.copy(alpha = 0.55f)
+            else -> LocalYancoPalette.current.PanelBorder
         }
     val fg =
         when {
-            primary -> YancoPalette.BackgroundDeep
-            highlighted -> YancoPalette.Accent
-            else -> YancoPalette.TextPrimary
+            primary -> LocalYancoPalette.current.BackgroundDeep
+            highlighted -> LocalYancoPalette.current.Accent
+            else -> LocalYancoPalette.current.TextPrimary
         }
     Row(
         modifier =
@@ -852,8 +852,8 @@ private fun HexCta(
                 .shadow(
                     elevation = if (focused) 14.dp else 0.dp,
                     shape = shape,
-                    ambientColor = YancoPalette.Accent,
-                    spotColor = YancoPalette.Accent,
+                    ambientColor = LocalYancoPalette.current.Accent,
+                    spotColor = LocalYancoPalette.current.Accent,
                 ).clip(shape)
                 .background(bg)
                 .border(if (focused) 2.dp else 1.dp, border, shape)
@@ -885,7 +885,7 @@ private fun MetaLivePill() {
         modifier =
             Modifier
                 .clip(YancoShapes.ChipBevel)
-                .background(YancoPalette.Live)
+                .background(LocalYancoPalette.current.Live)
                 .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -907,8 +907,8 @@ private fun MetaLockChip() {
         modifier =
             Modifier
                 .clip(YancoShapes.ChipBevel)
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
-                .border(1.dp, YancoPalette.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
+                .border(1.dp, LocalYancoPalette.current.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
                 .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -916,10 +916,10 @@ private fun MetaLockChip() {
         Icon(
             imageVector = YancoIcons.Lock,
             contentDescription = null,
-            tint = YancoPalette.Accent,
+            tint = LocalYancoPalette.current.Accent,
             modifier = Modifier.size(10.dp),
         )
-        Text(text = "LOCKED", color = YancoPalette.Accent, style = YancoType.Overline)
+        Text(text = "LOCKED", color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
     }
 }
 
@@ -1038,19 +1038,19 @@ private fun ContentOrb(
                     .shadow(
                         elevation = if (focused) 28.dp else 6.dp,
                         shape = YancoShapes.HexCapsule,
-                        ambientColor = YancoPalette.Accent,
-                        spotColor = YancoPalette.Accent,
+                        ambientColor = LocalYancoPalette.current.Accent,
+                        spotColor = LocalYancoPalette.current.Accent,
                     ).clip(YancoShapes.HexCapsule)
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                YancoPalette.BackgroundElevated,
-                                YancoPalette.BackgroundDeep,
+                                LocalYancoPalette.current.BackgroundElevated,
+                                LocalYancoPalette.current.BackgroundDeep,
                             ),
                         ),
                     ).border(
                         width = if (focused) 2.dp else 1.dp,
-                        color = if (focused) YancoPalette.FocusRing else YancoPalette.PanelBorder,
+                        color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
                         shape = YancoShapes.HexCapsule,
                     ).then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
                     .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
@@ -1075,7 +1075,7 @@ private fun ContentOrb(
             } else {
                 Text(
                     text = title.take(2).uppercase(),
-                    color = YancoPalette.Accent,
+                    color = LocalYancoPalette.current.Accent,
                     style = YancoType.TitleL,
                 )
             }
@@ -1087,10 +1087,10 @@ private fun ContentOrb(
                             .padding(Space.xs)
                             .size(22.dp)
                             .clip(RoundedCornerShape(Radius.pill))
-                            .background(YancoPalette.BackgroundDeep.copy(alpha = 0.85f))
+                            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
                             .border(
                                 1.dp,
-                                YancoPalette.Accent.copy(alpha = 0.55f),
+                                LocalYancoPalette.current.Accent.copy(alpha = 0.55f),
                                 RoundedCornerShape(Radius.pill),
                             ),
                     contentAlignment = Alignment.Center,
@@ -1098,7 +1098,7 @@ private fun ContentOrb(
                     Icon(
                         imageVector = YancoIcons.Lock,
                         contentDescription = null,
-                        tint = YancoPalette.Accent,
+                        tint = LocalYancoPalette.current.Accent,
                         modifier = Modifier.size(12.dp),
                     )
                 }
@@ -1106,7 +1106,7 @@ private fun ContentOrb(
         }
         Text(
             text = title,
-            color = if (isCenter) YancoPalette.TextPrimary else YancoPalette.TextSecondary,
+            color = if (isCenter) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextSecondary,
             style = if (isCenter) YancoType.LabelStrong else YancoType.Label,
             maxLines = 1,
         )
@@ -1121,7 +1121,7 @@ private fun ContentOrb(
         if (sub.isNotBlank()) {
             Text(
                 text = sub,
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
             )
@@ -1164,13 +1164,13 @@ private fun CoverflowEmptyState(
     ) {
         Text(
             text = title,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.TitleL,
         )
         Spacer(Modifier.height(Space.sm))
         Text(
             text = body,
-            color = YancoPalette.TextMuted,
+            color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Body,
         )
     }

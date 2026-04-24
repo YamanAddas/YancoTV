@@ -59,7 +59,7 @@ import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.YancoPalette
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
@@ -77,11 +77,6 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.util.Locale
 import kotlin.math.roundToInt
-
-private val tileProgressBrush =
-    Brush.horizontalGradient(
-        colors = listOf(YancoPalette.AccentDeep, YancoPalette.Accent, YancoPalette.AccentGlow),
-    )
 
 /**
  * Home landing dashboard. Six rails stacked on a cinematic canvas:
@@ -268,7 +263,7 @@ fun HomeContent(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(YancoPalette.BackgroundDeep)
+                .background(LocalYancoPalette.current.BackgroundDeep)
                 .verticalScroll(rememberScrollState())
                 .padding(top = Space.xl, bottom = Space.section),
         verticalArrangement = Arrangement.spacedBy(Space.xxxl),
@@ -489,9 +484,9 @@ private fun HomeHero(
                                     .clip(RoundedCornerShape(Radius.pill))
                                     .background(
                                         if (i == safeIndex) {
-                                            YancoPalette.Accent
+                                            LocalYancoPalette.current.Accent
                                         } else {
-                                            YancoPalette.TextFaint
+                                            LocalYancoPalette.current.TextFaint
                                         },
                                     ),
                         )
@@ -528,8 +523,8 @@ private fun HeroFrame(
                             Brush.linearGradient(
                                 colors =
                                     listOf(
-                                        YancoPalette.BackgroundElevated,
-                                        YancoPalette.BackgroundHover,
+                                        LocalYancoPalette.current.BackgroundElevated,
+                                        LocalYancoPalette.current.BackgroundHover,
                                     ),
                             ),
                         ),
@@ -545,8 +540,8 @@ private fun HeroFrame(
                         Brush.horizontalGradient(
                             colors =
                                 listOf(
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.40f),
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.40f),
                                     Color.Transparent,
                                 ),
                         ),
@@ -561,8 +556,8 @@ private fun HeroFrame(
                             colors =
                                 listOf(
                                     Color.Transparent,
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.45f),
-                                    YancoPalette.BackgroundDeep.copy(alpha = 0.85f),
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.45f),
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f),
                                 ),
                         ),
                     ),
@@ -582,26 +577,26 @@ private fun HeroFrame(
                 Icon(
                     imageVector = slide.accentIcon,
                     contentDescription = null,
-                    tint = YancoPalette.Accent,
+                    tint = LocalYancoPalette.current.Accent,
                     modifier = Modifier.size(16.dp),
                 )
                 Text(
                     text = slide.eyebrow,
-                    color = YancoPalette.Accent,
+                    color = LocalYancoPalette.current.Accent,
                     style = YancoType.Overline,
                 )
             }
             Spacer(Modifier.height(Space.sm))
             Text(
                 text = slide.headline,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.DisplayM,
                 maxLines = 2,
             )
             Spacer(Modifier.height(Space.xs))
             Text(
                 text = slide.subhead,
-                color = YancoPalette.TextSecondary,
+                color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.Body,
                 maxLines = 1,
             )
@@ -614,7 +609,7 @@ private fun HeroFrame(
                 if (!slide.item.groupName.isNullOrBlank()) {
                     Text(
                         text = slide.item.groupName!!,
-                        color = YancoPalette.TextMuted,
+                        color = LocalYancoPalette.current.TextMuted,
                         style = YancoType.Caption,
                     )
                 }
@@ -637,9 +632,9 @@ private fun HeroCta(
                 .clip(YancoShapes.ButtonBevel)
                 .background(
                     if (focused) {
-                        YancoPalette.Accent
+                        LocalYancoPalette.current.Accent
                     } else {
-                        YancoPalette.Accent.copy(alpha = 0.22f)
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
                     },
                 ).padding(horizontal = Space.lg, vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -648,12 +643,12 @@ private fun HeroCta(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (focused) YancoPalette.BackgroundDeep else YancoPalette.Accent,
+            tint = if (focused) LocalYancoPalette.current.BackgroundDeep else LocalYancoPalette.current.Accent,
             modifier = Modifier.size(16.dp),
         )
         Text(
             text = label,
-            color = if (focused) YancoPalette.BackgroundDeep else YancoPalette.Accent,
+            color = if (focused) LocalYancoPalette.current.BackgroundDeep else LocalYancoPalette.current.Accent,
             style = YancoType.LabelStrong,
         )
     }
@@ -670,20 +665,20 @@ private fun RailHeader(
     Column(modifier = Modifier.padding(horizontal = Space.section)) {
         Text(
             text = eyebrow,
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
         Spacer(Modifier.height(Space.xxs))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = title,
-                color = YancoPalette.TextPrimary,
+                color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleL,
             )
             Spacer(Modifier.width(Space.md))
             Text(
                 text = caption,
-                color = YancoPalette.TextMuted,
+                color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 modifier = Modifier.padding(bottom = 3.dp),
             )
@@ -834,7 +829,7 @@ private fun PosterTile(
                                         listOf(
                                             Color.Transparent,
                                             Color.Transparent,
-                                            YancoPalette.BackgroundDeep.copy(alpha = 0.9f),
+                                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.9f),
                                         ),
                                 ),
                             ),
@@ -869,19 +864,19 @@ private fun PosterTile(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
                         .padding(horizontal = Space.md, vertical = Space.sm),
                 verticalArrangement = Arrangement.spacedBy(Space.xxs),
             ) {
                 Text(
                     text = item.cleanTitle?.ifBlank { null } ?: item.title,
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
                 )
                 Text(
                     text = secondaryLine(item, resume),
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
                 )
@@ -932,7 +927,7 @@ private fun OnNowTile(
                                         listOf(
                                             Color.Transparent,
                                             Color.Transparent,
-                                            YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
                                         ),
                                 ),
                             ),
@@ -957,19 +952,19 @@ private fun OnNowTile(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
                         .padding(horizontal = Space.md, vertical = Space.sm),
                 verticalArrangement = Arrangement.spacedBy(Space.xxs),
             ) {
                 Text(
                     text = pair.programme.title,
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
                 )
                 Text(
                     text = pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
                 )
@@ -1016,7 +1011,7 @@ private fun UpNextTile(
                                         listOf(
                                             Color.Transparent,
                                             Color.Transparent,
-                                            YancoPalette.BackgroundDeep.copy(alpha = 0.92f),
+                                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
                                         ),
                                 ),
                             ),
@@ -1040,19 +1035,19 @@ private fun UpNextTile(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(YancoPalette.BackgroundDeep.copy(alpha = 0.55f))
+                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
                         .padding(horizontal = Space.md, vertical = Space.sm),
                 verticalArrangement = Arrangement.spacedBy(Space.xxs),
             ) {
                 Text(
                     text = pair.programme.title,
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
                 )
                 Text(
                     text = pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
-                    color = YancoPalette.TextMuted,
+                    color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
                 )
@@ -1084,8 +1079,8 @@ private fun TileArt(
                         Brush.linearGradient(
                             colors =
                                 listOf(
-                                    YancoPalette.BackgroundHover,
-                                    YancoPalette.BackgroundElevated,
+                                    LocalYancoPalette.current.BackgroundHover,
+                                    LocalYancoPalette.current.BackgroundElevated,
                                 ),
                         ),
                     ),
@@ -1093,7 +1088,7 @@ private fun TileArt(
         ) {
             Text(
                 text = (item.cleanTitle?.ifBlank { null } ?: item.title).take(2).uppercase(),
-                color = if (focused) YancoPalette.Accent else YancoPalette.TextSecondary,
+                color = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextSecondary,
                 style = YancoType.DisplayS,
                 fontWeight = FontWeight.Black,
             )
@@ -1108,13 +1103,13 @@ private fun LockBadge(modifier: Modifier = Modifier) {
             modifier
                 .size(24.dp)
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.75f)),
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = YancoIcons.Lock,
             contentDescription = "Locked",
-            tint = YancoPalette.Live,
+            tint = LocalYancoPalette.current.Live,
             modifier = Modifier.size(14.dp),
         )
     }
@@ -1138,7 +1133,7 @@ private fun ResumeBadge(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.75f))
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f))
                 .padding(horizontal = Space.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -1146,12 +1141,12 @@ private fun ResumeBadge(
         Icon(
             imageVector = YancoIcons.Play,
             contentDescription = null,
-            tint = YancoPalette.Accent,
+            tint = LocalYancoPalette.current.Accent,
             modifier = Modifier.size(10.dp),
         )
         Text(
             text = label,
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.Caption,
         )
     }
@@ -1163,7 +1158,7 @@ private fun LiveBadge(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(YancoPalette.Live.copy(alpha = 0.88f))
+                .background(LocalYancoPalette.current.Live.copy(alpha = 0.88f))
                 .padding(horizontal = Space.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -1173,11 +1168,11 @@ private fun LiveBadge(modifier: Modifier = Modifier) {
                 Modifier
                     .size(6.dp)
                     .clip(RoundedCornerShape(Radius.pill))
-                    .background(YancoPalette.TextPrimary),
+                    .background(LocalYancoPalette.current.TextPrimary),
         )
         Text(
             text = "LIVE",
-            color = YancoPalette.TextPrimary,
+            color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.Overline,
         )
     }
@@ -1192,14 +1187,14 @@ private fun StartTimeBadge(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.78f))
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.78f))
                 .padding(horizontal = Space.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Text(
             text = formatClock(programme.startTime),
-            color = YancoPalette.Accent,
+            color = LocalYancoPalette.current.Accent,
             style = YancoType.CaptionStrong,
         )
     }
@@ -1220,12 +1215,12 @@ private fun TypeChip(
         modifier =
             modifier
                 .clip(YancoShapes.ChipBevel)
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.72f))
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.72f))
                 .padding(horizontal = Space.md, vertical = 3.dp),
     ) {
         Text(
             text = label,
-            color = YancoPalette.TextSecondary,
+            color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.Caption,
             maxLines = 1,
         )
@@ -1237,12 +1232,20 @@ private fun ProgressStripe(
     progress: Float,
     modifier: Modifier,
 ) {
+    // Brush rebuilds only on palette swap (MK.16.1), not every recompose.
+    val pal = LocalYancoPalette.current
+    val tileProgressBrush =
+        remember(pal) {
+            Brush.horizontalGradient(
+                colors = listOf(pal.AccentDeep, pal.Accent, pal.AccentGlow),
+            )
+        }
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
                 .height(4.dp)
-                .background(YancoPalette.BackgroundDeep.copy(alpha = 0.6f)),
+                .background(pal.BackgroundDeep.copy(alpha = 0.6f)),
     ) {
         Box(
             modifier =
@@ -1372,8 +1375,8 @@ private fun EmptyHome(modifier: Modifier) {
                         Brush.linearGradient(
                             colors =
                                 listOf(
-                                    YancoPalette.BackgroundRaised,
-                                    YancoPalette.BackgroundElevated,
+                                    LocalYancoPalette.current.BackgroundRaised,
+                                    LocalYancoPalette.current.BackgroundElevated,
                                 ),
                         ),
                     ).padding(horizontal = Space.xxxl, vertical = Space.xxxl),
@@ -1384,18 +1387,18 @@ private fun EmptyHome(modifier: Modifier) {
             ) {
                 Text(
                     text = "YANCOTV+",
-                    color = YancoPalette.Accent,
+                    color = LocalYancoPalette.current.Accent,
                     style = YancoType.Overline,
                 )
                 Text(
                     text = "Your cinematic IPTV suite",
-                    color = YancoPalette.TextPrimary,
+                    color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.DisplayS,
                 )
                 Spacer(Modifier.height(Space.xs))
                 Text(
                     text = "Add a source in Settings → Sources, star a few channels, and this dashboard lights up with what to watch right now.",
-                    color = YancoPalette.TextSecondary,
+                    color = LocalYancoPalette.current.TextSecondary,
                     style = YancoType.BodyLong,
                 )
             }
