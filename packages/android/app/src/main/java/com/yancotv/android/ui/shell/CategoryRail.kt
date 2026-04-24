@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -149,6 +150,14 @@ fun CategoryRail(
                     color = LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.35f),
                     shape = RoundedCornerShape(0.dp),
                 ).padding(top = Space.md)
+                // Track whether ANY descendant pill has focus. Drives both
+                // [BackHandler] (BACK on a pill pops to sidebar — without
+                // this, hasFocus stayed false forever and BACK fell through
+                // to the system handler, exiting the app) and the
+                // onPanelFocusChanged callback that lets HomeScreen mark
+                // panelFocus=Categories when focus enters by routes other
+                // than the explicit RIGHT-from-sidebar path.
+                .onFocusChanged { hasFocus = it.hasFocus }
                 // D-pad LEFT pops to the sidebar from anywhere in the rail.
                 // RIGHT is intentionally NOT handled here — it's owned by each
                 // HexPillRow so the pill's `group` is captured in the click

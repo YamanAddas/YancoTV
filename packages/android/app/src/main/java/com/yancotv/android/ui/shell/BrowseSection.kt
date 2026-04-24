@@ -109,18 +109,42 @@ fun BrowseSection(
     // previous composition; isPlaced is true and awaitAndRequest fires
     // immediately. Both paths converge cleanly.
     LaunchedEffect(type, panelFocus) {
-        // When focus leaves Categories, the rail unmounts. Reset the anchor
-        // so re-entry (LEFT from coverflow / leftmost CTA) waits for the
-        // freshly-placed pill's onPlaced before requesting focus. Without
-        // this reset, `isPlaced` is stale-true from the previous mount and
-        // `awaitAndRequest` fires immediately against a detached
-        // FocusRequester — request silently fails, no pill has focus, LEFT
-        // and BACK both land nowhere and the next BACK closes the app.
-        if (panelFocus != PanelFocus.Categories) {
-            pillAnchor.reset()
-            return@LaunchedEffect
+        when (panelFocus) {
+            PanelFocus.Content -> {
+                // Rail unmounts (categoriesVisible == false). Reset so
+                // re-entry (LEFT from coverflow / leftmost CTA) waits for
+                // the freshly-placed pill's onPlaced before requesting
+                // focus. Without this reset, `isPlaced` is stale-true
+                // from the previous mount and `awaitAndRequest` fires
+                // immediately against a detached FocusRequester — the
+                // request silently fails, no pill has focus, LEFT and
+                // BACK both land nowhere and the next BACK closes the
+                // app.
+                pillAnchor.reset()
+            }
+            PanelFocus.Categories -> {
+                // Land focus on the active pill. This works whether the
+                // rail just remounted (Content → Categories: isPlaced
+                // resets to false above, then onPlaced flips it true and
+                // awaitAndRequest fires) or stayed mounted across the
+                // Sidebar transition (isPlaced is still true from the
+                // earlier mount, awaitAndRequest fires immediately).
+                pillAnchor.awaitAndRequest()
+            }
+            PanelFocus.Sidebar -> {
+                // Rail STAYS mounted (categoriesVisible == true). The
+                // pill's onPlaced won't refire while the node is still in
+                // the tree, so resetting isPlaced here would deadlock
+                // the next Sidebar → Categories transition: awaitAndRequest
+                // would wait forever. Leaving isPlaced=true means the
+                // next RIGHT-from-sidebar fires requestFocus immediately
+                // against the still-attached pill node. Critical: this
+                // is the bug Categories→Sidebar→Categories navigation
+                // tripped over before — RIGHT from sidebar appeared dead
+                // because focus was waiting on a re-placement that never
+                // came.
+            }
         }
-        pillAnchor.awaitAndRequest()
     }
     // Group catalogue per type. One-shot per type switch — failures degrade
     // silently to "no groups", in which case the rail still renders the
