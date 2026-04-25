@@ -76,6 +76,19 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            // Lets unit tests construct framework-touching classes
+            // (e.g. androidx.media3.common.PlaybackException, which calls
+            // SystemClock.elapsedRealtime() in its constructor) without
+            // standing up Robolectric. Un-mocked methods return 0 / null /
+            // false instead of throwing — fine for tests that only care
+            // about the wrapping object's logic, not Android framework
+            // behaviour. MK.9.4 FFmpeg-classifier test depends on this.
+            isReturnDefaultValues = true
+        }
+    }
+
     lint {
         // Launcher + banner assets are the MK.12 pass; the manifest
         // already documents the placeholder state. Keeping this as a

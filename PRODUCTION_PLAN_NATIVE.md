@@ -119,9 +119,11 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 
 ### Status (per 2026-04-25 audit)
 
-**Shipped:** MK.0–MK.8, MK.12a/b, MK.13.1–13.3, MK.16.shell, MK.16.1, MK.16.sheet, MK.16.player.vod.dock, MK.16.player.vod.chrome, MK.17.1, MK.18.1. D-phase complete. 133 commits pushed to `origin/master` 2026-04-25.
+**Shipped:** MK.0–MK.8, MK.9.1–9.5 (code-complete 2026-04-25), MK.12a/b, MK.13.1–13.3, MK.16.shell, MK.16.1, MK.16.sheet, MK.16.player.vod.dock, MK.16.player.vod.chrome, MK.17.1, MK.18.1. D-phase complete. 133 commits pushed to `origin/master` 2026-04-25.
 
-**Not started:** MK.9 (FFmpeg parked in `.ffmpeg-parked/`), MK.10 (Recommendations + voice search only — TIF deferred), MK.11.1/2 (PIP + gestures), MK.13.4, MK.14, MK.15, MK.16.2–16.6, MK.17.1a/2/3/4/5, MK.18.2, MK.19.
+**Not started:** MK.10 (Recommendations + voice search only — TIF deferred), MK.11.1/2 (PIP + gestures), MK.13.4, MK.14, MK.15, MK.16.2–16.6, MK.17.1a/2/3/4/5, MK.18.2, MK.19.
+
+**Pending verification:** MK.9.6 — 10-channel hands-on regression on Fire TV closes MB-14 and ticks Stage 1.2.
 
 **Dropped or deferred:** see Locked decisions table below.
 
@@ -140,7 +142,7 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 | # | Task | Maps to |
 |---|---|---|
 | 1.1 | ✅ Push 133 commits to `origin/master` (done 2026-04-25) | — |
-| 1.2 | **MK.9 FFmpeg ExoPlayer extension** + crash watchdog + platform-decoder fallback. Closes MB-14. NDK build for armeabi-v7a + arm64-v8a + x86_64. Register `FfmpegAudioRenderer` + `FfmpegVideoRenderer` with `EXTENSION_RENDERER_MODE_PREFER`. R8 keep rules for native libs in same commit. Fallback: if extension renderer crashes, swap to platform decoder, never hard-crash `PlayerActivity`. | MK.9 |
+| 1.2 | **MK.9 FFmpeg ExoPlayer extension** + crash watchdog + platform-decoder fallback. Closes MB-14. ⚙️ **Code-complete 2026-04-25** (`8f7551f` + `62a7ebe`): vendored sources + JNI shim live under `app/src/main/`, `DefaultRenderersFactory` registers `FfmpegAudioRenderer` + `FfmpegVideoRenderer` with `EXTENSION_RENDERER_MODE_PREFER` in `PlaybackController` (no `PlaybackService` — controller owns the player), R8 keep rules in `proguard-rules.pro`, watchdog releases-and-rebuilds with `EXTENSION_RENDERER_MODE_OFF` on FFmpeg-package errors (one rebuild per session), unit tests pin the classifier. ABIs scoped to `arm64-v8a` + `armeabi-v7a` (x86 / x86_64 dropped — emulator-only). ⏳ **Hands-on regression on real Fire TV channels still pending — closes Stage 1.2 once 10-channel verification posts.** | MK.9 |
 | 1.3 | **Sentry SDK integrated** — Android + KMP shared. Crash reporting, error breadcrumbs, network failure tracking. Replaces previously-planned Firebase Crashlytics (decision 2026-04-25). | MK.19.5 (re-platformed) |
 | 1.4 | **R8 / ProGuard baseline** + signed-APK pipeline. Keep rules for Media3 reflection, Koin module DSL, Kermit, SQLDelight runtime, Ktor serialization. Release-build smoke test added to per-commit dev cycle. | MK.19.1 |
 | 1.5 | **DB migration test harness** — real "upgrade from version N to N+1 with seeded data" tests, not just schema parsing. Plus a corruption-recovery path: if SQLDelight DB fails to open, soft-reset to a fresh DB while preserving Keystore credentials and a JSON dump of sources. | new (was implicit) |
@@ -337,7 +339,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 
 ### **MK.9 — Codec gap (FFmpeg ExoPlayer extension)** — Stage 1 priority
 
-> **Now Stage 1.2 in the v1.0 roadmap above.** Closes MB-14 (~30% of streams currently audio-only). Source is parked in `.ffmpeg-parked/`. Scope expanded 2026-04-25 to include crash watchdog + platform-decoder fallback + R8 keep rules in the same commit series.
+> **Now Stage 1.2 in the v1.0 roadmap above.** Closes MB-14 (~30% of streams currently audio-only). Sources unparked into `app/src/main/` 2026-04-25 (`8f7551f`); watchdog landed in `62a7ebe`. Scope completed: extension wired through `PlaybackController` (not a `PlaybackService` — the parked notes assumed one), platform-decoder fallback via `EXTENSION_RENDERER_MODE_OFF`-rebuild on confirmed FFmpeg-package errors, R8 keep rules pre-staged for Stage 1.4. ABIs `arm64-v8a` + `armeabi-v7a` only; x86/x86_64 dropped (emulator-only). MK.9.6 (10-channel regression on real source) still pending.
 
 | # | Task | DoD |
 |---|---|---|

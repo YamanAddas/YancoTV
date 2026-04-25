@@ -2,7 +2,7 @@
 
 Living register of **open** bugs across desktop and mobile. Closed bugs move to the changelog; incident reports (deep post-mortems or one-off refactor bug dumps) go to [docs/incidents/](docs/incidents/).
 
-**Last updated:** 2026-04-25 (MB-106/107/107a/108 + MB-109/110/111 + MB-112 + MB-113 + MB-114/115 + MB-117 + MB-116 — Settings hardening complete)
+**Last updated:** 2026-04-25 (MB-106/107/107a/108 + MB-109/110/111 + MB-112 + MB-113 + MB-114/115 + MB-117 + MB-116 — Settings hardening complete; MB-14 fix wired in master pending hands-on regression)
 **Format:** ID · Platform · Severity · One-line · Status · First seen · Fix target
 
 > **RN app frozen 2026-04-20.** All open `MB-*` bugs targeting React Native milestones are **Deferred to native rewrite** — they'll be resolved by construction in the Kotlin/KMP app. See [PRODUCTION_PLAN_NATIVE.md](PRODUCTION_PLAN_NATIVE.md). RN bugs remain in the register for historical reference; do not attempt RN fixes.
@@ -10,7 +10,7 @@ Living register of **open** bugs across desktop and mobile. Closed bugs move to 
 | ID | Platform | Sev | Summary | Status | First seen | Fix target |
 |---|---|---|---|---|---|---|
 | MB-13 | Mobile | High | Player takes two back presses to close; surface state desyncs between routes | **Fixed** | 2026-04-12 | Collapsed to one route + state-driven fullscreen (2026-04-20) — no modal to pop, back toggles `isFullscreen` then stops |
-| MB-14 | Mobile | High | HEVC-main10 / AC3 / EAC3 / DTS / TrueHD decode audio-only on ~30% of streams | **Deferred to native rewrite** | 2026-04-10 | MK.9 (FFmpeg ExoPlayer extension in Kotlin app) |
+| MB-14 | Mobile / Native | High | HEVC-main10 / AC3 / EAC3 / DTS / TrueHD decode audio-only on ~30% of streams | **Fix wired — pending regression** | 2026-04-10 | MK.9.1–9.5 shipped 2026-04-25 (`8f7551f` extension + `62a7ebe` watchdog). FfmpegAudioRenderer + ExperimentalFfmpegVideoRenderer load on Fire TV (AFTDCT31) confirmed via logcat. Closes when 10-channel hands-on regression passes on real source. |
 | MB-15 | Mobile | Medium | First-frame blocked by hydration gate on cold boot | **Deferred to native rewrite** | 2026-04-14 | N/A — Compose boots direct from SQLDelight (MK.4) |
 | MB-16 | Mobile | High | SearchScreen crashes during fast typing | **Fixed** | 2026-04-14 | FlatList virtualization (2026-04-19) — full rebuild as SearchOverlay in M4R |
 | MB-17 | Mobile | Medium | Navigation sluggish across the whole app | **Deferred to native rewrite** | 2026-04-12 | N/A — Compose navigation (MK.4) |

@@ -296,25 +296,7 @@ class PlaybackController(
         _playerRebuilt.tryEmit(Unit)
     }
 
-    /**
-     * MK.9.4 — error-classifier. The watchdog only triggers on errors that
-     * trace back to FFmpeg. Anything else (network failure, bad HTTP status,
-     * decoder-init failures from MediaCodec itself, source format errors)
-     * surfaces normally to PlayerActivity's error overlay so the user can
-     * retry or pick a different stream.
-     *
-     * Native crashes inside libffmpegJNI segfault the process and never
-     * reach this listener — that's a hard limit; nothing to do here.
-     */
-    private fun isFfmpegRelated(error: PlaybackException): Boolean {
-        if (error.errorCode !in FFMPEG_RELEVANT_ERROR_CODES) return false
-        var cause: Throwable? = error
-        while (cause != null) {
-            if ("Ffmpeg" in cause::class.java.name) return true
-            cause = cause.cause
-        }
-        return false
-    }
+    private fun isFfmpegRelated(error: PlaybackException): Boolean = isFfmpegRelatedError(error)
 
     // Main-immediate so state mutations stay on the main thread; IO work
     // (SQLDelight reads/writes for resume points) dispatches to IO via
@@ -706,7 +688,7 @@ class PlaybackController(
         // ERROR_CODE_DECODER_QUERY_FAILED isn't included: it fires when
         // MediaCodecList lookup fails on the platform side, never from the
         // extension renderer.
-        private val FFMPEG_RELEVANT_ERROR_CODES =
+        internal val FFMPEG_RELEVANT_ERROR_CODES =
             setOf(
                 PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
                 PlaybackException.ERROR_CODE_DECODING_FAILED,
@@ -714,3 +696,35 @@ class PlaybackController(
             )
     }
 }
+
+/**
+ * MK.9.4 — error-classifier. The watchdog only triggers on errors that
+ * trace back to the vendored FFmpeg extension package. Anything else
+ * (network failure, bad HTTP status, decoder-init failures from
+ * MediaCodec itself, source format errors, or unrelated classes that
+ * happen to have "Ffmpeg" in their name) surfaces normally to
+ * PlayerActivity's error overlay so the user can retry or pick a
+ * different stream.
+ *
+ * Native crashes inside libffmpegJNI segfault the process and never
+ * reach the listener — that's a hard limit; nothing to do here.
+ *
+ * The match is package-specific (`startsWith` on the FQN prefix) rather
+ * than a substring on "Ffmpeg" — the substring shape false-positives
+ * on user-defined exceptions or test fixtures with FFmpeg-mentioning
+ * names. Only classes from the vendored extension package count.
+ *
+ * Extracted top-level (internal visibility) so unit tests can exercise
+ * the cause-chain walk without standing up a full ExoPlayer.
+ */
+internal fun isFfmpegRelatedError(error: PlaybackException): Boolean {
+    if (error.errorCode !in PlaybackController.FFMPEG_RELEVANT_ERROR_CODES) return false
+    var cause: Throwable? = error
+    while (cause != null) {
+        if (cause::class.java.name.startsWith(FFMPEG_PACKAGE_PREFIX)) return true
+        cause = cause.cause
+    }
+    return false
+}
+
+private const val FFMPEG_PACKAGE_PREFIX = "androidx.media3.decoder.ffmpeg."
