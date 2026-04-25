@@ -254,7 +254,17 @@ fun ContentDetailScreen(
     // NOT automatically re-run the open-time focus ladder above because
     // `loaded` hasn't changed. Without this the user comes back to the
     // detail page with no visible selector — they have to press a d-pad
-    // key to wake it up. Mirrors BrowseShell's window-focus handler.
+    // key to wake it up. Mirrors CoverflowSectionScreen's window-focus
+    // handler.
+    //
+    // MB-115: replaced the previous 80/250/500ms delay-ladder with
+    // [PlacedFocusAnchor.awaitAndRequest], which is the canonical primitive
+    // for "request focus once layout has placed the target". On window
+    // regain the Play button is already in composition with isPlaced=true,
+    // so the snapshotFlow inside awaitAndRequest fires immediately; if for
+    // any reason layout hadn't settled, it suspends correctly instead of
+    // burning three arbitrary timeouts. The skill checklist explicitly
+    // calls out delay-ladders as race-prone.
     val windowInfo = LocalWindowInfo.current
     LaunchedEffect(Unit) {
         var seenUnfocused = false
@@ -263,11 +273,7 @@ fun ContentDetailScreen(
                 seenUnfocused = true
             } else if (seenUnfocused) {
                 seenUnfocused = false
-                for (delayMs in longArrayOf(80L, 250L, 500L)) {
-                    delay(delayMs)
-                    val ok = runCatching { playAnchor.requester.requestFocus() }.isSuccess
-                    if (ok) break
-                }
+                playAnchor.awaitAndRequest()
             }
         }
     }
