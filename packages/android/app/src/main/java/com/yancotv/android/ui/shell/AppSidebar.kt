@@ -44,7 +44,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,7 +64,6 @@ import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.LocalYancoPalette
-import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
 /**
@@ -74,10 +72,15 @@ import com.yancotv.android.ui.theme.YancoType
  * except move focus between the rail, the groups list, and the
  * channel list.
  *
- * [Modifier.focusRestorer] + [Modifier.focusGroup] together remember the
- * last focused row inside this rail, so when the user navigates away
- * and comes back, focus lands on whichever section they were on
- * instead of snapping to the first entry.
+ * Focus return is driven by the explicit [activeRowFocus] requester
+ * (bound by [bindActiveRowFocus] only to the current section's row).
+ * When the user BACKs out of a section, the caller calls
+ * `requestFocus()` and we land on the active row directly — no need
+ * for [Modifier.focusRestorer] to remember last focus, because the
+ * "last focus" target is identical to the active row by construction.
+ * Stripping the restorer (MB-113) eliminates the race where
+ * restorer-then-activeRowFocus could land out of order during the
+ * sidebar's collapse→expand width animation.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -140,7 +143,18 @@ fun AppSidebar(
                     } else {
                         false
                     }
-                }.focusRestorer()
+                }
+                // MB-113: focusRestorer() removed. It races with the
+                // explicit `activeRowFocus` binding (MB-106): on BACK / LEFT
+                // from a section, the restorer fires first to land focus on
+                // the *last-focused* descendant, then activeRowFocus fires
+                // to target the *current-section* row. Usually they agree,
+                // but during the COLLAPSED→EXPANDED width animation the
+                // layout is in flux and the two requests can land out of
+                // order — leaving the row focused but the interactionSource
+                // lagging until the user nudges the D-pad ("detector won't
+                // show until OK"). With explicit activeRowFocus we always
+                // know which row to focus; the restorer is dead weight.
                 .focusGroup(),
     ) {
         BrandMark(showWordmark = expanded)
@@ -354,14 +368,26 @@ private fun SidebarRow(
                         },
                     ),
         )
+        // MB-113: shape stable across the sidebar's two width states.
+        // CutCornerCardSmall uses an ABSOLUTE 16dp cut, which is 23 % of
+        // the row width when the sidebar is collapsed (92dp) and only
+        // 7 % when expanded (260dp) — same primitive, very different
+        // visual character. The user observed "the main bar is two
+        // shapes ... they show different selector". Replacing with a
+        // 10dp rounded corner: same character at any aspect ratio,
+        // focus FRAME reads identically in collapsed and expanded modes.
+        // Cut-corner aesthetic is preserved everywhere else (chips,
+        // cards, hero panels) — only the sidebar row, which morphs
+        // width, opts out.
+        val rowShape = remember { RoundedCornerShape(10.dp) }
         Row(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(start = Space.sm)
-                    .clip(YancoShapes.CutCornerCardSmall)
+                    .clip(rowShape)
                     .background(rowBrush)
-                    .border(borderWidth, border, YancoShapes.CutCornerCardSmall)
+                    .border(borderWidth, border, rowShape)
                     .let { base ->
                         // Requester binds to the SAME node that's focusable,
                         // not a wrapper. requestFocus then lands on this
