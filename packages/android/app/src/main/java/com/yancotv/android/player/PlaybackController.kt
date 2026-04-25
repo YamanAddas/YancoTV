@@ -2,6 +2,7 @@ package com.yancotv.android.player
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.VisibleForTesting
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -9,6 +10,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.BuildConfig
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -503,6 +505,31 @@ class PlaybackController(
         sleepJob?.cancel()
         sleepJob = null
         _sleepTimer.value = SleepTimerState.Off
+    }
+
+    /**
+     * MK.9.4 — debug-only entry point that forces the watchdog rebuild
+     * path on demand, for hands-on verification of the recovery flow on
+     * real hardware. Production builds short-circuit and return.
+     *
+     * Triggered via `adb shell am broadcast -a
+     * com.yancotv.android.debug.WATCHDOG_SMOKE_TEST` (the receiver lives
+     * in `src/debug/`, only compiled into debug variants). Resets
+     * [hasRebuiltOnce] so the rebuild can be re-exercised across multiple
+     * triggers in one session — production-path single-rebuild guard
+     * stays enforced for real FFmpeg crashes.
+     *
+     * Architecturally identical to a real rebuild: same release →
+     * snapshot → rebuild → restore → emit-signal flow. Surfaces
+     * (PlayerActivity, MiniPlayer, MainActivity keepAwake) re-bind via
+     * the rebuilt-signal path, exercising the same code that fires on
+     * a real FFmpeg-package crash.
+     */
+    @VisibleForTesting
+    fun debugForceRebuildForVerification() {
+        if (!BuildConfig.DEBUG) return
+        hasRebuiltOnce = false
+        rebuildWithoutFfmpeg()
     }
 
     private fun step(delta: Int): Boolean {

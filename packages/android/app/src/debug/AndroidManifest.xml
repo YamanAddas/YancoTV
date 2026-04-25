@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only manifest fragment. AGP merges this with the main manifest only
+  for the `debug` build variant; release APKs never see these receivers.
+
+  Verification entry points:
+    adb shell am broadcast -a com.yancotv.android.debug.SENTRY_SMOKE_TEST
+    adb shell am broadcast -a com.yancotv.android.debug.WATCHDOG_SMOKE_TEST
+
+  See docs/build/verification.md for the full verification flow.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+
+        <receiver
+            android:name="com.yancotv.android.debug.SentrySmokeTestReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.yancotv.android.debug.SENTRY_SMOKE_TEST" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.yancotv.android.debug.WatchdogSmokeTestReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.yancotv.android.debug.WATCHDOG_SMOKE_TEST" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>
