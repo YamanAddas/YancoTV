@@ -1,7 +1,6 @@
 package com.yancotv.android.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,7 +93,7 @@ fun SettingsPlaybackTab(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (mode in ResizeMode.values()) {
-                    ResizeChip(
+                    SettingsChip(
                         label = mode.displayName,
                         selected = snapshot.resizeMode == mode,
                         onClick = {
@@ -126,26 +125,6 @@ fun SettingsPlaybackTab(
             value = snapshot.subtitleLanguage,
             onCommit = { scope.launch { prefs.setSubtitleLanguage(it) } },
         )
-    }
-}
-
-@Composable
-private fun ResizeChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val bg = if (selected) LocalYancoPalette.current.Accent.copy(alpha = 0.22f) else LocalYancoPalette.current.BackgroundDeep
-    val fg = if (selected) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Text(label, color = fg, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 

@@ -1,7 +1,6 @@
 package com.yancotv.android.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,7 +77,7 @@ fun SettingsGeneralTab(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (section in OpenOn.values()) {
-                    Chip(
+                    SettingsChip(
                         label = section.displayName,
                         selected = state.openOn == section,
                         onClick = { scope.launch { prefs.setOpenOn(section) } },
@@ -104,27 +103,3 @@ fun SettingsGeneralTab(
     }
 }
 
-@Composable
-private fun Chip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val bg = if (selected) LocalYancoPalette.current.Accent.copy(alpha = 0.22f) else LocalYancoPalette.current.BackgroundDeep
-    val fg = if (selected) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Text(
-            label,
-            color = fg,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}

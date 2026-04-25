@@ -94,7 +94,7 @@ fun SettingsGroupsTab(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (type in ContentType.values()) {
-                TypeChip(
+                SettingsChip(
                     label = typeChipLabel(type),
                     selected = selectedType == type,
                     onClick = { selectedType = type },
@@ -102,7 +102,7 @@ fun SettingsGroupsTab(
             }
             Spacer(modifier = Modifier.fillMaxWidth(0.02f))
             if (hidden.isNotEmpty()) {
-                TypeChip(
+                SettingsChip(
                     label = "Show all (${hidden.size})",
                     selected = false,
                     onClick = { scope.launch { prefs.clearHiddenGroups() } },
@@ -210,31 +210,6 @@ private fun GroupRow(
                     uncheckedThumbColor = palette.TextMuted,
                     uncheckedTrackColor = palette.BackgroundHover,
                 ),
-        )
-    }
-}
-
-@Composable
-private fun TypeChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val bg = if (selected) LocalYancoPalette.current.Accent.copy(alpha = 0.22f) else LocalYancoPalette.current.BackgroundDeep
-    val fg = if (selected) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
 }

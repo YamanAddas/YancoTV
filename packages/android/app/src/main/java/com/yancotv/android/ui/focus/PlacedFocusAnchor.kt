@@ -104,3 +104,25 @@ fun FocusTrap(anchor: PlacedFocusAnchor) {
                 .focusable(),
     )
 }
+
+/**
+ * Invisible 0-dp focusable spacer with no anchor. Used as the first child
+ * of read-only / placeholder panes so that a `moveFocus(Right)` or
+ * descendant focus search lands on *something* — without it, panes that
+ * contain only Text composables silently fail focus search, which
+ * propagates back up to the parent (e.g. the Settings sub-sidebar bouncing
+ * focus back to itself; see MB-109).
+ *
+ * Drop this at the top of any pane that has no other focusable child but
+ * needs to be reachable from focus traversal. The user's CENTER press
+ * "lands" here invisibly; LEFT then takes them back out the way they came.
+ */
+@Composable
+fun FocusableSpacer() {
+    Spacer(
+        modifier =
+            Modifier
+                .size(0.dp)
+                .focusable(),
+    )
+}

@@ -3,6 +3,7 @@ package com.yancotv.android.ui.shell
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -349,7 +350,16 @@ fun HomeScreen(
                     )
                 }
             } else if (section == AppSection.Settings) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
+                // MB-111: .focusGroup() makes each non-browse content Box a
+                // deterministic descendant-focus search root. Without it,
+                // `mainContentFocus.requestFocus()` on a bare wrapper Box can
+                // silently fail on Compose 1.7 when the first focusable child
+                // isn't placed yet — the search bails instead of waiting. The
+                // group flag tells Compose "this wrapper owns focus search for
+                // its subtree" so the request reliably forwards to the next
+                // focusable child once placed. Same pattern repeats below for
+                // Guide / Favorites / Search / Home.
+                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     if (needsSettingsGate) {
                         SettingsLockedPlaceholder()
                     } else {
@@ -357,7 +367,7 @@ fun HomeScreen(
                     }
                 }
             } else if (section == AppSection.Guide) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
+                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     GuideScreen(
                         onPlay = { channel, _ ->
                             val item = guideChannelToContentItem(channel) ?: return@GuideScreen
@@ -380,18 +390,18 @@ fun HomeScreen(
                     )
                 }
             } else if (section == AppSection.Favorites) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
+                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     FavoritesScreen(
                         isTv = isTv,
                         onOpenDetail = { item -> detailItem = item },
                     )
                 }
             } else if (section == AppSection.Search) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
+                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     SearchScreen(isTv = isTv)
                 }
             } else if (section == AppSection.Home) {
-                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus)) {
+                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     HomeContent(
                         onPlay = { list, idx, resumeEpisodeId ->
                             val target = list.getOrNull(idx) ?: return@HomeContent

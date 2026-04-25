@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -43,6 +44,11 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // MB-109: read-only tab needs at least one focus target so a
+        // moveFocus(Right) from the sub-sidebar lands on something —
+        // otherwise focus stays on the sidebar and the user sees no
+        // response when committing the About row.
+        FocusableSpacer()
         Text(
             text = "YancoTV",
             color = LocalYancoPalette.current.TextPrimary,

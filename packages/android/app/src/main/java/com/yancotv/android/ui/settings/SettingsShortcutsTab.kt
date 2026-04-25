@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -35,6 +36,9 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        // MB-109: read-only tab needs at least one focus target so a
+        // moveFocus(Right) from the sub-sidebar lands on something.
+        FocusableSpacer()
         Text(
             text = "Shortcuts",
             color = LocalYancoPalette.current.TextPrimary,

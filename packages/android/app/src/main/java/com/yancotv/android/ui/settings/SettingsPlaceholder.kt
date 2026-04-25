@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
@@ -47,6 +48,12 @@ fun SettingsPlaceholder(
                 .padding(horizontal = Space.xxl, vertical = Space.xl),
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
+        // MB-109: every Settings tab body must contain at least one focusable
+        // node. Otherwise SettingsScreen.onSelect's moveFocus(Right) silently
+        // fails and focus stays on the sub-sidebar — pressing CENTER on a
+        // placeholder tab looks like the app froze. The 0-dp spacer is the
+        // CENTER landing target; LEFT takes the user back to the sidebar.
+        FocusableSpacer()
         Text(
             text = kicker.uppercase(),
             color = LocalYancoPalette.current.Accent,
