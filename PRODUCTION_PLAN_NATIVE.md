@@ -111,9 +111,129 @@ YancoTV/                        # pnpm workspace root (desktop stays pnpm)
 
 ---
 
-## Milestones — MK.0 → MK.19
+## v1.0 Roadmap — locked 2026-04-25
 
-> **Next up (2026-04-24):** MK.8 + D-phase are closed. Start MK.12 with **MK.12a (fast wires)** — see the block below for the ~1-week sequence that closes ~60% of the TiviMate control-surface gap before heavier work in MK.12b → MK.18.
+**v1.0 = a packed, signed, distributed APK that's complete and safe for daily personal use or store publishing.** No timeline — work proceeds at user's pace.
+
+The MK.* numbering below stays as a reference catalog; what's authoritative going forward is the **5-stage dependency + risk ordering** in this section.
+
+### Status (per 2026-04-25 audit)
+
+**Shipped:** MK.0–MK.8, MK.12a/b, MK.13.1–13.3, MK.16.shell, MK.16.1, MK.16.sheet, MK.16.player.vod.dock, MK.16.player.vod.chrome, MK.17.1, MK.18.1. D-phase complete. 133 commits pushed to `origin/master` 2026-04-25.
+
+**Not started:** MK.9 (FFmpeg parked in `.ffmpeg-parked/`), MK.10 (Recommendations + voice search only — TIF deferred), MK.11.1/2 (PIP + gestures), MK.13.4, MK.14, MK.15, MK.16.2–16.6, MK.17.1a/2/3/4/5, MK.18.2, MK.19.
+
+**Dropped or deferred:** see Locked decisions table below.
+
+### Ordering principles (challenge any of these before deviating)
+
+1. **Foundational before features.** Schema, observability, R8, theme — land before features built on top.
+2. **Risk-front-loaded.** The biggest unknown ships first. If FFmpeg can't be made to work, find out before stacking 6 features on it.
+3. **Observability before complex features.** Sentry in early — every feature after gets crash + error reports for free.
+4. **R8 baseline early.** Reflection libs (Media3, Koin, Kermit, SQLDelight, Ktor) break under R8 in subtle ways. Land R8 once, keep it green continuously.
+5. **Schema migrations bundled.** All v1.0 migrations land together — one test pass, one upgrade path. No fragmenting migrations across features.
+6. **No UI on stubs.** Recording UI doesn't get built before the recording service is real.
+7. **Per-feature definition-of-done.** Every Stage 3+ feature lands R8-tested, Sentry-instrumented, TalkBack-checked, D-pad-checked, no new placeholders introduced.
+
+### Stage 1 — Foundation
+
+| # | Task | Maps to |
+|---|---|---|
+| 1.1 | ✅ Push 133 commits to `origin/master` (done 2026-04-25) | — |
+| 1.2 | **MK.9 FFmpeg ExoPlayer extension** + crash watchdog + platform-decoder fallback. Closes MB-14. NDK build for armeabi-v7a + arm64-v8a + x86_64. Register `FfmpegAudioRenderer` + `FfmpegVideoRenderer` with `EXTENSION_RENDERER_MODE_PREFER`. R8 keep rules for native libs in same commit. Fallback: if extension renderer crashes, swap to platform decoder, never hard-crash `PlayerActivity`. | MK.9 |
+| 1.3 | **Sentry SDK integrated** — Android + KMP shared. Crash reporting, error breadcrumbs, network failure tracking. Replaces previously-planned Firebase Crashlytics (decision 2026-04-25). | MK.19.5 (re-platformed) |
+| 1.4 | **R8 / ProGuard baseline** + signed-APK pipeline. Keep rules for Media3 reflection, Koin module DSL, Kermit, SQLDelight runtime, Ktor serialization. Release-build smoke test added to per-commit dev cycle. | MK.19.1 |
+| 1.5 | **DB migration test harness** — real "upgrade from version N to N+1 with seeded data" tests, not just schema parsing. Plus a corruption-recovery path: if SQLDelight DB fails to open, soft-reset to a fresh DB while preserving Keystore credentials and a JSON dump of sources. | new (was implicit) |
+| 1.6 | **Performance budget set + measured** — cold start, channel zap, EPG scroll on Fire TV Lite. Numbers committed to `packages/android/PERFORMANCE.md`. Every feature after this measures against the budget. | new |
+
+### Stage 2 — Schema backbone
+
+Bundle all v1.0 schema migrations in one commit series, run upgrade tests once, move on. No feature in Stage 3 or 4 starts before this stage closes.
+
+| # | Task | Maps to |
+|---|---|---|
+| 2.1 | `recording_schedules.sq` + `recordings.sq` (status enum + paths + sizes) | MK.14.3 schema half |
+| 2.2 | `favorite_lists.sq` + `Favorites.sq.list_id` FK; default list seeded | MK.13.4 schema half |
+| 2.3 | `Sources.sq` per-source `user_agent` + `referer` columns | MK.17.5 schema half |
+| 2.4 | `EpgSources.sq` `epg_priority INTEGER DEFAULT 0` column | MK.15.7 schema half |
+| 2.5 | Backup/restore metadata schema (export version + checksum) | new |
+| 2.6 | Single migration test pass — populate v_prev with realistic data, migrate to v_new, verify all repos still read | new |
+
+### Stage 3 — Heavy features (touch playback core)
+
+| # | Task | Maps to |
+|---|---|---|
+| 3.1 | **MK.14 Recording — full HLS *and* MPEG-TS.** Foreground service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`), MediaStore writes, WorkManager schedules, EPG long-press hook, recordings browser, playback-conflict handling, storage management, recording sheet panel. **Spec the "record while playing? while another channel plays?" interaction questions BEFORE writing code.** MPEG-TS is non-negotiable — Xtream catch-up is mostly TS; HLS-only is not "complete". | MK.14.1–14.7 (re-scoped) |
+| 3.2 | **MK.11.1/2 Phone PIP + gesture controls.** `enterPictureInPictureMode` on phone player. Gesture seek / volume / brightness. | MK.11.1, MK.11.2 |
+
+(MK.11.3 Cast and MK.18.3/4/5 dropped — see Locked decisions below.)
+
+### Stage 4 — Surface features
+
+| # | Task | Maps to |
+|---|---|---|
+| 4.1 | **MK.15 EPG display options** — days forward/back, timeline duration, row height, now-line + jump-to-now, programme details dialog, catch-up badge + play-from-here, multi-EPG conflict priority UI. (Schema 2.4 already migrated.) | MK.15.1–15.7 |
+| 4.2 | **MK.17.1a–17.5 Network + playback prefs** — UA preset dropdown, test connection, HW decoder pref + fallback, buffer tuning presets, per-source UA UI. (Schema 2.3 already migrated.) | MK.17.1a, 17.2, 17.3, 17.4, 17.5 |
+| 4.3 | **MK.18.2 default external player per content type.** | MK.18.2 |
+| 4.4 | **MK.13.4 Multi-favorite-lists UI** — tabs in FavoritesScreen, list picker on add-to-favorites. (Schema 2.2 already migrated.) | MK.13.4 UI half |
+| 4.5 | **MK.10 TV launcher minimal** — Recommendations channel via `androidx.tvprovider`, voice search deep link via Google Assistant, on-screen channel zap polish. **TIF dropped → post-v1 study.** | MK.10.1, MK.10.3, MK.10.4 |
+| 4.6 | **MK.16.2–16.6 Theme polish** — additional themes (start with Midnight Sapphire as #2), accent picker (4 presets), font-size scale (90/100/110/125%), channel-number toggle + grouping, app-icon variants via `activity-alias`. | MK.16.2–16.6 |
+
+### Stage 5 — Ship-readiness
+
+| # | Task | Maps to |
+|---|---|---|
+| 5.1 | **Backup / restore** — sources + favorites + history + channel prefs + recording schedules. Export to JSON (Keystore-wrapped credentials), import on fresh install. Tested by full reinstall on a second Fire TV. | new |
+| 5.2 | **Sideload auto-update check** — polls GitHub Releases tag list at boot (cached 24h), prompts on new tag, downloads signed APK. | new |
+| 5.3 | **Accessibility audit** — final TalkBack + D-pad sweep across every Stage 3–4 surface. Per-feature DoD covers most of this; 5.3 is the catch-everything pass. | new |
+| 5.4 | **Performance audit** — verify against Stage 1 budget on Fire TV Lite, fix regressions. | MK.19 perf piece |
+| 5.5 | **Placeholder audit** — every "COMING IN MK.XX" string is gone from shipped code. Anything still placeholder either becomes real or comes out of nav. | new |
+| 5.6 | **Privacy policy + ToS + content rating questionnaire.** Required by Play Console + Amazon Appstore. Recording legal posture: explicit user acknowledgement on first record action. | new |
+| 5.7 | **Distribution pipeline** — Play Console listing (TV + phone), Amazon Appstore (Fire TV), GitHub Releases signed APK + `update.json` endpoint feeding 5.2. | MK.19.2, 19.3, 19.4 |
+| 5.8 | **Manual QA matrix** — Fire TV Stick 4K, AFTDCT31 (192.168.68.56), phone HT74J0206349, Google TV emulator, mid-range Android TV. 1-week soak with real streams + recording E2E. | MK.19.6 (expanded) |
+
+### Definition of Done — every Stage 3+ feature
+
+A feature is not "done" until all of these pass on its commit:
+
+- ✅ R8 release build green (`./gradlew :app:assembleRelease`)
+- ✅ Sentry-instrumented (errors flow to Sentry; new error class registered if needed)
+- ✅ TalkBack pass (every new interactive surface has `contentDescription` or proper semantics)
+- ✅ D-pad pass (every new focusable surface walks correctly with hardware remote on Fire TV)
+- ✅ Fire TV soak test (≥30 min real-stream playback with the new feature exercised)
+- ✅ No new "COMING IN MK.XX" placeholder strings introduced
+- ✅ Migration test green (if schema touched)
+- ✅ Performance budget honored (if hot path touched)
+
+This is the only way "complete v1.0" doesn't end with a 3-week regression-fixing tail.
+
+### Locked decisions (2026-04-25)
+
+| Decision | Status |
+|---|---|
+| Sentry over Firebase Crashlytics | **Adopted** |
+| Chromecast (MK.11.3 / MK.18.3) | **Dropped permanently** — receiver feasibility uncertain for IPTV streams; install YancoTV directly on every TV |
+| TIF live-channels integration (MK.10.2) | **Deferred — post-v1 study.** Fire TV doesn't support TIF, value is Google-Android-TV-only |
+| DLNA / UPnP (MK.18.4) | **Dropped permanently** — built for stored media not live streams; usage pattern doesn't need it |
+| Cross-device handoff (MK.18.5) | **Deferred — post-v1 study.** Requires either a cloud backend (out of scope) or LAN-only (loses home/away use case) |
+| MK.10 TIF replacement | **Recommendations channel + voice search deep link only** |
+| Recording (MK.14) scope | **HLS + MPEG-TS both, in v1.0.** HLS-only is not "complete" |
+| Definition-of-Done per feature | **Adopted** — see above |
+| No timeline | **Adopted** — work proceeds at user's pace |
+
+### Post-v1 ideas register
+
+Flagged here so future-us doesn't re-litigate from scratch. Both depend on architectural shifts that are out of scope for v1.0.
+
+- **TIF (TV Input Framework)** — inject YancoTV channels into the Android TV system Live Channels app. Pros: voice search tunes directly, channel up/down works system-wide, surfaces in Google TV "Live" recommendations. Cons: Fire TV doesn't support TIF (zero value on the canonical test target); massive scope (`TvInputService`, channel/program metadata sync into TIF DB, surface session for video, EPG re-ingestion, parental re-wired); maintenance burden as TIF data desyncs from app data. Revisit only if Google TV becomes the primary target.
+
+- **Cross-device handoff** — pause on TV, resume on phone where you left off. Pros: nice continuity UX for VOD/series. Cons: needs either a cloud backend (Supabase/Firebase + privacy policy + GDPR if EU users) or LAN-only (loses the home/away use case which is the only reason handoff is interesting); marginal value for live TV (most IPTV usage). Revisit only if a cloud backend gets added for other reasons.
+
+---
+
+## Milestone reference catalog (MK.0 → MK.19)
+
+> **As of 2026-04-25 the 5-stage map above is authoritative.** This section preserves the detailed task definitions, DoD criteria, and historical notes — Stage tasks reference MK.* IDs from here.
 
 Each milestone ends in a tagged APK (and later TestFlight build) + a commit series. "Delete-before-add" rule from the RN plan carries over.
 
@@ -215,21 +335,25 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.8.6 | `SettingsScreen.kt` — Sources, Playback, Network, EPG, Parental, Shortcuts, About | matches desktop coverage |
 | MK.8.7 | Parental PIN — shared hashing port + Keystore-wrapped storage + channel lock/hide/override | PIN gate works |
 
-### **MK.9 — Codec gap (FFmpeg ExoPlayer extension)** *(~1 week)*
+### **MK.9 — Codec gap (FFmpeg ExoPlayer extension)** — Stage 1 priority
+
+> **Now Stage 1.2 in the v1.0 roadmap above.** Closes MB-14 (~30% of streams currently audio-only). Source is parked in `.ffmpeg-parked/`. Scope expanded 2026-04-25 to include crash watchdog + platform-decoder fallback + R8 keep rules in the same commit series.
 
 | # | Task | DoD |
 |---|---|---|
 | MK.9.1 | Clone `androidx/media` at matching tag; build FFmpeg decoder extension via NDK for armeabi-v7a + arm64-v8a + x86_64 | `.so` artifacts produced |
-| MK.9.2 | Vendor libs into `packages/android/app/src/main/jniLibs/` | APK ships all three ABIs via splits |
+| MK.9.2 | Vendor libs into `packages/android/app/src/main/jniLibs/`; APK splits per ABI | APK ships all three ABIs via splits, sub-60MB each |
 | MK.9.3 | Register `FfmpegAudioRenderer` / `FfmpegVideoRenderer` in `PlaybackService`'s `DefaultRenderersFactory` with `EXTENSION_RENDERER_MODE_PREFER` | extension preferred over platform codecs |
-| MK.9.4 | Regression test against 10 real IPTV channels that were audio-only on the RN build | all 10 render picture |
+| MK.9.4 | **Crash watchdog** — `Player.Listener.onPlayerError` catches FFmpeg native crashes, swaps `RenderersFactory` to platform-only, retries `prepare()` once; if that also fails, surfaces error overlay (no hard-crash of `PlayerActivity`) | Force-fault the FFmpeg renderer in a debug build → playback recovers on platform decoder |
+| MK.9.5 | **R8 keep rules for native libs + JNI surfaces** — registered in same commit so release build doesn't strip the native registrations | `./gradlew :app:assembleRelease` plays the same regression streams as debug |
+| MK.9.6 | Regression test against 10 real IPTV channels that were audio-only on the RN build (MB-14 register) | all 10 render picture; MB-14 closed |
 
 ### **MK.10 — TV UX + launcher integration** *(~1 week)*
 
 | # | Task | DoD |
 |---|---|---|
 | MK.10.1 | Android TV recommendations channel (`androidx.tvprovider`) | recent + continue-watching cards on TV launcher home |
-| MK.10.2 | Android TV "Live channels" integration (`TIF`) | channels register so OS Live TV app finds them |
+| ~~MK.10.2~~ | ~~Android TV "Live channels" integration (`TIF`)~~ — **DEFERRED post-v1** (decision 2026-04-25). Fire TV doesn't support TIF; value is Google-Android-TV-only and scope is massive. See "Post-v1 ideas register" above | N/A in v1.0 |
 | MK.10.3 | Voice search via Google Assistant → deep link to Search screen | "Hey Google, play CNN on YancoTV" works |
 | MK.10.4 | Leanback on-screen channel zap UI polish | feels smoother than TiviMate |
 
@@ -239,7 +363,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 |---|---|---|
 | MK.11.1 | Phone PIP (`enterPictureInPictureMode`) | home button during playback → floating PIP |
 | MK.11.2 | Gesture seek / volume / brightness on phone player | feels native |
-| MK.11.3 | Chromecast sender via Media3's `CastPlayer` | cast to Google TV / Chromecast |
+| ~~MK.11.3~~ | ~~Chromecast sender via Media3's `CastPlayer`~~ — **DROPPED PERMANENTLY** (decision 2026-04-25). Default Cast receiver feasibility uncertain for IPTV streams (raw TS over HTTP with custom UA may not work without a Custom Web Receiver). User pattern: install YancoTV directly on every TV instead. Schema doesn't change so revisitable post-v1 if a new use case emerges | N/A in v1.0 |
 
 ---
 
@@ -293,7 +417,9 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 
 **Innovation beyond TiviMate:** multi-favorite-lists (13.4). TiviMate has one flat favorites list.
 
-### **MK.14 — Recording + scheduling** *(~1 week, HLS-only in phase 1)*
+### **MK.14 — Recording + scheduling** — Stage 3 priority (HLS + MPEG-TS in v1.0)
+
+> **Re-scoped 2026-04-25:** MPEG-TS recording moved into v1.0 (was phase 2). Without TS support, recording is broken on Xtream catch-up which is mostly TS — that's not "complete." DASH + encrypted segments stay phase 2.
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
@@ -303,7 +429,7 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 | MK.14.4 | Record-from-EPG long-press in GuidePanel programme cell (uses 14.3's schema with pre/post paddings from prefs, default 0/+60s) | 🔴 new | Long-press any programme → "Record" row → schedule row created |
 | MK.14.5 | `RecordingsScreen` in main nav — list / play / delete. Play via existing `PlaybackController.play(filePath)` | 🟡 glue | Screen shows past + in-progress recordings; delete removes row + file |
 | MK.14.6 | ~~Auto series recording (XMLTV `episode-num` heuristic)~~ — **replaced** with manual series binding: user long-presses a programme → "Record all programmes with this title on this channel" → creates N schedules based on EPG lookahead window | 🔴 new | Binding one series produces ≥1 scheduled row for next 7 days |
-| MK.14.7 | ~~MPEG-TS / DASH / encrypted-segment support~~ — **phase 2**; surface "HLS-only in v1" in the record button's disabled-state tooltip for non-HLS streams | — | Button disabled with reason-text on non-HLS |
+| MK.14.7 | **MPEG-TS support** — segment tee for `.ts` HTTP streams (the dominant Xtream catch-up format). DASH + encrypted segments stay phase 2 with a disabled-state tooltip | 🔴 new (2026-04-25 re-scope) | TS streams record cleanly; DASH/encrypted streams show disabled record button with reason text |
 
 **Innovation beyond TiviMate:** recording stays device-local (no cloud cost) + optional SMB push to NAS via `jcifs-ng` (post-record hook, MK.14.8 follow-up if time). TiviMate Premium's cloud archive costs $0 here.
 
@@ -364,26 +490,31 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
-| MK.18.1 | "Open in external" action in MK.12 sheet — `Intent.ACTION_VIEW` with package hints for VLC / MX Player / Just Player; detect installed apps via `PackageManager` | 🔴 new | Launches external player with current stream URL; falls back to chooser if none installed |
+| MK.18.1 | ~~"Open in external" action in MK.12 sheet — `Intent.ACTION_VIEW` with package hints for VLC / MX Player / Just Player; detect installed apps via `PackageManager`~~ — **DONE `f15ffb8`** (2026-04-24) | 🔴 new | ✅ |
 | MK.18.2 | Persist default external player per content-type (Live / Movie / Series) in prefs | 🟡 glue | Live defaults to VLC, VOD to internal (example); honored on next launch |
-| MK.18.3 | Chromecast sender via Media3 `CastPlayer` — MK.11.3 scope continuation. `MediaRouteButton` in MK.12 sheet | 🔴 new | Cast button appears when a receiver is visible; session transfer with current `MediaItem` + position |
-| MK.18.4 | ~~DLNA / UPnP~~ — **cut**. 5% user value, 2-week library bloat cost | — | Out of scope |
-| MK.18.5 | Cross-device handoff — **deferred to phase 2**. Schema already supports it (shared `watch_history` in SQLDelight on each device); needs QR-signed-blob transport layer | — | Out of scope for v1 gap-close |
+| ~~MK.18.3~~ | ~~Chromecast sender via Media3 `CastPlayer`~~ — **DROPPED PERMANENTLY** (decision 2026-04-25). See MK.11.3 for full reasoning. Sheet's CAST tab is removed in Stage 5.5 (placeholder audit) | — | N/A in v1.0 |
+| ~~MK.18.4~~ | ~~DLNA / UPnP~~ — **DROPPED PERMANENTLY** (re-confirmed 2026-04-25). Built for stored media, not live streams; older smart TVs without Cast aren't a target | — | N/A |
+| ~~MK.18.5~~ | ~~Cross-device handoff~~ — **DEFERRED post-v1** (decision 2026-04-25). Requires either a cloud backend (out of scope) or LAN-only (loses home/away use case which is the only reason handoff is interesting). See "Post-v1 ideas register" above | — | N/A in v1.0 |
 
 ---
 
-### **MK.19 — Distribution + QA + launch** *(~1 week)* *(was MK.12)*
+### **MK.19 — Distribution + QA + launch**
+
+> **Re-platformed 2026-04-25:** Sentry replaces Firebase Crashlytics (now Stage 1.3 — observability comes BEFORE the heavy features, not after). MK.19.6 device matrix expanded to match real test fleet. Backup/restore + auto-update check + privacy/ToS added to Stage 5.
 
 | # | Task | DoD |
 |---|---|---|
-| MK.19.1 | R8/ProGuard config, APK-size audit. Inherits the D.3 deferral — keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines | `./gradlew :app:assembleRelease` runs; APK plays end-to-end; per-ABI splits under 60MB |
-| MK.19.2 | Play Console listing (TV + phone), screenshots, description | internal track first |
+| MK.19.1 | R8/ProGuard config, APK-size audit. Now Stage 1.4 (lands early so every feature is release-tested continuously). Keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines | `./gradlew :app:assembleRelease` runs; APK plays end-to-end; per-ABI splits under 60MB |
+| MK.19.2 | Play Console listing (TV + phone), screenshots, description, content rating, privacy policy URL | internal track first |
 | MK.19.3 | Amazon Appstore submission (Fire TV) | pending review |
-| MK.19.4 | GitHub Releases sideload APK (signed, versioned) | one-click install |
-| MK.19.5 | Firebase Crashlytics wired (replaces Sentry on Android; Sentry keeps desktop) | crash-free sessions ≥ 99.5% |
-| MK.19.6 | Manual QA checklist against 5 devices: Fire TV Stick 4K, Insignia Fire TV, NVIDIA Shield, Pixel phone, Android tablet | `packages/android/tests/MANUAL_QA.md` |
+| MK.19.4 | GitHub Releases sideload APK (signed, versioned) + `update.json` endpoint feeding Stage 5.2 auto-update check | one-click install + auto-update prompt |
+| MK.19.5 | **Sentry SDK** wired (Android + KMP shared). Replaces previously-planned Firebase Crashlytics (decision 2026-04-25). Now Stage 1.3 — observability lands BEFORE complex features so every feature gets crash + error reports for free | crash-free sessions tracked; new error classes registered as features land |
+| MK.19.6 | Manual QA matrix — **real test fleet:** Fire TV Stick 4K, AFTDCT31 (192.168.68.56), phone HT74J0206349, Google TV emulator, mid-range Android TV. 1-week soak with real streams + recording E2E. | `packages/android/tests/MANUAL_QA.md` |
+| MK.19.7 | **Privacy policy + ToS + content rating questionnaire** (new, 2026-04-25). Required by Play Console + Amazon Appstore. Recording legal posture: explicit user acknowledgement on first record action — copyright disclaimer | URLs published, Play Console + Amazon submissions pass review |
+| MK.19.8 | **Backup / restore** (new, Stage 5.1). Sources, favorites, history, channel prefs, recording schedules → JSON export with Keystore-wrapped credentials. Tested by full reinstall on a second Fire TV | Round-trip preserves all user data |
+| MK.19.9 | **Sideload auto-update check** (new, Stage 5.2). Polls GitHub Releases tag list at boot (cached 24h), prompts on new tag, downloads signed APK | Install older build → next boot prompts to update |
 
-**Ship criterion for v1.0:** installable via Play Store + Fire TV Appstore + direct APK. Crash-free ≥99.5% over 7 days. All RN-plan feature parity reached + TiviMate-style mini preview works + TV launcher integration live + TiviMate control-surface parity (MK.12–MK.18) shipped.
+**Ship criterion for v1.0:** installable via Play Store + Fire TV Appstore + direct APK. Sentry-tracked, R8-hardened, performance-budget-honored. All RN-plan feature parity reached + TiviMate-style mini preview works + TV launcher minimal (Recommendations + voice search) live + recording (HLS + MPEG-TS) ships + per-feature DoD passes everywhere.
 
 ---
 
@@ -391,16 +522,18 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 What survived, what got cut, and what stands if time shrinks. Full reasoning captured in the 2026-04-24 planning session.
 
-**Already cut in the plan above:**
+**Already cut in the plan above (2026-04-24 + 2026-04-25):**
 - Audio delay (MK.12b.3) — Media3 has no setter; external player covers it
 - Auto series recording via XMLTV heuristic (MK.14.6) — replaced with manual series bind
-- MPEG-TS / DASH / encrypted recording (MK.14.7) — phase 2
+- ~~MPEG-TS / DASH / encrypted recording (MK.14.7) — phase 2~~ — **OVERRIDDEN 2026-04-25:** MPEG-TS recording is in v1.0 (HLS-only is not "complete"); DASH + encrypted segments stay phase 2
 - Cross-source user groups (MK.13.5) — phase 2
 - SOCKS proxy (MK.17.6) — phase 2
 - Connection profiles (MK.17) — phase 2
-- DLNA / UPnP (MK.18.4) — out
-- Cross-device handoff (MK.18.5) — phase 2
+- DLNA / UPnP (MK.18.4) — **DROPPED PERMANENTLY** (re-confirmed 2026-04-25)
+- Cross-device handoff (MK.18.5) — **DEFERRED post-v1 study** (2026-04-25)
 - Custom hex accent (MK.16.3) — 4 presets only
+- Chromecast (MK.11.3 / MK.18.3) — **DROPPED PERMANENTLY** (2026-04-25)
+- TIF live-channels (MK.10.2) — **DEFERRED post-v1 study** (2026-04-25)
 
 **Ordering constraints** (deviate = rework):
 1. **MK.12a ships before MK.12b** — the fast wires alone close ~60% of the visible gap in ~3 days and surface whether the bottom-sheet UX itself works before committing to heavier items.
@@ -412,18 +545,7 @@ What survived, what got cut, and what stands if time shrinks. Full reasoning cap
 - Every new timestamp column documents `-- ms since epoch` per native-android-mk rule.
 - Manual populated-DB check on Fire TV with ≥5k content rows before moving on.
 
-**If time shrinks, cut in this order:**
-1. MK.14 phase 1 entirely (recording is a 1-week slot; users have external tools)
-2. MK.16.6 (alternate app icons — cosmetic)
-3. MK.18.3 (Cast — keep only if MK.11.3 already landed)
-4. MK.17.5 (per-source UA — useful but rare)
-5. MK.13.4 (multi-favorite-lists — nice-to-have; can default to single list)
-
-**Keep even under pressure:**
-- MK.17.1 — fixes latent bug
-- MK.16.1 — unlocks future work
-- MK.12a — the single biggest UX jump
-- MK.13.1 + MK.13.2 — favorites from player + rename/logo are top user requests
+**If time shrinks** — N/A. Per 2026-04-25 decision, v1.0 = complete. No timeline pressure to budget against. If a feature genuinely doesn't work or adds disproportionate scope mid-implementation, escalate to the user before cutting.
 
 **Known risk zones:**
 - HLS recording (MK.14.1) — segment tee handles most streams; TS-discontinuities and encrypted segments are known failure modes, flagged in the plan with phase-2 deferral.
@@ -508,7 +630,7 @@ Updated in [bugs.md](bugs.md):
 | MB-31 ABI splits | Scheduled MK.9 (ABI splits in Android Gradle) |
 | MB-32 stream-type detection | Ported to Kotlin in MK.1.4 / MK.6 |
 | MB-33 player error UI | Scheduled inside MK.6 |
-| MB-34 release telemetry | Replaced by Firebase Crashlytics in MK.12.5 |
+| MB-34 release telemetry | Replaced by **Sentry** in Stage 1.3 / MK.19.5 (decision 2026-04-25 — was Crashlytics) |
 
 ---
 
@@ -527,32 +649,11 @@ Updated in [bugs.md](bugs.md):
 
 ---
 
-## Timeline — estimated
+## Timeline
 
-| Block | Weeks | Cumulative |
-|---|---|---|
-| MK.0 Scaffold | 0.5 | 0.5 |
-| MK.1 Core port | 1.5 | 2 |
-| MK.2 Persistence | 0.5 | 2.5 |
-| MK.3 Sources | 0.5 | 3 |
-| MK.4 Shell UI | 1 | 4 |
-| MK.5 Channel list + images | 0.5 | 4.5 |
-| MK.6 Playback (shared ExoPlayer) | 0.75 | 5.25 |
-| MK.7 EPG | 1 | 6.25 |
-| MK.8 Features | 1.5 | 7.75 |
-| MK.9 Codec gap | 1 | 8.75 |
-| MK.10 TV launcher | 1 | 9.75 |
-| MK.11 Phone-native | 1 | 10.75 |
-| MK.12 In-player control surface | 1 | 11.75 |
-| MK.13 Channel ops + favorites reach | 0.6 | 12.35 |
-| MK.14 Recording (HLS v1) | 1 | 13.35 |
-| MK.15 EPG display + timeline | 0.8 | 14.15 |
-| MK.16 Appearance + themes | 0.6 | 14.75 |
-| MK.17 Network wiring + advanced playback | 0.6 | 15.35 |
-| MK.18 External player + Cast | 0.4 | 15.75 |
-| MK.19 Distribution | 1 | 16.75 |
-| **Android v1.0 total** | | **~17 weeks** |
-| MK.iOS.* | 6–8 | 23–25 |
+**Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
+
+iOS / iPadOS milestones (`MK.iOS.*`) remain a separate post-Android-v1.0 block — see iOS section below.
 
 ---
 
@@ -569,3 +670,13 @@ Updated in [bugs.md](bugs.md):
 | Firebase Crashlytics on Android, Sentry stays on desktop | Crashlytics is free + integrates with Play Console. Sentry on desktop already paid for | 2026-04-20 |
 | RN app frozen, not deleted | Reference during rewrite; archive after Android ships | 2026-04-20 |
 | `@yancotv/core` TS stays as-is | Double-port cost (~2 weeks) cheaper than a cross-language build toolchain | 2026-04-20 |
+| **Sentry replaces Crashlytics on Android** (supersedes 2026-04-20 decision above) | Sentry has better KMP support, doesn't tie us to Firebase, works on desktop already so one platform fewer to learn. Crashlytics requires `google-services.json` and Firebase boot-up cost not worth it for a personal app | 2026-04-25 |
+| **Chromecast (MK.11.3 / MK.18.3) dropped permanently** | Default Cast receiver feasibility uncertain for IPTV streams (raw TS over HTTP with custom UA may not work). Custom Web Receiver is a separate project. User pattern: install YancoTV on every TV directly | 2026-04-25 |
+| **TIF (MK.10.2) deferred to post-v1 study** | Fire TV doesn't support TIF (zero value on canonical test target); scope is `TvInputService` + parallel channel/program DB + EPG re-ingestion. Revisit only if Google TV becomes primary target | 2026-04-25 |
+| **DLNA / UPnP (MK.18.4) dropped permanently** | Built for stored media not live streams; many DLNA renderers reject HLS/MPEG-TS or transcode badly. Older smart TVs aren't a target audience | 2026-04-25 |
+| **Cross-device handoff (MK.18.5) deferred to post-v1 study** | Requires either a cloud backend (out of scope, GDPR implications) or LAN-only sync (loses home/away use case). Marginal value for live TV. Revisit only if cloud backend gets added for other reasons | 2026-04-25 |
+| **No timeline / week estimates on the active plan** | Work proceeds at user's pace; sessions resume when rested. Estimates create false-precision pressure that doesn't match the actual cadence | 2026-04-25 |
+| **Definition-of-Done per Stage 3+ feature** (R8 + Sentry + TalkBack + D-pad + Fire TV soak + no-new-placeholders) | Avoids the regression-fixing tail at the end of v1.0. Catches reflection breakage, accessibility regressions, and stub-shipping inline as features land | 2026-04-25 |
+| **Schema migrations bundled into Stage 2** | Fragmenting migrations across features causes migration-A-vs-migration-B conflicts; one upgrade test pass over a single schema bump is safer | 2026-04-25 |
+| **MK.9 (FFmpeg) is Stage 1, not late-stage** | MB-14 leaves ~30% of streams audio-only; UX polish on broken playback is wasted. Risk-front-loading: if NDK / R8 keep rules / ABI splits go sideways, we want to know before stacking 6 features on top | 2026-04-25 |
+| **MK.14 Recording = HLS + MPEG-TS, both, in v1.0** (overrides 2026-04-24 phase-2 deferral of MPEG-TS) | "HLS-only recording" ships broken on Xtream catch-up which is mostly TS. Recording must work on the streams the user actually has, or it's not "complete" | 2026-04-25 |
