@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,11 +49,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
+import kotlinx.coroutines.launch
 
 /**
  * Settings shell — Concept A "Configure" layout (docs/design/design_handoff_yancotv/
@@ -102,6 +106,16 @@ fun SettingsScreen(
     initialTab: SettingsTab = SettingsTab.General,
 ) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
+    val scope = rememberCoroutineScope()
+    // MB-108: anchor on the ContentPane's focus group. When the user
+    // presses CENTER on a sidebar tab we commit the tab AND jump focus
+    // into the content body — without this the tab swaps but focus stays
+    // on the sidebar and the user has to press D-pad RIGHT separately,
+    // which doesn't match how the home screen sidebar → categories cascade
+    // already behaves. PlacedFocusAnchor (not a delay-ladder) waits for
+    // onPlaced before issuing the request, so it survives the inner
+    // `key(current)` remount.
+    val contentAnchor = rememberPlacedFocusAnchor()
 
     Row(
         modifier =
@@ -118,7 +132,10 @@ fun SettingsScreen(
     ) {
         Sidebar(
             current = tab,
-            onSelect = { tab = it },
+            onSelect = {
+                tab = it
+                scope.launch { contentAnchor.awaitAndRequest() }
+            },
             modifier =
                 Modifier
                     .width(380.dp)
@@ -126,6 +143,7 @@ fun SettingsScreen(
         )
         ContentPane(
             current = tab,
+            anchor = contentAnchor,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -372,10 +390,12 @@ private fun TabItem(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
 private fun ContentPane(
     current: SettingsTab,
+    anchor: com.yancotv.android.ui.focus.PlacedFocusAnchor,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -394,11 +414,21 @@ private fun ContentPane(
         // a LazyColumn. `key(current)` resets scroll state when the tab
         // swaps, so switching away from a scrolled tab and back lands at
         // top rather than keeping a stale offset.
+        //
+        // MB-108: focusGroup + focusRestorer routes incoming focus to the
+        // last-focused or first focusable child of the active tab, so the
+        // requestFocus from the sidebar's onSelect lands on a real
+        // interactive element (e.g. Parental's first toggle) rather than
+        // the wrapper Box. The anchor outlives the inner `key(current)`
+        // remount because it's hoisted in [SettingsScreen].
         Box(
             modifier =
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .focusGroup()
+                    .focusRestorer()
+                    .placedFocus(anchor),
         ) {
             androidx.compose.runtime.key(current) {
                 TabContent(tab = current)
