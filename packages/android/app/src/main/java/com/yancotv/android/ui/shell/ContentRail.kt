@@ -52,6 +52,7 @@ import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.components.WheelRow
 import com.yancotv.android.ui.components.wheelItemTransform
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.tvLongClickable
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
@@ -222,6 +223,12 @@ private fun LiveCard(
                 .focusRequester(selfRequester)
                 .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .focusable(interactionSource = interaction)
+                // MB-98: combinedClickable's onLongClick fires on touch but
+                // not on D-pad CENTER hold for Fire TV / Android TV. The
+                // explicit modifier below catches the long-press flag from
+                // the underlying KeyEvent and consumes the matching UP so
+                // onClick (= "play") doesn't also fire on release.
+                .tvLongClickable(onLongPress)
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
@@ -494,6 +501,8 @@ private fun PosterCard(
                 .focusRequester(selfRequester)
                 .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .focusable(interactionSource = interaction)
+                // MB-98: see [LiveCard] — same TV long-press fix.
+                .tvLongClickable(onLongPress)
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
