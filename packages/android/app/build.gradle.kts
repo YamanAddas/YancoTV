@@ -60,13 +60,19 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            // Stage 1.4 — R8 baseline. Code shrinking (+ obfuscation) +
+            // resource shrinking on for release. Keep rules in
+            // proguard-rules.pro; consumer rules ship inside dependent AARs
+            // (Compose, Sentry, Media3, OkHttp, Ktor, Coil, etc.).
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Real signing config arrives in MK.12. For MK.0 we reuse debug
-            // so `assembleRelease` produces an installable APK.
+            // Real signing config arrives in Stage 5.7 (distribution
+            // pipeline). Until then `assembleRelease` reuses debug signing
+            // so the resulting APK is installable on test hardware.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

@@ -111,11 +111,52 @@ crash`. That data closes the bug entry in `bugs.md`.
 
 ---
 
+## R8 release-build verification (Stage 1.4)
+
+R8 minification + resource shrinking are on for release builds (`isMinifyEnabled
+= true`, `isShrinkResources = true` in `app/build.gradle.kts`). The keep rules
+in `app/proguard-rules.pro` cover the reflection paths R8 would otherwise
+break: FFmpeg JNI bridge, Kotlinx Serialization synthetic `$$serializer`
+companions, Sentry reflective lookups, and SQLDelight runtime adapters.
+
+```bash
+cd packages/android
+./gradlew :app:assembleRelease
+adb -s 192.168.68.56:5555 install -r app/build/outputs/apk/release/app-release.apk
+adb -s 192.168.68.56:5555 logcat -c
+adb -s 192.168.68.56:5555 shell am start -n com.yancotv.android/.MainActivity
+sleep 10
+adb -s 192.168.68.56:5555 logcat -d -t 800 | grep -iE 'ExoPlayerImpl|Ffmpeg|Sentry|FATAL'
+```
+
+**Success looks like:**
+
+```
+YancoSentry: Sentry initialised — env=release
+ExoPlayerImpl: Init [AndroidXMedia3/1.5.1] [duckie, AFTDCT31, Amazon, 28]
+DefaultRenderersFactory: Loaded FfmpegAudioRenderer.
+```
+
+`env=release` (not `debug`) confirms `BuildConfig.DEBUG` survived minification.
+The `Loaded FfmpegAudioRenderer` line confirms the reflection-loaded extension
+was kept by the rules in `proguard-rules.pro`.
+
+**APK size baseline:** ~15 MB release (down from ~29 MB debug). The 14 MB
+delta is debug-only artifacts: LeakCanary integration, Compose tooling,
+debug receivers (smoke-test broadcast handlers), full unstripped sources.
+
+**The debug-only smoke-test receivers (`SentrySmokeTestReceiver`,
+`WatchdogSmokeTestReceiver`) are NOT present in release** — they live in
+`app/src/debug/` which AGP excludes from release variants. To exercise
+Sentry on a release build, trigger a real error path (e.g., an unsupported
+stream that fires `onPlayerError`).
+
 ## What this verification does NOT cover
 
-- **R8 release builds.** `isMinifyEnabled = false` today; Stage 1.4 flips
-  it on and re-runs both smoke tests against the minified APK to
-  confirm the FFmpeg + Sentry keep rules survive minification.
+- **Native libffmpegJNI segfaults.** Sentry's NDK signal handler is armed
+  but can't be triggered on demand. Wait for one organically; if Sentry's
+  dashboard shows a `libffmpegJNI` frame in the stack, the NDK integration
+  is working.
 - **Native FFmpeg crashes.** Segfaults inside `libffmpegJNI` are caught by
   Sentry's NDK signal handler but not by the Java watchdog. Difficult to
   trigger on demand. Wait for one to happen organically; if Sentry's
