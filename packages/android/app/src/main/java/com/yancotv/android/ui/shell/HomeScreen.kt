@@ -311,10 +311,15 @@ fun HomeScreen(
                         }
                     }
                 },
-                modifier =
-                    Modifier
-                        .focusRequester(sidebarFocus)
-                        .onFocusChanged { sidebarHasFocus = it.hasFocus },
+                // MB-106: requester binds to the active SidebarRow inside
+                // AppSidebar (not the wrapper Column) so BACK / detail-close
+                // / onExitToSidebar land focus on the row directly — no
+                // need for the user to nudge the D-pad to "wake up" the
+                // selector. focusRestorer on the wrapper kept misfiring
+                // because requestFocus on the wrapper required a child
+                // discovery pass before the row's interactionSource flipped.
+                activeRowFocus = sidebarFocus,
+                modifier = Modifier.onFocusChanged { sidebarHasFocus = it.hasFocus },
             )
 
             if (contentType != null) {

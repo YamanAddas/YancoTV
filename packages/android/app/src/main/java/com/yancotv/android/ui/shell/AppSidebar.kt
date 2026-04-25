@@ -42,6 +42,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -85,6 +87,7 @@ fun AppSidebar(
     modifier: Modifier = Modifier,
     expanded: Boolean = true,
     onMoveRight: () -> Unit = {},
+    activeRowFocus: FocusRequester? = null,
 ) {
     // Cascade-collapse: when focus moves into the categories rail or content
     // panel, the sidebar shrinks to an icon strip so the user always knows
@@ -156,12 +159,28 @@ fun AppSidebar(
                     .verticalScroll(rememberScrollState()),
         ) {
             AppSection.entries.forEach { section ->
+                // MB-106: bind the activeRowFocus requester to the row
+                // matching the current section so external requestFocus()
+                // calls (BACK from content, detail-overlay close,
+                // sidebar→sidebar onExitToSidebar) land on a real row that
+                // flips its MutableInteractionSource → focused gradient
+                // and accent border render immediately. Previously the
+                // requester was on the wrapper Column, so focusRestorer
+                // had to "discover" a child and the visual focus state
+                // wouldn't appear until the user nudged the D-pad.
+                val rowModifier =
+                    if (section == current && activeRowFocus != null) {
+                        Modifier.focusRequester(activeRowFocus)
+                    } else {
+                        Modifier
+                    }
                 SidebarRow(
                     section = section,
                     icon = iconFor(section),
                     selected = section == current,
                     showLabel = expanded,
                     onClick = { onSelect(section) },
+                    modifier = rowModifier,
                 )
             }
         }
@@ -223,6 +242,7 @@ private fun SidebarRow(
     selected: Boolean,
     showLabel: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -280,7 +300,7 @@ private fun SidebarRow(
 
     Box(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .height(52.dp),
     ) {
