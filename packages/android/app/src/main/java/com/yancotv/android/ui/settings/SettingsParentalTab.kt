@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -95,10 +97,17 @@ fun SettingsParentalTab(
         hiddenItems.addAll(resolved)
     }
 
+    // MB-107: vertical scroll on the outer Column. Without it the
+    // "Require PIN to open Settings" toggle and "Hidden channels" panel
+    // sit below the fold on Fire TV — D-pad DOWN can't reach them
+    // because there's no scrollable parent. The nested hidden-items
+    // LazyColumn below has bounded `heightIn(max = 280.dp)` so it
+    // measures fine inside the verticalScroll.
     Column(
         modifier =
             modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
