@@ -1,7 +1,10 @@
 package com.yancotv.android.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -141,44 +145,70 @@ fun SettingsGroupsTab(
     }
 }
 
+/**
+ * MB-107a: same focus-aware row treatment as [SettingsToggleRow] but with
+ * the Groups-tab specific shape — visible/hidden label slot in the middle,
+ * inverted Switch semantics (`checked = !hidden`).
+ *
+ * Inlined rather than parameterised on [SettingsToggleRow] because the
+ * extra label slot would push the shared composable into config-bag
+ * territory; the focus-border pattern is small enough to copy.
+ */
 @Composable
 private fun GroupRow(
     name: String,
     hidden: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
+    val palette = LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(8.dp)
+
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .clickable { onToggle(!hidden) }
+                .clip(shape)
+                .background(palette.BackgroundRaised)
+                .border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) palette.FocusRing else Color.Transparent,
+                    shape = shape,
+                )
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = { onToggle(!hidden) },
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
             text = name,
-            color = if (hidden) LocalYancoPalette.current.TextMuted else LocalYancoPalette.current.TextPrimary,
+            color = if (hidden) palette.TextMuted else palette.TextPrimary,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
         Text(
             text = if (hidden) "Hidden" else "Visible",
-            color = LocalYancoPalette.current.TextMuted,
+            color = palette.TextMuted,
             fontSize = 11.sp,
         )
+        // Display-only — row owns input via .clickable above. Keeps the
+        // focus target as the Row, not the Switch (which has an invisible
+        // halo against BackgroundRaised on Fire TV).
         Switch(
             checked = !hidden,
-            onCheckedChange = { checked -> onToggle(!checked) },
+            onCheckedChange = null,
             colors =
                 SwitchDefaults.colors(
-                    checkedThumbColor = LocalYancoPalette.current.Accent,
-                    checkedTrackColor = LocalYancoPalette.current.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = LocalYancoPalette.current.TextMuted,
-                    uncheckedTrackColor = LocalYancoPalette.current.BackgroundHover,
+                    checkedThumbColor = palette.Accent,
+                    checkedTrackColor = palette.Accent.copy(alpha = 0.4f),
+                    uncheckedThumbColor = palette.TextMuted,
+                    uncheckedTrackColor = palette.BackgroundHover,
                 ),
         )
     }

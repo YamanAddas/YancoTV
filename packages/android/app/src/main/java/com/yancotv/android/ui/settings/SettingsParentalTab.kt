@@ -4,10 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,8 +19,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -215,13 +211,17 @@ fun SettingsParentalTab(
         }
 
         // ───── Toggles ─────
-        ToggleRow(
+        // MB-107a: shared focus-aware row. Material3 `Switch`'s default
+        // focus indicator is invisible against `BackgroundRaised` on Fire
+        // TV, so users couldn't tell which toggle had focus. The shared
+        // composable owns a row-level accent border instead.
+        SettingsToggleRow(
             label = "Hide adult-tagged content",
             description = "Filter channels / movies / series that a provider marks as adult.",
             checked = settings.hideAdultContent,
             onCheckedChange = { repo.setHideAdultContent(it) },
         )
-        ToggleRow(
+        SettingsToggleRow(
             label = "Require PIN to open Settings",
             description = "Gate this Settings screen behind the PIN so kids can't change policy.",
             enabled = settings.pinSet,
@@ -353,53 +353,6 @@ private fun PinField(
             ),
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@Composable
-private fun ToggleRow(
-    label: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                color = if (enabled) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = description,
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
-            )
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            colors =
-                SwitchDefaults.colors(
-                    checkedThumbColor = LocalYancoPalette.current.Accent,
-                    checkedTrackColor = LocalYancoPalette.current.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = LocalYancoPalette.current.TextMuted,
-                    uncheckedTrackColor = LocalYancoPalette.current.BackgroundHover,
-                ),
-        )
-    }
 }
 
 @Composable
