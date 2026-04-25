@@ -5,20 +5,27 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.sentry)
 }
 
 // Sentry DSN — read from local.properties so the value stays per-machine and
 // out of git history. Empty string when missing means Sentry init is a silent
 // no-op (clean checkout / fresh dev box doesn't crash on launch).
-val sentryDsn: String =
+val sentryProps: Properties =
     rootProject.file("local.properties").let { propsFile ->
-        if (propsFile.exists()) {
-            Properties().apply { propsFile.inputStream().use { load(it) } }
-                .getProperty("sentry.dsn", "")
-        } else {
-            ""
+        Properties().apply {
+            if (propsFile.exists()) {
+                propsFile.inputStream().use { load(it) }
+            }
         }
     }
+val sentryDsn: String = sentryProps.getProperty("sentry.dsn", "")
+// Sentry auth token — used by the Sentry Gradle plugin at build time to
+// upload R8 mapping files. Never embedded in the APK. Empty when missing
+// means the plugin's upload step is skipped (a clean checkout still
+// builds; just no symbolicated stack traces in the dashboard for that
+// build's release crashes).
+val sentryAuthToken: String = sentryProps.getProperty("sentry.auth.token", "")
 
 // ktlint applied per-module (the version-catalog `libs` accessor isn't
 // available inside root `subprojects {}` blocks in Kotlin DSL, so each
@@ -222,4 +229,54 @@ dependencies {
     // ───── test ─────
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// Stage 1.4 follow-up — Sentry Gradle plugin. Uploads the R8 mapping file
+// to Sentry during release builds so obfuscated crash stack traces in the
+// dashboard get symbolicated back to readable Kotlin/Java source.
+//
+// Auth token is read from local.properties (gitignored). Empty token =
+// upload step is a no-op; the build still succeeds, just without
+// symbolication for that build's release events.
+//
+// Native debug-symbol upload is OFF — the vendored libffmpegJNI.so files
+// were stripped at build time (see docs/build/ffmpeg-extension.md), so
+// there's no debug info to upload anyway. We accept obfuscated function
+// names in the rare native-crash event in exchange for a smaller APK.
+//
+// Auto-installation of the Sentry SDK is OFF — we init manually in
+// YancoApp.onCreate via SentryInit so the DSN can be sourced from
+// local.properties. The plugin would otherwise re-add the SDK and bake
+// the DSN into the manifest.
+//
+// Tracing instrumentation is OFF — Stage 1.3 explicitly chose
+// crash + error reporting only; performance tracing has its own CPU and
+// network cost we'd want to budget deliberately.
+sentry {
+    org.set("catbyte")
+    projectName.set("yancotv-androidtv")
+    authToken.set(sentryAuthToken)
+
+    // Mapping upload — the actual point of this plugin for us.
+    includeProguardMapping.set(true)
+    autoUploadProguardMapping.set(sentryAuthToken.isNotBlank())
+
+    // Don't bundle source context (would add ~MB of source tree as build
+    // metadata). Stack traces with file+line are enough.
+    includeSourceContext.set(false)
+
+    // Native symbol upload — see comment above; off because we strip.
+    uploadNativeSymbols.set(false)
+
+    // Disable the auto-install ContentProvider injection — we init in
+    // YancoApp manually, see SentryInit.kt + AndroidManifest.xml's
+    // io.sentry.auto-init=false meta-data.
+    autoInstallation {
+        enabled.set(false)
+    }
+
+    // Bytecode instrumentation for tracing — off, see comment above.
+    tracingInstrumentation {
+        enabled.set(false)
+    }
 }
