@@ -9,21 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -113,61 +106,21 @@ fun SettingsPlaybackTab(
         )
 
         // ── Default audio + subtitle language ──
-        LangField(
+        // MB-117: SettingsClickToEditField — IME only on explicit OK press.
+        // The lowercase + 6-char cap lives in the onValueChange shim.
+        SettingsClickToEditField(
             label = "Preferred audio language",
             description = "Two- or three-letter ISO 639 code (e.g. en, eng, fre). Applied when a stream ships multiple audio tracks.",
             value = snapshot.audioLanguage,
-            onCommit = { scope.launch { prefs.setAudioLanguage(it) } },
+            onValueChange = { scope.launch { prefs.setAudioLanguage(it.take(6).lowercase()) } },
+            keyboardType = KeyboardType.Ascii,
         )
-        LangField(
+        SettingsClickToEditField(
             label = "Preferred subtitle language",
             description = "ISO 639 code. Blank = subtitles off by default.",
             value = snapshot.subtitleLanguage,
-            onCommit = { scope.launch { prefs.setSubtitleLanguage(it) } },
-        )
-    }
-}
-
-@Composable
-private fun LangField(
-    label: String,
-    description: String,
-    value: String,
-    onCommit: (String) -> Unit,
-) {
-    // Local draft so typing doesn't round-trip the DB per keystroke. Commit
-    // on every non-identity change — the DB write is cheap, and commit-on-
-    // blur semantics don't work well without explicit focus tracking on TV.
-    var draft by remember(value) { mutableStateOf(value) }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(text = label, color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text(text = description, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp)
-        OutlinedTextField(
-            value = draft,
-            onValueChange = {
-                draft = it.take(6).lowercase()
-                onCommit(draft)
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = LocalYancoPalette.current.TextPrimary,
-                    unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
-                    focusedBorderColor = LocalYancoPalette.current.Accent,
-                    unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
-                    cursorColor = LocalYancoPalette.current.Accent,
-                ),
-            modifier = Modifier.fillMaxWidth(),
+            onValueChange = { scope.launch { prefs.setSubtitleLanguage(it.take(6).lowercase()) } },
+            keyboardType = KeyboardType.Ascii,
         )
     }
 }

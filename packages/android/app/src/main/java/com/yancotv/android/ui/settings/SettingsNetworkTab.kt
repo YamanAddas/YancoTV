@@ -1,29 +1,18 @@
 package com.yancotv.android.ui.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -42,6 +31,10 @@ import org.koin.compose.koinInject
  * Timeouts apply to every HTTP request the shared layer makes
  * (catalog fetch, EPG fetch, playback URL resolve). Defaults match
  * what the pre-prefs build hardcoded.
+ *
+ * MB-117: every text input uses [SettingsClickToEditField] so the IME
+ * only opens when the user explicitly presses OK on a field — never
+ * on D-pad focus alone.
  */
 @Composable
 fun SettingsNetworkTab(
@@ -66,43 +59,37 @@ fun SettingsNetworkTab(
             fontWeight = FontWeight.SemiBold,
         )
 
-        PrefCard(
-            title = "User-Agent override",
+        SettingsClickToEditField(
+            label = "User-Agent override",
             description = "Some IPTV providers reject the default. Paste a custom string here (e.g. `VLC/3.0.20 LibVLC/3.0.20`) or leave blank to use the system default.",
-        ) {
-            var draft by remember(state.userAgentOverride) { mutableStateOf(state.userAgentOverride.orEmpty()) }
-            OutlinedTextField(
-                value = draft,
-                onValueChange = {
-                    draft = it.take(256)
-                    scope.launch { prefs.setUserAgent(draft) }
-                },
-                singleLine = true,
-                placeholder = { Text("VLC/3.0.20 LibVLC/3.0.20", color = LocalYancoPalette.current.TextMuted) },
-                textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp),
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = LocalYancoPalette.current.TextPrimary,
-                        unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
-                        focusedBorderColor = LocalYancoPalette.current.Accent,
-                        unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
-                        cursorColor = LocalYancoPalette.current.Accent,
-                    ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+            value = state.userAgentOverride.orEmpty(),
+            onValueChange = { input -> scope.launch { prefs.setUserAgent(input.take(256)) } },
+            hint = "VLC/3.0.20 LibVLC/3.0.20",
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TimeoutField(
+            SettingsClickToEditField(
                 label = "Connect timeout (s)",
-                value = state.connectTimeoutSec,
-                onCommit = { scope.launch { prefs.setConnectTimeout(it) } },
+                value = state.connectTimeoutSec.toString(),
+                onValueChange = { input ->
+                    val cleaned = input.filter { it.isDigit() }.take(4)
+                    cleaned.toIntOrNull()?.takeIf { it in 1..600 }?.let { v ->
+                        scope.launch { prefs.setConnectTimeout(v) }
+                    }
+                },
+                keyboardType = KeyboardType.Number,
                 modifier = Modifier.weight(1f),
             )
-            TimeoutField(
+            SettingsClickToEditField(
                 label = "Read timeout (s)",
-                value = state.readTimeoutSec,
-                onCommit = { scope.launch { prefs.setReadTimeout(it) } },
+                value = state.readTimeoutSec.toString(),
+                onValueChange = { input ->
+                    val cleaned = input.filter { it.isDigit() }.take(4)
+                    cleaned.toIntOrNull()?.takeIf { it in 1..600 }?.let { v ->
+                        scope.launch { prefs.setReadTimeout(v) }
+                    }
+                },
+                keyboardType = KeyboardType.Number,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -111,65 +98,5 @@ fun SettingsNetworkTab(
             color = LocalYancoPalette.current.TextMuted,
             fontSize = 11.sp,
         )
-    }
-}
-
-@Composable
-private fun TimeoutField(
-    label: String,
-    value: Int,
-    onCommit: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var draft by remember(value) { mutableStateOf(value.toString()) }
-    Column(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(text = label, color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { input ->
-                val cleaned = input.filter { it.isDigit() }.take(4)
-                draft = cleaned
-                cleaned.toIntOrNull()?.takeIf { it in 1..600 }?.let(onCommit)
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = LocalYancoPalette.current.TextPrimary,
-                    unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
-                    focusedBorderColor = LocalYancoPalette.current.Accent,
-                    unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
-                    cursorColor = LocalYancoPalette.current.Accent,
-                ),
-        )
-    }
-}
-
-@Composable
-private fun PrefCard(
-    title: String,
-    description: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(title, color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text(description, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp)
-        content()
     }
 }

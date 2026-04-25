@@ -17,13 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,15 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -175,45 +165,50 @@ fun AddSourceDialog(
                 }
 
                 SectionLabel("Details")
-                ClickToEditField(
+                SettingsClickToEditField(
                     label = "Name",
                     hint = "e.g. My IPTV",
                     value = name,
                     onValueChange = { name = it },
+                    bare = true,
                 )
-                ClickToEditField(
+                SettingsClickToEditField(
                     label = if (type == SourceType.XTREAM) "Host URL" else "M3U URL",
                     hint = if (type == SourceType.XTREAM) "http://host:port" else "https://provider.tv/list.m3u",
                     value = url,
                     onValueChange = { url = it },
                     keyboardType = KeyboardType.Uri,
+                    bare = true,
                 )
 
                 if (type == SourceType.XTREAM) {
                     SectionLabel("Credentials")
-                    ClickToEditField(
+                    SettingsClickToEditField(
                         label = "Username",
                         hint = null,
                         value = username,
                         onValueChange = { username = it },
+                        bare = true,
                     )
-                    ClickToEditField(
+                    SettingsClickToEditField(
                         label = "Password",
                         hint = null,
                         value = password,
                         onValueChange = { password = it },
                         transformation = PasswordVisualTransformation(),
                         keyboardType = KeyboardType.Password,
+                        bare = true,
                     )
                 }
 
                 SectionLabel("Electronic program guide")
-                ClickToEditField(
+                SettingsClickToEditField(
                     label = "EPG URL",
                     hint = "Optional — leave blank for the provider's built-in guide",
                     value = epgUrl,
                     onValueChange = { epgUrl = it },
                     keyboardType = KeyboardType.Uri,
+                    bare = true,
                 )
 
                 validationError?.let { ErrorBanner(text = it) }
@@ -279,154 +274,6 @@ private fun ErrorBanner(text: String) {
     ) {
         Text(text = text, color = LocalYancoPalette.current.Error, fontSize = 12.sp)
     }
-}
-
-/**
- * Click-to-edit field. Default state: focusable read-only row showing
- * the current value (or hint placeholder). Press OK → [editing] flips
- * true → an embedded [BasicTextField] takes focus, which opens the IME.
- * Press Done / Enter / Back → [editing] flips false, IME dismisses.
- *
- * This is the whole "only open the keyboard when I ask" flow — the
- * field is never auto-focused unless the user explicitly activates it.
- */
-@Composable
-private fun ClickToEditField(
-    label: String,
-    hint: String?,
-    value: String,
-    onValueChange: (String) -> Unit,
-    transformation: VisualTransformation = VisualTransformation.None,
-    keyboardType: KeyboardType = KeyboardType.Text,
-) {
-    var editing by remember { mutableStateOf(false) }
-    val editFocus = remember { FocusRequester() }
-
-    // Push focus into the text field the frame after `editing` flips true.
-    // The field is only composed while editing, so this effect is keyed on
-    // `editing` — it can't race with its own recomposition.
-    LaunchedEffect(editing) {
-        if (editing) runCatching { editFocus.requestFocus() }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = label,
-                color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            )
-            if (!hint.isNullOrBlank() && !editing) {
-                Text(text = hint, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp)
-            }
-        }
-        if (editing) {
-            EditableBody(
-                value = value,
-                onValueChange = onValueChange,
-                transformation = transformation,
-                keyboardType = keyboardType,
-                focusRequester = editFocus,
-                onDone = { editing = false },
-            )
-        } else {
-            ReadOnlyBody(
-                display = transformForDisplay(value, transformation),
-                placeholder = hint?.takeIf { value.isBlank() } ?: "",
-                empty = value.isBlank(),
-                onClick = { editing = true },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReadOnlyBody(
-    display: String,
-    placeholder: String,
-    empty: Boolean,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
-    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundDeep
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(8.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(
-            text = if (empty) placeholder else display,
-            color = if (empty) LocalYancoPalette.current.TextMuted else LocalYancoPalette.current.TextPrimary,
-            fontSize = 14.sp,
-        )
-    }
-}
-
-@Composable
-private fun EditableBody(
-    value: String,
-    onValueChange: (String) -> Unit,
-    transformation: VisualTransformation,
-    keyboardType: KeyboardType,
-    focusRequester: FocusRequester,
-    onDone: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.BackgroundHover)
-                .border(1.dp, LocalYancoPalette.current.FocusRing, RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            interactionSource = interaction,
-            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp),
-            cursorBrush = SolidColor(LocalYancoPalette.current.FocusRing),
-            visualTransformation = transformation,
-            keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = keyboardType,
-                    imeAction = ImeAction.Done,
-                ),
-            keyboardActions = KeyboardActions(onDone = { onDone() }),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-        )
-    }
-}
-
-private fun transformForDisplay(
-    value: String,
-    transformation: VisualTransformation,
-): String {
-    if (value.isEmpty()) return ""
-    if (transformation is PasswordVisualTransformation) return "•".repeat(value.length)
-    return value
 }
 
 @Composable
