@@ -72,6 +72,8 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
+import com.yancotv.android.ui.focus.tvLongClickable
+import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
@@ -142,6 +144,11 @@ fun CoverflowSectionScreen(
     modifier: Modifier = Modifier,
 ) {
     val firstItemAnchor = rememberPlacedFocusAnchor()
+
+    // MB-98 — channel context menu (long-press OK / MENU on a coverflow orb).
+    // Set by the per-orb tvLongClickable hook via ContentCoverflow's onLongPress;
+    // ChannelActionsMenu renders below the wheel when non-null.
+    var actionsFor by remember { mutableStateOf<ContentItem?>(null) }
 
     val items = remember(type) { mutableStateListOf<ContentItem>() }
     var total by remember(type) { mutableStateOf(0L) }
@@ -442,6 +449,7 @@ fun CoverflowSectionScreen(
                             focusedItem = item
                         },
                         onActivate = { idx -> onActivate(visible.toList(), idx) },
+                        onLongPress = { item -> actionsFor = item },
                     )
                 hasLoaded ->
                     CoverflowEmptyState(
@@ -450,6 +458,17 @@ fun CoverflowSectionScreen(
                     )
             }
         }
+    }
+
+    // MB-98 — channel context menu, lifted out of the wheel so the dialog
+    // renders over the entire CoverflowSectionScreen surface (not clipped
+    // to the LazyRow viewport). Dismissed via Back or any explicit row.
+    actionsFor?.let { target ->
+        ChannelActionsMenu(
+            item = target,
+            repo = parental,
+            onDismiss = { actionsFor = null },
+        )
     }
 }
 
@@ -943,6 +962,7 @@ private fun ContentCoverflow(
     entryFocus: FocusRequester,
     onFocus: (Int, ContentItem) -> Unit,
     onActivate: (Int) -> Unit,
+    onLongPress: (ContentItem) -> Unit,
 ) {
     val listState = rememberLazyListState()
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -981,6 +1001,7 @@ private fun ContentCoverflow(
                     entryFocus = if (index == focusedIndex) entryFocus else null,
                     onFocus = { onFocus(index, item) },
                     onActivate = { onActivate(index) },
+                    onLongPress = { onLongPress(item) },
                 )
             }
         }
@@ -998,6 +1019,7 @@ private fun ContentOrb(
     entryFocus: FocusRequester?,
     onFocus: () -> Unit,
     onActivate: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -1054,6 +1076,12 @@ private fun ContentOrb(
                         shape = YancoShapes.HexCapsule,
                     ).then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
                     .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
+                    // MB-98 — registers `onLongPress` as the active context-menu
+                    // action while this orb holds focus. The actual long-press
+                    // timer + KEYCODE_MENU dispatch live in MainActivity (see
+                    // TvContextActionState). Touch long-press is unsupported on
+                    // the coverflow path — TV-only surface.
+                    .tvLongClickable(onLongPress)
                     .focusable(interactionSource = interaction)
                     .clickable(
                         interactionSource = interaction,

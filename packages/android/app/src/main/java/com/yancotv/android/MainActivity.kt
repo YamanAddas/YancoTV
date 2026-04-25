@@ -21,9 +21,12 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.ui.focus.TvContextActionState
 import com.yancotv.android.ui.shell.HomeScreen
 import com.yancotv.android.ui.shell.SearchOverlayState
 import com.yancotv.android.ui.theme.YancoTheme
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -105,6 +108,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // MB-98 — D-pad CENTER long-press tracking. We deliberately don't use
+    // KeyEvent.startTracking() / onKeyLongPress: that path requires
+    // returning true from onKeyDown to start tracking, which would prevent
+    // Compose's combinedClickable from seeing the DOWN and would break the
+    // short-press onClick. Instead we run a manual 500ms timer scoped to
+    // the held key. Cancelled on UP (short-press, falls through to onClick)
+    // or fires the focused-card action and swallows the eventual UP
+    // (long-press; consumed so combinedClickable.onClick doesn't also run).
+    private var longPressJob: Job? = null
+    private var longPressFired = false
+
+    private fun isCenterKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            keyCode == KeyEvent.KEYCODE_ENTER ||
+            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+
     override fun onKeyDown(
         keyCode: Int,
         event: KeyEvent?,
@@ -120,7 +139,59 @@ class MainActivity : ComponentActivity() {
             SearchOverlayState.show()
             return true
         }
+
+        // MB-98 — KEYCODE_MENU is the canonical Android TV context-action
+        // key (Fire TV voice remote ≡, Shield ⋮). Single-press; fires
+        // whichever card currently holds focus. If no card is registered
+        // (e.g. focus is on the sidebar), fall through to default handling.
+        if (keyCode == KeyEvent.KEYCODE_MENU && event?.repeatCount == 0) {
+            if (TvContextActionState.fire()) return true
+        }
+
+        // MB-98 — start the long-press timer on the FIRST CENTER/ENTER DOWN
+        // only. Repeats arrive while held; we ignore those (the timer is
+        // already running). Don't consume — Compose still needs the DOWN
+        // for its combinedClickable press state and for the eventual short
+        // onClick on UP.
+        if (event?.repeatCount == 0 && isCenterKey(keyCode)) {
+            longPressJob?.cancel()
+            longPressFired = false
+            longPressJob =
+                lifecycleScope.launch {
+                    delay(LONG_PRESS_TIMEOUT_MS)
+                    if (TvContextActionState.fire()) {
+                        longPressFired = true
+                    }
+                }
+        }
+
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(
+        keyCode: Int,
+        event: KeyEvent?,
+    ): Boolean {
+        // MB-98 — short-press path: cancel pending timer, let combinedClickable
+        // see UP and fire onClick normally.
+        // Long-press path: timer already fired and opened the menu, so swallow
+        // this UP to keep onClick from also running on release.
+        if (isCenterKey(keyCode)) {
+            longPressJob?.cancel()
+            longPressJob = null
+            if (longPressFired) {
+                longPressFired = false
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    companion object {
+        // Standard Android long-press threshold. Matches ViewConfiguration's
+        // default and what users have been trained to expect from the
+        // platform (settings dialogs, launcher icon edits, etc.).
+        private const val LONG_PRESS_TIMEOUT_MS = 500L
     }
 
     private fun requestNotificationsPermissionIfNeeded() {

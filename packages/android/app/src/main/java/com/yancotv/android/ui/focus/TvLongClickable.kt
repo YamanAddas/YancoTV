@@ -1,82 +1,57 @@
 package com.yancotv.android.ui.focus
 
-import android.view.KeyEvent as AndroidKeyEvent
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
+import androidx.compose.ui.focus.onFocusChanged
 
 /**
- * MB-98 — fire [onLongClick] when D-pad CENTER / ENTER is held past the
- * system long-press timeout (~500 ms).
+ * MB-98 — register `onLongPress` as the active context-menu action while
+ * this composable holds focus.
  *
- * Why this exists: Compose Foundation's `Modifier.combinedClickable
- * (onLongClick = ...)` is reliable for touch but does not fire for
- * D-pad CENTER long-press on Android TV / Fire TV (verified on Compose
- * BOM 2025.01.00 / Foundation 1.7). The cards in [ContentRail] wired
- * `onLongClick` to open [ChannelActionsMenu] but the menu never opened
- * — short and long press both fell through to `onClick` (= "play").
+ * **History.** v1 used `Modifier.composed { onPreviewKeyEvent { ... } }` —
+ * the lambda body never executed in our chain. v2 used a `@Composable`
+ * extension that returned `onPreviewKeyEvent { isLongPress -> ... }` plus
+ * a parallel KEYCODE_MENU branch — both paths still failed on real Fire TV
+ * hardware (long-press AND MENU behaved as a click). Root cause: the
+ * system's `isLongPress` flag is only set when `KeyEvent.startTracking()`
+ * was called on the matching DOWN, which Compose's preview-key path
+ * doesn't do; and MENU appeared to be intercepted before reaching the
+ * modifier chain.
  *
- * Implementation: watch the underlying [AndroidKeyEvent] flag
- * [AndroidKeyEvent.isLongPress] on the down event. When the OS marks an
- * event as long-press (it sets FLAG_LONG_PRESS at the timeout), fire
- * the callback and consume both that DOWN and the eventual UP, so
- * [androidx.compose.foundation.combinedClickable]'s `onClick` doesn't
- * also fire when the user releases.
+ * **Current design (v3).** Long-press detection + MENU handling moved up
+ * to `MainActivity`, where they're routine Android patterns:
+ *   - `onKeyDown` schedules a manual 500ms timer for CENTER/ENTER.
+ *   - `onKeyDown` fires immediately for KEYCODE_MENU.
+ *   - `onKeyUp` swallows the matching UP if the long-press already fired,
+ *     so `combinedClickable.onClick` doesn't also fire on release.
  *
- * Apply this modifier ALONGSIDE `combinedClickable` on the same node;
- * it lives in the focused-element's preview-key chain so it sees the
- * event first. Intentionally also keeps `combinedClickable.onLongClick`
- * intact so touch users on phone still get the same gesture.
+ * The Activity needs to know WHICH card to act on. That's this modifier's
+ * job: when the host composable gains focus, we register `onLongPress` in
+ * [TvContextActionState]; when it loses focus, we clear (only if we're
+ * still the active token). The Activity calls `TvContextActionState.fire()`
+ * and the focused card's handler runs.
  *
- * Re-test on Compose Foundation upgrades — if the upstream primitive
- * starts honouring TV long-press, this modifier becomes redundant.
+ * The call signature is unchanged from v2 so existing call sites (LiveCard,
+ * PosterCard, …) need no churn beyond a comment refresh.
+ *
+ * Why `rememberUpdatedState`: the `onLongPress` lambda is fresh every
+ * recomposition (closure over current `item`, `onLongPress` param). We
+ * register a stable wrapper that always calls the latest captured value —
+ * otherwise we'd register a stale lambda whenever the parent recomposes
+ * without the focus state changing.
  */
-fun Modifier.tvLongClickable(onLongClick: () -> Unit): Modifier =
-    composed {
-        // Tracks whether the current key gesture has already fired a
-        // long-press. Survives recompositions so the matching UP can be
-        // consumed even if the parent recomposes while the key is held.
-        val swallowNextUp = remember { mutableStateOf(false) }
-        onPreviewKeyEvent { event ->
-            val keyCode = event.nativeKeyEvent.keyCode
-            val isCenterKey =
-                keyCode == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
-                    keyCode == AndroidKeyEvent.KEYCODE_ENTER ||
-                    keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER
-            if (!isCenterKey) return@onPreviewKeyEvent false
-
-            when (event.type) {
-                KeyEventType.KeyDown -> {
-                    if (event.nativeKeyEvent.isLongPress) {
-                        onLongClick()
-                        swallowNextUp.value = true
-                        // Consume this DOWN — combinedClickable would treat
-                        // it as a repeat and could leak haptic / visual press
-                        // state.
-                        true
-                    } else {
-                        // First (and intermediate-repeat) DOWNs flow through
-                        // to combinedClickable so it can keep its press-in-
-                        // progress visual state coherent.
-                        false
-                    }
-                }
-                KeyEventType.KeyUp -> {
-                    if (swallowNextUp.value) {
-                        swallowNextUp.value = false
-                        // Swallow the UP so combinedClickable doesn't fire
-                        // its `onClick` on release after we already fired
-                        // the long-press.
-                        true
-                    } else {
-                        false
-                    }
-                }
-                else -> false
-            }
+@Composable
+fun Modifier.tvLongClickable(onLongPress: () -> Unit): Modifier {
+    val token = remember { Any() }
+    val current by rememberUpdatedState(onLongPress)
+    return this.onFocusChanged { state ->
+        if (state.isFocused) {
+            TvContextActionState.set(token) { current() }
+        } else {
+            TvContextActionState.clearIf(token)
         }
     }
+}

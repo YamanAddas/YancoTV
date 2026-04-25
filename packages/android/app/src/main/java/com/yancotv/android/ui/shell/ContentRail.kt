@@ -219,16 +219,17 @@ private fun LiveCard(
         modifier =
             modifier
                 .width(300.dp)
+                // MB-98: combinedClickable.onLongClick doesn't fire on
+                // D-pad CENTER hold for Fire TV / Android TV (touch only).
+                // [tvLongClickable] registers `onLongPress` as the active
+                // context-menu action while this card holds focus; the
+                // matching long-press timer + KEYCODE_MENU dispatch live
+                // in MainActivity (see TvContextActionState).
+                .tvLongClickable(onLongPress)
                 .height(120.dp)
                 .focusRequester(selfRequester)
                 .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .focusable(interactionSource = interaction)
-                // MB-98: combinedClickable's onLongClick fires on touch but
-                // not on D-pad CENTER hold for Fire TV / Android TV. The
-                // explicit modifier below catches the long-press flag from
-                // the underlying KeyEvent and consumes the matching UP so
-                // onClick (= "play") doesn't also fire on release.
-                .tvLongClickable(onLongPress)
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
@@ -498,11 +499,13 @@ private fun PosterCard(
         modifier =
             modifier
                 .width(240.dp)
+                // MB-98: see [LiveCard] — same TV long-press / MENU fix.
+                // Registers the menu action while focused; Activity-level
+                // timer in MainActivity drives the actual trigger.
+                .tvLongClickable(onLongPress)
                 .focusRequester(selfRequester)
                 .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .focusable(interactionSource = interaction)
-                // MB-98: see [LiveCard] — same TV long-press fix.
-                .tvLongClickable(onLongPress)
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
