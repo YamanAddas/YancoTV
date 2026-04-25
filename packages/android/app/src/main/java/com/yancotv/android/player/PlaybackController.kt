@@ -202,21 +202,41 @@ class PlaybackController(
                     // retainBackBufferFromKeyframe =
                     true,
                 ).build()
-        // MK.9 — prefer the vendored FFmpeg extension over platform decoders
-        // on the initial build. Closes MB-14 (~30% of streams audio-only on
-        // Fire TV because the device lacks licensed AC3/EAC3/DTS/TrueHD
-        // decoders, plus HEVC-main10 edge cases). EXTENSION_RENDERER_MODE_
-        // PREFER puts FfmpegAudioRenderer ahead of MediaCodecAudioRenderer;
-        // setEnableDecoderFallback(true) means a format the extension can't
-        // handle still falls through to the platform decoder.
+        // MK.9 — vendor the FFmpeg AUDIO extension to fix MB-14
+        // (Fire TV ships without licensed AC3/EAC3/DTS/TrueHD decoders, so
+        // ~30% of IPTV streams played audio-only or no-audio without it).
         //
-        // MK.9.4 — after a confirmed FFmpeg crash the watchdog rebuilds with
-        // useFfmpeg = false, which uses EXTENSION_RENDERER_MODE_OFF. The
-        // platform decoder is then the only path; no extension renderer is
-        // even instantiated, so the crash class can't recur this session.
+        // Mode = EXTENSION_RENDERER_MODE_ON (NOT _PREFER): platform
+        // (MediaCodec hardware) renderers are tried FIRST for every format;
+        // the FFmpeg extension is only used when the platform decoder
+        // rejects the format. This is the right behavior because:
+        //
+        //   - For HEVC / H.264 video: Fire TV's hardware decoder is vastly
+        //     faster than software FFmpeg. Preferring FFmpeg ANR'd the app
+        //     on common HEVC streams (2026-04-25 incident — main thread
+        //     blocked waiting on slow software decode).
+        //   - For AC3 / EAC3 / DTS / TrueHD audio: Fire TV has no platform
+        //     decoder at all, so MediaCodec rejects the format and FFmpeg
+        //     picks it up automatically. Same MB-14 fix, no preference
+        //     change needed.
+        //
+        // setEnableDecoderFallback(true) gives a second chance: if the
+        // chosen renderer fails initialisation, ExoPlayer tries the next.
+        //
+        // MK.9.4 — after a confirmed FFmpeg crash the watchdog rebuilds
+        // with useFfmpeg = false (EXTENSION_RENDERER_MODE_OFF). Platform
+        // decoders are then the only path; the crash class can't recur.
+        //
+        // ExperimentalFfmpegVideoRenderer was deliberately removed from the
+        // vendored sources after the same 2026-04-25 ANR incident — software
+        // HEVC decode at 1080p is borderline on Fire TV Stick class hardware
+        // and impossible at 4K. The audio renderer is what fixes MB-14;
+        // forcing software video decode buys us one rare edge case (HEVC
+        // main10 the hw decoder partially handles) at the cost of routine
+        // ANRs on common streams. Wrong trade.
         val extensionMode =
             if (useFfmpeg) {
-                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
             } else {
                 DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
             }

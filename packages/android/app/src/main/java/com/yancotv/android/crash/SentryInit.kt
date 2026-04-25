@@ -50,6 +50,20 @@ object SentryInit {
             // Debug logging in dev so init issues surface in `adb logcat -s
             // Sentry`. Off in release so release builds don't chatty-log.
             options.isDebug = BuildConfig.DEBUG
+
+            // ANR detection — explicit (the meta-package's default is
+            // conservative on Fire TV / API 28, which falls back to the
+            // in-process watchdog AnrIntegration). 2026-04-25 Stage 1.2
+            // verification hit a real ANR that wasn't captured; these
+            // settings make the legacy detector fire reliably and report
+            // in debug builds (default suppresses ANR reports under a
+            // debugger to avoid breakpoint false-positives).
+            options.isAnrEnabled = true
+            options.anrTimeoutIntervalMillis = 5_000L
+            options.isAnrReportInDebug = true
+            // Thread dumps attached to ANR events so we can see what was
+            // blocking the main thread, not just that it was blocked.
+            options.isAttachThreads = true
         }
 
         // Wire shared Kermit -> Sentry. setLogWriters replaces the writer
