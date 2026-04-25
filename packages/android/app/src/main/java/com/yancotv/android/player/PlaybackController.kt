@@ -9,6 +9,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.yancotv.android.prefs.AppPreferences
@@ -149,9 +150,22 @@ class PlaybackController(
                         // retainBackBufferFromKeyframe =
                         true,
                     ).build()
+            // MK.9 — prefer the vendored FFmpeg extension over platform decoders.
+            // Closes MB-14 (~30% of streams audio-only on Fire TV because the
+            // device lacks licensed AC3/EAC3/DTS/TrueHD decoders, plus HEVC-main10
+            // edge cases). EXTENSION_RENDERER_MODE_PREFER puts FfmpegAudioRenderer
+            // ahead of MediaCodecAudioRenderer; setEnableDecoderFallback(true)
+            // means a format the extension can't handle still falls through to
+            // the platform decoder. No-op when libffmpegJNI.so isn't present
+            // (debug-build sanity if a dev wipes jniLibs/).
+            val renderersFactory =
+                DefaultRenderersFactory(context)
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+                    .setEnableDecoderFallback(true)
             val exo =
                 ExoPlayer
                     .Builder(context)
+                    .setRenderersFactory(renderersFactory)
                     .setMediaSourceFactory(
                         DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
                     ).setLoadControl(loadControl)

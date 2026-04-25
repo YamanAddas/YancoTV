@@ -142,6 +142,12 @@ dependencies {
     implementation(libs.media3.datasource.okhttp)
     implementation(libs.okhttp)
 
+    // MK.9 — checker-qual annotations are referenced by the vendored
+    // androidx.media3.decoder.ffmpeg sources for nullness static analysis.
+    // compileOnly — annotations have CLASS retention at most, never needed
+    // at runtime, so they don't need to land in the APK.
+    compileOnly(libs.checker.qual)
+
     // Coil 3 images
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
