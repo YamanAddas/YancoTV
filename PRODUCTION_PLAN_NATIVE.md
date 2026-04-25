@@ -10,7 +10,7 @@
 
 One week of Fire TV black-screen-with-audio — fixed only by bypassing the RN bridge entirely and shipping a native `PlayerActivity` (M4R.Player, commit `09150e9`, 2026-04-20). The fix worked first try. Pattern recognition: every TiviMate-shaped feature we need (mini-preview that keeps playing while you browse, channel zap, PIP, Leanback integration, Android TV launcher channels, voice search) is a custom native bridge in RN and free in Compose. TiviMate, IPTV Smarters, Kodi, VLC — all native. The substrate has to match the competition if we want to beat it.
 
-**Cost accepted:** ~10–12 weeks to reach current M4R parity + surpass it. RN-side M4R shell work (HomeShell, ContentPanel, navigation) is thrown away. `@yancotv/core` TypeScript business logic is ported to Kotlin (~2 weeks).
+**Cost accepted:** RN-side M4R shell work (HomeShell, ContentPanel, navigation) is thrown away. `@yancotv/core` TypeScript business logic is ported to Kotlin. (Original 2026-04-20 estimate of ~10–12 weeks is preserved in git history; per 2026-04-25 decision, work proceeds at user's pace with no week budget.)
 
 **What we keep:** the native `PlayerActivity` + `PlayerLauncher` we just shipped — it's Kotlin already. It folds into the new Android app with minor changes (share one ExoPlayer instance between mini-preview and fullscreen).
 
@@ -43,7 +43,7 @@ One week of Fire TV black-screen-with-audio — fixed only by bypassing the RN b
 | Image loading | **Coil 3** (KMP-compatible) |
 | Credentials | **Android Keystore** direct (EncryptedSharedPreferences) |
 | Notifications | **AndroidX WorkManager** + NotificationManager |
-| Cast | **Cast SDK** (MediaRouter) |
+| Crash + error reporting | **Sentry SDK** (Android + KMP shared) — Stage 1.3 |
 | Build | Gradle Kotlin DSL, AGP 8.x, min SDK 24, target SDK 35 |
 | Signing | Existing keystore (reused from RN app) |
 
@@ -144,7 +144,7 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 | 1.3 | **Sentry SDK integrated** — Android + KMP shared. Crash reporting, error breadcrumbs, network failure tracking. Replaces previously-planned Firebase Crashlytics (decision 2026-04-25). | MK.19.5 (re-platformed) |
 | 1.4 | **R8 / ProGuard baseline** + signed-APK pipeline. Keep rules for Media3 reflection, Koin module DSL, Kermit, SQLDelight runtime, Ktor serialization. Release-build smoke test added to per-commit dev cycle. | MK.19.1 |
 | 1.5 | **DB migration test harness** — real "upgrade from version N to N+1 with seeded data" tests, not just schema parsing. Plus a corruption-recovery path: if SQLDelight DB fails to open, soft-reset to a fresh DB while preserving Keystore credentials and a JSON dump of sources. | new (was implicit) |
-| 1.6 | **Performance budget set + measured** — cold start, channel zap, EPG scroll on Fire TV Lite. Numbers committed to `packages/android/PERFORMANCE.md`. Every feature after this measures against the budget. | new |
+| 1.6 | **Performance budget set + measured** — cold start (cold→shell visible), channel zap (≥95% of D-pad up/down zaps complete in ≤400 ms), EPG scroll (60fps sustained on 200ch × 24h grid), measured on AFTDCT31 (the slowest real device on hand). Numbers committed to `packages/android/PERFORMANCE.md`. Every feature after this measures against the budget. | new |
 
 ### Stage 2 — Schema backbone
 
@@ -163,7 +163,7 @@ Bundle all v1.0 schema migrations in one commit series, run upgrade tests once, 
 
 | # | Task | Maps to |
 |---|---|---|
-| 3.1 | **MK.14 Recording — full HLS *and* MPEG-TS.** Foreground service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`), MediaStore writes, WorkManager schedules, EPG long-press hook, recordings browser, playback-conflict handling, storage management, recording sheet panel. **Spec the "record while playing? while another channel plays?" interaction questions BEFORE writing code.** MPEG-TS is non-negotiable — Xtream catch-up is mostly TS; HLS-only is not "complete". | MK.14.1–14.7 (re-scoped) |
+| 3.1 | **MK.14 Recording — full HLS *and* MPEG-TS.** Foreground service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`), MediaStore writes, WorkManager schedules, EPG long-press hook, recordings browser, playback-conflict handling, recording sheet panel. **Storage management ships in this stage (not deferred):** user-set max-disk cap (default 16 GB), auto-cleanup oldest-first when cap hit, per-recording size shown in browser, low-storage warning before scheduled record fires. **Spec the "record while playing? while another channel plays?" interaction questions BEFORE writing code.** MPEG-TS is non-negotiable — Xtream catch-up is mostly TS; HLS-only is not "complete". | MK.14.1–14.7 (re-scoped) |
 | 3.2 | **MK.11.1/2 Phone PIP + gesture controls.** `enterPictureInPictureMode` on phone player. Gesture seek / volume / brightness. | MK.11.1, MK.11.2 |
 
 (MK.11.3 Cast and MK.18.3/4/5 dropped — see Locked decisions below.)
@@ -175,7 +175,7 @@ Bundle all v1.0 schema migrations in one commit series, run upgrade tests once, 
 | 4.1 | **MK.15 EPG display options** — days forward/back, timeline duration, row height, now-line + jump-to-now, programme details dialog, catch-up badge + play-from-here, multi-EPG conflict priority UI. (Schema 2.4 already migrated.) | MK.15.1–15.7 |
 | 4.2 | **MK.17.1a–17.5 Network + playback prefs** — UA preset dropdown, test connection, HW decoder pref + fallback, buffer tuning presets, per-source UA UI. (Schema 2.3 already migrated.) | MK.17.1a, 17.2, 17.3, 17.4, 17.5 |
 | 4.3 | **MK.18.2 default external player per content type.** | MK.18.2 |
-| 4.4 | **MK.13.4 Multi-favorite-lists UI** — tabs in FavoritesScreen, list picker on add-to-favorites. (Schema 2.2 already migrated.) | MK.13.4 UI half |
+| 4.4 | **MK.13.4 Multi-favorite-lists UI** — tabs in FavoritesScreen, list picker on add-to-favorites. (Schema 2.2 already migrated.) **Reconciles with MK.13.1's reactive star:** `isFavoriteFlow(contentId)` redefined as "favorited in any list"; star toggles add/remove from the user's "default list" pref, with long-press surfacing the list picker. | MK.13.4 UI half |
 | 4.5 | **MK.10 TV launcher minimal** — Recommendations channel via `androidx.tvprovider`, voice search deep link via Google Assistant, on-screen channel zap polish. **TIF dropped → post-v1 study.** | MK.10.1, MK.10.3, MK.10.4 |
 | 4.6 | **MK.16.2–16.6 Theme polish** — additional themes (start with Midnight Sapphire as #2), accent picker (4 presets), font-size scale (90/100/110/125%), channel-number toggle + grouping, app-icon variants via `activity-alias`. | MK.16.2–16.6 |
 
@@ -184,13 +184,13 @@ Bundle all v1.0 schema migrations in one commit series, run upgrade tests once, 
 | # | Task | Maps to |
 |---|---|---|
 | 5.1 | **Backup / restore** — sources + favorites + history + channel prefs + recording schedules. Export to JSON (Keystore-wrapped credentials), import on fresh install. Tested by full reinstall on a second Fire TV. | new |
-| 5.2 | **Sideload auto-update check** — polls GitHub Releases tag list at boot (cached 24h), prompts on new tag, downloads signed APK. | new |
+| 5.2 | **Sideload auto-update check** — polls GitHub Releases tag list at boot (cached 24h), prompts on new tag, downloads signed APK, then routes through Android's `ACTION_INSTALL_PACKAGE` with `REQUEST_INSTALL_PACKAGES` permission. On Android 8+ the user is sent to system "install unknown apps" screen for YancoTV the first time; document this in the prompt copy. Auto-update is opt-in (default on, toggleable in Settings → About). | new |
 | 5.3 | **Accessibility audit** — final TalkBack + D-pad sweep across every Stage 3–4 surface. Per-feature DoD covers most of this; 5.3 is the catch-everything pass. | new |
 | 5.4 | **Performance audit** — verify against Stage 1 budget on Fire TV Lite, fix regressions. | MK.19 perf piece |
-| 5.5 | **Placeholder audit** — every "COMING IN MK.XX" string is gone from shipped code. Anything still placeholder either becomes real or comes out of nav. | new |
-| 5.6 | **Privacy policy + ToS + content rating questionnaire.** Required by Play Console + Amazon Appstore. Recording legal posture: explicit user acknowledgement on first record action. | new |
+| 5.5 | **Placeholder audit** — every "COMING IN MK.XX" string is gone from shipped code. **Specifically:** `SettingsAppearanceTab` is filled by Stage 4.6; `SettingsRecordingsTab` by Stage 3.1. Tabs not filled by any v1.0 stage (`SettingsSubtitlesTab`, `SettingsNotificationsTab`, `SettingsStorageTab`) are removed from the Settings nav in this stage — schema and screens stay in tree for post-v1, just unwired from sidebar. Player-options sheet stub panels (SLEEP / FAV / EXT / CAST / LOOK) are wired or removed: SLEEP via MK.12b.1, FAV via MK.13.1, EXT via MK.18.1 (already done), LOOK via MK.16.2 picker; CAST tab is removed (Cast was dropped). | new |
+| 5.6 | **Privacy policy + ToS + content rating questionnaire.** Required by Play Console + Amazon Appstore. **Privacy policy must explicitly disclose Sentry** — crash reports, device model, OS version, stack traces leave the device to Sentry's SaaS (region selectable; pick EU if any EU users). User-toggleable opt-out in Settings → About → "Send crash reports". Recording legal posture: explicit user acknowledgement on first record action. | new |
 | 5.7 | **Distribution pipeline** — Play Console listing (TV + phone), Amazon Appstore (Fire TV), GitHub Releases signed APK + `update.json` endpoint feeding 5.2. | MK.19.2, 19.3, 19.4 |
-| 5.8 | **Manual QA matrix** — Fire TV Stick 4K, AFTDCT31 (192.168.68.56), phone HT74J0206349, Google TV emulator, mid-range Android TV. 1-week soak with real streams + recording E2E. | MK.19.6 (expanded) |
+| 5.8 | **Manual QA matrix** — Fire TV Stick 4K, AFTDCT31 (192.168.68.56), phone HT74J0206349, Google TV emulator, mid-range Android TV. Extended soak with real streams + recording E2E (run until no new bugs surface for several sessions; no fixed duration per no-timeline rule). | MK.19.6 (expanded) |
 
 ### Definition of Done — every Stage 3+ feature
 
@@ -237,7 +237,7 @@ Flagged here so future-us doesn't re-litigate from scratch. Both depend on archi
 
 Each milestone ends in a tagged APK (and later TestFlight build) + a commit series. "Delete-before-add" rule from the RN plan carries over.
 
-### **MK.0 — Scaffold** *(~2 days)*
+### **MK.0 — Scaffold**
 
 | # | Task | DoD |
 |---|---|---|
@@ -247,7 +247,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.0.4 | Port `PlayerActivity.kt` + `PlayerLauncherModule` → plain Android `PlayerActivity` (no RN bridge; callers invoke it directly via Intent) | Hard-code a test stream; Activity plays it when launched from `MainActivity` |
 | MK.0.5 | Commit + tag `native-v0.0.0-scaffold` | tag pushed |
 
-### **MK.1 — Shared core port** *(~1.5 weeks)*
+### **MK.1 — Shared core port**
 
 | # | Task | DoD |
 |---|---|---|
@@ -263,7 +263,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 
 **Ship criterion:** the full desktop 725-test suite's parsing/client/classifier tests have Kotlin equivalents passing on both `commonTest` + Android JVM target.
 
-### **MK.2 — Persistence** *(~3 days)*
+### **MK.2 — Persistence**
 
 | # | Task | DoD |
 |---|---|---|
@@ -272,7 +272,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.2.3 | FTS4 table + trigger-sync port | full-text search test passes |
 | MK.2.4 | Migrations runner — version table, forward-only migrations | upgrade test from v1 → latest passes |
 
-### **MK.3 — Sources** *(~3 days)*
+### **MK.3 — Sources**
 
 | # | Task | DoD |
 |---|---|---|
@@ -280,7 +280,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.3.2 | Credential storage via `androidx.security.crypto.EncryptedSharedPreferences` (Keystore-backed) | Xtream/Stalker credentials round-trip |
 | MK.3.3 | `SourceSyncService.kt` (Android) wrapping shared repo, exposing progress via Flow | background sync via WorkManager triggers |
 
-### **MK.4 — Shell UI** *(~1 week)*
+### **MK.4 — Shell UI**
 
 | # | Task | DoD |
 |---|---|---|
@@ -294,7 +294,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 
 **Ship criterion:** installable APK, shell boots in <1s on Fire TV 4K, D-pad walks the full UI, content panel scrolls a real 50k-item source.
 
-### **MK.5 — Channel list + image loading** *(~3 days)*
+### **MK.5 — Channel list + image loading**
 
 | # | Task | DoD |
 |---|---|---|
@@ -302,7 +302,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.5.2 | Coil 3 + disk LRU + memory cache + crossfade | logos/posters don't re-decode on scroll |
 | MK.5.3 | Quality badge parser (regex from M4R.D.4) → Compose badge chips | real channel titles render correct pills |
 
-### **MK.6 — Playback (shared ExoPlayer, mini ↔ fullscreen)** *(~4 days)*
+### **MK.6 — Playback (shared ExoPlayer, mini ↔ fullscreen)**
 
 | # | Task | DoD |
 |---|---|---|
@@ -314,7 +314,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 
 **Ship criterion:** tap channel in `ContentPanel` → plays in mini slot → Enter fullscreens seamlessly → Back returns to mini. No rebuffer. No black frame.
 
-### **MK.7 — EPG** *(~1 week)*
+### **MK.7 — EPG**
 
 | # | Task | DoD |
 |---|---|---|
@@ -323,7 +323,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.7.3 | `GuideScreen.kt` — 2D LazyGrid (channels × time), 6h window | scrolls 200 channels × 24h at 60fps |
 | MK.7.4 | Programme reminders via `AlarmManager` + NotificationManager | tap notification → opens channel + plays |
 
-### **MK.8 — Catch-up, Timeshift, Favorites, History, Search, Settings, Parental** *(~1.5 weeks)*
+### **MK.8 — Catch-up, Timeshift, Favorites, History, Search, Settings, Parental**
 
 | # | Task | DoD |
 |---|---|---|
@@ -344,11 +344,11 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.9.1 | Clone `androidx/media` at matching tag; build FFmpeg decoder extension via NDK for armeabi-v7a + arm64-v8a + x86_64 | `.so` artifacts produced |
 | MK.9.2 | Vendor libs into `packages/android/app/src/main/jniLibs/`; APK splits per ABI | APK ships all three ABIs via splits, sub-60MB each |
 | MK.9.3 | Register `FfmpegAudioRenderer` / `FfmpegVideoRenderer` in `PlaybackService`'s `DefaultRenderersFactory` with `EXTENSION_RENDERER_MODE_PREFER` | extension preferred over platform codecs |
-| MK.9.4 | **Crash watchdog** — `Player.Listener.onPlayerError` catches FFmpeg native crashes, swaps `RenderersFactory` to platform-only, retries `prepare()` once; if that also fails, surfaces error overlay (no hard-crash of `PlayerActivity`) | Force-fault the FFmpeg renderer in a debug build → playback recovers on platform decoder |
+| MK.9.4 | **Crash watchdog** — `Player.Listener.onPlayerError` catches FFmpeg native crashes, releases the current `ExoPlayer`, rebuilds it on the same `PlaybackService` path with a platform-only `RenderersFactory` (preserves Architecture rule 4: still one ExoPlayer at a time, never two simultaneously), retries `prepare()` once; if that also fails, surfaces error overlay (no hard-crash of `PlayerActivity`). The `MiniPlayerView`/`PlayerView.switchTargetView()` path stays valid because the new player is bound to the same service. | Force-fault the FFmpeg renderer in a debug build → playback recovers on platform decoder; mini-preview and fullscreen continue to share the rebuilt instance |
 | MK.9.5 | **R8 keep rules for native libs + JNI surfaces** — registered in same commit so release build doesn't strip the native registrations | `./gradlew :app:assembleRelease` plays the same regression streams as debug |
 | MK.9.6 | Regression test against 10 real IPTV channels that were audio-only on the RN build (MB-14 register) | all 10 render picture; MB-14 closed |
 
-### **MK.10 — TV UX + launcher integration** *(~1 week)*
+### **MK.10 — TV UX + launcher integration**
 
 | # | Task | DoD |
 |---|---|---|
@@ -357,7 +357,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.10.3 | Voice search via Google Assistant → deep link to Search screen | "Hey Google, play CNN on YancoTV" works |
 | MK.10.4 | Leanback on-screen channel zap UI polish | feels smoother than TiviMate |
 
-### **MK.11 — Phone-native features** *(~1 week)*
+### **MK.11 — Phone-native features**
 
 | # | Task | DoD |
 |---|---|---|
@@ -377,15 +377,15 @@ Post-MK.11 audit found that YancoTV Android has a solid core (one shared `ExoPla
 
 Old MK.12 (Distribution + QA + launch) moved to **MK.19** — unchanged scope.
 
-**Red-team cuts already applied** (see bottom of this block): audio delay downgraded to "external player", auto-series recording replaced with manual series bind, DLNA cut, SOCKS proxy cut, cross-source user groups deferred to phase 2. Total post-cut estimate: **~4 focused weeks** for MK.12–MK.18.
+**Red-team cuts already applied** (see bottom of this block): audio delay downgraded to "external player", auto-series recording replaced with manual series bind, DLNA cut, SOCKS proxy cut, cross-source user groups deferred to phase 2. (Original 2026-04-24 estimate was ~4 focused weeks; per 2026-04-25 no-timeline decision, the budget is dropped — use the 5-stage map at the top of this file for ordering.)
 
 **Schema-migration budget:** 6 SQLDelight migrations expected across this block (`Content.sq`, `Sources.sq`, `Favorites.sq` + new tables `channel_prefs`, `favorite_lists`, `recording_schedules`). Each migration lands in the same commit as its `commonTest` upgrade test on a populated fixture. Apply the native-android-mk skill's "schema units" rule (ms vs seconds) on every new timestamp column.
 
-### **MK.12 — In-player control surface** *(~1 week)*
+### **MK.12 — In-player control surface**
 
 Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMate users live in the player menu. Split into two sub-phases so fast wires ship first.
 
-**MK.12a — fast wires** (ship first, ~3 days, each 🟢 except 12a.1)
+**MK.12a — fast wires** (ship first, each 🟢 except 12a.1)
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
@@ -395,7 +395,7 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 | MK.12a.4 | ~~Playback speed picker (0.5 / 0.75 / 1.0 / 1.25 / 1.5 / 2.0×) via `player.setPlaybackSpeed()`; persisted per content-type~~ — **DONE** (2026-04-24). `PlaybackController.loadCurrent` resets LIVE to 1.0× and restores persisted speed on VOD/Episodes. Sheet reads live `player.playbackParameters.speed` so the ● marker stays in sync | 🟢 wire | ✅ |
 | MK.12a.5 | ~~Aspect-ratio quick-cycle (Fit / Fill / Zoom / 16:9 / 4:3). Extend `AppPreferences.ResizeMode` enum; `PlayerView.resizeMode` already reactive~~ — **DONE `b1d09d3`** (2026-04-24). Sheet picker + `AspectRatioFrameLayout.setAspectRatio` for forced 16:9 / 4:3. Remote hotkey deferred — no obvious unbound Fire TV key | 🟢 wire | ✅ |
 
-**MK.12b — heavier items** (~4 days)
+**MK.12b — heavier items**
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
@@ -405,7 +405,7 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 
 **Innovation beyond TiviMate:** per-channel preference memory (12b.2). TiviMate resets audio/sub selection each session.
 
-### **MK.13 — Channel ops + favorites reach** *(~3 days)*
+### **MK.13 — Channel ops + favorites reach**
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
@@ -433,7 +433,7 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 
 **Innovation beyond TiviMate:** recording stays device-local (no cloud cost) + optional SMB push to NAS via `jcifs-ng` (post-record hook, MK.14.8 follow-up if time). TiviMate Premium's cloud archive costs $0 here.
 
-### **MK.15 — EPG display + timeline prefs** *(~4 days)*
+### **MK.15 — EPG display + timeline prefs**
 
 Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we wire the 80% that use existing data.
 
@@ -451,7 +451,7 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 **Innovation beyond TiviMate:** adaptive timeline zoom — D-pad ↑/↓ in guide (pinch on phone) changes visible duration live; TiviMate is fixed at 90 min.
 
-### **MK.16 — Appearance, themes, typography** *(~3 days)*
+### **MK.16 — Appearance, themes, typography**
 
 **`Theme.kt` is currently `object YancoPalette` with `val` colors → cannot swap at runtime.** Refactor to state-driven theme **before** MK.15.3, MK.16.2+.
 
@@ -470,7 +470,7 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 **Innovation beyond TiviMate:** on Android 12+ phone, the default theme respects **Material You** (wallpaper-derived accent); TV always stays branded.
 
-### **MK.17 — Network wiring + advanced playback** *(~3 days)*
+### **MK.17 — Network wiring + advanced playback**
 
 **P0 latent bug found in audit**: `SettingsNetworkTab` writes to `AppPreferences.networkFlow` but `PlaybackController` hardcodes `CONNECT_TIMEOUT_SEC=15L`, `READ_TIMEOUT_SEC=30L`, UA `VLC/3.0.20 LibVLC/3.0.20`. Settings today are decorative. **MK.17.1 ships first as its own commit.**
 
@@ -486,7 +486,7 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 **Innovation beyond TiviMate:** "connection profiles" is **deferred to phase 2**; v1 ships per-source UA override which already covers the main use case.
 
-### **MK.18 — External player + Cast** *(~2 days after cuts)*
+### **MK.18 — External player + Cast**
 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
@@ -520,7 +520,7 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 ## Red-team summary (MK.12 → MK.18)
 
-What survived, what got cut, and what stands if time shrinks. Full reasoning captured in the 2026-04-24 planning session.
+What survived and what got cut. Full reasoning captured in the 2026-04-24 planning session; updated 2026-04-25 with no-timeline + permanent-drop decisions.
 
 **Already cut in the plan above (2026-04-24 + 2026-04-25):**
 - Audio delay (MK.12b.3) — Media3 has no setter; external player covers it
@@ -536,7 +536,7 @@ What survived, what got cut, and what stands if time shrinks. Full reasoning cap
 - TIF live-channels (MK.10.2) — **DEFERRED post-v1 study** (2026-04-25)
 
 **Ordering constraints** (deviate = rework):
-1. **MK.12a ships before MK.12b** — the fast wires alone close ~60% of the visible gap in ~3 days and surface whether the bottom-sheet UX itself works before committing to heavier items.
+1. **MK.12a ships before MK.12b** — the fast wires alone close ~60% of the visible gap and surface whether the bottom-sheet UX itself works before committing to heavier items.
 2. **MK.16.1 (theme refactor) ships before MK.15.3 and MK.16.2+** — driving row-height and palettes from state requires the `object → data class + CompositionLocal` refactor landed first.
 3. **MK.17.1 ships as its own commit, first in MK.17** — it's a latent P0 that makes existing Settings real.
 
@@ -556,7 +556,7 @@ What survived, what got cut, and what stands if time shrinks. Full reasoning cap
 
 ## D — Debugging & hardening (post-MK.11, runs in parallel with MK.12)
 
-Standing phase started 2026-04-24 after the cascade-nav focus bug shipped in `4a8a46e`. Goal: surface regressions in tooling instead of in user manual-test reports, before MK.12 distribution. **Scope was red-teamed** — `:macrobenchmark`, Crashlytics, Sentry, and a `scripts/logcat.sh` were all rejected as overkill / wrong-platform / not-needed-for-personal-app.
+Standing phase started 2026-04-24 after the cascade-nav focus bug shipped in `4a8a46e`. Goal: surface regressions in tooling instead of in user manual-test reports, before MK.12 distribution. **Scope was red-teamed** — `:macrobenchmark` and a `scripts/logcat.sh` were rejected as overkill / wrong-platform. Crashlytics and Sentry were rejected at the time as overkill for a personal app; **the Sentry rejection was reversed 2026-04-25** (now Stage 1.3) once observability was reframed as a foundation for every Stage 3+ feature, not optional polish. D.4's local crash log stays — it complements Sentry as an offline fallback.
 
 **Active hooks (already wired):**
 - LeakCanary 2.14 — `debugImplementation` only (single-process, the optional `androidx.work:work-multiprocess` integration is intentionally absent)
@@ -574,13 +574,13 @@ Standing phase started 2026-04-24 after the cascade-nav focus bug shipped in `4a
 | D.1 | Run `./gradlew :app:lint` once, capture baseline (`lintBaseline = file("lint-baseline.xml")` in `android.lint{}`) so every NEW warning fails the build. Then add ktlint via `org.jlleitschuh.gradle.ktlint`, run `./gradlew ktlintFormat` once, commit the mechanical reformat as a SEPARATE commit so `git blame` stays clean | One lint baseline file checked in; ktlint config + formatted tree in two distinct commits | **DONE** — D.1a `6c31685` (lint baseline 135 issues + PiP NewApi @RequiresApi fix), D.1a-fixes `419ee85` (triaged 15 cheap real bugs in place; baseline 135→120; lessons in CLAUDE.md `1984c20`), D.1b `a8779af` (ktlint plugin per-module — root `subprojects {}` can't see `libs` accessor in Kotlin DSL) + `4c0b50d` (mechanical reformat across 127 files, Compose `@Composable PascalCase` triggers non-fixable warnings, ignoreFailures=true accepts them) + `5a8e7e3` (`.git-blame-ignore-revs` so the reformat doesn't poison blame). Catalog keys: `ktlintCli` + `ktlintPlugin` (camelCase, flat — `ktlint` + `ktlint-plugin` collide via hyphen-nesting). When flipping `ignoreFailures=false` later, add `.editorconfig` rule disabling `function-naming` for `@Composable`. |
 | D.2 | **Reframed (2026-04-24)** from instrumented `:androidTest` to JVM unit tests + skill checklist after red-team — Compose UI test scaffolding is 2–4h for a single-tester personal app; the underlying mechanism (`PlacedFocusAnchor`'s await-then-request contract) is fully testable in JVM and the wiring layer (`key(contentType)` boundary) is more durable as a checklist + smoke-test entry than as instrumented tests. Existing test pattern in `BrowseShellLogicTest` already established this trade-off. | `PlacedFocusAnchorTest` (6 tests, all green) covers: suspends-until-placed, fires-immediately-when-already-placed, reset semantics, multiple concurrent calls, idempotent markPlaced. Native-android-mk skill gained: (1) "every `key(...)` boundary that scopes focus state holds its own anchor + requester" rule with the `4a8a46e` worked example, (2) 3-step cascade-nav smoke test for the human-loop check before merging HomeScreen/BrowseSection touches. Also fixed pre-existing test breakage in `BrowseShellLogicTest` from the `f432524` rename of `shouldStopLivePreviewForSection` → `shouldStopPlaybackOnSectionChange`. | **DONE** — see commit |
 | D.3 | Turn on R8 in release: `isMinifyEnabled = true`, `isShrinkResources = true`. Discover + write keep rules for Media3 reflection, Koin module classes, Kermit, SQLDelight serializers, Ktor engines. | `./gradlew :app:assembleRelease` runs; resulting APK boots, plays a stream end-to-end, persists resume point. Per-ABI splits still under 60MB | **DEFERRED → MK.19.1** (renumbered from MK.12.1 when MK.12→18 gap-close was inserted 2026-04-24) — same DoD, same work, right home for it. Not needed for stability; needed before any store submission. Removed as a D-phase blocker 2026-04-24. |
-| D.4 | `Thread.setDefaultUncaughtExceptionHandler` in `YancoApp.onCreate` writing last-crash to `filesDir/crash.log` + Kermit. NO Crashlytics, NO Sentry — owns its own data, no DSN management for a personal app | Force a crash → next launch reads `filesDir/crash.log` and surfaces it (or just logs it for now) | **DONE** `1e69da0` — `CrashReporter` singleton; atomic write (tmp→rename); reads+clears on next launch via `Log.e(TAG="YancoCrash")`; uses `android.util.Log` not Kermit (runs before shared module init) |
+| D.4 | `Thread.setDefaultUncaughtExceptionHandler` in `YancoApp.onCreate` writing last-crash to `filesDir/crash.log` + Kermit. Originally framed as "no Sentry" — **superseded 2026-04-25:** Sentry ships in Stage 1.3 alongside this; D.4's local crash log remains as an offline fallback (captures crashes when network is down or before Sentry SDK init) | Force a crash → next launch reads `filesDir/crash.log` and surfaces it (or just logs it for now) | **DONE** `1e69da0` — `CrashReporter` singleton; atomic write (tmp→rename); reads+clears on next launch via `Log.e(TAG="YancoCrash")`; uses `android.util.Log` not Kermit (runs before shared module init) |
 | D.5 | Behavioural tests for the two skill-checklist landmines: (a) `positionFor(contentId)` returns null for a series container with no content-level row (never an episode row), (b) `controller.currentId == target.id` short-circuit at every `controller.play(` call site — write a test fixture that calls each launch site twice with the same item, asserts the second call doesn't re-prepare the `MediaItem` | Both tests in `:shared:commonTest` (positionFor) and `app/src/test/` (currentId guard) | **DONE** `a8bc63a` — (a) already covered by `WatchHistoryRepositoryTest.positionFor_ignoresEpisodeRowsWhenNoContainerRow` (MB-41 guard). (b) extracted `resolveActivation(currentId, targetId, isTv) → ActivationAction` into `BrowseShell.kt`; updated `FavoritesScreen` two call sites to use it; `ActivationGuardTest` (6 tests) pins TV first-tap/second-tap/null and phone single-tap/already-playing/different-item routing. `PlaybackController.play()` also has the same guard internally (lines 153-157) — belt + suspenders. Auto-preview paths guarded via `resolveAutoPreviewIndex()` (already tested). |
 | D.6 | Audit pass — read `logger/AndroidLogger.kt` (currently routes shared-module Logger to `android.util.Log`; CLAUDE.md claims "Kermit logging" but Android side doesn't actually use Kermit), grep all `BackHandler {` sites for missing back-stack handling, grep `controller.play(` sites for the two-tap guard, grep `AsyncImage(` for missing `contentDescription` | Punch list of findings written into a follow-up `D.7` task per finding | **DONE** — Audit clean across all three categories. (1) BackHandler: 7 instances (HomeScreen ×3, BrowseShell ×3, CoverflowSectionScreen ×1), all properly enabled-guarded with real handlers — no empty blocks. (2) controller.play(): 15 call sites, 15/15 guarded — HomeScreen uses explicit `currentId != target.id`, auto-preview uses `resolveAutoPreviewIndex()`, FavoritesScreen uses `resolveActivation()`, SearchScreen has inline alreadyPlaying guard. (3) AsyncImage: 15 call sites, 15/15 have `contentDescription` param (13 explicit null with paired text, 2 semantic string descriptions). No D.7 punch list needed. |
 
 **Explicitly out-of-scope (red-teamed and rejected):**
 - `:macrobenchmark` Gradle module + baseline-profile generator — weeks of yak-shaving for a personal IPTV app with no perf complaint on file. Use `dumpsys gfxinfo com.yancotv.android framestats` + the Compose recomposition reports above. Revisit only if a real jank report lands.
-- Crashlytics / Sentry — DSN management, GDPR'd SDKs, `google-services.json` bloat. D.4's local crash log is the cheaper win.
+- Crashlytics — `google-services.json` bloat + Firebase boot cost. **(Sentry was previously in this bucket; reversed 2026-04-25 — now Stage 1.3. See `MK.19.5` and the decision log.)**
 - `scripts/logcat.sh` — wrong shell for a Windows-first repo (`scripts/` has `.ps1` + `.js`, no `.sh`). Personal-shell territory, not repo territory.
 
 **Reading order for a cold reader picking this up:** [packages/android/CLAUDE.md](packages/android/CLAUDE.md) → [`.claude/skills/native-android-mk/SKILL.md`](.claude/skills/native-android-mk/SKILL.md) → this section → `git log --oneline 7fa1bf9^..` to see what D.0 actually changed → `app/build/compose_compiler/app_debug-module.json` for the latest baseline numbers.
@@ -667,7 +667,7 @@ iOS / iPadOS milestones (`MK.iOS.*`) remain a separate post-Android-v1.0 block �
 | SQLDelight over Room | Room is Android-only; SQLDelight is KMP and generates typed queries for both targets | 2026-04-20 |
 | Koin over Hilt | Hilt is Android-only; Koin is KMP-native and works on iOS | 2026-04-20 |
 | Ktor over Retrofit | Retrofit is Android-only | 2026-04-20 |
-| Firebase Crashlytics on Android, Sentry stays on desktop | Crashlytics is free + integrates with Play Console. Sentry on desktop already paid for | 2026-04-20 |
+| ~~Firebase Crashlytics on Android, Sentry stays on desktop~~ — **SUPERSEDED 2026-04-25** by the "Sentry replaces Crashlytics on Android" row below | Crashlytics was free + Play Console integrated; reversed once Sentry's KMP support and unified two-platform observability outweighed the Firebase-specific free tier | 2026-04-20 |
 | RN app frozen, not deleted | Reference during rewrite; archive after Android ships | 2026-04-20 |
 | `@yancotv/core` TS stays as-is | Double-port cost (~2 weeks) cheaper than a cross-language build toolchain | 2026-04-20 |
 | **Sentry replaces Crashlytics on Android** (supersedes 2026-04-20 decision above) | Sentry has better KMP support, doesn't tie us to Firebase, works on desktop already so one platform fewer to learn. Crashlytics requires `google-services.json` and Firebase boot-up cost not worth it for a personal app | 2026-04-25 |
