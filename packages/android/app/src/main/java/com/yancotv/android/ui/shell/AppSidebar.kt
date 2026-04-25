@@ -166,14 +166,15 @@ fun AppSidebar(
                 // the focusable descendant in Compose 1.7, so the
                 // MutableInteractionSource never flipped and the focused
                 // gradient + border didn't render until the user nudged
-                // the D-pad.
+                // the D-pad. Binding rule extracted to
+                // [bindActiveRowFocus] for unit-test coverage.
                 SidebarRow(
                     section = section,
                     icon = iconFor(section),
                     selected = section == current,
                     showLabel = expanded,
                     onClick = { onSelect(section) },
-                    focusRequester = if (section == current) activeRowFocus else null,
+                    focusRequester = bindActiveRowFocus(section, current, activeRowFocus),
                 )
             }
         }
@@ -192,6 +193,26 @@ fun AppSidebar(
  * the Compose runtime.
  */
 internal fun accentInsetFraction(springProgress: Float): Float = (1f - springProgress).coerceIn(0f, 1f)
+
+/**
+ * MB-106: which sidebar row, if any, should hold the [activeRowFocus]
+ * requester for this composition.
+ *
+ * Rule: the requester binds to the row matching [current] — and only that
+ * row. Returning the requester for non-current rows would let
+ * `requestFocus()` land on whichever row Compose visited first, defeating
+ * the whole point of the BACK-to-active-row UX. Returning `null` when no
+ * requester was passed in keeps the SidebarRow caller path simple — there
+ * is no "default" requester to fall back to.
+ *
+ * Pulled out of the composable so the binding contract is unit-testable
+ * without spinning up the Compose runtime.
+ */
+internal fun bindActiveRowFocus(
+    section: AppSection,
+    current: AppSection,
+    activeRowFocus: FocusRequester?,
+): FocusRequester? = if (section == current) activeRowFocus else null
 
 private fun iconFor(section: AppSection): ImageVector =
     when (section) {

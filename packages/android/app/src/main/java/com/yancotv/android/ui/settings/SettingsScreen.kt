@@ -2,6 +2,7 @@ package com.yancotv.android.ui.settings
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -108,14 +109,23 @@ fun SettingsScreen(
 ) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val scope = rememberCoroutineScope()
-    // MB-108 v2: simulate D-pad RIGHT after the tab commits. A
-    // focusGroup+focusRestorer wrapper (v1) sometimes lost focus
+    // MB-108 v2 (hardened): simulate D-pad RIGHT after the tab commits.
+    // A focusGroup+focusRestorer wrapper (v1) sometimes lost focus
     // entirely on Fire TV — focus searched up the tree and bounced back
     // to the sidebar. moveFocus(Right) mimics exactly the manual press
     // the user would otherwise do, so we get identical behaviour to
     // pressing CENTER then RIGHT, with no extra focus indirection.
-    // withFrameNanos lets the new tab body finish composing before the
-    // focus search runs, so it has a focusable target to land on.
+    //
+    // Hardening over v2:
+    //   1. Wait TWO frames before the first moveFocus call. One frame
+    //      gets us past composition; the second covers layout. Heavy
+    //      tabs (Sources, Groups) didn't always have placed focusable
+    //      children after a single frame.
+    //   2. moveFocus returns false when no focus target was found —
+    //      retry once after another frame instead of giving up. If
+    //      both attempts fail we leave focus on the sidebar tab item
+    //      (the user can press RIGHT manually) and log so a Fire TV
+    //      regression is diagnosable from logcat instead of by feel.
     val focusManager = LocalFocusManager.current
 
     Row(
@@ -136,10 +146,23 @@ fun SettingsScreen(
             onSelect = {
                 tab = it
                 scope.launch {
-                    // One frame so the new tab body's focusable children
-                    // are placed before moveFocus searches for them.
+                    // Two frames: composition pass + layout pass. Heavier
+                    // tab bodies (Sources, Groups, Parental) need both.
                     withFrameNanos { }
-                    focusManager.moveFocus(FocusDirection.Right)
+                    withFrameNanos { }
+                    val moved = focusManager.moveFocus(FocusDirection.Right)
+                    if (!moved) {
+                        // One retry — sometimes the first attempt lands
+                        // before the LazyColumn has placed its first item.
+                        withFrameNanos { }
+                        val movedRetry = focusManager.moveFocus(FocusDirection.Right)
+                        if (!movedRetry) {
+                            Log.w(
+                                "SettingsScreen",
+                                "MB-108: moveFocus(Right) failed twice for tab=$it; focus stays on sidebar",
+                            )
+                        }
+                    }
                 }
             },
             modifier =
