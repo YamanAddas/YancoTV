@@ -123,21 +123,28 @@ fun ChannelActionsMenu(
                         if (locked) {
                             gateForUnlock = true
                         } else {
-                            // Preserves pre-MK.13.3 behaviour: lock writes synchronously
-                            // off the click lambda. ParentalRepository.lockChannel touches
-                            // SQLDelight + a StateFlow update; if this becomes visibly
-                            // janky on Fire TV we'll hoist to IO in a follow-up rather
-                            // than mix that change with the menu rebuild.
-                            repo.lockChannel(item.id)
+                            // MB-104: dismiss FIRST so the focus return target (the
+                            // orb that triggered the menu) is still alive when the
+                            // StateFlow flip recomposes the rail. Then push the
+                            // SQLDelight write to IO per the threading rule.
                             onDismiss()
+                            scope.launch(Dispatchers.IO) {
+                                runCatching { repo.lockChannel(item.id) }
+                            }
                         }
                     },
                 )
                 ActionRow(
                     label = "Hide from lists",
                     onClick = {
-                        repo.hideChannel(item.id)
+                        // MB-104: same shape as Lock above. The original synchronous
+                        // call combined with hide actually filtering the focused orb
+                        // out of `visible` froze the focus system mid-dismiss → ANR.
+                        // Dismiss first, then write off the main thread.
                         onDismiss()
+                        scope.launch(Dispatchers.IO) {
+                            runCatching { repo.hideChannel(item.id) }
+                        }
                     },
                 )
                 ActionRow(
