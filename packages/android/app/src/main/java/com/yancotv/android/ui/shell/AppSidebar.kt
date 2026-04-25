@@ -11,6 +11,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -140,8 +142,18 @@ fun AppSidebar(
     ) {
         BrandMark(showWordmark = expanded)
         Spacer(Modifier.height(Space.md))
+        // MB-99: take all remaining vertical space and scroll on overflow.
+        // Logo stays at its full size (96.dp) per the user's ask; if the
+        // viewport is short (phone landscape, scaled-down TVs), the
+        // destinations list scrolls instead of clipping Settings off the
+        // bottom. Focus traversal on TV brings the focused row into view
+        // automatically through the scroll container.
         Column(
             verticalArrangement = Arrangement.spacedBy(Space.xxs),
+            modifier =
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
         ) {
             AppSection.entries.forEach { section ->
                 SidebarRow(
