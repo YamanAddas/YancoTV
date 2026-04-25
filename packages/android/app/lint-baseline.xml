@@ -744,17 +744,6 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/java/com/yancotv/android/ui/shell/BrowseShell.kt"
-            line="243"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="ModifierParameter"
-        message="Modifier parameter should be the first optional parameter"
-        errorLine1="    modifier: Modifier = Modifier,"
-        errorLine2="    ~~~~~~~~">
-        <location
             file="src/main/java/com/yancotv/android/ui/shell/CoverflowSectionScreen.kt"
             line="144"
             column="5"/>
@@ -791,50 +780,6 @@
             file="src/main/AndroidManifest.xml"
             line="35"
             column="30"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var total by remember(type) { mutableStateOf(0L) }"
-        errorLine2="                                  ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/BrowseShell.kt"
-            line="254"
-            column="35"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var loaded by remember(type) { mutableStateOf(0L) }"
-        errorLine2="                                   ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/BrowseShell.kt"
-            line="255"
-            column="36"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="    var focusedIndex by rememberSaveable(focusKey) { mutableStateOf(0) }"
-        errorLine2="                                                     ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/BrowseShell.kt"
-            line="347"
-            column="54"/>
-    </issue>
-
-    <issue
-        id="AutoboxingStateCreation"
-        message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
-        errorLine1="    var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }"
-        errorLine2="                                 ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/yancotv/android/ui/shell/BrowseShell.kt"
-            line="386"
-            column="34"/>
     </issue>
 
     <issue
