@@ -24,6 +24,7 @@ androidx-work = "2.9.1"
 androidx-security = "1.1.0-alpha06"
 leakcanary = "2.14"
 checker-qual = "3.49.0"
+sentry = "7.20.0"
 ktlintPlugin = "12.1.1"
 ktlintCli = "1.5.0"
 
@@ -105,6 +106,11 @@ leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", ve
 # checker-qual — compile-time-only nullness annotations consumed by the
 # vendored Media3 FFmpeg extension Java sources (MK.9). Not packaged.
 checker-qual = { module = "org.checkerframework:checker-qual", version.ref = "checker-qual" }
+
+# Sentry (Stage 1.3 / MK.19.5) — meta-package pulls in core + NDK + lifecycle.
+# NDK integration matters here because the FFmpeg renderer's native crashes
+# segfault inside libffmpegJNI and never reach Java's UncaughtExceptionHandler.
+sentry-android = { module = "io.sentry:sentry-android", version.ref = "sentry" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

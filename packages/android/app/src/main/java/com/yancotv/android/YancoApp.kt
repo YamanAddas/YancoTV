@@ -8,6 +8,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.work.WorkManager
 import coil3.SingletonImageLoader
 import com.yancotv.android.crash.CrashReporter
+import com.yancotv.android.crash.SentryInit
 import com.yancotv.android.di.appModule
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderNotificationChannel
@@ -35,6 +36,13 @@ class YancoApp : Application() {
         // startup are caught. filesDir is accessible because the Application
         // context is partially ready at this point even before super fires.
         CrashReporter.install(this)
+        // Stage 1.3 — Sentry sits alongside the local CrashReporter. Java
+        // crashes go to both (defense in depth: Sentry gets aggregated remote
+        // visibility; CrashReporter survives offline). Native crashes inside
+        // libffmpegJNI (FFmpeg renderer segfaults) are caught by Sentry's
+        // NDK signal handler, not the Java UncaughtExceptionHandler — that's
+        // the gap CrashReporter alone can't close.
+        SentryInit.install(this)
 
         if (BuildConfig.DEBUG) {
             StrictMode.setThreadPolicy(

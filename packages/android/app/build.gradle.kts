@@ -1,9 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.ktlint)
 }
+
+// Sentry DSN — read from local.properties so the value stays per-machine and
+// out of git history. Empty string when missing means Sentry init is a silent
+// no-op (clean checkout / fresh dev box doesn't crash on launch).
+val sentryDsn: String =
+    rootProject.file("local.properties").let { propsFile ->
+        if (propsFile.exists()) {
+            Properties().apply { propsFile.inputStream().use { load(it) } }
+                .getProperty("sentry.dsn", "")
+        } else {
+            ""
+        }
+    }
 
 // ktlint applied per-module (the version-catalog `libs` accessor isn't
 // available inside root `subprojects {}` blocks in Kotlin DSL, so each
@@ -35,6 +50,12 @@ android {
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
+
+        // Stage 1.3 / MK.19.5 — Sentry DSN baked into BuildConfig at compile
+        // time. Source: local.properties → sentry.dsn (gitignored, per-machine).
+        // The constant is read by YancoApp.onCreate; empty means "Sentry off
+        // for this build" (init becomes a no-op).
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
     }
 
     buildTypes {
@@ -160,6 +181,19 @@ dependencies {
     // compileOnly — annotations have CLASS retention at most, never needed
     // at runtime, so they don't need to land in the APK.
     compileOnly(libs.checker.qual)
+
+    // Stage 1.3 / MK.19.5 — Sentry crash + error reporting. Meta-package
+    // pulls in core + ANR detection + lifecycle hooks + NDK crash capture.
+    // NDK matters: the FFmpeg renderer's native crashes segfault inside
+    // libffmpegJNI and never reach Java's UncaughtExceptionHandler — Sentry's
+    // signal handler catches those and uploads on next launch.
+    implementation(libs.sentry.android)
+
+    // Kermit (Stage 1.3) — used by SentryKermitWriter to bridge log output
+    // to Sentry breadcrumbs/events. Already a transitive of :shared but as
+    // an `implementation` dep there it's not on the app module's compile
+    // classpath; declaring it here avoids depending on a leak.
+    implementation(libs.kermit)
 
     // Coil 3 images
     implementation(libs.coil.compose)
