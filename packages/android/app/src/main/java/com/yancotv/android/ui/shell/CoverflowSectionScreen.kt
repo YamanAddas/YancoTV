@@ -348,6 +348,37 @@ fun CoverflowSectionScreen(
         }
     }
 
+    // MB-114: in-process overlay close (Movie/Series detail, search, PIN
+    // dialog). The windowInfo handler above only catches OS-level
+    // window-focus transitions (e.g. fullscreen PlayerActivity finishing);
+    // Compose overlays mounted in the same window don't trigger that, so
+    // closing a detail dropped focus to whatever Compose's focus search
+    // happened to land on — usually NOT the orb the user opened detail
+    // from. The user then had to nudge a D-pad key to "wake" the selector.
+    //
+    // HomeScreen flips `restoreFocusOnWindowRegain` to false while any
+    // overlay is mounted (detailItem != null || searchOverlayVisible ||
+    // pendingPlay != null) and back to true once they all clear. Watching
+    // that flag for a false → true transition gives us the in-process
+    // analogue of the windowInfo regain event: the overlay just left
+    // composition, so re-fire `firstItemAnchor` to land focus on the
+    // last-focused orb.
+    //
+    // Why this is safe: the only entry points that toggle the flag false
+    // (detail / search / PIN-gated play) all originate from a coverflow
+    // user action, so the user was in coverflow before the overlay
+    // mounted. Returning focus to the focused orb on close mirrors the
+    // mental model. The initial-mount case is a no-op because the flag
+    // starts true and `prevRestore` is seeded with the same value, so
+    // `turnedOn` is false on the first invocation — a normal mount that
+    // lands on the CategoryRail pill is untouched.
+    var prevRestore by remember { mutableStateOf(restoreFocusOnWindowRegain) }
+    LaunchedEffect(restoreFocusOnWindowRegain) {
+        val turnedOn = !prevRestore && restoreFocusOnWindowRegain
+        prevRestore = restoreFocusOnWindowRegain
+        if (turnedOn) firstItemAnchor.awaitAndRequest()
+    }
+
     var coverflowHasFocus by remember { mutableStateOf(false) }
     LaunchedEffect(coverflowHasFocus) { onPanelFocusChanged(coverflowHasFocus) }
     BackHandler(enabled = coverflowHasFocus) { onExitToCategories() }
