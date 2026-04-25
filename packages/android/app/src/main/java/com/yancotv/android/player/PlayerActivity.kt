@@ -385,7 +385,22 @@ class PlayerActivity : AppCompatActivity() {
         dockProgressTickJob = null
         dockAutoHideJob?.cancel()
         dockAutoHideJob = null
+
+        // MB-119 follow-up — explicit ordered surface detach symmetric to
+        // PlayerLauncher's pre-launch clearVideoSurface(). Without this, the
+        // implicit detach via PlayerView.player=null below races against
+        // ThreadedRenderer's finalize() during activity teardown. At 4K
+        // resolution the race deadlocked GPU resource cleanup for 10+
+        // seconds and FinalizerWatchdog killed the app:
+        //   FATAL: TimeoutException: ThreadedRenderer.finalize() timed out
+        //   at android.view.ThreadedRenderer.nDeleteProxy(Native Method)
+        // clearVideoSurface() is synchronous — it tells MediaCodec to stop
+        // using this SurfaceView and waits for ack BEFORE we let the view
+        // hierarchy teardown begin. Cost: a few ms of main-thread block on
+        // the back-press; cheap relative to the alternative.
+        controller.player.clearVideoSurface()
         playerView.player = null
+
         // VOD audio bleed fix: nothing reclaims the surface for movies /
         // episodes after fullscreen exit (the LIVE-only MiniPlayer in the
         // hero won't bind), so the shared ExoPlayer happily keeps decoding
