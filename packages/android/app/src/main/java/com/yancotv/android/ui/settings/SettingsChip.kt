@@ -94,9 +94,16 @@ internal fun SettingsChip(
  * state. Pure function: takes a palette + booleans, returns colours. Pulled
  * out so the contract is unit-testable without spinning up Compose.
  *
- * Rules locked in by [SettingsChipColorsTest]:
- * - `focused` always wins over `selected` for the border colour (so the
- *   user can always see where focus is, even on the currently-picked chip).
+ * Rules locked in by [SettingsChipColorsTest] (MB-112):
+ * - **Focus is the FRAME.** Only `focused` paints a border. Selected-but-
+ *   unfocused has Color.Transparent — selection is communicated by the
+ *   background tint alone. This is the explicit "make the detector a
+ *   frame around the thing" rule from the user feedback after MB-110:
+ *   on Fire TV at 3 metres, a 1dp accent border on selected and a 2dp
+ *   FocusRing border on focused look the same; the eye reads both as a
+ *   thin coloured outline, so you can't tell where the cursor actually
+ *   is. Pulling the border off `selected` makes "frame present" mean
+ *   one thing: focus.
  * - `selected` wins for background tinting (the user keeps the "I picked
  *   this" cue while moving focus away).
  * - Foreground stays primary for `selected || focused`, muted otherwise.
@@ -114,12 +121,7 @@ internal fun chipColors(
 ): SettingsChipColors {
     val background =
         if (selected) palette.Accent.copy(alpha = 0.22f) else palette.BackgroundDeep
-    val border =
-        when {
-            focused -> palette.FocusRing
-            selected -> palette.Accent.copy(alpha = 0.55f)
-            else -> Color.Transparent
-        }
+    val border = if (focused) palette.FocusRing else Color.Transparent
     val foreground =
         if (selected || focused) palette.TextPrimary else palette.TextMuted
     return SettingsChipColors(background = background, border = border, foreground = foreground)

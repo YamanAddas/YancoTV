@@ -206,11 +206,18 @@ private fun Chip(
                 )
             else -> SolidColor(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
         }
+    // MB-112: only `focused` gets a border — the FRAME is what tells the
+    // user where the cursor is, distinct from the breadcrumb-style fill
+    // on a selected-but-unfocused chip. Selected-not-focused already has
+    // the soft accent gradient + the leading pip below to mark "this is
+    // the picked group"; adding an accent border too made it visually
+    // identical to the focused state at TV distance, which is the bug
+    // the user surfaced ("category and live tv show selection at the
+    // same color").
     val border =
         when {
             focused -> LocalYancoPalette.current.FocusRing
-            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.55f)
-            else -> LocalYancoPalette.current.BorderSubtle
+            else -> Color.Transparent
         }
     val fg by animateColorAsState(
         targetValue =
@@ -235,7 +242,7 @@ private fun Chip(
                     spotColor = LocalYancoPalette.current.Accent,
                 ).clip(YancoShapes.ChipBevel)
                 .background(bg)
-                .border(if (focused) 2.dp else 1.dp, border, YancoShapes.ChipBevel)
+                .border(if (focused) 2.dp else 0.dp, border, YancoShapes.ChipBevel)
                 .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick)

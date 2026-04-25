@@ -261,22 +261,31 @@ private fun SidebarRow(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
-    // Three visual states layered onto the hex-cut active row:
-    //   focused  → emerald gradient + bright accent ring + lit edge
-    //   selected → softer emerald wash, glow bar lit, no ring
-    //   idle     → transparent, muted foreground
+    // Three visual states layered onto the hex-cut active row. The split
+    // between "where am I" (focus) and "where I am rooted" (selected) has
+    // to be loud — on Fire TV the user sits 3 metres away and a 0.12 alpha
+    // delta on a green gradient is invisible. Rules locked here:
+    //
+    //   focused  → 2dp accent FRAME border. The frame is the *only* cue
+    //              that's exclusive to focus. Same fill as `selected` so
+    //              the row doesn't shift colour when focus arrives, only
+    //              the outline appears. This matches the SettingsChip
+    //              pattern (MB-110) and the SettingsScreen TabItem.
+    //   selected → softer emerald wash + the persistent left accent rail
+    //              bar (drawn by the outer Box). NO border — leaving the
+    //              border slot exclusively for focus means BACK / LEFT
+    //              into the sidebar always shows a visible frame on the
+    //              active row, distinct from the wash that was already
+    //              there. This is the MB-112 fix.
+    //   idle     → transparent, muted foreground.
     val rowBrush =
         when {
-            focused ->
-                Brush.horizontalGradient(
-                    colors =
-                        listOf(
-                            LocalYancoPalette.current.Accent.copy(alpha = 0.40f),
-                            LocalYancoPalette.current.Accent.copy(alpha = 0.18f),
-                            Color.Transparent,
-                        ),
-                )
-            selected ->
+            // Focused-and-selected and selected-but-not-focused share the
+            // same fill so navigating onto the active row doesn't repaint
+            // the gradient — only the focus frame (below) appears. This
+            // is the explicit "selected wins on background, focus wins on
+            // border" rule from SettingsChip.
+            focused || selected ->
                 Brush.horizontalGradient(
                     colors =
                         listOf(
@@ -290,12 +299,14 @@ private fun SidebarRow(
                     colors = listOf(Color.Transparent, Color.Transparent),
                 )
         }
+    // Focus FRAME — only painted while focused. Selected-without-focus
+    // has no border at all; the left accent rail + fill carry the
+    // breadcrumb cue. Selected-and-focused gets the focus frame on top
+    // of the same fill, so it reads as "I'm rooted here AND my cursor is
+    // here right now".
     val border =
-        when {
-            focused -> LocalYancoPalette.current.FocusRing
-            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.45f)
-            else -> Color.Transparent
-        }
+        if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
+    val borderWidth = if (focused) 2.dp else 0.dp
     val fg by animateColorAsState(
         targetValue =
             when {
@@ -350,7 +361,7 @@ private fun SidebarRow(
                     .padding(start = Space.sm)
                     .clip(YancoShapes.CutCornerCardSmall)
                     .background(rowBrush)
-                    .border(1.dp, border, YancoShapes.CutCornerCardSmall)
+                    .border(borderWidth, border, YancoShapes.CutCornerCardSmall)
                     .let { base ->
                         // Requester binds to the SAME node that's focusable,
                         // not a wrapper. requestFocus then lands on this

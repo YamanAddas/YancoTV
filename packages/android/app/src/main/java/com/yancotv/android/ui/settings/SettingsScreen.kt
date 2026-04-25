@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -449,6 +450,28 @@ private fun ContentPane(
             androidx.compose.runtime.key(current) {
                 TabContent(tab = current)
             }
+            // MB-109 (hoisted): single focus fallback for the entire
+            // ContentPane. moveFocus(Right) from the sub-sidebar lands
+            // on the first focusable child of the active tab body if it
+            // has any (General/Playback/Groups/Network/Parental do); if
+            // the tab is read-only (About/Shortcuts) or a placeholder,
+            // focus falls through to this 0-dp trap so the request never
+            // silently fails and the user always exits the sub-sidebar.
+            //
+            // Lives at ContentPane scope (not per-tab) so:
+            //   1. Tab swap doesn't unmount it — focus traversal sees a
+            //      stable target across the `key(current)` re-mount.
+            //   2. No per-tab Column.spacedBy gap pushes the visible
+            //      content down by 12-16dp (the regression from the
+            //      first attempt — see MB-112 commit).
+            //   3. One source of truth: future placeholder tabs inherit
+            //      the trap automatically; no per-tab boilerplate.
+            //
+            // Sibling of the keyed TabContent inside the same Box, so
+            // it's last in the focus traversal order — real tab
+            // focusables come first, the trap is only used when a tab
+            // body has no other focus targets.
+            FocusableSpacer()
         }
     }
 }
