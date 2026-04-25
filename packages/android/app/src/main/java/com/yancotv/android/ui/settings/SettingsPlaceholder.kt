@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
@@ -39,11 +40,17 @@ fun SettingsPlaceholder(
     body: String,
     modifier: Modifier = Modifier,
 ) {
+    val scroll = rememberScrollState()
     Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
+                // MB-116: focusable + D-pad scroll for placeholder tabs
+                // (Storage / Notifications / Recordings / EPG /
+                // Subtitles / Appearance) — read-only bodies still need
+                // to be scrollable on TV.
+                .dpadVerticalScroll(scroll)
                 .padding(horizontal = Space.xxl, vertical = Space.xl),
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {

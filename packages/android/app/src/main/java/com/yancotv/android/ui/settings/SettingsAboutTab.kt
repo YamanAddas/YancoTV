@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -34,12 +35,18 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
 fun SettingsAboutTab(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val info = remember { buildInfo(ctx) }
+    val scroll = rememberScrollState()
 
     Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
+                // MB-116: focusable + D-pad UP/DOWN drive scroll. Without
+                // this the read-only About body has no focusable child, so
+                // the focus from the sub-sidebar lands on ContentPane's
+                // sibling FocusableSpacer and D-pad arrows do nothing.
+                .dpadVerticalScroll(scroll)
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {

@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -27,11 +28,14 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
  */
 @Composable
 fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
+    val scroll = rememberScrollState()
     Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
+                // MB-116: focusable + D-pad scroll on the read-only body.
+                .dpadVerticalScroll(scroll)
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
