@@ -173,17 +173,22 @@ class PlaybackController(
         // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
         // don't oscillate between BUFFERING and READY on flaky sources.
         //
-        // MK.8.2 timeshift retains a back-buffer so users can pause/rewind
-        // a non-DVR live stream. Sized at 2 minutes — covers the realistic
-        // "missed that line, rewind it" use case without piling up off-heap
-        // chunk cache during long viewing sessions. At ~5 Mbps that's ~75 MB
-        // of cache vs ~375 MB at the original 10-minute window; the bigger
-        // window made the app noticeably heavier the longer it ran on Fire
-        // TV Stick (320 MB heap, modest GPU memory pool).
+        // **MB-119 / 2026-04-25 4K ANR retune** — earlier values were tuned
+        // for ~5 Mbps streams: maxBufferMs=20s, backBufferMs=120s. At
+        // ~10 Mbps 4K HEVC (e.g. Bien Sport 4K) the same window doubles to
+        // ~25 MB max-buffer + ~150 MB back-buffer in native chunk cache.
+        // Combined with TextureView frame copies on the GPU side, the
+        // process hit ~94 MB heap usage with concurrent GC pauses up to
+        // 583ms — main thread input dispatch lost 5+ seconds, ANR fired,
+        // OS killed the app. Now sized for 4K headroom:
         //
-        // maxBufferMs trimmed from 30s → 20s for the same reason — saves
-        // ~6 MB per active stream at 5 Mbps, still gives plenty of headroom
-        // for HLS segment fetch latency.
+        //   - maxBufferMs 15s (was 20s) — ~19 MB at 10 Mbps; HLS segment
+        //     fetch latency is well-covered.
+        //   - backBufferMs 30s (was 120s) — ~37 MB at 10 Mbps. Trades the
+        //     "rewind 2 minutes" timeshift window for "rewind 30s to catch
+        //     a line you missed", which is the actually-used pattern.
+        //   - bufferForPlayback 1s, bufferForPlaybackAfterRebuffer 2.5s
+        //     — unchanged; channel-zap UX stays snappy.
         val loadControl =
             DefaultLoadControl
                 .Builder()
@@ -191,14 +196,14 @@ class PlaybackController(
                     // minBufferMs =
                     15_000,
                     // maxBufferMs =
-                    20_000,
+                    15_000,
                     // bufferForPlaybackMs =
                     1_000,
                     // bufferForPlaybackAfterRebufferMs =
                     2_500,
                 ).setBackBuffer(
                     // backBufferDurationMs =
-                    2 * 60 * 1_000,
+                    30_000,
                     // retainBackBufferFromKeyframe =
                     true,
                 ).build()
