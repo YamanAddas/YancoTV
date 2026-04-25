@@ -159,28 +159,21 @@ fun AppSidebar(
                     .verticalScroll(rememberScrollState()),
         ) {
             AppSection.entries.forEach { section ->
-                // MB-106: bind the activeRowFocus requester to the row
-                // matching the current section so external requestFocus()
-                // calls (BACK from content, detail-overlay close,
-                // sidebar→sidebar onExitToSidebar) land on a real row that
-                // flips its MutableInteractionSource → focused gradient
-                // and accent border render immediately. Previously the
-                // requester was on the wrapper Column, so focusRestorer
-                // had to "discover" a child and the visual focus state
-                // wouldn't appear until the user nudged the D-pad.
-                val rowModifier =
-                    if (section == current && activeRowFocus != null) {
-                        Modifier.focusRequester(activeRowFocus)
-                    } else {
-                        Modifier
-                    }
+                // MB-106: pass activeRowFocus *only* to the row matching
+                // the current section. SidebarRow attaches it directly to
+                // the inner Row that owns `.focusable(...)` — putting it
+                // on the wrapper Box (v1) didn't reliably land focus on
+                // the focusable descendant in Compose 1.7, so the
+                // MutableInteractionSource never flipped and the focused
+                // gradient + border didn't render until the user nudged
+                // the D-pad.
                 SidebarRow(
                     section = section,
                     icon = iconFor(section),
                     selected = section == current,
                     showLabel = expanded,
                     onClick = { onSelect(section) },
-                    modifier = rowModifier,
+                    focusRequester = if (section == current) activeRowFocus else null,
                 )
             }
         }
@@ -242,7 +235,7 @@ private fun SidebarRow(
     selected: Boolean,
     showLabel: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -300,7 +293,7 @@ private fun SidebarRow(
 
     Box(
         modifier =
-            modifier
+            Modifier
                 .fillMaxWidth()
                 .height(52.dp),
     ) {
@@ -337,6 +330,13 @@ private fun SidebarRow(
                     .clip(YancoShapes.CutCornerCardSmall)
                     .background(rowBrush)
                     .border(1.dp, border, YancoShapes.CutCornerCardSmall)
+                    .let { base ->
+                        // Requester binds to the SAME node that's focusable,
+                        // not a wrapper. requestFocus then lands on this
+                        // node directly → interactionSource flips → focused
+                        // gradient + ring render immediately (MB-106 v2).
+                        if (focusRequester != null) base.focusRequester(focusRequester) else base
+                    }
                     .focusable(interactionSource = interaction)
                     .clickable(interactionSource = interaction, indication = null, onClick = onClick)
                     .padding(horizontal = Space.md, vertical = Space.sm),
