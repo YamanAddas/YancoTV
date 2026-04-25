@@ -4,6 +4,7 @@ import android.view.TextureView
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
@@ -99,6 +100,19 @@ fun MiniPlayer(
             // dangling reference, continues playing audio in the background,
             // and crashes when the next MiniPlayer calls setVideoTextureView.
             viewRef[0]?.let { controller.player.clearVideoTextureView(it) }
+        }
+    }
+
+    // MK.9.4 — re-bind the TextureView after a watchdog rebuild. The old
+    // ExoPlayer was released; controller.player now points at the platform-
+    // only replacement, which has no surface attached. Without this the
+    // mini-preview goes black after a recovered crash.
+    LaunchedEffect(controller) {
+        controller.playerRebuilt.collect {
+            viewRef[0]?.let { v ->
+                controller.player.clearVideoSurface()
+                controller.player.setVideoTextureView(v)
+            }
         }
     }
 }

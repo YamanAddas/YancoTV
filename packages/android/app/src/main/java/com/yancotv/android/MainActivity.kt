@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.focus.TvContextActionState
@@ -54,6 +55,12 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    // MK.9.4 — track which ExoPlayer instance the keepAwake listener is
+    // attached to. After a watchdog rebuild controller.player is a new
+    // instance; this ref lets us remove from the released instance and
+    // re-add to the replacement on the next attach.
+    private var keepAwakeAttachedPlayer: ExoPlayer? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -78,26 +85,52 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // MK.9.4 — re-attach keepAwake to the new ExoPlayer after the
+        // watchdog rebuilds. attachKeepAwake is idempotent (compares
+        // against the tracked instance ref).
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                controller.playerRebuilt.collect {
+                    attachKeepAwake()
+                }
+            }
+        }
     }
 
     override fun onStart() {
         super.onStart()
-        controller.player.addListener(keepAwakeListener)
-        // Seed from current state: if the mini-preview is already playing
-        // when the shell returns to the foreground (e.g. back from
-        // PlayerActivity), flip the flag on immediately.
-        setKeepScreenOn(controller.player.isPlaying)
+        attachKeepAwake()
     }
 
     override fun onStop() {
         super.onStop()
-        controller.player.removeListener(keepAwakeListener)
+        keepAwakeAttachedPlayer?.removeListener(keepAwakeListener)
+        keepAwakeAttachedPlayer = null
         setKeepScreenOn(false)
         // Mini-preview can host VOD (e.g. a movie the user dismissed back
         // to the shell). Pressing Home while that plays must persist the
         // resume point — PlayerActivity.onPause only covers the fullscreen
         // path. persistResumePoint is a no-op for live streams.
         controller.persistResumePoint()
+    }
+
+    /**
+     * Attach [keepAwakeListener] to the current `controller.player`. Idempotent:
+     * if the tracked instance already matches, only the seed-from-current-state
+     * call runs. After a watchdog rebuild the instance differs, so the listener
+     * is removed from the released player and added to the new one.
+     */
+    private fun attachKeepAwake() {
+        val target = controller.player
+        if (keepAwakeAttachedPlayer !== target) {
+            keepAwakeAttachedPlayer?.removeListener(keepAwakeListener)
+            target.addListener(keepAwakeListener)
+            keepAwakeAttachedPlayer = target
+        }
+        // Seed from current state: if the mini-preview is already playing
+        // when the shell returns to the foreground (e.g. back from
+        // PlayerActivity), flip the flag on immediately.
+        setKeepScreenOn(target.isPlaying)
     }
 
     private fun setKeepScreenOn(on: Boolean) {

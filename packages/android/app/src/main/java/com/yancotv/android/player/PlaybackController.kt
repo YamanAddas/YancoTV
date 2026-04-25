@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -24,8 +26,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,110 +86,235 @@ sealed interface SleepTimerState {
  */
 @UnstableApi
 class PlaybackController(
-    context: Context,
+    private val context: Context,
     private val prefs: AppPreferences,
     private val history: WatchHistoryRepository? = null,
 ) {
-    val player: ExoPlayer =
-        run {
-            // Dynamic network prefs — UA + per-call timeouts are read from
-            // AppPreferences.networkFlow on every request via an interceptor.
-            // The ExoPlayer itself is constructed once; the next MediaItem
-            // picks up changes without a player rebuild.
-            val okHttp =
-                OkHttpClient
-                    .Builder()
-                    .followRedirects(true)
-                    .followSslRedirects(true)
-                    .addInterceptor { chain ->
-                        val net = prefs.networkFlow.value
-                        val ua =
-                            net.userAgentOverride
-                                ?.takeIf { it.isNotBlank() }
-                                ?: DEFAULT_USER_AGENT
-                        val connect = net.connectTimeoutSec.takeIf { it > 0 } ?: DEFAULT_CONNECT_TIMEOUT_SEC
-                        val read = net.readTimeoutSec.takeIf { it > 0 } ?: DEFAULT_READ_TIMEOUT_SEC
-                        val req =
-                            chain.request().newBuilder()
-                                .header("User-Agent", ua)
-                                .build()
-                        chain
-                            .withConnectTimeout(connect, TimeUnit.SECONDS)
-                            .withReadTimeout(read, TimeUnit.SECONDS)
-                            .proceed(req)
-                    }.build()
-            // OkHttpDataSource.Factory.setUserAgent is intentionally NOT called —
-            // the interceptor above is the sole source of the UA so user
-            // overrides from Settings actually take effect per request.
-            val dataSourceFactory = OkHttpDataSource.Factory(okHttp)
-            // Tuned for channel-zap UX — start playing at 1s buffered instead
-            // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
-            // don't oscillate between BUFFERING and READY on flaky sources.
-            //
-            // MK.8.2 timeshift retains a back-buffer so users can pause/rewind
-            // a non-DVR live stream. Sized at 2 minutes — covers the realistic
-            // "missed that line, rewind it" use case without piling up off-heap
-            // chunk cache during long viewing sessions. At ~5 Mbps that's ~75 MB
-            // of cache vs ~375 MB at the original 10-minute window; the bigger
-            // window made the app noticeably heavier the longer it ran on Fire
-            // TV Stick (320 MB heap, modest GPU memory pool).
-            //
-            // maxBufferMs trimmed from 30s → 20s for the same reason — saves
-            // ~6 MB per active stream at 5 Mbps, still gives plenty of headroom
-            // for HLS segment fetch latency.
-            val loadControl =
-                DefaultLoadControl
-                    .Builder()
-                    .setBufferDurationsMs(
-                        // minBufferMs =
-                        15_000,
-                        // maxBufferMs =
-                        20_000,
-                        // bufferForPlaybackMs =
-                        1_000,
-                        // bufferForPlaybackAfterRebufferMs =
-                        2_500,
-                    ).setBackBuffer(
-                        // backBufferDurationMs =
-                        2 * 60 * 1_000,
-                        // retainBackBufferFromKeyframe =
-                        true,
-                    ).build()
-            // MK.9 — prefer the vendored FFmpeg extension over platform decoders.
-            // Closes MB-14 (~30% of streams audio-only on Fire TV because the
-            // device lacks licensed AC3/EAC3/DTS/TrueHD decoders, plus HEVC-main10
-            // edge cases). EXTENSION_RENDERER_MODE_PREFER puts FfmpegAudioRenderer
-            // ahead of MediaCodecAudioRenderer; setEnableDecoderFallback(true)
-            // means a format the extension can't handle still falls through to
-            // the platform decoder. No-op when libffmpegJNI.so isn't present
-            // (debug-build sanity if a dev wipes jniLibs/).
-            val renderersFactory =
-                DefaultRenderersFactory(context)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-                    .setEnableDecoderFallback(true)
-            val exo =
-                ExoPlayer
-                    .Builder(context)
-                    .setRenderersFactory(renderersFactory)
-                    .setMediaSourceFactory(
-                        DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
-                    ).setLoadControl(loadControl)
-                    .setHandleAudioBecomingNoisy(true)
-                    .build()
-            // MK.12a.2 — apply the user's persisted preferred audio language
-            // at construction so channels with multi-language audio default
-            // to their pick. ExoPlayer carries TrackSelectionParameters across
-            // MediaItem swaps, so one write here covers every channel zap.
-            val preferredAudio = prefs.playbackFlow.value.audioLanguage
-            if (preferredAudio.isNotBlank()) {
-                exo.trackSelectionParameters =
-                    exo.trackSelectionParameters
-                        .buildUpon()
-                        .setPreferredAudioLanguage(preferredAudio)
-                        .build()
+    /**
+     * The shared ExoPlayer. Mutable to support MK.9.4's FFmpeg crash
+     * watchdog: on a confirmed FFmpeg-renderer crash the controller
+     * releases this instance and rebuilds with platform-only renderers.
+     * Surfaces that hold the reference (`PlayerActivity`, `MiniPlayer`,
+     * `MainActivity` keep-awake listener) observe [playerRebuilt] and
+     * re-bind. Architecture rule 4 ("one ExoPlayer at a time") holds —
+     * the old instance is released before the new one is exposed.
+     */
+    var player: ExoPlayer = buildPlayer(useFfmpeg = true)
+        private set
+
+    // MK.9.4 — watchdog state. One rebuild per session: if the platform-
+    // only fallback also crashes, surface it as a stream error to the user
+    // (the existing PlayerActivity error overlay path handles that) instead
+    // of looping rebuilds.
+    private var hasRebuiltOnce = false
+
+    // MK.9.4 — fired after a successful rebuild. Surfaces re-bind PlayerView
+    // / TextureView and re-attach their Player.Listener instances.
+    // SharedFlow with replay = 0; backgrounded surfaces re-sync on next
+    // attach via the attached-player identity check, not via missed signals.
+    private val _playerRebuilt = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val playerRebuilt: SharedFlow<Unit> = _playerRebuilt.asSharedFlow()
+
+    // MK.9.4 — internal listener owned by the controller (separate from
+    // PlayerActivity's playerListener which handles user-facing errors).
+    // Re-attaches itself to whichever player instance is current.
+    private val internalErrorListener =
+        object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                if (hasRebuiltOnce) return
+                if (!isFfmpegRelated(error)) return
+                rebuildWithoutFfmpeg()
             }
-            exo
         }
+
+    init {
+        player.addListener(internalErrorListener)
+    }
+
+    /**
+     * Construct the shared ExoPlayer. Called once at controller-init with
+     * `useFfmpeg = true`, and again by [rebuildWithoutFfmpeg] with
+     * `useFfmpeg = false` after a confirmed FFmpeg-renderer crash.
+     */
+    private fun buildPlayer(useFfmpeg: Boolean): ExoPlayer {
+        // Dynamic network prefs — UA + per-call timeouts are read from
+        // AppPreferences.networkFlow on every request via an interceptor.
+        // The ExoPlayer itself is constructed once; the next MediaItem
+        // picks up changes without a player rebuild.
+        val okHttp =
+            OkHttpClient
+                .Builder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .addInterceptor { chain ->
+                    val net = prefs.networkFlow.value
+                    val ua =
+                        net.userAgentOverride
+                            ?.takeIf { it.isNotBlank() }
+                            ?: DEFAULT_USER_AGENT
+                    val connect = net.connectTimeoutSec.takeIf { it > 0 } ?: DEFAULT_CONNECT_TIMEOUT_SEC
+                    val read = net.readTimeoutSec.takeIf { it > 0 } ?: DEFAULT_READ_TIMEOUT_SEC
+                    val req =
+                        chain.request().newBuilder()
+                            .header("User-Agent", ua)
+                            .build()
+                    chain
+                        .withConnectTimeout(connect, TimeUnit.SECONDS)
+                        .withReadTimeout(read, TimeUnit.SECONDS)
+                        .proceed(req)
+                }.build()
+        // OkHttpDataSource.Factory.setUserAgent is intentionally NOT called —
+        // the interceptor above is the sole source of the UA so user
+        // overrides from Settings actually take effect per request.
+        val dataSourceFactory = OkHttpDataSource.Factory(okHttp)
+        // Tuned for channel-zap UX — start playing at 1s buffered instead
+        // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
+        // don't oscillate between BUFFERING and READY on flaky sources.
+        //
+        // MK.8.2 timeshift retains a back-buffer so users can pause/rewind
+        // a non-DVR live stream. Sized at 2 minutes — covers the realistic
+        // "missed that line, rewind it" use case without piling up off-heap
+        // chunk cache during long viewing sessions. At ~5 Mbps that's ~75 MB
+        // of cache vs ~375 MB at the original 10-minute window; the bigger
+        // window made the app noticeably heavier the longer it ran on Fire
+        // TV Stick (320 MB heap, modest GPU memory pool).
+        //
+        // maxBufferMs trimmed from 30s → 20s for the same reason — saves
+        // ~6 MB per active stream at 5 Mbps, still gives plenty of headroom
+        // for HLS segment fetch latency.
+        val loadControl =
+            DefaultLoadControl
+                .Builder()
+                .setBufferDurationsMs(
+                    // minBufferMs =
+                    15_000,
+                    // maxBufferMs =
+                    20_000,
+                    // bufferForPlaybackMs =
+                    1_000,
+                    // bufferForPlaybackAfterRebufferMs =
+                    2_500,
+                ).setBackBuffer(
+                    // backBufferDurationMs =
+                    2 * 60 * 1_000,
+                    // retainBackBufferFromKeyframe =
+                    true,
+                ).build()
+        // MK.9 — prefer the vendored FFmpeg extension over platform decoders
+        // on the initial build. Closes MB-14 (~30% of streams audio-only on
+        // Fire TV because the device lacks licensed AC3/EAC3/DTS/TrueHD
+        // decoders, plus HEVC-main10 edge cases). EXTENSION_RENDERER_MODE_
+        // PREFER puts FfmpegAudioRenderer ahead of MediaCodecAudioRenderer;
+        // setEnableDecoderFallback(true) means a format the extension can't
+        // handle still falls through to the platform decoder.
+        //
+        // MK.9.4 — after a confirmed FFmpeg crash the watchdog rebuilds with
+        // useFfmpeg = false, which uses EXTENSION_RENDERER_MODE_OFF. The
+        // platform decoder is then the only path; no extension renderer is
+        // even instantiated, so the crash class can't recur this session.
+        val extensionMode =
+            if (useFfmpeg) {
+                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            } else {
+                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+            }
+        val renderersFactory =
+            DefaultRenderersFactory(context)
+                .setExtensionRendererMode(extensionMode)
+                .setEnableDecoderFallback(true)
+        val exo =
+            ExoPlayer
+                .Builder(context)
+                .setRenderersFactory(renderersFactory)
+                .setMediaSourceFactory(
+                    DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
+                ).setLoadControl(loadControl)
+                .setHandleAudioBecomingNoisy(true)
+                .build()
+        // MK.12a.2 — apply the user's persisted preferred audio language
+        // at construction so channels with multi-language audio default
+        // to their pick. ExoPlayer carries TrackSelectionParameters across
+        // MediaItem swaps, so one write here covers every channel zap.
+        val preferredAudio = prefs.playbackFlow.value.audioLanguage
+        if (preferredAudio.isNotBlank()) {
+            exo.trackSelectionParameters =
+                exo.trackSelectionParameters
+                    .buildUpon()
+                    .setPreferredAudioLanguage(preferredAudio)
+                    .build()
+        }
+        return exo
+    }
+
+    /**
+     * MK.9.4 — release the current FFmpeg-enabled player and stand a new
+     * one up with EXTENSION_RENDERER_MODE_OFF. Captures the live state
+     * (current item, position, playWhenReady, speed, track-selection
+     * params) before release; reloads the same item at the same offset on
+     * the new instance so the user sees a brief buffer instead of a
+     * stopped player. Emits [playerRebuilt] last so consumer surfaces have
+     * a current instance to bind to when they observe.
+     *
+     * Architecture rule 4: the old player is fully released before the new
+     * one is exposed, so there is never a moment with two live ExoPlayers.
+     */
+    private fun rebuildWithoutFfmpeg() {
+        hasRebuiltOnce = true
+        // Belt-and-suspenders: persist the watch-history offset before
+        // tearing the player down. setMediaItem(item, pos) on the new
+        // instance covers the resume too, but if the rebuild itself
+        // throws, watch_history still has the right number for next launch.
+        persistResumePoint()
+        val old = player
+        // Snapshot before release; ExoPlayer methods are main-thread-safe
+        // and the listener that called us runs on the application thread
+        // (which Media3 dispatches main events on by default).
+        val pos = old.currentPosition.coerceAtLeast(0L)
+        val playWhenReady = old.playWhenReady
+        val speed = old.playbackParameters.speed
+        val trackParams = old.trackSelectionParameters
+        old.removeListener(internalErrorListener)
+        old.release()
+
+        val replacement = buildPlayer(useFfmpeg = false)
+        replacement.addListener(internalErrorListener)
+        replacement.trackSelectionParameters = trackParams
+        if (speed != 1.0f) replacement.setPlaybackSpeed(speed)
+        player = replacement
+
+        // Restore the active item — read fresh from the queue/index flows;
+        // they hold the user's last navigation choice independent of the
+        // released player's MediaItem.
+        val item = _queue.value.getOrNull(_index.value)
+        if (item != null) {
+            val mediaItem = buildMediaItem(item)
+            if (pos > 0L) replacement.setMediaItem(mediaItem, pos) else replacement.setMediaItem(mediaItem)
+            replacement.prepare()
+            replacement.playWhenReady = playWhenReady
+        }
+
+        _playerRebuilt.tryEmit(Unit)
+    }
+
+    /**
+     * MK.9.4 — error-classifier. The watchdog only triggers on errors that
+     * trace back to FFmpeg. Anything else (network failure, bad HTTP status,
+     * decoder-init failures from MediaCodec itself, source format errors)
+     * surfaces normally to PlayerActivity's error overlay so the user can
+     * retry or pick a different stream.
+     *
+     * Native crashes inside libffmpegJNI segfault the process and never
+     * reach this listener — that's a hard limit; nothing to do here.
+     */
+    private fun isFfmpegRelated(error: PlaybackException): Boolean {
+        if (error.errorCode !in FFMPEG_RELEVANT_ERROR_CODES) return false
+        var cause: Throwable? = error
+        while (cause != null) {
+            if ("Ffmpeg" in cause::class.java.name) return true
+            cause = cause.cause
+        }
+        return false
+    }
 
     // Main-immediate so state mutations stay on the main thread; IO work
     // (SQLDelight reads/writes for resume points) dispatches to IO via
@@ -570,5 +700,17 @@ class PlaybackController(
         // the controller has a safe floor independent of the prefs defaults.
         private const val DEFAULT_CONNECT_TIMEOUT_SEC = 15
         private const val DEFAULT_READ_TIMEOUT_SEC = 30
+
+        // MK.9.4 — error codes the watchdog inspects. Anything outside this
+        // set bypasses the FFmpeg classifier entirely and surfaces normally.
+        // ERROR_CODE_DECODER_QUERY_FAILED isn't included: it fires when
+        // MediaCodecList lookup fails on the platform side, never from the
+        // extension renderer.
+        private val FFMPEG_RELEVANT_ERROR_CODES =
+            setOf(
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+            )
     }
 }

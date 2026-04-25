@@ -35,6 +35,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.yancotv.android.R
@@ -171,7 +172,11 @@ class PlayerActivity : AppCompatActivity() {
             if (uri != null) onSubtitleUriPicked(uri)
         }
 
-    private var listenerAttached = false
+    // MK.9.4 — track which ExoPlayer instance our listener is attached to.
+    // After a watchdog rebuild, controller.player is a new instance; this
+    // ref lets attachShared() detect the swap and reattach without leaking
+    // the listener on the released instance.
+    private var attachedPlayer: ExoPlayer? = null
     private var controllerVisible = false
     private var currentProgramme: EpgProgramme? = null
     private var progressTickerJob: Job? = null
@@ -310,6 +315,17 @@ class PlayerActivity : AppCompatActivity() {
                 prefs.playbackFlow.collect { applyResizeMode(it.resizeMode) }
             }
         }
+        // MK.9.4 — re-bind to the new ExoPlayer after the watchdog rebuilds.
+        // attachShared is idempotent (no-ops if attachedPlayer is already
+        // the current instance) so backgrounded rebuilds also resync via
+        // the next onStart() call.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                controller.playerRebuilt.collect {
+                    attachShared()
+                }
+            }
+        }
     }
 
     /**
@@ -384,10 +400,8 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        if (listenerAttached) {
-            controller.player.removeListener(playerListener)
-            listenerAttached = false
-        }
+        attachedPlayer?.removeListener(playerListener)
+        attachedPlayer = null
         super.onDestroy()
     }
 
@@ -485,9 +499,14 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun attachShared() {
         val target = controller.player
-        if (!listenerAttached) {
+        // MK.9.4 — listener is per-instance. If the watchdog rebuilt the
+        // player, the attached instance no longer matches; remove from the
+        // released ref (no-op since the player handled it on release()) and
+        // attach fresh to the new one.
+        if (attachedPlayer !== target) {
+            attachedPlayer?.removeListener(playerListener)
             target.addListener(playerListener)
-            listenerAttached = true
+            attachedPlayer = target
         }
         // Drop any prior surface (the MiniPlayer's TextureView when the user
         // launched fullscreen from the shell) before binding to the local
