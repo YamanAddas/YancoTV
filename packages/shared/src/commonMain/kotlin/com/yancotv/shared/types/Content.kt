@@ -56,7 +56,29 @@ data class ContentItem(
     val metadataJson: String? = null,
     val sortOrder: Int,
     val createdAt: Long,
-)
+    // MK.13.2 — user-applied overrides. Both default to null; UI reads them
+    // through `displayTitle` / `displayLogoUrl` so call sites never branch.
+    val nameOverride: String? = null,
+    val logoOverride: String? = null,
+) {
+    /**
+     * MK.13.2 — what the UI should render for the channel name.
+     * Falls back through: user override → cleaned M3U title → raw M3U title.
+     * Blank overrides are ignored (same as null) so a user clearing the field
+     * doesn't end up with an empty channel row.
+     */
+    val displayTitle: String
+        get() = nameOverride?.takeIf { it.isNotBlank() } ?: cleanTitle?.takeIf { it.isNotBlank() } ?: title
+
+    /**
+     * MK.13.2 — what the UI should render for the channel logo.
+     * Falls back through: user override → M3U logo. Blank overrides are
+     * ignored (same as null) — user clears field → revert to M3U logo, not
+     * "no logo at all".
+     */
+    val displayLogoUrl: String?
+        get() = logoOverride?.takeIf { it.isNotBlank() } ?: logoUrl
+}
 
 @Serializable
 data class Episode(

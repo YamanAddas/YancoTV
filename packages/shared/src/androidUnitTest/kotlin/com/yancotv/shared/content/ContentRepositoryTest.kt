@@ -131,6 +131,82 @@ class ContentRepositoryTest {
             assertEquals(0L, repo.count(ContentType.SERIES))
         }
 
+    // ───── MK.13.2 — name / logo overrides ─────
+
+    @Test fun newRow_hasNullOverrides_displayTitleFallsBackToCleanTitle() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "ch-A", "src-A", tvgId = "cnn.us", title = "CNN HD [US]")
+            // insertContent uses `clean_title = title` (the raw value); this
+            // test covers the "no override set" path.
+            val row = ContentRepository(db).findById("ch-A")
+            assertNotNull(row)
+            assertNull(row.nameOverride)
+            assertNull(row.logoOverride)
+            // displayTitle / displayLogoUrl fall through to the M3U-shipped
+            // fields when overrides are absent.
+            assertEquals("CNN HD [US]", row.displayTitle)
+            assertNull(row.displayLogoUrl)
+        }
+
+    @Test fun setOverrides_renameAndLogo_roundTripViaDisplayHelpers() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "ch-A", "src-A", tvgId = "cnn.us", title = "CNN HD [US]")
+
+            val repo = ContentRepository(db)
+            repo.setOverrides("ch-A", nameOverride = "CNN", logoOverride = "https://logos.example/cnn.png")
+
+            val row = repo.findById("ch-A")
+            assertNotNull(row)
+            assertEquals("CNN", row.nameOverride)
+            assertEquals("https://logos.example/cnn.png", row.logoOverride)
+            // Override wins over the M3U title/logo without the call site
+            // having to branch on null.
+            assertEquals("CNN", row.displayTitle)
+            assertEquals("https://logos.example/cnn.png", row.displayLogoUrl)
+        }
+
+    @Test fun setOverrides_blankIsTreatedAsClear() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "ch-A", "src-A", tvgId = "cnn.us", title = "CNN HD [US]")
+
+            val repo = ContentRepository(db)
+            // Clearing via blank string — the UI's TextField.onValueChange may
+            // fire with "" before "null" reaches us. Both must mean "remove".
+            repo.setOverrides("ch-A", nameOverride = "Custom", logoOverride = "url")
+            repo.setOverrides("ch-A", nameOverride = "   ", logoOverride = "")
+
+            val row = repo.findById("ch-A")
+            assertNotNull(row)
+            assertNull(row.nameOverride)
+            assertNull(row.logoOverride)
+            assertEquals("CNN HD [US]", row.displayTitle)
+        }
+
+    @Test fun setOverrides_partialUpdate_leavesOtherFieldUnchangedWhenCallerKeepsIt() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "ch-A", "src-A", tvgId = "cnn.us", title = "CNN HD [US]")
+
+            val repo = ContentRepository(db)
+            repo.setOverrides("ch-A", nameOverride = "CNN", logoOverride = "https://l/cnn.png")
+            // Caller wants to update logo only — passes the existing name back
+            // through. (The repo doesn't have a single-field setter today; the
+            // contract is that callers carry both values.)
+            val current = repo.findById("ch-A")!!
+            repo.setOverrides("ch-A", nameOverride = current.nameOverride, logoOverride = "https://l/cnn-2.png")
+
+            val row = repo.findById("ch-A")!!
+            assertEquals("CNN", row.nameOverride)
+            assertEquals("https://l/cnn-2.png", row.logoOverride)
+        }
+
     // ───── fixtures ─────
 
     private fun insertSource(

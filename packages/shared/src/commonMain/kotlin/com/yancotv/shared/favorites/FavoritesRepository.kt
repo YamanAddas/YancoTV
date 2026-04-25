@@ -42,6 +42,8 @@ class FavoritesRepository(
                         metadataJson = row.metadata_json,
                         sortOrder = row.sort_order.toInt(),
                         createdAt = row.created_at,
+                        nameOverride = row.name_override,
+                        logoOverride = row.logo_override,
                     ),
             )
         }
@@ -76,6 +78,8 @@ class FavoritesRepository(
                             metadataJson = row.metadata_json,
                             sortOrder = row.sort_order.toInt(),
                             createdAt = row.created_at,
+                            nameOverride = row.name_override,
+                            logoOverride = row.logo_override,
                         ),
                 )
             }

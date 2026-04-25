@@ -97,6 +97,8 @@ class WatchHistoryRepository(
                         metadataJson = c.metadata_json,
                         sortOrder = c.sort_order.toInt(),
                         createdAt = c.created_at,
+                        nameOverride = c.name_override,
+                        logoOverride = c.logo_override,
                     ),
             )
         }

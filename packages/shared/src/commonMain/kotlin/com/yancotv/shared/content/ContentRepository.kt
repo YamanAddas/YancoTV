@@ -110,6 +110,29 @@ class ContentRepository(
     }
 
     /**
+     * MK.13.2 — set or clear the per-channel rename / custom logo overrides.
+     * Pass `null` (or a blank string, treated identically downstream) to
+     * clear an override; pass a non-blank string to set one. Either field
+     * is independently settable via the same call by passing the other
+     * unchanged. Survives FTS unchanged — search still matches the M3U
+     * title — see Content.sq for the rationale.
+     *
+     * Caller dispatches: this is a synchronous SQLDelight write; on Android
+     * wrap in `Dispatchers.IO` per the threading rule.
+     */
+    fun setOverrides(
+        contentId: String,
+        nameOverride: String?,
+        logoOverride: String?,
+    ) {
+        db.contentQueries.setOverrides(
+            nameOverride = nameOverride?.takeIf { it.isNotBlank() },
+            logoOverride = logoOverride?.takeIf { it.isNotBlank() },
+            id = contentId,
+        )
+    }
+
+    /**
      * Direct lookup of an episode by its stable id. Backs the Home
      * Continue Watching rail's series-resume path: when watch_history
      * carries a non-null episode_id, we resolve it here and hand the
@@ -144,6 +167,8 @@ private fun com.yancotv.shared.db.Content.toDomain(): ContentItem =
         metadataJson = metadata_json,
         sortOrder = sort_order.toInt(),
         createdAt = created_at,
+        nameOverride = name_override,
+        logoOverride = logo_override,
     )
 
 private val ContentType.dbValue: String

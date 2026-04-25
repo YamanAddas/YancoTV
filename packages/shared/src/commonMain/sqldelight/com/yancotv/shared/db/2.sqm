@@ -1,0 +1,8 @@
+-- v2 → v3 (MK.13.2): per-channel rename + custom logo overrides.
+-- Both columns are nullable; null means "fall back to the M3U-shipped
+-- value". Existing rows pick up NULL for both, so the migration is a
+-- no-op for users who haven't customised anything. Not added to FTS:
+-- search still matches the canonical title (re-indexing on every rename
+-- would re-introduce the per-row write trigger 1.sqm removed).
+ALTER TABLE content ADD COLUMN name_override TEXT;
+ALTER TABLE content ADD COLUMN logo_override TEXT;
