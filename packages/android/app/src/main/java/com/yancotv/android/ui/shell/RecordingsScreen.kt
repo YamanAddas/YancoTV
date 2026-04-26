@@ -39,8 +39,12 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.recording.RecordingService
+import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.recording.RecordingEntry
+import com.yancotv.shared.recording.RecordingScheduleEntry
+import com.yancotv.shared.recording.RecordingScheduleRepository
+import com.yancotv.shared.recording.RecordingScheduleState
 import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.types.ContentItem
@@ -81,14 +85,37 @@ fun RecordingsScreen(
     isTv: Boolean,
     recordings: RecordingsRepository = koinInject(),
     controller: PlaybackController = koinInject(),
+    schedules: RecordingScheduleRepository = koinInject(),
+    scheduler: RecordingScheduleScheduler = koinInject(),
 ) {
     val palette = LocalYancoPalette.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Reactive list — flips immediately when a recording starts, stops,
-    // fails, or gets deleted from any surface.
+    // Reactive lists — flip immediately when a recording or schedule
+    // changes from any surface (RecordingService writes, schedule
+    // create/cancel, alarm fires, boot reconciliation).
     val rows by remember { recordings.allFlow() }.collectAsState(initial = emptyList())
+    val allSchedules by remember { schedules.allFlow() }.collectAsState(initial = emptyList())
+
+    // MK.14.3 — "Upcoming" view shows non-terminal schedules ordered
+    // soonest-first. Terminal-state rows (COMPLETED / CANCELLED /
+    // MISSED / FAILED) live in the "History" tail below the active
+    // recordings so the user can review what fired (and what didn't)
+    // without burying the actively-recording row.
+    val upcoming =
+        remember(allSchedules) {
+            allSchedules
+                .filter { !it.state.isTerminal() }
+                .sortedBy { it.scheduledStart }
+        }
+    val historySchedules =
+        remember(allSchedules) {
+            allSchedules
+                .filter { it.state.isTerminal() }
+                .sortedByDescending { it.updatedAt }
+                .take(20) // keep the tail trimmed to avoid scrolling forever
+        }
 
     Column(
         modifier =
@@ -112,28 +139,67 @@ fun RecordingsScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (rows.isEmpty()) {
+        if (rows.isEmpty() && allSchedules.isEmpty()) {
             EmptyRecordingsState(palette)
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(rows, key = { it.id }) { row ->
-                    RecordingRow(
-                        entry = row,
-                        onPlay = { playRecording(controller, context, row) },
-                        onStop = { RecordingService.stop(context, row.id) },
-                        onDelete = {
-                            scope.launch(Dispatchers.IO) {
-                                runCatching { deleteRecording(context, recordings, row) }
-                            }
-                        },
-                    )
+                if (upcoming.isNotEmpty()) {
+                    item("upcoming-header") { SectionHeader("Upcoming · ${upcoming.size}", palette) }
+                    items(upcoming, key = { "upc-${it.id}" }) { schedule ->
+                        UpcomingScheduleRow(
+                            entry = schedule,
+                            onCancel = {
+                                scope.launch(Dispatchers.IO) {
+                                    runCatching { scheduler.cancel(schedule.id) }
+                                }
+                            },
+                        )
+                    }
+                    item("upcoming-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
+                }
+                if (rows.isNotEmpty()) {
+                    item("recordings-header") { SectionHeader("Recordings", palette) }
+                    items(rows, key = { "rec-${it.id}" }) { row ->
+                        RecordingRow(
+                            entry = row,
+                            onPlay = { playRecording(controller, context, row) },
+                            onStop = { RecordingService.stop(context, row.id) },
+                            onDelete = {
+                                scope.launch(Dispatchers.IO) {
+                                    runCatching { deleteRecording(context, recordings, row) }
+                                }
+                            },
+                        )
+                    }
+                }
+                if (historySchedules.isNotEmpty()) {
+                    item("history-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
+                    item("history-header") { SectionHeader("Schedule history", palette) }
+                    items(historySchedules, key = { "hist-${it.id}" }) { schedule ->
+                        HistoryScheduleRow(entry = schedule)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(
+    text: String,
+    palette: com.yancotv.android.ui.theme.YancoPalette,
+) {
+    Text(
+        text = text.uppercase(Locale.getDefault()),
+        color = palette.TextMuted,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.4.sp,
+        modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+    )
 }
 
 @Composable
@@ -262,6 +328,133 @@ private fun StatusBadge(
             RecordingStatus.COMPLETED -> Triple("Saved", palette.BackgroundDeep, palette.Accent)
             RecordingStatus.FAILED -> Triple("Failed", palette.BackgroundDeep, palette.Error)
             RecordingStatus.CANCELLED -> Triple("Stopped", palette.TextMuted, palette.BackgroundElevated)
+        }
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(bg)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            color = fg,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+        )
+    }
+}
+
+/**
+ * MK.14.3 — non-terminal scheduled recording row. Shown in the
+ * "Upcoming" section. Cancel is a single visible action (matching
+ * RecordingRow's two-button discipline — D-pad finds the action
+ * unambiguously). FIRING schedules show "Stop" instead of "Cancel"
+ * so the user understands they're stopping an in-flight recording,
+ * not just unscheduling something pending.
+ */
+@Composable
+private fun UpcomingScheduleRow(
+    entry: RecordingScheduleEntry,
+    onCancel: () -> Unit,
+) {
+    val palette = LocalYancoPalette.current
+    val shape = RoundedCornerShape(10.dp)
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(palette.BackgroundRaised)
+                .border(width = 1.dp, color = palette.PanelBorder, shape = shape)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.title,
+                color = palette.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = entry.upcomingMetaLine(),
+                color = palette.TextMuted,
+                fontSize = 11.sp,
+                maxLines = 1,
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        ScheduleStateBadge(entry.state, palette)
+        Spacer(modifier = Modifier.width(12.dp))
+        FocusableInlineButton(
+            label =
+                if (entry.state == RecordingScheduleState.FIRING) "Stop" else "Cancel",
+            primary = false,
+            onClick = onCancel,
+        )
+    }
+}
+
+/**
+ * MK.14.3 — terminal-state scheduled recording row, no actions.
+ * Compact — the user wants to see what fired (or didn't) without
+ * the visual weight of the upcoming/recordings rows.
+ */
+@Composable
+private fun HistoryScheduleRow(entry: RecordingScheduleEntry) {
+    val palette = LocalYancoPalette.current
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(palette.BackgroundDeep.copy(alpha = 0.4f))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.title,
+                color = palette.TextPrimary,
+                fontSize = 12.sp,
+                maxLines = 1,
+            )
+            Text(
+                text = entry.historyMetaLine(),
+                color = palette.TextMuted,
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        ScheduleStateBadge(entry.state, palette)
+    }
+}
+
+@Composable
+private fun ScheduleStateBadge(
+    state: RecordingScheduleState,
+    palette: com.yancotv.android.ui.theme.YancoPalette,
+) {
+    val (label, fg, bg) =
+        when (state) {
+            RecordingScheduleState.SCHEDULED, RecordingScheduleState.ARMED ->
+                Triple("Scheduled", palette.BackgroundDeep, palette.Accent)
+            RecordingScheduleState.FIRING ->
+                Triple("REC", palette.BackgroundDeep, palette.Live)
+            RecordingScheduleState.COMPLETED ->
+                Triple("Done", palette.BackgroundDeep, palette.Accent)
+            RecordingScheduleState.FAILED ->
+                Triple("Failed", palette.BackgroundDeep, palette.Error)
+            RecordingScheduleState.CANCELLED ->
+                Triple("Cancelled", palette.TextMuted, palette.BackgroundElevated)
+            RecordingScheduleState.MISSED ->
+                Triple("Missed", palette.BackgroundDeep, palette.Error)
         }
     Box(
         modifier =
@@ -424,3 +617,51 @@ private suspend fun deleteRecording(
         runCatching { recordings.deleteById(entry.id) }
     }
 }
+
+/**
+ * MK.14.3 — meta line for an upcoming/active schedule:
+ * "Tonight 8:00 PM · in 3 hours" / "Recording · ends 9:45 PM" / etc.
+ */
+private fun RecordingScheduleEntry.upcomingMetaLine(): String {
+    val nowMs = System.currentTimeMillis()
+    val timeFmt = SimpleDateFormat("EEE, MMM d · h:mm a", Locale.getDefault())
+    val startStr = timeFmt.format(Date(scheduledStart))
+    return when (state) {
+        RecordingScheduleState.FIRING -> {
+            val endTimeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
+            "Recording · ends ${endTimeFmt.format(Date(scheduledEnd))}"
+        }
+        else -> {
+            val deltaMs = scheduledStart - nowMs
+            val relative =
+                when {
+                    deltaMs < 0L -> "starting now"
+                    deltaMs < 60L * 60_000L -> "in ${deltaMs / 60_000L} min"
+                    deltaMs < 24L * 60L * 60_000L -> "in ${deltaMs / (60L * 60_000L)} h"
+                    else -> "in ${deltaMs / (24L * 60L * 60_000L)} days"
+                }
+            "$startStr · $relative"
+        }
+    }
+}
+
+/**
+ * MK.14.3 — meta line for a terminal-state schedule:
+ * "Yesterday 8:00 PM · device was off" / "Tomorrow 9 PM · cancelled" / etc.
+ */
+private fun RecordingScheduleEntry.historyMetaLine(): String {
+    val timeFmt = SimpleDateFormat("MMM d · h:mm a", Locale.getDefault())
+    val startStr = timeFmt.format(Date(scheduledStart))
+    val reason =
+        error?.takeIf { it.isNotBlank() }?.let { friendlyReason(it) }
+    return if (reason != null) "$startStr · $reason" else startStr
+}
+
+private fun friendlyReason(rawReason: String): String =
+    when (rawReason) {
+        "device_offline" -> "device was off"
+        "concurrent_recording_active" -> "another recording was running"
+        "orphaned_by_app_kill" -> "interrupted by reboot"
+        "channel_deleted" -> "channel removed"
+        else -> rawReason.replace('_', ' ')
+    }

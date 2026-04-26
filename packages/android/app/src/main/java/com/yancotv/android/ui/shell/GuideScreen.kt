@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -58,6 +59,8 @@ import com.yancotv.shared.catchup.CatchupService
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.parental.ParentalRepository
+import com.yancotv.shared.recording.RecordingScheduleRepository
+import com.yancotv.shared.recording.RecordingScheduleState
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
@@ -117,6 +120,8 @@ fun GuideScreen(
     catchup: CatchupService = koinInject(),
     contentRepo: ContentRepository = koinInject(),
     parental: ParentalRepository = koinInject(),
+    recordScheduler: RecordingScheduleScheduler = koinInject(),
+    recordSchedules: RecordingScheduleRepository = koinInject(),
 ) {
     // Channel list is grown via pagination — initial 100, then more as the
     // user scrolls. Holds bounded memory even for 250k-channel catalogs.
@@ -338,11 +343,36 @@ fun GuideScreen(
             catchupItem = (resolved as? CatchupService.Resolution.Playable)?.item
         }
 
+        // MK.14.4 — surface "Record this programme" / "Cancel scheduled
+        // recording" alongside the reminder action when the programme is
+        // in the future. Currently-airing programmes use the player's
+        // MENU → Record path (MK.14.2); past programmes use catch-up.
+        // Keyed on programme id to refresh when the user re-opens the
+        // dialog after creating/cancelling a schedule.
+        var existingScheduleId by remember(target.programme.id) {
+            mutableStateOf<String?>(null)
+        }
+        LaunchedEffect(target.programme.id) {
+            existingScheduleId =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        recordSchedules
+                            .getAll()
+                            .firstOrNull { entry ->
+                                entry.programmeId == target.programme.id &&
+                                    !entry.state.isTerminal()
+                            }
+                            ?.id
+                    }.getOrNull()
+                }
+        }
+
         ProgrammeActionDialog(
             channel = target.channel,
             programme = target.programme,
             nowSeconds = nowSeconds,
             isReminderSet = scheduler.isSet(target.programme.id),
+            isRecordScheduled = existingScheduleId != null,
             catchupItem = catchupItem,
             onWatch = {
                 actionTarget = null
@@ -358,6 +388,42 @@ fun GuideScreen(
             },
             onCancelReminder = {
                 scheduler.cancel(target.programme.id)
+                actionTarget = null
+            },
+            onScheduleRecord = {
+                val channel = target.channel
+                val programme = target.programme
+                val streamUrl = channel.streamUrl
+                if (streamUrl.isNullOrBlank()) {
+                    Log.w(
+                        "Yanco",
+                        "GuideScreen.onScheduleRecord: no streamUrl for tvgId=${channel.tvgId}; skipping",
+                    )
+                } else {
+                    // Resolve content_id from tvg_id via the existing
+                    // findLiveByTvgId lookup so the schedule's FK + the
+                    // future "switch player to scheduled channel" step
+                    // can use the real content row.
+                    val contentItem =
+                        runCatching { contentRepo.findLiveByTvgId(channel.tvgId) }.getOrNull()
+                    runCatching {
+                        recordScheduler.schedule(
+                            contentId = contentItem?.id,
+                            programmeId = programme.id,
+                            title = programme.title,
+                            streamUrl = streamUrl,
+                            scheduledStart = programme.startTime * 1000L,
+                            scheduledEnd = programme.endTime * 1000L,
+                        )
+                    }.onFailure { Log.e("Yanco", "schedule failed for ${programme.id}", it) }
+                }
+                actionTarget = null
+            },
+            onCancelRecord = {
+                existingScheduleId?.let { id ->
+                    runCatching { recordScheduler.cancel(id) }
+                        .onFailure { Log.w("Yanco", "cancel-record failed for $id", it) }
+                }
                 actionTarget = null
             },
             onDismiss = { actionTarget = null },
@@ -691,17 +757,21 @@ private fun ProgrammeActionDialog(
     programme: EpgProgramme,
     nowSeconds: Long,
     isReminderSet: Boolean,
+    isRecordScheduled: Boolean,
     catchupItem: ContentItem?,
     onWatch: () -> Unit,
     onPlayCatchup: (ContentItem) -> Unit,
     onSetReminder: () -> Unit,
     onCancelReminder: () -> Unit,
+    onScheduleRecord: () -> Unit,
+    onCancelRecord: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     // "Future" means the programme hasn't started yet. Setting a reminder on
     // something already live is pointless — the user should just press Watch.
     val isFuture = programme.startTime > nowSeconds
     val isPast = programme.endTime <= nowSeconds
+    val canRecord = isFuture && !channel.streamUrl.isNullOrBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -740,24 +810,41 @@ private fun ProgrammeActionDialog(
             }
         },
         dismissButton = {
-            when {
-                isFuture -> {
-                    if (isReminderSet) {
-                        TextButton(onClick = onCancelReminder) {
-                            Text(text = "Cancel reminder", color = LocalYancoPalette.current.TextPrimary)
+            // Pack the future-programme actions into a horizontal row so
+            // both Reminder and Record sit side-by-side without overflowing
+            // the AlertDialog's button slot. On phone this still fits;
+            // on TV the D-pad navigates between them naturally.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                when {
+                    isFuture -> {
+                        if (isReminderSet) {
+                            TextButton(onClick = onCancelReminder) {
+                                Text(text = "Cancel reminder", color = LocalYancoPalette.current.TextPrimary)
+                            }
+                        } else {
+                            TextButton(onClick = onSetReminder) {
+                                Text(text = "Set reminder", color = LocalYancoPalette.current.TextPrimary)
+                            }
                         }
-                    } else {
-                        TextButton(onClick = onSetReminder) {
-                            Text(text = "Set reminder", color = LocalYancoPalette.current.TextPrimary)
+                        if (canRecord) {
+                            if (isRecordScheduled) {
+                                TextButton(onClick = onCancelRecord) {
+                                    Text(text = "Cancel recording", color = LocalYancoPalette.current.TextPrimary)
+                                }
+                            } else {
+                                TextButton(onClick = onScheduleRecord) {
+                                    Text(text = "Record", color = LocalYancoPalette.current.TextPrimary)
+                                }
+                            }
                         }
                     }
-                }
-                isPast && catchupItem != null -> {
-                    TextButton(onClick = onWatch) {
-                        Text(text = "Watch channel", color = LocalYancoPalette.current.TextPrimary)
+                    isPast && catchupItem != null -> {
+                        TextButton(onClick = onWatch) {
+                            Text(text = "Watch channel", color = LocalYancoPalette.current.TextPrimary)
+                        }
                     }
+                    else -> Unit
                 }
-                else -> Unit
             }
         },
     )
