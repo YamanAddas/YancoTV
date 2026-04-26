@@ -9,8 +9,10 @@ import com.yancotv.shared.recording.RecordingFormat
 import kotlinx.io.Sink
 import kotlinx.io.asSink
 import kotlinx.io.buffered
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,6 +45,16 @@ sealed interface RecordingOutput {
     /** Buffered sink the recorder writes into. Caller closes via Sink.close(). */
     fun openSink(): Sink
 
+    /**
+     * Buffered [OutputStream] handle. Used by MK.14.8's
+     * [RecordingDataSink] (which works in `byte[]` chunks, not the
+     * kotlinx-io [Sink] surface). Caller takes ownership and closes the
+     * stream when the recording ends. Backed by the same underlying
+     * file or SAF descriptor as [openSink] — calling both on the same
+     * [RecordingOutput] is undefined and not done in production.
+     */
+    fun openOutputStream(): OutputStream
+
     /** On-disk byte count after the sink is closed. Used by [RecordingService.handleStop]
      *  to decide between markCompleted (>0) and silent delete (0). 0 on error. */
     fun size(): Long
@@ -55,6 +67,8 @@ internal class FileBackedOutput(val file: File) : RecordingOutput {
     override val storagePath: String get() = file.absolutePath
 
     override fun openSink(): Sink = FileOutputStream(file).asSink().buffered()
+
+    override fun openOutputStream(): OutputStream = BufferedOutputStream(FileOutputStream(file))
 
     override fun size(): Long = runCatching { file.length() }.getOrDefault(0L)
 
@@ -72,6 +86,13 @@ internal class DocumentBackedOutput(
             context.contentResolver.openOutputStream(documentFile.uri, "w")
                 ?: error("ContentResolver returned null OutputStream for ${documentFile.uri}")
         return stream.asSink().buffered()
+    }
+
+    override fun openOutputStream(): OutputStream {
+        val stream =
+            context.contentResolver.openOutputStream(documentFile.uri, "w")
+                ?: error("ContentResolver returned null OutputStream for ${documentFile.uri}")
+        return BufferedOutputStream(stream)
     }
 
     override fun size(): Long = runCatching { documentFile.length() }.getOrDefault(0L)

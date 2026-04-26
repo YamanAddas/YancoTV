@@ -437,8 +437,100 @@ Single biggest UX jump. Today the player overlay is zap bar + quick info; TiviMa
 | MK.14.5 | `RecordingsScreen` in main nav — list / play / delete. Play via existing `PlaybackController.play(filePath)` | 🟡 glue | Screen shows past + in-progress recordings; delete removes row + file |
 | MK.14.6 | ~~Auto series recording (XMLTV `episode-num` heuristic)~~ — **replaced** with manual series binding: user long-presses a programme → "Record all programmes with this title on this channel" → creates N schedules based on EPG lookahead window | 🔴 new | Binding one series produces ≥1 scheduled row for next 7 days |
 | MK.14.7 | **MPEG-TS support** — segment tee for `.ts` HTTP streams (the dominant Xtream catch-up format). DASH + encrypted segments stay phase 2 with a disabled-state tooltip | 🔴 new (2026-04-25 re-scope) | TS streams record cleanly; DASH/encrypted streams show disabled record button with reason text |
+| MK.14.8 | **Live recording via Media3 `TeeDataSource` (architectural pivot, 2026-04-26)** — replaces the second-HTTP-GET path that fails on single-stream IPTV accounts. New `RecordingDataSink` (writes ExoPlayer's existing byte stream to disk via `androidx.media3.datasource.DataSink`); `TeeingDataSourceFactory` wraps `OkHttpDataSource.Factory` with `TeeDataSource`; `PlaybackController` swaps to teeing factory; `RecordingService` routes live URL → tee path, catch-up URL (different from currently-playing) → existing `MpegTsRecorder`/`HlsRecorder` fresh-GET path; `RecordPanel` no longer calls `controller.stop()`/`activity.finish()` — player keeps playing while recording. | 🔴 new (2026-04-26 pivot) | Record-while-watching reliably saves bytes regardless of provider's concurrent-stream cap; player keeps playing; recording-in-progress file plays in `RecordingsScreen` while still being written |
 
-**Innovation beyond TiviMate:** recording stays device-local (no cloud cost) + optional SMB push to NAS via `jcifs-ng` (post-record hook, MK.14.8 follow-up if time). TiviMate Premium's cloud archive costs $0 here.
+**Innovation beyond TiviMate:** recording stays device-local (no cloud cost) + optional SMB push to NAS via `jcifs-ng` (post-record hook, MK.14.9 follow-up if time). TiviMate Premium's cloud archive costs $0 here. **Beyond TiviMate's policy of "buy a 2-connection plan to record-while-watching":** MK.14.8 lets users on 1-stream plans record-while-watching by tapping into ExoPlayer's existing data flow, no second HTTP connection needed.
+
+#### MK.14.8 — Implementation plan (2026-04-26 pivot)
+
+**Why we're pivoting.** The current `MpegTsRecorder`/`HlsRecorder` open a fresh HTTP GET to the same channel URL the player is already streaming. Most Xtream-style IPTV providers cap at 1 stream per account at the server. The recorder's parallel GET either hangs in `performGet` (server holds the slot for the player) or kicks the player off; both observed on the user's Fire TV provider. Five rounds of bandages (cancellation re-throw, `streamLive` flag, release-and-record, grace periods of 1 s and 5 s) all ride a fundamentally fragile second-connection assumption. The right answer is to *not open a second connection* — tap the bytes the player is already pulling.
+
+**Architecture.**
+
+```
+ExoPlayer
+   ↓ uses
+DefaultDataSource.Factory (routes by URI scheme)
+   ↓ for http(s)://
+TeeingDataSourceFactory (NEW)
+   ↓ wraps each created source in
+TeeDataSource(upstream = OkHttpDataSource, sink = RecordingDataSink)
+   ↓ when ExoPlayer reads bytes
+upstream.read(buf, off, len) → returns N bytes
+   ↓ Tee then calls
+RecordingDataSink.write(buf, off, N)
+   ↓ if active (begin() was called)
+appends bytes to FileOutputStream(recordingFile)
+```
+
+**Components.**
+
+| Component | File | Purpose |
+|---|---|---|
+| `RecordingDataSink` | `packages/android/app/src/main/java/com/yancotv/android/recording/RecordingDataSink.kt` (new) | Implements `androidx.media3.datasource.DataSink`. `begin(file)` opens a `FileOutputStream`; `end()` flushes + closes; `open(DataSpec)` and `close()` are **no-ops** (per-DataSpec lifecycle from Tee shouldn't end the user-driven recording — relevant for HLS where each segment is a separate DataSpec). Thread-safe via `synchronized` (writes from ExoPlayer's load thread; begin/end from RecordingService's IO scope). |
+| `TeeingDataSourceFactory` | `packages/android/app/src/main/java/com/yancotv/android/recording/TeeingDataSourceFactory.kt` (new) | Implements `androidx.media3.datasource.DataSource.Factory`. Wraps an upstream factory + the singleton `RecordingDataSink`. `createDataSource()` returns `TeeDataSource(upstreamFactory.createDataSource(), recordingSink)`. |
+| `PlaybackController` | (modify) | Inject `RecordingDataSink` via Koin. Swap data-source chain: `OkHttpDataSource.Factory` → `TeeingDataSourceFactory` → `DefaultDataSource.Factory`. Only HTTP traffic gets tee'd; file/asset/content URIs (used for playing back finished recordings) bypass it via DefaultDataSource's scheme routing. |
+| `RecordingService` | (modify) | Inject `RecordingDataSink` and `PlaybackController`. New `handleStartLive(input, output)` path: `recordingSink.begin(output) → markStarted → register a no-op job in activeJobs so handleStop's lookup still works`. Decision: if `input.sourceUrl == controller.currentItem.value?.streamUrl` → live tee; else → existing `MpegTsRecorder`/`HlsRecorder` fresh-GET path (catch-up, scheduled). Modified `handleStop`: tee path calls `recordingSink.end()` then measures file size; fresh-GET path keeps `cancelAndJoin` flow. |
+| `RecordPanel` (in `PlayerOptionsSheet.kt`) | (modify) | Remove `controller.stop()`, remove `activity.finish()`, remove the toast about "player paused." Replace with: "Recording started · keep watching or open Recordings". `onBack()` still dismisses sheet. Player continues. |
+| `RecordingService.handleStart` | (modify) | Drop the `delay(GRACE_BEFORE_RECORD_MS)` for the live path (no second connection means no grace needed). Keep delay only for fresh-GET catch-up path if needed (probably also not — there's no concurrent player on a catch-up URL). |
+
+**`RecordingDataSink` API contract (verified against `androidx.media3.datasource.TeeDataSource` source on `release` branch, 2026-04-26):**
+
+- `TeeDataSource.open(DataSpec)` calls `upstream.open(dataSpec)` → if bytes > 0, calls `dataSink.open(...)`.
+- `TeeDataSource.read(buf, off, len)` calls `upstream.read(...)`, then if read > 0, calls `dataSink.write(buf, off, bytesRead)`.
+- `TeeDataSource.close()` closes upstream in `try`, closes dataSink in `finally`.
+
+For continuous MPEG-TS (the user's case), ExoPlayer opens once, reads continuously, closes once. For HLS, one open/close per segment. Our DataSink's no-op `open`/`close` lets it survive across segments and write a concatenated file.
+
+**Edge cases (v1.0 acceptable behavior).**
+
+| Case | Behavior |
+|---|---|
+| User changes channel while recording | Tee continues writing into the recording file; bytes are now from the new channel. **Limitation**: file ends up with a glitchy switch. v1.0 mitigation: when `controller.play()` is called with a different MediaItem AND a recording is active, refuse with toast "Stop recording first" (or auto-stop the recording — TBD in implementation). |
+| User exits player (BACK) | ExoPlayer is released; DataSource closes; no more bytes flow. Tee.close() fires our DataSink.close() — which is a no-op. Recording row stays in `RECORDING` status with whatever bytes were captured. User has to explicitly Stop from Recordings tab to finalize the row. |
+| User pauses player | ExoPlayer keeps the DataSource open and keeps reading-ahead until buffer is full, then idles. Tee continues writing whatever ExoPlayer reads. Recording effectively pauses growing once buffer fills, resumes when user unpauses. Acceptable. |
+| Buffer-ahead bytes captured | ExoPlayer's read-ahead means the recording captures bytes for the next ~15 s of playback when Record is pressed. So the recording starts *slightly ahead* of the visible playhead. Acceptable — TiviMate has the same behavior. |
+| Multiple concurrent recordings | The current UI permits only one record-from-channel at a time (RecordPanel checks `activeForChannel`). With one DataSink singleton, only one live recording can be active. Catch-up recordings (fresh-GET path) can run concurrently with a live recording — they don't share the DataSink. |
+
+**What we keep (does not regress):**
+
+- `MpegTsRecorder` / `HlsRecorder` — kept for catch-up URLs (different from current playback) and future scheduled recordings (MK.14.3) where there's no player running.
+- `RecordingService.handleStop` → `cancelAndJoin` → measure-file → `markCompleted`/`markFailed` flow. Same logic, just gated on whether the path is tee vs fresh-GET.
+- `RecordingsScreen` UI, MIME=`video/mp2t` playback fix, focus-bleed fix, cancellation re-throws — all stay.
+
+**Tests.**
+
+- `RecordingDataSinkTest` (commonTest if pure Kotlin or androidUnitTest if wraps `DataSink` directly):
+  - `beginThenWriteThenEndProducesFileWithBytes`
+  - `writeBeforeBeginIsDropped` (no NPE, no file)
+  - `multipleOpenCloseCyclesFromTeeDontTerminateRecording` (simulates HLS segment lifecycle)
+  - `endIsIdempotent`
+- Hands-on Fire TV smoke (after build):
+  1. Open live UHD channel → wait for picture → MENU → RECORD → "Record this channel" → toast.
+  2. Verify player KEEPS PLAYING (regression check vs current Option B).
+  3. Open Recordings tab in another section of the app → row visible, size growing in real-time (`file.length()` reflects bytes ExoPlayer is reading).
+  4. Tap Play on the in-progress row → second ExoPlayer instance plays the local file from offset 0. Should work because the `_rec_` MIME fix is in.
+  5. Back to Recordings → tap Stop → row goes to Saved with full byte count.
+  6. Play the finished recording → confirms it plays end-to-end.
+
+**Estimated cost.** ~250 lines new code (RecordingDataSink + TeeingDataSourceFactory + 2 tests), ~80 lines of edits to PlaybackController/RecordingService/RecordPanel, ~30 lines test. **2–3 hours** end-to-end including the verify cycle on Fire TV. (Earlier estimate of "~half a day with HLS handled properly" assumed I'd also be writing the HLS-segment-concatenation in this same change — for our user's MPEG-TS-only provider that's not on the critical path; HLS Just Works because our DataSink no-ops `open`/`close`.)
+
+**Out of scope for MK.14.8** (deferred to follow-ups):
+
+- Refusing channel-change during recording with a clean error UX (out: ship simple "stop first" toast if needed; full refuse-flow can be MK.14.8a).
+- Auto-stop recording on player release (out: rely on user explicit stop for v1.0).
+- Real-time size updates in RecordingsScreen rows (out: file size is read on stop; live polling is MK.14.5a if users complain).
+- HLS-segment-concatenation correctness audit (out: covered when we exercise an HLS provider; MK.14.7 territory).
+
+**Migration / cleanup.**
+
+- Revert the `controller.stop()` + `activity.finish()` + `delay(GRACE_BEFORE_RECORD_MS)` Option B path in this same commit so we don't carry both architectures simultaneously.
+- Keep the cancellation re-throw fixes in MpegTsRecorder / HlsRecorder — they remain correct for catch-up.
+
+**Verified API references (fetched 2026-04-26 from `androidx/media` `release` branch):**
+- `TeeDataSource(upstream: DataSource, dataSink: DataSink)` constructor.
+- `DataSink.open(DataSpec) / write(byte[], offset, length) / close()` methods + `DataSink.Factory.createDataSink()`.
+- `Media3 1.6.0` (March 2025 release) included MPEG-TS extractor fixes — recording playback won't regress because we already pin a recent Media3 build via Gradle catalog.
 
 ### **MK.15 — EPG display + timeline prefs**
 

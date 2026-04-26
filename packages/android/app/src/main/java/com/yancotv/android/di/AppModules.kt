@@ -79,7 +79,19 @@ val appModule =
             )
         }
         single { SourceSyncCoordinator(context = androidContext(), repo = get(), logger = get()) }
-        single { PlaybackController(context = androidContext(), prefs = get(), history = get()) }
+        // MK.14.8 — singleton tee sink so live recordings tap ExoPlayer's
+        // existing HTTP traffic instead of opening a second GET. One
+        // instance is shared between the PlaybackController data-source
+        // chain (writer side) and RecordingService (begin / end side).
+        single { com.yancotv.android.recording.RecordingDataSink(logger = get()) }
+        single {
+            PlaybackController(
+                context = androidContext(),
+                prefs = get(),
+                history = get(),
+                recordingSink = get(),
+            )
+        }
         single {
             EpgRepository(
                 db = get(),

@@ -12,8 +12,10 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
 import com.yancotv.android.R
+import com.yancotv.android.player.PlaybackController
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.recording.HlsRecorder
 import com.yancotv.shared.recording.MpegTsRecorder
@@ -26,9 +28,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,11 +59,19 @@ import java.util.concurrent.ConcurrentHashMap
  * handles them on next launch (called from `YancoApp.onCreate` —
  * not this class).
  */
+@UnstableApi
 class RecordingService : Service() {
     private val recordings: RecordingsRepository by inject()
     private val http: HttpClient by inject()
     private val prefs: com.yancotv.android.prefs.AppPreferences by inject()
     private val logger: com.yancotv.shared.logger.Logger by inject()
+    // MK.14.8 — PlaybackController and RecordingDataSink expose Media3
+    // types (DataSink, ExoPlayer config), so this service is annotated
+    // @UnstableApi at the class level. Callers (UI / WorkManager) reach
+    // it through the static start / stop / stopAll companion functions
+    // which are themselves opt-in-tagged.
+    private val controller: PlaybackController by inject()
+    private val recordingSink: RecordingDataSink by inject()
 
     private val storageResolver by lazy {
         RecordingStorageResolver(applicationContext, prefs)
@@ -122,71 +132,96 @@ class RecordingService : Service() {
             Log.w(TAG, "duplicate start for ${input.recordId} — ignoring")
             return
         }
-        Log.i(TAG, "start[${input.recordId}] format=${input.format}")
+        // **MK.14.8 routing decision.** If the user is recording the channel
+        // they're currently watching, the player already has an HTTP GET
+        // open to that URL — opening a second one fails on 1-stream IPTV
+        // accounts (the original Stage 3.1 architecture). Tee the bytes
+        // ExoPlayer is already pulling instead via [RecordingDataSink].
+        // For any other URL (catch-up, scheduled recording on a different
+        // channel) the legacy fresh-GET path runs — `MpegTsRecorder` /
+        // `HlsRecorder` open their own HTTP request. Those URLs aren't
+        // currently being played, so there's no second-connection conflict.
+        val playingUrl = controller.currentItem.value?.streamUrl
+        val useLiveTee = playingUrl != null && playingUrl == input.sourceUrl
+        Log.i(TAG, "start[${input.recordId}] format=${input.format} path=${if (useLiveTee) "live-tee" else "fresh-get"}")
         // Become foreground immediately. Android requires startForeground
         // within 5s of startForegroundService; doing it before the
         // recording coroutine even starts is the safest pattern.
         startForegroundIfNeeded()
 
-        // Storage resolution can suspend (it reads contentResolver +
-        // creates a DocumentFile), so launch the whole coroutine and
-        // treat allocation failure as a markFailed. This also lets the
-        // resolver clear a stale SAF pref if the persisted permission
-        // got revoked since the user picked the folder.
+        if (useLiveTee) {
+            handleStartLiveTee(input)
+        } else {
+            handleStartFreshGet(input)
+        }
+        // Update the notification's "N in progress" body.
+        refreshNotification()
+    }
+
+    /**
+     * **MK.14.8 live-tee path.** The user is recording the channel they're
+     * currently watching. ExoPlayer's data-source chain already routes
+     * HTTP traffic through [RecordingDataSink]; we just need to:
+     *
+     *   1. Allocate the output file.
+     *   2. Insert the RECORDING row.
+     *   3. Call `recordingSink.begin(stream)` to start capturing bytes.
+     *   4. Park a job in `activeJobs` so [handleStop]'s lookup still works.
+     *
+     * The job suspends via [awaitCancellation] until [handleStop]'s
+     * `cancelAndJoin` triggers it; the `finally` then calls
+     * `recordingSink.end()` to flush + close the stream. After that,
+     * `output.size()` reflects the final byte count on disk.
+     *
+     * No grace delay — there's no second HTTP GET to race with.
+     */
+    private fun handleStartLiveTee(input: RecordInput) {
         val job =
             serviceScope.launch(Dispatchers.IO) {
-                // **Single-connection IPTV grace period.** When the user
-                // pressed "Record this channel" from the player options
-                // sheet, the player's connection has just been released —
-                // but ExoPlayer's OkHttp socket close + the server's
-                // stream-slot release are both async. Opening a fresh GET
-                // immediately makes the server still see two connections,
-                // which surfaces as performGet hanging forever (recorder
-                // gets 0 bytes). 1 s is overkill for a healthy network
-                // but the cheap insurance that lets stop-then-record on
-                // a 1-stream provider Just Work. Living here in the
-                // service (not the launching composable) means it isn't
-                // cancelled when the player activity finishes immediately
-                // after firing this Intent.
-                delay(GRACE_BEFORE_RECORD_MS)
-                val output =
-                    try {
-                        storageResolver.resolve(
-                            recordId = input.recordId,
-                            title = input.title,
-                            format = input.format,
-                            onPermissionLost = {
-                                Log.w(TAG, "SAF tree URI permission lost — clearing pref")
-                                runCatching { prefs.setRecordingFolderUri(null) }
-                            },
-                        )
-                    } catch (c: kotlinx.coroutines.CancellationException) {
-                        // User stopped before resolve completed — let the
-                        // cancellation propagate so the launch ends in
-                        // Cancelled state. No row was created (markStarted
-                        // hasn't run), so there's nothing to transition.
-                        // handleStop's cleanup of activeJobs/activeOutputs
-                        // already ran when ACTION_STOP was processed.
-                        throw c
-                    } catch (t: Throwable) {
-                        Log.e(TAG, "failed to allocate output for ${input.recordId}", t)
-                        // markFailed throws if no row exists yet (resolve
-                        // failed before markStarted), so wrap defensively.
-                        // This case is "file allocation died on us" — a real
-                        // failure mode (no storage / SAF revoked) that we
-                        // want surfaced if a row exists, swallowed otherwise.
-                        runCatching {
-                            recordings.markFailed(
-                                id = input.recordId,
-                                reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
-                                bytesWritten = 0L,
-                            )
-                        }
-                        // maybeStop is non-suspending Service-framework
-                        // calls; safe from any thread, no need to switch.
-                        maybeStop()
-                        return@launch
-                    }
+                val output = resolveOutputOrFail(input) ?: return@launch
+                activeOutputs[input.recordId] = output
+
+                // Insert the RECORDING row. Every exit path below must
+                // transition it to a terminal state.
+                recordings.markStarted(
+                    id = input.recordId,
+                    contentId = input.contentId,
+                    title = input.title,
+                    streamUrl = input.sourceUrl,
+                    filePath = output.storagePath,
+                    format = input.format,
+                )
+
+                // Open the output stream and arm the tee. The sink owns
+                // the stream from this point — it's closed by `end()` in
+                // the finally below.
+                val stream = output.openOutputStream()
+                recordingSink.begin(stream)
+                try {
+                    // Park until handleStop cancels us. Bytes flow through
+                    // the tee in parallel on ExoPlayer's load thread.
+                    awaitCancellation()
+                } finally {
+                    // Symmetric end — flushes the stream so file.length()
+                    // reflects every captured byte. Idempotent: a noop if
+                    // the sink was already ended elsewhere.
+                    val captured = recordingSink.end()
+                    Log.i(TAG, "tee[${input.recordId}] ended after $captured bytes (in-process counter)")
+                }
+            }
+        activeJobs[input.recordId] = job
+    }
+
+    /**
+     * **Fresh-GET path** for catch-up / scheduled recordings — and the
+     * pre-MK.14.8 default. Opens its own HTTP request via
+     * `MpegTsRecorder` / `HlsRecorder`. The recorded URL is NOT the
+     * currently-playing URL, so there's no concurrent-connection conflict.
+     */
+    private fun handleStartFreshGet(input: RecordInput) {
+        val job =
+            serviceScope.launch(Dispatchers.IO) {
+                val output = resolveOutputOrFail(input) ?: return@launch
                 activeOutputs[input.recordId] = output
 
                 // Insert the row in RECORDING status. After this point,
@@ -213,9 +248,44 @@ class RecordingService : Service() {
                 onRecorderResult(input.recordId, result)
             }
         activeJobs[input.recordId] = job
-        // Update the notification's "N in progress" body.
-        refreshNotification()
     }
+
+    /**
+     * Storage resolution shared by both [handleStartLiveTee] and
+     * [handleStartFreshGet]. Returns `null` and marks the row failed if
+     * allocation throws (no storage / SAF permission revoked / etc.).
+     */
+    private suspend fun resolveOutputOrFail(input: RecordInput): RecordingOutput? =
+        try {
+            storageResolver.resolve(
+                recordId = input.recordId,
+                title = input.title,
+                format = input.format,
+                onPermissionLost = {
+                    Log.w(TAG, "SAF tree URI permission lost — clearing pref")
+                    runCatching { prefs.setRecordingFolderUri(null) }
+                },
+            )
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            // User stopped before resolve completed — let the
+            // cancellation propagate so the launch ends in
+            // Cancelled state. No row was created (markStarted
+            // hasn't run), so there's nothing to transition.
+            // handleStop's cleanup of activeJobs/activeOutputs
+            // already ran when ACTION_STOP was processed.
+            throw c
+        } catch (t: Throwable) {
+            Log.e(TAG, "failed to allocate output for ${input.recordId}", t)
+            runCatching {
+                recordings.markFailed(
+                    id = input.recordId,
+                    reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
+                    bytesWritten = 0L,
+                )
+            }
+            maybeStop()
+            null
+        }
 
     private fun handleStop(recordId: String) {
         val job = activeJobs[recordId] ?: return
@@ -225,12 +295,11 @@ class RecordingService : Service() {
         activeJobs.remove(recordId)
         activeOutputs.remove(recordId)
 
-        // The launching coroutine's `output.openSink().use {}` flushes the
-        // sink in its `finally` even when cancellation propagates — but that
-        // happens *asynchronously* after `job.cancel()`. If we marked the
-        // row immediately we'd race the flush and write a stale byte count.
-        // cancelAndJoin awaits the use{} cleanup, so File.length() then
-        // reflects the real on-disk total.
+        // Both paths flush their stream from a `finally` in the launched
+        // coroutine — fresh-GET via `output.openSink().use {}`, live-tee
+        // via `recordingSink.end()` in the awaitCancellation block. The
+        // flush is asynchronous from `job.cancel()`, so we cancelAndJoin
+        // before reading `output.size()` to avoid racing a stale byte count.
         serviceScope.launch(Dispatchers.IO) {
             runCatching { job.cancelAndJoin() }
             val bytes = output?.size() ?: 0L
@@ -240,7 +309,7 @@ class RecordingService : Service() {
                     startedAt?.let { (System.currentTimeMillis() - it) / 1000L }
                         ?.coerceAtLeast(0L) ?: 0L
                 if (bytes <= 0L) {
-                    // Recorder ran but no bytes hit the disk before stop —
+                    // Recording ran but no bytes hit the disk before stop —
                     // typically because the server never started serving the
                     // request body within the time the user waited. Mark
                     // FAILED so the row reads "Failed · no_response_from_server"
@@ -401,12 +470,6 @@ class RecordingService : Service() {
         private const val CHANNEL_ID = "yanco_recordings"
         private const val NOTIFICATION_ID = 9001
 
-        /** Grace period at the start of every recording so the prior
-         *  player connection on the same channel has time to fully close
-         *  on the wire before the recorder opens its own GET. See the
-         *  delay call in [handleStart]. */
-        private const val GRACE_BEFORE_RECORD_MS = 1_000L
-
         const val ACTION_START = "com.yancotv.android.recording.START"
         const val ACTION_STOP = "com.yancotv.android.recording.STOP"
         const val ACTION_STOP_ALL = "com.yancotv.android.recording.STOP_ALL"
@@ -491,6 +554,7 @@ class RecordingService : Service() {
  * Hydrate a [RecordInput] from an Intent's extras. Returns null if
  * required fields are missing — caller logs and bails.
  */
+@UnstableApi
 private fun Intent.toRecordInput(): RecordInput? {
     val id = getStringExtra(RecordingService.EXTRA_RECORD_ID) ?: return null
     val title = getStringExtra(RecordingService.EXTRA_TITLE) ?: return null

@@ -18,6 +18,8 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.recording.RecordingDataSink
+import com.yancotv.android.recording.TeeingDataSourceFactory
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.playback.toPlayable
@@ -92,6 +94,16 @@ class PlaybackController(
     private val context: Context,
     private val prefs: AppPreferences,
     private val history: WatchHistoryRepository? = null,
+    /**
+     * MK.14.8 — singleton tee sink wired between [androidx.media3.datasource.okhttp.OkHttpDataSource]
+     * and [androidx.media3.datasource.DefaultDataSource]. ExoPlayer's HTTP
+     * reads pass through it; when the user starts a live recording,
+     * `RecordingService` calls `recordingSink.begin(stream)` and bytes
+     * stream to disk in parallel with playback. `null` in tests that
+     * don't need recording wiring — the data-source chain skips the
+     * tee in that case.
+     */
+    private val recordingSink: RecordingDataSink? = null,
 ) {
     /**
      * The shared ExoPlayer. Mutable to support MK.9.4's FFmpeg crash
@@ -180,7 +192,19 @@ class PlaybackController(
         // http(s) → our OkHttp factory. Live IPTV streams are unaffected
         // (they go through OkHttp the same way they always did).
         val httpDataSourceFactory = OkHttpDataSource.Factory(okHttp)
-        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+        // **MK.14.8 (2026-04-26 pivot):** wrap the HTTP factory in a
+        // [TeeingDataSourceFactory] so user-initiated live recordings can
+        // tap ExoPlayer's existing HTTP stream instead of opening a fresh
+        // GET. Single-stream IPTV providers refused the second connection;
+        // tee'ing sidesteps the cap entirely. The sink is a no-op when
+        // no recording is active, so non-recording playback is unaffected.
+        // Wrapped *inside* DefaultDataSource.Factory so file:// /
+        // content:// (used for finished-recording playback) bypass the
+        // tee — playing back a recording can't accidentally tee itself.
+        val sourceForExo: androidx.media3.datasource.DataSource.Factory =
+            recordingSink?.let { TeeingDataSourceFactory(httpDataSourceFactory, it) }
+                ?: httpDataSourceFactory
+        val dataSourceFactory = DefaultDataSource.Factory(context, sourceForExo)
         // Tuned for channel-zap UX — start playing at 1s buffered instead
         // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
         // don't oscillate between BUFFERING and READY on flaky sources.

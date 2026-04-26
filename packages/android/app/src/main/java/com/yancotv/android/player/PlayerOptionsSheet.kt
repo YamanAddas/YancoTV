@@ -1414,6 +1414,7 @@ private fun formatSleepCountdown(ms: Long): String {
  * companion full-screen RecordingsScreen (MK.14.5) — out of scope
  * here.
  */
+@UnstableApi
 @Composable
 private fun RecordPanel(
     controller: PlaybackController,
@@ -1500,23 +1501,19 @@ private fun RecordPanel(
     HexOptionRow(
         leading = null,
         label = "Record this channel",
-        sub = formatLabel + " · player will pause to free your IPTV connection",
+        sub = formatLabel + " · keep watching while it records",
         selected = false,
         focusRequester = firstRowFocus,
         onEscapeUp = onEscapeUp,
         onPick = {
-            // **Single-connection IPTV reality** (Stage 3.1 / option B):
-            // Most Xtream-style providers cap concurrent streams per account.
-            // If the player keeps its connection open, the recorder's
-            // parallel GET to the same channel either hangs or kicks the
-            // player off. Release the player here so the recorder owns the
-            // connection. The grace period that lets the OkHttp socket
-            // close on the wire before the recorder's GET fires lives
-            // inside RecordingService.handleStart so it survives this
-            // composable being torn down by activity.finish() below — the
-            // earlier rememberCoroutineScope-based delay was cancelled when
-            // the panel disposed and the recording never started.
-            controller.stop()
+            // **MK.14.8 (2026-04-26 pivot).** RecordingService routes this
+            // to its live-tee path because the URL matches the channel
+            // currently in PlaybackController — `RecordingDataSink.begin()`
+            // taps the bytes ExoPlayer is already pulling, so the player
+            // keeps playing while bytes stream to disk. The previous
+            // architecture (`controller.stop()` + `activity.finish()` +
+            // grace delay) opened a second HTTP GET to the same URL,
+            // which 1-stream IPTV providers refused.
             RecordingService.start(
                 context = context,
                 input =
@@ -1530,14 +1527,9 @@ private fun RecordPanel(
             )
             android.widget.Toast.makeText(
                 context,
-                "Recording started · player paused. Open Recordings to watch.",
+                "Recording started · keep watching or open Recordings.",
                 android.widget.Toast.LENGTH_LONG,
             ).show()
-            // Drop out of fullscreen — with no media item the player would
-            // just show a black surface. Sending the user back to Home
-            // reads as "OK, we're recording now," and they can hop into
-            // Recordings from the sidebar.
-            (context as? android.app.Activity)?.finish()
             onBack()
         },
     )
