@@ -12,6 +12,9 @@ CREATE TABLE sources (
     mac_address_encrypted BLOB,
     epg_url TEXT,
     user_agent TEXT,
+    -- Stage 2.3 — per-source HTTP Referer override for providers that
+    -- gate playback on the header. NULL = no override (no Referer sent).
+    referer TEXT,
     last_synced INTEGER,
     last_sync_error TEXT,
     is_active INTEGER AS kotlin.Boolean NOT NULL DEFAULT 1,
@@ -37,10 +40,10 @@ insert:
 INSERT INTO sources (
     id, name, type, url, file_path,
     username_encrypted, password_encrypted, mac_address_encrypted,
-    epg_url, user_agent, last_synced, last_sync_error,
+    epg_url, user_agent, referer, last_synced, last_sync_error,
     is_active, priority, channel_count, auto_sync_interval,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateSyncResult:
 UPDATE sources
@@ -59,6 +62,7 @@ SET name = ?,
     mac_address_encrypted = ?,
     epg_url = ?,
     user_agent = ?,
+    referer = ?,
     auto_sync_interval = ?,
     updated_at = ?
 WHERE id = ?;

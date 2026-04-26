@@ -55,7 +55,12 @@ class MigrationTest {
         driver.execute(null, SEED_CONTENT_V2, 0)
 
         // Run the migration through SQLDelight's generated migrator.
-        YancoDb.Schema.migrate(driver, oldVersion = 2, newVersion = YancoDb.Schema.version)
+        // Pinned to v3 — this test exercises 2.sqm specifically. Stage 2's
+        // 3.sqm onward operate on tables (recordings, favorites, sources)
+        // this minimal v2 fixture doesn't include; the full v2 → current
+        // path is covered by the Stage 2.6 migration test with a complete
+        // v2 fixture.
+        YancoDb.Schema.migrate(driver, oldVersion = 2, newVersion = 3)
 
         // Wrap and read back via the v3 query API.
         val db = YancoDb(driver)
@@ -97,7 +102,9 @@ class MigrationTest {
         v2Schema().forEach { driver.execute(null, it, 0) }
         driver.execute(null, "PRAGMA user_version = 2;", 0)
 
-        YancoDb.Schema.migrate(driver, oldVersion = 2, newVersion = YancoDb.Schema.version)
+        // Pinned to v3 — same rationale as above; Stage 2.6 covers v2 →
+        // current with a complete fixture.
+        YancoDb.Schema.migrate(driver, oldVersion = 2, newVersion = 3)
 
         // Now usable as a v3 DB — selectById on an empty table returns null,
         // setOverrides on a non-existent row is a no-op (UPDATE ... WHERE id=
@@ -138,6 +145,7 @@ class MigrationTest {
             mac_address_encrypted = null,
             epg_url = null,
             user_agent = null,
+            referer = null,
             last_synced = null,
             last_sync_error = null,
             is_active = true,

@@ -28,6 +28,10 @@ data class Source(
     val epgUrl: String? = null,
     /** Optional per-source HTTP User-Agent. Applied to mpv playback. */
     val userAgent: String? = null,
+    /** Optional per-source HTTP Referer. Required by some providers
+     *  (TikiLive / OkLivetv-class hosts) that gate playback on the
+     *  Referer header. NULL = no header sent. */
+    val referer: String? = null,
     val lastSynced: Long? = null,
     val isActive: Boolean,
     val priority: Int,
@@ -49,6 +53,7 @@ data class AddSourceInput(
     val macAddress: String? = null,
     val epgUrl: String? = null,
     val userAgent: String? = null,
+    val referer: String? = null,
 )
 
 @Serializable
@@ -61,5 +66,6 @@ data class UpdateSourceInput(
     val macAddress: String? = null,
     val epgUrl: String? = null,
     val userAgent: String? = null,
+    val referer: String? = null,
     val autoSyncInterval: Int? = null,
 )

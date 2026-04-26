@@ -1,0 +1,11 @@
+-- v5 → v6 (Stage 2.3, MK.17.5 schema half): per-source `referer` for
+-- providers that gate playback on the HTTP `Referer` header (HLS-over-
+-- web hosts especially — TikiLive / OkLivetv / restricted YouTube
+-- mirrors). `user_agent` was already on the table since the genesis
+-- schema; this migration just adds the missing companion.
+--
+-- Existing rows pick up NULL (no per-source referer override); the
+-- network layer's interceptor falls through to "no Referer header"
+-- which is the historical behaviour. Stage 4.2 (MK.17.5 UI) gives the
+-- user a place to set this.
+ALTER TABLE sources ADD COLUMN referer TEXT;

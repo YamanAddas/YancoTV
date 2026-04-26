@@ -68,6 +68,7 @@ class SourcesBackupTest {
             mac_address_encrypted = null,
             epg_url = "https://example.com/guide.xml",
             user_agent = "VLC/3.0",
+            referer = null,
             last_synced = now - 60_000L,
             last_sync_error = null,
             is_active = true,
@@ -90,6 +91,7 @@ class SourcesBackupTest {
             mac_address_encrypted = null,
             epg_url = null,
             user_agent = null,
+            referer = null,
             last_synced = null,
             last_sync_error = "401 Unauthorized",
             is_active = false,
@@ -137,7 +139,7 @@ class SourcesBackupTest {
         originalDb.sourcesQueries.insert(
             id = "src-1", name = "S1", type = "m3u_url", url = "u1", file_path = null,
             username_encrypted = null, password_encrypted = null, mac_address_encrypted = null,
-            epg_url = null, user_agent = null, last_synced = null, last_sync_error = null,
+            epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = true, priority = 0, channel_count = 0, auto_sync_interval = 0,
             created_at = now, updated_at = now,
         )
@@ -145,7 +147,7 @@ class SourcesBackupTest {
             id = "src-2", name = "S2", type = "stalker", url = "u2", file_path = null,
             username_encrypted = null, password_encrypted = null,
             mac_address_encrypted = byteArrayOf(0xAB.toByte(), 0xCD.toByte()),
-            epg_url = null, user_agent = null, last_synced = null, last_sync_error = null,
+            epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = false, priority = 1, channel_count = 0, auto_sync_interval = 0,
             created_at = now, updated_at = now,
         )
@@ -193,7 +195,7 @@ class SourcesBackupTest {
         db.sourcesQueries.insert(
             id = "src-1", name = "S1", type = "m3u_url", url = "u1", file_path = null,
             username_encrypted = null, password_encrypted = null, mac_address_encrypted = null,
-            epg_url = null, user_agent = null, last_synced = null, last_sync_error = null,
+            epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = true, priority = 0, channel_count = 0, auto_sync_interval = 0,
             created_at = now, updated_at = now,
         )

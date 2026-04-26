@@ -225,6 +225,7 @@ class ContentRepositoryTest {
             mac_address_encrypted = null,
             epg_url = null,
             user_agent = null,
+            referer = null,
             last_synced = null,
             last_sync_error = null,
             is_active = true,

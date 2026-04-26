@@ -67,6 +67,7 @@ internal class SourcesBackup(
                             macAddressEncrypted = row.mac_address_encrypted,
                             epgUrl = row.epg_url,
                             userAgent = row.user_agent,
+                            referer = row.referer,
                             lastSynced = row.last_synced,
                             lastSyncError = row.last_sync_error,
                             isActive = row.is_active,
@@ -130,6 +131,7 @@ internal class SourcesBackup(
                     mac_address_encrypted = src.macAddressEncrypted,
                     epg_url = src.epgUrl,
                     user_agent = src.userAgent,
+                    referer = src.referer,
                     last_synced = src.lastSynced,
                     last_sync_error = src.lastSyncError,
                     is_active = src.isActive,
@@ -170,6 +172,9 @@ internal data class BackedUpSource(
     val macAddressEncrypted: ByteArray?,
     val epgUrl: String?,
     val userAgent: String?,
+    // Stage 2.3 — added 2026-04-26. Default null so backups produced by
+    // older builds (no `referer` column) still deserialise cleanly.
+    val referer: String? = null,
     val lastSynced: Long?,
     val lastSyncError: String?,
     val isActive: Boolean,
@@ -195,6 +200,7 @@ internal data class BackedUpSource(
             macAddressEncrypted.contentEqualsOrBothNull(other.macAddressEncrypted) &&
             epgUrl == other.epgUrl &&
             userAgent == other.userAgent &&
+            referer == other.referer &&
             lastSynced == other.lastSynced &&
             lastSyncError == other.lastSyncError &&
             isActive == other.isActive &&
