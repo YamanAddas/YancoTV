@@ -224,6 +224,10 @@ dependencies {
     // WorkManager — background sync for sources (MK.3.3)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // DocumentFile — Stage 3.1 / MK.14.2-storage. Recording engine uses
+    // it to write into a user-picked SAF folder when one's configured.
+    implementation(libs.androidx.documentfile)
+
     // LeakCanary — debug-only. Installs its own ContentProvider, watches
     // every Activity/Fragment/ViewModel for retained references after
     // destroy, dumps a heap when one survives. Pure additive; release

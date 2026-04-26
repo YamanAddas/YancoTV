@@ -30,8 +30,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
-import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -59,10 +59,15 @@ import java.util.concurrent.ConcurrentHashMap
 class RecordingService : Service() {
     private val recordings: RecordingsRepository by inject()
     private val http: HttpClient by inject()
+    private val prefs: com.yancotv.android.prefs.AppPreferences by inject()
+
+    private val storageResolver by lazy {
+        RecordingStorageResolver(applicationContext, prefs)
+    }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val activeJobs = ConcurrentHashMap<String, Job>()
-    private val activeFiles = ConcurrentHashMap<String, File>()
+    private val activeOutputs = ConcurrentHashMap<String, RecordingOutput>()
     private val activeBytes = ConcurrentHashMap<String, Long>()
     private val notificationLock = Mutex()
 
@@ -106,7 +111,7 @@ class RecordingService : Service() {
         // on next launch.
         serviceScope.cancel()
         activeJobs.clear()
-        activeFiles.clear()
+        activeOutputs.clear()
         activeBytes.clear()
     }
 
@@ -122,37 +127,50 @@ class RecordingService : Service() {
         // recording coroutine even starts is the safest pattern.
         startForegroundIfNeeded()
 
-        val file =
-            try {
-                RecordingFileOutput.fileFor(this, input.recordId, input.format)
-            } catch (t: Throwable) {
-                Log.e(TAG, "failed to allocate file for ${input.recordId}", t)
-                recordings.markFailed(
-                    id = input.recordId,
-                    reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
-                    bytesWritten = 0L,
-                )
-                maybeStop()
-                return
-            }
-        activeFiles[input.recordId] = file
-
-        // Insert the row in RECORDING status. After this point, every
-        // exit path must transition the row to a terminal state.
-        recordings.markStarted(
-            id = input.recordId,
-            contentId = input.contentId,
-            title = input.title,
-            streamUrl = input.sourceUrl,
-            filePath = file.absolutePath,
-            format = input.format,
-        )
-
+        // Storage resolution can suspend (it reads contentResolver +
+        // creates a DocumentFile), so launch the whole coroutine and
+        // treat allocation failure as a markFailed. This also lets the
+        // resolver clear a stale SAF pref if the persisted permission
+        // got revoked since the user picked the folder.
         val job =
             serviceScope.launch(Dispatchers.IO) {
-                val sink = RecordingFileOutput.openSink(file)
+                val output =
+                    try {
+                        storageResolver.resolve(
+                            recordId = input.recordId,
+                            title = input.title,
+                            format = input.format,
+                            onPermissionLost = {
+                                Log.w(TAG, "SAF tree URI permission lost — clearing pref")
+                                runCatching { prefs.setRecordingFolderUri(null) }
+                            },
+                        )
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "failed to allocate output for ${input.recordId}", t)
+                        recordings.markFailed(
+                            id = input.recordId,
+                            reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
+                            bytesWritten = 0L,
+                        )
+                        withContext(Dispatchers.Main) { maybeStop() }
+                        return@launch
+                    }
+                activeOutputs[input.recordId] = output
+
+                // Insert the row in RECORDING status. After this point,
+                // every exit path must transition the row to a terminal
+                // state. Done on IO since it hits SQLDelight.
+                recordings.markStarted(
+                    id = input.recordId,
+                    contentId = input.contentId,
+                    title = input.title,
+                    streamUrl = input.sourceUrl,
+                    filePath = output.storagePath,
+                    format = input.format,
+                )
+
                 val result =
-                    sink.use { boundSink ->
+                    output.openSink().use { boundSink ->
                         when (input.format) {
                             RecordingFormat.HLS ->
                                 HlsRecorder(http, RealClock).record(input, boundSink)
@@ -172,11 +190,15 @@ class RecordingService : Service() {
         job.cancel()
         // The launching coroutine's catch / finally won't reach our
         // result handler when cancelled; transition the row here and
-        // clean up bookkeeping.
+        // clean up bookkeeping. SQLDelight write — dispatch off main.
         val bytes = activeBytes[recordId] ?: 0L
-        recordings.markCancelled(id = recordId, bytesWritten = bytes)
+        serviceScope.launch(Dispatchers.IO) {
+            runCatching {
+                recordings.markCancelled(id = recordId, bytesWritten = bytes)
+            }
+        }
         activeJobs.remove(recordId)
-        activeFiles.remove(recordId)
+        activeOutputs.remove(recordId)
         activeBytes.remove(recordId)
         refreshNotification()
         maybeStop()
@@ -212,7 +234,7 @@ class RecordingService : Service() {
             Log.w(TAG, "recorder result for $recordId — row missing?", t)
         }
         activeJobs.remove(recordId)
-        activeFiles.remove(recordId)
+        activeOutputs.remove(recordId)
         activeBytes.remove(recordId)
         refreshNotification()
         maybeStop()

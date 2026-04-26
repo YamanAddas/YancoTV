@@ -35,6 +35,9 @@ class AppPreferences(
     private val _hiddenGroups = MutableStateFlow(readHiddenGroups())
     val hiddenGroupsFlow: StateFlow<Set<String>> = _hiddenGroups.asStateFlow()
 
+    private val _recording = MutableStateFlow(readRecording())
+    val recordingFlow: StateFlow<RecordingPrefs> = _recording.asStateFlow()
+
     // Synchronous snapshot for bootstrapping — MainActivity/HomeScreen need
     // the "open app on" value on first composition before any flow has had
     // a chance to emit. Reads the settings table directly.
@@ -105,6 +108,19 @@ class AppPreferences(
             _general.value = _general.value.copy(smartGrouping = enabled)
         }
 
+    // ───── Recording (Stage 3.1 / MK.14.2-storage) ─────
+    //
+    // The user-chosen storage folder for recordings. Stored as an opaque
+    // string — typically a SAF tree URI (`content://com.android.externalstorage.documents/...`)
+    // when the user has picked a folder via the system picker. Empty / null
+    // means "use the app-private default" which is `getExternalFilesDir(MOVIES)`.
+
+    suspend fun setRecordingFolderUri(uri: String?) =
+        write(KEY_RECORDING_FOLDER_URI, uri.orEmpty()) {
+            _recording.value =
+                _recording.value.copy(folderUri = uri?.takeIf { it.isNotBlank() })
+        }
+
     // ───── Hidden groups ─────
     //
     // Providers routinely push 400+ category groups, most of which a
@@ -164,6 +180,11 @@ class AppPreferences(
             smartGrouping = readString(KEY_SMART_GROUPING) == "1",
         )
 
+    private fun readRecording(): RecordingPrefs =
+        RecordingPrefs(
+            folderUri = readString(KEY_RECORDING_FOLDER_URI)?.takeIf { it.isNotBlank() },
+        )
+
     private fun readHiddenGroups(): Set<String> =
         readString(KEY_HIDDEN_GROUPS)
             ?.split('\n')
@@ -206,8 +227,15 @@ class AppPreferences(
         private const val KEY_HIDDEN_GROUPS = "pref_hidden_groups"
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
         private const val KEY_SPEED = "pref_playback_speed"
+        private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"
     }
 }
+
+/** Stage 3.1 / MK.14.2-storage — recording-storage prefs. */
+data class RecordingPrefs(
+    /** SAF tree URI string, or null to use the app-private default. */
+    val folderUri: String? = null,
+)
 
 /** Default section to land on when the app opens. TiviMate defaults to last-used. */
 enum class OpenOn(
