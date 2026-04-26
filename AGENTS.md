@@ -43,6 +43,19 @@ Fire TV target for native: `adb connect 192.168.68.56:5555` then `installDebug`.
 9. **Build `@yancotv/core` before `pnpm dev`/`build`.** It's ESM; Node 24 rejects directory imports. Root `package.json` runs `build:core` automatically — don't break that chain.
 10. **No feature work outside the active plan.** If it's not in the relevant `MK.*` or Sprint task, add it to the plan first.
 
+## Threat model notes
+
+### Cleartext traffic (Android)
+
+The Android manifest sets `android:usesCleartextTraffic="true"` globally. This is **deliberate, not a regression**, but it has a known scope.
+
+- **Why it's on:** IPTV providers commonly serve plain HTTP — playlist endpoints, Xtream `player_api.php`, MPEG-TS streams, EPG XMLTV dumps. Provider host-set is user-configured at runtime, so an Android `network_security_config.xml` static allow-list isn't workable.
+- **What this exposes:** an attacker on the same Wi-Fi can MITM provider URL traffic. Provider credentials are already in those URLs (Xtream auth is `?username=…&password=…`); cleartext doesn't make that worse.
+- **What this does NOT expose:** Sentry telemetry (HTTPS-only by SDK config), Coil image fetches that target HTTPS CDNs (the common case). Adding any `http://` URL outside of user-configured provider hosts would expose new traffic — flag it in review.
+- **Tracked:** [bugs.md MB-203](bugs.md). Stage 5.x will narrow this with a runtime allow-list when distribution-hardening starts.
+
+Provider URL credentials are otherwise handled by [`redactCredentials`](packages/shared/src/commonMain/kotlin/com/yancotv/shared/http/UrlRedaction.kt) at every error / log / DB / on-screen rendering site.
+
 ## Where deeper docs live
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — process/data architecture
