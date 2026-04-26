@@ -191,6 +191,10 @@ class PlayerActivity : AppCompatActivity() {
                 showStreamError(error)
             }
 
+            override fun onRenderedFirstFrame() {
+                ZapLatencyTracer.onFirstFrame()
+            }
+
             override fun onPlaybackStateChanged(state: Int) {
                 val name =
                     when (state) {
@@ -995,10 +999,12 @@ class PlayerActivity : AppCompatActivity() {
                     resetDockAutoHide()
                 },
                 onPrevious = {
+                    ZapLatencyTracer.markZapStart("DOCK_PREV")
                     controller.previous()
                     resetDockAutoHide()
                 },
                 onNext = {
+                    ZapLatencyTracer.markZapStart("DOCK_NEXT")
                     controller.next()
                     resetDockAutoHide()
                 },
@@ -1426,9 +1432,11 @@ class PlayerActivity : AppCompatActivity() {
                 return true
             }
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
+                ZapLatencyTracer.markZapStart("UP")
                 if (controller.previous()) return true
             }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                ZapLatencyTracer.markZapStart("DOWN")
                 if (controller.next()) return true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
