@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1920, initial-scale=1"/>
+<title>YancoTV — Prototype Table of Contents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="yanco-ds.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="ds/ds.jsx"></script>
+<script type="text/babel" data-presets="react">
+const SURFACES = [
+  {
+    group: 'PLAYER',
+    items: [
+      { id:'vod',      href:'vod.html',       title:'VOD Player',           sub:'5 states · controls · scrub · next-up · buffer · error · end', badge:'5 states' },
+      { id:'live',     href:'live-player.html', title:'Live TV Player',     sub:'6 states · zap bar · info card · timeshift · channel surf · catch-up · reconnect', badge:'6 states' },
+      { id:'sheet',    href:'options-sheet.html', title:'Player Options Sheet', sub:'10 sub-panels · audio · subs · speed · aspect · sleep · record · favorite · external · cast · appearance', badge:'10 panels' },
+    ]
+  },
+  {
+    group: 'SETTINGS',
+    items: [
+      { id:'settings', href:'settings.html', title:'Settings',              sub:'14 tabs · full nav tree · General → About', badge:'14 tabs' },
+      { id:'sources',  href:'sources.html',  title:'Sources — list / edit / add / detail', sub:'M3U URL · M3U File · Xtream · Stalker flows · source-detail view', badge:'flows' },
+    ]
+  },
+  {
+    group: 'DESIGN SYSTEM',
+    items: [
+      { id:'components', href:'components.html', title:'Components', sub:'Every hex shape × every state · buttons · chips · cards · focus rings', badge:'ref' },
+    ]
+  },
+];
+
+const TOKENS = [
+  { c:'#050A08', n:'BackgroundDeep' },
+  { c:'#0A1410', n:'BackgroundRaised' },
+  { c:'#0F1C17', n:'BackgroundHover' },
+  { c:'#14251F', n:'BackgroundElevated' },
+  { c:'#00E28A', n:'Accent' },
+  { c:'#66F0B5', n:'AccentSoft' },
+  { c:'#00B872', n:'AccentDeep' },
+  { c:'#D7B36A', n:'Premium' },
+  { c:'#FF3B3B', n:'Live' },
+  { c:'#F0FFF6', n:'TextPrimary' },
+  { c:'#A7B8AF', n:'TextSecondary' },
+  { c:'#5F7068', n:'TextMuted' },
+];
+
+function TOC() {
+  return (
+    <Stage>
+      <div className="bg-green-tint bg-hex-grid" style={{ position:'absolute', inset:0 }} />
+
+      {/* header */}
+      <div style={{ position:'absolute', left:96, top:72, right:96 }}>
+        <div className="kicker">YANCOTV · CONCEPT A · MK.12c</div>
+        <div style={{ fontSize:80, fontWeight:900, letterSpacing:'-0.035em', lineHeight:1, color:'var(--text-primary)', marginTop:12,
+          background:'linear-gradient(180deg, #F0FFF6 0%, #A7D9BE 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+        }}>Player &amp; Settings redesign</div>
+        <div style={{ fontSize:18, color:'var(--text-secondary)', marginTop:16, maxWidth:880, lineHeight:1.5, fontWeight:400 }}>
+          Interactive prototype for VOD player, Live TV player and the full Settings menu tree — using the shipped Frosted&nbsp;Glass&nbsp;Emerald design language. Tokens locked to <span className="mono" style={{color:'var(--accent)'}}>YancoPalette</span> / <span className="mono" style={{color:'var(--accent)'}}>YancoShapes</span>.
+        </div>
+      </div>
+
+      {/* palette strip */}
+      <div style={{ position:'absolute', right:96, top:72, display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end' }}>
+        <div className="kicker-d">TOKENS · THEME.KT</div>
+        <div style={{ display:'flex', gap:4 }}>
+          {TOKENS.map(t=>(
+            <div key={t.n} className="y-chip" title={`${t.n} — ${t.c}`} style={{
+              width:36, height:72, background:t.c, border:'1px solid var(--border-subtle)',
+            }} />
+          ))}
+        </div>
+        <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em' }}>Inter · JetBrains Mono · tabular</div>
+      </div>
+
+      {/* surface grid */}
+      <div style={{ position:'absolute', left:96, right:96, top:280, bottom:96 }}>
+        {SURFACES.map((grp, gi) => (
+          <div key={grp.group} style={{ marginBottom: 30 }}>
+            <div style={{ display:'flex', alignItems:'baseline', gap:14, marginBottom:14 }}>
+              <div className="kicker">{grp.group}</div>
+              <div style={{ flex:1, height:1, background:'linear-gradient(90deg, rgba(0,226,138,0.2) 0%, transparent 80%)' }} />
+              <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.18em' }}>{grp.items.length} SURFACES</div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:`repeat(${grp.items.length}, 1fr)`, gap:20 }}>
+              {grp.items.map((s, idx) => (
+                <a key={s.id} href={s.href}>
+                  <YCard large glow style={{ padding:28, height: gi===2? 180 : 220, position:'relative' }}>
+                    {/* index chip */}
+                    <div className="mono" style={{ position:'absolute', top:18, right:24, fontSize:10, color:'var(--text-muted)', letterSpacing:'0.18em' }}>
+                      {String(idx+1).padStart(2,'0')} / {String(grp.items.length).padStart(2,'0')}
+                    </div>
+                    {/* facet highlight */}
+                    <div style={{ position:'absolute', left:32, right:32, top:0, height:1, background:'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)' }}/>
+                    <HexChip tone="muted">{s.badge}</HexChip>
+                    <div style={{ fontSize:34, fontWeight:900, letterSpacing:'-0.02em', marginTop:18, color:'var(--text-primary)', lineHeight:1.05 }}>{s.title}</div>
+                    <div style={{ fontSize:13, color:'var(--text-secondary)', marginTop:10, lineHeight:1.5, maxWidth:'90%' }}>{s.sub}</div>
+                    <div style={{ position:'absolute', bottom:22, right:28, display:'flex', alignItems:'center', gap:8, color:'var(--accent)', fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700, letterSpacing:'0.18em' }}>
+                      OPEN <Icon path={I.chevR} size={14}/>
+                    </div>
+                  </YCard>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* footer */}
+      <div style={{ position:'absolute', left:96, right:96, bottom:30, display:'flex', justifyContent:'space-between', alignItems:'center', color:'var(--text-muted)', fontSize:11 }}>
+        <div className="mono" style={{ letterSpacing:'0.18em' }}>TV-FIRST · 1920×1080 · DARK MODE ONLY · NO RIPPLES · NO EMOJI</div>
+        <div className="mono" style={{ letterSpacing:'0.18em' }}>BASED ON: THEME.KT · SHAPES.KT · MK.12C PLAN</div>
+      </div>
+    </Stage>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<TOC />);
+</script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1920, initial-scale=1"/>
+<title>YancoTV — Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="yanco-ds.css"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  /* Settings-specific: hide scrollbars but keep scroll */
+  .settings-scroll { scrollbar-width: none; }
+  .settings-scroll::-webkit-scrollbar { display:none; }
+
+  /* Vertical hex-nav items */
+  .tab-hex {
+    position: relative;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px 0 22px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .tab-hex:hover {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, transparent 100%);
+    color: var(--text-primary);
+  }
+  .tab-hex.active {
+    background: linear-gradient(90deg, rgba(0,226,138,0.14) 0%, rgba(0,226,138,0.02) 100%);
+    color: var(--text-primary);
+  }
+  .tab-hex.active::before {
+    content:'';
+    position:absolute;
+    left:0; top:10px; bottom:10px; width:3px;
+    background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
+    box-shadow: 0 0 10px rgba(0,226,138,0.7);
+  }
+  .tab-hex .tab-ico {
+    width: 36px; height: 36px;
+    display:grid; place-items:center;
+    clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-muted);
+    flex-shrink:0;
+    transition: all 120ms ease;
+  }
+  .tab-hex.active .tab-ico {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+    color: #04130C;
+    box-shadow: 0 0 12px rgba(0,226,138,0.5);
+  }
+  .tab-hex .tab-label {
+    font-size:14px; font-weight:700; letter-spacing:0.01em;
+  }
+  .tab-hex .tab-sub {
+    font-size:10px; color:var(--text-muted); margin-top:2px; font-family:var(--font-mono); letter-spacing:0.1em; text-transform:uppercase;
+  }
+  .tab-hex.active .tab-sub { color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="ds/ds.jsx"></script>
+<script type="text/babel" src="pages/settings-tabs.jsx"></script>
+<script type="text/babel" data-presets="react">
+
+const TABS = [
+  { id:'general',       label:'General',       sub:'01 · lang · startup',  icon:I.settings,    comp: TabGeneral },
+  { id:'appearance',    label:'Appearance',    sub:'02 · theme · font',    icon:I.theme,       comp: TabAppearance },
+  { id:'playback',      label:'Playback',      sub:'03 · video · audio',   icon:I.play,        comp: TabPlayback },
+  { id:'subtitles',     label:'Subtitles',     sub:'04 · captions',        icon:I.cc,          comp: TabSubtitles },
+  { id:'network',       label:'Network',       sub:'05 · http · proxy',    icon:I.signal,      comp: TabNetwork },
+  { id:'sources',       label:'Sources',       sub:'06 · playlists · sync',icon:I.link,        comp: TabSources },
+  { id:'groups',        label:'Groups',        sub:'07 · rails · pin',     icon:I.grid,        comp: TabGroups },
+  { id:'epg',           label:'EPG',           sub:'08 · guide · timing',  icon:I.guide,       comp: TabEPG },
+  { id:'parental',      label:'Parental',      sub:'09 · pin · adult',     icon:I.shield,      comp: TabParental },
+  { id:'recordings',    label:'Recordings',    sub:'10 · dvr · storage',   icon:I.record,      comp: TabRecordings },
+  { id:'notifications', label:'Notifications', sub:'11 · events',          icon:I.bell,        comp: TabNotifications },
+  { id:'storage',       label:'Storage',       sub:'12 · cache',           icon:I.hdd,         comp: TabStorage },
+  { id:'shortcuts',     label:'Shortcuts',     sub:'13 · remote · key',    icon:I.key,         comp: TabShortcuts },
+  { id:'about',         label:'About',         sub:'14 · version · data',  icon:I.info,        comp: TabAbout },
+];
+
+function SettingsShell() {
+  const [tab, setTab] = uS('appearance');
+  const current = TABS.find(t => t.id === tab) || TABS[0];
+  const Comp = current.comp;
+
+  return (
+    <Stage>
+      <div className="bg-green-tint" style={{ position:'absolute', inset:0 }} />
+      <div className="bg-hex-grid" style={{ position:'absolute', inset:0 }} />
+      <CrumbBar here="SETTINGS" />
+
+      {/* Two-panel layout: 420 sidebar + content */}
+      <div style={{ position:'absolute', inset:'80px 48px 40px 48px', display:'flex', gap:24 }}>
+
+        {/* ==== SIDEBAR ==== */}
+        <div className="y-card-l" style={{
+          width: 380,
+          background:'rgba(10,20,16,0.82)',
+          backdropFilter:'blur(20px)',
+          border:'1px solid var(--panel-border)',
+          boxShadow:'0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)',
+          display:'flex', flexDirection:'column',
+          flexShrink: 0,
+        }}>
+          {/* Header */}
+          <div style={{ padding:'28px 28px 18px 28px', borderBottom:'1px solid var(--border-subtle)' }}>
+            <div className="kicker">YANCOTV · SETTINGS</div>
+            <div style={{ fontSize:34, fontWeight:900, letterSpacing:'-0.02em', marginTop:6, lineHeight:1 }}>Configure</div>
+            <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:8, lineHeight:1.5 }}>Preferences apply instantly and sync across restarts.</div>
+          </div>
+          {/* Tabs */}
+          <div className="settings-scroll" style={{ flex:1, overflowY:'auto', padding:'14px 0' }}>
+            {TABS.map((t, i) => (
+              <div key={t.id}
+                className={`tab-hex ${t.id===tab?'active':''}`}
+                onClick={()=>setTab(t.id)}>
+                <div className="tab-ico">
+                  <Icon path={t.icon} size={16} stroke="2"/>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div className="tab-label">{t.label}</div>
+                  <div className="tab-sub">{t.sub}</div>
+                </div>
+                <div className="mono tab-nums" style={{
+                  fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em',
+                }}>{String(i+1).padStart(2,'0')}</div>
+                {t.id===tab && <Icon path={I.chevR} size={14}/>}
+              </div>
+            ))}
+          </div>
+          {/* Footer */}
+          <div style={{ padding:'18px 28px', borderTop:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:10 }}>
+            <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em', flex:1 }}>
+              v1.12.0 · 2026042403
+            </div>
+            <HexChip tone="muted" icon={I.cloud}>SYNCED</HexChip>
+          </div>
+        </div>
+
+        {/* ==== CONTENT ==== */}
+        <div className="y-card-l" style={{
+          flex:1,
+          background:'rgba(10,20,16,0.72)',
+          backdropFilter:'blur(20px)',
+          border:'1px solid var(--panel-border)',
+          boxShadow:'0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)',
+          display:'flex', flexDirection:'column',
+          overflow:'hidden', position:'relative',
+        }}>
+          {/* breadcrumb */}
+          <div style={{
+            padding:'24px 40px 20px 40px',
+            borderBottom:'1px solid var(--border-subtle)',
+            display:'flex', alignItems:'center', gap:14,
+          }}>
+            <HexChip tone="muted">SETTINGS</HexChip>
+            <Icon path={I.chevR} size={12} />
+            <HexChip active icon={current.icon}>{current.label.toUpperCase()}</HexChip>
+            <div style={{ flex:1 }}/>
+            <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.18em' }}>{current.sub.toUpperCase()}</div>
+          </div>
+
+          {/* content scroll region */}
+          <div className="settings-scroll" style={{ flex:1, overflowY:'auto', padding:'32px 44px' }}>
+            <Comp />
+            <div style={{ height:40 }}/>
+          </div>
+
+          {/* subtle accent glow in corner */}
+          <div style={{
+            position:'absolute', top:0, right:0, width:200, height:200,
+            background:'radial-gradient(circle at 100% 0%, rgba(0,226,138,0.1), transparent 70%)',
+            pointerEvents:'none',
+          }}/>
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<SettingsShell />);
+</script>
+</body>
+</html>

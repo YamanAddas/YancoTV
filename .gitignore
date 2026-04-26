@@ -13,6 +13,9 @@ release/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .claude/launch.json
+# Per-session agent scratch — DB dumps, logcat tails, .ts test recordings,
+# spawned worktree state. Local debugging artifacts only.
+.claude/worktrees/
 CLAUDE.local.md
 mpv/
 playwright-report/

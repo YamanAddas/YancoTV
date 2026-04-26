@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1920, initial-scale=1"/>
+<title>YancoTV — Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="yanco-ds.css"/>
+<style>
+  html, body { overflow: auto; background: var(--bg-deep); }
+  .cmp-page {
+    min-width: 1920px; padding: 80px 96px;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #0F1C17 0%, #0A1410 60%, #050A08 100%);
+    position: relative;
+  }
+  .cmp-page::before {
+    content: ''; position:absolute; inset:0; pointer-events:none; opacity:.04;
+    background-image:
+      repeating-linear-gradient(60deg, var(--accent) 0 1px, transparent 1px 60px),
+      repeating-linear-gradient(-60deg, var(--accent) 0 1px, transparent 1px 60px);
+  }
+
+  /* Section */
+  .cmp-sec { margin-bottom: 56px; position: relative; }
+  .cmp-sec-head {
+    display:flex; align-items:baseline; gap:18px; margin-bottom:24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .cmp-sec-n {
+    font-family: var(--font-mono); font-weight:900; color: var(--accent);
+    font-size: 14px; letter-spacing:0.2em;
+  }
+  .cmp-sec-t {
+    font-size: 32px; font-weight: 900; letter-spacing:-0.02em; color: var(--text-primary);
+  }
+  .cmp-sec-s {
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);
+    letter-spacing:0.14em;
+  }
+  .cmp-row-label {
+    font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em;
+    color:var(--text-muted); margin-bottom:10px; text-transform: uppercase;
+  }
+  /* card "artboard" */
+  .swatch {
+    background: rgba(10,20,16,0.6);
+    border:1px solid var(--border-subtle);
+    padding: 24px 22px 18px;
+    display:flex; flex-direction:column; gap:16px; align-items:flex-start;
+    position: relative;
+    clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+  }
+  .swatch-code {
+    position:absolute; top:10px; right:14px;
+    font-family: var(--font-mono); font-size:9px; letter-spacing:0.14em;
+    color:var(--text-muted);
+  }
+  .swatch-label {
+    font-family: var(--font-mono); font-size:10px; letter-spacing:0.2em;
+    color:var(--accent); text-transform: uppercase;
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="ds/ds.jsx"></script>
+<script type="text/babel" data-presets="react">
+
+function Sec({ n, title, sub, children }) {
+  return (
+    <div className="cmp-sec">
+      <div className="cmp-sec-head">
+        <div className="cmp-sec-n">{n}</div>
+        <div className="cmp-sec-t">{title}</div>
+        <div style={{ flex:1 }}/>
+        <div className="cmp-sec-s">{sub}</div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Swatch({ label, code, children, style }) {
+  return (
+    <div className="swatch" style={style}>
+      {code && <div className="swatch-code">{code}</div>}
+      <div style={{ minHeight:56, display:'flex', alignItems:'center', width:'100%' }}>{children}</div>
+      {label && <div className="swatch-label">{label}</div>}
+    </div>
+  );
+}
+
+// =====================================================================
+// TOKEN SWATCHES
+// =====================================================================
+const COLORS = [
+  // Canvas
+  { grp:'Canvas', items:[
+    { c:'#050A08', n:'BackgroundDeep',   k:'--bg-deep' },
+    { c:'#0A1410', n:'BackgroundRaised', k:'--bg-raised' },
+    { c:'#0F1C17', n:'BackgroundHover',  k:'--bg-hover' },
+    { c:'#14251F', n:'BackgroundElevated', k:'--bg-elevated' },
+  ]},
+  { grp:'Text', items:[
+    { c:'#F0FFF6', n:'TextPrimary',   k:'--text-primary',   onDark:true },
+    { c:'#A7B8AF', n:'TextSecondary', k:'--text-secondary', onDark:true },
+    { c:'#5F7068', n:'TextMuted',     k:'--text-muted',     onDark:true },
+    { c:'#3A4A43', n:'TextFaint',     k:'--text-faint',     onDark:true },
+  ]},
+  { grp:'Accent', items:[
+    { c:'#00E28A', n:'Accent',      k:'--accent' },
+    { c:'#66F0B5', n:'AccentSoft',  k:'--accent-soft' },
+    { c:'#00B872', n:'AccentDeep',  k:'--accent-deep' },
+    { c:'#1C7A55', n:'AccentMuted', k:'--accent-muted' },
+  ]},
+  { grp:'Feedback', items:[
+    { c:'#FF3B3B', n:'Live · OnAir', k:'--live' },
+    { c:'#D7B36A', n:'Premium',      k:'--premium' },
+    { c:'#FF6B6B', n:'Error',        k:'--error' },
+    { c:'#66F0B5', n:'FocusRing',    k:'--focus-ring' },
+  ]},
+];
+
+// =====================================================================
+// PAGE
+// =====================================================================
+function ComponentsPage() {
+  return (
+    <div className="cmp-page">
+      <CrumbBar here="COMPONENTS · REFERENCE"/>
+
+      {/* ============ HEADER ============ */}
+      <div style={{ display:'flex', alignItems:'flex-end', marginBottom:48, position:'relative' }}>
+        <div>
+          <div className="kicker">YANCOTV · COMPONENT REFERENCE · MK.12C</div>
+          <div style={{ fontSize:76, fontWeight:900, letterSpacing:'-0.035em', lineHeight:1, marginTop:12,
+            background:'linear-gradient(180deg, #F0FFF6 0%, #A7D9BE 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+          }}>Components</div>
+          <div style={{ fontSize:17, color:'var(--text-secondary)', marginTop:14, maxWidth:900, lineHeight:1.5 }}>
+            Every hex shape, chip, button, card, icon and state used in the YancoTV prototype. Token names map
+            1:1 to <span className="mono" style={{color:'var(--accent)'}}>YancoPalette</span> /
+            <span className="mono" style={{color:'var(--accent)'}}> YancoShapes</span> in the shipped Kotlin theme.
+          </div>
+        </div>
+        <div style={{ flex:1 }}/>
+        <div className="y-card-l" style={{
+          padding:'18px 24px', background:'rgba(10,20,16,0.7)', backdropFilter:'blur(16px)',
+          border:'1px solid var(--panel-border)',
+        }}>
+          <div className="kicker-d">SCOPE</div>
+          <div className="mono" style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', marginTop:6, lineHeight:1.8, letterSpacing:'0.1em' }}>
+            <div>· <span style={{color:'var(--accent)'}}>32</span> COLOR TOKENS</div>
+            <div>· <span style={{color:'var(--accent)'}}>7</span> SHAPES</div>
+            <div>· <span style={{color:'var(--accent)'}}>6</span> CHIP VARIANTS</div>
+            <div>· <span style={{color:'var(--accent)'}}>48</span> ICONS</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ============ COLOR TOKENS ============ */}
+      <Sec n="01" title="Color tokens" sub="YANCO.PALETTE · THEME.KT">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:24 }}>
+          {COLORS.map(grp => (
+            <div key={grp.grp}>
+              <div className="cmp-row-label">{grp.grp}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {grp.items.map(t => (
+                  <div key={t.n} className="y-chip" style={{
+                    padding:'10px 14px', display:'flex', alignItems:'center', gap:14,
+                    background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)',
+                  }}>
+                    <div style={{ width:36, height:36, background:t.c, border:'1px solid rgba(255,255,255,0.14)', flexShrink:0,
+                      boxShadow: t.n==='Accent' ? '0 0 18px rgba(0,226,138,0.5)' : (t.n==='Live · OnAir' ? '0 0 16px rgba(255,59,59,0.5)' : 'none'),
+                    }}/>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:'var(--text-primary)' }}>{t.n}</div>
+                      <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.1em', marginTop:2 }}>{t.c} · <span style={{color:'var(--accent)'}}>{t.k}</span></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Sec>
+
+      {/* ============ TYPOGRAPHY ============ */}
+      <Sec n="02" title="Typography" sub="INTER · JETBRAINS MONO · TABULAR">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+          <div className="y-card" style={{ padding:'28px 32px', background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:22}}>SANS · INTER</div>
+            <div style={{ fontSize:88, fontWeight:900, letterSpacing:'-0.035em', lineHeight:0.95, background:'linear-gradient(180deg, #F0FFF6 0%, #A7D9BE 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Display 900</div>
+            <div style={{ fontSize:48, fontWeight:800, letterSpacing:'-0.02em', marginTop:18 }}>Title 800 · 48/1.1</div>
+            <div style={{ fontSize:28, fontWeight:700, letterSpacing:'-0.01em', marginTop:14 }}>Heading 700 · 28</div>
+            <div style={{ fontSize:16, fontWeight:600, marginTop:14, color:'var(--text-primary)' }}>Body strong · 16/500</div>
+            <div style={{ fontSize:15, fontWeight:400, marginTop:8, color:'var(--text-secondary)', maxWidth:560, lineHeight:1.55 }}>
+              Body 400 · 15/1.55 — used for supporting copy, descriptions, dialog text, and secondary rows. Muted green tint preserves legibility on dark surfaces without introducing chromatic clash with the accent.
+            </div>
+            <div style={{ fontSize:12, fontWeight:500, marginTop:12, color:'var(--text-muted)' }}>Caption · 12/500 · Muted text color</div>
+          </div>
+
+          <div className="y-card" style={{ padding:'28px 32px', background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:22}}>MONO · JETBRAINS · TABULAR</div>
+            <div className="mono tab-nums" style={{ fontSize:84, fontWeight:900, letterSpacing:'-0.02em', lineHeight:0.95, color:'var(--accent)' }}>00:55:08</div>
+            <div className="mono tab-nums" style={{ fontSize:32, fontWeight:800, marginTop:16, color:'var(--text-primary)' }}>101 · 2160p</div>
+            <div className="mono" style={{ fontSize:14, marginTop:16, color:'var(--text-secondary)', letterSpacing:'0.06em' }}>JetBrainsMono Medium 14</div>
+            <div className="kicker" style={{ marginTop:18 }}>KICKER · ACCENT 10 · LS 0.22</div>
+            <div className="kicker-d" style={{ marginTop:8 }}>KICKER MUTED · SAME SIZE, DIMMED</div>
+            <div className="mono" style={{ fontSize:11, marginTop:18, color:'var(--text-muted)', letterSpacing:'0.14em', lineHeight:1.8 }}>
+              <div>STATUS · 12.4 MBPS · 2160P HDR</div>
+              <div>ERR · E_MEDIA_STALLED · 408</div>
+              <div>EPG · 22:00 → 23:00 · 62% ELAPSED</div>
+            </div>
+          </div>
+        </div>
+      </Sec>
+
+      {/* ============ SHAPES ============ */}
+      <Sec n="03" title="Shapes" sub="YANCO.SHAPES · BEVELED HEX FAMILY">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:18 }}>
+          {[
+            { cls:'y-chip',   l:'ChipBevel',   code:'10dp cut · TL + BR', h:56 },
+            { cls:'y-btn',    l:'ButtonBevel', code:'14dp cut · TL + BR', h:56 },
+            { cls:'y-card',   l:'CutCornerCard', code:'22dp cut · TL + BR', h:100 },
+            { cls:'y-card-l', l:'CutCornerCardLarge', code:'32dp cut · TL + BR', h:100 },
+            { cls:'y-hex-sm', l:'HexCapsule·S',  code:'10dp point · L + R', h:56 },
+            { cls:'y-hex',    l:'HexCapsule',    code:'16dp point · L + R', h:56 },
+            { cls:'y-pill',   l:'HexPill',       code:'20dp point · L + R', h:56 },
+            { cls:'y-chip',   l:'Beveled square · large', code:'10dp · 100×100', h:100, w:100 },
+          ].map((s,i)=>(
+            <Swatch key={i} label={s.l} code={s.code}>
+              <div className={s.cls} style={{
+                width: s.w || '100%', height:s.h,
+                background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%)',
+                boxShadow:'inset 0 1px 0 rgba(255,255,255,0.3)',
+              }}/>
+            </Swatch>
+          ))}
+        </div>
+      </Sec>
+
+      {/* ============ BUTTONS ============ */}
+      <Sec n="04" title="Buttons" sub="HEX BUTTON · 3 TONES × 4 STATES">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:18 }}>
+          <Swatch label="Primary · default" code="primary">
+            <HexBtn primary icon={I.play}>PLAY</HexBtn>
+          </Swatch>
+          <Swatch label="Primary · focused" code="focus-ring">
+            <HexBtn primary icon={I.play} focused>PLAY</HexBtn>
+          </Swatch>
+          <Swatch label="Primary · icon only" code="w=44">
+            <HexBtn primary icon={I.play} style={{ width:46, padding:0 }}/>
+          </Swatch>
+          <Swatch label="Primary · wide" code="height 56">
+            <HexBtn primary icon={I.record} height={56}>START RECORDING</HexBtn>
+          </Swatch>
+
+          <Swatch label="Secondary · default" code="default">
+            <HexBtn icon={I.record}>RECORD</HexBtn>
+          </Swatch>
+          <Swatch label="Secondary · focused" code="focus-ring">
+            <HexBtn icon={I.record} focused>RECORD</HexBtn>
+          </Swatch>
+          <Swatch label="Secondary · wide" code="height 56">
+            <HexBtn icon={I.retry} height={56}>RETRY</HexBtn>
+          </Swatch>
+          <Swatch label="Destructive · inline" code="tonal">
+            <div className="y-btn" style={{
+              height:44, padding:'0 22px',
+              display:'inline-flex', alignItems:'center', gap:10,
+              background:'rgba(255,59,59,0.12)', border:'1px solid rgba(255,59,59,0.4)',
+              color:'var(--error)', fontSize:12, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase',
+            }}>
+              <Icon path={I.trash} size={14}/> DELETE SOURCE
+            </div>
+          </Swatch>
+        </div>
+      </Sec>
+
+      {/* ============ CHIPS ============ */}
+      <Sec n="05" title="Chips" sub="HEXCHIP · 6 TONES × 3 STATES">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:14 }}>
+          <Swatch label="default" code="tone=default">
+            <HexChip>DEFAULT</HexChip>
+          </Swatch>
+          <Swatch label="active" code="active">
+            <HexChip active>ACTIVE</HexChip>
+          </Swatch>
+          <Swatch label="muted" code="tone=muted">
+            <HexChip tone="muted">MUTED</HexChip>
+          </Swatch>
+          <Swatch label="live" code="tone=live">
+            <HexChip tone="live">● LIVE</HexChip>
+          </Swatch>
+          <Swatch label="premium" code="tone=premium">
+            <HexChip tone="premium">4K · HDR</HexChip>
+          </Swatch>
+          <Swatch label="with icon" code="icon=">
+            <HexChip active icon={I.play}>NOW PLAYING</HexChip>
+          </Swatch>
+
+          <Swatch label="pill · active" code="y-pill">
+            <HexPill active icon={I.play}>PLAY NOW</HexPill>
+          </Swatch>
+          <Swatch label="pill · default" code="y-pill">
+            <HexPill icon={I.grid}>BROWSE</HexPill>
+          </Swatch>
+          <Swatch label="toggle · on" code="">
+            <Toggle value={true}/>
+          </Swatch>
+          <Swatch label="toggle · off" code="">
+            <Toggle value={false}/>
+          </Swatch>
+          <Swatch label="live dot" code=".live-dot">
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div className="live-dot"/>
+              <span className="mono" style={{ fontSize:11, color:'var(--error)', fontWeight:800, letterSpacing:'0.14em' }}>ON AIR</span>
+            </div>
+          </Swatch>
+          <Swatch label="numeric badge" code="mono · tabular">
+            <div className="mono tab-nums" style={{ fontSize:44, fontWeight:900, color:'var(--accent)', letterSpacing:'-0.02em', textShadow:'0 0 20px rgba(0,226,138,0.5)' }}>101</div>
+          </Swatch>
+        </div>
+      </Sec>
+
+      {/* ============ CARDS ============ */}
+      <Sec n="06" title="Cards" sub="CUT-CORNER CARD · 4 VARIANTS">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:18 }}>
+          <div>
+            <div className="cmp-row-label">Default</div>
+            <YCard style={{ padding:24, height:180 }}>
+              <HexChip tone="muted">MOVIE</HexChip>
+              <div style={{ fontSize:20, fontWeight:900, marginTop:14, letterSpacing:'-0.01em' }}>Card title</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:6 }}>Default card — no focus, resting state.</div>
+            </YCard>
+          </div>
+          <div>
+            <div className="cmp-row-label">Focused</div>
+            <div className="y-card" style={{
+              padding:24, height:180, position:'relative',
+              background: 'linear-gradient(135deg, rgba(0,226,138,0.18), rgba(0,226,138,0.04))',
+              border:'1.5px solid var(--accent)',
+              boxShadow:'0 0 0 3px rgba(102,240,181,0.35), 0 20px 40px rgba(0,226,138,0.3)',
+            }}>
+              <HexChip active>FOCUSED</HexChip>
+              <div style={{ fontSize:20, fontWeight:900, marginTop:14, letterSpacing:'-0.01em' }}>Card title</div>
+              <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:6 }}>D-pad focus · double ring glow.</div>
+            </div>
+          </div>
+          <div>
+            <div className="cmp-row-label">Active · selected</div>
+            <div className="y-card" style={{
+              padding:24, height:180, position:'relative',
+              background: 'rgba(10,20,16,0.8)',
+              border:'1.5px solid var(--accent)',
+              boxShadow:'inset 0 0 0 1px rgba(0,226,138,0.2)',
+            }}>
+              <HexChip active>SELECTED</HexChip>
+              <div style={{ fontSize:20, fontWeight:900, marginTop:14, letterSpacing:'-0.01em' }}>Card title</div>
+              <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:6 }}>Committed state · no outer glow.</div>
+            </div>
+          </div>
+          <div>
+            <div className="cmp-row-label">Large · glow</div>
+            <YCard large glow style={{ padding:26, height:180 }}>
+              <HexChip tone="premium">4K · HDR</HexChip>
+              <div style={{ fontSize:22, fontWeight:900, marginTop:14, letterSpacing:'-0.01em' }}>Hero card</div>
+              <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:6 }}>32dp cut · 0,0,0,0.3 lift · accent halo.</div>
+            </YCard>
+          </div>
+        </div>
+      </Sec>
+
+      {/* ============ PROGRESS / SLIDERS ============ */}
+      <Sec n="07" title="Progress & sliders" sub="PLAYER · TIMESHIFT · AUDIO">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+          <div className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:18}}>VOD progress</div>
+            <div style={{ display:'flex', alignItems:'center', gap:18 }}>
+              <div className="mono tab-nums" style={{ fontSize:14, color:'var(--accent)', fontWeight:700, minWidth:70 }}>00:55:08</div>
+              <div style={{ flex:1, position:'relative', height:22, display:'flex', alignItems:'center' }}>
+                <div style={{ flex:1, height:5, background:'rgba(255,255,255,0.18)', borderRadius:3, position:'relative', overflow:'hidden' }}>
+                  <div style={{ position:'absolute', top:0, width:'68%', height:'100%', background:'rgba(255,255,255,0.28)' }}/>
+                  <div style={{ position:'absolute', top:0, width:'41%', height:'100%', background:'linear-gradient(90deg, var(--accent-deep), var(--accent))', boxShadow:'0 0 10px rgba(0,226,138,0.6)', borderRadius:3 }}/>
+                </div>
+                <div style={{ position:'absolute', left:'41%', top:'50%', transform:'translate(-50%,-50%)', width:16, height:16, borderRadius:'50%', background:'var(--accent)', boxShadow:'0 0 0 4px rgba(0,226,138,0.2), 0 0 14px rgba(0,226,138,0.7)' }}/>
+              </div>
+              <div className="mono tab-nums" style={{ fontSize:14, color:'rgba(255,255,255,0.5)', fontWeight:700, minWidth:70, textAlign:'right' }}>02:14:00</div>
+            </div>
+          </div>
+          <div className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:18}}>Live EPG progress</div>
+            <div style={{ display:'flex', alignItems:'center', gap:12, fontFamily:'var(--font-mono)', fontSize:11, color:'var(--text-muted)', letterSpacing:'0.12em' }}>
+              <span style={{color:'var(--accent)'}}>22:00</span>
+              <div style={{ flex:1, height:3, background:'rgba(255,255,255,0.08)', position:'relative' }}>
+                <div style={{ width:'62%', height:'100%', background:'linear-gradient(90deg, var(--accent-deep), var(--accent))', boxShadow:'0 0 8px rgba(0,226,138,0.6)' }}/>
+                <div style={{ position:'absolute', left:'62%', top:-3, width:9, height:9, borderRadius:'50%', background:'var(--accent)', transform:'translateX(-50%)' }}/>
+              </div>
+              <span>23:00</span>
+            </div>
+          </div>
+          <div className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:14}}>Audio slider · focused</div>
+            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+              <Icon path={I.volume} size={18}/>
+              <div style={{ flex:1, position:'relative', height:22, display:'flex', alignItems:'center' }}>
+                <div style={{ flex:1, height:4, background:'rgba(255,255,255,0.1)', position:'relative', borderRadius:2 }}>
+                  <div style={{ position:'absolute', left:0, width:'72%', height:'100%', background:'linear-gradient(90deg, var(--accent-deep), var(--accent))', borderRadius:2, boxShadow:'0 0 10px rgba(0,226,138,0.6)' }}/>
+                </div>
+                <div style={{ position:'absolute', left:'72%', top:'50%', transform:'translate(-50%,-50%)', width:22, height:22, borderRadius:'50%', background:'var(--accent)', boxShadow:'0 0 0 6px rgba(102,240,181,0.25), 0 0 24px rgba(0,226,138,0.8)' }}/>
+              </div>
+              <div className="mono tab-nums" style={{ fontSize:14, fontWeight:700, color:'var(--accent)', minWidth:44, textAlign:'right' }}>72</div>
+            </div>
+          </div>
+          <div className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:14}}>Timeshift bar · live edge</div>
+            <div style={{ height:12, background:'rgba(255,255,255,0.08)', position:'relative', clipPath:'polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%)' }}>
+              <div style={{ position:'absolute', left:0, width:'80%', height:'100%', background:'linear-gradient(90deg, rgba(215,179,106,0.3), rgba(0,226,138,0.5))' }}/>
+              <div style={{ position:'absolute', left:'80%', top:-8, width:3, height:28, background:'var(--error)', transform:'translateX(-50%)', boxShadow:'0 0 10px rgba(255,59,59,0.6)' }}/>
+              <div style={{ position:'absolute', left:'60%', top:'50%', transform:'translate(-50%,-50%)', width:20, height:20, borderRadius:'50%', background:'var(--premium)', boxShadow:'0 0 0 4px rgba(215,179,106,0.3), 0 0 16px rgba(215,179,106,0.6)' }}/>
+            </div>
+            <div style={{ marginTop:10, display:'flex', justifyContent:'space-between', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em' }}>
+              <span>START</span>
+              <span style={{color:'var(--premium)'}}>● HERE</span>
+              <span style={{color:'var(--error)'}}>● LIVE</span>
+            </div>
+          </div>
+        </div>
+      </Sec>
+
+      {/* ============ ROW ITEM ============ */}
+      <Sec n="08" title="List rows" sub="OPTION · SOURCE · EPG">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+          <div className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:14}}>Option · resting + focus + active</div>
+            {[
+              { l:'English', s:'Stereo · AAC · 192 kbps', state:'default' },
+              { l:'Français', s:'Stereo · AAC · 192 kbps', state:'focused' },
+              { l:'العربية',  s:'Stereo · AAC · 160 kbps', state:'active' },
+            ].map((r,i)=>(
+              <div key={i} style={{
+                display:'flex', alignItems:'center', gap:14, padding:'12px 14px', marginBottom:6,
+                background: r.state==='focused' ? 'linear-gradient(90deg, rgba(0,226,138,0.18), rgba(0,226,138,0.04))' : 'rgba(20,37,31,0.4)',
+                border: r.state==='focused' ? '1.5px solid var(--accent)' : (r.state==='active' ? '1px solid var(--accent)' : '1px solid var(--border-subtle)'),
+                boxShadow: r.state==='focused' ? '0 0 0 3px rgba(102,240,181,0.3)' : 'none',
+                clipPath:'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)',
+              }}>
+                <Icon path={I.cc} size={16}/>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text-primary)' }}>{r.l}</div>
+                  <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.1em', marginTop:2 }}>{r.s}</div>
+                </div>
+                {r.state==='active' && (
+                  <div style={{ width:24, height:24, background:'linear-gradient(180deg, var(--accent), var(--accent-deep))', color:'#04130C', display:'grid', placeItems:'center',
+                    clipPath:'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)' }}>
+                    <Icon path={I.check} size={12} stroke="2.5"/>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:14}}>Channel row · focused</div>
+            <div style={{
+              padding:'14px 16px', display:'flex', alignItems:'center', gap:14,
+              background:'linear-gradient(90deg, rgba(0,226,138,0.18), rgba(0,226,138,0.04))',
+              border:'1.5px solid var(--accent)',
+              boxShadow:'0 0 0 3px rgba(102,240,181,0.3), 0 12px 26px rgba(0,226,138,0.2)',
+              clipPath:'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)',
+            }}>
+              <div className="mono tab-nums" style={{ fontSize:14, color:'var(--accent)', fontWeight:800, letterSpacing:'0.08em' }}>101</div>
+              <div className="y-chip" style={{ width:34, height:34, display:'grid', placeItems:'center', background:'rgba(255,255,255,0.9)', color:'#0a1410', fontSize:10, fontWeight:900, fontFamily:'var(--font-mono)' }}>bS</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:800 }}>beIN SPORTS 1</div>
+                <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:1 }}>PSG vs Lyon · Ligue 1 · 62%</div>
+              </div>
+              <HexChip tone="live">ON AIR</HexChip>
+            </div>
+
+            <div className="cmp-row-label" style={{marginTop:18, marginBottom:14}}>Source row · synced</div>
+            <div style={{
+              padding:'14px 16px', display:'flex', alignItems:'center', gap:14,
+              background:'rgba(20,37,31,0.4)',
+              border:'1px solid var(--border-subtle)',
+              clipPath:'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)',
+            }}>
+              <div className="y-hex" style={{ width:36, height:36, display:'grid', placeItems:'center', background:'rgba(0,226,138,0.15)', color:'var(--accent)' }}>
+                <Icon path={I.link} size={16}/>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:800 }}>BrittBox Premium</div>
+                <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.08em', marginTop:2 }}>XTREAM-CODES · 3,812 CHANNELS · 9 HRS AGO</div>
+              </div>
+              <HexChip active icon={I.check}>SYNCED</HexChip>
+            </div>
+          </div>
+        </div>
+      </Sec>
+
+      {/* ============ ICONS ============ */}
+      <Sec n="09" title="Icon set" sub="48 CUSTOM LINE ICONS · 1.8 STROKE · 24×24 GRID">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:10 }}>
+          {Object.entries(I).map(([key, path])=>(
+            <div key={key} className="y-chip" style={{
+              padding:'14px 10px', background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)',
+              display:'flex', flexDirection:'column', alignItems:'center', gap:8,
+            }}>
+              <Icon path={path} size={22}/>
+              <div className="mono" style={{ fontSize:9, color:'var(--text-muted)', letterSpacing:'0.12em', textTransform:'uppercase' }}>{key}</div>
+            </div>
+          ))}
+        </div>
+      </Sec>
+
+      {/* ============ FOCUS STATES ============ */}
+      <Sec n="10" title="Focus ring · motion" sub="D-PAD NAV · TV-FIRST">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:18 }}>
+          <div className="y-card" style={{ padding:32, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:22}}>01 · Focus ring</div>
+            <div style={{
+              width:180, height:100,
+              background: 'rgba(10,20,16,0.8)',
+              border:'1.5px solid var(--accent)',
+              boxShadow:'0 0 0 3px rgba(102,240,181,0.35), 0 0 40px rgba(102,240,181,0.35)',
+              display:'grid', placeItems:'center',
+              clipPath:'polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px)',
+            }}>
+              <div className="mono" style={{ fontSize:11, color:'var(--accent)', letterSpacing:'0.2em' }}>FOCUSED</div>
+            </div>
+            <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em', marginTop:16 }}>
+              1.5PX SOLID · 3PX OUTER · 40PX GLOW
+            </div>
+          </div>
+          <div className="y-card" style={{ padding:32, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:22}}>02 · Scale on focus · 1.08×</div>
+            <div style={{
+              width:180, height:100, transform:'scale(1.08)', transformOrigin:'center',
+              background: 'linear-gradient(135deg, rgba(0,226,138,0.22), rgba(0,226,138,0.04))',
+              border:'1.5px solid var(--accent)',
+              boxShadow:'0 0 0 3px rgba(102,240,181,0.35), 0 20px 40px rgba(0,226,138,0.3)',
+              display:'grid', placeItems:'center',
+              clipPath:'polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px)',
+            }}>
+              <div className="mono" style={{ fontSize:11, color:'var(--accent)', letterSpacing:'0.2em' }}>ELEVATED</div>
+            </div>
+            <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em', marginTop:16 }}>
+              SCALE 1.08 · 180MS · EASE-OUT
+            </div>
+          </div>
+          <div className="y-card" style={{ padding:32, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+            <div className="cmp-row-label" style={{marginBottom:22}}>03 · Disabled</div>
+            <div style={{
+              width:180, height:100,
+              background:'rgba(20,37,31,0.3)',
+              border:'1px dashed var(--border-subtle)',
+              opacity:0.5,
+              display:'grid', placeItems:'center',
+              clipPath:'polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px)',
+            }}>
+              <div className="mono" style={{ fontSize:11, color:'var(--text-faint)', letterSpacing:'0.2em' }}>UNAVAILABLE</div>
+            </div>
+            <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em', marginTop:16 }}>
+              OPACITY 0.5 · NO FOCUS · DASHED BORDER
+            </div>
+          </div>
+        </div>
+      </Sec>
+
+      {/* ============ SHADOWS / ELEVATION ============ */}
+      <Sec n="11" title="Elevation" sub="SHADOW + BACKDROP BLUR">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:18 }}>
+          {[
+            { l:'0 · flat', s:'none', bg:'rgba(10,20,16,0.6)' },
+            { l:'1 · card', s:'0 6px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)', bg:'rgba(10,20,16,0.82)' },
+            { l:'2 · raised', s:'0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)', bg:'rgba(10,20,16,0.82)' },
+            { l:'3 · sheet · blur', s:'0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,226,138,0.3), inset 0 1px 0 rgba(255,255,255,0.06)', bg:'rgba(10,20,16,0.92)' },
+          ].map((e,i)=>(
+            <div key={i}>
+              <div className="cmp-row-label">{e.l}</div>
+              <div style={{
+                padding:'22px 20px', height:110, background:e.bg, boxShadow:e.s,
+                backdropFilter: i===3 ? 'blur(24px)' : 'none',
+                border:'1px solid var(--border-subtle)', display:'flex', alignItems:'flex-end',
+                clipPath:'polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px)',
+              }}>
+                <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em' }}>{e.s === 'none' ? 'NO SHADOW' : 'SHADOW + LIFT'}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Sec>
+
+      {/* ============ MOTION PRINCIPLES ============ */}
+      <Sec n="12" title="Motion principles" sub="TV-FIRST · NO RIPPLES">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:18 }}>
+          {[
+            { n:'FOCUS',     v:'180ms',    c:'ease-out',     d:'Scale 1→1.08 · ring fade-in'   },
+            { n:'CROSS-FADE',v:'240ms',    c:'ease-in-out', d:'Hero backdrop on rail focus'    },
+            { n:'PANEL',     v:'320ms',    c:'cubic 0.2/0/0/1', d:'Sheet slide from right'    },
+            { n:'LIVE DOT',  v:'1600ms',   c:'ease-in-out ∞', d:'Opacity pulse · 3 stages'    },
+          ].map((m,i)=>(
+            <div key={i} className="y-card" style={{ padding:22, background:'rgba(10,20,16,0.6)', border:'1px solid var(--border-subtle)' }}>
+              <div className="kicker">{m.n}</div>
+              <div className="mono" style={{ fontSize:32, fontWeight:900, color:'var(--text-primary)', marginTop:8, letterSpacing:'-0.01em' }}>{m.v}</div>
+              <div className="mono" style={{ fontSize:11, color:'var(--accent)', marginTop:4, letterSpacing:'0.1em' }}>{m.c}</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:10, lineHeight:1.5 }}>{m.d}</div>
+            </div>
+          ))}
+        </div>
+      </Sec>
+
+      {/* ============ FOOTER ============ */}
+      <div style={{ paddingTop:40, paddingBottom:20, borderTop:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between', color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-mono)', letterSpacing:'0.18em' }}>
+        <span>YANCOTV · CONCEPT A · MK.12C · FROSTED GLASS EMERALD</span>
+        <span>EVERY TOKEN → THEME.KT · SHAPES.KT · 1:1</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<ComponentsPage/>);
+</script>
+</body>
+</html>

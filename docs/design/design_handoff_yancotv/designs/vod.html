@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1920, initial-scale=1"/>
+<title>YancoTV — VOD Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="yanco-ds.css"/>
+<style>
+  html, body { overflow: auto; background: #000; }
+  .vod-stage {
+    width: 1920px; height: 1080px;
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(60% 50% at 25% 30%, rgba(90, 60, 160, 0.35), transparent 65%),
+      radial-gradient(50% 60% at 80% 70%, rgba(0, 140, 90, 0.28), transparent 65%),
+      linear-gradient(135deg, #0a0620 0%, #0f1a1d 50%, #06130b 100%);
+  }
+  /* simulated film poster composition */
+  .poster-backdrop {
+    position:absolute; inset:0;
+    background:
+      radial-gradient(80% 60% at 40% 30%, rgba(255, 212, 165, 0.18), transparent 70%),
+      radial-gradient(40% 40% at 80% 80%, rgba(255, 59, 59, 0.2), transparent 70%),
+      radial-gradient(60% 40% at 60% 50%, rgba(100, 50, 180, 0.4), transparent 70%),
+      linear-gradient(135deg, #0c0820 0%, #1a0a1a 40%, #120820 100%);
+  }
+  /* bottom scrim */
+  .scrim-bottom {
+    position:absolute; left:0; right:0; bottom:0; height:45%;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.95) 100%);
+  }
+  .scrim-top {
+    position:absolute; left:0; right:0; top:0; height:20%;
+    background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+  }
+  /* progress bar */
+  .prog-track { height: 5px; background: rgba(255,255,255,0.18); border-radius: 3px; overflow: hidden; position: relative; }
+  .prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent-deep), var(--accent)); border-radius: 3px; box-shadow: 0 0 12px rgba(0,226,138,0.7); }
+  .prog-buffer { position:absolute; top:0; height:100%; background: rgba(255,255,255,0.28); border-radius: 3px; }
+  .prog-scrub {
+    position:absolute; top:50%; transform: translate(-50%, -50%);
+    width: 16px; height: 16px;
+    background: var(--accent); border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(0,226,138,0.18), 0 0 18px rgba(0,226,138,0.7);
+  }
+  .prog-scrub-focus {
+    position:absolute; top:50%; transform: translate(-50%, -50%);
+    width: 22px; height: 22px;
+    background: var(--accent); border-radius: 50%;
+    box-shadow: 0 0 0 6px rgba(102,240,181,0.25), 0 0 32px rgba(0,226,138,0.9);
+  }
+
+  /* big round play */
+  .control-btn {
+    display:grid; place-items:center;
+    border-radius: 50%;
+    background: rgba(20,37,31,0.4);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(18px);
+    color: var(--text-primary);
+    transition: transform 140ms ease, box-shadow 140ms ease;
+  }
+  .control-btn.primary {
+    background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
+    color: #04130C;
+    border: none;
+    box-shadow: 0 12px 32px rgba(0,226,138,0.5), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .control-btn.focused {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 3px var(--focus-ring), 0 0 40px rgba(102,240,181,0.55);
+  }
+
+  /* chapter tick marks */
+  .chapter-tick {
+    position:absolute; top:-2px; width:2px; height:9px;
+    background: rgba(255,255,255,0.5);
+  }
+
+  /* Buffering spinner */
+  @keyframes vod-spin { to { transform: rotate(360deg); } }
+  .loader-ring {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    border: 3px solid rgba(0,226,138,0.15);
+    border-top-color: var(--accent);
+    animation: vod-spin 0.9s linear infinite;
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="ds/ds.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" data-presets="react">
+
+// =====================================================================
+// Shared VOD frame — every state reuses this base.
+// =====================================================================
+
+const FILM = {
+  title: 'Emerald Horizon',
+  year: 2024,
+  rating: 'PG-13',
+  runtime: '2h 14m',
+  genre: 'Sci-Fi · Drama',
+  director: 'Aria Chen',
+  cast: 'Noa Yosef, Idris Okafor, Sasha Rivers',
+  desc: 'A botanist stranded on a colony world uncovers a signal that rewrites humanity’s map of the galaxy — and the people she left behind.',
+};
+
+function VODPoster() {
+  return (
+    <div className="poster-backdrop">
+      {/* Mock "still frame" — a horizon with title-ish shape */}
+      <div style={{
+        position:'absolute', left:0, right:0, top:'40%', height:'60%',
+        background:'linear-gradient(180deg, rgba(20,10,40,0.1) 0%, rgba(10,20,16,0.95) 100%)',
+      }}/>
+      {/* Central figure silhouette */}
+      <div style={{
+        position:'absolute', left:'50%', top:'58%',
+        width:200, height:360,
+        transform:'translateX(-50%)',
+        background:'radial-gradient(ellipse at center top, rgba(0,0,0,0.9) 40%, rgba(0,0,0,0.2) 90%)',
+      }}/>
+      {/* Sun + halo */}
+      <div style={{
+        position:'absolute', left:'50%', top:'36%',
+        width:180, height:180, transform:'translate(-50%,-50%)',
+        background:'radial-gradient(circle, rgba(255,180,100,0.85) 0%, rgba(255,120,80,0.3) 40%, transparent 70%)',
+        borderRadius:'50%', filter:'blur(1px)',
+      }}/>
+      {/* light streaks */}
+      {[0.1, 0.3, 0.5, 0.7, 0.9].map((x,i) => (
+        <div key={i} style={{
+          position:'absolute', left:`${x*100}%`, top:0, bottom:0, width:1,
+          background:`linear-gradient(180deg, transparent 30%, rgba(255,200,120,${0.08 + i*0.03}) 55%, transparent 75%)`,
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+function TopChrome({ secondary }) {
+  return (
+    <div style={{ position:'absolute', left:0, right:0, top:0, padding:'30px 48px', display:'flex', alignItems:'center', gap:16, zIndex:8 }}>
+      <HexBtn icon={I.chevL}>BACK</HexBtn>
+      <HexChip tone="muted">MOVIES</HexChip>
+      <Icon path={I.chevR} size={11}/>
+      <HexChip tone="muted">SCI-FI</HexChip>
+      <div style={{ flex:1 }}/>
+      {secondary}
+      <div className="mono tab-nums" style={{ fontSize:13, color:'rgba(255,255,255,0.7)', letterSpacing:'0.12em' }}>21:04</div>
+    </div>
+  );
+}
+
+// =====================================================================
+// STATE 1 · CONTROLS (active)
+// =====================================================================
+function VODControls() {
+  const percent = 41;
+  const buffer = 68;
+  const chapters = [8, 22, 38, 58, 78];
+  return (
+    <div className="vod-stage">
+      <VODPoster/>
+      <div className="scrim-top"/>
+      <div className="scrim-bottom"/>
+
+      <TopChrome secondary={
+        <>
+          <HexChip tone="muted" icon={I.cast}>CAST · LIVING ROOM</HexChip>
+          <HexChip tone="muted">HDR10 · 2160P</HexChip>
+        </>
+      }/>
+
+      {/* Top-right: quick indicators */}
+      <div style={{ position:'absolute', top:84, right:48, display:'flex', flexDirection:'column', gap:10, alignItems:'flex-end', zIndex:8 }}>
+        <div className="y-chip mono tab-nums" style={{
+          padding:'8px 16px', background:'rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.12)',
+          fontSize:12, color:'rgba(255,255,255,0.82)', letterSpacing:'0.14em',
+        }}>55 · 32 · 180 · 16M · 2.0X</div>
+      </div>
+
+      {/* Center play-state hint (small) */}
+      <div style={{ position:'absolute', top:'42%', left:0, right:0, textAlign:'center', zIndex:7 }}>
+        <div className="y-chip" style={{
+          display:'inline-flex', alignItems:'center', gap:14,
+          padding:'16px 28px',
+          background:'rgba(20,37,31,0.4)',
+          backdropFilter:'blur(20px)',
+          border:'1px solid rgba(255,255,255,0.12)',
+          boxShadow:'0 10px 30px rgba(0,0,0,0.6)',
+        }}>
+          <Icon path={I.play} size={20}/>
+          <span className="mono" style={{ fontSize:12, letterSpacing:'0.18em', fontWeight:700, color:'rgba(255,255,255,0.9)' }}>PLAYING · 1.00X</span>
+        </div>
+      </div>
+
+      {/* === Metadata (left side, above controls) === */}
+      <div style={{ position:'absolute', left:48, right:48, bottom:210, zIndex:8 }}>
+        <div className="kicker">NOW PLAYING · YANCO.VOD</div>
+        <div style={{ fontSize:72, fontWeight:900, letterSpacing:'-0.03em', lineHeight:1, marginTop:8,
+          background:'linear-gradient(180deg, #F0FFF6 0%, #A7D9BE 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+        }}>{FILM.title}</div>
+        <div style={{ display:'flex', gap:10, marginTop:16, alignItems:'center' }}>
+          <HexChip tone="premium">{FILM.rating}</HexChip>
+          <HexChip tone="muted">{FILM.year}</HexChip>
+          <HexChip tone="muted">{FILM.runtime}</HexChip>
+          <HexChip tone="muted">{FILM.genre}</HexChip>
+          <HexChip tone="muted" icon={I.cc}>EN · FR · AR · DE</HexChip>
+          <div style={{ width:1, height:18, background:'rgba(255,255,255,0.2)' }}/>
+          <div className="mono" style={{ fontSize:12, color:'var(--text-secondary)', letterSpacing:'0.1em' }}>DIR. {FILM.director.toUpperCase()}</div>
+        </div>
+      </div>
+
+      {/* === Control dock === */}
+      <div style={{ position:'absolute', left:48, right:48, bottom:56, zIndex:8 }}>
+        {/* Progress bar */}
+        <div style={{ display:'flex', alignItems:'center', gap:18, marginBottom:26 }}>
+          <div className="mono tab-nums" style={{ fontSize:15, fontWeight:700, color:'var(--accent)', minWidth:76 }}>00:55:08</div>
+          <div style={{ flex:1, position:'relative', height:22, display:'flex', alignItems:'center' }}>
+            <div className="prog-track" style={{ flex:1 }}>
+              <div className="prog-buffer" style={{ width:`${buffer}%` }}/>
+              <div className="prog-fill" style={{ width:`${percent}%` }}/>
+              {chapters.map(c => <div key={c} className="chapter-tick" style={{ left:`${c}%` }}/>)}
+            </div>
+            <div className="prog-scrub-focus" style={{ left:`${percent}%` }}/>
+            {/* thumbnail hover */}
+            <div style={{
+              position:'absolute', left:`${percent}%`, bottom:36, transform:'translateX(-50%)',
+            }}>
+              <div className="y-card" style={{
+                padding:8, background:'rgba(0,0,0,0.85)', border:'1px solid rgba(255,255,255,0.2)',
+                boxShadow:'0 16px 40px rgba(0,0,0,0.7)',
+              }}>
+                <div style={{
+                  width:200, height:112,
+                  background:`radial-gradient(60% 60% at 40% 40%, rgba(255,180,100,0.6), transparent 70%),
+                    linear-gradient(135deg, #2a1040, #0a1410)`,
+                }}/>
+                <div className="mono tab-nums" style={{ fontSize:11, color:'var(--accent)', textAlign:'center', marginTop:6, letterSpacing:'0.1em' }}>00:55:08 · CH 3: COLONY</div>
+              </div>
+            </div>
+          </div>
+          <div className="mono tab-nums" style={{ fontSize:15, fontWeight:700, color:'rgba(255,255,255,0.5)', minWidth:76, textAlign:'right' }}>02:14:00</div>
+        </div>
+
+        {/* Button row */}
+        <div style={{ display:'flex', alignItems:'center', gap:18, justifyContent:'center' }}>
+          <div className="control-btn" style={{ width:52, height:52 }}>
+            <Icon path={I.chevL} size={22}/>
+          </div>
+          <div className="control-btn" style={{ width:58, height:58 }}>
+            <Icon path={I.back10} size={26}/>
+          </div>
+          <div className="control-btn primary focused" style={{ width:88, height:88 }}>
+            <Icon path={I.pause} size={34} stroke="0" fill="#04130C"/>
+          </div>
+          <div className="control-btn" style={{ width:58, height:58 }}>
+            <Icon path={I.fwd10} size={26}/>
+          </div>
+          <div className="control-btn" style={{ width:52, height:52 }}>
+            <Icon path={I.chevR} size={22}/>
+          </div>
+
+          <div style={{ width:36 }}/>
+
+          {/* secondary controls */}
+          {[
+            {i:I.cc,    l:'EN'},
+            {i:I.audio, l:'5.1'},
+            {i:I.speed, l:'1.0×'},
+            {i:I.aspect,l:'FIT'},
+            {i:I.favorites, l:''},
+            {i:I.menu,  l:''},
+          ].map((b,i)=>(
+            <div key={i} className="y-chip" style={{
+              padding:'0 14px', height:46, minWidth:46,
+              display:'inline-flex', alignItems:'center', justifyContent:'center', gap:8,
+              background:'rgba(20,37,31,0.45)', backdropFilter:'blur(18px)',
+              border:'1px solid rgba(255,255,255,0.12)',
+              fontSize:12, fontWeight:700, letterSpacing:'0.1em', color:'rgba(255,255,255,0.9)',
+              fontFamily:'var(--font-mono)',
+            }}>
+              <Icon path={b.i} size={18}/>
+              {b.l && <span>{b.l}</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Remote hint strip */}
+        <div style={{
+          marginTop:26, display:'flex', gap:24, justifyContent:'center',
+          fontSize:11, color:'rgba(255,255,255,0.45)', fontFamily:'var(--font-mono)', letterSpacing:'0.18em',
+        }}>
+          <span><span style={{color:'var(--accent)'}}>◂▸</span> SEEK</span>
+          <span><span style={{color:'var(--accent)'}}>▾</span> MENU</span>
+          <span><span style={{color:'var(--accent)'}}>HOLD ●</span> 2× SPEED</span>
+          <span><span style={{color:'var(--accent)'}}>◀</span> BACK</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// STATE 2 · SCRUB (deep scrub with preview frame)
+// =====================================================================
+function VODScrub() {
+  return (
+    <div className="vod-stage">
+      <VODPoster/>
+      <div className="scrim-top"/>
+      <div className="scrim-bottom"/>
+
+      <TopChrome secondary={<HexChip tone="muted">HDR10 · 2160P</HexChip>}/>
+
+      {/* Huge timestamp rising from scrub */}
+      <div style={{ position:'absolute', left:'50%', top:180, transform:'translateX(-50%)', textAlign:'center', zIndex:9 }}>
+        <div className="kicker-d" style={{ color:'rgba(255,255,255,0.4)' }}>SEEKING · HOLD FOR 2× PREVIEW</div>
+        <div className="mono tab-nums" style={{ fontSize:180, fontWeight:900, letterSpacing:'-0.04em', lineHeight:1, marginTop:12,
+          background:'linear-gradient(180deg, #F0FFF6 0%, #66F0B5 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+          textShadow:'0 0 60px rgba(0,226,138,0.3)',
+        }}>01:12:43</div>
+        <div className="mono" style={{ fontSize:18, color:'rgba(255,255,255,0.5)', letterSpacing:'0.14em', marginTop:8 }}>+ 00:17:35 FROM PLAYHEAD</div>
+      </div>
+
+      {/* Large scrub thumbnail grid */}
+      <div style={{
+        position:'absolute', left:'50%', top:480, transform:'translateX(-50%)',
+        display:'flex', gap:8, padding:12,
+        background:'rgba(0,0,0,0.7)', backdropFilter:'blur(24px)',
+        border:'1px solid rgba(255,255,255,0.14)',
+        clipPath:'polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px)',
+        boxShadow:'0 30px 80px rgba(0,0,0,0.8)',
+        zIndex:9,
+      }}>
+        {[
+          { t:'01:12:10', g:'linear-gradient(135deg, #2a1040, #0a1410)', active:false },
+          { t:'01:12:25', g:'linear-gradient(135deg, #401030, #1a1020)', active:false },
+          { t:'01:12:43', g:'radial-gradient(60% 60% at 40% 40%, rgba(255,180,100,0.7), transparent 70%), linear-gradient(135deg, #3a1040, #0a1410)', active:true },
+          { t:'01:13:00', g:'linear-gradient(135deg, #30104a, #10142a)', active:false },
+          { t:'01:13:15', g:'linear-gradient(135deg, #201030, #0a1020)', active:false },
+        ].map((f,i)=>(
+          <div key={i} style={{
+            width: f.active ? 280 : 180,
+            height: f.active ? 158 : 102,
+            marginTop: f.active ? 0 : 28,
+            background: f.g,
+            border: f.active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.2)',
+            boxShadow: f.active ? '0 0 34px rgba(0,226,138,0.4)' : 'none',
+            position:'relative', overflow:'hidden',
+          }}>
+            <div className="mono tab-nums" style={{
+              position:'absolute', left:0, right:0, bottom:0,
+              padding:'4px 8px',
+              background:'linear-gradient(180deg, transparent, rgba(0,0,0,0.85))',
+              fontSize: f.active? 14 : 10,
+              color: f.active ? 'var(--accent)' : 'rgba(255,255,255,0.7)',
+              textAlign:'center', letterSpacing:'0.1em', fontWeight:700,
+            }}>{f.t}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Progress bar with big scrubber */}
+      <div style={{ position:'absolute', left:48, right:48, bottom:88, zIndex:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:18 }}>
+          <div className="mono tab-nums" style={{ fontSize:15, fontWeight:700, color:'var(--accent)', minWidth:76 }}>00:55:08</div>
+          <div style={{ flex:1, position:'relative', height:22, display:'flex', alignItems:'center' }}>
+            <div className="prog-track" style={{ flex:1, height:8, background:'rgba(255,255,255,0.2)' }}>
+              <div className="prog-fill" style={{ width:'41%' }}/>
+              {/* target hover strip */}
+              <div style={{
+                position:'absolute', top:0, bottom:0, left:'41%', width:'13%',
+                background:'linear-gradient(90deg, rgba(102,240,181,0.45), rgba(0,226,138,0.0))',
+              }}/>
+            </div>
+            {/* Ghost scrubber at target */}
+            <div className="prog-scrub-focus" style={{ left:'54%', background:'var(--accent-soft)', width:28, height:28 }}/>
+            {/* Live playhead */}
+            <div style={{
+              position:'absolute', left:'41%', top:'50%', transform:'translate(-50%, -50%)',
+              width:4, height:28, background:'rgba(255,255,255,0.5)',
+            }}/>
+          </div>
+          <div className="mono tab-nums" style={{ fontSize:15, fontWeight:700, color:'rgba(255,255,255,0.5)', minWidth:76, textAlign:'right' }}>02:14:00</div>
+        </div>
+        <div style={{ marginTop:18, display:'flex', gap:26, justifyContent:'center', fontSize:11, color:'rgba(255,255,255,0.5)', fontFamily:'var(--font-mono)', letterSpacing:'0.18em' }}>
+          <span><span style={{color:'var(--accent)'}}>◂▸</span> SCRUB 10s</span>
+          <span><span style={{color:'var(--accent)'}}>HOLD ◂▸</span> FAST SCRUB</span>
+          <span><span style={{color:'var(--accent)'}}>●</span> JUMP</span>
+          <span><span style={{color:'var(--accent)'}}>◀</span> CANCEL</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// STATE 3 · NEXT-UP (ending bumper for series)
+// =====================================================================
+function VODNextUp() {
+  const cd = 7;
+  return (
+    <div className="vod-stage">
+      <VODPoster/>
+      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.5)' }}/>
+
+      <TopChrome secondary={<HexChip tone="muted">PLAYING NEXT</HexChip>}/>
+
+      {/* Shrunk playing video in top-right */}
+      <div className="y-card" style={{
+        position:'absolute', top:100, right:48,
+        width:380, height:214,
+        background:'radial-gradient(60% 60% at 40% 40%, rgba(255,180,100,0.6), transparent 70%), linear-gradient(135deg, #2a1040, #0a1410)',
+        border:'1px solid rgba(255,255,255,0.15)',
+        overflow:'hidden',
+      }}>
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.8))' }}/>
+        <div className="kicker-d" style={{ position:'absolute', left:16, top:14, color:'rgba(255,255,255,0.65)' }}>NOW ENDING</div>
+        <div style={{ position:'absolute', left:16, right:16, bottom:12 }}>
+          <div style={{ fontSize:15, fontWeight:800 }}>Emerald Horizon · S1E4</div>
+          <div className="mono tab-nums" style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginTop:3, letterSpacing:'0.1em' }}>02:13:45 / 02:14:00 · 99%</div>
+        </div>
+        <div style={{ position:'absolute', left:0, right:0, bottom:0, height:3, background:'rgba(0,0,0,0.4)' }}>
+          <div style={{ width:'99%', height:'100%', background:'var(--accent)', boxShadow:'0 0 10px rgba(0,226,138,0.6)' }}/>
+        </div>
+      </div>
+
+      {/* Central: next episode hero */}
+      <div style={{ position:'absolute', left:48, right:48, bottom:80, display:'flex', gap:32, alignItems:'flex-end', zIndex:8 }}>
+        {/* Next poster card */}
+        <div style={{ width:420, flexShrink:0 }}>
+          <div className="y-card-l" style={{
+            height:556, position:'relative', overflow:'hidden',
+            background: `
+              radial-gradient(50% 50% at 50% 30%, rgba(100, 80, 200, 0.65), transparent 70%),
+              linear-gradient(135deg, #0a1a3a 0%, #1a0820 100%)
+            `,
+            border:'1px solid var(--panel-border)',
+            boxShadow:'0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,226,138,0.2)',
+          }}>
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.85))' }}/>
+            <div style={{ position:'absolute', top:22, left:22 }}>
+              <HexChip active>UP NEXT · AUTO</HexChip>
+            </div>
+            <div style={{ position:'absolute', left:24, right:24, bottom:24 }}>
+              <div className="kicker">S1 · E5 · 51 MIN</div>
+              <div style={{ fontSize:38, fontWeight:900, letterSpacing:'-0.02em', lineHeight:1.05, marginTop:6 }}>The Signal Beneath</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Countdown + actions */}
+        <div style={{ flex:1 }}>
+          <div className="kicker">AUTO-PLAY IN</div>
+          <div style={{ display:'flex', alignItems:'baseline', gap:20, marginTop:6 }}>
+            <div className="mono tab-nums" style={{ fontSize:220, fontWeight:900, letterSpacing:'-0.04em', lineHeight:1,
+              background:'linear-gradient(180deg, var(--accent-soft) 0%, var(--accent-deep) 100%)',
+              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+              filter:'drop-shadow(0 0 32px rgba(0,226,138,0.5))',
+            }}>{cd}</div>
+            <div className="mono" style={{ fontSize:24, color:'var(--text-muted)', letterSpacing:'0.14em' }}>SECONDS</div>
+          </div>
+
+          <div style={{ maxWidth:560, fontSize:16, color:'var(--text-secondary)', lineHeight:1.55, marginTop:8 }}>
+            Dr. Lin decodes the repeating pattern and prepares to transmit. Pierce and the crew negotiate the colony's trust.
+          </div>
+
+          <div style={{ display:'flex', gap:10, marginTop:32, flexWrap:'wrap' }}>
+            <HexBtn primary icon={I.skip} height={56}>PLAY NOW</HexBtn>
+            <HexBtn icon={I.close} height={56}>CANCEL AUTO-PLAY</HexBtn>
+            <HexBtn icon={I.grid} height={56}>BROWSE EPISODES</HexBtn>
+            <HexBtn icon={I.info} height={56}>DETAILS</HexBtn>
+          </div>
+
+          {/* Countdown bar */}
+          <div style={{ marginTop:26, display:'flex', alignItems:'center', gap:14 }}>
+            <div style={{ flex:1, height:3, background:'rgba(255,255,255,0.12)', overflow:'hidden' }}>
+              <div style={{ width:'28%', height:'100%', background:'linear-gradient(90deg, var(--accent-deep), var(--accent))', boxShadow:'0 0 10px rgba(0,226,138,0.5)' }}/>
+            </div>
+            <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.18em' }}>01 / 05 REMAINING</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// STATE 4 · BUFFERING
+// =====================================================================
+function VODBuffering() {
+  return (
+    <div className="vod-stage" style={{ background:'radial-gradient(60% 50% at 50% 40%, rgba(20, 70, 50, 0.3), transparent 65%), linear-gradient(135deg, #050a08 0%, #0a1410 100%)' }}>
+      <TopChrome secondary={<HexChip tone="muted">RECONNECTING</HexChip>}/>
+
+      <div style={{ position:'absolute', left:0, right:0, top:'50%', transform:'translateY(-50%)', textAlign:'center' }}>
+        <div style={{ display:'inline-block', position:'relative', marginBottom:40 }}>
+          <div className="loader-ring"/>
+          {/* inner hex */}
+          <div className="y-hex" style={{
+            position:'absolute', inset:22,
+            background:'linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%)',
+            display:'grid', placeItems:'center', color:'#04130C',
+            boxShadow:'0 0 24px rgba(0,226,138,0.6)',
+          }}>
+            <div style={{ fontSize:22, fontWeight:900 }}>Y</div>
+          </div>
+        </div>
+
+        <div className="kicker">BUFFERING · 38%</div>
+        <div style={{ fontSize:56, fontWeight:900, letterSpacing:'-0.02em', marginTop:10,
+          background:'linear-gradient(180deg, #F0FFF6 0%, #66F0B5 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+        }}>Tuning the stream</div>
+        <div style={{ fontSize:16, color:'var(--text-secondary)', marginTop:16, maxWidth:620, margin:'16px auto 0', lineHeight:1.5 }}>
+          Your network is fetching 2160p HDR frames. Switching to 1080p automatically if this takes more than 10 seconds.
+        </div>
+
+        {/* diagnostic row */}
+        <div style={{ display:'inline-flex', gap:12, marginTop:30 }}>
+          {[
+            { l:'BITRATE',  v:'12.4 Mbps',    c:'var(--accent)' },
+            { l:'BUFFER',   v:'01.2s / 2.0s', c:'var(--text-primary)' },
+            { l:'LATENCY',  v:'142 ms',       c:'var(--text-primary)' },
+            { l:'RES.',     v:'2160p → 1080p',c:'var(--accent-soft)' },
+          ].map(d => (
+            <div key={d.l} className="y-card" style={{
+              padding:'12px 18px', background:'rgba(20,37,31,0.4)',
+              border:'1px solid var(--border-subtle)', backdropFilter:'blur(12px)',
+            }}>
+              <div className="kicker-d">{d.l}</div>
+              <div className="mono tab-nums" style={{ fontSize:16, fontWeight:800, color:d.c, marginTop:3 }}>{d.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ position:'absolute', left:48, right:48, bottom:56, display:'flex', gap:14, justifyContent:'center' }}>
+        <HexBtn icon={I.retry}>RETRY</HexBtn>
+        <HexBtn icon={I.menu}>PLAYBACK OPTIONS</HexBtn>
+        <HexBtn icon={I.chevL}>CANCEL</HexBtn>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// STATE 5 · ERROR
+// =====================================================================
+function VODError() {
+  return (
+    <div className="vod-stage" style={{ background:'radial-gradient(50% 50% at 50% 40%, rgba(180, 20, 40, 0.22), transparent 65%), linear-gradient(135deg, #0a0508 0%, #100a0a 100%)' }}>
+      <TopChrome secondary={<HexChip tone="live">PLAYBACK ERROR</HexChip>}/>
+
+      <div style={{ position:'absolute', left:0, right:0, top:'50%', transform:'translateY(-50%)', padding:'0 48px', display:'flex', gap:48, alignItems:'center', justifyContent:'center' }}>
+        {/* Icon */}
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <div className="y-hex" style={{
+            width:220, height:220,
+            background:'radial-gradient(60% 60% at 50% 50%, rgba(255,59,59,0.3), transparent 75%)',
+            border:'1px solid rgba(255,59,59,0.4)',
+            display:'grid', placeItems:'center',
+            boxShadow:'0 0 60px rgba(255,59,59,0.35)',
+          }}>
+            <Icon path={I.close} size={100} stroke="1.6"/>
+          </div>
+        </div>
+
+        {/* Copy */}
+        <div style={{ maxWidth:700 }}>
+          <div className="kicker-d" style={{ color:'var(--error)' }}>ERR · E_MEDIA_STALLED · 408</div>
+          <div style={{ fontSize:64, fontWeight:900, letterSpacing:'-0.02em', lineHeight:1.05, marginTop:12 }}>
+            Couldn't open this stream
+          </div>
+          <div style={{ fontSize:16, color:'var(--text-secondary)', marginTop:16, lineHeight:1.55, maxWidth:620 }}>
+            Your source timed out after 30 seconds. This usually means the provider is throttling or the stream was moved. Try a lower resolution, switch source, or ask your provider.
+          </div>
+
+          <div style={{ marginTop:22, padding:'14px 18px', background:'rgba(0,0,0,0.5)', border:'1px solid var(--border-subtle)', clipPath:'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)',
+              fontFamily:'var(--font-mono)', fontSize:12, color:'var(--text-secondary)', lineHeight:1.8 }}>
+            <div><span style={{ color:'var(--text-muted)' }}>source</span> · BrittBox Premium · xtream</div>
+            <div><span style={{ color:'var(--text-muted)' }}>stream</span> · /movie/0214/7842/EmeraldHorizon.mkv</div>
+            <div><span style={{ color:'var(--text-muted)' }}>remote</span> · 203.0.113.44:8080 · upstream disconnect</div>
+            <div><span style={{ color:'var(--text-muted)' }}>attempt</span> · 3 of 3 · 21:03:48</div>
+          </div>
+
+          <div style={{ display:'flex', gap:10, marginTop:26, flexWrap:'wrap' }}>
+            <HexBtn primary icon={I.retry} height={52}>RETRY</HexBtn>
+            <HexBtn icon={I.sync} height={52}>SWITCH TO 1080P</HexBtn>
+            <HexBtn icon={I.shield} height={52}>TRY ANOTHER SOURCE</HexBtn>
+            <HexBtn icon={I.external} height={52}>REPORT ISSUE</HexBtn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// STATE 6 · END OF FILM
+// =====================================================================
+function VODEnd() {
+  return (
+    <div className="vod-stage">
+      <VODPoster/>
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%)' }}/>
+
+      <TopChrome secondary={<HexChip tone="muted">FINISHED</HexChip>}/>
+
+      <div style={{ position:'absolute', left:48, right:48, top:180 }}>
+        <div className="kicker">FINISHED · 02:14:00 / 02:14:00 · 100%</div>
+        <div style={{ fontSize:88, fontWeight:900, letterSpacing:'-0.03em', lineHeight:1, marginTop:14,
+          background:'linear-gradient(180deg, #F0FFF6 0%, #A7D9BE 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+        }}>That's a wrap</div>
+        <div style={{ fontSize:18, color:'var(--text-secondary)', marginTop:12, maxWidth:720 }}>
+          <span style={{ color:'var(--text-primary)', fontWeight:700 }}>{FILM.title}</span> · saved to Watched. Rate and review to sharpen recommendations.
+        </div>
+
+        {/* Rating block */}
+        <div style={{ display:'flex', gap:10, marginTop:30, alignItems:'center' }}>
+          <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.22em', marginRight:8 }}>YOUR RATING</div>
+          {[1,2,3,4,5].map(n => (
+            <div key={n} className="y-chip" style={{
+              width:52, height:52, display:'grid', placeItems:'center',
+              background: n<=4 ? 'linear-gradient(180deg, var(--accent), var(--accent-deep))' : 'rgba(20,37,31,0.6)',
+              color: n<=4 ? '#04130C' : 'var(--text-muted)',
+              border: n<=4 ? 'none' : '1px solid var(--border-subtle)',
+              boxShadow: n<=4 ? '0 6px 14px rgba(0,226,138,0.4)' : 'none',
+            }}>
+              <Icon path={I.star} size={22}/>
+            </div>
+          ))}
+          <div className="mono tab-nums" style={{ marginLeft:12, fontSize:18, fontWeight:700, color:'var(--accent)' }}>4 / 5</div>
+        </div>
+      </div>
+
+      {/* Bottom rail: recommended up-next */}
+      <div style={{ position:'absolute', left:48, right:48, bottom:48 }}>
+        <div style={{ display:'flex', alignItems:'baseline', gap:14, marginBottom:16 }}>
+          <div className="kicker">BECAUSE YOU WATCHED</div>
+          <div style={{ flex:1, height:1, background:'linear-gradient(90deg, rgba(0,226,138,0.2), transparent)' }}/>
+          <HexChip tone="muted">6 MATCHES</HexChip>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:18 }}>
+          {[
+            { t:'Orbital Drift',    s:'2023 · 1h 58m',  g:'linear-gradient(135deg, #0a2540 0%, #0a1a2f 100%)' },
+            { t:'Quiet Meridian',   s:'2022 · 2h 06m',  g:'linear-gradient(135deg, #1a0a2a 0%, #0a0a1a 100%)', focused:true },
+            { t:'Signal Echo',      s:'2024 · 1h 48m',  g:'linear-gradient(135deg, #2a100a 0%, #1a0a0a 100%)' },
+            { t:'Last Light',       s:'2021 · 2h 22m',  g:'linear-gradient(135deg, #0a2a1a 0%, #0a1a14 100%)' },
+            { t:'Red Horizon',      s:'2020 · 1h 54m',  g:'linear-gradient(135deg, #2a1a0a 0%, #1a100a 100%)' },
+            { t:'The Observer',     s:'2023 · 2h 08m',  g:'linear-gradient(135deg, #0a1a2a 0%, #050a1a 100%)' },
+          ].map((m,i)=>(
+            <div key={i} className="y-card" style={{
+              position:'relative', height:260, overflow:'hidden',
+              background: m.g, border: m.focused ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
+              boxShadow: m.focused ? '0 0 0 3px rgba(102,240,181,0.35), 0 20px 40px rgba(0,226,138,0.3)' : '0 12px 28px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.9))' }}/>
+              <div style={{ position:'absolute', left:16, right:16, bottom:16 }}>
+                <div style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.01em' }}>{m.t}</div>
+                <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', marginTop:3, letterSpacing:'0.1em' }}>{m.s}</div>
+              </div>
+              {m.focused && (
+                <div style={{ position:'absolute', top:14, left:14 }}>
+                  <HexChip active>FOCUS</HexChip>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// Shell — wraps everything in DesignCanvas
+// =====================================================================
+function VODShell() {
+  return (
+    <div style={{ minWidth: '100vw', minHeight: '100vh' }}>
+      <CrumbBar here="VOD PLAYER · 5 STATES" />
+      <DesignCanvas>
+        <DCSection id="vod" title="VOD Player — every state" subtitle="Controls · Scrub · Next-up · Buffering · Error · End">
+          <DCArtboard id="controls"  label="01 · Controls"         width={1920} height={1080}><VODControls/></DCArtboard>
+          <DCArtboard id="scrub"     label="02 · Scrub preview"    width={1920} height={1080}><VODScrub/></DCArtboard>
+          <DCArtboard id="nextup"    label="03 · Next-up bumper"   width={1920} height={1080}><VODNextUp/></DCArtboard>
+          <DCArtboard id="buffering" label="04 · Buffering"        width={1920} height={1080}><VODBuffering/></DCArtboard>
+          <DCArtboard id="error"     label="05 · Playback error"   width={1920} height={1080}><VODError/></DCArtboard>
+          <DCArtboard id="end"       label="06 · End · what next"  width={1920} height={1080}><VODEnd/></DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<VODShell />);
+</script>
+</body>
+</html>

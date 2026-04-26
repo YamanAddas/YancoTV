@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>YancoTV+ — Concept A · Hex Emerald</title>
+<meta name="viewport" content="width=1920" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-0: #050A08;
+    --bg-1: #0A1410;
+    --bg-2: #0F1C17;
+    --bg-surf: #14251F;
+    --panel: rgba(10, 20, 16, 0.82);
+    --accent: #00E28A;
+    --accent-2: #00B872;
+    --accent-soft: rgba(0, 226, 138, 0.35);
+    --accent-glow: rgba(0, 226, 138, 0.55);
+    --text-0: #F0FFF6;
+    --text-1: #A7B8AF;
+    --text-2: #5F7068;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-hot: rgba(0, 226, 138, 0.45);
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #040807;
+    color: var(--text-0);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  #stage {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform-origin: center center;
+    overflow: hidden;
+    background: var(--bg-1);
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Hex clip utility — balanced (two opposite corner cuts) */
+  .hex-2cut {
+    /* top-right & bottom-left cut */
+    clip-path: polygon(
+      0 0, calc(100% - 22px) 0, 100% 22px,
+      100% 100%, 22px 100%, 0 calc(100% - 22px)
+    );
+  }
+  .hex-2cut-lg {
+    clip-path: polygon(
+      0 0, calc(100% - 32px) 0, 100% 32px,
+      100% 100%, 32px 100%, 0 calc(100% - 32px)
+    );
+  }
+  .hex-chip {
+    clip-path: polygon(
+      14px 0, calc(100% - 14px) 0, 100% 50%,
+      calc(100% - 14px) 100%, 14px 100%, 0 50%
+    );
+  }
+  .hex-btn {
+    clip-path: polygon(
+      0 0, calc(100% - 14px) 0, 100% 50%,
+      calc(100% - 14px) 100%, 0 100%, 0 50%
+    );
+  }
+
+  @keyframes halo-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%      { opacity: 0.85; transform: scale(1.06); }
+  }
+  @keyframes live-blink {
+    0%, 55% { opacity: 1; }
+    70%, 100% { opacity: 0.3; }
+  }
+  @keyframes ambient-fade {
+    0% { opacity: 0; }
+    100% { opacity: 0.55; }
+  }
+  @keyframes sheen-sweep {
+    0%   { transform: translateX(-120%) skewX(-20deg); opacity: 0; }
+    20%  { opacity: 0.55; }
+    100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
+  }
+  @keyframes grid-drift {
+    0% { background-position: 0 0, 0 0; }
+    100% { background-position: 80px 80px, -80px -80px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="yanco-icons.jsx"></script>
+<script type="text/babel" src="yanco-data.jsx"></script>
+<script type="text/babel" src="yanco-parts.jsx"></script>
+<script type="text/babel" src="yanco-livetv.jsx"></script>
+<script type="text/babel" src="yanco-app.jsx"></script>
+
+<script>
+  (function() {
+    const stage = document.getElementById('stage');
+    function fit() {
+      const sx = window.innerWidth / 1920;
+      const sy = window.innerHeight / 1080;
+      const s = Math.min(sx, sy);
+      stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+    }
+    fit();
+    window.addEventListener('resize', fit);
+  })();
+</script>
+</body>
+</html>

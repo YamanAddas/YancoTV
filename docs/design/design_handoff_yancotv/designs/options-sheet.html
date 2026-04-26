@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1920, initial-scale=1"/>
+<title>YancoTV — Player Options Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="yanco-ds.css"/>
+<style>
+  html, body { overflow: auto; background: #000; }
+  .sheet-stage {
+    width: 1920px; height: 1080px;
+    position: relative; overflow: hidden;
+    background: #000;
+  }
+  /* faded film backdrop */
+  .sheet-backdrop {
+    position:absolute; inset:0;
+    background:
+      radial-gradient(60% 50% at 25% 30%, rgba(90, 60, 160, 0.28), transparent 65%),
+      radial-gradient(50% 60% at 80% 70%, rgba(0, 140, 90, 0.18), transparent 65%),
+      linear-gradient(135deg, #0a0620 0%, #0f1a1d 50%, #06130b 100%);
+  }
+  .sheet-scrim {
+    position:absolute; inset:0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+  }
+  /* right side sheet shape */
+  .side-sheet {
+    position:absolute; top:0; right:0; bottom:0; width:720px;
+    background: rgba(10,20,16,0.92);
+    border-left: 1px solid var(--panel-border);
+    backdrop-filter: blur(24px);
+    box-shadow: -30px 0 80px rgba(0,0,0,0.7), inset 1px 0 0 rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 32px);
+  }
+  .sheet-head {
+    padding: 28px 36px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .sheet-body { padding: 24px 36px; flex: 1; overflow-y: auto; }
+  .sheet-foot {
+    padding: 18px 36px;
+    border-top: 1px solid var(--border-subtle);
+    display:flex; gap:10px; align-items:center;
+  }
+
+  /* row — list option */
+  .opt-row {
+    display:flex; align-items:center; gap:16px;
+    padding:14px 18px;
+    background: rgba(20,37,31,0.4);
+    border: 1px solid var(--border-subtle);
+    margin-bottom: 8px;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .opt-row.focused {
+    background: linear-gradient(90deg, rgba(0,226,138,0.18) 0%, rgba(0,226,138,0.04) 100%);
+    border: 1.5px solid var(--accent);
+    box-shadow: 0 0 0 3px rgba(102,240,181,0.3), 0 12px 26px rgba(0,226,138,0.3);
+  }
+  .opt-row.active { border-color: var(--accent); }
+
+  .opt-label { flex:1; font-size:15px; font-weight:700; color: var(--text-primary); letter-spacing:-0.005em; }
+  .opt-sub { font-size:12px; color: var(--text-muted); font-family: var(--font-mono); letter-spacing:0.08em; margin-top:2px; }
+  .opt-code { font-family: var(--font-mono); font-size:11px; color: var(--text-muted); letter-spacing:0.14em; }
+  .opt-check {
+    width:28px; height:28px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+    color: #04130C;
+    display:grid; place-items:center;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+
+  /* slider track */
+  .slider-track {
+    height:4px; background: rgba(255,255,255,0.1);
+    position:relative; border-radius:2px;
+  }
+  .slider-fill {
+    position:absolute; left:0; top:0; bottom:0;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    border-radius:2px;
+    box-shadow: 0 0 10px rgba(0,226,138,0.6);
+  }
+  .slider-knob {
+    position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
+    background: var(--accent); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px rgba(102,240,181,0.3), 0 0 16px rgba(0,226,138,0.6);
+  }
+
+  /* preview strip — shows effect of option on actual video */
+  .preview-strip {
+    height: 180px;
+    background: radial-gradient(60% 60% at 40% 40%, rgba(255,180,100,0.5), transparent 70%),
+      linear-gradient(135deg, #2a1040, #0a1410);
+    position: relative; overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="ds/ds.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" data-presets="react">
+
+// ==== Shared backdrop — fake film frame with metadata ================
+function Backdrop() {
+  return (
+    <>
+      <div className="sheet-backdrop"/>
+      {/* Sun + halo */}
+      <div style={{
+        position:'absolute', left:'30%', top:'36%',
+        width:180, height:180, transform:'translate(-50%,-50%)',
+        background:'radial-gradient(circle, rgba(255,180,100,0.8) 0%, rgba(255,120,80,0.3) 40%, transparent 70%)',
+        borderRadius:'50%', filter:'blur(1px)',
+      }}/>
+      {/* silhouette */}
+      <div style={{
+        position:'absolute', left:'30%', top:'58%',
+        width:200, height:360, transform:'translateX(-50%)',
+        background:'radial-gradient(ellipse at center top, rgba(0,0,0,0.9) 40%, rgba(0,0,0,0.2) 90%)',
+      }}/>
+      <div className="sheet-scrim"/>
+      {/* metadata on left side, de-emphasised */}
+      <div style={{ position:'absolute', left:48, bottom:48, opacity:0.6 }}>
+        <div className="kicker">NOW PLAYING</div>
+        <div style={{ fontSize:42, fontWeight:900, letterSpacing:'-0.02em', marginTop:6, color:'rgba(240,255,246,0.7)' }}>Emerald Horizon</div>
+        <div className="mono" style={{ fontSize:11, color:'rgba(255,255,255,0.4)', letterSpacing:'0.14em', marginTop:6 }}>00:55:08 / 02:14:00 · PAUSED FOR OPTIONS</div>
+      </div>
+    </>
+  );
+}
+
+// ==== Sheet frame ====================================================
+function Sheet({ kicker, title, sub, children, footer, tabs, active }) {
+  const allTabs = tabs || [
+    { id:'audio',   l:'AUDIO',       i:I.audio },
+    { id:'subs',    l:'SUBS',        i:I.cc },
+    { id:'speed',   l:'SPEED',       i:I.speed },
+    { id:'aspect',  l:'ASPECT',      i:I.aspect },
+    { id:'sleep',   l:'SLEEP',       i:I.clock },
+    { id:'record',  l:'RECORD',      i:I.record },
+    { id:'fav',     l:'FAV',         i:I.favorites },
+    { id:'ext',     l:'EXTERNAL',    i:I.external },
+    { id:'cast',    l:'CAST',        i:I.cast },
+    { id:'look',    l:'APPEARANCE',  i:I.theme },
+  ];
+  return (
+    <div className="sheet-stage">
+      <Backdrop/>
+      <div className="side-sheet">
+        <div className="sheet-head">
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+            <HexChip active icon={I.menu}>PLAYER OPTIONS</HexChip>
+            <div style={{ flex:1 }}/>
+            <div className="mono tab-nums" style={{ fontSize:11, color:'var(--text-muted)', letterSpacing:'0.12em' }}>◀ DISMISS</div>
+          </div>
+          <div className="kicker">{kicker}</div>
+          <div style={{ fontSize:34, fontWeight:900, letterSpacing:'-0.02em', marginTop:6, lineHeight:1.05 }}>{title}</div>
+          {sub && <div style={{ fontSize:13, color:'var(--text-secondary)', marginTop:8, lineHeight:1.5 }}>{sub}</div>}
+
+          {/* tab strip — hex capsules */}
+          <div style={{ display:'flex', gap:6, marginTop:18, flexWrap:'wrap' }}>
+            {allTabs.map(t => {
+              const a = t.id === active;
+              return (
+                <div key={t.id} className="y-hex-sm" style={{
+                  padding:'0 14px', height:32,
+                  display:'inline-flex', alignItems:'center', gap:6,
+                  background: a ? 'linear-gradient(180deg, var(--accent), var(--accent-deep))' : 'rgba(20,37,31,0.6)',
+                  color: a ? '#04130C' : 'var(--text-muted)',
+                  fontSize:10, fontWeight: a?800:700, letterSpacing:'0.12em', fontFamily:'var(--font-mono)',
+                  boxShadow: a ? '0 6px 14px rgba(0,226,138,0.4)' : 'none',
+                }}>
+                  <Icon path={t.i} size={11}/>
+                  {t.l}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="sheet-body">{children}</div>
+
+        <div className="sheet-foot">
+          {footer || (
+            <>
+              <div className="mono" style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'0.18em' }}>
+                <span style={{color:'var(--accent)'}}>▲▼</span> CHOOSE · <span style={{color:'var(--accent)'}}>●</span> SET · <span style={{color:'var(--accent)'}}>◀</span> BACK
+              </div>
+              <div style={{flex:1}}/>
+              <HexChip tone="muted">APPLIES TO THIS STREAM</HexChip>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// PANEL 01 · AUDIO
+// =====================================================================
+function AudioPanel() {
+  const tracks = [
+    { c:'EN', n:'English',        sub:'Stereo · AAC · 192 kbps',  focus:true, active:true },
+    { c:'EN', n:'English',        sub:'5.1 Surround · E-AC3 · 640 kbps',  badge:'ORIGINAL' },
+    { c:'FR', n:'Français',       sub:'Stereo · AAC · 192 kbps',  badge:'DUB' },
+    { c:'AR', n:'العربية',        sub:'Stereo · AAC · 160 kbps',  badge:'DUB' },
+    { c:'DE', n:'Deutsch',        sub:'Stereo · AAC · 192 kbps',  badge:'DUB' },
+    { c:'ES', n:'Español (LAT)',  sub:'Stereo · AAC · 192 kbps',  badge:'DUB' },
+    { c:'EN', n:'Audio Description', sub:'Mono · AAC · 96 kbps',  badge:'AD' },
+  ];
+  return (
+    <Sheet
+      kicker="01 · PLAYER · AUDIO"
+      title="Audio tracks"
+      sub="Choose language, mix and described audio. Applies to current stream; defaults can be set in Settings · Playback."
+      active="audio"
+    >
+      <div style={{ marginBottom:18 }}>
+        <div className="kicker-d" style={{ marginBottom:8 }}>VOLUME</div>
+        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+          <Icon path={I.volume} size={18}/>
+          <div style={{ flex:1 }}>
+            <div className="slider-track">
+              <div className="slider-fill" style={{ width:'72%' }}/>
+              <div className="slider-knob" style={{ left:'72%' }}/>
+            </div>
+          </div>
+          <div className="mono tab-nums" style={{ fontSize:14, fontWeight:700, color:'var(--accent)', minWidth:44, textAlign:'right' }}>72</div>
+        </div>
+        <div style={{ display:'flex', gap:8, marginTop:12 }}>
+          <HexChip active>NORMALIZE</HexChip>
+          <HexChip tone="muted">NIGHT MODE</HexChip>
+          <HexChip tone="muted">VOICE BOOST +3 dB</HexChip>
+        </div>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>TRACKS · 7 AVAILABLE</div>
+      {tracks.map((t,i)=>(
+        <div key={i} className={`opt-row ${t.focus?'focused':''} ${t.active?'active':''}`}>
+          <div className="y-hex" style={{
+            width:42, height:42, display:'grid', placeItems:'center',
+            background: t.active? 'rgba(0,226,138,0.2)' : 'rgba(20,37,31,0.8)',
+            color: t.active? 'var(--accent)' : 'var(--text-secondary)',
+            fontSize:12, fontWeight:900, fontFamily:'var(--font-mono)',
+            border: t.active? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
+          }}>{t.c}</div>
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{t.n}</div>
+            <div className="opt-sub">{t.sub}</div>
+          </div>
+          {t.badge && <HexChip tone={t.badge==='ORIGINAL'?'premium':'muted'}>{t.badge}</HexChip>}
+          {t.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 02 · SUBTITLES
+// =====================================================================
+function SubsPanel() {
+  return (
+    <Sheet
+      kicker="02 · PLAYER · SUBTITLES"
+      title="Subtitles"
+      sub="Enable captions, match a language, or load an external .srt."
+      active="subs"
+    >
+      {/* preview */}
+      <div className="preview-strip" style={{ marginBottom:18, display:'grid', placeItems:'end center' }}>
+        <div style={{ marginBottom:16, padding:'5px 14px', background:'rgba(0,0,0,0.7)',
+          fontSize:18, fontWeight:600, color:'#FEE800', textShadow:'0 0 3px #000, 0 0 3px #000',
+          letterSpacing:'-0.005em' }}>
+          "The signal came from somewhere beyond the map."
+        </div>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+        <div className="kicker-d">ENABLE</div>
+        <div style={{ flex:1 }}/>
+        <Toggle value={true}/>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8, marginTop:16 }}>LANGUAGE · 5 AVAILABLE + 2 EXTERNAL</div>
+      {[
+        { n:'Off',                       sub:'No subtitles'  },
+        { n:'English',                   sub:'Forced · SDH · 24 fps'  },
+        { n:'English',                   sub:'CC · Hearing impaired', active:true, focus:true  },
+        { n:'Français',                  sub:'Forced · 24 fps' },
+        { n:'العربية',                   sub:'Full · 24 fps' },
+        { n:'Deutsch',                   sub:'Full · 24 fps' },
+        { n:'Load external file…',       sub:'USB · Network share · URL', ext:true },
+      ].map((t,i)=>(
+        <div key={i} className={`opt-row ${t.focus?'focused':''}`}>
+          <Icon path={t.ext? I.folder : I.cc} size={18}/>
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{t.n}</div>
+            <div className="opt-sub">{t.sub}</div>
+          </div>
+          {t.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+
+      <div className="kicker-d" style={{ marginTop:20, marginBottom:8 }}>QUICK STYLE</div>
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        {['SMALL','MEDIUM','LARGE','X-LARGE'].map((s,i)=>(
+          <HexChip key={s} active={i===1}>{s}</HexChip>
+        ))}
+        <div style={{ width:14 }}/>
+        {['WHITE','YELLOW','GREEN'].map((s,i)=>(
+          <HexChip key={s} active={i===1}>{s}</HexChip>
+        ))}
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 03 · SPEED
+// =====================================================================
+function SpeedPanel() {
+  const speeds = ['0.25×','0.5×','0.75×','1.0×','1.25×','1.5×','1.75×','2.0×','2.5×','3.0×'];
+  return (
+    <Sheet
+      kicker="03 · PLAYER · PLAYBACK RATE"
+      title="Playback speed"
+      sub="Hold ● on remote to temporarily boost to 2× without leaving this sheet."
+      active="speed"
+    >
+      <div style={{
+        padding:36, marginBottom:24,
+        background: 'linear-gradient(135deg, rgba(0,226,138,0.1) 0%, rgba(0,226,138,0.02) 100%)',
+        border: '1px solid rgba(0,226,138,0.3)',
+        textAlign:'center',
+        clipPath:'polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px)',
+      }}>
+        <div className="kicker-d">CURRENT</div>
+        <div className="mono tab-nums" style={{ fontSize:108, fontWeight:900, letterSpacing:'-0.04em', lineHeight:1, marginTop:6,
+          background:'linear-gradient(180deg, var(--accent-soft) 0%, var(--accent-deep) 100%)',
+          WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+          filter:'drop-shadow(0 0 20px rgba(0,226,138,0.4))',
+        }}>1.25×</div>
+        <div className="mono" style={{ fontSize:12, color:'var(--text-muted)', letterSpacing:'0.18em', marginTop:4 }}>PITCH-CORRECTED · NO ARTIFACTS</div>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:10 }}>PRESETS</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:6, marginBottom:20 }}>
+        {speeds.map((s,i) => {
+          const active = s === '1.25×';
+          const focus = s === '1.5×';
+          return (
+            <div key={s} className="y-chip" style={{
+              padding:'12px 8px', textAlign:'center', fontFamily:'var(--font-mono)',
+              fontSize: active ? 18 : 14, fontWeight: active ? 900 : 700,
+              background: active ? 'linear-gradient(180deg, var(--accent), var(--accent-deep))' : (focus ? 'rgba(0,226,138,0.1)' : 'rgba(20,37,31,0.5)'),
+              color: active ? '#04130C' : 'var(--text-secondary)',
+              border: focus && !active ? '1.5px solid var(--accent)' : '1px solid var(--border-subtle)',
+              boxShadow: active ? '0 8px 18px rgba(0,226,138,0.4)' : (focus ? '0 0 0 3px rgba(102,240,181,0.25)' : 'none'),
+              letterSpacing: '0.06em',
+            }}>{s}</div>
+          );
+        })}
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>FINE-TUNE</div>
+      <div style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 0' }}>
+        <div className="mono tab-nums" style={{ fontSize:13, color:'var(--text-muted)', minWidth:40 }}>0.25×</div>
+        <div style={{ flex:1 }}>
+          <div className="slider-track">
+            <div className="slider-fill" style={{ width:'36%' }}/>
+            <div className="slider-knob" style={{ left:'36%' }}/>
+            {/* tick marks at presets */}
+            {[0, 10, 19, 28, 36, 46, 55, 64, 82, 100].map((p,i)=>(
+              <div key={i} style={{ position:'absolute', left:`${p}%`, top:-3, width:1, height:10, background:'rgba(255,255,255,0.3)' }}/>
+            ))}
+          </div>
+        </div>
+        <div className="mono tab-nums" style={{ fontSize:13, color:'var(--text-muted)', minWidth:40, textAlign:'right' }}>3.0×</div>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:18 }}>
+        <div className="opt-label" style={{ flex:1 }}>Preserve pitch</div>
+        <Toggle value={true}/>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
+        <div className="opt-label" style={{ flex:1 }}>Reset to 1.0× at end of file</div>
+        <Toggle value={false}/>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 04 · ASPECT / ZOOM
+// =====================================================================
+function AspectPanel() {
+  const modes = [
+    { k:'FIT',       l:'Fit',           s:'Letterbox — preserves source', shape:'bar', active:true, focus:true },
+    { k:'FILL',      l:'Fill',          s:'Crop — edges may clip',        shape:'full' },
+    { k:'STRETCH',   l:'Stretch',       s:'Distort — not recommended',    shape:'stretch' },
+    { k:'16:9',      l:'16:9 · HDTV',   s:'Force widescreen',              shape:'16:9' },
+    { k:'4:3',       l:'4:3 · SD',      s:'Classic broadcast ratio',       shape:'4:3' },
+    { k:'2.39:1',    l:'Cinema · 2.39', s:'Anamorphic widescreen',         shape:'cinema' },
+    { k:'21:9',      l:'21:9 · Ultrawide', s:'Crop top & bottom',           shape:'ultra' },
+  ];
+  const shapePreview = (kind) => {
+    const cont = { width:52, height:32, background:'rgba(0,0,0,0.5)', position:'relative', display:'grid', placeItems:'center', flexShrink:0 };
+    const inner = { background:'linear-gradient(135deg, var(--accent-soft), var(--accent-deep))' };
+    const sizes = {
+      bar:    { w:52, h:22 },
+      full:   { w:52, h:32 },
+      stretch:{ w:52, h:32 },
+      '16:9': { w:52, h:29 },
+      '4:3':  { w:42, h:32 },
+      cinema: { w:52, h:22 },
+      ultra:  { w:52, h:22 },
+    };
+    const sz = sizes[kind] || sizes.bar;
+    return (
+      <div className="y-chip" style={cont}>
+        <div style={{ ...inner, width:sz.w, height:sz.h }}/>
+      </div>
+    );
+  };
+
+  return (
+    <Sheet
+      kicker="04 · PLAYER · ASPECT & ZOOM"
+      title="Aspect ratio"
+      sub="Match the source or force a ratio. Zoom & pan for cropping."
+      active="aspect"
+    >
+      <div className="preview-strip" style={{ marginBottom:20, display:'grid', placeItems:'center' }}>
+        <div style={{ width:'80%', height:'70%', background:'rgba(0,0,0,0.85)', border:'1px solid var(--accent)',
+          boxShadow:'0 0 0 3px rgba(102,240,181,0.18)', display:'grid', placeItems:'center' }}>
+          <div className="mono" style={{ fontSize:11, color:'var(--accent)', letterSpacing:'0.2em' }}>FIT · 16:9 SOURCE → 16:9 DISPLAY</div>
+        </div>
+      </div>
+
+      {modes.map((m,i)=>(
+        <div key={m.k} className={`opt-row ${m.focus?'focused':''}`}>
+          {shapePreview(m.shape)}
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{m.l}</div>
+            <div className="opt-sub">{m.s}</div>
+          </div>
+          <div className="opt-code">{m.k}</div>
+          {m.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+
+      <div className="kicker-d" style={{ marginTop:20, marginBottom:10 }}>ZOOM · 100%</div>
+      <div className="slider-track">
+        <div className="slider-fill" style={{ width:'0%' }}/>
+        <div className="slider-knob" style={{ left:'0%' }}/>
+      </div>
+      <div className="mono" style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', letterSpacing:'0.14em', marginTop:6 }}>
+        <span>50%</span><span>100% (native)</span><span>200%</span>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 05 · SLEEP TIMER
+// =====================================================================
+function SleepPanel() {
+  const presets = [
+    { t:'Off',         s:'Plays forever' },
+    { t:'15 min',      s:'Stops in 14:32' },
+    { t:'30 min',      s:'Stops in 29:32', focus:true },
+    { t:'45 min',      s:'Stops in 44:32' },
+    { t:'1 hour',      s:'Stops in 59:32', active:true },
+    { t:'90 min',      s:'Stops in 1:29:32' },
+    { t:'End of video',s:'Stops at 02:14:00 · 1:18:52 from now' },
+    { t:'End of episode', s:'Stops at next credits break' },
+    { t:'Custom…',     s:'Pick exact duration' },
+  ];
+  return (
+    <Sheet
+      kicker="05 · PLAYER · SLEEP TIMER"
+      title="Sleep timer"
+      sub="Stop playback and return to home after a chosen duration."
+      active="sleep"
+    >
+      <div style={{
+        padding:36, marginBottom:24, textAlign:'center',
+        background:'linear-gradient(135deg, rgba(0,226,138,0.1) 0%, rgba(0,226,138,0.02) 100%)',
+        border:'1px solid rgba(0,226,138,0.3)',
+        clipPath:'polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px)',
+      }}>
+        <div className="kicker-d">ACTIVE · RUNNING</div>
+        <div className="mono tab-nums" style={{ fontSize:96, fontWeight:900, letterSpacing:'-0.04em', lineHeight:1, marginTop:6,
+          background:'linear-gradient(180deg, var(--accent-soft) 0%, var(--accent-deep) 100%)',
+          WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+        }}>59:32</div>
+        <div className="mono" style={{ fontSize:12, color:'var(--text-muted)', letterSpacing:'0.18em', marginTop:6 }}>STOPS AT 22:03:40 · TONIGHT</div>
+
+        <div style={{ marginTop:18, height:3, background:'rgba(255,255,255,0.12)' }}>
+          <div style={{ width:'1%', height:'100%', background:'linear-gradient(90deg, var(--accent-deep), var(--accent))' }}/>
+        </div>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:10 }}>PRESETS</div>
+      {presets.map((p,i)=>(
+        <div key={i} className={`opt-row ${p.focus?'focused':''}`}>
+          <Icon path={I.clock} size={18}/>
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{p.t}</div>
+            <div className="opt-sub">{p.s}</div>
+          </div>
+          {p.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:18 }}>
+        <div className="opt-label" style={{ flex:1 }}>Fade audio before stopping</div>
+        <Toggle value={true}/>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
+        <div className="opt-label" style={{ flex:1 }}>Repeat nightly at this hour</div>
+        <Toggle value={false}/>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 06 · RECORD
+// =====================================================================
+function RecordPanel() {
+  return (
+    <Sheet
+      kicker="06 · PLAYER · DVR"
+      title="Record programme"
+      sub="Save this stream to your configured cloud bucket or local drive. Scheduled recordings continue even when the app is closed."
+      active="record"
+    >
+      <div style={{
+        padding:'24px 28px', marginBottom:22,
+        background:'linear-gradient(135deg, rgba(255,59,59,0.12), rgba(255,59,59,0.02))',
+        border:'1px solid rgba(255,59,59,0.35)',
+        display:'flex', alignItems:'center', gap:20,
+        clipPath:'polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px)',
+      }}>
+        <div className="y-hex" style={{
+          width:80, height:80, display:'grid', placeItems:'center',
+          background:'radial-gradient(circle, var(--live), #a80020)',
+          boxShadow:'0 0 0 4px rgba(255,59,59,0.18), 0 0 24px rgba(255,59,59,0.6)',
+        }}>
+          <div className="live-dot" style={{ width:24, height:24 }}/>
+        </div>
+        <div style={{ flex:1 }}>
+          <div className="kicker-d" style={{ color:'var(--error)' }}>RECORDING</div>
+          <div style={{ fontSize:24, fontWeight:900, letterSpacing:'-0.01em', marginTop:4 }}>Emerald Horizon · S1E4</div>
+          <div className="mono tab-nums" style={{ fontSize:12, color:'var(--text-muted)', marginTop:4, letterSpacing:'0.1em' }}>
+            00:12:08 CAPTURED · 4.2 GB · 2160p HEVC
+          </div>
+        </div>
+        <HexBtn icon={I.close}>STOP</HexBtn>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:10 }}>RANGE · WHAT TO RECORD</div>
+      {[
+        { n:'From now until end of programme', s:'02:14:00 – 22:00:00 · 1:18:52 remaining', active:true, focus:true },
+        { n:'Whole programme (retroactive)',   s:'Uses catch-up buffer · 00:55 earlier' },
+        { n:'Next 30 minutes',                 s:'Stop at 21:34' },
+        { n:'Custom range…',                   s:'Pick start & end' },
+        { n:'This + next episode',             s:'Auto-continue through series' },
+      ].map((r,i)=>(
+        <div key={i} className={`opt-row ${r.focus?'focused':''}`}>
+          <Icon path={I.record} size={18}/>
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{r.n}</div>
+            <div className="opt-sub">{r.s}</div>
+          </div>
+          {r.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+
+      <div className="kicker-d" style={{ marginTop:20, marginBottom:8 }}>STORE TO</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        <div className="opt-row active" style={{ marginBottom:0, flexDirection:'column', alignItems:'flex-start', padding:'14px 16px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, width:'100%' }}>
+            <Icon path={I.cloud} size={18} />
+            <span className="opt-label" style={{flex:1}}>Nextcloud · Home</span>
+            <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>
+          </div>
+          <div className="opt-sub" style={{ marginLeft:28 }}>412 GB free · auto sync</div>
+        </div>
+        <div className="opt-row" style={{ marginBottom:0, flexDirection:'column', alignItems:'flex-start', padding:'14px 16px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, width:'100%' }}>
+            <Icon path={I.hdd} size={18} />
+            <span className="opt-label" style={{flex:1}}>USB · SHIELD 2TB</span>
+          </div>
+          <div className="opt-sub" style={{ marginLeft:28 }}>1.8 TB free · local</div>
+        </div>
+      </div>
+
+      <div style={{ display:'flex', gap:10, marginTop:20 }}>
+        <HexBtn primary icon={I.record}>START RECORDING</HexBtn>
+        <HexBtn icon={I.bell}>REMIND ME INSTEAD</HexBtn>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 07 · FAVORITE / PLAYLISTS
+// =====================================================================
+function FavPanel() {
+  const lists = [
+    { n:'★ My Favorites',      c:48, active:true, focus:true,  },
+    { n:'Sci-Fi night',        c:12, active:true },
+    { n:'Watch with Sam',      c:7 },
+    { n:'For later',           c:34 },
+    { n:'Kids picks',          c:62 },
+    { n:'Documentaries',       c:19 },
+    { n:'+ New playlist…',     c:null, add:true },
+  ];
+  return (
+    <Sheet
+      kicker="07 · PLAYER · FAVORITES"
+      title="Add to favorites"
+      sub="Save this title to one or more playlists. Add to Favorites for a top-level shortcut from Home."
+      active="fav"
+    >
+      <div style={{
+        display:'flex', alignItems:'center', gap:16, marginBottom:22, padding:'16px 18px',
+        background:'rgba(20,37,31,0.5)', border:'1px solid var(--border-subtle)',
+        clipPath:'polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px)',
+      }}>
+        <div style={{ width:80, height:110,
+          background:'radial-gradient(40% 30% at 50% 30%, rgba(255,180,100,0.8), transparent 70%), linear-gradient(135deg, #2a1040, #0a1410)',
+        }}/>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:18, fontWeight:800 }}>Emerald Horizon</div>
+          <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:3 }}>2024 · Sci-Fi · 2h 14m</div>
+          <div style={{ display:'flex', gap:6, marginTop:8 }}>
+            <HexChip tone="muted">IN 2 PLAYLISTS</HexChip>
+            <HexChip tone="premium">FAVORITED</HexChip>
+          </div>
+        </div>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>PLAYLISTS · 6 OWNED</div>
+      {lists.map((l,i)=>(
+        <div key={i} className={`opt-row ${l.focus?'focused':''}`}>
+          {l.add ? <Icon path={I.plus} size={18} stroke="2"/> : <Icon path={I.favorites} size={18}/>}
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{l.n}</div>
+            {l.c !== null && <div className="opt-sub">{l.c} items</div>}
+          </div>
+          {l.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+
+      <div className="kicker-d" style={{ marginTop:20, marginBottom:10 }}>QUICK ACTIONS</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        <HexBtn icon={I.bell}>REMIND WHEN RELATED</HexBtn>
+        <HexBtn icon={I.trend}>RATE 4 / 5 ★</HexBtn>
+        <HexBtn icon={I.shield}>HIDE FROM HOME</HexBtn>
+        <HexBtn icon={I.info}>DETAILS</HexBtn>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 08 · EXTERNAL PLAYER
+// =====================================================================
+function ExternalPanel() {
+  const apps = [
+    { n:'YancoTV · Native',     s:'Exoplayer · HDR10+ · HEVC', active:true, badge:'DEFAULT' },
+    { n:'VLC for Android',      s:'3.5.6 · wide codec support · subtitles', focus:true },
+    { n:'MX Player Pro',        s:'1.84.10 · hardware decoder' },
+    { n:'Kodi',                 s:'21.0 · launches via intent' },
+    { n:'Smart Tube',           s:'24.2 · YouTube fallback' },
+    { n:'Custom intent…',       s:'Pick package & action', custom:true },
+  ];
+  return (
+    <Sheet
+      kicker="08 · PLAYER · EXTERNAL"
+      title="Open in external player"
+      sub="Hand off the current stream URL to a third-party app. Position is passed along; return picks up where you left off."
+      active="ext"
+    >
+      <div style={{
+        display:'flex', alignItems:'center', gap:16, marginBottom:20, padding:'14px 18px',
+        background:'rgba(215,179,106,0.06)', border:'1px solid rgba(215,179,106,0.25)',
+        clipPath:'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)',
+      }}>
+        <Icon path={I.info} size={18} stroke="1.8"/>
+        <div style={{ fontSize:12, color:'var(--text-secondary)', lineHeight:1.55 }}>
+          <strong style={{color:'var(--premium)'}}>Some providers block external players.</strong> If stream fails, return to YancoTV native.
+        </div>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>APPS DETECTED · 5 + CUSTOM</div>
+      {apps.map((a,i)=>(
+        <div key={i} className={`opt-row ${a.focus?'focused':''} ${a.active?'active':''}`}>
+          <div className="y-chip" style={{
+            width:44, height:44, display:'grid', placeItems:'center',
+            background: a.active ? 'linear-gradient(180deg, var(--accent), var(--accent-deep))' : 'rgba(20,37,31,0.8)',
+            color: a.active ? '#04130C' : 'var(--text-secondary)',
+          }}>
+            <Icon path={a.custom ? I.plus : I.external} size={18} stroke="1.8"/>
+          </div>
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{a.n}</div>
+            <div className="opt-sub">{a.s}</div>
+          </div>
+          {a.badge && <HexChip tone="premium">{a.badge}</HexChip>}
+          {a.active && <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>}
+        </div>
+      ))}
+
+      <div className="kicker-d" style={{ marginTop:20, marginBottom:10 }}>HANDOFF PAYLOAD</div>
+      <div style={{
+        padding:'16px 20px', background:'rgba(0,0,0,0.4)',
+        border:'1px solid var(--border-subtle)', fontFamily:'var(--font-mono)', fontSize:11,
+        color:'var(--text-secondary)', lineHeight:1.8,
+        clipPath:'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)',
+      }}>
+        <div><span style={{color:'var(--text-muted)'}}>url</span> · /movie/0214/.../EmeraldHorizon.mkv</div>
+        <div><span style={{color:'var(--text-muted)'}}>pos</span> · 3308 sec</div>
+        <div><span style={{color:'var(--text-muted)'}}>audio</span> · en.5.1</div>
+        <div><span style={{color:'var(--text-muted)'}}>subs</span> · en.cc</div>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 09 · CAST
+// =====================================================================
+function CastPanel() {
+  const devices = [
+    { n:'Living Room TV',        s:'Chromecast with Google TV · 4K · HDR', active:true, focus:true },
+    { n:'Bedroom Shield',        s:'Nvidia Shield Pro · AndroidTV 12' },
+    { n:'Kitchen Display',       s:'Nest Hub Max · 1280×800' },
+    { n:'Office Monitor',        s:'AirPlay · LG UltraFine' },
+    { n:'MacBook Pro · Safari',  s:'Chrome Cast · this network' },
+    { n:'Sonos Arc',             s:'Audio-only · 5.1.2 · Dolby Atmos' },
+  ];
+  return (
+    <Sheet
+      kicker="09 · PLAYER · CAST"
+      title="Cast to another device"
+      sub="Send the stream to a nearby screen. Playback stays in sync; controls mirror to your TV remote."
+      active="cast"
+    >
+      <div style={{
+        padding:'22px 24px', marginBottom:20,
+        background:'linear-gradient(135deg, rgba(0,226,138,0.15), rgba(0,226,138,0.02))',
+        border:'1px solid rgba(0,226,138,0.3)',
+        display:'flex', alignItems:'center', gap:18,
+        clipPath:'polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px)',
+      }}>
+        <div className="y-hex" style={{
+          width:72, height:72, display:'grid', placeItems:'center',
+          background:'rgba(0,226,138,0.2)', color:'var(--accent)',
+          border:'1px solid var(--accent)',
+        }}>
+          <Icon path={I.cast} size={28}/>
+        </div>
+        <div style={{ flex:1 }}>
+          <div className="kicker">CASTING TO</div>
+          <div style={{ fontSize:24, fontWeight:900, marginTop:3 }}>Living Room TV</div>
+          <div className="mono" style={{ fontSize:11, color:'var(--text-muted)', marginTop:4, letterSpacing:'0.12em' }}>4K HDR · 14.2 Mbps · 142 ms latency</div>
+        </div>
+        <HexBtn icon={I.close}>STOP</HexBtn>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>AVAILABLE · 6 DEVICES</div>
+      {devices.map((d,i)=>(
+        <div key={i} className={`opt-row ${d.focus?'focused':''} ${d.active?'active':''}`}>
+          <div className="y-chip" style={{
+            width:40, height:40, display:'grid', placeItems:'center',
+            background: d.active ? 'rgba(0,226,138,0.2)' : 'rgba(20,37,31,0.8)',
+            color: d.active ? 'var(--accent)' : 'var(--text-secondary)',
+            border: d.active ? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
+          }}>
+            <Icon path={I.cast} size={16}/>
+          </div>
+          <div style={{ flex:1 }}>
+            <div className="opt-label">{d.n}</div>
+            <div className="opt-sub">{d.s}</div>
+          </div>
+          {d.active && <>
+            <HexChip tone="live">● CASTING</HexChip>
+            <div className="opt-check"><Icon path={I.check} size={14} stroke="2.5"/></div>
+          </>}
+        </div>
+      ))}
+
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:18 }}>
+        <div className="opt-label" style={{ flex:1 }}>Mute this device while casting</div>
+        <Toggle value={true}/>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
+        <div className="opt-label" style={{ flex:1 }}>Keep controls visible on this screen</div>
+        <Toggle value={true}/>
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// PANEL 10 · APPEARANCE
+// =====================================================================
+function LookPanel() {
+  return (
+    <Sheet
+      kicker="10 · PLAYER · APPEARANCE"
+      title="Player appearance"
+      sub="Tune color output, brightness ceiling, HDR target and the on-screen information density."
+      active="look"
+    >
+      {/* Preview */}
+      <div className="preview-strip" style={{ marginBottom:22 }}>
+        {/* Watermark, time, controls overlay */}
+        <div style={{ position:'absolute', top:12, right:12 }}><HexChip tone="premium">HDR · 1000 nits</HexChip></div>
+        <div style={{ position:'absolute', left:16, bottom:16 }}>
+          <div className="mono tab-nums" style={{ fontSize:11, color:'var(--accent)', letterSpacing:'0.12em' }}>00:55:08 / 02:14:00</div>
+          <div style={{ fontSize:15, fontWeight:800, marginTop:2, color:'var(--text-primary)' }}>Emerald Horizon</div>
+        </div>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>BRIGHTNESS · 78%</div>
+      <div className="slider-track" style={{ marginBottom:18 }}>
+        <div className="slider-fill" style={{ width:'78%' }}/>
+        <div className="slider-knob" style={{ left:'78%' }}/>
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>HDR TARGET</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6, marginBottom:18 }}>
+        {[
+          { l:'SDR',       s:'100 nits' },
+          { l:'HDR10',     s:'1000 nits', active:true },
+          { l:'HDR10+',    s:'4000 nits' },
+          { l:'DOLBY',     s:'VISION', focus:true },
+        ].map((h,i)=>(
+          <div key={i} className="y-chip" style={{
+            padding:'12px 8px', textAlign:'center',
+            background: h.active? 'linear-gradient(180deg, var(--accent), var(--accent-deep))' : (h.focus? 'rgba(0,226,138,0.08)' : 'rgba(20,37,31,0.5)'),
+            color: h.active? '#04130C' : 'var(--text-primary)',
+            border: h.focus? '1.5px solid var(--accent)' : '1px solid var(--border-subtle)',
+            boxShadow: h.active? '0 6px 14px rgba(0,226,138,0.35)' : (h.focus? '0 0 0 3px rgba(102,240,181,0.2)' : 'none'),
+          }}>
+            <div style={{ fontSize:14, fontWeight:900, letterSpacing:'0.06em' }}>{h.l}</div>
+            <div className="mono" style={{ fontSize:10, marginTop:3, color: h.active? '#04130C' : 'var(--text-muted)', letterSpacing:'0.14em' }}>{h.s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="kicker-d" style={{ marginBottom:8 }}>OVERLAY INFO</div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 0' }}>
+        <div className="opt-label" style={{ flex:1 }}>Show watermark (broadcaster)</div>
+        <Toggle value={true}/>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 0' }}>
+        <div className="opt-label" style={{ flex:1 }}>Show playback stats (Alt+Tab)</div>
+        <Toggle value={false}/>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 0' }}>
+        <div className="opt-label" style={{ flex:1 }}>Auto-hide chrome after 4s</div>
+        <Toggle value={true}/>
+      </div>
+
+      <div className="kicker-d" style={{ marginTop:16, marginBottom:8 }}>ACCENT THEME</div>
+      <div style={{ display:'flex', gap:8 }}>
+        {[
+          { c:'#00E28A', l:'EMERALD', active:true },
+          { c:'#D7B36A', l:'GOLD' },
+          { c:'#66C8FF', l:'ICE' },
+          { c:'#FF6B6B', l:'CORAL' },
+          { c:'#C084FC', l:'AMETHYST' },
+        ].map(t=>(
+          <div key={t.l} className="y-chip" style={{
+            padding:'12px 14px', display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+            background: t.active? 'rgba(0,226,138,0.1)' : 'rgba(20,37,31,0.5)',
+            border: t.active? '1.5px solid var(--accent)' : '1px solid var(--border-subtle)',
+            fontFamily:'var(--font-mono)', fontSize:10, letterSpacing:'0.12em', color:'var(--text-secondary)', fontWeight:700,
+          }}>
+            <div style={{ width:28, height:28, background:t.c, borderRadius:'50%', boxShadow:`0 0 16px ${t.c}60` }}/>
+            {t.l}
+          </div>
+        ))}
+      </div>
+    </Sheet>
+  );
+}
+
+// =====================================================================
+// Shell
+// =====================================================================
+function SheetShell() {
+  return (
+    <div style={{ minWidth:'100vw', minHeight:'100vh' }}>
+      <CrumbBar here="PLAYER OPTIONS · 10 PANELS"/>
+      <DesignCanvas>
+        <DCSection id="sheets" title="Player Options Sheet — 10 sub-panels" subtitle="Right-anchored side-sheet. Same frame, different panel. Tabs navigable with ◀▶; items with ▲▼.">
+          <DCArtboard id="audio"  label="01 · Audio tracks"         width={1920} height={1080}><AudioPanel/></DCArtboard>
+          <DCArtboard id="subs"   label="02 · Subtitles"            width={1920} height={1080}><SubsPanel/></DCArtboard>
+          <DCArtboard id="speed"  label="03 · Playback speed"       width={1920} height={1080}><SpeedPanel/></DCArtboard>
+          <DCArtboard id="aspect" label="04 · Aspect & zoom"        width={1920} height={1080}><AspectPanel/></DCArtboard>
+          <DCArtboard id="sleep"  label="05 · Sleep timer"          width={1920} height={1080}><SleepPanel/></DCArtboard>
+          <DCArtboard id="record" label="06 · Record · DVR"         width={1920} height={1080}><RecordPanel/></DCArtboard>
+          <DCArtboard id="fav"    label="07 · Favorites · playlists" width={1920} height={1080}><FavPanel/></DCArtboard>
+          <DCArtboard id="ext"    label="08 · External player"      width={1920} height={1080}><ExternalPanel/></DCArtboard>
+          <DCArtboard id="cast"   label="09 · Cast"                 width={1920} height={1080}><CastPanel/></DCArtboard>
+          <DCArtboard id="look"   label="10 · Appearance & HDR"     width={1920} height={1080}><LookPanel/></DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<SheetShell />);
+</script>
+</body>
+</html>
