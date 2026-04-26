@@ -39,7 +39,15 @@ ktlint {
         // Don't lint generated code (Compose, KSP, R-class, etc.) —
         // generators don't follow human style and we don't want those
         // diffs in our reports.
-        exclude { it.file.toString().contains("/build/generated/") }
+        //
+        // Path normalisation is mandatory: `it.file.toString()` on Windows
+        // produces backslashes (`D:\...\build\generated\...`), which
+        // `contains("/build/generated/")` misses. Replace separators
+        // before the substring check so the filter matches on both OSes.
+        exclude {
+            val normalized = it.file.path.replace('\\', '/')
+            normalized.contains("/build/generated/")
+        }
     }
 }
 

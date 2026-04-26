@@ -13,7 +13,13 @@ ktlint {
     android.set(false) // KMP module — Android-specific rules don't apply
     ignoreFailures.set(true)
     filter {
-        exclude { it.file.toString().contains("/build/generated/") }
+        // Match on both `/` (POSIX) and `\` (Windows) — `it.file.path` on
+        // Windows uses backslashes, so a literal `/build/generated/` check
+        // misses the SQLDelight-generated `YancoDb.kt` etc.
+        exclude {
+            val normalized = it.file.path.replace('\\', '/')
+            normalized.contains("/build/generated/")
+        }
     }
 }
 

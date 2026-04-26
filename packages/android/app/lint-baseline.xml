@@ -8,7 +8,7 @@
         errorLine2="                         ~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="353"
+            line="505"
             column="26"/>
     </issue>
 
@@ -19,7 +19,7 @@
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="14"
+            line="61"
             column="9"/>
     </issue>
 
@@ -30,7 +30,7 @@
         errorLine2="     ~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="33"
+            line="65"
             column="6"/>
     </issue>
 
@@ -602,7 +602,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="17"
+            line="18"
             column="17"/>
     </issue>
 
@@ -613,7 +613,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="17"
+            line="18"
             column="17"/>
     </issue>
 
@@ -624,7 +624,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="17"
+            line="18"
             column="17"/>
     </issue>
 
@@ -635,7 +635,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="17"
+            line="18"
             column="17"/>
     </issue>
 
@@ -646,7 +646,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="17"
+            line="18"
             column="17"/>
     </issue>
 
@@ -657,7 +657,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="17"
+            line="18"
             column="17"/>
     </issue>
 
@@ -668,7 +668,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="23"
+            line="24"
             column="17"/>
     </issue>
 
@@ -679,7 +679,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="23"
+            line="24"
             column="17"/>
     </issue>
 
@@ -690,7 +690,7 @@
         errorLine2="                ~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="23"
+            line="24"
             column="17"/>
     </issue>
 
@@ -701,7 +701,7 @@
         errorLine2="                    ~~~~~~~~~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="24"
+            line="25"
             column="21"/>
     </issue>
 
@@ -712,7 +712,7 @@
         errorLine2="                    ~~~~~~~~~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="24"
+            line="25"
             column="21"/>
     </issue>
 
@@ -723,8 +723,723 @@
         errorLine2="                    ~~~~~~~~~~~~~~~">
         <location
             file="../gradle/libs.versions.toml"
-            line="24"
+            line="25"
             column="21"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.documentfile:documentfile than 1.0.1 is available: 1.1.0"
+        errorLine1="androidx-documentfile = &quot;1.0.1&quot;"
+        errorLine2="                        ~~~~~~~">
+        <location
+            file="../gradle/libs.versions.toml"
+            line="26"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.documentfile:documentfile than 1.0.1 is available: 1.1.0"
+        errorLine1="androidx-documentfile = &quot;1.0.1&quot;"
+        errorLine2="                        ~~~~~~~">
+        <location
+            file="../gradle/libs.versions.toml"
+            line="26"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.documentfile:documentfile than 1.0.1 is available: 1.1.0"
+        errorLine1="androidx-documentfile = &quot;1.0.1&quot;"
+        errorLine2="                        ~~~~~~~">
+        <location
+            file="../gradle/libs.versions.toml"
+            line="26"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of io.sentry:sentry-android than 7.20.0 is available: 8.38.0"
+        errorLine1="sentry = &quot;7.20.0&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="../gradle/libs.versions.toml"
+            line="29"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of io.sentry:sentry-android than 7.20.0 is available: 8.38.0"
+        errorLine1="sentry = &quot;7.20.0&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="../gradle/libs.versions.toml"
+            line="29"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of io.sentry:sentry-android than 7.20.0 is available: 8.38.0"
+        errorLine1="sentry = &quot;7.20.0&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="../gradle/libs.versions.toml"
+            line="29"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    extends SimpleDecoder&lt;DecoderInputBuffer, SimpleDecoderOutputBuffer, FfmpegDecoderException> {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="34"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);"
+        errorLine2="    ~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="59"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);"
+        errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="59"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);"
+        errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="59"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    if (!FfmpegLibrary.isAvailable()) {"
+        errorLine2="                       ~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="60"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      throw new FfmpegDecoderException(&quot;Failed to load decoder native libraries.&quot;);"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="61"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    checkNotNull(format.sampleMimeType);"
+        errorLine2="    ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="63"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    codecName = checkNotNull(FfmpegLibrary.getCodecName(format.sampleMimeType));"
+        errorLine2="    ~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="64"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    codecName = checkNotNull(FfmpegLibrary.getCodecName(format.sampleMimeType));"
+        errorLine2="                ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="64"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    codecName = checkNotNull(FfmpegLibrary.getCodecName(format.sampleMimeType));"
+        errorLine2="                                           ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="64"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    extraData = getExtraData(format.sampleMimeType, format.initializationData);"
+        errorLine2="                                                           ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="65"
+            column="60"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    encoding = outputFloat ? C.ENCODING_PCM_FLOAT : C.ENCODING_PCM_16BIT;"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="66"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    encoding = outputFloat ? C.ENCODING_PCM_FLOAT : C.ENCODING_PCM_16BIT;"
+        errorLine2="                                                      ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="66"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      throw new FfmpegDecoderException(&quot;Initialization failed.&quot;);"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="72"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    setInitialInputBufferSize(initialInputBufferSize);"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="74"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  public String getName() {"
+        errorLine2="                ~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="78"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    return &quot;ffmpeg&quot; + FfmpegLibrary.getVersion() + &quot;-&quot; + codecName;"
+        errorLine2="                                    ~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="79"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected DecoderInputBuffer createInputBuffer() {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="83"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected DecoderInputBuffer createInputBuffer() {"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="83"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    return new DecoderInputBuffer("
+        errorLine2="           ^">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="84"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT,"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="85"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        FfmpegLibrary.getInputBufferPaddingSize());"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="86"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected SimpleDecoderOutputBuffer createOutputBuffer() {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="90"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected SimpleDecoderOutputBuffer createOutputBuffer() {"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="90"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    return new SimpleDecoderOutputBuffer(this::releaseOutputBuffer);"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="91"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    return new SimpleDecoderOutputBuffer(this::releaseOutputBuffer);"
+        errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="91"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected FfmpegDecoderException createUnexpectedDecodeException(Throwable error) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="95"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected FfmpegDecoderException createUnexpectedDecodeException(Throwable error) {"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="95"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    return new FfmpegDecoderException(&quot;Unexpected decode error&quot;, error);"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="96"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected FfmpegDecoderException decode("
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="101"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  protected FfmpegDecoderException decode("
+        errorLine2="                                   ~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="101"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      DecoderInputBuffer inputBuffer, SimpleDecoderOutputBuffer outputBuffer, boolean reset) {"
+        errorLine2="      ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="102"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      DecoderInputBuffer inputBuffer, SimpleDecoderOutputBuffer outputBuffer, boolean reset) {"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="102"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        return new FfmpegDecoderException(&quot;Error resetting (see logcat).&quot;);"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="106"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    ByteBuffer inputData = Util.castNonNull(inputBuffer.data);"
+        errorLine2="                                ~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="109"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    ByteBuffer inputData = Util.castNonNull(inputBuffer.data);"
+        errorLine2="                                                        ~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="109"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    ByteBuffer outputData = outputBuffer.init(inputBuffer.timeUs, outputBufferSize);"
+        errorLine2="                                         ~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="111"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    ByteBuffer outputData = outputBuffer.init(inputBuffer.timeUs, outputBufferSize);"
+        errorLine2="                                                          ~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="111"
+            column="59"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      return new FfmpegDecoderException(&quot;Error decoding (see logcat).&quot;);"
+        errorLine2="             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="116"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      outputBuffer.shouldBeSkipped = true;"
+        errorLine2="                   ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="121"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      outputBuffer.shouldBeSkipped = true;"
+        errorLine2="                   ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="125"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        checkNotNull(extraData);"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="132"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        ParsableByteArray parsableExtraData = new ParsableByteArray(extraData);"
+        errorLine2="        ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="135"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        ParsableByteArray parsableExtraData = new ParsableByteArray(extraData);"
+        errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="135"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        parsableExtraData.setPosition(extraData.length - 4);"
+        errorLine2="                          ~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="136"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        sampleRate = parsableExtraData.readUnsignedIntToInt();"
+        errorLine2="        ~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="137"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        sampleRate = parsableExtraData.readUnsignedIntToInt();"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="137"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    outputData = checkNotNull(outputBuffer.data);"
+        errorLine2="    ~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="143"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    outputData = checkNotNull(outputBuffer.data);"
+        errorLine2="                 ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="143"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    outputData = checkNotNull(outputBuffer.data);"
+        errorLine2="                                           ~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="143"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  private ByteBuffer growOutputBuffer(SimpleDecoderOutputBuffer outputBuffer, int requiredSize) {"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="151"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    return outputBuffer.grow(requiredSize);"
+        errorLine2="                        ~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="154"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="  public void release() {"
+        errorLine2="              ~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="158"
+            column="15"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    super.release();"
+        errorLine2="          ~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="159"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="      SimpleDecoderOutputBuffer decoderOutputBuffer,"
+        errorLine2="      ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java"
+            line="241"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    if (error.errorCode !in PlaybackController.FFMPEG_RELEVANT_ERROR_CODES) return false"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/yancotv/android/player/PlaybackController.kt"
+            line="829"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    controller: PlaybackController,"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/yancotv/android/player/PlayerOptionsSheet.kt"
+            line="1555"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    controller: PlaybackController,"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/yancotv/android/player/RecordingIndicator.kt"
+            line="57"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="VisibleForTests"
+        message="This method should only be accessed from tests or within private scope"
+        errorLine1="                controller.debugForceRebuildForVerification()"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/java/com/yancotv/android/debug/WatchdogSmokeTestReceiver.kt"
+            line="58"
+            column="28"/>
     </issue>
 
     <issue
@@ -750,14 +1465,36 @@
     </issue>
 
     <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/java/com/yancotv/android/player/VodPlayerDock.kt"
+            line="143"
+            column="5"/>
+    </issue>
+
+    <issue
         id="DiscouragedApi"
         message="Should not restrict activity to fixed orientation. This may not be suitable for different form factors, causing the app to be letterboxed."
         errorLine1="            android:screenOrientation=&quot;landscape&quot;"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="65"
+            line="106"
             column="13"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;channels&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;recording_notification_title_many&quot;>Recording %1$d channels&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="9"
+            column="5"/>
     </issue>
 
     <issue
@@ -767,8 +1504,30 @@
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="19"
+            line="66"
             column="27"/>
+    </issue>
+
+    <issue
+        id="ExportedReceiver"
+        message="Exported receiver does not require permission"
+        errorLine1="        &lt;receiver"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/debug/AndroidManifest.xml"
+            line="15"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="ExportedReceiver"
+        message="Exported receiver does not require permission"
+        errorLine1="        &lt;receiver"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/debug/AndroidManifest.xml"
+            line="24"
+            column="10"/>
     </issue>
 
     <issue
@@ -778,7 +1537,7 @@
         errorLine2="                             ~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="35"
+            line="67"
             column="30"/>
     </issue>
 
@@ -789,7 +1548,7 @@
         errorLine2="                                        ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/CategoryChipBar.kt"
-            line="93"
+            line="94"
             column="41"/>
     </issue>
 
@@ -800,7 +1559,7 @@
         errorLine2="                                           ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/CategoryRail.kt"
-            line="118"
+            line="120"
             column="44"/>
     </issue>
 
@@ -811,7 +1570,7 @@
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/detail/ContentDetailScreen.kt"
-            line="121"
+            line="123"
             column="9"/>
     </issue>
 
@@ -822,7 +1581,7 @@
         errorLine2="                                  ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/CoverflowSectionScreen.kt"
-            line="149"
+            line="154"
             column="35"/>
     </issue>
 
@@ -833,7 +1592,7 @@
         errorLine2="                                   ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/CoverflowSectionScreen.kt"
-            line="150"
+            line="155"
             column="36"/>
     </issue>
 
@@ -844,7 +1603,7 @@
         errorLine2="                                                     ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/CoverflowSectionScreen.kt"
-            line="211"
+            line="218"
             column="54"/>
     </issue>
 
@@ -855,7 +1614,7 @@
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/CoverflowSectionScreen.kt"
-            line="232"
+            line="242"
             column="34"/>
     </issue>
 
@@ -921,7 +1680,7 @@
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/GuideSyncPanel.kt"
-            line="94"
+            line="89"
             column="34"/>
     </issue>
 
@@ -932,7 +1691,7 @@
         errorLine2="                                         ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/shell/HomeContent.kt"
-            line="405"
+            line="420"
             column="42"/>
     </issue>
 
@@ -943,8 +1702,30 @@
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/ui/parental/PinEntryDialog.kt"
-            line="58"
+            line="57"
             column="34"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableFloatStateOf` instead of `mutableStateOf`"
+        errorLine1="    var currentSpeed by remember { mutableStateOf(currentPlayerSpeed(controller.player)) }"
+        errorLine2="                                   ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/yancotv/android/player/PlayerOptionsSheet.kt"
+            line="992"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
+        errorLine1="        mutableStateOf((state.deadlineMs - System.currentTimeMillis()).coerceAtLeast(0L))"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/yancotv/android/player/PlayerOptionsSheet.kt"
+            line="1287"
+            column="9"/>
     </issue>
 
     <issue
@@ -1028,34 +1809,34 @@
     <issue
         id="SetTextI18n"
         message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
-        errorLine1="        ppTime.text = &quot;${remainingMin} min left • ${totalMin} min&quot;"
-        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="        ppTime.text = &quot;$remainingMin min left • $totalMin min&quot;"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="488"
+            line="660"
             column="23"/>
     </issue>
 
     <issue
         id="SetTextI18n"
         message="String literal in `setText` can not be translated. Use Android resources instead."
-        errorLine1="        ppTime.text = &quot;${remainingMin} min left • ${totalMin} min&quot;"
-        errorLine2="                                      ~~~~~~~~~~~~">
+        errorLine1="        ppTime.text = &quot;$remainingMin min left • $totalMin min&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="488"
-            column="39"/>
+            line="660"
+            column="37"/>
     </issue>
 
     <issue
         id="SetTextI18n"
         message="String literal in `setText` can not be translated. Use Android resources instead."
-        errorLine1="        ppTime.text = &quot;${remainingMin} min left • ${totalMin} min&quot;"
-        errorLine2="                                                             ~~~~">
+        errorLine1="        ppTime.text = &quot;$remainingMin min left • $totalMin min&quot;"
+        errorLine2="                                                         ~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="488"
-            column="62"/>
+            line="660"
+            column="58"/>
     </issue>
 
     <issue
@@ -1065,7 +1846,7 @@
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="521"
+            line="694"
             column="29"/>
     </issue>
 
@@ -1076,7 +1857,7 @@
         errorLine2="                             ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="521"
+            line="694"
             column="30"/>
     </issue>
 
@@ -1087,7 +1868,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="522"
+            line="695"
             column="24"/>
     </issue>
 
@@ -1098,7 +1879,7 @@
         errorLine2="                        ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="522"
+            line="695"
             column="25"/>
     </issue>
 
@@ -1109,7 +1890,7 @@
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="523"
+            line="696"
             column="26"/>
     </issue>
 
@@ -1120,7 +1901,7 @@
         errorLine2="                          ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="523"
+            line="696"
             column="27"/>
     </issue>
 
@@ -1131,7 +1912,7 @@
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="524"
+            line="697"
             column="25"/>
     </issue>
 
@@ -1142,7 +1923,7 @@
         errorLine2="                         ~~~~~~~~">
         <location
             file="src/main/java/com/yancotv/android/player/PlayerActivity.kt"
-            line="524"
+            line="697"
             column="26"/>
     </issue>
 
@@ -1153,7 +1934,7 @@
         errorLine2="                ~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/layout/activity_player.xml"
-            line="57"
+            line="72"
             column="17"/>
     </issue>
 
@@ -1164,7 +1945,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/layout/activity_player.xml"
-            line="119"
+            line="134"
             column="13"/>
     </issue>
 
@@ -1175,7 +1956,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/layout/activity_player.xml"
-            line="167"
+            line="182"
             column="13"/>
     </issue>
 
@@ -1186,41 +1967,8 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/layout/activity_player.xml"
-            line="265"
+            line="280"
             column="13"/>
-    </issue>
-
-    <issue
-        id="HardcodedText"
-        message="Hardcoded string &quot;Stream unavailable&quot;, should use `@string` resource"
-        errorLine1="            android:text=&quot;Stream unavailable&quot;"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/layout/activity_player.xml"
-            line="317"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="HardcodedText"
-        message="Hardcoded string &quot;Retry&quot;, should use `@string` resource"
-        errorLine1="                android:text=&quot;Retry&quot;"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/layout/activity_player.xml"
-            line="343"
-            column="17"/>
-    </issue>
-
-    <issue
-        id="HardcodedText"
-        message="Hardcoded string &quot;Back&quot;, should use `@string` resource"
-        errorLine1="                android:text=&quot;Back&quot;"
-        errorLine2="                ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/layout/activity_player.xml"
-            line="359"
-            column="17"/>
     </issue>
 
 </issues>
