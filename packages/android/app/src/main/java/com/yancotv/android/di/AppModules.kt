@@ -137,6 +137,16 @@ val appModule =
                 clock = { System.currentTimeMillis() },
             )
         }
+        // MK.14.3 — alarm wrapper + scheduler. Receiver pulls these
+        // via KoinComponent.inject() at fire time.
+        single { com.yancotv.android.recording.schedule.RecordingScheduleAlarmManager(androidContext()) }
+        single {
+            com.yancotv.android.recording.schedule.RecordingScheduleScheduler(
+                context = androidContext(),
+                repo = get(),
+                alarmManager = get(),
+            )
+        }
         single<PinHasher> { AndroidPinHasher() }
         single {
             ParentalRepository(

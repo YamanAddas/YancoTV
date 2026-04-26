@@ -132,6 +132,27 @@
             </intent-filter>
         </receiver>
 
+        <!-- MK.14.3 — fires when a scheduled recording's pre-fire or end
+             alarm triggers. Pre-fire: decides tee / switch+tee / missed
+             based on player state, then starts RecordingService. End:
+             stops the linked recording and transitions the schedule to
+             COMPLETED. -->
+        <receiver
+            android:name=".recording.schedule.RecordingScheduleReceiver"
+            android:exported="false" />
+
+        <!-- MK.14.3 — re-arms alarms that didn't survive reboot, plus
+             reconciles lapsed schedules to MISSED so the UI doesn't
+             show stale "scheduled" entries forever. -->
+        <receiver
+            android:name=".recording.schedule.RecordingScheduleBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
         <!-- Stage 3.1 / MK.14.1e — foreground service that owns every
              in-flight recording. `dataSync` is the appropriate type
              (we're streaming bytes from the network and writing them
