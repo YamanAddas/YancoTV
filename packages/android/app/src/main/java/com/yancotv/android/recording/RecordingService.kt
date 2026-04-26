@@ -28,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -134,6 +135,20 @@ class RecordingService : Service() {
         // got revoked since the user picked the folder.
         val job =
             serviceScope.launch(Dispatchers.IO) {
+                // **Single-connection IPTV grace period.** When the user
+                // pressed "Record this channel" from the player options
+                // sheet, the player's connection has just been released —
+                // but ExoPlayer's OkHttp socket close + the server's
+                // stream-slot release are both async. Opening a fresh GET
+                // immediately makes the server still see two connections,
+                // which surfaces as performGet hanging forever (recorder
+                // gets 0 bytes). 1 s is overkill for a healthy network
+                // but the cheap insurance that lets stop-then-record on
+                // a 1-stream provider Just Work. Living here in the
+                // service (not the launching composable) means it isn't
+                // cancelled when the player activity finishes immediately
+                // after firing this Intent.
+                delay(GRACE_BEFORE_RECORD_MS)
                 val output =
                     try {
                         storageResolver.resolve(
@@ -385,6 +400,12 @@ class RecordingService : Service() {
         private const val TAG = "YancoRecordingSvc"
         private const val CHANNEL_ID = "yanco_recordings"
         private const val NOTIFICATION_ID = 9001
+
+        /** Grace period at the start of every recording so the prior
+         *  player connection on the same channel has time to fully close
+         *  on the wire before the recorder opens its own GET. See the
+         *  delay call in [handleStart]. */
+        private const val GRACE_BEFORE_RECORD_MS = 1_000L
 
         const val ACTION_START = "com.yancotv.android.recording.START"
         const val ACTION_STOP = "com.yancotv.android.recording.STOP"

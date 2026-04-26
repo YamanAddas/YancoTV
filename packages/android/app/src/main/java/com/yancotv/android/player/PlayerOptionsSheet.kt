@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1425,11 +1424,6 @@ private fun RecordPanel(
     val pal = LocalYancoPalette.current
     val firstRowFocus = remember { FocusRequester() }
     val context = LocalContext.current
-    // rememberCoroutineScope ties the scope to this composable's lifetime —
-    // it cancels automatically when the panel leaves composition. The
-    // earlier hand-rolled CoroutineScope(SupervisorJob() + Main.immediate)
-    // was leaked on disposal.
-    val recordScope = rememberCoroutineScope()
     val currentItem by controller.currentItem.collectAsState()
     // Reactive list of in-flight recordings — flips this panel's
     // start-vs-stop state when another surface starts / stops a
@@ -1513,45 +1507,36 @@ private fun RecordPanel(
         onPick = {
             // **Single-connection IPTV reality** (Stage 3.1 / option B):
             // Most Xtream-style providers cap concurrent streams per account.
-            // If the player keeps its connection open, the recorder's parallel
-            // GET to the same channel either hangs (server holds it) or kicks
-            // the player off — both observed on the user's provider. Releasing
-            // the player here is honest: one connection, one consumer (the
-            // recorder).
-            //
-            // Order + delay: stop the player FIRST, then wait ~1 s before
-            // starting the recorder. controller.stop() returns synchronously
-            // but the underlying OkHttp socket close + the server's stream-
-            // slot release are both async. Without the delay the recorder's
-            // GET hits the server while it still believes the previous
-            // connection is alive, which surfaces as performGet hanging
-            // forever (observed: 0-byte recordings every time). 1 s is
-            // overkill for a healthy network but cheap insurance.
-            val capturedItem = item
+            // If the player keeps its connection open, the recorder's
+            // parallel GET to the same channel either hangs or kicks the
+            // player off. Release the player here so the recorder owns the
+            // connection. The grace period that lets the OkHttp socket
+            // close on the wire before the recorder's GET fires lives
+            // inside RecordingService.handleStart so it survives this
+            // composable being torn down by activity.finish() below — the
+            // earlier rememberCoroutineScope-based delay was cancelled when
+            // the panel disposed and the recording never started.
             controller.stop()
+            RecordingService.start(
+                context = context,
+                input =
+                    RecordInput(
+                        recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
+                        sourceUrl = item.streamUrl,
+                        title = displayTitle,
+                        format = format,
+                        contentId = item.id,
+                    ),
+            )
             android.widget.Toast.makeText(
                 context,
                 "Recording started · player paused. Open Recordings to watch.",
                 android.widget.Toast.LENGTH_LONG,
             ).show()
-            recordScope.launch {
-                kotlinx.coroutines.delay(1000)
-                RecordingService.start(
-                    context = context,
-                    input =
-                        RecordInput(
-                            recordId = "rec-${System.currentTimeMillis()}-${capturedItem.id.take(8)}",
-                            sourceUrl = capturedItem.streamUrl,
-                            title = displayTitle,
-                            format = format,
-                            contentId = capturedItem.id,
-                        ),
-                )
-            }
             // Drop out of fullscreen — with no media item the player would
-            // just show a black surface. Sending the user back to Home reads
-            // as "OK, we're recording now," and they can hop into Recordings
-            // from the sidebar.
+            // just show a black surface. Sending the user back to Home
+            // reads as "OK, we're recording now," and they can hop into
+            // Recordings from the sidebar.
             (context as? android.app.Activity)?.finish()
             onBack()
         },
