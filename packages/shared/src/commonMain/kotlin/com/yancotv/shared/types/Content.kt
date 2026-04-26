@@ -172,4 +172,8 @@ data class FavoriteEntry(
     val favoriteId: String,
     val addedAt: Long,
     val content: ContentItem,
+    /** Stage 2.2 — which favorite list this entry belongs to. Null for
+     *  legacy rows that haven't been migrated yet (shouldn't happen on
+     *  shipped builds since the v4 → v5 migration backfills 'default'). */
+    val listId: String? = null,
 )

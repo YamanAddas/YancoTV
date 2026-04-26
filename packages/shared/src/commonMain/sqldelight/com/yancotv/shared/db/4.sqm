@@ -1,0 +1,52 @@
+-- v4 → v5 (Stage 2.2, MK.13.4 schema half): multi-list favorites.
+--
+--   * `favorite_lists` table holds named lists with stable sort_order.
+--     A "default" list is seeded so existing single-list installs see
+--     no behavioural change — every legacy `favorites` row gets
+--     list_id = 'default' below.
+--
+--   * `favorites.list_id` joins each row to a list. Added nullable
+--     because SQLite ALTER TABLE can't add NOT NULL without a constant
+--     default (and even with a default, the resulting column would be
+--     "default-list-id" hard-coded in DDL — uglier than a controlled
+--     UPDATE). After the UPDATE seeds every legacy row, NULLs only
+--     occur if app code forgets to set it on insert; the .sq query
+--     binding makes the parameter required so that's prevented at the
+--     type level.
+--
+--   * Backfill UPDATE pins legacy favorites to the seeded 'default'
+--     list. List deletion cascades to favorites by FK so deleting a
+--     non-default list reaps its membership; the UI must block deletion
+--     of the default list itself (covered in MK.13.4 feature wiring).
+CREATE TABLE favorite_lists (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    -- 1 marks the un-deletable default list. CHECK enforces 0/1 only;
+    -- multiple "default = 1" rows would be a UI bug, but the schema
+    -- doesn't make uniqueness easy to enforce without a partial index
+    -- (SQLite supports them but SQLDelight tooling didn't always
+    -- generate them cleanly). UI layer enforces single-default.
+    is_default INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0, 1)),
+    created_at INTEGER NOT NULL, -- ms since epoch
+    updated_at INTEGER NOT NULL  -- ms since epoch
+);
+
+CREATE INDEX idx_favorite_lists_sort_order ON favorite_lists(sort_order ASC);
+
+-- Seed the default list with a fixed id so every install (fresh OR
+-- migrated-from-v4) shares the same row identity. INSERT OR IGNORE so
+-- repeated migration runs (re-tests, etc.) don't duplicate it.
+INSERT OR IGNORE INTO favorite_lists
+    (id, name, sort_order, is_default, created_at, updated_at)
+VALUES
+    ('default', 'Favorites', 0, 1, 0, 0);
+
+ALTER TABLE favorites ADD COLUMN list_id TEXT REFERENCES favorite_lists(id) ON DELETE CASCADE;
+
+-- Backfill: every legacy favorite was implicitly in the single-list
+-- world; pin them to the default list so the migrated DB is internally
+-- consistent.
+UPDATE favorites SET list_id = 'default' WHERE list_id IS NULL;
+
+CREATE INDEX idx_favorites_list_id ON favorites(list_id);

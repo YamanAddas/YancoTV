@@ -28,6 +28,7 @@ class FavoritesRepository(
             FavoriteEntry(
                 favoriteId = row.favorite_id,
                 addedAt = row.added_at,
+                listId = row.list_id,
                 content =
                     ContentItem(
                         id = row.id,
@@ -64,6 +65,7 @@ class FavoritesRepository(
                 FavoriteEntry(
                     favoriteId = row.favorite_id,
                     addedAt = row.added_at,
+                    listId = row.list_id,
                     content =
                         ContentItem(
                             id = row.id,
@@ -101,9 +103,14 @@ class FavoritesRepository(
             db.favoritesQueries.deleteByContent(contentId)
             false
         } else {
+            // Stage 2.2 — bare star toggle adds to the user's default list.
+            // The long-press list-picker (MK.13.4 / Stage 4.4) will pass an
+            // explicit list_id via a new repo method; this method stays the
+            // shorthand for "just add it to my favorites".
             db.favoritesQueries.insert(
                 id = "fav:$contentId",
                 content_id = contentId,
+                list_id = DEFAULT_LIST_ID,
                 added_at = clock(),
             )
             true
@@ -112,6 +119,13 @@ class FavoritesRepository(
 
     fun remove(contentId: String) {
         db.favoritesQueries.deleteByContent(contentId)
+    }
+
+    private companion object {
+        // Stage 2.2 — id of the seeded "default" list. Created by the v4 → v5
+        // migration AND by FavoriteLists.sq's INSERT OR IGNORE on fresh
+        // install, so every device has it from launch one.
+        const val DEFAULT_LIST_ID = "default"
     }
 }
 

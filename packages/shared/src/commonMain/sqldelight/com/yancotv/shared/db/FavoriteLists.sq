@@ -1,0 +1,46 @@
+-- Stage 2.2 — named favorite lists. The 'default' list is seeded at
+-- create time and is the un-deletable home for any favorite added
+-- before the user has created their own lists.
+CREATE TABLE favorite_lists (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_default INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0, 1)),
+    created_at INTEGER NOT NULL, -- ms since epoch
+    updated_at INTEGER NOT NULL  -- ms since epoch
+);
+
+CREATE INDEX idx_favorite_lists_sort_order ON favorite_lists(sort_order ASC);
+
+-- Same seed as 4.sqm — fresh installs land here, migrated installs hit
+-- the migration's identical INSERT OR IGNORE. Either way, every device
+-- has a 'default' list row from launch one.
+INSERT OR IGNORE INTO favorite_lists
+    (id, name, sort_order, is_default, created_at, updated_at)
+VALUES
+    ('default', 'Favorites', 0, 1, 0, 0);
+
+selectAll:
+SELECT * FROM favorite_lists ORDER BY sort_order ASC;
+
+selectById:
+SELECT * FROM favorite_lists WHERE id = ?;
+
+selectDefault:
+SELECT * FROM favorite_lists WHERE is_default = 1 LIMIT 1;
+
+insert:
+INSERT INTO favorite_lists (id, name, sort_order, is_default, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+rename:
+UPDATE favorite_lists SET name = ?, updated_at = ? WHERE id = ?;
+
+setSortOrder:
+UPDATE favorite_lists SET sort_order = ?, updated_at = ? WHERE id = ?;
+
+-- Caller must guard: deleting is_default = 1 leaves un-listed favorites
+-- (FK CASCADE drops them entirely, which is bad UX). UI blocks default
+-- deletion before reaching this query.
+deleteById:
+DELETE FROM favorite_lists WHERE id = ? AND is_default = 0;

@@ -1,22 +1,49 @@
 CREATE TABLE favorites (
     id TEXT PRIMARY KEY NOT NULL,
     content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
+    -- Stage 2.2 — every favorite belongs to exactly one list. The
+    -- 'default' list (seeded by FavoriteLists.sq) is the implicit home
+    -- for legacy favorites and any add-without-list-pick action.
+    -- Nullable in the DDL so the v4 → v5 migration's ALTER ADD COLUMN
+    -- can run; app code always sets it on insert (.sq parameter is
+    -- non-null TEXT below).
+    list_id TEXT REFERENCES favorite_lists(id) ON DELETE CASCADE,
     added_at INTEGER NOT NULL -- wall clock, ms since epoch
 );
 
 CREATE INDEX idx_favorites_content ON favorites(content_id);
+CREATE INDEX idx_favorites_list_id ON favorites(list_id);
 
 selectAll:
-SELECT f.id AS favorite_id, f.added_at, c.*
+SELECT f.id AS favorite_id, f.added_at, f.list_id, c.*
 FROM favorites f
 JOIN content c ON c.id = f.content_id
 ORDER BY f.added_at DESC;
 
+-- Stage 2.2 — list-scoped favorites view for the multi-list tabs.
+selectByList:
+SELECT f.id AS favorite_id, f.added_at, f.list_id, c.*
+FROM favorites f
+JOIN content c ON c.id = f.content_id
+WHERE f.list_id = ?
+ORDER BY f.added_at DESC;
+
+-- "Favorited in any list" check for MK.13.1's reactive star — the star
+-- lights up if the content is in at least one list, not specifically
+-- the default. Long-press in the UI surfaces the per-list picker.
 isFavorite:
 SELECT COUNT(*) > 0 FROM favorites WHERE content_id = ?;
 
-insert:
-INSERT INTO favorites (id, content_id, added_at) VALUES (?, ?, ?);
-
+-- Used by the "remove from favorites" action when the UI doesn't know
+-- which list contained it (legacy single-list star). Removes from
+-- every list — the user can re-add to a specific list afterwards.
 deleteByContent:
 DELETE FROM favorites WHERE content_id = ?;
+
+-- Stage 2.2 — list-scoped delete for "remove from THIS list" without
+-- touching the same content's membership in other lists.
+deleteByContentInList:
+DELETE FROM favorites WHERE content_id = ? AND list_id = ?;
+
+insert:
+INSERT INTO favorites (id, content_id, list_id, added_at) VALUES (?, ?, ?, ?);
