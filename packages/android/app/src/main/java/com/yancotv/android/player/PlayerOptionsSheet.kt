@@ -61,12 +61,17 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
+import com.yancotv.android.recording.RecordingService
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.recording.RecordInput
+import com.yancotv.shared.recording.RecordingFormat
+import com.yancotv.shared.recording.RecordingStatus
+import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -302,10 +307,10 @@ fun PlayerOptionsSheet(
                             onEscapeUp = escapeToTabs,
                         )
                     SheetMode.RECORD ->
-                        StubPanel(
-                            heading = "Record programme",
-                            body = "Save this stream to Nextcloud / S3 / local drive. Scheduled recordings continue in the background.",
-                            milestone = "MK.14",
+                        RecordPanel(
+                            controller = controller,
+                            onBack = onDismiss,
+                            onEscapeUp = escapeToTabs,
                         )
                     SheetMode.FAV ->
                         FavoritesPanel(
@@ -1387,7 +1392,153 @@ private fun formatSleepCountdown(ms: Long): String {
  * write to the favorites table fires the SQLDelight notifier, so a
  * toggle from Browse/Home or this panel reflects everywhere immediately.
  */
-@UnstableApi
+
+// ───── Record panel (MK.14.2) ─────
+
+/**
+ * One-tap "Record now" / "Stop recording" surface for the channel
+ * currently in the player. Wires the player options sheet's RECORD
+ * tab into the Stage 3.1 recording engine.
+ *
+ * Behaviour:
+ *   - If [PlaybackController.currentItem] is null → empty-state row.
+ *   - If a recording for this channel is already in flight (status =
+ *     RECORDING in the recordings table) → show "Stop recording";
+ *     tapping fires [RecordingService.stop].
+ *   - Otherwise → show "Start recording" with the detected format
+ *     (HLS if the URL ends in `.m3u8`, MPEG-TS for everything else
+ *     including Xtream catch-up `.ts`); tapping fires
+ *     [RecordingService.start] and dismisses the sheet.
+ *
+ * The "browse past recordings" link belongs in [SheetMode.RECORD]'s
+ * companion full-screen RecordingsScreen (MK.14.5) — out of scope
+ * here.
+ */
+@Composable
+private fun RecordPanel(
+    controller: PlaybackController,
+    onBack: () -> Unit,
+    onEscapeUp: () -> Unit,
+    recordings: RecordingsRepository = koinInject(),
+) {
+    val pal = LocalYancoPalette.current
+    val firstRowFocus = remember { FocusRequester() }
+    val context = LocalContext.current
+    val currentItem by controller.currentItem.collectAsState()
+    // Reactive list of in-flight recordings — flips this panel's
+    // start-vs-stop state when another surface starts / stops a
+    // recording for the same channel.
+    val inflight by remember { recordings.allFlow() }
+        .collectAsState(initial = emptyList())
+    val activeForChannel =
+        inflight.firstOrNull { it.contentId == currentItem?.id && it.status == RecordingStatus.RECORDING }
+
+    LaunchedEffect(currentItem?.id) {
+        if (currentItem != null) runCatching { firstRowFocus.requestFocus() }
+    }
+
+    if (currentItem == null) {
+        EmptyPanelLine("Nothing playing — start a stream to record it.")
+        return
+    }
+    val item = currentItem!!
+    val displayTitle =
+        item.cleanTitle?.takeIf { it.isNotBlank() } ?: item.title
+
+    SectionKicker(text = "CURRENT TITLE")
+    Text(
+        text = displayTitle,
+        color = pal.TextPrimary,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.2).sp,
+        modifier = Modifier.padding(bottom = 6.dp),
+    )
+    val typeHint =
+        when (item.type) {
+            ContentType.LIVE -> "Live channel"
+            ContentType.MOVIE -> "Movie"
+            ContentType.SERIES -> "Series"
+        }
+    Text(
+        text = typeHint.uppercase(Locale.ROOT),
+        color = pal.TextMuted,
+        fontSize = 10.sp,
+        letterSpacing = 1.6.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(bottom = 12.dp),
+    )
+
+    if (activeForChannel != null) {
+        SectionKicker(text = "IN PROGRESS")
+        HexOptionRow(
+            leading = null,
+            label = "Stop recording",
+            sub = "Recording will be saved to your library",
+            selected = true,
+            focusRequester = firstRowFocus,
+            onEscapeUp = onEscapeUp,
+            onPick = {
+                RecordingService.stop(context, activeForChannel.id)
+                onBack()
+            },
+        )
+        return
+    }
+
+    val format = detectRecordingFormat(item.streamUrl)
+    val formatLabel =
+        when (format) {
+            RecordingFormat.HLS -> "HLS · auto-detected from .m3u8"
+            RecordingFormat.MPEG_TS -> "MPEG-TS · direct stream"
+        }
+
+    SectionKicker(text = "START")
+    HexOptionRow(
+        leading = null,
+        label = "Record this channel",
+        sub = formatLabel,
+        selected = false,
+        focusRequester = firstRowFocus,
+        onEscapeUp = onEscapeUp,
+        onPick = {
+            // Fire the foreground service. The RecordingsRepository's
+            // reactive flow lights up the "in progress" state on this
+            // panel within a frame or two; the service writes the
+            // recordings row, the row update triggers the flow, the
+            // flow updates inflight → UI flips to "Stop recording".
+            RecordingService.start(
+                context = context,
+                input =
+                    RecordInput(
+                        recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
+                        sourceUrl = item.streamUrl,
+                        title = displayTitle,
+                        format = format,
+                        contentId = item.id,
+                    ),
+            )
+            onBack()
+        },
+    )
+}
+
+/** Heuristic format detection for record-now from the player. HLS
+ *  manifests end in `.m3u8` (sometimes with query string); everything
+ *  else (raw `.ts`, Xtream catch-up paths, plain `.mp4`) is treated
+ *  as MPEG-TS for the recorder's purposes — the MpegTsRecorder reads
+ *  a continuous body, which works for both. DASH / encrypted formats
+ *  go down the disabled-with-tooltip path in MK.14.7; v1.0 doesn't
+ *  surface them in this panel. */
+private fun detectRecordingFormat(streamUrl: String): RecordingFormat {
+    val withoutQuery = streamUrl.substringBefore('?').substringBefore('#')
+    return if (withoutQuery.endsWith(".m3u8", ignoreCase = true)) {
+        RecordingFormat.HLS
+    } else {
+        RecordingFormat.MPEG_TS
+    }
+}
+
 @Composable
 private fun FavoritesPanel(
     controller: PlaybackController,
