@@ -21,11 +21,16 @@ CREATE TABLE sources (
     priority INTEGER NOT NULL DEFAULT 0,
     channel_count INTEGER NOT NULL DEFAULT 0,
     auto_sync_interval INTEGER NOT NULL DEFAULT 0,
+    -- Stage 2.4 — multi-EPG merge priority. Higher wins when two
+    -- sources cover the same tvg_id. Default 0 keeps single-source
+    -- behaviour unchanged.
+    epg_priority INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
 
 CREATE INDEX idx_sources_priority ON sources(priority ASC);
+CREATE INDEX idx_sources_epg_priority ON sources(epg_priority DESC);
 
 selectAll:
 SELECT * FROM sources ORDER BY priority ASC, created_at ASC;
@@ -42,8 +47,9 @@ INSERT INTO sources (
     username_encrypted, password_encrypted, mac_address_encrypted,
     epg_url, user_agent, referer, last_synced, last_sync_error,
     is_active, priority, channel_count, auto_sync_interval,
+    epg_priority,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateSyncResult:
 UPDATE sources
@@ -69,6 +75,12 @@ WHERE id = ?;
 
 setPriority:
 UPDATE sources SET priority = ?, updated_at = ? WHERE id = ?;
+
+-- Stage 2.4 — EPG merge priority setter for the multi-EPG conflict UI.
+-- Note this is independent of `priority` (which orders sources in the
+-- shell rail); two different orderings serve different UX purposes.
+setEpgPriority:
+UPDATE sources SET epg_priority = ?, updated_at = ? WHERE id = ?;
 
 -- Updates `epg_url` without touching credentials. Used to adopt an EPG URL
 -- discovered during sync (the M3U `#EXTM3U url-tvg=`/`x-tvg-url=` header, or

@@ -43,6 +43,7 @@ class ContentWriterTest {
             priority = 0,
             channel_count = 0,
             auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = 1L,
             updated_at = 1L,
         )
@@ -92,6 +93,7 @@ class ContentWriterTest {
             priority = 0,
             channel_count = 0,
             auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = 1L,
             updated_at = 1L,
         )
@@ -134,6 +136,7 @@ class ContentWriterTest {
             priority = 0,
             channel_count = 0,
             auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = 1L,
             updated_at = 1L,
         )

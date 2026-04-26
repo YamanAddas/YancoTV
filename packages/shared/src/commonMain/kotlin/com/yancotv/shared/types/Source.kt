@@ -38,6 +38,10 @@ data class Source(
     val channelCount: Int,
     val lastSyncError: String? = null,
     val autoSyncInterval: Int,
+    /** Stage 2.4 — multi-EPG merge priority. Higher wins when two sources
+     *  cover the same tvg_id. Default 0 = "no preference, last writer
+     *  wins" which matches single-EPG installs. */
+    val epgPriority: Int = 0,
     val createdAt: Long,
     val updatedAt: Long,
 )

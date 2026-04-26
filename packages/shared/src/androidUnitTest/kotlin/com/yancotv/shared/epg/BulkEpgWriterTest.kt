@@ -224,6 +224,7 @@ class BulkEpgWriterTest {
             priority = 0L,
             channel_count = 0,
             auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = 0L,
             updated_at = 0L,
         )

@@ -74,6 +74,7 @@ internal class SourcesBackup(
                             priority = row.priority,
                             channelCount = row.channel_count,
                             autoSyncInterval = row.auto_sync_interval,
+                            epgPriority = row.epg_priority,
                             createdAt = row.created_at,
                             updatedAt = row.updated_at,
                         )
@@ -138,6 +139,7 @@ internal class SourcesBackup(
                     priority = src.priority,
                     channel_count = src.channelCount,
                     auto_sync_interval = src.autoSyncInterval,
+                    epg_priority = src.epgPriority,
                     created_at = src.createdAt,
                     updated_at = src.updatedAt,
                 )
@@ -181,6 +183,9 @@ internal data class BackedUpSource(
     val priority: Long,
     val channelCount: Long,
     val autoSyncInterval: Long,
+    // Stage 2.4 — added 2026-04-26. Default 0 so backups produced by older
+    // builds (no `epg_priority` column) still deserialise cleanly.
+    val epgPriority: Long = 0,
     val createdAt: Long,
     val updatedAt: Long,
 ) {

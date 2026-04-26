@@ -1,0 +1,16 @@
+-- v6 → v7 (Stage 2.4, MK.15.7 schema half): per-source EPG merge priority.
+--
+-- When multiple sources advertise EPG data for the same `tvg_id`,
+-- whichever row has the highest `epg_priority` wins for that
+-- programme. Existing rows pick up 0 (the schema-level default), so
+-- behaviour for single-EPG users is unchanged. Stage 4.1 (MK.15.7)
+-- adds the reorder UI; the EPG merge code reads this column at
+-- programme-write time.
+--
+-- Note: the plan entry called this "EpgSources.sq epg_priority" but
+-- the canonical task spec (MK.15.7) puts the column on the existing
+-- `sources` table — we have one source row per provider and EPG is
+-- carried by `epg_url` on the same row, so a separate epg_sources
+-- table would duplicate the source dimension. Followed MK.15.7's
+-- intent, not the plan-table's typo.
+ALTER TABLE sources ADD COLUMN epg_priority INTEGER NOT NULL DEFAULT 0;

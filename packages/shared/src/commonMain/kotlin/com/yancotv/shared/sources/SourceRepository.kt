@@ -123,6 +123,7 @@ class SourceRepository(
             priority = priority.toLong(),
             channel_count = 0,
             auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = now,
             updated_at = now,
         )
@@ -675,6 +676,7 @@ class SourceRepository(
             channelCount = channel_count.toInt(),
             lastSyncError = last_sync_error,
             autoSyncInterval = auto_sync_interval.toInt(),
+            epgPriority = epg_priority.toInt(),
             createdAt = created_at,
             updatedAt = updated_at,
         )

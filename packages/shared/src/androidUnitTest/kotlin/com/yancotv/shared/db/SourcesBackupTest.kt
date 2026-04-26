@@ -75,6 +75,7 @@ class SourcesBackupTest {
             priority = 0,
             channel_count = 1234,
             auto_sync_interval = 86400,
+            epg_priority = 0,
             created_at = now,
             updated_at = now,
         )
@@ -98,6 +99,7 @@ class SourcesBackupTest {
             priority = 1,
             channel_count = 0,
             auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = now,
             updated_at = now,
         )
@@ -141,6 +143,7 @@ class SourcesBackupTest {
             username_encrypted = null, password_encrypted = null, mac_address_encrypted = null,
             epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = true, priority = 0, channel_count = 0, auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = now, updated_at = now,
         )
         originalDb.sourcesQueries.insert(
@@ -149,6 +152,7 @@ class SourcesBackupTest {
             mac_address_encrypted = byteArrayOf(0xAB.toByte(), 0xCD.toByte()),
             epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = false, priority = 1, channel_count = 0, auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = now, updated_at = now,
         )
 
@@ -197,6 +201,7 @@ class SourcesBackupTest {
             username_encrypted = null, password_encrypted = null, mac_address_encrypted = null,
             epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = true, priority = 0, channel_count = 0, auto_sync_interval = 0,
+            epg_priority = 0,
             created_at = now, updated_at = now,
         )
         backup.writeFromDb(db)
