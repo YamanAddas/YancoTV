@@ -1,0 +1,54 @@
+-- v7 → v8 (Stage 2.5): backup metadata table for the Stage 5.1 export /
+-- import flow.
+--
+-- Backups themselves live as JSON files in user-picked storage; this
+-- table is the local record of what was exported when, against which
+-- schema version, and the SHA-256 of the resulting file. Use cases:
+--
+--   * Settings → Backup tab can show "Last backup: 3 days ago" without
+--     scanning the user's storage for the file.
+--   * Import flow can warn if the backup's `schema_version` is newer
+--     than the running build (downgrade scenario).
+--   * Checksum lets a future "verify backup" feature confirm the file
+--     hasn't been corrupted in transit / cloud-sync drift.
+--
+-- Distinct from `sources-backup.json` (the Stage 1.5 corruption-recovery
+-- artifact) — that one is silent, single-file, and rewritten on every
+-- successful DB open. This table tracks user-initiated full-app
+-- backups across all data classes (sources + favorites + history +
+-- recording schedules + channel prefs).
+CREATE TABLE backup_metadata (
+    id TEXT PRIMARY KEY NOT NULL,
+    -- Where the backup was written. Typically a content:// URI from the
+    -- Storage Access Framework picker so we don't need persistable
+    -- read/write permissions on a regular File path. May also be a
+    -- file:// URI for the legacy filesDir path. NULL when the file
+    -- has been deleted out from under us (kept the row for "I exported
+    -- this on date X" history; the user can re-export at any time).
+    file_uri TEXT,
+    -- Display label shown in the Backup tab. Free-form; user can
+    -- override at export time. Defaults to "Backup YYYY-MM-DD HH:mm".
+    label TEXT NOT NULL,
+    -- Schema version at the moment the dump was written. The import
+    -- flow uses this to decide whether the file is consumable by the
+    -- current binary; backups produced by a newer build are refused
+    -- with an explicit message rather than half-imported.
+    schema_version INTEGER NOT NULL,
+    -- SHA-256 hex (64 chars). Computed from the canonical-encoded JSON
+    -- payload at write time. Verified at import time so we catch
+    -- corruption (cloud sync truncation, copy-paste errors, etc.)
+    -- before applying.
+    checksum TEXT NOT NULL,
+    -- Total bytes of the backup file as written. Lets the Backup tab
+    -- show "x.y MB" without re-querying the filesystem.
+    size_bytes INTEGER NOT NULL,
+    -- Per-class counts as a JSON map: {"sources": 5, "favorites": 17,
+    -- "history": 432, "schedules": 3}. Stage 5.1 uses this in the
+    -- backup detail dialog so the user can confirm "this backup
+    -- contains the data I expect" before importing.
+    record_counts TEXT,
+    notes TEXT,
+    created_at INTEGER NOT NULL  -- ms since epoch
+);
+
+CREATE INDEX idx_backup_metadata_created_at ON backup_metadata(created_at DESC);

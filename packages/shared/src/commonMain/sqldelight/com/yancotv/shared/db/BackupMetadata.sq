@@ -1,0 +1,47 @@
+-- Stage 2.5 — local record of user-initiated backup exports.
+--
+-- See `7.sqm` for column-level rationale + usage. Stage 5.1 wires the
+-- Settings → Backup tab to this table; export writes a row, import
+-- reads (and verifies checksum + schema_version), the listing UI reads
+-- via `selectAll`.
+CREATE TABLE backup_metadata (
+    id TEXT PRIMARY KEY NOT NULL,
+    file_uri TEXT,
+    label TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    checksum TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    record_counts TEXT,
+    notes TEXT,
+    created_at INTEGER NOT NULL -- ms since epoch
+);
+
+CREATE INDEX idx_backup_metadata_created_at ON backup_metadata(created_at DESC);
+
+selectAll:
+SELECT * FROM backup_metadata ORDER BY created_at DESC;
+
+selectById:
+SELECT * FROM backup_metadata WHERE id = ?;
+
+-- Convenience for the "Last backup" stat in the Backup tab.
+selectLatest:
+SELECT * FROM backup_metadata ORDER BY created_at DESC LIMIT 1;
+
+insert:
+INSERT INTO backup_metadata
+    (id, file_uri, label, schema_version, checksum, size_bytes,
+     record_counts, notes, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateNotes:
+UPDATE backup_metadata SET notes = ? WHERE id = ?;
+
+-- Used when the file has been moved / deleted by the user externally.
+-- Keeps the metadata row but clears the URI so the UI can flag it
+-- "file missing".
+clearFileUri:
+UPDATE backup_metadata SET file_uri = NULL WHERE id = ?;
+
+deleteById:
+DELETE FROM backup_metadata WHERE id = ?;
