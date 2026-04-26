@@ -126,10 +126,15 @@ open class KtorHttpClient(
                 }
             }
         if (!response.status.isSuccess()) {
+            // Redact provider credentials before this string ends up in
+            // Android logcat / `sources.last_sync_error` / the on-screen
+            // failure dialog. Xtream URLs carry username/password in the
+            // query string; shipping them in an error message is a real
+            // PII leak. See [redactCredentials].
             throw HttpResponseError(
                 status = response.status.value,
                 statusText = response.status.description,
-                message = "HTTP ${response.status.value} from $url",
+                message = "HTTP ${response.status.value} from ${redactCredentials(url)}",
             )
         }
         return response

@@ -155,12 +155,14 @@ class RecordingsRepository(
 
     /** Reactive list — backs the RecordingsScreen. Inserts /
      *  transitions / deletes anywhere in the app refresh subscribers
-     *  without manual reload. Terminal IO dispatches off main. */
+     *  without manual reload. Terminal query dispatches off main on
+     *  `Dispatchers.Default` (KMP-safe — `Dispatchers.IO` only exists
+     *  on JVM/Android). */
     fun allFlow(): Flow<List<RecordingEntry>> =
         db.recordingsQueries
             .selectAll()
             .asFlow()
-            .mapToList(Dispatchers.IO)
+            .mapToList(Dispatchers.Default)
             .map { rows -> rows.map { it.toEntry() } }
 
     fun deleteById(id: String) {

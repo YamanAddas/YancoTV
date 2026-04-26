@@ -5,6 +5,8 @@ import com.yancotv.shared.db.Sources
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
+import com.yancotv.shared.http.redactCredentials
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import com.yancotv.shared.parsers.M3uEntry
@@ -283,7 +285,12 @@ class SourceRepository(
                 logger.info("syncSource[$id] cancelled")
                 throw ce
             } catch (t: Throwable) {
-                val msg = t.message ?: t.toString()
+                // Redact credentials before this string lands in three
+                // PII-leak-prone surfaces: Android logcat (visible to adb /
+                // bug reports), `sources.last_sync_error` (persisted), and
+                // the Sources screen's failure-text rendering. Xtream
+                // 401/404 URLs include `?username=…&password=…` verbatim.
+                val msg = redactErrorMessage(t)
                 logger.error("sync failed for ${source.id}: $msg")
                 db.sourcesQueries.updateSyncResult(
                     last_synced = source.lastSynced,
@@ -357,7 +364,7 @@ class SourceRepository(
                 val end = minOf(i + CHUNK_SIZE, entries.size)
                 val chunk = entries.subList(i, end)
                 val wrote =
-                    withContext(Dispatchers.IO) {
+                    withContext(Dispatchers.Default) {
                         bulk.writeM3uChunk(sourceId, chunk, now, sort)
                     }
                 sort += wrote
@@ -365,7 +372,7 @@ class SourceRepository(
                 onProgress(written, total)
                 i = end
             }
-            withContext(Dispatchers.IO) { bulk.finishSource(sourceId) }
+            withContext(Dispatchers.Default) { bulk.finishSource(sourceId) }
             return written
         } catch (t: Throwable) {
             bulk.abortSource(sourceId)
@@ -386,7 +393,9 @@ class SourceRepository(
     ) {
         val d = discovered?.takeIf { it.isNotBlank() } ?: return
         if (!source.epgUrl.isNullOrBlank()) return
-        logger.info("syncSource[${source.id}] adopting M3U-header EPG URL: $d")
+        // Redact in case the M3U header EPG URL itself carries credentials —
+        // some providers serve `url-tvg=http://provider/?username=…`.
+        logger.info("syncSource[${source.id}] adopting M3U-header EPG URL: ${redactCredentials(d)}")
         db.sourcesQueries.setEpgUrl(d, now, source.id)
     }
 
@@ -457,7 +466,7 @@ class SourceRepository(
         var seriesWritten = 0
         var total = 0
         val writeMutex = Mutex()
-        val ioCtx = Dispatchers.IO
+        val ioCtx = Dispatchers.Default
 
         try {
             coroutineScope {
@@ -579,7 +588,7 @@ class SourceRepository(
         onProgress(SyncProgress.Phase.WRITING, 0, total, null)
         bulk.prepareSource(source.id)
         var written = 0
-        val ioCtx = Dispatchers.IO
+        val ioCtx = Dispatchers.Default
         try {
             var sort = 0L
             var i = 0

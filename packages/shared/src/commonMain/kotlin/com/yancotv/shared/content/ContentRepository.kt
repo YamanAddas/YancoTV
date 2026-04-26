@@ -118,7 +118,8 @@ class ContentRepository(
      * title — see Content.sq for the rationale.
      *
      * Caller dispatches: this is a synchronous SQLDelight write; on Android
-     * wrap in `Dispatchers.IO` per the threading rule.
+     * wrap in `Dispatchers.Default` per the threading rule (`Dispatchers.IO`
+     * only exists on JVM/Android — `commonMain` has to use the KMP-safe one).
      */
     fun setOverrides(
         contentId: String,

@@ -57,10 +57,13 @@ class FavoritesRepository(
      * Reactive [all] — backed by SQLDelight's [asFlow]. Emits the current
      * snapshot immediately on collection, then re-emits every time a write
      * through any `favoritesQueries` binding fires a notifier. Dispatches
-     * the terminal query to IO so collectors on Main.immediate don't block.
+     * the terminal query to a background dispatcher so collectors on
+     * Main.immediate don't block — `Dispatchers.Default` is KMP-safe
+     * (`Dispatchers.IO` only exists on JVM/Android and would fail the iOS
+     * metadata compile).
      */
     fun allFlow(): Flow<List<FavoriteEntry>> =
-        db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.IO).map { rows ->
+        db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows ->
             rows.map { row ->
                 FavoriteEntry(
                     favoriteId = row.favorite_id,
@@ -95,7 +98,7 @@ class FavoritesRepository(
         db.favoritesQueries
             .isFavorite(contentId)
             .asFlow()
-            .mapToOne(Dispatchers.IO)
+            .mapToOne(Dispatchers.Default)
 
     fun toggle(contentId: String): Boolean {
         // Returns the new state — caller can flip a UI star without re-querying.
