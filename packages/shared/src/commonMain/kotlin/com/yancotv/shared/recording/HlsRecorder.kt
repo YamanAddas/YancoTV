@@ -244,7 +244,19 @@ class HlsRecorder(
             if (!userAgent.isNullOrBlank()) put("User-Agent", userAgent)
             if (!referer.isNullOrBlank()) put("Referer", referer)
         }
-        return if (headers.isEmpty()) HttpRequestOptions() else HttpRequestOptions(headers = headers)
+        // Override the user's network read-timeout (defaults to 90s per
+        // AppPreferences). Manifest + segment fetches should always be
+        // quick, but a slow CDN under load could push individual
+        // requests near a minute. 5 min per single fetch is plenty;
+        // anything truly stuck is caught by the recorder's own
+        // heartbeat watchdog (60s by default), not by Ktor's request
+        // timeout. Stage 3.1 / MK.14.2 bug fix: the previous behaviour
+        // (no timeoutMs passed) inherited the global 90s default and
+        // killed live recordings at the 90s mark.
+        return HttpRequestOptions(
+            timeoutMs = HLS_REQUEST_TIMEOUT_MS,
+            headers = headers,
+        )
     }
 
     private fun finishCompleted(
@@ -290,5 +302,13 @@ class HlsRecorder(
                 partialBytesWritten = bytesWritten,
             )
         return RecordResult.Failure(recordId, bytesWritten, reason)
+    }
+
+    private companion object {
+        // 5 min per single manifest / segment fetch — generous enough for
+        // any individual request even on a slow CDN; the recorder's
+        // heartbeat watchdog (60s by default) handles "stream is stuck"
+        // cases. See options() for full rationale.
+        const val HLS_REQUEST_TIMEOUT_MS: Long = 5L * 60_000L
     }
 }

@@ -2,12 +2,15 @@ package com.yancotv.android.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -185,10 +188,15 @@ fun SettingsRecordingsTab(
                     label = if (isCustom) "Change folder" else "Pick a folder",
                     primary = true,
                     onClick = {
-                        // Pass null as the initial URI — Android opens at the
-                        // top-level "Recent" location which is the cleanest
-                        // entry point for first-time pickers.
-                        folderPicker.launch(null)
+                        // Hint the picker to start at primary external
+                        // storage (Internal storage on most devices). On
+                        // Fire TV the bare DocumentsUI defaults to a
+                        // "Recent" view that's empty + un-navigable; this
+                        // hint at least scrolls to a real folder. Falls
+                        // back to null on devices where the hint isn't
+                        // supported.
+                        val initial = primaryStorageInitialUri()
+                        folderPicker.launch(initial)
                     },
                 )
                 if (isCustom) {
@@ -237,15 +245,62 @@ fun SettingsRecordingsTab(
             )
             Text(
                 text =
-                    "Coming in the next update — a sidebar destination called Recordings " +
-                        "with playback, delete, and per-file details. For now, recordings are " +
-                        "saved to the folder above; a file manager can play them with any " +
-                        "video app.",
+                    "Open the Recordings tab in the sidebar to play, delete, and inspect " +
+                        "any recording you've made. New recordings show up there immediately " +
+                        "as they start.",
+                color = palette.TextMuted,
+                fontSize = 11.sp,
+            )
+        }
+
+        // ── Fire TV picker limitation note ───────────────────────
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(palette.BackgroundRaised)
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "Picker not working on your TV?",
+                color = palette.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text =
+                    "Stock Fire TV's folder picker can come up empty and unresponsive — " +
+                        "it's a Fire OS limitation, not a YancoTV bug. The default folder above " +
+                        "still works fine; recordings save there with no setup. To make the " +
+                        "picker usable, install Files by Google (or any file-manager app) — " +
+                        "Fire TV will route the picker through it.",
                 color = palette.TextMuted,
                 fontSize = 11.sp,
             )
         }
     }
+}
+
+/**
+ * Build an initial-URI hint for the SAF folder picker that points at
+ * the primary external storage volume's root. On Fire TV the stock
+ * DocumentsUI's default "Recent" view is empty + un-navigable; this
+ * hint at least scrolls the picker to a folder that exists.
+ *
+ * Returns null on API levels where DocumentsContract.buildDocumentUri
+ * isn't available — the launcher then opens at the picker's default
+ * (which is fine on phones / Google TV).
+ */
+private fun primaryStorageInitialUri(): Uri? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+    return runCatching {
+        DocumentsContract.buildDocumentUri(
+            "com.android.externalstorage.documents",
+            "primary:",
+        )
+    }.getOrNull()
 }
 
 /**
@@ -313,6 +368,10 @@ private fun FocusableSettingsButton(
                     color = borderColor,
                     shape = shape,
                 )
+                // TV D-pad needs the explicit focusable; same pattern
+                // every clickable in this codebase that needs to take
+                // focus on Fire TV.
+                .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,

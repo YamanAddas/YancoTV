@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -187,6 +188,12 @@ private fun RecordingRow(
                     color = if (focused) palette.Accent else palette.PanelBorder,
                     shape = shape,
                 )
+                // Stage 3.1 / MK.14.5 bug fix: TV D-pad needs explicit
+                // `.focusable()` paired with the same MutableInteractionSource
+                // as the clickable. Modifier.clickable alone reliably
+                // gets focus on phone but not on Fire TV — same pattern
+                // as FavoritesScreen rows (working since MK.13.x).
+                .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
@@ -275,6 +282,9 @@ private fun FocusableInlineButton(
                     color = if (focused) palette.Accent else palette.PanelBorder,
                     shape = shape,
                 )
+                // Same pattern as the row above — TV D-pad RIGHT lands
+                // here from the row, OK fires onClick.
+                .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,

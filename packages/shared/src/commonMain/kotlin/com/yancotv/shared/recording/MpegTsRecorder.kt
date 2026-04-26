@@ -122,7 +122,19 @@ class MpegTsRecorder(
         }
         // Long-lived response — no client-side maxResponseBytes cap;
         // the recorder bounds via deadlineMs / heartbeat instead.
-        return if (headers.isEmpty()) HttpRequestOptions() else HttpRequestOptions(headers = headers)
+        //
+        // **Critical** (Stage 3.1 / MK.14.2 bug fix): the request-level
+        // timeout MUST be disabled here. AppPreferences-derived defaults
+        // give every request a 90s ceiling, which means a continuous
+        // MPEG-TS body (typical Xtream catch-up: a several-hour single
+        // GET) gets killed at 90s in. The heartbeat watchdog inside
+        // record() bounds idle time per chunk; that's the right shape
+        // of bound for streaming, not a hard request timeout. Long.MAX_VALUE
+        // is Ktor's documented "no timeout" sentinel.
+        return HttpRequestOptions(
+            timeoutMs = Long.MAX_VALUE,
+            headers = headers,
+        )
     }
 
     private fun finishCompleted(
