@@ -178,19 +178,13 @@ class RecordingService : Service() {
     private fun handleStartLiveTee(input: RecordInput) {
         val job =
             serviceScope.launch(Dispatchers.IO) {
+                // [resolveOutputOrFail] handles the full markStarted /
+                // markFailed contract internally — by the time it returns
+                // a non-null output, a RECORDING row exists in the DB. On
+                // null, a FAILED row was already inserted so the user
+                // sees the failure in the Recordings list.
                 val output = resolveOutputOrFail(input) ?: return@launch
                 activeOutputs[input.recordId] = output
-
-                // Insert the RECORDING row. Every exit path below must
-                // transition it to a terminal state.
-                recordings.markStarted(
-                    id = input.recordId,
-                    contentId = input.contentId,
-                    title = input.title,
-                    streamUrl = input.sourceUrl,
-                    filePath = output.storagePath,
-                    format = input.format,
-                )
 
                 // Open the output stream and arm the tee. The sink owns
                 // the stream from this point — it's closed by `end()` in
@@ -221,20 +215,12 @@ class RecordingService : Service() {
     private fun handleStartFreshGet(input: RecordInput) {
         val job =
             serviceScope.launch(Dispatchers.IO) {
+                // See [resolveOutputOrFail] — markStarted / markFailed is
+                // handled internally so a RECORDING row is guaranteed by
+                // the time we get a non-null output (and a FAILED row is
+                // visible in the Recordings list when alloc throws).
                 val output = resolveOutputOrFail(input) ?: return@launch
                 activeOutputs[input.recordId] = output
-
-                // Insert the row in RECORDING status. After this point,
-                // every exit path must transition the row to a terminal
-                // state. Done on IO since it hits SQLDelight.
-                recordings.markStarted(
-                    id = input.recordId,
-                    contentId = input.contentId,
-                    title = input.title,
-                    streamUrl = input.sourceUrl,
-                    filePath = output.storagePath,
-                    format = input.format,
-                )
 
                 val result =
                     output.openSink().use { boundSink ->
@@ -251,41 +237,102 @@ class RecordingService : Service() {
     }
 
     /**
-     * Storage resolution shared by both [handleStartLiveTee] and
-     * [handleStartFreshGet]. Returns `null` and marks the row failed if
-     * allocation throws (no storage / SAF permission revoked / etc.).
+     * **MB-204 (audit follow-up).** Resolve a destination AND make the
+     * recording row visible in the Recordings list — both for success
+     * and failure. Shared by [handleStartLiveTee] and [handleStartFreshGet].
+     *
+     * Contract:
+     *   - Returns a non-null [RecordingOutput] iff a `RECORDING`-state
+     *     row has been inserted into the recordings table with the
+     *     resolved file_path. Callers can rely on the row existing for
+     *     all subsequent transitions ([RecordingsRepository.markCompleted]
+     *     / [RecordingsRepository.markFailed]).
+     *   - Returns `null` when storage allocation throws after exhausting
+     *     the resolver's app-private fallback chain. In that case a
+     *     `FAILED`-state row HAS been inserted (with empty file_path
+     *     and `reason = file_allocation_failed: …`) so the user sees
+     *     the failure in the Recordings list.
+     *   - Re-throws [kotlinx.coroutines.CancellationException] so
+     *     structured concurrency works — e.g. the user stops the
+     *     recording before allocation completes.
+     *
+     * Pre-MB-204 the row was inserted by the callers AFTER allocation;
+     * if allocation failed, no row was created and `markFailed` would
+     * itself throw because the row didn't exist. The failure was
+     * swallowed by `runCatching` and the user saw nothing — Recordings
+     * list empty AND `activeJobs` empty AND the player options sheet's
+     * Record tab still showing "Record" instead of "Stop recording".
+     * Real-world incident: 2026-04-26 Public mode + missing
+     * WRITE_EXTERNAL_STORAGE on Fire TV API 28.
      */
-    private suspend fun resolveOutputOrFail(input: RecordInput): RecordingOutput? =
-        try {
-            storageResolver.resolve(
-                recordId = input.recordId,
-                title = input.title,
-                format = input.format,
-                onPermissionLost = {
-                    Log.w(TAG, "SAF tree URI permission lost — clearing pref")
-                    runCatching { prefs.setRecordingFolderUri(null) }
-                },
-            )
-        } catch (c: kotlinx.coroutines.CancellationException) {
-            // User stopped before resolve completed — let the
-            // cancellation propagate so the launch ends in
-            // Cancelled state. No row was created (markStarted
-            // hasn't run), so there's nothing to transition.
-            // handleStop's cleanup of activeJobs/activeOutputs
-            // already ran when ACTION_STOP was processed.
-            throw c
-        } catch (t: Throwable) {
-            Log.e(TAG, "failed to allocate output for ${input.recordId}", t)
-            runCatching {
-                recordings.markFailed(
-                    id = input.recordId,
-                    reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
-                    bytesWritten = 0L,
+    private suspend fun resolveOutputOrFail(input: RecordInput): RecordingOutput? {
+        val output =
+            try {
+                storageResolver.resolve(
+                    recordId = input.recordId,
+                    title = input.title,
+                    format = input.format,
+                    onPermissionLost = {
+                        Log.w(TAG, "SAF tree URI permission lost — clearing pref")
+                        runCatching { prefs.setRecordingFolderUri(null) }
+                    },
                 )
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                // User stopped before resolve completed — propagate so
+                // the launch ends in Cancelled state. No row was inserted
+                // yet (we haven't reached markStarted below), so there's
+                // nothing to transition.
+                throw c
+            } catch (t: Throwable) {
+                // Resolver exhausted its fallback chain. Insert a row
+                // and immediately transition to FAILED so the user sees
+                // the failure surfaced in the Recordings list.
+                Log.e(TAG, "failed to allocate output for ${input.recordId}", t)
+                runCatching {
+                    recordings.markStarted(
+                        id = input.recordId,
+                        contentId = input.contentId,
+                        title = input.title,
+                        streamUrl = input.sourceUrl,
+                        filePath = "",
+                        format = input.format,
+                    )
+                    recordings.markFailed(
+                        id = input.recordId,
+                        reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
+                        bytesWritten = 0L,
+                    )
+                }.onFailure { Log.w(TAG, "markFailed bookkeeping failed for ${input.recordId}", it) }
+                maybeStop()
+                return null
             }
+
+        // Allocation succeeded — insert the row in RECORDING state.
+        // Every exit path below this is the caller's responsibility to
+        // transition (handleStop -> markCompleted/markFailed via
+        // file-size check; onRecorderResult for the fresh-GET path).
+        try {
+            recordings.markStarted(
+                id = input.recordId,
+                contentId = input.contentId,
+                title = input.title,
+                streamUrl = input.sourceUrl,
+                filePath = output.storagePath,
+                format = input.format,
+            )
+        } catch (t: Throwable) {
+            // markStarted itself threw — almost certainly a duplicate
+            // recordId (developer error) or a DB-level corruption. Bail
+            // gracefully: the output isn't useful without a row to
+            // transition. Best-effort delete the partially-allocated
+            // file so we don't leak.
+            Log.e(TAG, "markStarted failed for ${input.recordId}", t)
+            runCatching { output.delete() }
             maybeStop()
-            null
+            return null
         }
+        return output
+    }
 
     private fun handleStop(recordId: String) {
         val job = activeJobs[recordId] ?: return
