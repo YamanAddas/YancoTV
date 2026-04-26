@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import com.yancotv.android.prefs.AppPreferences
@@ -222,7 +223,7 @@ internal class RecordingStorageResolver(
         val friendlyName = friendlyFilename(title, recordId) + "." + ext
 
         return when (recording.storageMode) {
-            RecordingStorageMode.PUBLIC_MEDIA_STORE -> resolvePublic(friendlyName)
+            RecordingStorageMode.PUBLIC_MEDIA_STORE -> resolvePublic(recordId, ext, friendlyName)
             RecordingStorageMode.APP_PRIVATE -> resolveAppPrivate(recordId, ext)
             RecordingStorageMode.CUSTOM_SAF ->
                 resolveCustomSaf(
@@ -235,13 +236,52 @@ internal class RecordingStorageResolver(
         }
     }
 
-    private fun resolvePublic(filename: String): RecordingOutput {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            resolvePublicMediaStore(filename)
-        } else {
-            resolvePublicLegacy(filename)
+    /**
+     * Resolve the Public mode destination, falling back to app-private if
+     * the active strategy can't allocate a file:
+     *   - API ≤28 needs `WRITE_EXTERNAL_STORAGE` for the legacy direct-file
+     *     path. If the user hasn't granted it yet, fall back silently —
+     *     recordings keep working in app-private until they grant from
+     *     Settings → Recordings → Public folder. That's the audit-driven
+     *     "never break recording on the broken-picker bug" guarantee.
+     *   - API 29+ MediaStore insert can fail for other reasons (provider
+     *     quota, no writable volume, OEM differences). Same fallback —
+     *     better to record in a less-discoverable place than to record
+     *     nothing.
+     *
+     * Without this fallback the resolver throws before
+     * `RecordingService.handleStartLiveTee` has inserted the row, so the
+     * failure is invisible to the user — no row in Recordings list AND
+     * `activeJobs` stays empty so the player options sheet shows
+     * "Record" instead of "Stop recording". Verified on Fire TV API 28
+     * post-MK.14.X migration.
+     */
+    private fun resolvePublic(
+        recordId: String,
+        ext: String,
+        filename: String,
+    ): RecordingOutput =
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                resolvePublicMediaStore(filename)
+            } else if (hasWriteExternalStoragePermission()) {
+                resolvePublicLegacy(filename)
+            } else {
+                // Throw into the fallback path below — same handling as
+                // a MediaStore.insert returning null on API 29+.
+                error(
+                    "WRITE_EXTERNAL_STORAGE not granted on API ${Build.VERSION.SDK_INT}; " +
+                        "Public mode falls back to app-private until the user grants from Settings.",
+                )
+            }
+        }.getOrElse { t ->
+            Log.w(
+                TAG,
+                "Public mode allocation failed (${t.message}); falling back to app-private. " +
+                    "Recording will save inside YancoTV's app data dir instead of Movies/YancoTV/.",
+            )
+            resolveAppPrivate(recordId, ext)
         }
-    }
 
     /**
      * API 29+: scoped-storage MediaStore insert. No permission required.
@@ -402,5 +442,6 @@ internal class RecordingStorageResolver(
         const val DEFAULT_DIR_NAME = "yanco-recordings"
         const val PUBLIC_DIR_NAME = "YancoTV"
         const val MIME_MPEG_TS = "video/mp2t"
+        private const val TAG = "YancoStorageResolver"
     }
 }
