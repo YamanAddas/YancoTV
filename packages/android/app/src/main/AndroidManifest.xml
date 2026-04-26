@@ -30,6 +30,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- MK.14.X audit-revised storage path: legacy direct writes to
+         /storage/emulated/0/Movies/YancoTV/ on Fire OS 7 / API 28 (where
+         MediaStore RELATIVE_PATH isn't available yet). On API 29+ the
+         permission is silently ignored — MediaStore writes don't need
+         it under scoped storage — so this is Fire-TV-only in practice.
+         maxSdkVersion="28" keeps the permission off the install
+         consent screen on modern phones / Google TV / Chromecast. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <!-- Android 11+ package visibility: lets us resolve the speech recognizer
          intent used by the voice-input buttons on Fire TV remotes, AND query
          installed external video players for the MK.18.1 "Open in external"

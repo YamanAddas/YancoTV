@@ -108,12 +108,27 @@ class AppPreferences(
             _general.value = _general.value.copy(smartGrouping = enabled)
         }
 
-    // ───── Recording (Stage 3.1 / MK.14.2-storage) ─────
+    // ───── Recording (Stage 3.1 / MK.14.2-storage, MK.14.X audit revision) ─────
     //
-    // The user-chosen storage folder for recordings. Stored as an opaque
-    // string — typically a SAF tree URI (`content://com.android.externalstorage.documents/...`)
-    // when the user has picked a folder via the system picker. Empty / null
-    // means "use the app-private default" which is `getExternalFilesDir(MOVIES)`.
+    // Two interlocking prefs:
+    //
+    //   - [RecordingPrefs.storageMode] decides which destination strategy
+    //     resolves the file. Default for fresh installs is
+    //     [RecordingStorageMode.PUBLIC_MEDIA_STORE] — recordings land in
+    //     `/storage/emulated/0/Movies/YancoTV/` via MediaStore (API 29+) or
+    //     direct File writes (API ≤28 with WRITE_EXTERNAL_STORAGE).
+    //   - [RecordingPrefs.folderUri] is the opaque persistable URI for
+    //     `CUSTOM_SAF` mode — typically a SAF tree URI from the system
+    //     picker. Ignored for the other modes.
+    //
+    // Migration: pre-revision installs only stored `folderUri`. If
+    // present, we infer `storageMode = CUSTOM_SAF`. Absent → default
+    // mode wins on first read. See [readRecording].
+
+    suspend fun setRecordingStorageMode(mode: RecordingStorageMode) =
+        write(KEY_RECORDING_STORAGE_MODE, mode.key) {
+            _recording.value = _recording.value.copy(storageMode = mode)
+        }
 
     suspend fun setRecordingFolderUri(uri: String?) =
         write(KEY_RECORDING_FOLDER_URI, uri.orEmpty()) {
@@ -180,10 +195,19 @@ class AppPreferences(
             smartGrouping = readString(KEY_SMART_GROUPING) == "1",
         )
 
-    private fun readRecording(): RecordingPrefs =
-        RecordingPrefs(
-            folderUri = readString(KEY_RECORDING_FOLDER_URI)?.takeIf { it.isNotBlank() },
-        )
+    private fun readRecording(): RecordingPrefs {
+        val folderUri = readString(KEY_RECORDING_FOLDER_URI)?.takeIf { it.isNotBlank() }
+        val explicitMode = readString(KEY_RECORDING_STORAGE_MODE)
+        val mode =
+            when {
+                explicitMode != null -> RecordingStorageMode.fromKey(explicitMode)
+                // Pre-revision install with a SAF folder picked → CUSTOM_SAF.
+                folderUri != null -> RecordingStorageMode.CUSTOM_SAF
+                // Fresh install: default to the audit-recommended public path.
+                else -> RecordingStorageMode.PUBLIC_MEDIA_STORE
+            }
+        return RecordingPrefs(storageMode = mode, folderUri = folderUri)
+    }
 
     private fun readHiddenGroups(): Set<String> =
         readString(KEY_HIDDEN_GROUPS)
@@ -228,14 +252,52 @@ class AppPreferences(
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
         private const val KEY_SPEED = "pref_playback_speed"
         private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"
+        private const val KEY_RECORDING_STORAGE_MODE = "pref_recording_storage_mode"
     }
 }
 
-/** Stage 3.1 / MK.14.2-storage — recording-storage prefs. */
+/**
+ * Stage 3.1 / MK.14.2-storage (audit-revised) — recording-storage prefs.
+ *
+ * The [storageMode] field decides which resolver branch handles the
+ * file allocation; [folderUri] is only meaningful when mode is
+ * [RecordingStorageMode.CUSTOM_SAF].
+ */
 data class RecordingPrefs(
-    /** SAF tree URI string, or null to use the app-private default. */
+    val storageMode: RecordingStorageMode = RecordingStorageMode.PUBLIC_MEDIA_STORE,
+    /** SAF tree URI string. Populated only when [storageMode] is
+     *  [RecordingStorageMode.CUSTOM_SAF]; ignored otherwise. */
     val folderUri: String? = null,
 )
+
+/**
+ * Where new recordings get written.
+ *
+ * - [PUBLIC_MEDIA_STORE] (default for fresh installs) — `Movies/YancoTV/`
+ *   via MediaStore (API 29+) or direct File writes (API ≤28 with
+ *   `WRITE_EXTERNAL_STORAGE`). Files survive uninstall; visible to any
+ *   file manager / Gallery / Photos app.
+ * - [APP_PRIVATE] — `getExternalFilesDir(Movies)/yanco-recordings/`. No
+ *   permission needed on any API. Removed when YancoTV is uninstalled
+ *   (Android contract for app-specific external dirs).
+ * - [CUSTOM_SAF] — user picked a folder via the SAF system picker
+ *   (`ACTION_OPEN_DOCUMENT_TREE`). Tree URI persisted via
+ *   `takePersistableUriPermission`. Files survive uninstall but the
+ *   YancoTV-side metadata (recordings table rows, persisted URI grant)
+ *   does NOT carry across reinstall — Android attributes the orphaned
+ *   files to "no installed app" until the user reimports.
+ */
+enum class RecordingStorageMode(val key: String) {
+    PUBLIC_MEDIA_STORE("public_media_store"),
+    APP_PRIVATE("app_private"),
+    CUSTOM_SAF("custom_saf"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): RecordingStorageMode =
+            values().firstOrNull { it.key == key } ?: PUBLIC_MEDIA_STORE
+    }
+}
 
 /** Default section to land on when the app opens. TiviMate defaults to last-used. */
 enum class OpenOn(

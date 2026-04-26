@@ -302,6 +302,11 @@ class RecordingService : Service() {
         // before reading `output.size()` to avoid racing a stale byte count.
         serviceScope.launch(Dispatchers.IO) {
             runCatching { job.cancelAndJoin() }
+            // MK.14.X audit revision — flip MediaStore IS_PENDING=0 (or
+            // whatever the backend's finalize step is) AFTER cancelAndJoin
+            // returns so the file is fully flushed when the system marks
+            // it visible. No-op for File / SAF backends.
+            runCatching { output?.onFinalize() }
             val bytes = output?.size() ?: 0L
             runCatching {
                 val startedAt = recordings.getById(recordId)?.startedAt
