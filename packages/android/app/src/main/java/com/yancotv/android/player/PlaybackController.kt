@@ -694,6 +694,12 @@ class PlaybackController(
     fun persistResumePoint() {
         val item = _currentItem.value ?: return
         if (item.type == ContentType.LIVE) return
+        // Stage 3.1 / MK.14.5 — local recordings play through this same
+        // path with a synthesized ContentItem whose id starts with
+        // `_rec_`. They have no `content` row, so writing a watch_history
+        // entry would FK-violate. Skip persisting resume for these
+        // ad-hoc plays; the user can rewind manually if needed.
+        if (item.id.startsWith(LOCAL_RECORDING_ID_PREFIX)) return
         val pos = player.currentPosition.coerceAtLeast(0L) / 1000L
         val dur = player.duration.takeIf { it > 0L }?.let { it / 1000L }
         // Don't record positions near the very start — if the user opened a
@@ -730,6 +736,11 @@ class PlaybackController(
         // what the shell's OkHttp source clients send so provider-side UA
         // checks don't flip streams to audio-only.
         private const val DEFAULT_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
+
+        /** Prefix on synthetic ContentItem ids built by RecordingsScreen
+         *  so we can identify local-file recordings inside the controller
+         *  and skip resume-point persistence (they have no `content` row). */
+        const val LOCAL_RECORDING_ID_PREFIX = "_rec_"
         // Fallbacks for when AppPreferences returns 0/blank — kept here so
         // the controller has a safe floor independent of the prefs defaults.
         private const val DEFAULT_CONNECT_TIMEOUT_SEC = 15

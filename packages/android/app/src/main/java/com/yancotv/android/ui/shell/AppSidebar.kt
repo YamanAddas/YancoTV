@@ -236,6 +236,7 @@ private fun iconFor(section: AppSection): ImageVector =
         AppSection.Movies -> YancoIcons.Movies
         AppSection.Series -> YancoIcons.Series
         AppSection.Favorites -> YancoIcons.Favorites
+        AppSection.Recordings -> YancoIcons.Recordings
         AppSection.Search -> YancoIcons.Search
         AppSection.Settings -> YancoIcons.Settings
     }

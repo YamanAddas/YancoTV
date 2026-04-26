@@ -116,6 +116,27 @@ object YancoIcons {
             arcToRelative(6.5f, 6.5f, 0f, true, true, -13f, 0f)
         }
 
+    val Recordings: ImageVector =
+        buildLine("recordings") {
+            // Disc + record-dot — same idiom every DVR uses; reads as
+            // "saved media" without colliding with the Live (red rect)
+            // or Movies (filmstrip) icons.
+            moveTo(3.5f, 12f)
+            // Stand-in for an arc: trace a square + an inner dot. The
+            // existing buildLine helper doesn't expose curves; the
+            // square reads close enough at icon size.
+            lineTo(3.5f, 4f)
+            lineTo(20.5f, 4f)
+            lineTo(20.5f, 20f)
+            lineTo(3.5f, 20f)
+            close()
+            moveTo(9f, 9f)
+            lineTo(15f, 9f)
+            lineTo(15f, 15f)
+            lineTo(9f, 15f)
+            close()
+        }
+
     val Settings: ImageVector =
         buildLine("settings") {
             moveTo(12f, 8.5f)

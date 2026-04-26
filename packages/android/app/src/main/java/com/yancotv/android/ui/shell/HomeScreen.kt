@@ -396,6 +396,10 @@ fun HomeScreen(
                         onOpenDetail = { item -> detailItem = item },
                     )
                 }
+            } else if (section == AppSection.Recordings) {
+                Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
+                    com.yancotv.android.ui.shell.RecordingsScreen(isTv = isTv)
+                }
             } else if (section == AppSection.Search) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     SearchScreen(isTv = isTv)

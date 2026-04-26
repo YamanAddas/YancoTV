@@ -8,8 +8,8 @@ import com.yancotv.shared.types.ContentType
  * can route them into the shared ContentPanel; everything else has its own
  * dedicated screen.
  *
- * Recordings / Downloads were dropped — desktop-only features that never
- * landed on Android and aren't on the roadmap.
+ * Recordings landed back in 2026-04-26 (Stage 3.1 / MK.14.5) as the catalog
+ * surface for the recording engine. Downloads stays dropped — no roadmap.
  */
 enum class AppSection(
     val label: String,
@@ -21,6 +21,7 @@ enum class AppSection(
     Movies("Movies", ContentType.MOVIE),
     Series("Series", ContentType.SERIES),
     Favorites("Favorites"),
+    Recordings("Recordings"),
     Search("Search"),
     Settings("Settings"),
 }
