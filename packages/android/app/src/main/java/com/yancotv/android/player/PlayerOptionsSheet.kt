@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,8 +78,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import org.koin.compose.koinInject
 import java.util.Locale
 
@@ -622,7 +621,7 @@ private fun AudioPanel(
 ) {
     val firstRowFocus = remember { FocusRequester() }
     val audioTracks = rememberAudioTracks(controller.player)
-    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val scope = rememberCoroutineScope()
 
     // Panel initial focus lands on the first row so the user can pick
     // immediately without extra key presses. The sheet-level
@@ -813,7 +812,7 @@ private fun SubtitlesPanel(
     val firstRowFocus = remember { FocusRequester() }
     val textTracks = rememberTextTracks(controller.player)
     val textDisabled = rememberTextDisabled(controller.player)
-    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val scope = rememberCoroutineScope()
 
     // Panel initial focus lands on the first row ("Off"). See AudioPanel
     // for the model note — DPAD UP on the first row escapes to the tab
@@ -989,7 +988,7 @@ private fun SpeedPanel(
     onEscapeUp: () -> Unit,
 ) {
     val firstRowFocus = remember { FocusRequester() }
-    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val scope = rememberCoroutineScope()
     var currentSpeed by remember { mutableStateOf(currentPlayerSpeed(controller.player)) }
     DisposableEffect(controller.player) {
         val listener =
@@ -1114,7 +1113,7 @@ private fun AspectPanel(
 ) {
     val firstRowFocus = remember { FocusRequester() }
     val playback by prefs.playbackFlow.collectAsState()
-    val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val scope = rememberCoroutineScope()
     // Panel initial focus lands on the first fit-mode row. See AudioPanel
     // for the model note — DPAD UP on the first row escapes to the tab
     // strip.
@@ -1175,7 +1174,7 @@ private fun SleepPanel(
     val firstRowFocus = remember { FocusRequester() }
     val sleepState by controller.sleepTimer.collectAsState()
     val currentItem by controller.currentItem.collectAsState()
-    val ioScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val ioScope = rememberCoroutineScope()
 
     // End-of-program is only meaningful for live channels with a tvgId
     // AND a programme that covers "now". Look it up off the main thread
@@ -1562,7 +1561,7 @@ private fun FavoritesPanel(
     val firstRowFocus = remember { FocusRequester() }
     val currentItem by controller.currentItem.collectAsState()
     val currentEpisode by controller.currentEpisode.collectAsState()
-    val ioScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val ioScope = rememberCoroutineScope()
 
     // Pick the FK-safe content id for the current playback context:
     //   - Episode play → the *series* id (episodes have no content row)

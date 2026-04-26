@@ -49,9 +49,15 @@ src/
 
 ```bash
 ./gradlew :shared:build
-./gradlew :shared:commonTest            # KMP tests
-./gradlew :shared:androidUnitTest       # Android-flavored tests (e.g. JVM XMLTV parser)
+./gradlew :shared:testDebugUnitTest     # JVM unit tests (this is where commonTest + androidUnitTest sources land)
+./gradlew :shared:allTests              # KMP aggregate (JVM + iOS klib once iOS source set is populated)
+./gradlew :shared:compileCommonMainKotlinMetadata    # iOS-relevant common metadata compile
 ```
+
+Note: there is no `:shared:commonTest` Gradle task. `commonTest` is a
+source-set name; the runner task that executes those tests on JVM is
+`:shared:testDebugUnitTest` (Android target hierarchy). `:shared:allTests`
+is the aggregate when more targets ship.
 
 From repo root or `packages/android/`. `JAVA_HOME` must point at Android Studio's JBR.
 

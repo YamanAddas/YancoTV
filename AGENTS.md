@@ -24,7 +24,8 @@ Shared logic runs in two parallel ports: `packages/core/` (TypeScript, for deskt
 pnpm install                                # workspace install (pnpm enforced)
 pnpm dev                                    # desktop: Vite + Electron on :5173
 cd packages/android && ./gradlew :app:installDebug        # Android to connected device
-./gradlew :shared:commonTest :shared:androidUnitTest       # KMP tests
+./gradlew :shared:testDebugUnitTest                        # shared module unit tests (JVM)
+./gradlew :shared:allTests                                 # all targets (JVM + iOS klib if present)
 ```
 
 Fire TV target for native: `adb connect 192.168.68.56:5555` then `installDebug`. `JAVA_HOME` must point at Android Studio's JBR.

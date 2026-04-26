@@ -63,7 +63,8 @@ cd packages/android
 ./gradlew :app:assembleDebug                    # debug APK
 ./gradlew :app:installDebug                     # build + install (Fire TV on 192.168.68.56:5555)
 ./gradlew :app:assembleRelease                  # signed per-ABI splits
-./gradlew :shared:commonTest :shared:androidUnitTest   # run shared tests
+./gradlew :shared:testDebugUnitTest             # shared module unit tests (JVM target)
+./gradlew :shared:allTests                      # all KMP targets aggregate
 ```
 
 `JAVA_HOME` must point at Android Studio's JBR: `C:\Program Files\Android\Android Studio\jbr`.
