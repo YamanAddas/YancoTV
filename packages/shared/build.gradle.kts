@@ -128,3 +128,42 @@ sqldelight {
         }
     }
 }
+
+// SQLDelight 2.0.2 auto-creates `verifyCommonMainYancoDbMigration` whenever
+// there are `.sqm` migration files in `commonMain`, regardless of whether
+// `verifyMigrations` is set in the DSL (the DSL property tunes test-time
+// verification, not the build-time task). The task uses sqlite-jdbc's
+// native binding, which on this Windows + Android Studio JBR combination
+// fails with:
+//
+//     A failure occurred while executing
+//       app.cash.sqldelight.gradle.VerifyMigrationTask$VerifyMigrationAction
+//     > 'void org.sqlite.core.NativeDB._open_utf8(byte[], int)'
+//
+// (sqlite-jdbc's `.dll` extracts to a temp dir but the JBR's class
+// resolution misses the matching native method.) `:gradlew clean build`
+// trips this before any of our actual code compiles. Runtime
+// `MigrationTest.kt` in `:shared:androidUnitTest` covers the same
+// migration ladder via the JVM SQLite driver, so skipping the build-time
+// task on Windows is a safe trade — Linux / macOS CI still verifies it.
+//
+// Tracked: see PRODUCTION_PLAN_NATIVE.md Stage 1.5 for the original
+// note + bugs.md MB-200..203 for the outside-review-pass deferrals.
+val isWindowsHost = System.getProperty("os.name").lowercase().startsWith("windows")
+if (isWindowsHost) {
+    tasks.matching {
+        it.name.startsWith("verify") && it.name.endsWith("Migration")
+    }.configureEach {
+        enabled = false
+        // Helpful echo on `clean build` so the dev sees why the task was
+        // skipped instead of wondering why their migrations were never
+        // verified at build time.
+        doFirst {
+            logger.lifecycle(
+                "Skipping ${name} on Windows — sqlite-jdbc + JBR native-link " +
+                    "incompatibility (see :shared:build.gradle.kts comment). " +
+                    "Migration coverage runs via :shared:testDebugUnitTest -> MigrationTest.kt.",
+            )
+        }
+    }
+}
