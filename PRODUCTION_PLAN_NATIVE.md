@@ -119,7 +119,7 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 
 ### Status (per 2026-04-25 audit)
 
-**Shipped:** MK.0–MK.8, MK.9.1–9.5 (Stage 1.2 closed 2026-04-25), Stage 1.3 Sentry (2026-04-25), Stage 1.4 R8 baseline (2026-04-25), Stage 1.5 DB migration tests + corruption recovery (2026-04-25), Stage 1.6 perf budget + baseline (2026-04-25), MK.12a/b, MK.13.1–13.3, MK.16.shell, MK.16.1, MK.16.sheet, MK.16.player.vod.dock, MK.16.player.vod.chrome, MK.17.1, MK.18.1. **Stage 1 complete.** D-phase complete. 133 commits pushed to `origin/master` 2026-04-25.
+**Shipped:** MK.0–MK.8, MK.9.1–9.5 (Stage 1.2 closed 2026-04-25), Stage 1.3 Sentry (2026-04-25), Stage 1.4 R8 baseline (2026-04-25), Stage 1.5 DB migration tests + corruption recovery (2026-04-25), Stage 1.6 perf budget + baseline (2026-04-25), Stage 2.1–2.6 schema backbone v3 → v8 (2026-04-26), MK.12a/b, MK.13.1–13.3, MK.16.shell, MK.16.1, MK.16.sheet, MK.16.player.vod.dock, MK.16.player.vod.chrome, MK.17.1, MK.18.1. **Stages 1 + 2 complete.** D-phase complete. 133 commits pushed to `origin/master` 2026-04-25.
 
 **Not started:** MK.10 (Recommendations + voice search only — TIF deferred), MK.11.1/2 (PIP + gestures), MK.13.4, MK.14, MK.15, MK.16.2–16.6, MK.17.1a/2/3/4/5, MK.18.2, MK.19.
 
@@ -152,14 +152,19 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 
 Bundle all v1.0 schema migrations in one commit series, run upgrade tests once, move on. No feature in Stage 3 or 4 starts before this stage closes.
 
+**Stage 2 closed 2026-04-26.** Schema went v3 → v8 across five `.sqm`
+migrations (`3.sqm` … `7.sqm`); `Stage2MigrationTest` exercises the
+full v3 → current path against a realistic seeded fixture and asserts
+every backfill, default, and new table contract.
+
 | # | Task | Maps to |
 |---|---|---|
-| 2.1 | `recording_schedules.sq` + `recordings.sq` (status enum + paths + sizes) | MK.14.3 schema half |
-| 2.2 | `favorite_lists.sq` + `Favorites.sq.list_id` FK; default list seeded | MK.13.4 schema half |
-| 2.3 | `Sources.sq` per-source `user_agent` + `referer` columns | MK.17.5 schema half |
-| 2.4 | `EpgSources.sq` `epg_priority INTEGER DEFAULT 0` column | MK.15.7 schema half |
-| 2.5 | Backup/restore metadata schema (export version + checksum) | new |
-| 2.6 | Single migration test pass — populate v_prev with realistic data, migrate to v_new, verify all repos still read | new |
+| 2.1 | ✅ `RecordingSchedules.sq` + `recordings.format` (`3.sqm`, v3 → v4). State machine for armed schedules decoupled from in-flight recording status; soft FKs (`ON DELETE SET NULL`) on content / programme / recording links. | MK.14.3 schema half |
+| 2.2 | ✅ `FavoriteLists.sq` + `favorites.list_id` (`4.sqm`, v4 → v5). Default list seeded with stable id `'default'` (is_default=1) at fresh-create AND migration; legacy favorites backfilled to that list. UI guards default-list deletion. | MK.13.4 schema half |
+| 2.3 | ✅ `Sources.referer` (`5.sqm`, v5 → v6). `user_agent` already on the genesis schema; this commit adds the missing companion for providers that gate playback on the Referer header. | MK.17.5 schema half |
+| 2.4 | ✅ `Sources.epg_priority INTEGER DEFAULT 0` (`6.sqm`, v6 → v7). The plan entry's "EpgSources.sq" was a typo — followed MK.15.7's intent and put the column on the existing `sources` table. Index DESC for the EPG-merge "highest priority for tvg_id" pattern. | MK.15.7 schema half |
+| 2.5 | ✅ `BackupMetadata.sq` (`7.sqm`, v7 → v8). Local record of user-initiated full-app exports — file URI, label, schema_version, SHA-256 checksum, size, per-class record counts. Distinct from Stage 1.5's silent `sources-backup.json` corruption-recovery file. | new |
+| 2.6 | ✅ `Stage2MigrationTest` covers v3 → current with seeded source / content / epg / recording / favorite. Plus empty-DB sanity + fresh-create default-list assertion. 333 unit tests pass after Stage 2. | new |
 
 ### Stage 3 — Heavy features (touch playback core)
 
