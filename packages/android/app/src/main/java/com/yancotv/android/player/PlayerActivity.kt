@@ -89,6 +89,7 @@ class PlayerActivity : AppCompatActivity() {
     private val controller: PlaybackController by inject()
     private val epg: EpgRepository by inject()
     private val prefs: AppPreferences by inject()
+    private val recordings: com.yancotv.shared.recording.RecordingsRepository by inject()
 
     private lateinit var playerView: PlayerView
 
@@ -255,6 +256,25 @@ class PlayerActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_player)
         playerView = findViewById(R.id.player_view)
+
+        // MK.14.2-fix — in-app recording indicator. Fire TV doesn't show
+        // foreground-service notifications over fullscreen video, so this
+        // pinned pill is the user's primary "is it recording?" signal.
+        // The composable observes the recordings flow internally; eager
+        // setup here is essentially free (it renders nothing until a
+        // matching row appears).
+        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.recording_indicator)
+            .apply {
+                setViewCompositionStrategy(
+                    androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
+                setContent {
+                    RecordingIndicator(
+                        controller = controller,
+                        recordings = recordings,
+                    )
+                }
+            }
 
         zapBar = findViewById(R.id.zap_bar)
         zapLiveDot = findViewById(R.id.zap_live_dot)

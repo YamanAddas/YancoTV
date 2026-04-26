@@ -18,6 +18,21 @@
         app:show_buffering="when_playing"
         app:shutter_background_color="@android:color/black" />
 
+    <!-- Recording status indicator (MK.14.2-fix). Top-end pill that's
+         visible while a recording for the playing channel is in flight.
+         Eager-inflated (zero-cost when idle — observes a StateFlow,
+         renders nothing until it sees an active row). Fire TV doesn't
+         show our system foreground-service notification over fullscreen
+         video by design (Amazon docs), so this is the user's primary
+         "is it recording?" feedback. -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/recording_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="32dp" />
+
     <!-- Zap bar: channel name + now/next, top-start. Fades with Media3 controller. -->
     <LinearLayout
         android:id="@+id/zap_bar"

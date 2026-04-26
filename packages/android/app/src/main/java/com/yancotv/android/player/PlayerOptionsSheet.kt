@@ -1474,7 +1474,10 @@ private fun RecordPanel(
         HexOptionRow(
             leading = null,
             label = "Stop recording",
-            sub = "Recording will be saved to your library",
+            // Honest copy — there's no "library" yet (MK.14.5 lands the
+            // sidebar Recordings destination). The file is on the device
+            // at the path managed by Settings → Recordings.
+            sub = "Saving to your device · Tap to finish",
             selected = true,
             focusRequester = firstRowFocus,
             onEscapeUp = onEscapeUp,
