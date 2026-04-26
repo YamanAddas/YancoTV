@@ -128,6 +128,15 @@ val appModule =
                 clock = { System.currentTimeMillis() },
             )
         }
+        // MK.14.3 — scheduled-recording state machine. Owned by
+        // RecordingScheduleScheduler (alarm pairing, slice 2) and
+        // RecordingScheduleReceiver (fire-time transitions).
+        single {
+            com.yancotv.shared.recording.RecordingScheduleRepository(
+                db = get(),
+                clock = { System.currentTimeMillis() },
+            )
+        }
         single<PinHasher> { AndroidPinHasher() }
         single {
             ParentalRepository(
