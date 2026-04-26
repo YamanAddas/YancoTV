@@ -96,12 +96,29 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    testOptions {
+        unitTests {
+            // Same rationale as :app's testOptions — let unit tests touch
+            // `android.util.Log` and similar framework methods without
+            // standing up Robolectric. Stage 1.5 SourcesBackupTest depends
+            // on this (SourcesBackup.restoreInto logs an info line).
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 sqldelight {
     databases {
         create("YancoDb") {
             packageName.set("com.yancotv.shared.db")
+            // Stage 1.5 — `verifyMigrations` and `schemaOutputDirectory`
+            // were tried but SQLDelight's GenerateSchemaTask depends on
+            // sqlite-jdbc whose Windows native binding doesn't link cleanly
+            // against the Android Studio JBR (NoSuchMethodError on
+            // org.sqlite.core.NativeDB._open_utf8). Migration verification
+            // is done via runtime tests in `androidUnitTest` instead — see
+            // MigrationTest.kt. Those use JdbcSqliteDriver via Kotlin test
+            // classpath which loads the native lib correctly.
         }
     }
 }
