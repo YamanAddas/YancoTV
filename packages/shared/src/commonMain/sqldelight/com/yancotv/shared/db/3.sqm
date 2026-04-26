@@ -1,0 +1,59 @@
+-- v3 → v4 (Stage 2.1, MK.14.3 schema half): scheduled-recording layer.
+-- The existing `recordings` table already covers in-flight + completed
+-- recordings. Stage 2 adds:
+--
+--   * `recording_schedules` — user-armed future recordings that get
+--     materialised into a `recordings` row when the schedule fires. State
+--     machine is decoupled from the recording row's status: a schedule can
+--     be `scheduled / armed / firing / completed / failed / cancelled /
+--     missed`, while the recording row tracks `recording / completed /
+--     failed / cancelled` only after firing. The two link via
+--     `recording_schedules.recording_id`.
+--
+--   * `recordings.format` — null for legacy rows; 'hls' / 'mpeg_ts' for
+--     new ones. MK.14 needs this in the recordings browser (different
+--     formats imply different external-player compatibility).
+--
+-- Existing rows: `format` is NULL (treated as 'unknown' by the recordings
+-- browser; download-replay still works because the file exists on disk).
+CREATE TABLE recording_schedules (
+    id TEXT PRIMARY KEY NOT NULL,
+    -- Soft FK to content (channel id). Channel may be removed without
+    -- losing the schedule history; ON DELETE SET NULL keeps the record
+    -- so the user can see a "channel deleted" entry instead of it
+    -- silently disappearing.
+    content_id TEXT REFERENCES content(id) ON DELETE SET NULL,
+    -- Soft FK to epg_programmes when the schedule was created via EPG
+    -- long-press. NULL for manual time-based schedules. ON DELETE SET
+    -- NULL because programme rows churn during EPG refresh and we don't
+    -- want a stale FK to nuke a user's schedule.
+    programme_id TEXT REFERENCES epg_programmes(id) ON DELETE SET NULL,
+    -- Snapshot at schedule creation. Channel rename / EPG mutation must
+    -- not mutate the schedule's display label; users see what they armed.
+    title TEXT NOT NULL,
+    -- Snapshot at schedule creation. Stream URL might change (provider
+    -- rotation); we use this fixed URL when firing. The user can re-arm
+    -- to pick up the new URL.
+    stream_url TEXT NOT NULL,
+    scheduled_start INTEGER NOT NULL, -- ms since epoch
+    scheduled_end INTEGER NOT NULL,   -- ms since epoch
+    state TEXT NOT NULL CHECK(state IN (
+        'scheduled', 'armed', 'firing',
+        'completed', 'failed', 'cancelled', 'missed'
+    )),
+    -- Set when state transitions to 'firing' or beyond. SET NULL on
+    -- recordings deletion so a user-deleted recording doesn't break the
+    -- schedule history view.
+    recording_id TEXT REFERENCES recordings(id) ON DELETE SET NULL,
+    error TEXT,
+    created_at INTEGER NOT NULL, -- ms since epoch
+    updated_at INTEGER NOT NULL  -- ms since epoch
+);
+
+CREATE INDEX idx_recording_schedules_scheduled_start
+    ON recording_schedules(scheduled_start ASC);
+
+CREATE INDEX idx_recording_schedules_state
+    ON recording_schedules(state);
+
+ALTER TABLE recordings ADD COLUMN format TEXT;

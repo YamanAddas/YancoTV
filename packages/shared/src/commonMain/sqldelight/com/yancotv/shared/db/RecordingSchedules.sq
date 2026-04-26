@@ -1,0 +1,85 @@
+-- Stage 2.1 — user-armed recording schedules. State machine decoupled
+-- from `recordings.status`: a schedule lives independently of the
+-- eventual recording row and remains visible to the user in the
+-- "Scheduled" tab even after firing (where it shows the recording_id
+-- as a link to the recordings browser entry).
+--
+-- See `3.sqm` for migration semantics + column-level rationale.
+CREATE TABLE recording_schedules (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT REFERENCES content(id) ON DELETE SET NULL,
+    programme_id TEXT REFERENCES epg_programmes(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    stream_url TEXT NOT NULL,
+    scheduled_start INTEGER NOT NULL, -- ms since epoch
+    scheduled_end INTEGER NOT NULL,   -- ms since epoch
+    state TEXT NOT NULL CHECK(state IN (
+        'scheduled', 'armed', 'firing',
+        'completed', 'failed', 'cancelled', 'missed'
+    )),
+    recording_id TEXT REFERENCES recordings(id) ON DELETE SET NULL,
+    error TEXT,
+    created_at INTEGER NOT NULL, -- ms since epoch
+    updated_at INTEGER NOT NULL  -- ms since epoch
+);
+
+CREATE INDEX idx_recording_schedules_scheduled_start
+    ON recording_schedules(scheduled_start ASC);
+
+CREATE INDEX idx_recording_schedules_state
+    ON recording_schedules(state);
+
+selectAll:
+SELECT * FROM recording_schedules ORDER BY scheduled_start ASC;
+
+selectById:
+SELECT * FROM recording_schedules WHERE id = ?;
+
+selectByState:
+SELECT * FROM recording_schedules WHERE state = ? ORDER BY scheduled_start ASC;
+
+-- For the WorkManager arm-loop: schedules that should fire in the next
+-- window. WorkManager periodic runs every ~15 min; we arm anything
+-- whose scheduled_start lies within the next window's worst-case
+-- coverage so the JobScheduler exact alarm gets set in time.
+selectArmable:
+SELECT *
+FROM recording_schedules
+WHERE state = 'scheduled' AND scheduled_start <= ?
+ORDER BY scheduled_start ASC;
+
+-- For the schedule-fire moment: the earliest 'armed' schedule whose
+-- start time has arrived.
+selectFiring:
+SELECT *
+FROM recording_schedules
+WHERE state = 'armed' AND scheduled_start <= ?
+ORDER BY scheduled_start ASC;
+
+insert:
+INSERT INTO recording_schedules (
+    id, content_id, programme_id, title, stream_url,
+    scheduled_start, scheduled_end, state, recording_id, error,
+    created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+setState:
+UPDATE recording_schedules
+SET state = ?, updated_at = ?, error = ?
+WHERE id = ?;
+
+linkRecording:
+UPDATE recording_schedules
+SET state = ?, recording_id = ?, updated_at = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM recording_schedules WHERE id = ?;
+
+-- Sweep cancelled / completed schedules older than the cutoff (ms since
+-- epoch). Surfaces missed schedules from a long-offline device too:
+-- those can build up into a noisy "Scheduled" tab if never reaped.
+deleteOlderThan:
+DELETE FROM recording_schedules
+WHERE state IN ('completed', 'cancelled', 'missed', 'failed')
+  AND updated_at < ?;

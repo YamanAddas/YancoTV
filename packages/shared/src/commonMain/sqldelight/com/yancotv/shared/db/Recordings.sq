@@ -1,3 +1,7 @@
+-- In-flight + completed recording rows. Created by the recording
+-- foreground service when a [recording_schedules] entry fires (or a
+-- manual record-now action runs); updated as the recording progresses.
+-- Format is set at firing time based on the source stream type.
 CREATE TABLE recordings (
     id TEXT PRIMARY KEY NOT NULL,
     content_id TEXT,
@@ -5,11 +9,15 @@ CREATE TABLE recordings (
     stream_url TEXT NOT NULL,
     file_path TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('recording', 'completed', 'failed', 'cancelled')),
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    duration_seconds INTEGER,
+    started_at INTEGER NOT NULL,    -- ms since epoch (actual fire time)
+    ended_at INTEGER,               -- ms since epoch
+    duration_seconds INTEGER,       -- media offset, NOT wall-clock
     file_size_bytes INTEGER,
-    error TEXT
+    error TEXT,
+    -- 'hls' / 'mpeg_ts' / NULL. NULL on rows created before Stage 2.1
+    -- migration; treated as 'unknown' by the recordings browser. New
+    -- rows always set this.
+    format TEXT
 );
 
 CREATE INDEX idx_recordings_status ON recordings(status);
@@ -27,8 +35,8 @@ SELECT * FROM recordings WHERE id = ?;
 insert:
 INSERT INTO recordings
     (id, content_id, title, stream_url, file_path, status,
-     started_at, ended_at, duration_seconds, file_size_bytes, error)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+     started_at, ended_at, duration_seconds, file_size_bytes, error, format)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateStatus:
 UPDATE recordings
