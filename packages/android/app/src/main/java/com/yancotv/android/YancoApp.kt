@@ -14,6 +14,11 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderNotificationChannel
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.image.buildYancoImageLoader
+import com.yancotv.shared.recording.RecordingsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
@@ -21,6 +26,7 @@ import org.koin.core.context.startKoin
 @UnstableApi
 class YancoApp : Application() {
     private val playbackController: PlaybackController by inject()
+    private val recordingsRepo: RecordingsRepository by inject()
     private var startedActivities = 0
 
     override fun onCreate() {
@@ -79,6 +85,14 @@ class YancoApp : Application() {
         SingletonImageLoader.setSafe { buildYancoImageLoader(this) }
         EpgSyncWorker.schedulePeriodic(this)
         ReminderNotificationChannel.ensureCreated(this)
+        // Stage 3.1 / MK.14.1c — sweep any RECORDING-status rows that
+        // outlived a crash / process death. The repo flips orphans
+        // (started_at older than the default 10 min threshold) to
+        // FAILED('orphaned_by_app_kill') so the UI doesn't show a
+        // stuck row forever. IO-bound; off the main thread.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { recordingsRepo.sweepOrphans() }
+        }
         // Drop SUCCEEDED/FAILED WorkInfo records that survive across app
         // restarts. GuideSyncPanel observes the unique-work flow and the
         // accumulated history slowly grows the in-memory list it renders

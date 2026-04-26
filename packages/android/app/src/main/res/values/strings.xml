@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">YancoTV</string>
+
+    <!-- Stage 3.1 / MK.14.1e — recording foreground service. -->
+    <string name="recording_channel_name">Recordings</string>
+    <string name="recording_channel_description">Background recording status</string>
+    <string name="recording_notification_title_one">Recording 1 channel</string>
+    <string name="recording_notification_title_many">Recording %1$d channels</string>
+    <string name="recording_notification_body">Tap to manage your recordings</string>
+    <string name="recording_notification_stop_all">Stop all</string>
 </resources>

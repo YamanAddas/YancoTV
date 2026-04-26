@@ -21,6 +21,14 @@
          on API 31+. SCHEDULE_EXACT_ALARM is the user-revocable fallback. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Stage 3.1 / MK.14.1e — recording foreground service. The
+         FOREGROUND_SERVICE base permission is needed on every Android
+         release that ships foreground services. The matching
+         FOREGROUND_SERVICE_DATA_SYNC permission is required from
+         Android 14 (API 34) to declare `dataSync` as the service type;
+         on earlier releases it's a harmless no-op. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Android 11+ package visibility: lets us resolve the speech recognizer
          intent used by the voice-input buttons on Fire TV remotes, AND query
@@ -112,6 +120,15 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- Stage 3.1 / MK.14.1e — foreground service that owns every
+             in-flight recording. `dataSync` is the appropriate type
+             (we're streaming bytes from the network and writing them
+             to a file; not media playback / not user-visible camera). -->
+        <service
+            android:name=".recording.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 

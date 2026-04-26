@@ -33,6 +33,14 @@ data class RecordInput(
     val title: String,
     val format: RecordingFormat,
     /**
+     * FK-soft pointer to a `content` row (channel) when the recording
+     * originates from a channel zap. `null` for ad-hoc record-now
+     * actions where there's no corresponding content row (e.g. a
+     * one-off URL drop in the future). Surfaced so the recordings
+     * browser can join with channel metadata for thumbnails / labels.
+     */
+    val contentId: String? = null,
+    /**
      * Hard cap on the recording duration in milliseconds. Scheduled
      * recordings set this from `recording_schedules.scheduled_end -
      * scheduled_start + post_padding`. `null` means unbounded — the

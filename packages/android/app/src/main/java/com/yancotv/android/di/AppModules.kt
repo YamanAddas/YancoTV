@@ -108,6 +108,14 @@ val appModule =
         single { ReminderScheduler(androidContext(), get()) }
         single { FavoritesRepository(db = get(), clock = { System.currentTimeMillis() }) }
         single { WatchHistoryRepository(db = get(), clock = { System.currentTimeMillis() }) }
+        // Stage 3.1 / MK.14.1c — recording state-machine repo. Used by
+        // RecordingService and (eventually) the Recordings screen.
+        single {
+            com.yancotv.shared.recording.RecordingsRepository(
+                db = get(),
+                clock = { System.currentTimeMillis() },
+            )
+        }
         single<PinHasher> { AndroidPinHasher() }
         single {
             ParentalRepository(

@@ -208,6 +208,11 @@ dependencies {
     // classpath; declaring it here avoids depending on a leak.
     implementation(libs.kermit)
 
+    // kotlinx.io (Stage 3.1 / MK.14.1e) — RecordingFileOutput wraps a
+    // FileOutputStream as a Sink for the shared-side recorders. Same
+    // "transitive of :shared but not on app compile classpath" reason.
+    implementation(libs.kotlinx.io.core)
+
     // Coil 3 images
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
