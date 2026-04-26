@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.BuildConfig
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -168,7 +169,18 @@ class PlaybackController(
         // OkHttpDataSource.Factory.setUserAgent is intentionally NOT called —
         // the interceptor above is the sole source of the UA so user
         // overrides from Settings actually take effect per request.
-        val dataSourceFactory = OkHttpDataSource.Factory(okHttp)
+        //
+        // **MK.14.5 fix (2026-04-26):** wrap the OkHttp HTTP factory in a
+        // `DefaultDataSource.Factory`. OkHttp only handles `http(s)://`
+        // URIs; without this wrapper, every other scheme (file:// for
+        // recordings, content:// for SAF-saved recordings, asset://,
+        // raw://) falls through to nothing → ExoPlayer surfaces it as
+        // ERROR_CODE_FAILED_RUNTIME_CHECK (1004). DefaultDataSource.Factory
+        // routes by scheme: file/asset/content/raw → built-in handlers,
+        // http(s) → our OkHttp factory. Live IPTV streams are unaffected
+        // (they go through OkHttp the same way they always did).
+        val httpDataSourceFactory = OkHttpDataSource.Factory(okHttp)
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
         // Tuned for channel-zap UX — start playing at 1s buffered instead
         // of the stock 2.5s. Rebuffer threshold stays at stock 5s so we
         // don't oscillate between BUFFERING and READY on flaky sources.

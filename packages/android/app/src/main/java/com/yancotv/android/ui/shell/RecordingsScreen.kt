@@ -38,6 +38,7 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.recording.RecordingService
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.recording.RecordingEntry
 import com.yancotv.shared.recording.RecordingStatus
@@ -121,11 +122,8 @@ fun RecordingsScreen(
                 items(rows, key = { it.id }) { row ->
                     RecordingRow(
                         entry = row,
-                        onPlay = {
-                            if (row.status == RecordingStatus.COMPLETED) {
-                                playRecording(controller, context, row)
-                            }
-                        },
+                        onPlay = { playRecording(controller, context, row) },
+                        onStop = { RecordingService.stop(context, row.id) },
                         onDelete = {
                             scope.launch(Dispatchers.IO) {
                                 runCatching { deleteRecording(context, recordings, row) }
@@ -166,15 +164,28 @@ private fun EmptyRecordingsState(palette: com.yancotv.android.ui.theme.YancoPale
     }
 }
 
+/**
+ * Per-row UX, action buttons by status:
+ *   - RECORDING → Stop (primary) + Delete
+ *   - COMPLETED → Play (primary) + Delete
+ *   - FAILED / CANCELLED → Delete only (the row already shows the
+ *     reason; replaying a failed recording isn't a v1.0 feature)
+ *
+ * The row container is **not** clickable — actions live exclusively
+ * in the buttons. Bug feedback from MK.14.5: a "whole row activates
+ * play" with a separate Delete button is confusing because users
+ * can't predict which gesture goes where, and on TV D-pad CENTER
+ * could land either action depending on focus. Two explicit buttons
+ * with their own focus targets is unambiguous.
+ */
 @Composable
 private fun RecordingRow(
     entry: RecordingEntry,
     onPlay: () -> Unit,
+    onStop: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val palette = LocalYancoPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
     val shape = RoundedCornerShape(10.dp)
 
     Row(
@@ -182,23 +193,8 @@ private fun RecordingRow(
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .background(if (focused) palette.BackgroundElevated else palette.BackgroundRaised)
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) palette.Accent else palette.PanelBorder,
-                    shape = shape,
-                )
-                // Stage 3.1 / MK.14.5 bug fix: TV D-pad needs explicit
-                // `.focusable()` paired with the same MutableInteractionSource
-                // as the clickable. Modifier.clickable alone reliably
-                // gets focus on phone but not on Fire TV — same pattern
-                // as FavoritesScreen rows (working since MK.13.x).
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    onClick = onPlay,
-                )
+                .background(palette.BackgroundRaised)
+                .border(width = 1.dp, color = palette.PanelBorder, shape = shape)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -229,8 +225,22 @@ private fun RecordingRow(
         }
         Spacer(modifier = Modifier.width(12.dp))
         StatusBadge(entry.status, palette)
-        Spacer(modifier = Modifier.width(8.dp))
-        FocusableInlineButton(label = "Delete", onClick = onDelete)
+        Spacer(modifier = Modifier.width(12.dp))
+        when (entry.status) {
+            RecordingStatus.RECORDING -> {
+                FocusableInlineButton(label = "Stop", primary = true, onClick = onStop)
+                Spacer(modifier = Modifier.width(8.dp))
+                FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+            }
+            RecordingStatus.COMPLETED -> {
+                FocusableInlineButton(label = "Play", primary = true, onClick = onPlay)
+                Spacer(modifier = Modifier.width(8.dp))
+                FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+            }
+            RecordingStatus.FAILED, RecordingStatus.CANCELLED -> {
+                FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+            }
+        }
     }
 }
 
@@ -266,24 +276,45 @@ private fun StatusBadge(
 @Composable
 private fun FocusableInlineButton(
     label: String,
+    primary: Boolean = false,
     onClick: () -> Unit,
 ) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = RoundedCornerShape(6.dp)
+    val bg =
+        when {
+            focused -> palette.Accent
+            primary -> palette.AccentSoft
+            else -> palette.BackgroundElevated
+        }
+    val borderColor =
+        when {
+            focused -> palette.Accent
+            primary -> palette.Accent
+            else -> palette.PanelBorder
+        }
+    val fg =
+        when {
+            focused -> palette.BackgroundDeep
+            primary -> palette.Accent
+            else -> palette.TextPrimary
+        }
     Box(
         modifier =
             Modifier
                 .clip(shape)
-                .background(if (focused) palette.Accent else palette.BackgroundElevated)
+                .background(bg)
                 .border(
                     width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) palette.Accent else palette.PanelBorder,
+                    color = borderColor,
                     shape = shape,
                 )
-                // Same pattern as the row above — TV D-pad RIGHT lands
-                // here from the row, OK fires onClick.
+                // TV D-pad needs explicit `.focusable` paired with the
+                // clickable's MutableInteractionSource — same lesson as
+                // FavoritesScreen rows. Without this, Modifier.clickable
+                // alone is unreliable for D-pad focus on Fire TV.
                 .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
@@ -294,7 +325,7 @@ private fun FocusableInlineButton(
     ) {
         Text(
             text = label,
-            color = if (focused) palette.BackgroundDeep else palette.TextPrimary,
+            color = fg,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
         )
