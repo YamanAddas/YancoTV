@@ -4,6 +4,7 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.jvm.javaio.copyTo
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.io.Source
@@ -52,6 +53,22 @@ class AndroidKtorHttpClient(
     ): T =
         withContext(Dispatchers.IO) {
             val response = performGet(url, options)
+
+            // Streaming-live path: hand the caller a Source backed directly
+            // by the network channel. Required for [MpegTsRecorder] where the
+            // body is a multi-hour MPEG-TS that never ends until the caller
+            // cancels — the default temp-file path below would call
+            // `streamToFile` and loop forever, never reaching `block(source)`,
+            // so the recorder's sink would receive zero bytes (regression
+            // observed when stopping a recording produced 0-byte files).
+            if (options.streamLive) {
+                val channel: ByteReadChannel = response.bodyAsChannel()
+                return@withContext channel.toInputStream().use { input ->
+                    val source: Source = input.asSource().buffered()
+                    source.use { block(it) }
+                }
+            }
+
             options.maxResponseBytes?.let { cap ->
                 response.headers["Content-Length"]?.toLongOrNull()?.let { declared ->
                     if (declared > cap) {

@@ -43,6 +43,10 @@ sealed interface RecordingOutput {
     /** Buffered sink the recorder writes into. Caller closes via Sink.close(). */
     fun openSink(): Sink
 
+    /** On-disk byte count after the sink is closed. Used by [RecordingService.handleStop]
+     *  to decide between markCompleted (>0) and silent delete (0). 0 on error. */
+    fun size(): Long
+
     /** Best-effort delete; called by the eviction path or user "delete recording". */
     fun delete(): Boolean
 }
@@ -51,6 +55,8 @@ internal class FileBackedOutput(val file: File) : RecordingOutput {
     override val storagePath: String get() = file.absolutePath
 
     override fun openSink(): Sink = FileOutputStream(file).asSink().buffered()
+
+    override fun size(): Long = runCatching { file.length() }.getOrDefault(0L)
 
     override fun delete(): Boolean = file.delete()
 }
@@ -67,6 +73,8 @@ internal class DocumentBackedOutput(
                 ?: error("ContentResolver returned null OutputStream for ${documentFile.uri}")
         return stream.asSink().buffered()
     }
+
+    override fun size(): Long = runCatching { documentFile.length() }.getOrDefault(0L)
 
     override fun delete(): Boolean = runCatching { documentFile.delete() }.getOrDefault(false)
 }

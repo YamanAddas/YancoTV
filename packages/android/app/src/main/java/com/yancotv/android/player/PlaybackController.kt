@@ -681,6 +681,15 @@ class PlaybackController(
                         .setArtworkUri(item.logoUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
                         .build(),
                 )
+        // Local recordings are MPEG-TS files. ExoPlayer's
+        // ProgressiveMediaSource auto-sniffs but TsExtractor's sniff() can
+        // false-negative on streams that lead with a DVB SDT packet (PID
+        // 0x0011) before the PAT — observed on the user's recordings
+        // (UnrecognizedInputFormatException despite valid TS bytes). Setting
+        // the MIME explicitly forces TsExtractor selection without sniff.
+        if (item.id.startsWith(LOCAL_RECORDING_ID_PREFIX)) {
+            builder.setMimeType(androidx.media3.common.MimeTypes.VIDEO_MP2T)
+        }
         _externalSubtitle?.let { (uri, mime) ->
             val cfg =
                 MediaItem.SubtitleConfiguration

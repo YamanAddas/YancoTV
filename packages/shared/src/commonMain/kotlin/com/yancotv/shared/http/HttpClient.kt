@@ -13,6 +13,16 @@ data class HttpRequestOptions(
     val maxResponseBytes: Long? = null,
     /** Whether to follow HTTP 3xx redirects. Defaults to true. */
     val followRedirects: Boolean = true,
+    /**
+     * If true, [HttpClient.getSource] hands the caller a Source that reads
+     * directly from the network channel as bytes arrive — no whole-body
+     * buffering. Required for continuous bodies (MPEG-TS recordings) where
+     * the response never ends until cancellation; the default temp-file
+     * buffering path would loop forever and never deliver any bytes to
+     * the caller's block. Catalog fetches keep the default (false) so the
+     * memory-bounded temp-file path stays in effect.
+     */
+    val streamLive: Boolean = false,
 )
 
 /** Thrown for non-2xx HTTP responses. Preserves status so retry logic can match on it. */

@@ -27,10 +27,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -60,6 +60,7 @@ class RecordingService : Service() {
     private val recordings: RecordingsRepository by inject()
     private val http: HttpClient by inject()
     private val prefs: com.yancotv.android.prefs.AppPreferences by inject()
+    private val logger: com.yancotv.shared.logger.Logger by inject()
 
     private val storageResolver by lazy {
         RecordingStorageResolver(applicationContext, prefs)
@@ -68,7 +69,6 @@ class RecordingService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val activeOutputs = ConcurrentHashMap<String, RecordingOutput>()
-    private val activeBytes = ConcurrentHashMap<String, Long>()
     private val notificationLock = Mutex()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -112,7 +112,6 @@ class RecordingService : Service() {
         serviceScope.cancel()
         activeJobs.clear()
         activeOutputs.clear()
-        activeBytes.clear()
     }
 
     // ── Action handlers ───────────────────────────────────────────
@@ -122,6 +121,7 @@ class RecordingService : Service() {
             Log.w(TAG, "duplicate start for ${input.recordId} — ignoring")
             return
         }
+        Log.i(TAG, "start[${input.recordId}] format=${input.format}")
         // Become foreground immediately. Android requires startForeground
         // within 5s of startForegroundService; doing it before the
         // recording coroutine even starts is the safest pattern.
@@ -145,14 +145,31 @@ class RecordingService : Service() {
                                 runCatching { prefs.setRecordingFolderUri(null) }
                             },
                         )
+                    } catch (c: kotlinx.coroutines.CancellationException) {
+                        // User stopped before resolve completed — let the
+                        // cancellation propagate so the launch ends in
+                        // Cancelled state. No row was created (markStarted
+                        // hasn't run), so there's nothing to transition.
+                        // handleStop's cleanup of activeJobs/activeOutputs
+                        // already ran when ACTION_STOP was processed.
+                        throw c
                     } catch (t: Throwable) {
                         Log.e(TAG, "failed to allocate output for ${input.recordId}", t)
-                        recordings.markFailed(
-                            id = input.recordId,
-                            reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
-                            bytesWritten = 0L,
-                        )
-                        withContext(Dispatchers.Main) { maybeStop() }
+                        // markFailed throws if no row exists yet (resolve
+                        // failed before markStarted), so wrap defensively.
+                        // This case is "file allocation died on us" — a real
+                        // failure mode (no storage / SAF revoked) that we
+                        // want surfaced if a row exists, swallowed otherwise.
+                        runCatching {
+                            recordings.markFailed(
+                                id = input.recordId,
+                                reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
+                                bytesWritten = 0L,
+                            )
+                        }
+                        // maybeStop is non-suspending Service-framework
+                        // calls; safe from any thread, no need to switch.
+                        maybeStop()
                         return@launch
                     }
                 activeOutputs[input.recordId] = output
@@ -173,9 +190,9 @@ class RecordingService : Service() {
                     output.openSink().use { boundSink ->
                         when (input.format) {
                             RecordingFormat.HLS ->
-                                HlsRecorder(http, RealClock).record(input, boundSink)
+                                HlsRecorder(http, RealClock, logger = logger).record(input, boundSink)
                             RecordingFormat.MPEG_TS ->
-                                MpegTsRecorder(http, RealClock).record(input, boundSink)
+                                MpegTsRecorder(http, RealClock, logger = logger).record(input, boundSink)
                         }
                     }
                 onRecorderResult(input.recordId, result)
@@ -187,21 +204,51 @@ class RecordingService : Service() {
 
     private fun handleStop(recordId: String) {
         val job = activeJobs[recordId] ?: return
-        job.cancel()
-        // The launching coroutine's catch / finally won't reach our
-        // result handler when cancelled; transition the row here and
-        // clean up bookkeeping. SQLDelight write — dispatch off main.
-        val bytes = activeBytes[recordId] ?: 0L
-        serviceScope.launch(Dispatchers.IO) {
-            runCatching {
-                recordings.markCancelled(id = recordId, bytesWritten = bytes)
-            }
-        }
+        val output = activeOutputs[recordId]
+        // Pull bookkeeping off the maps up front so a duplicate ACTION_STOP
+        // arriving while we're awaiting the flush doesn't double-cancel.
         activeJobs.remove(recordId)
         activeOutputs.remove(recordId)
-        activeBytes.remove(recordId)
-        refreshNotification()
-        maybeStop()
+
+        // The launching coroutine's `output.openSink().use {}` flushes the
+        // sink in its `finally` even when cancellation propagates — but that
+        // happens *asynchronously* after `job.cancel()`. If we marked the
+        // row immediately we'd race the flush and write a stale byte count.
+        // cancelAndJoin awaits the use{} cleanup, so File.length() then
+        // reflects the real on-disk total.
+        serviceScope.launch(Dispatchers.IO) {
+            runCatching { job.cancelAndJoin() }
+            val bytes = output?.size() ?: 0L
+            runCatching {
+                val startedAt = recordings.getById(recordId)?.startedAt
+                val secs =
+                    startedAt?.let { (System.currentTimeMillis() - it) / 1000L }
+                        ?.coerceAtLeast(0L) ?: 0L
+                if (bytes <= 0L) {
+                    // Recorder ran but no bytes hit the disk before stop —
+                    // typically because the server never started serving the
+                    // request body within the time the user waited. Mark
+                    // FAILED so the row reads "Failed · no_response_from_server"
+                    // instead of "Saved 0 KB" (which would invite the user to
+                    // tap Play and hit the 3003 unrecognized-input error).
+                    Log.i(TAG, "stop[$recordId] failed — no bytes from server")
+                    recordings.markFailed(
+                        id = recordId,
+                        reason = "no_response_from_server",
+                        bytesWritten = 0L,
+                    )
+                } else {
+                    Log.i(TAG, "stop[$recordId] saved $bytes bytes (${secs}s)")
+                    recordings.markCompleted(
+                        id = recordId,
+                        bytesWritten = bytes,
+                        durationSeconds = secs,
+                    )
+                }
+            }.onFailure { Log.w(TAG, "stop[$recordId] transition failed", it) }
+            refreshNotification()
+            maybeStop()
+        }
     }
 
     private fun handleStopAll() {
@@ -235,7 +282,6 @@ class RecordingService : Service() {
         }
         activeJobs.remove(recordId)
         activeOutputs.remove(recordId)
-        activeBytes.remove(recordId)
         refreshNotification()
         maybeStop()
     }

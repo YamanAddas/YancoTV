@@ -11,6 +11,7 @@ import android.util.Log
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ProgressBar
@@ -1240,6 +1241,14 @@ class PlayerActivity : AppCompatActivity() {
         // Hide the Media3 controller if it was up — the sheet sits over the
         // controls and a two-layer overlay reads as broken.
         playerView.hideController()
+        // Block PlayerView (and its Media3 PlayerControlView descendants)
+        // from receiving D-pad focus while the sheet owns the screen. Without
+        // this, Compose's 2D focus search inside a panel can escape the sheet
+        // when the focused row vanishes (e.g. after Stop recording flips the
+        // panel) and land on a transport button underneath — the user then
+        // controls play/pause through the sheet's scrim. Restored in hideSheet().
+        playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        playerView.isFocusable = false
         // Open on the requested tab. Default is AUDIO: the MK.16.sheet
         // Concept A port dropped the old root "OPTIONS" list in favour of
         // tab-driven navigation, and audio is both the most-used tab and
@@ -1259,6 +1268,12 @@ class PlayerActivity : AppCompatActivity() {
         sheetVisible = false
         sheetMode = SheetMode.AUDIO
         sheetOverlay?.visibility = View.GONE
+        // Restore PlayerView focus so Media3's transport buttons + the
+        // controller chrome are reachable again. FOCUS_AFTER_DESCENDANTS is
+        // PlayerView's default — it lets the controller's buttons take focus
+        // first when visible, falling back to the View itself otherwise.
+        playerView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        playerView.isFocusable = true
         playerView.requestFocus()
     }
 

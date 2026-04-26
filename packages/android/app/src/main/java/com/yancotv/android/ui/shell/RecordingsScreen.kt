@@ -232,12 +232,19 @@ private fun RecordingRow(
                 Spacer(modifier = Modifier.width(8.dp))
                 FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
             }
-            RecordingStatus.COMPLETED -> {
+            RecordingStatus.COMPLETED, RecordingStatus.CANCELLED -> {
+                // Manually-stopped recordings are partial but valid — the
+                // recorder flushes the sink on cancel, so the bytes already
+                // written are a well-formed prefix that ExoPlayer plays
+                // happily. Surface Play next to Delete just like a completed
+                // row. FAILED stays Delete-only because a 0-byte file or one
+                // killed mid-write isn't something we want to surface as
+                // playable.
                 FocusableInlineButton(label = "Play", primary = true, onClick = onPlay)
                 Spacer(modifier = Modifier.width(8.dp))
                 FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
             }
-            RecordingStatus.FAILED, RecordingStatus.CANCELLED -> {
+            RecordingStatus.FAILED -> {
                 FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
             }
         }

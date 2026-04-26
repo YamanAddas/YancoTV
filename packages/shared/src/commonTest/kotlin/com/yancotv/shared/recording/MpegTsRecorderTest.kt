@@ -3,6 +3,12 @@ package com.yancotv.shared.recording
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.Buffer
 import kotlinx.io.Source
@@ -11,6 +17,7 @@ import kotlinx.io.write
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -70,6 +77,56 @@ class MpegTsRecorderTest {
             assertIs<RecordResult.Failure>(result)
             assertEquals("stream_403", result.reason)
             assertEquals(0L, result.bytesWritten)
+        }
+
+    /**
+     * Regression: when the launching coroutine is cancelled (Android
+     * `RecordingService.handleStop` → `job.cancelAndJoin()`), the recorder
+     * must let `CancellationException` propagate. The pre-fix outer
+     * `catch (t: Throwable)` swallowed cancellation and converted it into
+     * `RecordResult.Failure(reason = "stream_error")`, which then race-wrote
+     * `markFailed` on top of the service's `markCancelled`/`markCompleted`.
+     * See [MpegTsRecorder.record] catch chain.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun cancellationDuringGetSourcePropagatesAsCancellationException() =
+        runTest {
+            val http = NeverEndingSourceClient()
+            val recorder = MpegTsRecorder(http, fixedClock())
+            val sink = Buffer()
+
+            var caught: Throwable? = null
+            val job =
+                launch {
+                    try {
+                        recorder.record(
+                            RecordInput("r-cancel", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
+                            sink,
+                        )
+                    } catch (t: Throwable) {
+                        caught = t
+                        throw t
+                    }
+                }
+            // Let the launch dispatch into record() so we're suspended
+            // inside the never-ending getSource.
+            runCurrent()
+
+            job.cancelAndJoin()
+
+            assertNotNull(caught, "expected the launch body to throw, got nothing")
+            assertIs<CancellationException>(
+                caught,
+                "expected CancellationException; got ${caught!!::class.simpleName}",
+            )
+            // The recorder must not transition to Failed on cancellation —
+            // that's the service's row-state job. Idle (never set anything)
+            // or Recording (mid-flight) are both acceptable.
+            val terminal = recorder.state.value
+            assertTrue(
+                terminal !is RecorderState.Failed,
+                "state must not be Failed after cancel; got $terminal",
+            )
         }
 
     @Test fun maxDurationCutoffEndsAsCompleted() =
@@ -169,6 +226,36 @@ class MpegTsRecorderTest {
             options: HttpRequestOptions,
             block: suspend (Source) -> T,
         ): T = throw error
+    }
+
+    /**
+     * Client whose getSource suspends indefinitely — used to exercise the
+     * cancellation path. Real-world equivalent: a slow IPTV server that
+     * never delivers response headers, exactly the case the user reported
+     * where stopping a recording produced 0-byte files unless the
+     * recorder properly propagated cancellation.
+     */
+    private class NeverEndingSourceClient : HttpClient {
+        override suspend fun getJson(
+            url: String,
+            options: HttpRequestOptions,
+        ): Any? = throw UnsupportedOperationException()
+
+        override suspend fun getText(
+            url: String,
+            options: HttpRequestOptions,
+        ): String = throw UnsupportedOperationException()
+
+        override suspend fun <T> getSource(
+            url: String,
+            options: HttpRequestOptions,
+            block: suspend (Source) -> T,
+        ): T {
+            // Suspends forever; only completes when the parent coroutine
+            // is cancelled, throwing CancellationException through.
+            delay(Long.MAX_VALUE)
+            throw IllegalStateException("unreachable")
+        }
     }
 
 }

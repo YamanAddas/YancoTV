@@ -5,6 +5,7 @@ import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,6 +76,11 @@ class HlsRecorder(
                 resolveStartingPlaylist(input.sourceUrl, input.userAgent, input.referer)
             } catch (e: HttpResponseError) {
                 return failManifest(input.recordId, "manifest_${e.status}", e, bytesWritten = 0L)
+            } catch (c: CancellationException) {
+                // Manual stop — let the caller's job.cancel() propagate. The
+                // service writes CANCELLED via markCancelled; converting this
+                // to failManifest would race-write FAILED on top.
+                throw c
             } catch (t: Throwable) {
                 return failManifest(input.recordId, "manifest_error: ${t.message ?: t::class.simpleName}", t, 0L)
             }
@@ -96,6 +102,8 @@ class HlsRecorder(
                     val playlistText =
                         try {
                             fetchManifest(mediaUrl, input.userAgent, input.referer)
+                        } catch (c: CancellationException) {
+                            throw c
                         } catch (t: Throwable) {
                             // Manifest fetch failures are unrecoverable; the source URL
                             // probably rotated. Failing here is the right move.
@@ -126,6 +134,8 @@ class HlsRecorder(
                 val segmentBytes =
                     try {
                         fetchSegmentWithRetry(segment.url, input.userAgent, input.referer)
+                    } catch (c: CancellationException) {
+                        throw c
                     } catch (t: Throwable) {
                         // Per §2 Q9, lost segments aren't fatal — log + skip.
                         logger.warn("HlsRecorder segment fetch failed seq=${segment.sequence}: ${t.message}")
@@ -219,6 +229,8 @@ class HlsRecorder(
         while (attempt <= strategy.maxRetriesPerRequest) {
             try {
                 return http.getBytes(url, options(userAgent, referer))
+            } catch (c: CancellationException) {
+                throw c
             } catch (t: Throwable) {
                 lastError = t
                 // 4xx on a SEGMENT is unusual but recoverable — the

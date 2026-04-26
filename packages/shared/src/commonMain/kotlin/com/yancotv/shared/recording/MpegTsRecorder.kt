@@ -5,6 +5,7 @@ import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,6 +108,14 @@ class MpegTsRecorder(
             // because there's no "request the next segment" — the body
             // either streams or it doesn't.
             failWithReason(input.recordId, "stream_${e.status}", e, bytesWritten)
+        } catch (c: CancellationException) {
+            // Caller cancelled the launching Job (Android `RecordingService.handleStop`
+            // → `job.cancel()`). Re-throw so the calling coroutine ends with
+            // CancellationException and the service's `markCancelled` is the
+            // only writer to the row. Catching this as a generic Throwable
+            // would convert a manual stop into a `RecordResult.Failure` and
+            // race-write FAILED on top of CANCELLED.
+            throw c
         } catch (t: Throwable) {
             failWithReason(input.recordId, "stream_error: ${t.message ?: t::class.simpleName}", t, bytesWritten)
         }
@@ -131,9 +140,18 @@ class MpegTsRecorder(
         // record() bounds idle time per chunk; that's the right shape
         // of bound for streaming, not a hard request timeout. Long.MAX_VALUE
         // is Ktor's documented "no timeout" sentinel.
+        //
+        // **Critical** (follow-up bug fix): `streamLive = true`. The default
+        // [HttpClient.getSource] on Android buffers the entire response body
+        // to a temp file before invoking `block` — fine for catalog fetches,
+        // catastrophic for a continuous MPEG-TS stream because the body
+        // never ends. Without this flag, the recorder's `sink.write` loop
+        // never runs and stop produces a 0-byte file regardless of how long
+        // it ran. With it, bytes flow channel → caller sink as they arrive.
         return HttpRequestOptions(
             timeoutMs = Long.MAX_VALUE,
             headers = headers,
+            streamLive = true,
         )
     }
 

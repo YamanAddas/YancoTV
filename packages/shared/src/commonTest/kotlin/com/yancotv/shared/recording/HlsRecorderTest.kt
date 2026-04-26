@@ -3,14 +3,22 @@ package com.yancotv.shared.recording
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.Buffer
+import kotlinx.io.Source
 import kotlinx.io.readByteArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -146,6 +154,102 @@ class HlsRecorderTest {
             assertIs<RecordResult.Success>(result)
             assertEquals(1L, result.bytesWritten)
             assertTrue(sink.readByteArray().contentEquals(byteArrayOf(0x42)))
+        }
+
+    /**
+     * Regression: cancellation during the initial manifest fetch must
+     * propagate as `CancellationException`. The pre-fix `catch (t: Throwable)`
+     * around `resolveStartingPlaylist` would convert it into a
+     * `failManifest("manifest_error: ...")`, racing the service's
+     * `markCancelled`. See [HlsRecorder.record] outer catches.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun cancellationDuringInitialManifestPropagatesAsCancellationException() =
+        runTest {
+            val http = NeverEndingHttpClient()
+            val recorder = HlsRecorder(http, fixedClock())
+            val sink = Buffer()
+
+            var caught: Throwable? = null
+            val job =
+                launch {
+                    try {
+                        recorder.record(
+                            RecordInput("r-cancel-manifest", mediaUrl, "Test", RecordingFormat.HLS),
+                            sink,
+                        )
+                    } catch (t: Throwable) {
+                        caught = t
+                        throw t
+                    }
+                }
+            runCurrent()
+
+            job.cancelAndJoin()
+
+            assertNotNull(caught, "expected the launch body to throw, got nothing")
+            assertIs<CancellationException>(
+                caught,
+                "expected CancellationException; got ${caught!!::class.simpleName}",
+            )
+            val terminal = recorder.state.value
+            assertTrue(
+                terminal !is RecorderState.Failed,
+                "state must not be Failed after manifest-fetch cancel; got $terminal",
+            )
+        }
+
+    /**
+     * Regression: cancellation during a segment fetch retry loop must
+     * propagate. Pre-fix `fetchSegmentWithRetry`'s `catch (t: Throwable)`
+     * would catch CancellationException, treat it as a transient error,
+     * `delay(backoff)` (which would itself throw CancellationException
+     * due to coroutine cancellation), and ultimately re-throw — but
+     * defensive in case `delay` semantics change, the explicit
+     * `catch (c: CancellationException) { throw c }` arm guarantees it.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun cancellationDuringSegmentFetchPropagatesAsCancellationException() =
+        runTest {
+            val http = QueueHttpClient()
+            // Manifest fetches normally...
+            http.queueText(
+                """
+                #EXTM3U
+                #EXT-X-TARGETDURATION:5
+                #EXTINF:5.000,
+                segment-0.ts
+                #EXT-X-ENDLIST
+                """.trimIndent(),
+            )
+            // ...but the segment fetch hangs.
+            http.queueBytesNeverEnding()
+
+            val recorder = HlsRecorder(http, fixedClock())
+            val sink = Buffer()
+
+            var caught: Throwable? = null
+            val job =
+                launch {
+                    try {
+                        recorder.record(
+                            RecordInput("r-cancel-segment", mediaUrl, "Test", RecordingFormat.HLS),
+                            sink,
+                        )
+                    } catch (t: Throwable) {
+                        caught = t
+                        throw t
+                    }
+                }
+            runCurrent()
+
+            job.cancelAndJoin()
+
+            assertNotNull(caught, "expected the launch body to throw, got nothing")
+            assertIs<CancellationException>(
+                caught,
+                "expected CancellationException; got ${caught!!::class.simpleName}",
+            )
         }
 
     @Test fun manifest4xxFailsFastWithStatusReason() =
@@ -304,6 +408,16 @@ class HlsRecorderTest {
             bytesQueue.addLast(error)
         }
 
+        /** Sentinel marker — when consumed by `getBytes`, it suspends
+         *  indefinitely instead of returning. Used by the cancellation
+         *  test to simulate a segment fetch that the user cancels mid-
+         *  flight. */
+        private object NeverEnds
+
+        fun queueBytesNeverEnding() {
+            bytesQueue.addLast(NeverEnds)
+        }
+
         override suspend fun getJson(
             url: String,
             options: HttpRequestOptions,
@@ -325,8 +439,46 @@ class HlsRecorderTest {
         ): ByteArray {
             urlsRequested += url
             val next = if (bytesQueue.isNotEmpty()) bytesQueue.removeFirst() else error("no queued bytes response for $url")
+            if (next === NeverEnds) {
+                delay(Long.MAX_VALUE)
+                error("unreachable")
+            }
             if (next is Throwable) throw next
             return next as ByteArray
+        }
+    }
+
+    /**
+     * HttpClient whose every endpoint suspends indefinitely. Models a
+     * server that never sends response headers — exactly the failure
+     * mode that motivated the cancellation re-throw in
+     * [HlsRecorder.resolveStartingPlaylist].
+     */
+    private class NeverEndingHttpClient : HttpClient {
+        override suspend fun getJson(
+            url: String,
+            options: HttpRequestOptions,
+        ): Any? = suspendForever()
+
+        override suspend fun getText(
+            url: String,
+            options: HttpRequestOptions,
+        ): String = suspendForever()
+
+        override suspend fun getBytes(
+            url: String,
+            options: HttpRequestOptions,
+        ): ByteArray = suspendForever()
+
+        override suspend fun <T> getSource(
+            url: String,
+            options: HttpRequestOptions,
+            block: suspend (Source) -> T,
+        ): T = suspendForever()
+
+        private suspend fun <T> suspendForever(): T {
+            delay(Long.MAX_VALUE)
+            error("unreachable")
         }
     }
 }
