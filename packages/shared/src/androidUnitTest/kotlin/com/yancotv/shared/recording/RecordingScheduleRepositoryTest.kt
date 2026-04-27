@@ -217,6 +217,57 @@ class RecordingScheduleRepositoryTest {
         }
     }
 
+    // ── MB-214: race-condition coverage ───────────────────────────
+
+    @Test fun endAlarmAfterCancelIsRejected() {
+        // MB-214 — end alarm fires AFTER the user cancelled the
+        // schedule (or some other terminal transition won the race).
+        // The state machine must reject a fresh COMPLETED/FAILED
+        // transition; without this guard the receiver could clobber
+        // a CANCELLED row back into COMPLETED on a late alarm.
+        val repo = makeRepo()
+        repo.insert("s", null, null, "T", "u", 1L, 100L)
+        repo.transitionTo("s", RecordingScheduleState.ARMED)
+        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.CANCELLED)
+        assertFailsWith<IllegalArgumentException> {
+            repo.transitionTo("s", RecordingScheduleState.COMPLETED)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            repo.transitionTo("s", RecordingScheduleState.FAILED, errorReason = "x")
+        }
+    }
+
+    @Test fun secondTerminalTransitionFromFiringIsRejected() {
+        // MB-214 — receiver's handleEnd path could race with the
+        // service's own terminal transition (MB-212 fix territory).
+        // Whoever wins lands a terminal state; the loser must throw
+        // (caller wraps in runCatching; bug surfaced if it didn't).
+        val repo = makeRepo()
+        repo.insert("s", null, null, "T", "u", 1L, 100L)
+        repo.transitionTo("s", RecordingScheduleState.ARMED)
+        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.COMPLETED)
+        // Second attempt — whether by handleEnd or by handleStop.
+        assertFailsWith<IllegalArgumentException> {
+            repo.transitionTo("s", RecordingScheduleState.FAILED, errorReason = "race")
+        }
+    }
+
+    @Test fun deletedScheduleEndAlarmThrows() {
+        // MB-214 — schedule deletion races with end alarm. After
+        // deleteById, transitionTo for the same id must throw cleanly
+        // (IllegalStateException, not a NullPointerException) so the
+        // receiver's runCatching catches it as a transient error.
+        val repo = makeRepo()
+        repo.insert("s", null, null, "T", "u", 1L, 100L)
+        repo.transitionTo("s", RecordingScheduleState.ARMED)
+        repo.deleteById("s")
+        assertFailsWith<IllegalStateException> {
+            repo.transitionTo("s", RecordingScheduleState.MISSED)
+        }
+    }
+
     // ── deleteById / reapOlderThan ────────────────────────────────
 
     @Test fun deleteByIdRemovesRow() {

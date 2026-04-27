@@ -65,6 +65,26 @@ import org.koin.core.component.inject
  * alarms (which we use) get an exemption window — see
  * https://developer.android.com/develop/background-work/services/foreground-services#background-start-restrictions
  */
+/**
+ * MB-215 — testable extraction of the FGS-start-or-fail logic.
+ * Top-level (not a method) so a JVM unit test can verify that a failed
+ * `startService` lambda routes to `transitionFailed` with a
+ * `service_start_failed:` reason — no Context, no Receiver, no Service
+ * required. Production call site lives in [RecordingScheduleReceiver.startRecording].
+ */
+internal fun tryStartOrFailSchedule(
+    scheduleId: String,
+    tag: String,
+    startService: () -> Unit,
+    transitionFailed: (reason: String) -> Unit,
+) {
+    runCatching { startService() }
+        .onFailure { t ->
+            Log.e(tag, "RecordingService.start failed for $scheduleId", t)
+            transitionFailed("service_start_failed: ${t.message ?: t::class.simpleName}")
+        }
+}
+
 @UnstableApi
 class RecordingScheduleReceiver :
     BroadcastReceiver(),
@@ -300,8 +320,14 @@ class RecordingScheduleReceiver :
         // in FIRING for the end alarm to optimistically COMPLETE. The
         // exemption window granted by setExactAndAllowWhileIdle is real
         // but not universally honoured.
-        val started =
-            runCatching {
+        //
+        // MB-215 — extracted via [tryStartOrFailSchedule] so the
+        // failure-path contract is unit-testable without standing up a
+        // BroadcastReceiver / Context / FGS infrastructure.
+        tryStartOrFailSchedule(
+            scheduleId = schedule.id,
+            tag = TAG,
+            startService = {
                 RecordingService.start(
                     context = context,
                     input =
@@ -313,18 +339,19 @@ class RecordingScheduleReceiver :
                             contentId = schedule.contentId,
                         ),
                 )
-            }
-        started.onFailure { t ->
-            Log.e(TAG, "RecordingService.start failed for ${schedule.id}", t)
-            runCatching {
-                schedules.transitionTo(
-                    schedule.id,
-                    RecordingScheduleState.FAILED,
-                    errorReason = "service_start_failed: ${t.message ?: t::class.simpleName}",
-                )
-            }
-        }
+            },
+            transitionFailed = { reason ->
+                runCatching {
+                    schedules.transitionTo(
+                        schedule.id,
+                        RecordingScheduleState.FAILED,
+                        errorReason = reason,
+                    )
+                }
+            },
+        )
     }
+
 
     /**
      * Resolve the [ContentItem] to hand to [PlaybackController.play] when

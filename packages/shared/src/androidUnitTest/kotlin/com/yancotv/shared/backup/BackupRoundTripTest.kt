@@ -303,6 +303,65 @@ class BackupRoundTripTest {
         assertTrue(importer.pendingLinks.value.isEmpty())
     }
 
+    @Test fun importRecordings_missingFileUri_landsAsFailed() {
+        // MB-217 — completed recording whose file URI doesn't resolve
+        // on the target device should import as FAILED("file_not_found_post_restore"),
+        // not COMPLETED with an unplayable file. Recordings that were
+        // already FAILED / CANCELLED at export skip the check.
+        val src = testDb()
+        seedSource(src)
+        seedContent(src, "ch-1", streamUrl = "http://stream/movie")
+        // Two recordings: one COMPLETED (will be flagged), one FAILED
+        // (already terminal-non-playable, doesn't need the check).
+        src.recordingsQueries.insert(
+            id = "rec-good",
+            content_id = "ch-1",
+            title = "Good Movie",
+            stream_url = "http://stream/movie",
+            file_path = "content://exists/1",
+            status = "completed",
+            started_at = 1L,
+            ended_at = 100L,
+            duration_seconds = 99L,
+            file_size_bytes = 1024L,
+            error = null,
+            format = "mpeg_ts",
+        )
+        src.recordingsQueries.insert(
+            id = "rec-orphan",
+            content_id = "ch-1",
+            title = "Orphan Movie",
+            stream_url = "http://stream/movie",
+            file_path = "content://gone/2",
+            status = "completed",
+            started_at = 2L,
+            ended_at = 200L,
+            duration_seconds = 198L,
+            file_size_bytes = 2048L,
+            error = null,
+            format = "mpeg_ts",
+        )
+        val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", 8, 1L)
+
+        // Inject a fileExists fake: only "content://exists/1" reports true.
+        val dst = testDb()
+        val importer =
+            BackupImporter(
+                dst,
+                PlaintextCredentialStore(),
+                recordingFileExists = { uri -> uri == "content://exists/1" },
+            )
+        importer.import(file, currentSchemaVersion = 8)
+
+        val good = dst.recordingsQueries.selectById("rec-good").executeAsOne()
+        assertEquals("completed", good.status)
+        assertNull(good.error)
+
+        val orphan = dst.recordingsQueries.selectById("rec-orphan").executeAsOne()
+        assertEquals("failed", orphan.status)
+        assertEquals("file_not_found_post_restore", orphan.error)
+    }
+
     @Test fun relink_recordingContentIdResolvesByStreamUrl() {
         // Audit fix #1 — recording rows on import re-resolve content_id
         // via stream_url (no source_id was exported). Pre-seed content

@@ -55,7 +55,15 @@ import java.util.Locale
  * (the other two). ExoPlayer accepts both via `DefaultDataSource.Factory`'s
  * scheme routing.
  */
-sealed interface RecordingOutput {
+/**
+ * MB-218 — extends [AutoCloseable] so post-write finalisation runs via
+ * `output.use { … }` or an explicit `close()`. The MediaStore backend's
+ * `IS_PENDING=0` flip lives in [close]; File / SAF backends use the
+ * default no-op. Pre-MB-218 the call site had to remember a separate
+ * `onFinalize()` invocation; forgetting left MediaStore files invisible
+ * in Gallery.
+ */
+sealed interface RecordingOutput : AutoCloseable {
     /** What goes into `recordings.file_path` for later playback / display. */
     val storagePath: String
 
@@ -80,13 +88,12 @@ sealed interface RecordingOutput {
     fun delete(): Boolean
 
     /**
-     * Called by [RecordingService.handleStop] after the sink/stream is
-     * closed and bytes are flushed to disk. Default implementation is a
-     * no-op for File / SAF backends. The MediaStore backend overrides
-     * this to flip `IS_PENDING = 0` so the file becomes visible in
-     * Gallery / Photos / file manager apps.
+     * Called AFTER the sink/stream has been closed and bytes are flushed
+     * to disk. Default no-op for File / SAF backends. The MediaStore
+     * backend overrides to flip `IS_PENDING = 0` so the file becomes
+     * visible in Gallery / Photos / file manager apps.
      */
-    fun onFinalize() {}
+    override fun close() {}
 }
 
 internal class FileBackedOutput(val file: File) : RecordingOutput {
@@ -131,7 +138,7 @@ internal class DocumentBackedOutput(
  *
  * Rows inserted into `MediaStore.Video.Media` with `RELATIVE_PATH =
  * Movies/YancoTV` and `IS_PENDING = 1` so the partial file isn't
- * exposed to other apps mid-write. [onFinalize] flips `IS_PENDING = 0`
+ * exposed to other apps mid-write. [close] flips `IS_PENDING = 0`
  * once the recorder has closed the stream.
  *
  * Note on uninstall: the underlying file remains in `Movies/YancoTV/`
@@ -174,7 +181,7 @@ internal class MediaStoreRecordingOutput(
             context.contentResolver.delete(uri, null, null) > 0
         }.getOrDefault(false)
 
-    override fun onFinalize() {
+    override fun close() {
         // IS_PENDING is API 29+. On API ≤28 this path doesn't exist (we
         // use FileBackedOutput on legacy), so the guard is defensive.
         if (!markPendingOnFinalize) return
@@ -286,7 +293,7 @@ internal class RecordingStorageResolver(
     /**
      * API 29+: scoped-storage MediaStore insert. No permission required.
      * Sets `IS_PENDING = 1` so partial files aren't exposed mid-write —
-     * [MediaStoreRecordingOutput.onFinalize] flips it to 0 on stop.
+     * [MediaStoreRecordingOutput.close] flips it to 0 on stop.
      */
     private fun resolvePublicMediaStore(filename: String): RecordingOutput {
         val values =

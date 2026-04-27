@@ -36,6 +36,16 @@ class BackupImporter(
     private val db: YancoDb,
     private val credentialStore: CredentialStore,
     private val cipher: BackupCipher = BackupCipher(),
+    /**
+     * MB-217 — pre-flight check for whether a recording file URI is
+     * still reachable after restore. Default `{ true }` preserves the
+     * prior behaviour (trust the URI). Android callers should inject a
+     * proper `DocumentFile.fromTreeUri(...).exists()` /
+     * `ContentResolver.openInputStream(uri)?.close()` check so files
+     * that didn't survive the export → import journey land as FAILED
+     * instead of appearing playable then erroring on tap.
+     */
+    private val recordingFileExists: (fileUri: String) -> Boolean = { true },
 ) {
     private val _pending = MutableStateFlow(PendingLinkState.empty())
     val pendingLinks: StateFlow<PendingLinkState> = _pending.asStateFlow()
@@ -342,18 +352,34 @@ class BackupImporter(
             // null when the source hasn't resynced yet — recordings
             // browser handles null content_id gracefully.
             val resolvedContentId = db.contentQueries.findIdByStreamUrl(r.streamUrl).executeAsOneOrNull()
+
+            // MB-217 — recordings whose status was COMPLETED on export
+            // but whose file_uri doesn't resolve on this device land as
+            // FAILED("file_not_found_post_restore"). Avoids the trap
+            // where the user taps Play and gets a cryptic MediaCodec
+            // error. Recordings that exported in non-terminal states
+            // (RECORDING / FAILED / CANCELLED) skip the existence
+            // check — they're orphans by definition and the browser
+            // already handles their non-playable status.
+            val (effectiveStatus, effectiveError) =
+                if (r.status == "completed" && !recordingFileExists(r.fileUri)) {
+                    "failed" to "file_not_found_post_restore"
+                } else {
+                    r.status to null
+                }
+
             db.recordingsQueries.insert(
                 id = r.id,
                 content_id = resolvedContentId,
                 title = r.title,
                 stream_url = r.streamUrl,
                 file_path = r.fileUri,
-                status = r.status,
+                status = effectiveStatus,
                 started_at = r.startedAt,
                 ended_at = r.endedAt,
                 duration_seconds = r.durationSeconds,
                 file_size_bytes = r.fileSizeBytes,
-                error = null,
+                error = effectiveError,
                 format = r.format,
             )
             inserted++

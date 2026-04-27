@@ -190,7 +190,10 @@ class RecordingService : Service() {
         // `HlsRecorder` open their own HTTP request. Those URLs aren't
         // currently being played, so there's no second-connection conflict.
         val playingUrl = controller.currentItem.value?.streamUrl
-        val useLiveTee = playingUrl != null && playingUrl == input.sourceUrl
+        // MB-213 — routing decision lives in [RecordingRouting] so a
+        // JVM unit test can pin the table without standing up the
+        // service. Same string-equality semantics; behaviour unchanged.
+        val useLiveTee = RecordingRouting.decide(playingUrl, input.sourceUrl) == RecordingPath.LiveTee
         Log.i(TAG, "start[${input.recordId}] format=${input.format} path=${if (useLiveTee) "live-tee" else "fresh-get"}")
         // Become foreground immediately. Android requires startForeground
         // within 5s of startForegroundService; doing it before the
@@ -407,11 +410,12 @@ class RecordingService : Service() {
         // before reading `output.size()` to avoid racing a stale byte count.
         serviceScope.launch(Dispatchers.IO) {
             runCatching { job.cancelAndJoin() }
-            // MK.14.X audit revision — flip MediaStore IS_PENDING=0 (or
-            // whatever the backend's finalize step is) AFTER cancelAndJoin
-            // returns so the file is fully flushed when the system marks
-            // it visible. No-op for File / SAF backends.
-            runCatching { output?.onFinalize() }
+            // MK.14.X audit revision + MB-218 (AutoCloseable) — flip
+            // MediaStore IS_PENDING=0 (or whatever the backend's finalize
+            // step is) AFTER cancelAndJoin returns so the file is fully
+            // flushed when the system marks it visible. No-op for File /
+            // SAF backends. close() is the AutoCloseable surface.
+            runCatching { output?.close() }
             val bytes = output?.size() ?: 0L
             runCatching {
                 val startedAt = recordings.getById(recordId)?.startedAt
