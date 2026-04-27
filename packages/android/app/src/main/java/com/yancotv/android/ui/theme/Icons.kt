@@ -362,6 +362,14 @@ object YancoIcons {
             moveTo(12f, 12f); lineTo(12f, 16f)
         }
 
+    /** Floppy-disk silhouette — Backup tab (export/import). */
+    val Save: ImageVector =
+        buildLine("save") {
+            moveTo(5f, 4f); lineTo(17f, 4f); lineTo(20f, 7f); lineTo(20f, 20f); lineTo(4f, 20f); lineTo(4f, 5f); close()
+            moveTo(8f, 4f); lineTo(8f, 9f); lineTo(15f, 9f); lineTo(15f, 4f)
+            moveTo(7f, 13f); lineTo(17f, 13f); lineTo(17f, 19f); lineTo(7f, 19f); close()
+        }
+
     /** Soft cloud silhouette — sidebar "SYNCED" footer chip. */
     val Cloud: ImageVector =
         buildLine("cloud") {

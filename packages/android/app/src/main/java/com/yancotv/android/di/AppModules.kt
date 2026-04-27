@@ -121,6 +121,19 @@ val appModule =
         single { ReminderScheduler(androidContext(), get()) }
         single { FavoritesRepository(db = get(), clock = { System.currentTimeMillis() }) }
         single { WatchHistoryRepository(db = get(), clock = { System.currentTimeMillis() }) }
+        // MK.19.8.3 + 19.8.4 — backup/restore coordinator. Bridges SAF
+        // picker results to the pure BackupExporter / BackupImporter
+        // engine. Subscribes to SourceSyncCoordinator state so buffered
+        // re-link records drain when each source's catalog finishes
+        // syncing post-restore.
+        single {
+            com.yancotv.android.backup.BackupCoordinator(
+                context = androidContext(),
+                db = get(),
+                credentialStore = get(),
+                syncCoordinator = get(),
+            )
+        }
         // Stage 3.1 / MK.14.1c — recording state-machine repo. Used by
         // RecordingService and (eventually) the Recordings screen.
         single {

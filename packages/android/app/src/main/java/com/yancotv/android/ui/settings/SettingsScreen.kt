@@ -93,7 +93,8 @@ enum class SettingsTab(
     Notifications("Notifications", "11 · events", YancoIcons.Bell),
     Storage("Storage", "12 · cache", YancoIcons.Hdd),
     Shortcuts("Shortcuts", "13 · remote · key", YancoIcons.Key),
-    About("About", "14 · version · data", YancoIcons.Info),
+    Backup("Backup", "14 · export · import", YancoIcons.Save),
+    About("About", "15 · version · data", YancoIcons.Info),
 }
 
 // Dark ink used for text/icons on top of the accent gradient fills. Matches
@@ -526,6 +527,7 @@ private fun TabContent(tab: SettingsTab) {
         SettingsTab.Notifications -> SettingsNotificationsTab()
         SettingsTab.Storage -> SettingsStorageTab()
         SettingsTab.Shortcuts -> SettingsShortcutsTab()
+        SettingsTab.Backup -> SettingsBackupTab()
         SettingsTab.About -> SettingsAboutTab()
     }
 }

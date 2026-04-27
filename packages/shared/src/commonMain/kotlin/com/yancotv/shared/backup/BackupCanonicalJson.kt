@@ -1,5 +1,6 @@
 package com.yancotv.shared.backup
 
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
@@ -37,4 +38,15 @@ object BackupCanonicalJson {
             encodeDefaults = true
             ignoreUnknownKeys = true
         }
+
+    /** Encode a [BackupFileV1] as pretty-printed JSON string for on-disk storage. */
+    fun encodePretty(file: BackupFileV1): String = Pretty.encodeToString(file)
+
+    /** Encode an arbitrary serializable value as compact JSON. Used for
+     *  the BackupMetadata.record_counts column. */
+    inline fun <reified T> encodeCompact(value: T): String = Compact.encodeToString(value)
+
+    /** Decode a backup file from JSON text. Tolerates both pretty and
+     *  compact forms (whitespace is irrelevant to JSON parsing). */
+    fun decodeBackupFile(text: String): BackupFileV1 = Compact.decodeFromString<BackupFileV1>(text)
 }
