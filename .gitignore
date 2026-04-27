@@ -44,3 +44,6 @@ D:YancoTV*.txt
 
 # pnpm patch editable copies (the generated patch in patches/ is committed)
 patches-work/
+
+# Concept A design zip — local reference only
+packages/android/*.zip
