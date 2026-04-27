@@ -169,6 +169,17 @@ SELECT source_id, stream_url, name_override, logo_override
 FROM content
 WHERE name_override IS NOT NULL OR logo_override IS NOT NULL;
 
+-- MK.19.8.2 — backup importer's re-link path. Maps a backup-side
+-- (source_id, stream_url) pair to the local content_id post-resync.
+-- Returns the most recent row if a stream_url collides across types
+-- under the same source (e.g. a movie and live channel sharing a URL —
+-- rare but possible with badly-tagged providers).
+findIdBySourceAndStreamUrl:
+SELECT id FROM content
+WHERE source_id = :sourceId AND stream_url = :streamUrl
+ORDER BY created_at DESC
+LIMIT 1;
+
 deleteBySource:
 DELETE FROM content WHERE source_id = ?;
 
