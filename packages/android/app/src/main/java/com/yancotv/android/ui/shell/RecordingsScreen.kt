@@ -179,7 +179,40 @@ fun RecordingsScreen(
                     item("history-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
                     item("history-header") { SectionHeader("Schedule history", palette) }
                     items(historySchedules, key = { "hist-${it.id}" }) { schedule ->
-                        HistoryScheduleRow(entry = schedule)
+                        // Pair the schedule with its recording row when
+                        // the link is set (only COMPLETED rows carry a
+                        // recordingId). Local lookup on the already-
+                        // collected `rows` list — cheap (≤ a few hundred
+                        // rows in practice) and keeps the row composable
+                        // free of repo plumbing.
+                        val linked =
+                            remember(schedule.recordingId, rows) {
+                                schedule.recordingId?.let { rid -> rows.firstOrNull { it.id == rid } }
+                            }
+                        HistoryScheduleRow(
+                            entry = schedule,
+                            linkedRecording = linked,
+                            onPlay =
+                                if (linked != null) {
+                                    { playRecording(controller, context, linked) }
+                                } else {
+                                    null
+                                },
+                            onDelete = {
+                                // Delete the schedule row; if a linked
+                                // recording exists, delete it too (file +
+                                // DB row) so "Done" entries don't strand
+                                // a phantom recording on disk. Cancelled /
+                                // failed / missed entries have no
+                                // recording to clean up.
+                                scope.launch(Dispatchers.IO) {
+                                    if (linked != null) {
+                                        runCatching { deleteRecording(context, recordings, linked) }
+                                    }
+                                    runCatching { schedules.deleteById(schedule.id) }
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -406,7 +439,12 @@ private fun UpcomingScheduleRow(
  * the visual weight of the upcoming/recordings rows.
  */
 @Composable
-private fun HistoryScheduleRow(entry: RecordingScheduleEntry) {
+private fun HistoryScheduleRow(
+    entry: RecordingScheduleEntry,
+    linkedRecording: com.yancotv.shared.recording.RecordingEntry?,
+    onPlay: (() -> Unit)?,
+    onDelete: () -> Unit,
+) {
     val palette = LocalYancoPalette.current
     Row(
         modifier =
@@ -433,6 +471,12 @@ private fun HistoryScheduleRow(entry: RecordingScheduleEntry) {
         }
         Spacer(modifier = Modifier.width(10.dp))
         ScheduleStateBadge(entry.state, palette)
+        if (onPlay != null && linkedRecording != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            FocusableInlineButton(label = "Play", primary = true, onClick = onPlay)
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
     }
 }
 
