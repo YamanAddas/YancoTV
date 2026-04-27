@@ -431,7 +431,7 @@ private fun UpcomingScheduleRow(
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
-        ScheduleStateBadge(entry.state, palette)
+        ScheduleStateBadge(kind = ScheduleStateBadgeKind.fromState(entry.state), palette = palette)
         Spacer(modifier = Modifier.width(12.dp))
         FocusableInlineButton(
             label =
@@ -479,7 +479,19 @@ private fun HistoryScheduleRow(
             )
         }
         Spacer(modifier = Modifier.width(10.dp))
-        ScheduleStateBadge(entry.state, palette)
+        // Promote a COMPLETED schedule with no recording row behind it
+        // to the "No file" badge. Tells the user honestly that the
+        // alarm fired but nothing was captured (storage permission
+        // gap, app process killed during the recording window, or the
+        // file was already deleted). Without this the row reads "Done"
+        // beside a Delete-only action — confusing.
+        val effectiveState =
+            if (entry.state == RecordingScheduleState.COMPLETED && linkedRecording == null) {
+                ScheduleStateBadgeKind.NO_FILE
+            } else {
+                ScheduleStateBadgeKind.fromState(entry.state)
+            }
+        ScheduleStateBadge(kind = effectiveState, palette = palette)
         if (onPlay != null && linkedRecording != null) {
             Spacer(modifier = Modifier.width(8.dp))
             FocusableInlineButton(label = "Play", primary = true, onClick = onPlay)
@@ -489,24 +501,51 @@ private fun HistoryScheduleRow(
     }
 }
 
+/** UI-side badge variants. Mirrors [RecordingScheduleState] plus a synthetic
+ *  NO_FILE for completed schedules whose recording row is missing. */
+private enum class ScheduleStateBadgeKind {
+    SCHEDULED,
+    FIRING,
+    COMPLETED,
+    NO_FILE,
+    FAILED,
+    CANCELLED,
+    MISSED,
+    ;
+
+    companion object {
+        fun fromState(state: RecordingScheduleState): ScheduleStateBadgeKind =
+            when (state) {
+                RecordingScheduleState.SCHEDULED, RecordingScheduleState.ARMED -> SCHEDULED
+                RecordingScheduleState.FIRING -> FIRING
+                RecordingScheduleState.COMPLETED -> COMPLETED
+                RecordingScheduleState.FAILED -> FAILED
+                RecordingScheduleState.CANCELLED -> CANCELLED
+                RecordingScheduleState.MISSED -> MISSED
+            }
+    }
+}
+
 @Composable
 private fun ScheduleStateBadge(
-    state: RecordingScheduleState,
+    kind: ScheduleStateBadgeKind,
     palette: com.yancotv.android.ui.theme.YancoPalette,
 ) {
     val (label, fg, bg) =
-        when (state) {
-            RecordingScheduleState.SCHEDULED, RecordingScheduleState.ARMED ->
+        when (kind) {
+            ScheduleStateBadgeKind.SCHEDULED ->
                 Triple("Scheduled", palette.BackgroundDeep, palette.Accent)
-            RecordingScheduleState.FIRING ->
+            ScheduleStateBadgeKind.FIRING ->
                 Triple("REC", palette.BackgroundDeep, palette.Live)
-            RecordingScheduleState.COMPLETED ->
+            ScheduleStateBadgeKind.COMPLETED ->
                 Triple("Done", palette.BackgroundDeep, palette.Accent)
-            RecordingScheduleState.FAILED ->
+            ScheduleStateBadgeKind.NO_FILE ->
+                Triple("No file", palette.BackgroundDeep, palette.Error)
+            ScheduleStateBadgeKind.FAILED ->
                 Triple("Failed", palette.BackgroundDeep, palette.Error)
-            RecordingScheduleState.CANCELLED ->
+            ScheduleStateBadgeKind.CANCELLED ->
                 Triple("Cancelled", palette.TextMuted, palette.BackgroundElevated)
-            RecordingScheduleState.MISSED ->
+            ScheduleStateBadgeKind.MISSED ->
                 Triple("Missed", palette.BackgroundDeep, palette.Error)
         }
     Box(
