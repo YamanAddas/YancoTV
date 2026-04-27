@@ -162,9 +162,31 @@ fun BrowseSection(
     }
 
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
+    val general by prefs.generalFlow.collectAsState()
     val visibleGroups =
         remember(groupsState.toList(), hiddenGroups) {
             visibleGroupsFor(groupsState.toList(), hiddenGroups)
+        }
+
+    // MK.20.3 — when the smart-grouping toggle is on, fork the rail's data
+    // path: filter hidden first, run [com.yancotv.shared.content.CategoryTreeBuilder]
+    // over the filtered list (provider-ordered already from MK.20.1), then
+    // flatten per the rail's expand state. Per-type expand state is kept in
+    // a rememberSaveable Set so flipping Live ↔ Movies preserves which
+    // parents the user opened. Process-death survival isn't critical (it's
+    // a UI nicety) so we accept that a Set<String> isn't trivially Saveable
+    // — we wrap it via the standard MutableStateFlow + remember pattern.
+    val smartGroupingEnabled = general.smartGrouping
+    var expandedParents by remember(type) { mutableStateOf(emptySet<String>()) }
+    val railRows =
+        remember(groupsState.toList(), hiddenGroups, smartGroupingEnabled, expandedParents) {
+            if (!smartGroupingEnabled) {
+                null
+            } else {
+                val filtered = applySmartGroupingHidden(groupsState.toList(), hiddenGroups)
+                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered)
+                flattenCategoryTree(tree, expandedParents)
+            }
         }
 
     // Selected group persists per type so flipping Live → Movies → Live
@@ -184,7 +206,7 @@ fun BrowseSection(
     Row(modifier = modifier.fillMaxSize()) {
         if (categoriesVisible) {
             CategoryRail(
-                groups = visibleGroups,
+                groups = if (smartGroupingEnabled) emptyList() else visibleGroups,
                 selected = selectedGroup,
                 onSelect = { selectedGroup = it },
                 onEnterContent = {
@@ -203,6 +225,11 @@ fun BrowseSection(
                     if (hasFocus) onPanelFocusChanged(PanelFocus.Categories)
                 },
                 selectedAnchor = pillAnchor,
+                rows = railRows,
+                onToggleExpand = { label ->
+                    expandedParents =
+                        if (label in expandedParents) expandedParents - label else expandedParents + label
+                },
             )
         }
         CoverflowSectionScreen(

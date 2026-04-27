@@ -117,8 +117,8 @@ fun SettingsGeneralTab(
         }
 
         SettingsToggleRow(
-            label = "Smart grouping",
-            description = "Bucket the provider's 400+ category list into Sports / Movies / News / Kids / Music / Regions for easy scanning. Selecting a sub-group still filters by the exact category.",
+            label = "Smart category grouping",
+            description = "Bucket categories by detected language / region prefix (AR | …, EN | …, US| …) into collapsible Arabic / English / USA / … parents. Off shows the provider's flat category list.",
             checked = state.smartGrouping,
             onCheckedChange = { scope.launch { prefs.setSmartGrouping(it) } },
         )

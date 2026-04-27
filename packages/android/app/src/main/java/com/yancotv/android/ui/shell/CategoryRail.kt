@@ -93,15 +93,33 @@ fun CategoryRail(
     modifier: Modifier = Modifier,
     showFavorites: Boolean = true,
     selectedAnchor: PlacedFocusAnchor? = null,
+    // MK.20.3 — when non-null, render hierarchical rows (Parent + Leaf)
+    // instead of the flat [groups] list. Parents toggle expand on
+    // click/CENTER via [onToggleExpand]; Leafs commit selection like the
+    // flat path. The flat [groups] parameter is ignored when rows is set
+    // — call sites pass empty for symmetry.
+    rows: List<CategoryRailRow>? = null,
+    onToggleExpand: ((String) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
 
     // Stable index math for the active pill — pinned Favorites + All sit
     // at the head of the visual list, then a divider (rendered as a
-    // contentPadding gap, not an item), then the prioritised groups.
-    val groupPos = remember(groups, selected) { groups.indexOf(selected) }
+    // contentPadding gap, not an item), then the groups (flat or
+    // hierarchical). For the hierarchical path the index is computed
+    // against [rows] so collapsing a parent doesn't strand the scroll
+    // position past the new tail.
+    val effectiveGroupCount = rows?.size ?: groups.size
+    val groupPos =
+        remember(rows, groups, selected) {
+            if (rows != null) {
+                rows.indexOfFirst { it is CategoryRailRow.Leaf && it.groupName == selected }
+            } else {
+                groups.indexOf(selected)
+            }
+        }
     val selectedIndex =
-        remember(groupPos, selected, showFavorites) {
+        remember(groupPos, selected, showFavorites, effectiveGroupCount) {
             val offset = if (showFavorites) 1 else 0
             when (selected) {
                 FAVORITES_GROUP -> if (showFavorites) 0 else -1
@@ -109,15 +127,13 @@ fun CategoryRail(
                 else -> if (groupPos < 0) -1 else offset + 1 + groupPos
             }
         }
-    // Re-key on `groups` so the scroll-bias gate doesn't carry a stale
-    // selectedIndex across sections — without this, switching from a Live
-    // section where Sports was at index 5 to a Movies section where the
-    // initial "All" is at index 1 would still fire scroll for any new
-    // index != 5, but never actually clear the fact that we already
-    // "scrolled" once. Belt-and-braces: BrowseSection is wrapped in
-    // key(contentType) which already remounts the rail, but this makes
-    // the intent explicit and survives any future hoisting.
-    var prevScrolled by remember(groups) { mutableStateOf(-1) }
+    // Re-key on `groups`/`rows` so the scroll-bias gate doesn't carry a
+    // stale selectedIndex across sections. Same reason as the flat path:
+    // BrowseSection is wrapped in key(contentType) which already remounts
+    // the rail, but this makes the intent explicit and survives any
+    // future hoisting. Hierarchical: re-keys when expand state changes,
+    // which is the right time to re-bias scroll.
+    var prevScrolled by remember(groups, rows) { mutableStateOf(-1) }
     LaunchedEffect(selectedIndex) {
         if (selectedIndex >= 0 && selectedIndex != prevScrolled) {
             prevScrolled = selectedIndex
@@ -234,23 +250,71 @@ fun CategoryRail(
                     },
                 )
             }
-            items(groups, key = { it }) { group ->
-                val isSelected = selected == group
-                HexPillRow(
-                    label = group,
-                    leading = null,
-                    selected = isSelected,
-                    anchor = if (isSelected) selectedAnchor else null,
-                    onClick = {
-                        onSelect(group)
-                        onEnterContent()
-                    },
-                    onFocused = { onSelect(group) },
-                    onCommitAndEnter = {
-                        onSelect(group)
-                        onEnterContent()
-                    },
-                )
+            if (rows != null) {
+                items(rows, key = { it.key }) { row ->
+                    when (row) {
+                        is CategoryRailRow.Leaf -> {
+                            val isSelected = selected == row.groupName
+                            HexPillRow(
+                                label = row.label,
+                                leading = if (row.indented) YancoIcons.ChevronRight else null,
+                                selected = isSelected,
+                                anchor = if (isSelected) selectedAnchor else null,
+                                onClick = {
+                                    onSelect(row.groupName)
+                                    onEnterContent()
+                                },
+                                onFocused = { onSelect(row.groupName) },
+                                onCommitAndEnter = {
+                                    onSelect(row.groupName)
+                                    onEnterContent()
+                                },
+                                trailingText = null,
+                                indented = row.indented,
+                            )
+                        }
+                        is CategoryRailRow.Parent -> {
+                            // Parents are visual buckets — committing them
+                            // toggles expand/collapse, never changes the
+                            // active filter. Glyph reflects state, count
+                            // badge shows children. Focus stays on the
+                            // parent across toggle so D-pad continues from
+                            // a stable position.
+                            HexPillRow(
+                                label = row.label,
+                                leading = if (row.expanded) YancoIcons.ChevronDown else YancoIcons.ChevronRight,
+                                selected = false,
+                                anchor = null,
+                                onClick = { onToggleExpand?.invoke(row.label) },
+                                onFocused = {},
+                                onCommitAndEnter = { onToggleExpand?.invoke(row.label) },
+                                trailingText = row.childCount.toString(),
+                                indented = false,
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(groups, key = { it }) { group ->
+                    val isSelected = selected == group
+                    HexPillRow(
+                        label = group,
+                        leading = null,
+                        selected = isSelected,
+                        anchor = if (isSelected) selectedAnchor else null,
+                        onClick = {
+                            onSelect(group)
+                            onEnterContent()
+                        },
+                        onFocused = { onSelect(group) },
+                        onCommitAndEnter = {
+                            onSelect(group)
+                            onEnterContent()
+                        },
+                        trailingText = null,
+                        indented = false,
+                    )
+                }
             }
         }
     }
@@ -271,6 +335,8 @@ private fun HexPillRow(
     onClick: () -> Unit,
     onFocused: () -> Unit,
     onCommitAndEnter: () -> Unit,
+    trailingText: String? = null,
+    indented: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -343,7 +409,12 @@ private fun HexPillRow(
                 }.focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick)
                 .semantics(mergeDescendants = true) { contentDescription = "Category: $label" }
-                .padding(horizontal = Space.lg, vertical = Space.xs),
+                .padding(
+                    start = if (indented) Space.section else Space.lg,
+                    end = Space.lg,
+                    top = Space.xs,
+                    bottom = Space.xs,
+                ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -368,6 +439,15 @@ private fun HexPillRow(
             color = fg,
             style = if (selected) YancoType.LabelStrong else YancoType.Label,
             maxLines = 1,
+            modifier = Modifier.weight(1f, fill = false),
         )
+        if (trailingText != null) {
+            Text(
+                text = trailingText,
+                color = fg.copy(alpha = 0.7f),
+                style = YancoType.Caption,
+                maxLines = 1,
+            )
+        }
     }
 }

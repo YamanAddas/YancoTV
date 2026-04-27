@@ -218,6 +218,14 @@ object YancoIcons {
             lineTo(9f, 19f)
         }
 
+    /** Chevron pointing down — used for expanded category-rail parents (MK.20.3). */
+    val ChevronDown: ImageVector =
+        buildLine("chevron-down") {
+            moveTo(5f, 9f)
+            lineTo(12f, 16f)
+            lineTo(19f, 9f)
+        }
+
     // === Settings-tab glyphs (Concept A) ========================================
     // Ported from yanco-ds/ds.jsx `I` map. Paths mirror the SVG d-attrs in that
     // file; if the design changes the source, update here.

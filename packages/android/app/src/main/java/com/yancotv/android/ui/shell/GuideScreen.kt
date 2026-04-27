@@ -415,10 +415,29 @@ fun GuideScreen(
     BackHandler(enabled = gridHasFocus) {
         onPanelFocusChanged(PanelFocus.Categories)
     }
+    // MK.20.3 — guide rail honours the same smart-grouping toggle as the
+    // Live/Movies/Series rails. `groups` here is already provider-ordered
+    // (MK.20.1 distinctGuideGroups). When the toggle is on, hidden filter
+    // first, then bucket via CategoryTreeBuilder, then flatten per the
+    // expand state.
+    val guideHiddenGroups by appPrefs.hiddenGroupsFlow.collectAsState()
+    val guideGeneral by appPrefs.generalFlow.collectAsState()
+    val guideSmartEnabled = guideGeneral.smartGrouping
+    var guideExpandedParents by remember { mutableStateOf(emptySet<String>()) }
+    val guideRailRows =
+        remember(groups, guideHiddenGroups, guideSmartEnabled, guideExpandedParents) {
+            if (!guideSmartEnabled) {
+                null
+            } else {
+                val filtered = applySmartGroupingHidden(groups, guideHiddenGroups)
+                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered)
+                flattenCategoryTree(tree, guideExpandedParents)
+            }
+        }
     Row(modifier = modifier.fillMaxSize()) {
         if (groups.isNotEmpty()) {
             CategoryRail(
-                groups = groups,
+                groups = if (guideSmartEnabled) emptyList() else groups,
                 selected = railSelected,
                 onSelect = { picked ->
                     selectedGroup = if (picked == ALL_GROUPS) null else picked
@@ -439,6 +458,11 @@ fun GuideScreen(
                 },
                 selectedAnchor = pillAnchor,
                 showFavorites = false,
+                rows = guideRailRows,
+                onToggleExpand = { label ->
+                    guideExpandedParents =
+                        if (label in guideExpandedParents) guideExpandedParents - label else guideExpandedParents + label
+                },
             )
         }
         Column(

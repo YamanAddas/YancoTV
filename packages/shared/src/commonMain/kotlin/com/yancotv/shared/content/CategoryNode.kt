@@ -36,81 +36,76 @@ sealed interface CategoryNode {
     }
 }
 
-internal object CategoryTreeBuilder {
+object CategoryTreeBuilder {
+    private data class Bucket(
+        val label: String,
+        val kind: PrefixCatalog.Kind,
+        val code: String,
+        val children: MutableList<CategoryNode.Leaf>,
+    )
+
     /**
      * Build a one-level tree out of the provider-ordered flat list returned
      * by [ContentRepository.groups]. Inputs are already in provider order;
      * the builder never re-sorts — it only buckets.
      *
-     * Single-child parents collapse to a [Leaf] (the child's original
-     * group_name), so a feed with a single `AR | Sports` row doesn't
-     * surface an `Arabic` dropdown of one. Multi-child parents render
-     * with the resolved [PrefixCatalog.Entry.displayName] as the label.
+     * Single-child parents collapse to a [CategoryNode.Leaf] (the child's
+     * original group_name), so a feed with a single `AR | Sports` row
+     * doesn't surface an `Arabic` dropdown of one. Multi-child parents
+     * render with the resolved [PrefixCatalog.Entry.displayName] as label.
      */
     fun build(flatGroups: List<String>): List<CategoryNode> {
         if (flatGroups.isEmpty()) return emptyList()
 
-        // Bucket children by resolved display name. Use a LinkedHashMap to
-        // preserve first-seen order — that's the bucket's "min sort_order"
-        // since the input list is provider-ordered.
-        data class Bucket(
-            val label: String,
-            val kind: PrefixCatalog.Kind,
-            val code: String,
-            val children: MutableList<CategoryNode.Leaf>,
-        )
-
+        // Two-pass: first pass collects buckets in first-seen order and
+        // emits a slot index where each bucket's parent (or collapsed leaf)
+        // will live in the final output. Second pass materialises the slots.
+        // Avoids leaking a "placeholder" CategoryNode subtype through the
+        // public sealed type.
         val buckets = LinkedHashMap<String, Bucket>()
-        val output = mutableListOf<CategoryNode>()
+        // slots: each entry is either a CategoryNode.Leaf (unprefixed group)
+        // or a bucket key (String) to be resolved in pass 2.
+        val slots = mutableListOf<Any>()
 
         for (group in flatGroups) {
             val parsed = PrefixParser.parse(group)
             val resolved = parsed.resolved
             if (resolved == null) {
-                output.add(CategoryNode.Leaf(group))
+                slots.add(CategoryNode.Leaf(group))
                 continue
             }
             val key = resolved.displayName
             val bucket =
                 buckets.getOrPut(key) {
-                    val newBucket =
-                        Bucket(
-                            label = resolved.displayName,
-                            kind = resolved.kind,
-                            code = parsed.prefix ?: resolved.displayName,
-                            children = mutableListOf(),
-                        )
-                    // Reserve the bucket's slot in the output stream the moment
-                    // we first see it. Filled in below once we know the child
-                    // count (single-child collapses to Leaf).
-                    output.add(PlaceholderLeaf(key))
-                    newBucket
+                    slots.add(key) // reserve slot the first time we see this bucket
+                    Bucket(
+                        label = resolved.displayName,
+                        kind = resolved.kind,
+                        code = parsed.prefix ?: resolved.displayName,
+                        children = mutableListOf(),
+                    )
                 }
             bucket.children.add(CategoryNode.Leaf(group))
         }
 
-        // Replace each placeholder with either a real Parent or — for
-        // single-child buckets — a flat Leaf carrying the original group_name.
-        return output.map { node ->
-            if (node is PlaceholderLeaf) {
-                val bucket = buckets[node.key]!!
-                if (bucket.children.size == 1) {
-                    bucket.children.single()
-                } else {
-                    CategoryNode.Parent(
-                        label = bucket.label,
-                        kind = bucket.kind,
-                        prefixCode = bucket.code,
-                        children = bucket.children.toList(),
-                    )
+        return slots.map { slot ->
+            when (slot) {
+                is CategoryNode.Leaf -> slot
+                is String -> {
+                    val bucket = buckets.getValue(slot)
+                    if (bucket.children.size == 1) {
+                        bucket.children.single()
+                    } else {
+                        CategoryNode.Parent(
+                            label = bucket.label,
+                            kind = bucket.kind,
+                            prefixCode = bucket.code,
+                            children = bucket.children.toList(),
+                        )
+                    }
                 }
-            } else {
-                node
+                else -> error("unreachable")
             }
         }
-    }
-
-    private data class PlaceholderLeaf(val key: String) : CategoryNode {
-        override val groupName: String get() = key
     }
 }
