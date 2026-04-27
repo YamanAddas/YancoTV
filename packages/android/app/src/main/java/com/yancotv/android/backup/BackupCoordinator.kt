@@ -1,10 +1,16 @@
 package com.yancotv.android.backup
 
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import java.io.File
+import java.io.FileOutputStream
 import com.yancotv.android.BuildConfig
 import com.yancotv.shared.backup.BackupCanonicalJson
 import com.yancotv.shared.backup.BackupChecksumMismatchException
@@ -80,6 +86,82 @@ class BackupCoordinator(
             .launchIn(scope)
     }
     /**
+     * Default export path — writes to the system's public Downloads
+     * folder (`MediaStore.Downloads` on API 29+, direct file write to
+     * `Environment.DIRECTORY_DOWNLOADS` on API ≤28). The file survives
+     * uninstall and is visible in any file manager / Files app.
+     *
+     * Used when the user hasn't explicitly picked a backup folder
+     * via the Settings → Backup → "Change folder…" button.
+     */
+    suspend fun exportToDefault(
+        filename: String,
+        password: String?,
+        label: String?,
+    ): ExportResult =
+        withContext(Dispatchers.IO) {
+            val (file, bytes) = buildBackupBytes(password)
+            val (storageUriString, sizeBytes) =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    writeToMediaStoreDownloads(filename, bytes)
+                        ?: return@withContext ExportResult.Failed("MediaStore.Downloads insert failed")
+                } else {
+                    writeToPublicDownloadsLegacy(filename, bytes)
+                        ?: return@withContext ExportResult.Failed("Could not write to /sdcard/Download")
+                }
+            persistMetadata(file, storageUriString, sizeBytes, label)
+            ExportResult.Success(file = file, bytesWritten = sizeBytes)
+        }
+
+    private fun writeToMediaStoreDownloads(
+        filename: String,
+        bytes: ByteArray,
+    ): Pair<String, Long>? {
+        val values =
+            ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, filename)
+                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/YancoTV")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+            }
+        val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
+        return runCatching {
+            context.contentResolver.openOutputStream(uri, "w")?.use { it.write(bytes); it.flush() }
+                ?: error("openOutputStream returned null")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                context.contentResolver.update(uri, values, null, null)
+            }
+            uri.toString() to bytes.size.toLong()
+        }.getOrElse {
+            // Best-effort cleanup of the half-written row.
+            runCatching { context.contentResolver.delete(uri, null, null) }
+            Log.e(TAG, "MediaStore.Downloads write failed", it)
+            null
+        }
+    }
+
+    private fun writeToPublicDownloadsLegacy(
+        filename: String,
+        bytes: ByteArray,
+    ): Pair<String, Long>? {
+        @Suppress("DEPRECATION")
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val targetDir = File(downloads, "YancoTV").also { it.mkdirs() }
+        val file = File(targetDir, filename)
+        return runCatching {
+            FileOutputStream(file).use { it.write(bytes); it.flush() }
+            Uri.fromFile(file).toString() to file.length()
+        }.getOrElse {
+            Log.e(TAG, "legacy Downloads write failed", it)
+            null
+        }
+    }
+
+    /**
      * Build a backup and write it as `[filename]` inside [folderUri]
      * (an SAF tree URI from `ACTION_OPEN_DOCUMENT_TREE`). Fire TV's
      * file picker handles `OPEN_DOCUMENT_TREE` cleanly with D-pad —
@@ -94,20 +176,7 @@ class BackupCoordinator(
         label: String?,
     ): ExportResult =
         withContext(Dispatchers.IO) {
-            val exporter = BackupExporter(db, credentialStore)
-            val file =
-                exporter.export(
-                    appVersion = BuildConfig.VERSION_NAME,
-                    dbSchemaVersion = YancoDb.Schema.version.toInt(),
-                    nowMs = System.currentTimeMillis(),
-                    password = password,
-                )
-
-            // Pretty-print to disk so the user can eyeball the file in
-            // a text editor; checksum is over the compact form (already
-            // computed inside exporter.export and stored on the file).
-            val pretty = BackupCanonicalJson.encodePretty(file)
-            val bytes = pretty.encodeToByteArray()
+            val (file, bytes) = buildBackupBytes(password)
 
             // Resolve the tree URI to a writable DocumentFile, create
             // (or replace) the named file inside, write bytes.
@@ -126,29 +195,50 @@ class BackupCoordinator(
                 out.write(bytes)
                 out.flush()
             } ?: return@withContext ExportResult.Failed("Could not open file for writing")
-            val destination = doc.uri
 
-            // MK.19.8.5 — record the export in BackupMetadata so the
-            // Settings tab can show "your last 3 backups" and the user
-            // has a forensics trail. SHA-256 over the on-disk bytes
-            // (mirrors what the importer would recompute) — distinct
-            // from file.checksum which is over `records` only.
-            val onDiskChecksum = sha256Hex(bytes)
-            val countsJson = BackupCanonicalJson.encodeCompact(file.recordCounts)
-            db.backupMetadataQueries.insert(
-                id = "bk-${file.createdAt}",
-                file_uri = destination.toString(),
-                label = label?.takeIf { it.isNotBlank() } ?: "(no label)",
-                schema_version = file.dbSchemaVersion.toLong(),
-                checksum = onDiskChecksum,
-                size_bytes = bytes.size.toLong(),
-                record_counts = countsJson,
-                notes = null,
-                created_at = file.createdAt,
-            )
-
+            persistMetadata(file, doc.uri.toString(), bytes.size.toLong(), label)
             ExportResult.Success(file = file, bytesWritten = bytes.size.toLong())
         }
+
+    /** Build the BackupFileV1 + canonical-pretty-JSON bytes once, share across export paths. */
+    private fun buildBackupBytes(password: String?): Pair<BackupFileV1, ByteArray> {
+        val exporter = BackupExporter(db, credentialStore)
+        val file =
+            exporter.export(
+                appVersion = BuildConfig.VERSION_NAME,
+                dbSchemaVersion = YancoDb.Schema.version.toInt(),
+                nowMs = System.currentTimeMillis(),
+                password = password,
+            )
+        val pretty = BackupCanonicalJson.encodePretty(file)
+        return file to pretty.encodeToByteArray()
+    }
+
+    /** Insert a BackupMetadata row tracking the just-written export. */
+    private fun persistMetadata(
+        file: BackupFileV1,
+        fileUri: String,
+        sizeBytes: Long,
+        label: String?,
+    ) {
+        // SHA-256 over the on-disk bytes — distinct from file.checksum
+        // (which is over the `records` block only). The on-disk
+        // checksum lets a future "verify integrity" feature catch
+        // out-of-band edits to the file.
+        val onDiskChecksum = sha256Hex(file.let { BackupCanonicalJson.encodePretty(it).encodeToByteArray() })
+        val countsJson = BackupCanonicalJson.encodeCompact(file.recordCounts)
+        db.backupMetadataQueries.insert(
+            id = "bk-${file.createdAt}",
+            file_uri = fileUri,
+            label = label?.takeIf { it.isNotBlank() } ?: "(no label)",
+            schema_version = file.dbSchemaVersion.toLong(),
+            checksum = onDiskChecksum,
+            size_bytes = sizeBytes,
+            record_counts = countsJson,
+            notes = null,
+            created_at = file.createdAt,
+        )
+    }
 
     /**
      * Read [source] as a [BackupFileV1] and apply via [BackupImporter].

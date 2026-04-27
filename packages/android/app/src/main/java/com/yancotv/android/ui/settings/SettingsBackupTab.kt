@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,20 +27,24 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.backup.BackupCoordinator
 import com.yancotv.android.backup.ExportResult
 import com.yancotv.android.backup.ImportResult
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.db.YancoDb
 import kotlinx.coroutines.Dispatchers
@@ -50,54 +53,115 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
- * MK.19.8.3 — Backup tab. Two sections:
+ * MK.19.8.3 — Backup tab.
  *
- *  - **Export** — optional label, optional password, SAF Save dialog
- *    (`ACTION_CREATE_DOCUMENT`) → JSON file written via
- *    [BackupCoordinator]. A `BackupMetadata` row is persisted on every
- *    success so the "Recent backups" list below stays in sync.
+ * Default export path writes to the public Downloads folder
+ * (`Download/YancoTV/yancotv-backup-…json`) via MediaStore on API 29+
+ * or direct file write on API ≤28. The user can override with a SAF
+ * folder pick that persists across sessions.
  *
- *  - **Import** — SAF Open dialog (`ACTION_OPEN_DOCUMENT`) → password
- *    field (only used when the file is encrypted) → restore via
- *    [BackupCoordinator] → restore report. Merge mode only in v1
- *    (per the active-queue decision).
+ * SAF picker uses `OPEN_DOCUMENT_TREE` (folder picker) — Fire TV's
+ * `CREATE_DOCUMENT` (file picker with Save) traps focus on the Save
+ * button so D-pad users can't actually save.
  *
- *  - **Recent backups** (MK.19.8.5) — last 3 `BackupMetadata` rows,
- *    useful for finding a previous export's URI.
+ * Form state uses `rememberSaveable` so picker round-trips don't
+ * clobber the user's typed label / password.
  */
 @Composable
 fun SettingsBackupTab(
     modifier: Modifier = Modifier,
     coordinator: BackupCoordinator = koinInject(),
     db: YancoDb = koinInject(),
+    prefs: AppPreferences = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var label by remember { mutableStateOf("") }
-    var encryptToggle by remember { mutableStateOf(false) }
-    var exportPassword by remember { mutableStateOf("") }
-    var exportStatus by remember { mutableStateOf<String?>(null) }
+    // Survives configuration changes + process death — picker round-
+    // trips don't clear the user's typed label or toggle.
+    var label by rememberSaveable { mutableStateOf("") }
+    var encryptToggle by rememberSaveable { mutableStateOf(false) }
+    var exportPassword by rememberSaveable { mutableStateOf("") }
+    var exportStatus by rememberSaveable { mutableStateOf<String?>(null) }
     var exporting by remember { mutableStateOf(false) }
 
-    var importPickedUri by remember { mutableStateOf<Uri?>(null) }
-    var importPassword by remember { mutableStateOf("") }
-    var importStatus by remember { mutableStateOf<String?>(null) }
+    var importPickedUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    val importPickedUri = importPickedUriString?.let(Uri::parse)
+    var importPassword by rememberSaveable { mutableStateOf("") }
+    var importStatus by rememberSaveable { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
 
-    // Folder picker (OPEN_DOCUMENT_TREE) instead of CREATE_DOCUMENT —
-    // Fire TV's CREATE_DOCUMENT picker often traps focus on the Save
-    // button so the user can't actually save anything. Tree-pick is the
-    // same flow the Recordings tab uses; D-pad navigation is reliable.
-    // Once a folder is chosen, [BackupCoordinator.export] creates a
-    // timestamped JSON file inside it via DocumentFile.
-    val exportLauncher =
+    // Persisted SAF backup folder URI (null → use MediaStore default).
+    var customFolderString by rememberSaveable { mutableStateOf(prefs.readBackupFolderUri()) }
+    val customFolder = customFolderString?.let(Uri::parse)
+
+    // Focus anchors — when an SAF picker returns, Compose puts focus
+    // wherever it lands by default (often on the sidebar tab item).
+    // Re-grab focus on the Export / Restore button after operations
+    // complete so the user stays in this tab, in this section.
+    val exportButtonFocus = remember { FocusRequester() }
+    val importButtonFocus = remember { FocusRequester() }
+
+    // Generate a timestamped filename.
+    fun makeFilename(): String {
+        val now = java.time.LocalDateTime.now()
+        return "yancotv-backup-%04d-%02d-%02d-%02d%02d.json".format(
+            now.year,
+            now.monthValue,
+            now.dayOfMonth,
+            now.hour,
+            now.minute,
+        )
+    }
+
+    fun runExportToCustomFolder(folder: Uri) {
+        val filename = makeFilename()
+        exporting = true
+        exportStatus = "Exporting to $filename…"
+        scope.launch {
+            val result =
+                runCatching {
+                    coordinator.export(
+                        folderUri = folder,
+                        filename = filename,
+                        password = exportPassword.takeIf { encryptToggle && it.isNotBlank() },
+                        label = label.takeIf { it.isNotBlank() },
+                    )
+                }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
+            exporting = false
+            exportStatus = formatExportResult(result, filename)
+            // Re-grab focus after the picker / coroutine round-trip.
+            runCatching { exportButtonFocus.requestFocus() }
+        }
+    }
+
+    fun runExportToDefault() {
+        val filename = makeFilename()
+        exporting = true
+        exportStatus = "Exporting $filename to Downloads/YancoTV…"
+        scope.launch {
+            val result =
+                runCatching {
+                    coordinator.exportToDefault(
+                        filename = filename,
+                        password = exportPassword.takeIf { encryptToggle && it.isNotBlank() },
+                        label = label.takeIf { it.isNotBlank() },
+                    )
+                }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
+            exporting = false
+            exportStatus = formatExportResult(result, filename)
+            runCatching { exportButtonFocus.requestFocus() }
+        }
+    }
+
+    val changeFolderLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocumentTree(),
         ) { treeUri: Uri? ->
-            if (treeUri == null) return@rememberLauncherForActivityResult
-            // Take persistable read+write so a follow-up restore can
-            // reach the same folder without re-prompting.
+            if (treeUri == null) {
+                runCatching { exportButtonFocus.requestFocus() }
+                return@rememberLauncherForActivityResult
+            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     treeUri,
@@ -105,48 +169,26 @@ fun SettingsBackupTab(
                         Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             }
-            // Default filename includes timestamp so successive exports
-            // into the same folder don't collide.
-            val now = java.time.LocalDateTime.now()
-            val stamp =
-                "%04d-%02d-%02d-%02d%02d".format(
-                    now.year,
-                    now.monthValue,
-                    now.dayOfMonth,
-                    now.hour,
-                    now.minute,
-                )
-            val filename = "yancotv-backup-$stamp.json"
-            exporting = true
-            exportStatus = "Exporting to $filename…"
+            customFolderString = treeUri.toString()
             scope.launch {
-                val result =
-                    runCatching {
-                        coordinator.export(
-                            folderUri = treeUri,
-                            filename = filename,
-                            password = exportPassword.takeIf { encryptToggle && it.isNotBlank() },
-                            label = label.takeIf { it.isNotBlank() },
-                        )
-                    }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
-                exporting = false
-                exportStatus =
-                    when (result) {
-                        is ExportResult.Success ->
-                            "Exported $filename · ${formatBytes(result.bytesWritten)} · schema v${result.file.dbSchemaVersion} · " +
-                                "${result.file.recordCounts.values.sum()} records · checksum ${result.file.checksum.take(8)}…"
-                        is ExportResult.Failed -> "Export failed: ${result.message}"
-                    }
+                prefs.setBackupFolderUri(treeUri.toString())
             }
+            // Immediately export to the freshly-picked folder — that's
+            // what the user just confirmed.
+            runExportToCustomFolder(treeUri)
         }
 
     val importPickLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocument(),
         ) { uri: Uri? ->
-            if (uri == null) return@rememberLauncherForActivityResult
-            importPickedUri = uri
+            if (uri == null) {
+                runCatching { importButtonFocus.requestFocus() }
+                return@rememberLauncherForActivityResult
+            }
+            importPickedUriString = uri.toString()
             importStatus = "Picked ${uri.lastPathSegment ?: uri}"
+            runCatching { importButtonFocus.requestFocus() }
         }
 
     Column(
@@ -186,6 +228,15 @@ fun SettingsBackupTab(
                 color = LocalYancoPalette.current.Accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
+            )
+            Text(
+                if (customFolder != null) {
+                    "Saving to: ${customFolder.lastPathSegment ?: customFolder}"
+                } else {
+                    "Saving to: Downloads/YancoTV (default)"
+                },
+                color = LocalYancoPalette.current.TextSecondary,
+                fontSize = 11.sp,
             )
             SettingsClickToEditField(
                 label = "Label (optional)",
@@ -240,15 +291,34 @@ fun SettingsBackupTab(
                 Button(
                     enabled = !exporting && (!encryptToggle || exportPassword.length >= 8),
                     onClick = {
-                        // Pass `null` to OpenDocumentTree so the picker
-                        // opens the system default (usually Downloads).
-                        // The launcher creates the file inside whichever
-                        // folder the user picks.
-                        exportLauncher.launch(null)
+                        if (customFolder != null) {
+                            runExportToCustomFolder(customFolder)
+                        } else {
+                            runExportToDefault()
+                        }
                     },
+                    modifier = Modifier.focusRequester(exportButtonFocus),
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
-                    Text(if (exporting) "Exporting…" else "Choose folder & export…")
+                    Text(if (exporting) "Exporting…" else "Export backup")
+                }
+                OutlinedButton(
+                    onClick = { changeFolderLauncher.launch(null) },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
+                ) {
+                    Text(if (customFolder != null) "Change folder…" else "Pick folder…")
+                }
+                if (customFolder != null) {
+                    OutlinedButton(
+                        onClick = {
+                            customFolderString = null
+                            scope.launch { prefs.setBackupFolderUri(null) }
+                            runCatching { exportButtonFocus.requestFocus() }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextMuted),
+                    ) {
+                        Text("Reset to default")
+                    }
                 }
             }
             exportStatus?.let { status ->
@@ -289,6 +359,7 @@ fun SettingsBackupTab(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { importPickLauncher.launch(arrayOf("application/json", "*/*")) },
+                    modifier = Modifier.focusRequester(importButtonFocus),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
                     Text(if (importPickedUri == null) "Choose backup file…" else "Choose another file…")
@@ -296,7 +367,7 @@ fun SettingsBackupTab(
             }
             if (importPickedUri != null) {
                 Text(
-                    "Picked: ${importPickedUri?.lastPathSegment ?: importPickedUri}",
+                    "Picked: ${importPickedUri.lastPathSegment ?: importPickedUri}",
                     color = LocalYancoPalette.current.TextSecondary,
                     fontSize = 11.sp,
                 )
@@ -313,10 +384,10 @@ fun SettingsBackupTab(
                         importing = true
                         importStatus = "Restoring…"
                         scope.launch {
-                            val pickedUri = importPickedUri ?: return@launch
-                            val result = coordinator.import(pickedUri, password = importPassword.takeIf { it.isNotBlank() })
+                            val result = coordinator.import(importPickedUri, password = importPassword.takeIf { it.isNotBlank() })
                             importing = false
                             importStatus = formatImportResult(result)
+                            runCatching { importButtonFocus.requestFocus() }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
@@ -341,8 +412,6 @@ fun SettingsBackupTab(
         // ───── Recent backups (MK.19.8.5) ─────
         val recent = remember { mutableStateListOf<RecentBackup>() }
         LaunchedEffect(exportStatus) {
-            // Re-read on every export-status change so the row appears
-            // immediately after a successful export.
             withContext(Dispatchers.IO) {
                 val rows =
                     runCatching {
@@ -415,6 +484,14 @@ private fun formatBytes(b: Long): String =
         b < 1024 -> "$b B"
         b < 1024 * 1024 -> "%.1f KB".format(b / 1024.0)
         else -> "%.1f MB".format(b / (1024.0 * 1024.0))
+    }
+
+private fun formatExportResult(r: ExportResult, filename: String): String =
+    when (r) {
+        is ExportResult.Success ->
+            "Exported $filename · ${formatBytes(r.bytesWritten)} · schema v${r.file.dbSchemaVersion} · " +
+                "${r.file.recordCounts.values.sum()} records · checksum ${r.file.checksum.take(8)}…"
+        is ExportResult.Failed -> "Export failed: ${r.message}"
     }
 
 private fun formatImportResult(r: ImportResult): String =

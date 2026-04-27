@@ -247,6 +247,17 @@ class AppPreferences(
                 _recording.value.copy(folderUri = uri?.takeIf { it.isNotBlank() })
         }
 
+    /**
+     * MK.19.8.3 — persisted SAF tree URI for backup exports. Null /
+     * unset → the coordinator falls back to MediaStore.Downloads on
+     * API 29+, or the public Downloads dir on API ≤28. The Settings
+     * → Backup tab's "Change folder…" button writes here.
+     */
+    suspend fun setBackupFolderUri(uri: String?) =
+        write(KEY_BACKUP_FOLDER_URI, uri.orEmpty()) { /* no flow surface yet — read on demand */ }
+
+    fun readBackupFolderUri(): String? = readString(KEY_BACKUP_FOLDER_URI)?.takeIf { it.isNotBlank() }
+
     // ───── Hidden groups ─────
     //
     // Providers routinely push 400+ category groups, most of which a
@@ -386,6 +397,7 @@ class AppPreferences(
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
         private const val KEY_SPEED = "pref_playback_speed"
         private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"
+        private const val KEY_BACKUP_FOLDER_URI = "pref_backup_folder_uri"
         private const val KEY_RECORDING_STORAGE_MODE = "pref_recording_storage_mode"
         private const val KEY_EPG_DAYS_BACK = "pref_epg_days_back"
         private const val KEY_EPG_DAYS_FORWARD = "pref_epg_days_forward"
