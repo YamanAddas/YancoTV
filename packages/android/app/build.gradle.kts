@@ -188,6 +188,8 @@ dependencies {
 
     // TV
     implementation(libs.tv.material)
+    // MK.10.1 — Android TV launcher Recommendations channel.
+    implementation(libs.tvprovider)
 
     // Media3 — powers PlayerActivity
     implementation(libs.media3.exoplayer)

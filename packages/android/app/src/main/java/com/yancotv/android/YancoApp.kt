@@ -84,6 +84,11 @@ class YancoApp : Application() {
 
         SingletonImageLoader.setSafe { buildYancoImageLoader(this) }
         EpgSyncWorker.schedulePeriodic(this)
+        // MK.10.1 — keep the launcher Recommendations channel current.
+        // Periodic refresh + a one-shot so the channel exists on first
+        // boot without waiting 6 hours.
+        com.yancotv.android.recommendations.RecommendationsWorker.enqueuePeriodic(this)
+        com.yancotv.android.recommendations.RecommendationsWorker.enqueueOnce(this)
         ReminderNotificationChannel.ensureCreated(this)
         // Stage 3.1 / MK.14.1c — sweep any RECORDING-status rows that
         // outlived a crash / process death. The repo flips orphans

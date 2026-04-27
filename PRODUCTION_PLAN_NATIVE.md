@@ -361,7 +361,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 |---|---|---|
 | MK.10.1 | Android TV recommendations channel (`androidx.tvprovider`) | recent + continue-watching cards on TV launcher home |
 | ~~MK.10.2~~ | ~~Android TV "Live channels" integration (`TIF`)~~ — **DEFERRED post-v1** (decision 2026-04-25). Fire TV doesn't support TIF; value is Google-Android-TV-only and scope is massive. See "Post-v1 ideas register" above | N/A in v1.0 |
-| MK.10.3 | Voice search via Google Assistant → deep link to Search screen | "Hey Google, play CNN on YancoTV" works |
+| MK.10.3 | Voice search via Google Assistant → deep link to Search screen | "Hey Google, play CNN on YancoTV" works. **Fire TV / Alexa limitation (2026-04-27 hands-on):** the remote's voice button always routes to Alexa system-wide; Alexa doesn't query third-party apps without the Alexa Skills SDK + Amazon cert (separate program). Our manifest hook is correct for Google Assistant on Google TV / Android TV, but on Fire TV the user uses the in-app overlay instead (KEYCODE_SEARCH already opens it). Future: add an in-app mic button that fires RECOGNIZE_SPEECH directly so Fire TV users get voice input without going through Alexa. |
 | MK.10.4 | Leanback on-screen channel zap UI polish | feels smoother than TiviMate |
 
 ### **MK.11 — Phone-native features**
