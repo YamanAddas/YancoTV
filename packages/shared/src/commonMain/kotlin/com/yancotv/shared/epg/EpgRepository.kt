@@ -100,6 +100,24 @@ class EpgRepository(
         return result
     }
 
+    /**
+     * MK.14.6 — find future occurrences of a programme by title on a
+     * channel, within `[now, now + windowMs)`. Used by the manual series-
+     * binding flow ("Record all on this channel"). Exact-match on the
+     * EPG-canonical title — caller has the snapshot from the long-pressed
+     * row.
+     */
+    fun findFutureByChannelAndTitle(
+        tvgId: String,
+        title: String,
+        now: Long,
+        windowMs: Long,
+    ): List<EpgProgramme> =
+        db.epgProgrammesQueries
+            .futureByChannelAndTitle(tvgId, title, now, now + windowMs)
+            .executeAsList()
+            .map { it.toDomain() }
+
     fun getProgrammesForChannel(
         tvgId: String,
         startTime: Long,

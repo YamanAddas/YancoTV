@@ -20,7 +20,10 @@ CREATE TABLE recording_schedules (
     recording_id TEXT REFERENCES recordings(id) ON DELETE SET NULL,
     error TEXT,
     created_at INTEGER NOT NULL, -- ms since epoch
-    updated_at INTEGER NOT NULL  -- ms since epoch
+    updated_at INTEGER NOT NULL, -- ms since epoch
+    -- MK.14.6 — non-null when the schedule was created via "Record all on
+    -- this channel" (manual series binding). Format `<channel_id>::<title>`.
+    series_key TEXT
 );
 
 CREATE INDEX idx_recording_schedules_scheduled_start
@@ -28,6 +31,9 @@ CREATE INDEX idx_recording_schedules_scheduled_start
 
 CREATE INDEX idx_recording_schedules_state
     ON recording_schedules(state);
+
+CREATE INDEX idx_recording_schedules_series_key
+    ON recording_schedules(series_key);
 
 selectAll:
 SELECT * FROM recording_schedules ORDER BY scheduled_start ASC;
@@ -60,8 +66,13 @@ insert:
 INSERT INTO recording_schedules (
     id, content_id, programme_id, title, stream_url,
     scheduled_start, scheduled_end, state, recording_id, error,
-    created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    created_at, updated_at, series_key
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectBySeriesKey:
+SELECT * FROM recording_schedules
+WHERE series_key = ?
+ORDER BY scheduled_start ASC;
 
 setState:
 UPDATE recording_schedules

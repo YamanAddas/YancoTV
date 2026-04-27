@@ -37,6 +37,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +67,7 @@ import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
 import com.yancotv.shared.types.EpgProgramme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -94,6 +96,11 @@ private const val NOW_TICK_MS = 60_000L
 // the result is mapped to domain objects.
 private const val GUIDE_PAGE_SIZE = 100L
 private const val PREFETCH_THRESHOLD = 20
+
+/** MK.14.6 — series-binding lookahead window. 7 days covers the full
+ *  EPG horizon most providers populate; longer windows are wasted because
+ *  EPG refresh will replace the rows before the alarm fires. */
+private const val SERIES_LOOKAHEAD_MS: Long = 7L * 24L * 60L * 60_000L
 
 /**
  * 2D EPG guide: channels on the Y axis, time on the X axis. Horizontal
@@ -136,6 +143,7 @@ fun GuideScreen(
     var actionTarget by remember { mutableStateOf<ProgrammeAction?>(null) }
     var reloadTick by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     // Initial / forced reload — resets pagination and fetches page 0.
     LaunchedEffect(reloadTick) {
@@ -352,19 +360,31 @@ fun GuideScreen(
         var existingScheduleId by remember(target.programme.id) {
             mutableStateOf<String?>(null)
         }
+        // MK.14.6 — series-binding state for the long-pressed programme.
+        // Active iff at least one non-terminal schedule is tagged with the
+        // (channel, title) series_key. Used to swap "Record series" for
+        // "Cancel series" in the dialog.
+        var isSeriesBound by remember(target.programme.id) { mutableStateOf(false) }
         LaunchedEffect(target.programme.id) {
-            existingScheduleId =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        recordSchedules
-                            .getAll()
-                            .firstOrNull { entry ->
-                                entry.programmeId == target.programme.id &&
-                                    !entry.state.isTerminal()
-                            }
-                            ?.id
-                    }.getOrNull()
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val all = recordSchedules.getAll()
+                    existingScheduleId =
+                        all.firstOrNull { entry ->
+                            entry.programmeId == target.programme.id &&
+                                !entry.state.isTerminal()
+                        }?.id
+                    val key =
+                        RecordingScheduleScheduler.seriesKeyFor(
+                            target.channel.tvgId,
+                            target.programme.title,
+                        )
+                    isSeriesBound =
+                        all.any { entry ->
+                            entry.seriesKey == key && !entry.state.isTerminal()
+                        }
                 }
+            }
         }
 
         ProgrammeActionDialog(
@@ -373,6 +393,7 @@ fun GuideScreen(
             nowSeconds = nowSeconds,
             isReminderSet = scheduler.isSet(target.programme.id),
             isRecordScheduled = existingScheduleId != null,
+            isSeriesBound = isSeriesBound,
             catchupItem = catchupItem,
             onWatch = {
                 actionTarget = null
@@ -423,6 +444,55 @@ fun GuideScreen(
                 existingScheduleId?.let { id ->
                     runCatching { recordScheduler.cancel(id) }
                         .onFailure { Log.w("Yanco", "cancel-record failed for $id", it) }
+                }
+                actionTarget = null
+            },
+            onScheduleSeries = {
+                // MK.14.6 — bind every future programme on this channel
+                // matching the long-pressed title within the 7-day EPG
+                // lookahead. Runs on IO; dialog dismisses immediately so
+                // the user isn't blocked by the EPG query + N inserts.
+                val channel = target.channel
+                val programme = target.programme
+                val streamUrl = channel.streamUrl
+                if (!streamUrl.isNullOrBlank()) {
+                    coroutineScope.launch(Dispatchers.IO) {
+                        runCatching {
+                            val contentItem =
+                                contentRepo.findLiveByTvgId(channel.tvgId)
+                            val now = System.currentTimeMillis()
+                            val matches =
+                                epg.findFutureByChannelAndTitle(
+                                    tvgId = channel.tvgId,
+                                    title = programme.title,
+                                    now = now,
+                                    windowMs = SERIES_LOOKAHEAD_MS,
+                                )
+                            recordScheduler.scheduleSeries(
+                                contentId = contentItem?.id,
+                                channelTvgId = channel.tvgId,
+                                title = programme.title,
+                                streamUrl = streamUrl,
+                                programmes =
+                                    matches.map { p ->
+                                        Triple(p.id, p.startTime * 1000L, p.endTime * 1000L)
+                                    },
+                            )
+                        }.onFailure {
+                            Log.e("Yanco", "scheduleSeries failed for ${programme.title}", it)
+                        }
+                    }
+                }
+                actionTarget = null
+            },
+            onCancelSeries = {
+                val channel = target.channel
+                val programme = target.programme
+                val key =
+                    RecordingScheduleScheduler.seriesKeyFor(channel.tvgId, programme.title)
+                coroutineScope.launch(Dispatchers.IO) {
+                    runCatching { recordScheduler.cancelSeries(key) }
+                        .onFailure { Log.w("Yanco", "cancelSeries failed for $key", it) }
                 }
                 actionTarget = null
             },
@@ -758,6 +828,7 @@ private fun ProgrammeActionDialog(
     nowSeconds: Long,
     isReminderSet: Boolean,
     isRecordScheduled: Boolean,
+    isSeriesBound: Boolean,
     catchupItem: ContentItem?,
     onWatch: () -> Unit,
     onPlayCatchup: (ContentItem) -> Unit,
@@ -765,6 +836,8 @@ private fun ProgrammeActionDialog(
     onCancelReminder: () -> Unit,
     onScheduleRecord: () -> Unit,
     onCancelRecord: () -> Unit,
+    onScheduleSeries: () -> Unit,
+    onCancelSeries: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     // "Future" means the programme hasn't started yet. Setting a reminder on
@@ -834,6 +907,18 @@ private fun ProgrammeActionDialog(
                             } else {
                                 TextButton(onClick = onScheduleRecord) {
                                     Text(text = "Record", color = LocalYancoPalette.current.TextPrimary)
+                                }
+                            }
+                            // MK.14.6 — series binding. "Record series" arms
+                            // every future programme on this channel matching
+                            // the current title within the 7-day EPG window.
+                            if (isSeriesBound) {
+                                TextButton(onClick = onCancelSeries) {
+                                    Text(text = "Cancel series", color = LocalYancoPalette.current.TextPrimary)
+                                }
+                            } else {
+                                TextButton(onClick = onScheduleSeries) {
+                                    Text(text = "Record series", color = LocalYancoPalette.current.TextPrimary)
                                 }
                             }
                         }

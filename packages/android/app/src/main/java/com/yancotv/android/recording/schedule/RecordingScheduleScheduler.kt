@@ -54,6 +54,7 @@ class RecordingScheduleScheduler(
         scheduleId: String = "sched-${UUID.randomUUID()}",
         prePaddingSeconds: Long = DEFAULT_PRE_PADDING_S,
         postPaddingSeconds: Long = DEFAULT_POST_PADDING_S,
+        seriesKey: String? = null,
     ): RecordingScheduleEntry {
         val inserted =
             repo.insert(
@@ -64,6 +65,7 @@ class RecordingScheduleScheduler(
                 streamUrl = streamUrl,
                 scheduledStart = scheduledStart,
                 scheduledEnd = scheduledEnd,
+                seriesKey = seriesKey,
             )
         alarmManager.arm(
             inserted,
@@ -72,6 +74,79 @@ class RecordingScheduleScheduler(
         )
         return repo.transitionTo(scheduleId, RecordingScheduleState.ARMED)
     }
+
+    /**
+     * MK.14.6 — manual series binding. Creates one schedule per upcoming
+     * programme on [channelTvgId] whose title equals [title], within
+     * `[now, now + lookaheadMs)`. Returns the count actually scheduled
+     * (skips programmes that already have an active schedule for the
+     * same `programme_id`, so calling this again is idempotent).
+     *
+     * The shared `series_key` is `<channelTvgId>::<title>`, snapshotted
+     * here so that EPG title drift between bind and cancel doesn't break
+     * the binding. [cancelSeries] uses the same key.
+     *
+     * Caller must already have:
+     *   - resolved [streamUrl] from the channel's `ContentItem`,
+     *   - looked up the future programme list via
+     *     [com.yancotv.shared.epg.EpgRepository.findFutureByChannelAndTitle].
+     *
+     * `programmes` is `(programmeId, scheduledStart, scheduledEnd)`.
+     */
+    fun scheduleSeries(
+        contentId: String?,
+        channelTvgId: String,
+        title: String,
+        streamUrl: String,
+        programmes: List<Triple<String, Long, Long>>,
+        prePaddingSeconds: Long = DEFAULT_PRE_PADDING_S,
+        postPaddingSeconds: Long = DEFAULT_POST_PADDING_S,
+    ): SeriesBindResult {
+        val seriesKey = seriesKeyFor(channelTvgId, title)
+        // Skip programmes already covered by a non-terminal schedule for
+        // this series — keeps re-binding idempotent.
+        val existingProgrammeIds =
+            repo.getBySeriesKey(seriesKey)
+                .filter { !it.state.isTerminal() }
+                .mapNotNull { it.programmeId }
+                .toSet()
+        var created = 0
+        for ((programmeId, start, end) in programmes) {
+            if (programmeId in existingProgrammeIds) continue
+            schedule(
+                contentId = contentId,
+                programmeId = programmeId,
+                title = title,
+                streamUrl = streamUrl,
+                scheduledStart = start,
+                scheduledEnd = end,
+                prePaddingSeconds = prePaddingSeconds,
+                postPaddingSeconds = postPaddingSeconds,
+                seriesKey = seriesKey,
+            )
+            created++
+        }
+        Log.i(TAG, "scheduleSeries[$seriesKey] created=$created skipped=${programmes.size - created}")
+        return SeriesBindResult(seriesKey, created, programmes.size - created)
+    }
+
+    /**
+     * Cancel every non-terminal schedule tagged with [seriesKey].
+     * Terminal rows (already-fired, missed, etc.) stay as-is — those
+     * are history. Returns the number actually cancelled.
+     */
+    fun cancelSeries(seriesKey: String): Int {
+        val targets = repo.getBySeriesKey(seriesKey).filter { !it.state.isTerminal() }
+        for (entry in targets) cancel(entry.id)
+        Log.i(TAG, "cancelSeries[$seriesKey] cancelled=${targets.size}")
+        return targets.size
+    }
+
+    data class SeriesBindResult(
+        val seriesKey: String,
+        val created: Int,
+        val skipped: Int,
+    )
 
     /**
      * Cancel a schedule. Behavior depends on current state:
@@ -185,5 +260,10 @@ class RecordingScheduleScheduler(
          * logcat/Recordings UI scans.
          */
         fun recordIdForSchedule(scheduleId: String): String = "sched-rec-$scheduleId"
+
+        /** Canonical series-binding key. Snapshot at bind time; cancel
+         *  uses the same key regardless of later EPG title drift. */
+        fun seriesKeyFor(channelTvgId: String, title: String): String =
+            "$channelTvgId::$title"
     }
 }

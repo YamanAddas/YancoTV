@@ -1,0 +1,14 @@
+-- v8 → v9 (MK.14.6 manual series binding): tag schedules with a shared
+-- key when the user records a series via "Record all on this channel."
+-- Keying is `<channel_id>::<cleaned_title>` (computed by the scheduler
+-- at bind time). NULL for one-off schedules (the existing case).
+--
+-- Why a column rather than deriving on the fly: cancel-the-whole-series
+-- needs an indexable lookup, and (channel_id, title) can drift if the
+-- EPG refreshes to a slightly-different snapshot title between bind and
+-- cancel. Storing the key snapshots the binding decision so cancel
+-- always finds the rows the user originally armed together.
+ALTER TABLE recording_schedules ADD COLUMN series_key TEXT;
+
+CREATE INDEX idx_recording_schedules_series_key
+    ON recording_schedules(series_key);

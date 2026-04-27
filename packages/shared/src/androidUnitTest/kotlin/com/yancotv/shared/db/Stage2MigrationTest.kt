@@ -73,6 +73,7 @@ class Stage2MigrationTest {
             error = null,
             created_at = 1_700_000_000_000L,
             updated_at = 1_700_000_000_000L,
+            series_key = null,
         )
         val sched = db.recordingSchedulesQueries.selectById("sch-1").executeAsOne()
         assertEquals("Football match", sched.title)

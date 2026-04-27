@@ -99,6 +99,10 @@ data class RecordingScheduleEntry(
     val error: String?,
     val createdAt: Long,
     val updatedAt: Long,
+    /** MK.14.6 — set when the schedule was created via manual series
+     *  binding ("Record all on this channel"). Null for one-off schedules.
+     *  Format: `<channel_id>::<title>`. */
+    val seriesKey: String?,
 )
 
 /**
@@ -125,6 +129,7 @@ class RecordingScheduleRepository(
         streamUrl: String,
         scheduledStart: Long,
         scheduledEnd: Long,
+        seriesKey: String? = null,
     ): RecordingScheduleEntry {
         require(scheduledEnd > scheduledStart) {
             "scheduled_end ($scheduledEnd) must be > scheduled_start ($scheduledStart)"
@@ -143,6 +148,7 @@ class RecordingScheduleRepository(
             error = null,
             created_at = now,
             updated_at = now,
+            series_key = seriesKey,
         )
         return getById(id) ?: error("insert succeeded but row missing: $id")
     }
@@ -162,6 +168,13 @@ class RecordingScheduleRepository(
     fun getByState(state: RecordingScheduleState): List<RecordingScheduleEntry> =
         db.recordingSchedulesQueries
             .selectByState(state.sql)
+            .executeAsList()
+            .map { it.toEntry() }
+
+    /** MK.14.6 — fetch every schedule (any state) tagged with [seriesKey]. */
+    fun getBySeriesKey(seriesKey: String): List<RecordingScheduleEntry> =
+        db.recordingSchedulesQueries
+            .selectBySeriesKey(seriesKey)
             .executeAsList()
             .map { it.toEntry() }
 
@@ -352,6 +365,7 @@ class RecordingScheduleRepository(
             error = error,
             createdAt = created_at,
             updatedAt = updated_at,
+            seriesKey = series_key,
         )
 
     /** Result counts from [reconcileAfterBoot] — surfaces to the

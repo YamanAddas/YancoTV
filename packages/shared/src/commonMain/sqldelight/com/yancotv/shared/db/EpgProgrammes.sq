@@ -32,6 +32,18 @@ SELECT * FROM epg_programmes
 WHERE end_time > ? AND start_time < ?
 ORDER BY channel_tvg_id, start_time;
 
+-- MK.14.6 — find future programmes on a channel matching a title (case
+-- sensitive; titles are EPG-canonical and the binding key is exact-match
+-- on the snapshot the user long-pressed). [now] is the floor;
+-- [windowEnd] caps the lookahead (typically now + 7 days).
+futureByChannelAndTitle:
+SELECT * FROM epg_programmes
+WHERE channel_tvg_id = ?
+  AND title = ?
+  AND start_time >= ?
+  AND start_time < ?
+ORDER BY start_time ASC;
+
 forChannelRange:
 SELECT * FROM epg_programmes
 WHERE channel_tvg_id = ? AND end_time > ? AND start_time < ?
