@@ -300,6 +300,8 @@ class ContentRepositoryTest {
         tvgId: String?,
         title: String,
         type: String = "live",
+        groupName: String? = null,
+        sortOrder: Long = 0L,
     ) {
         db.contentQueries.insert(
             id = id,
@@ -307,13 +309,32 @@ class ContentRepositoryTest {
             type = type,
             title = title,
             clean_title = title,
-            group_name = null,
+            group_name = groupName,
             stream_url = "http://stream/$id",
             logo_url = null,
             tvg_id = tvgId,
             metadata_json = null,
-            sort_order = 0L,
+            sort_order = sortOrder,
             created_at = 0L,
         )
     }
+
+    // MK.20.1 — provider-order group sort. Insert three groups in non-
+    // alphabetical arrival order; assert groups() returns insertion order
+    // (Sports, AR Movies, News), NOT the legacy alphabetical order
+    // (AR Movies, News, Sports).
+    @Test fun groups_returnInProviderOrderNotAlphabetical() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "ch-1", "src-A", "c1", "Ch1", groupName = "Sports", sortOrder = 0L)
+            insertContent(db, "ch-2", "src-A", "c2", "Ch2", groupName = "Sports", sortOrder = 1L)
+            insertContent(db, "ch-3", "src-A", "c3", "Ch3", groupName = "AR Movies", sortOrder = 2L)
+            insertContent(db, "ch-4", "src-A", "c4", "Ch4", groupName = "News", sortOrder = 3L)
+
+            val repo = ContentRepository(db)
+            val groups = repo.groups(ContentType.LIVE)
+
+            assertEquals(listOf("Sports", "AR Movies", "News"), groups)
+        }
 }

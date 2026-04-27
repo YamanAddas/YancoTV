@@ -102,10 +102,17 @@ SELECT * FROM content
 WHERE type = ? AND group_name = ?
 ORDER BY sort_order;
 
+-- MK.20.1 — provider order, not alphabetical. Providers ship groups in a
+-- deliberate order (favourites first, then sports, then geos); alphabetising
+-- threw that signal away. MIN(sort_order) per group gives the index of the
+-- first row tagged with that group, which matches arrival order from the
+-- M3U/Xtream parse. Backed by idx_content_sort_order(source_id, type,
+-- sort_order) — no new index.
 distinctGroupsForType:
-SELECT DISTINCT group_name FROM content
+SELECT group_name FROM content
 WHERE type = ? AND group_name IS NOT NULL
-ORDER BY group_name;
+GROUP BY group_name
+ORDER BY MIN(sort_order);
 
 searchFts:
 SELECT c.*
@@ -320,8 +327,9 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
 -- chip strip so the picker only shows groups the user can actually
 -- filter by (a Sports group with no EPG-covered channel would be a
 -- dead chip).
+-- MK.20.1 — provider order, see distinctGroupsForType note above.
 distinctGuideGroups:
-SELECT DISTINCT c.group_name FROM content c
+SELECT c.group_name FROM content c
 WHERE c.type = 'live'
   AND c.group_name IS NOT NULL AND c.group_name != ''
   AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
@@ -330,4 +338,5 @@ WHERE c.type = 'live'
     WHERE ep.channel_tvg_id = c.tvg_id
       AND ep.end_time > :startTime AND ep.start_time < :endTime
   )
-ORDER BY c.group_name ASC;
+GROUP BY c.group_name
+ORDER BY MIN(c.sort_order);

@@ -164,7 +164,7 @@ fun BrowseSection(
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
     val visibleGroups =
         remember(groupsState.toList(), hiddenGroups) {
-            prioritizedGroupsFor(visibleGroupsFor(groupsState.toList(), hiddenGroups))
+            visibleGroupsFor(groupsState.toList(), hiddenGroups)
         }
 
     // Selected group persists per type so flipping Live → Movies → Live

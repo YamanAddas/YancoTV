@@ -617,6 +617,83 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 
 ---
 
+## MK.20 — Smart categories (provider order + language/region grouping) — added 2026-04-27
+
+**Why.** Two related complaints converge on the same UI surface (the category rail used by Live / Movies / Series / Guide):
+
+1. Today `distinctGroupsForType` and `distinctGuideGroups` `ORDER BY group_name` (alphabetical). Providers ship groups in a deliberate order — favourites first, then sports, then geos — and we throw that away. Result: the user re-scrolls past the same alphabetical wall every time. Provider order should be the default.
+2. IPTV M3Us are heavily prefixed by language/region: `AR | beIN Sports`, `EN | BBC One`, `US| ESPN`, `CA - TSN`. Today every prefixed group is a flat sibling. We want to bucket them into collapsible parents (`Arabic`, `English`, `USA`, `Canada`…) with the parent label being the resolved full name, not the raw code. Toggleable from settings so users with non-prefixed lists keep the flat view.
+
+**Red-team verified state (2026-04-27).** Three findings reshaped the original Slice plan:
+
+- `Classifier.normalizeCategory()` *exists* and strips `^[A-Z]{2,3}[:|]` prefixes, but it is **not wired into any production write path** ([BulkContentWriter.kt:354](packages/shared/src/commonMain/kotlin/com/yancotv/shared/sources/BulkContentWriter.kt:354) inserts `e.groupTitle.ifBlank { null }` raw). The prefix is *already* sitting in `content.group_name` for every existing row. **No migration, no parser change, no re-fetch needed to recover it.**
+- `content.sort_order` is already populated per row in provider arrival order (M3U + Xtream + Stalker paths all do `sortOrder++` after each bind). `MIN(sort_order)` per `group_name` gives provider-order-of-groups for free. **No `group_order` column needed.**
+- `GroupPreferences` table already ships `is_hidden`, `is_pinned`, `custom_name` per (type, group_name). Hiding/pinning/renaming is solved infrastructure — MK.20 extends it, doesn't reinvent it.
+
+This collapses MK.20 to almost-pure read-side work. One small migration only if the toggle moves from `AppPreferences` (file-backed) into a DB-backed setting.
+
+### Slice 20.1 — Provider order as the default group sort
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.20.1.1 | Replace `ORDER BY group_name` with `GROUP BY group_name ORDER BY MIN(sort_order)` in `distinctGroupsForType` ([Content.sq:105](packages/shared/src/commonMain/sqldelight/com/yancotv/shared/db/Content.sq:105)) and `distinctGuideGroups` ([Content.sq:323](packages/shared/src/commonMain/sqldelight/com/yancotv/shared/db/Content.sq:323)). Existing `idx_content_sort_order(source_id, type, sort_order)` covers it; no new index. | 🟢 wire | Live / Movies / Series / Guide rails render groups in M3U order; flicker-free |
+| MK.20.1.2 | Delete `prioritizedGroupsFor()` in [BrowseShell.kt:65](packages/android/app/src/main/java/com/yancotv/android/ui/shell/BrowseShell.kt:65) and its call site. Hardcoded Arabic/EN/UK/US tier-floating conflicts with provider order; the catalog in 20.2 replaces its intent properly. Existing `is_pinned` from `GroupPreferences` keeps user-driven floating intact. | 🟢 wire | No hardcoded language strings in `BrowseShell.kt`; pinned groups still float to top via `GroupPreferences.is_pinned` |
+| MK.20.1.3 | Test: extend [ContentRepositoryTest.kt](packages/shared/src/androidUnitTest/kotlin/com/yancotv/shared/content/ContentRepositoryTest.kt) — insert 3 groups out of alphabetical order (`"Sports"`, `"AR Movies"`, `"News"`) with ascending `sort_order`, assert `groups()` returns insertion order not alphabetical. | 🟢 wire | One test pinning the contract |
+
+**No schema change. No UI change. ~1–2 hours.** Lowest-risk slice; ships independently.
+
+### Slice 20.2 — Prefix catalog + repository-side bucketing
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.20.2.1 | New file `packages/shared/src/commonMain/kotlin/com/yancotv/shared/content/PrefixCatalog.kt` — pure data, no I/O. Static map of `code → ResolvedLabel(displayName, kind)` where `kind ∈ {Language, Region}`. Seed: `ar→Arabic, en→English, fr→French, es→Spanish, de→German, tr→Turkish, ru→Russian, it→Italian, pt→Portuguese, nl→Dutch, pl→Polish, sv→Swedish, hi→Hindi, ur→Urdu, fa→Persian, ku→Kurdish, he→Hebrew` (languages); `us→USA, uk→UK / United Kingdom, ca→Canada, au→Australia, nz→New Zealand, sa→Saudi Arabia, ae→UAE, eg→Egypt, ma→Morocco, dz→Algeria, qa→Qatar, kw→Kuwait, lb→Lebanon, sy→Syria, iq→Iraq, jo→Jordan, ye→Yemen, ir→Iran, pk→Pakistan, in→India, tr→Türkiye` (regions). Conflicts (`ca`=Canada vs Catalan, `tr`=Türkiye vs Turkish): pick region by default — IPTV M3Us overwhelmingly use country codes. | 🔴 new | Catalog covers ≥30 entries; loaded from a single Kotlin file; trivial to extend |
+| MK.20.2.2 | New `parsePrefix(groupName: String): ParsedGroup` extractor in same package. Handles real-world shapes: `"AR\| Foo"`, `"\|AR\| Foo"`, `"[AR] Foo"`, `"AR - Foo"`, `"AR: Foo"`, `"AR Foo"` (space-only, only when followed by capital), `"Arabic \| Foo"` (full-word, matches catalog display name case-insensitive). Returns `ParsedGroup(prefix: String?, resolved: ResolvedLabel?, remainder: String, originalName: String)`. Unmatched groups return `prefix=null`. | 🔴 new | Returns correct triple for ≥10 prefix shapes covered by tests |
+| MK.20.2.3 | Test: new `PrefixCatalogTest.kt` in `commonTest` — table-driven; covers all delimiter shapes, full-word matches, code-collision cases (`CA` resolves to Canada not Catalan), and unmatched cases (`"Sports"` → `prefix=null`). | 🔴 new | Table covers ≥20 fixtures from real M3U samples |
+| MK.20.2.4 | Repository extension: `ContentRepository.groupsHierarchical(type)` returns `List<CategoryNode>` where `CategoryNode = sealed { Leaf(groupName), Parent(label, kind, children: List<Leaf>, prefixCode) }`. Built by calling existing `groups(type)` (now provider-ordered from 20.1.1), running `parsePrefix` on each, bucketing matches under their resolved parent (parent ordered by `min(child sortOrder)` to preserve provider order at the parent level too), leaving unmatched as top-level `Leaf`s. | 🟡 glue | Returns valid tree; preserves provider order; single-child parents collapse to `Leaf` (avoid useless dropdown) |
+| MK.20.2.5 | Test: `ContentRepositoryTest.kt` — fixtures with mixed prefixed + unprefixed groups, assert correct hierarchy + ordering + single-child collapse rule. | 🟡 glue | One test per rule |
+
+**No schema change. ~2–3 hours.** Pure read-side, no UI yet — Slice 20.3 consumes the tree.
+
+### Slice 20.3 — Settings toggle + collapsible rail UI
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.20.3.1 | New preference `AppPreferences.smartCategoryGrouping: Flow<Boolean>` (default **off** until catalog is field-tested). Settings screen row: "Smart category grouping" with subtitle "Bucket categories by language / region (e.g. AR \| → Arabic)". | 🟢 wire | Toggle persists; default off |
+| MK.20.3.2 | `BrowseSection` and `GuideScreen` switch on the preference: off → existing flat `groups()` call (Slice 20.1 already gives provider order); on → call `groupsHierarchical()` and flatten visible nodes per current expand/collapse state. Expand state held in `rememberSaveable(parentCode) { mutableStateOf(false) }` per parent — survives rotation, not process death (per-screen scope). | 🟡 glue | Toggle on → rail shows `▶ Arabic (12)` and `▶ USA (8)` rows; toggle off → flat rail unchanged |
+| MK.20.3.3 | `CategoryRail` row composable branches on `CategoryNode` type. Parents render as a single pill with `▶`/`▼` glyph + count badge. CENTER on a parent toggles expand. Children render indented (or with a leading `↳` glyph — pick one in design pass). Per the MK.8 cascade-nav rule: own a fresh `PlacedFocusAnchor` inside `key(expandedSet.hashCode())` so expand/collapse remounts the visible-list scope cleanly. Refresh `requestFocus()` lands on the previously-focused row's new index after expand or, if it was a now-hidden child, falls back to its parent. | 🔴 new | All three MK.8 cascade-nav flows pass on Fire TV (sidebar→rail RIGHT, rail→content RIGHT/CENTER, type swap remount) |
+| MK.20.3.4 | `GroupPreferences` interaction rules: (a) leaf with `is_hidden=true` is skipped during tree build; (b) parent with all children hidden is omitted entirely (no empty dropdown); (c) `is_pinned` on a leaf floats it to root level (out of its parent bucket) — semantics: pinning is "promote to top" and parents are visual grouping, not membership; (d) pinning a parent is not yet supported (out of scope this slice — file [bugs.md MB-211](bugs.md) "pin a whole language bucket" follow-up if user asks). | 🟡 glue | Hide a child → not visible; hide all of Arabic's children → Arabic parent disappears; pin a child → moves to top of root list, retains pin glyph |
+| MK.20.3.5 | Test: snapshot-style unit test on the visible-flatten helper — asserts that `(tree, expandedSet, hiddenSet, pinnedSet) → List<CategoryRow>` produces the expected ordering for ≥6 cases (all collapsed, one expanded, parent fully hidden, pinned-child-floats, single-child-collapse, mixed). | 🔴 new | Helper is pure / pinned by tests so refactors can't regress the rules |
+| MK.20.3.6 | Manual Fire TV verification on a real provider M3U: enable toggle, confirm Arabic / English / USA / Canada parents materialize, expand/collapse navigates cleanly with D-pad, hidden + pinned interactions match 20.3.4. Capture before/after for the user. | — | Hands-on green check |
+
+**Risky slice.** Focus model is the bulk of the cost. ~4–6 hours including the cascade-nav audit + manual Fire TV pass.
+
+### Out of scope for MK.20 (file as MB-* / future MK if asked)
+
+- In-app catalog editor ("rename AR to العربية"): defer to a later milestone. Static catalog file is enough for v1.
+- Pinning a whole parent bucket (mentioned in 20.3.4): file as MB-* if user asks.
+- Forced-alphabetical override: don't add until requested. Provider order + smart grouping are already two axes; a third makes the mental model muddy.
+- `Search` rails: no hierarchy. FTS is type-rail driven; categories don't apply.
+- Stalker portals: groups arrive via `category_id → category_title`; same `parsePrefix` approach works on the title string. Confirm during 20.2.4 against a Stalker fixture.
+
+### Open questions before starting
+
+1. **Default toggle state**: I propose **off** — ship the catalog, let user flip on, expand catalog over time, flip default later. (User-confirmable on slice 20.3 start.)
+2. **Settings location**: New "Categories" section, or under existing "Display"? — recommend new section so future per-rail toggles have a home.
+3. **Apply to Guide rail too?**: Recommended yes — same UX consistency rule the user has applied elsewhere. GuideScreen already uses `CategoryRail`, so 20.3.2 covers it for free.
+
+### Cost (honest)
+
+| Slice | Estimate | Risk |
+|---|---|---|
+| 20.1 | 1–2 h | Low — query change + delete + 1 test |
+| 20.2 | 2–3 h | Low — pure data + parser + tests |
+| 20.3 | 4–6 h | Medium — focus audit dominates; expect 1–2 hands-on Fire TV passes |
+| **Total** | **7–11 h** | — |
+
+Each slice is independently shippable; recommended order is 20.1 → 20.2 → 20.3.
+
+---
+
 ## Red-team summary (MK.12 → MK.18)
 
 What survived and what got cut. Full reasoning captured in the 2026-04-24 planning session; updated 2026-04-25 with no-timeline + permanent-drop decisions.
