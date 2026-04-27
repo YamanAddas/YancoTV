@@ -3,6 +3,7 @@ package com.yancotv.android
 import android.Manifest
 import android.app.UiModeManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
@@ -72,6 +73,13 @@ class MainActivity : ComponentActivity() {
                 HomeScreen(isTv = isTv)
             }
         }
+        // MK.10.3 — voice search deep link. Google Assistant / Fire TV
+        // voice remote dispatches Intent.ACTION_SEARCH (or the global
+        // ACTION_VIEW with `query` extra) to the launcher activity that
+        // declared the searchable metadata. We pull the recognised text
+        // out and prime the global search overlay; SearchScreen consumes
+        // it on next composition.
+        handleSearchIntent(intent)
 
         // Subscribe to the sync coordinator's error bus so bad-credential
         // and unreachable-host failures reach the user even when they've
@@ -100,6 +108,27 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         attachKeepAwake()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // singleTop launchMode: a SEARCH intent fired while the activity
+        // is already alive lands here, not in onCreate.
+        setIntent(intent)
+        handleSearchIntent(intent)
+    }
+
+    private fun handleSearchIntent(intent: Intent?) {
+        if (intent == null) return
+        val query =
+            when (intent.action) {
+                Intent.ACTION_SEARCH -> intent.getStringExtra(android.app.SearchManager.QUERY)
+                Intent.ACTION_VIEW -> intent.getStringExtra(android.app.SearchManager.QUERY)
+                else -> null
+            }
+        if (!query.isNullOrBlank()) {
+            SearchOverlayState.show(query.trim())
+        }
     }
 
     override fun onStop() {

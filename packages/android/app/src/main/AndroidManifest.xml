@@ -108,6 +108,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- MK.10.3 — voice search deep link. Google Assistant / Fire
+                 TV voice remote (and any Android-TV launcher's "Search this
+                 app" affordance) dispatches ACTION_SEARCH with the
+                 recognised query in `SearchManager.QUERY`. Paired with
+                 res/xml/searchable.xml metadata so the searchable surface
+                 is discoverable to the system. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
         </activity>
 
         <activity

@@ -84,6 +84,14 @@ fun SearchScreen(
     // query typed doesn't wipe the term. Results are not saved — rerunning
     // the FTS query is cheap and keeps the snapshot small.
     var query by rememberSaveable { mutableStateOf("") }
+
+    // MK.10.3 — voice search / Assistant deep-link. SearchOverlayState
+    // stores the recognised query; we drain it on first frame so the
+    // user lands on results immediately. Drained, not preserved, so
+    // reopening search later starts blank as expected.
+    LaunchedEffect(Unit) {
+        SearchOverlayState.consumeInitialQuery()?.let { q -> query = q }
+    }
     val results = remember { mutableStateListOf<ContentItem>() }
     var searching by remember { mutableStateOf(false) }
     val context = LocalContext.current

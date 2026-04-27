@@ -20,7 +20,14 @@ object SearchOverlayState {
     private val _visible = MutableStateFlow(false)
     val visible: StateFlow<Boolean> = _visible.asStateFlow()
 
-    fun show() {
+    /** MK.10.3 — voice / Assistant deep link writes the recognised
+     *  query here before showing the overlay. SearchScreen consumes it
+     *  on first frame and clears so a manual reopen later starts blank. */
+    private val _initialQuery = MutableStateFlow<String?>(null)
+    val initialQuery: StateFlow<String?> = _initialQuery.asStateFlow()
+
+    fun show(query: String? = null) {
+        if (!query.isNullOrBlank()) _initialQuery.value = query
         _visible.value = true
     }
 
@@ -30,5 +37,11 @@ object SearchOverlayState {
 
     fun toggle() {
         _visible.value = !_visible.value
+    }
+
+    fun consumeInitialQuery(): String? {
+        val q = _initialQuery.value
+        if (q != null) _initialQuery.value = null
+        return q
     }
 }

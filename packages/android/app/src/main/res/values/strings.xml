@@ -9,4 +9,7 @@
     <string name="recording_notification_title_many">Recording %1$d channels</string>
     <string name="recording_notification_body">Tap to manage your recordings</string>
     <string name="recording_notification_stop_all">Stop all</string>
+
+    <!-- MK.10.3 — voice search hint shown in the launcher's "Search YancoTV" widget. -->
+    <string name="search_hint">Channels, movies, shows</string>
 </resources>
