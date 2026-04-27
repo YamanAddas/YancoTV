@@ -1,6 +1,8 @@
 package com.yancotv.android.ui.parental
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -82,8 +84,35 @@ fun ChannelActionsMenu(
 
     var gateForUnlock by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
+    var showLogoSourceChoice by remember { mutableStateOf(false) }
     var showLogoUrl by remember { mutableStateOf(false) }
     var showListPicker by remember { mutableStateOf(false) }
+
+    // MK.13.3 — SAF picker for custom logo. Persists URI permission so
+    // the logo survives reboots; saves the URI as the logoOverride
+    // string (Coil 3 reads content:// natively, so AsyncImage just
+    // works without further plumbing).
+    val logoPickLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        content.setOverrides(
+                            contentId = item.id,
+                            nameOverride = item.nameOverride,
+                            logoOverride = uri.toString(),
+                        )
+                    }
+                }
+                onDismiss()
+            }
+        }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -125,7 +154,7 @@ fun ChannelActionsMenu(
                 )
                 ActionRow(
                     label = "Custom logo",
-                    onClick = { showLogoUrl = true },
+                    onClick = { showLogoSourceChoice = true },
                 )
                 ActionRow(
                     label = if (locked) "Unlock (PIN)" else "Lock",
@@ -253,6 +282,65 @@ fun ChannelActionsMenu(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showListPicker = false }) {
+                    Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                }
+            },
+        )
+    }
+
+    if (showLogoSourceChoice) {
+        AlertDialog(
+            onDismissRequest = { showLogoSourceChoice = false },
+            containerColor = LocalYancoPalette.current.BackgroundRaised,
+            title = { Text("Custom logo", color = LocalYancoPalette.current.TextPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    TextButton(
+                        onClick = {
+                            showLogoSourceChoice = false
+                            showLogoUrl = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Paste URL", color = LocalYancoPalette.current.TextPrimary)
+                    }
+                    TextButton(
+                        onClick = {
+                            showLogoSourceChoice = false
+                            // SAF picker; image/* matches everything Coil
+                            // can decode. Result handler above persists
+                            // URI permission and writes the override.
+                            runCatching { logoPickLauncher.launch("image/*") }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Pick from device", color = LocalYancoPalette.current.TextPrimary)
+                    }
+                    if (!item.logoOverride.isNullOrBlank()) {
+                        TextButton(
+                            onClick = {
+                                showLogoSourceChoice = false
+                                scope.launch(Dispatchers.IO) {
+                                    runCatching {
+                                        content.setOverrides(
+                                            contentId = item.id,
+                                            nameOverride = item.nameOverride,
+                                            logoOverride = "",
+                                        )
+                                    }
+                                }
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Revert to original", color = LocalYancoPalette.current.Accent)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLogoSourceChoice = false }) {
                     Text("Cancel", color = LocalYancoPalette.current.TextMuted)
                 }
             },
