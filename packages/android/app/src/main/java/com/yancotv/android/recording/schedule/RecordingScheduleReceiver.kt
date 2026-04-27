@@ -143,17 +143,40 @@ class RecordingScheduleReceiver :
                 }
             }
 
-            else -> {
-                // Player is on a different channel (or nothing playing) and no
-                // other recording is in flight. Switch the player to the scheduled
-                // channel; once it attaches, RecordingService.handleStart's URL
-                // match routes to live-tee.
+            currentUrl == null -> {
+                // **MB-209 (2026-04-27) — headless / standby path.**
+                // No active playback. Don't kick ExoPlayer here: in a
+                // fresh process (app was closed when the alarm fired)
+                // or with the TV in standby, there's no PlayerActivity
+                // and no video Surface attached. ExoPlayer would pull
+                // bytes only until its buffer fills (~15–45s) and then
+                // pause loading — the recording would freeze short.
                 //
-                // Scheduling IS consent — we don't ask the user before switching.
-                // If they're actively watching something else, they'll see the
-                // channel change. Their recorded programme matters more than the
-                // current viewing decision they made earlier; that was the
-                // implicit trade when they scheduled this.
+                // Skip play() entirely and let RecordingService's
+                // URL-match check naturally route to fresh-GET, which
+                // opens its own HTTP connection via MpegTsRecorder /
+                // HlsRecorder and writes bytes straight to disk — no
+                // Surface, no decoder, full duration. The "1-stream
+                // cap" rationale that made tee preferred only applies
+                // when the user is actively watching; with nothing
+                // playing, fresh-GET is correct.
+                Log.i(TAG, "fire[$scheduleId] path=headless_fresh_get")
+                startRecording(context, schedule)
+            }
+
+            else -> {
+                // Player is on a different channel (and active). Switch
+                // the player to the scheduled channel; once it attaches,
+                // RecordingService.handleStart's URL match routes to
+                // live-tee. This avoids opening a second HTTP connection
+                // (1-stream IPTV cap).
+                //
+                // Scheduling IS consent — we don't ask the user before
+                // switching. If they're actively watching something else,
+                // they'll see the channel change. Their recorded
+                // programme matters more than the current viewing
+                // decision they made earlier; that was the implicit
+                // trade when they scheduled this.
                 Log.i(TAG, "fire[$scheduleId] path=switch_then_tee from=$currentUrl")
                 val contentItem = resolveContentItem(schedule)
                 // **MB-208 (2026-04-27).** Receiver onReceive runs on
