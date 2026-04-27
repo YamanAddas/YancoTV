@@ -282,7 +282,11 @@ fun HomeScreen(
                     // For browse sections, BrowseSection's PlacedFocusAnchor
                     // lands focus on the active pill once it's placed.
                     section = newSection
-                    if (newSection.contentType != null) {
+                    // Guide also has a CategoryRail (MK.guide.groups), so
+                    // treat it like the browse sections: forward into
+                    // Categories, not Content. GuideScreen's
+                    // LaunchedEffect(panelFocus) lands focus on the rail.
+                    if (newSection.contentType != null || newSection == AppSection.Guide) {
                         panelFocus = PanelFocus.Categories
                     } else {
                         panelFocus = PanelFocus.Content
@@ -303,7 +307,7 @@ fun HomeScreen(
                     // categories rail; non-browse sections jump straight
                     // into their content. The sidebar collapses to icon-only
                     // because expanded = (panelFocus == Sidebar).
-                    if (contentType != null) {
+                    if (contentType != null || section == AppSection.Guide) {
                         panelFocus = PanelFocus.Categories
                     } else {
                         panelFocus = PanelFocus.Content

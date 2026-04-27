@@ -10,6 +10,11 @@ import androidx.compose.foundation.focusable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -188,6 +193,14 @@ fun GuideScreen(
             PanelFocus.Sidebar -> { /* shell sidebar owns focus */ }
         }
     }
+    // Hole-cover: RIGHT-arrow from rail moves focus into the grid via
+    // Compose's natural sibling traversal (no callback fires). Without
+    // syncing panelFocus → Content here, BACK from grid would call
+    // onPanelFocusChanged(Categories) on a state already-equal-to-
+    // Categories — LaunchedEffect wouldn't re-fire, pill wouldn't
+    // refocus. Tracked separately from a Content key so we can also
+    // observe when grid loses focus to either rail (BACK) or to nothing
+    // (overlay opens) without churning panelFocus on every transient.
 
     // Reload when the user changes the EPG window prefs OR picks a
     // different group filter. We deliberately do NOT blank `channels`
@@ -423,7 +436,18 @@ fun GuideScreen(
                     .fillMaxHeight()
                     .focusRequester(gridFocus)
                     .focusGroup()
-                    .onFocusChanged { gridHasFocus = it.hasFocus },
+                    .onFocusChanged { state ->
+                        gridHasFocus = state.hasFocus
+                        // Hole-cover: RIGHT-arrow from rail uses Compose
+                        // natural traversal, no callback fires.
+                        // Syncing panelFocus → Content here keeps the
+                        // state machine in step so BACK from grid
+                        // produces a Content → Categories transition
+                        // (LaunchedEffect re-fires, pill refocuses).
+                        if (state.hasFocus && panelFocus != PanelFocus.Content) {
+                            onPanelFocusChanged(PanelFocus.Content)
+                        }
+                    },
         ) {
             if (guideEmpty) {
                 if (loading) {
@@ -454,6 +478,7 @@ fun GuideScreen(
                         actionTarget = ProgrammeAction(channel, programme)
                     },
                     onChannelLongPress = onChannelLongPress,
+                    onExitLeftFromChannel = { onPanelFocusChanged(PanelFocus.Categories) },
                     pxPerMin = pxPerMinFor(epgPrefs.timelineMinutes),
                     modifier = Modifier.weight(1f),
                 )
@@ -649,6 +674,7 @@ private fun GuideGrid(
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,
     onProgrammeAction: (EpgGuideChannel, EpgProgramme) -> Unit,
     onChannelLongPress: (EpgGuideChannel) -> Unit,
+    onExitLeftFromChannel: () -> Unit,
     pxPerMin: Int,
     modifier: Modifier,
 ) {
@@ -723,6 +749,7 @@ private fun GuideGrid(
                         onPlayChannel = { onPlay(channel, null) },
                         onLongPressChannel = { onChannelLongPress(channel) },
                         onProgrammeAction = { prog -> onProgrammeAction(channel, prog) },
+                        onExitLeftFromChannel = onExitLeftFromChannel,
                     )
                 }
             }
@@ -843,6 +870,7 @@ private fun ChannelRow(
     onPlayChannel: () -> Unit,
     onLongPressChannel: () -> Unit,
     onProgrammeAction: (EpgProgramme) -> Unit,
+    onExitLeftFromChannel: () -> Unit,
 ) {
     Row(
         modifier =
@@ -857,6 +885,7 @@ private fun ChannelRow(
             channel = channel,
             onClick = onPlayChannel,
             onLongPress = onLongPressChannel,
+            onExitLeft = onExitLeftFromChannel,
         )
 
         // Programme lane. We manually position each programme with a leading
@@ -896,6 +925,7 @@ private fun ChannelCell(
     channel: EpgGuideChannel,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
+    onExitLeft: () -> Unit = {},
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -920,6 +950,19 @@ private fun ChannelCell(
                 .fillMaxHeight()
                 .background(bg)
                 .border(0.5.dp, border)
+                // Hole-cover: LEFT from the leftmost cell exits to the
+                // category rail. Programmes inside the timeline use
+                // their own LEFT/RIGHT for navigation between blocks;
+                // only the channel column is the "leftmost edge"
+                // where LEFT must escape the panel.
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                        onExitLeft()
+                        true
+                    } else {
+                        false
+                    }
+                }
                 .focusable(interactionSource = interaction)
                 .combinedClickable(
                     interactionSource = interaction,
