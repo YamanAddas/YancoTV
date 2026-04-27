@@ -179,15 +179,24 @@ fun RecordingsScreen(
                     item("history-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
                     item("history-header") { SectionHeader("Schedule history", palette) }
                     items(historySchedules, key = { "hist-${it.id}" }) { schedule ->
-                        // Pair the schedule with its recording row when
-                        // the link is set (only COMPLETED rows carry a
-                        // recordingId). Local lookup on the already-
-                        // collected `rows` list — cheap (≤ a few hundred
-                        // rows in practice) and keeps the row composable
-                        // free of repo plumbing.
+                        // Pair the schedule with its recording row.
+                        // Note: schedule.recordingId is intentionally
+                        // never written (recordingScheduleReceiver
+                        // sidesteps an FK-timing bug by deriving the
+                        // recordId deterministically from the schedule
+                        // id — see RecordingScheduleScheduler
+                        // .recordIdForSchedule). So fall back to that
+                        // derivation when the column is null. Lookup on
+                        // the already-collected `rows` list — cheap and
+                        // keeps the row composable free of repo plumbing.
+                        val derivedRecId =
+                            remember(schedule.id, schedule.recordingId) {
+                                schedule.recordingId
+                                    ?: RecordingScheduleScheduler.recordIdForSchedule(schedule.id)
+                            }
                         val linked =
-                            remember(schedule.recordingId, rows) {
-                                schedule.recordingId?.let { rid -> rows.firstOrNull { it.id == rid } }
+                            remember(derivedRecId, rows) {
+                                rows.firstOrNull { it.id == derivedRecId }
                             }
                         HistoryScheduleRow(
                             entry = schedule,
