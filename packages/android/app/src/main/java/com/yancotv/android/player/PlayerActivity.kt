@@ -1538,7 +1538,13 @@ class PlayerActivity : AppCompatActivity() {
             // cleanly. Without the `!sheetVisible` guard we were racing
             // Compose's pressed-state tracking on CENTER and the picks
             // looked dead.
-            if (!controllerVisible && !surfVisible && !dockVisible && !sheetVisible) {
+            // MK.options.redesign — when the new options popup/panel is up,
+            // skip the bypass too so its ComposeView's focus traversal sees
+            // every key. Without this, UP/DOWN go straight to onKeyDown
+            // which zaps channels even though the popup is visible — the
+            // user could see the menu but not navigate it.
+            val optionsV2Visible = optionsV2Inflated && optionsV2State.menuVisible.value
+            if (!controllerVisible && !surfVisible && !dockVisible && !sheetVisible && !optionsV2Visible) {
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_CENTER,
                     KeyEvent.KEYCODE_ENTER,
