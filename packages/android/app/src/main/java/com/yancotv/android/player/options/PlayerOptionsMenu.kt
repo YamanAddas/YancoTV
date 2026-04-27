@@ -72,11 +72,38 @@ fun PlayerOptionsMenu(
     onDismiss: () -> Unit,
 ) {
     val visible by state.menuVisible.collectAsState()
+    val activePanel by state.activePanel.collectAsState()
     val palette = LocalYancoPalette.current
-    val firstRowFocus = remember { FocusRequester() }
+    // One requester per row so the popup can restore focus to the
+    // exact row whose panel was just closed. A single-first-row
+    // requester collapsed the return-from-panel case onto the first
+    // row, which lost the user's place.
+    val rowFocus =
+        remember(rows.map { it.category }) {
+            rows.associate { it.category to FocusRequester() }
+        }
+    // Track the last-opened category so we can focus its row when the
+    // panel exits. `previousPanel` only updates after we react to the
+    // transition; without this delay we'd see active==null before we
+    // remember which panel had been open.
+    val previousPanel = remember { mutableStateOf<PlayerOptionCategory?>(null) }
 
-    LaunchedEffect(visible) {
-        if (visible) runCatching { firstRowFocus.requestFocus() }
+    LaunchedEffect(visible, activePanel) {
+        if (!visible) {
+            previousPanel.value = null
+            return@LaunchedEffect
+        }
+        if (activePanel == null) {
+            // Popup is up, no panel. Focus either:
+            //   - the row whose panel was just closed (return path), or
+            //   - the first row (initial open / no prior panel).
+            val target =
+                previousPanel.value
+                    ?: rows.firstOrNull()?.category
+            target?.let { cat -> runCatching { rowFocus[cat]?.requestFocus() } }
+        }
+        // Keep `previousPanel` up to date for the next transition.
+        previousPanel.value = activePanel
     }
 
     Box(
@@ -114,10 +141,10 @@ fun PlayerOptionsMenu(
                     letterSpacing = 1.5.sp,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 )
-                rows.forEachIndexed { idx, row ->
+                rows.forEach { row ->
                     PlayerOptionsRowItem(
                         row = row,
-                        focusRequester = if (idx == 0) firstRowFocus else null,
+                        focusRequester = rowFocus[row.category],
                     )
                 }
             }
