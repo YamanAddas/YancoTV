@@ -662,15 +662,6 @@ private fun OptionRow(
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(6.dp))
                 .let { m -> if (focusAnchor != null) m.placedFocus(focusAnchor) else m }
-                // Explicit CENTER/ENTER handler. RCA for the
-                // "Stop recording doesn't respond" report: with the
-                // focusable + clickable(interactionSource) split, the
-                // clickable's internal key-event listener can miss
-                // ACTION_UP for CENTER when the focused node is the
-                // focusable (separate Compose modifier node from the
-                // clickable). Handling the key directly here
-                // guarantees onPick fires once the row owns focus,
-                // regardless of clickable's internal wiring.
                 .onPreviewKeyEvent { e ->
                     if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                     when (e.key) {
@@ -735,9 +726,23 @@ private fun RecordPanelContent(
         inflight.firstOrNull {
             it.contentId == currentItem?.id && it.status == RecordingStatus.RECORDING
         }
-    val firstRowAnchor = rememberPlacedFocusAnchor()
-    LaunchedEffect(currentItem?.id) {
-        if (currentItem != null) firstRowAnchor.awaitAndRequest()
+    // MB-205 root cause (2026-04-27 logcat): the inflight flow starts
+    // empty, so on first frame `active` is null and the "Record this
+    // channel" row composes + receives focus. The flow then emits the
+    // real list and Compose swaps in "Stop recording". The two rows
+    // are different OptionRow call sites (separate identities), so
+    // focus doesn't transfer.
+    //
+    // Fix: ONE anchor per branch. Each branch's anchor lives only while
+    // its row is mounted; the LaunchedEffect picks the right one based
+    // on `active != null` and waits for that row's own onPlaced. No
+    // reset()-vs-markPlaced race that broke the prior attempt.
+    val recordAnchor = rememberPlacedFocusAnchor()
+    val stopAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(currentItem?.id, active != null) {
+        if (currentItem == null) return@LaunchedEffect
+        if (active != null) stopAnchor.awaitAndRequest()
+        else recordAnchor.awaitAndRequest()
     }
     val item = currentItem
     if (item == null) {
@@ -750,7 +755,7 @@ private fun RecordPanelContent(
         OptionRow(
             label = "Stop recording",
             selected = true,
-            focusAnchor = firstRowAnchor,
+            focusAnchor = stopAnchor,
             onPick = {
                 // Diagnostic log so a "stop didn't stop" report can be
                 // confirmed via `adb logcat -s YancoRecsPanel`.
@@ -769,7 +774,7 @@ private fun RecordPanelContent(
     OptionRow(
         label = "Record this channel",
         selected = false,
-        focusAnchor = firstRowAnchor,
+        focusAnchor = recordAnchor,
         onPick = {
             RecordingService.start(
                 context = context,
