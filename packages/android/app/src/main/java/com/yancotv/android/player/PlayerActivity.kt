@@ -1561,9 +1561,19 @@ class PlayerActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_3, KeyEvent.KEYCODE_4, KeyEvent.KEYCODE_5,
             KeyEvent.KEYCODE_6, KeyEvent.KEYCODE_7, KeyEvent.KEYCODE_8,
             KeyEvent.KEYCODE_9,
+            KeyEvent.KEYCODE_NUMPAD_0, KeyEvent.KEYCODE_NUMPAD_1,
+            KeyEvent.KEYCODE_NUMPAD_2, KeyEvent.KEYCODE_NUMPAD_3,
+            KeyEvent.KEYCODE_NUMPAD_4, KeyEvent.KEYCODE_NUMPAD_5,
+            KeyEvent.KEYCODE_NUMPAD_6, KeyEvent.KEYCODE_NUMPAD_7,
+            KeyEvent.KEYCODE_NUMPAD_8, KeyEvent.KEYCODE_NUMPAD_9,
             -> {
                 if (controller.currentItem.value?.type == ContentType.LIVE) {
-                    val digit = ('0' + (keyCode - KeyEvent.KEYCODE_0))
+                    val digit =
+                        if (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+                            '0' + (keyCode - KeyEvent.KEYCODE_0)
+                        } else {
+                            '0' + (keyCode - KeyEvent.KEYCODE_NUMPAD_0)
+                        }
                     onChannelDigit(digit)
                     return true
                 }

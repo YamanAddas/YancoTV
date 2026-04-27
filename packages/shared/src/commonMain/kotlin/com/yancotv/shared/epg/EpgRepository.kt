@@ -411,8 +411,9 @@ class EpgRepository(
         val cleanTitle: String?,
         val logoUrl: String?,
         val streamUrl: String,
-        /** MK.16.5 — channel number from M3U `tvg-chno` (or sequential
-         *  position fallback). NULL when the source didn't provide one. */
+        /** MK.16.5 — channel number rendered in the guide. Currently
+         *  the sequential playlist position from `content.sort_order`;
+         *  a follow-up migration will split out `tvg-chno` properly. */
         val sortOrder: Long?,
     )
 

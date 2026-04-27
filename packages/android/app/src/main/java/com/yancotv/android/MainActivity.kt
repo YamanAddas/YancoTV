@@ -27,9 +27,11 @@ import com.yancotv.android.ui.focus.TvContextActionState
 import com.yancotv.android.ui.shell.HomeScreen
 import com.yancotv.android.ui.shell.SearchOverlayState
 import com.yancotv.android.ui.theme.YancoTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 
 @UnstableApi
@@ -43,6 +45,7 @@ class MainActivity : ComponentActivity() {
 
     private val controller: PlaybackController by inject()
     private val syncCoordinator: SourceSyncCoordinator by inject()
+    private val contentRepo: com.yancotv.shared.content.ContentRepository by inject()
 
     // Keep the shell's window awake only while the shared ExoPlayer is
     // actually playing — covers the mini-preview case where MainActivity
@@ -120,6 +123,35 @@ class MainActivity : ComponentActivity() {
 
     private fun handleSearchIntent(intent: Intent?) {
         if (intent == null) return
+        // MK.10.1 — Recommendations card deep-link. Cards carry the
+        // content id in EXTRA_DEEP_LINK_ID; if the row still exists we
+        // queue + launch playback. Missing row → fall through (user
+        // ends up on home, which is the safe default).
+        val deepLinkId =
+            intent.getStringExtra(
+                com.yancotv.android.recommendations.RecommendationsSync.EXTRA_DEEP_LINK_ID,
+            )
+        if (!deepLinkId.isNullOrBlank()) {
+            // Clear the extra so a config-change recreate doesn't re-fire
+            // the deep-link on every onCreate.
+            intent.removeExtra(
+                com.yancotv.android.recommendations.RecommendationsSync.EXTRA_DEEP_LINK_ID,
+            )
+            lifecycleScope.launch {
+                val item: com.yancotv.shared.types.ContentItem? =
+                    withContext(Dispatchers.IO) {
+                        runCatching { contentRepo.findById(deepLinkId) }.getOrNull()
+                    }
+                if (item != null) {
+                    if (controller.currentId != item.id) {
+                        controller.play(listOf(item), 0)
+                    }
+                    com.yancotv.android.player.PlayerLauncher.launch(this@MainActivity)
+                }
+            }
+            return
+        }
+
         val query =
             when (intent.action) {
                 Intent.ACTION_SEARCH -> intent.getStringExtra(android.app.SearchManager.QUERY)

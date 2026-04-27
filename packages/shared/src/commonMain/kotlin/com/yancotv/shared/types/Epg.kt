@@ -37,8 +37,12 @@ data class EpgGuideChannel(
     /** Stream URL for direct playback — avoids a second getLive() call from the Guide page */
     val streamUrl: String? = null,
     val programmes: List<EpgProgramme>,
-    /** MK.16.5 — channel number from M3U `tvg-chno` (or sequential
-     *  position fallback). NULL when the source didn't provide one. */
+    /** MK.16.5 — channel number rendered in the guide. Currently
+     *  populated from `content.sort_order`, which today is the
+     *  sequential playlist position (not `tvg-chno`). NULL when the
+     *  source didn't provide one. Storing the broadcast-style channel
+     *  number from `tvg-chno` separately needs a schema migration —
+     *  tracked as a follow-up. */
     val channelNumber: Int? = null,
 )
 
