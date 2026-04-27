@@ -104,6 +104,23 @@ class RecordingService : Service() {
             .also { it.setReferenceCounted(false) }
     }
 
+    /**
+     * **MB-210 (2026-04-27).** Partial CPU wake lock held for the
+     * lifetime of the recording set. The FGS's implicit wake lock isn't
+     * enough on Fire TV — Amazon's ActivityManager enforces an "app
+     * idle" foreground-service stop after ~60 s when the app process
+     * isn't user-active (logcat: "Stopping service due to app idle").
+     * The explicit PARTIAL_WAKE_LOCK is the canonical "do not idle"
+     * signal Android and Amazon's fork honour for long-running
+     * background work. Reference-counted disabled — single acquire on
+     * first start, single release in maybeStop / onDestroy.
+     */
+    private val cpuWakeLock: android.os.PowerManager.WakeLock by lazy {
+        (getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "yanco:recording")
+            .also { it.setReferenceCounted(false) }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -145,12 +162,15 @@ class RecordingService : Service() {
         serviceScope.cancel()
         activeJobs.clear()
         activeOutputs.clear()
-        // MB-209 hardening — final-line release. If maybeStop() didn't
-        // run (process killed, abrupt destroy), Android's lock-leak
-        // detection logs a warning at process exit but the lock is GCd
-        // either way. Releasing here keeps the system cleaner.
+        // MB-209 / MB-210 hardening — final-line releases. If maybeStop()
+        // didn't run (process killed, abrupt destroy), Android's
+        // lock-leak detection logs a warning at process exit but the
+        // locks are GCd either way. Releasing here keeps the system
+        // cleaner.
         runCatching { if (wifiLock.isHeld) wifiLock.release() }
             .onFailure { Log.w(TAG, "wifiLock.release in onDestroy failed", it) }
+        runCatching { if (cpuWakeLock.isHeld) cpuWakeLock.release() }
+            .onFailure { Log.w(TAG, "cpuWakeLock.release in onDestroy failed", it) }
     }
 
     // ── Action handlers ───────────────────────────────────────────
@@ -181,6 +201,11 @@ class RecordingService : Service() {
         // here, single release in maybeStop() once activeJobs drains.
         runCatching { if (!wifiLock.isHeld) wifiLock.acquire() }
             .onFailure { Log.w(TAG, "wifiLock.acquire failed", it) }
+        // MB-210 hardening — explicit PARTIAL_WAKE_LOCK so Fire TV's
+        // ActivityManager doesn't reap the FGS after ~60 s of app
+        // idle. Released alongside the Wi-Fi lock in maybeStop.
+        runCatching { if (!cpuWakeLock.isHeld) cpuWakeLock.acquire() }
+            .onFailure { Log.w(TAG, "cpuWakeLock.acquire failed", it) }
 
         if (useLiveTee) {
             handleStartLiveTee(input)
@@ -457,12 +482,14 @@ class RecordingService : Service() {
 
     private fun maybeStop() {
         if (activeJobs.isEmpty()) {
-            // MB-209 hardening — release the high-perf Wi-Fi lock now
-            // that no recording remains. isHeld guard so we don't fault
-            // when no acquire ever ran (fresh service whose first
-            // intent had a malformed input).
+            // MB-209 / MB-210 hardening — release locks now that no
+            // recording remains. isHeld guards so we don't fault when
+            // no acquire ever ran (fresh service whose first intent
+            // had a malformed input).
             runCatching { if (wifiLock.isHeld) wifiLock.release() }
                 .onFailure { Log.w(TAG, "wifiLock.release failed", it) }
+            runCatching { if (cpuWakeLock.isHeld) cpuWakeLock.release() }
+                .onFailure { Log.w(TAG, "cpuWakeLock.release failed", it) }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }

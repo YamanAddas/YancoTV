@@ -198,12 +198,21 @@ fun RecordingsScreen(
                             remember(derivedRecId, rows) {
                                 rows.firstOrNull { it.id == derivedRecId }
                             }
+                        // Play only when the linked row is actually
+                        // playable. FAILED / CANCELLED rows have no usable
+                        // file (or 0 bytes) — same gating as RecordingRow.
+                        // RECORDING is in flight; not listed in history
+                        // anyway since the schedule's still firing.
+                        val playable =
+                            linked?.takeIf {
+                                it.status == com.yancotv.shared.recording.RecordingStatus.COMPLETED
+                            }
                         HistoryScheduleRow(
                             entry = schedule,
                             linkedRecording = linked,
                             onPlay =
-                                if (linked != null) {
-                                    { playRecording(controller, context, linked) }
+                                if (playable != null) {
+                                    { playRecording(controller, context, playable) }
                                 } else {
                                     null
                                 },
