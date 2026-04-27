@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +24,9 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.ui.shell.GuideSyncPanel
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.shared.sources.SourceRepository
+import com.yancotv.shared.types.Source
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -42,9 +46,15 @@ import org.koin.compose.koinInject
 fun SettingsEpgTab(
     modifier: Modifier = Modifier,
     prefs: AppPreferences = koinInject(),
+    sources: SourceRepository = koinInject(),
 ) {
     val epg by prefs.epgFlow.collectAsState()
     val scope = rememberCoroutineScope()
+    // MK.15.7 — reactive source list for the EPG priority section.
+    // Sorted highest-priority first so the user sees winners on top.
+    val allSources by sources.allFlow().collectAsState(initial = emptyList())
+    val orderedSources =
+        remember(allSources) { allSources.sortedByDescending { it.epgPriority } }
 
     Column(
         modifier =
@@ -89,6 +99,92 @@ fun SettingsEpgTab(
                     )
                 }
             }
+
+            // MK.15.7 — multi-EPG source priority. When two sources cover
+            // the same `tvg_id`, the higher-priority source wins. List is
+            // ordered highest-first; ↑ raises this source above the one
+            // currently above it (swap priorities), ↓ does the inverse.
+            // Single-source installs see one row with the controls
+            // disabled. Edits propagate to EpgRepository's read queries
+            // (LEFT JOIN sources + ORDER BY epg_priority DESC) on the
+            // next read; nothing to invalidate here.
+            if (orderedSources.isNotEmpty()) {
+                SectionHeader(text = "Source priority (multi-EPG)")
+                Text(
+                    text =
+                        "When two sources provide programmes for the same channel, the higher-priority " +
+                            "source wins. Reorder with the arrows.",
+                    color = LocalYancoPalette.current.TextMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                orderedSources.forEachIndexed { idx, src ->
+                    EpgPriorityRow(
+                        source = src,
+                        canMoveUp = idx > 0,
+                        canMoveDown = idx < orderedSources.lastIndex,
+                        onMoveUp = {
+                            val above = orderedSources[idx - 1]
+                            val a = src.epgPriority
+                            val b = above.epgPriority
+                            // If they happen to share the same priority, bump
+                            // ours by 1 to break the tie and put us on top.
+                            val newSelf = if (a == b) b + 1 else b
+                            val newAbove = if (a == b) b else a
+                            scope.launch(Dispatchers.IO) {
+                                sources.setEpgPriority(src.id, newSelf)
+                                sources.setEpgPriority(above.id, newAbove)
+                            }
+                        },
+                        onMoveDown = {
+                            val below = orderedSources[idx + 1]
+                            val a = src.epgPriority
+                            val b = below.epgPriority
+                            val newSelf = if (a == b) b - 1 else b
+                            val newBelow = if (a == b) b else a
+                            scope.launch(Dispatchers.IO) {
+                                sources.setEpgPriority(src.id, newSelf)
+                                sources.setEpgPriority(below.id, newBelow)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpgPriorityRow(
+    source: Source,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = source.name,
+                color = LocalYancoPalette.current.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Priority ${source.epgPriority}",
+                color = LocalYancoPalette.current.TextMuted,
+                fontSize = 11.sp,
+            )
+        }
+        if (canMoveUp) {
+            SettingsChip(label = "↑", selected = false, onClick = onMoveUp)
+        }
+        if (canMoveDown) {
+            SettingsChip(label = "↓", selected = false, onClick = onMoveDown)
         }
     }
 }

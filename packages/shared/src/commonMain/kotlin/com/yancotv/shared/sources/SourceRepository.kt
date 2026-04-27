@@ -1,5 +1,7 @@
 package com.yancotv.shared.sources
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.db.Sources
 import com.yancotv.shared.db.YancoDb
@@ -27,6 +29,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -217,6 +220,26 @@ class SourceRepository(
     ) {
         db.sourcesQueries.setActive(active, clock(), id)
     }
+
+    /** MK.15.7 — set the EPG merge priority for a source. Higher values
+     *  win when two sources cover the same `tvg_id`. Independent of
+     *  `priority` (which orders sources in the shell rail). */
+    fun setEpgPriority(
+        id: String,
+        priority: Int,
+    ) {
+        db.sourcesQueries.setEpgPriority(priority.toLong(), clock(), id)
+    }
+
+    /** Reactive source list for Settings UIs that need to repaint after a
+     *  setEpgPriority / setActive write. SQLDelight emits on any sources-
+     *  table change, so writes from any other path light this up too. */
+    fun allFlow(): Flow<List<Source>> =
+        db.sourcesQueries
+            .selectAll()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toDomain() } }
 
     fun removeSource(id: String) {
         // Content rows cascade via the FK.
