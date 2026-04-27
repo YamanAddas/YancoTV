@@ -80,12 +80,20 @@ fun PlayerOptionsPanelHost(
 ) {
     val active by state.activePanel.collectAsState()
     val palette = LocalYancoPalette.current
+    // Picking an option in a panel returns the user to the popup (one
+    // level up) so they can change another category without re-opening
+    // MENU. BACK in the panel does the same. Outside-tap on the scrim
+    // (touch only) is the only path that fully dismisses.
+    val onPickOption: () -> Unit = remember(state) { { state.closePanel() } }
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .pointerInput(active) {
+                    // Outside-tap (touch only) closes everything — popup
+                    // and panel both. Distinct from BACK / option-pick,
+                    // which only pop one level.
                     if (active != null) detectTapGestures { onDismiss() }
                 },
         contentAlignment = Alignment.BottomEnd,
@@ -118,15 +126,15 @@ fun PlayerOptionsPanelHost(
                     ) {
                         when (current) {
                             PlayerOptionCategory.AUDIO ->
-                                AudioPanelContent(controller, prefs, onDismiss)
+                                AudioPanelContent(controller, prefs, onPickOption)
                             PlayerOptionCategory.SUBTITLES ->
-                                SubtitlesPanelContent(controller, prefs, onPickSubtitleFile, onDismiss)
+                                SubtitlesPanelContent(controller, prefs, onPickSubtitleFile, onPickOption)
                             PlayerOptionCategory.ASPECT ->
-                                AspectPanelContent(prefs, onDismiss)
+                                AspectPanelContent(prefs, onPickOption)
                             PlayerOptionCategory.SPEED ->
-                                SpeedPanelContent(controller, prefs, onDismiss)
+                                SpeedPanelContent(controller, prefs, onPickOption)
                             PlayerOptionCategory.SLEEP ->
-                                SleepPanelContent(controller, onDismiss)
+                                SleepPanelContent(controller, onPickOption)
                             else -> Unit
                         }
                     }
@@ -168,7 +176,7 @@ private fun labelFor(c: PlayerOptionCategory): String =
 private fun AudioPanelContent(
     controller: PlaybackController,
     prefs: AppPreferences,
-    onDismiss: () -> Unit,
+    onPickOption: () -> Unit,
 ) {
     val tracks = rememberAudioTracks(controller.player)
     val scope = rememberCoroutineScope()
@@ -190,7 +198,7 @@ private fun AudioPanelContent(
                 t.language?.takeIf { it.isNotBlank() }?.let { lang ->
                     scope.launch { prefs.setAudioLanguage(lang) }
                 }
-                onDismiss()
+                onPickOption()
             },
         )
     }
@@ -273,7 +281,7 @@ private fun SubtitlesPanelContent(
     controller: PlaybackController,
     prefs: AppPreferences,
     onPickExternal: () -> Unit,
-    onDismiss: () -> Unit,
+    onPickOption: () -> Unit,
 ) {
     val tracks = rememberTextTracks(controller.player)
     val disabled = rememberTextDisabled(controller.player)
@@ -295,7 +303,7 @@ private fun SubtitlesPanelContent(
                     .build()
             controller.player.trackSelectionParameters = params
             scope.launch { prefs.setSubtitleLanguage("") }
-            onDismiss()
+            onPickOption()
         },
     )
     tracks.forEach { t ->
@@ -307,7 +315,7 @@ private fun SubtitlesPanelContent(
                 t.language?.takeIf { it.isNotBlank() }?.let { lang ->
                     scope.launch { prefs.setSubtitleLanguage(lang) }
                 }
-                onDismiss()
+                onPickOption()
             },
         )
     }
@@ -316,7 +324,7 @@ private fun SubtitlesPanelContent(
         selected = false,
         onPick = {
             onPickExternal()
-            onDismiss()
+            onPickOption()
         },
     )
 }
@@ -411,7 +419,7 @@ private fun applyTextTrack(
 @Composable
 private fun AspectPanelContent(
     prefs: AppPreferences,
-    onDismiss: () -> Unit,
+    onPickOption: () -> Unit,
 ) {
     val state by prefs.playbackFlow.collectAsState()
     val scope = rememberCoroutineScope()
@@ -425,7 +433,7 @@ private fun AspectPanelContent(
             focusRequester = if (idx == 0) firstRowFocus else null,
             onPick = {
                 scope.launch { prefs.setResizeMode(mode) }
-                onDismiss()
+                onPickOption()
             },
         )
     }
@@ -452,7 +460,7 @@ private val SPEED_PRESETS = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
 private fun SpeedPanelContent(
     controller: PlaybackController,
     prefs: AppPreferences,
-    onDismiss: () -> Unit,
+    onPickOption: () -> Unit,
 ) {
     val state by prefs.playbackFlow.collectAsState()
     val scope = rememberCoroutineScope()
@@ -467,7 +475,7 @@ private fun SpeedPanelContent(
             focusRequester = if (idx == 0) firstRowFocus else null,
             onPick = {
                 applySpeed(controller, prefs, speed, scope)
-                onDismiss()
+                onPickOption()
             },
         )
     }
@@ -512,7 +520,7 @@ suspend fun cycleSpeed(
 @Composable
 private fun SleepPanelContent(
     controller: PlaybackController,
-    onDismiss: () -> Unit,
+    onPickOption: () -> Unit,
 ) {
     val sleep by controller.sleepTimer.collectAsState()
     val firstRowFocus = remember { FocusRequester() }
@@ -527,7 +535,7 @@ private fun SleepPanelContent(
         focusRequester = firstRowFocus,
         onPick = {
             controller.cancelSleepTimer()
-            onDismiss()
+            onPickOption()
         },
     )
     SleepTimerOption.values().forEach { opt ->
@@ -537,7 +545,7 @@ private fun SleepPanelContent(
             selected = activeOption == opt,
             onPick = {
                 controller.setSleepTimer(opt)
-                onDismiss()
+                onPickOption()
             },
         )
     }

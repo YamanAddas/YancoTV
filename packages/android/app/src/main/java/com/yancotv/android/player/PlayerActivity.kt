@@ -868,6 +868,12 @@ class PlayerActivity : AppCompatActivity() {
     private fun showOptionsV2() {
         ensureOptionsV2()
         playerView.hideController()
+        // Audit: same defense the legacy sheet uses. Block PlayerView's
+        // focusable descendants while options are up so a stray Compose
+        // focus search can't escape into the Media3 controller buttons
+        // underneath. Restored in hideOptionsV2.
+        playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        playerView.isFocusable = false
         optionsV2State.showMenu()
         optionsV2View?.visibility = View.VISIBLE
         optionsV2View?.post { optionsV2View?.requestFocus() }
@@ -876,6 +882,10 @@ class PlayerActivity : AppCompatActivity() {
     private fun hideOptionsV2() {
         optionsV2State.hideMenu()
         optionsV2View?.visibility = View.GONE
+        // Restore PlayerView focus so the user's next D-pad press flows
+        // back into the Media3 controller / dock as expected.
+        playerView.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+        playerView.isFocusable = true
     }
 
     private fun ensureOptionsV2() {

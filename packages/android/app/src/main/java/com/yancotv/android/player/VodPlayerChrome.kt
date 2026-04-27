@@ -29,6 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
@@ -163,15 +168,34 @@ private fun HexBtn(
 ) {
     val palette = LocalYancoPalette.current
     val shape = hexRowShape(10.dp)
-    val bg = if (primary) palette.Accent else palette.BackgroundRaised
+    // Audit-pass-7 (Bug D): focus chrome via shared interactionSource.
+    // Previously `.clickable(onClick)` had no focus indicator, so D-pad
+    // navigation between BUFFERING / ERROR overlay actions left no
+    // visible cursor.
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val bg =
+        when {
+            focused && primary -> palette.AccentSoft
+            focused -> palette.BackgroundHover
+            primary -> palette.Accent
+            else -> palette.BackgroundRaised
+        }
+    val borderColor = if (focused) palette.FocusRing else palette.BorderSubtle
+    val borderWidth = if (focused) 2.dp else 1.dp
     val fg = if (primary) Color.Black else palette.TextPrimary
     Box(
         modifier = modifier
             .height(44.dp)
             .clip(shape)
             .background(bg)
-            .border(1.dp, palette.BorderSubtle, shape)
-            .clickable(onClick = onClick)
+            .border(borderWidth, borderColor, shape)
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            )
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
