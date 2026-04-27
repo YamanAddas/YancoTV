@@ -156,9 +156,18 @@ class RecordingScheduleReceiver :
                 // implicit trade when they scheduled this.
                 Log.i(TAG, "fire[$scheduleId] path=switch_then_tee from=$currentUrl")
                 val contentItem = resolveContentItem(schedule)
-                ContextCompat.getMainExecutor(context).execute {
-                    playbackController.play(listOf(contentItem), 0)
-                }
+                // **MB-208 (2026-04-27).** Receiver onReceive runs on
+                // the main thread already, so call play() directly
+                // instead of deferring through getMainExecutor. The
+                // deferral let RecordingService.handleStart's
+                // currentItem.value read fire BEFORE the player swap
+                // was applied, sometimes routing to fresh-GET (a
+                // second HTTP connection to the same channel — kills
+                // 1-stream IPTV plans). Synchronous play() guarantees
+                // controller.currentItem is the scheduled URL by the
+                // time the FGS intent is delivered.
+                runCatching { playbackController.play(listOf(contentItem), 0) }
+                    .onFailure { Log.w(TAG, "playbackController.play failed for $scheduleId", it) }
                 startRecording(context, schedule)
             }
         }
@@ -188,15 +197,48 @@ class RecordingScheduleReceiver :
                 ?: RecordingScheduleScheduler.recordIdForSchedule(scheduleId)
         Log.i(TAG, "end[$scheduleId] stopping recording $recordId")
         RecordingService.stop(context, recordId)
-        // Optimistically transition the schedule to COMPLETED. The recording
-        // row's terminal status is the source of truth for whether bytes
-        // actually landed (a 0-byte recording transitions to FAILED via
-        // RecordingService.handleStop). The schedule's state reflects user
-        // intent ("the recording window has ended"); UI joins schedule + recording
-        // when surfacing details.
+
+        // **MB-208 (2026-04-27).** Don't unconditionally transition the
+        // schedule to COMPLETED — that lied about successful capture
+        // when the recording never actually started (process death
+        // mid-window, FGS-from-background restriction, or
+        // resolveOutputOrFail throwing before markStarted). Check the
+        // recording row instead:
+        //
+        //   - row missing                → FAILED (`recording_never_started`)
+        //   - row present but 0 bytes    → FAILED (`zero_bytes_captured`)
+        //   - row present with bytes     → COMPLETED (recording row's own
+        //                                   status reflects whether the
+        //                                   stop-flush succeeded)
+        //
+        // RecordingService.stop dispatches an Intent; the actual flush
+        // happens asynchronously, so reading row status here would race.
+        // Row presence + size is enough to distinguish "never recorded"
+        // from "did record" without needing to wait for the flush.
+        val finalState: RecordingScheduleState
+        val reason: String?
+        val row = runCatching { recordings.getById(recordId) }.getOrNull()
+        when {
+            row == null -> {
+                finalState = RecordingScheduleState.FAILED
+                reason = "recording_never_started"
+            }
+            (row.fileSizeBytes ?: 0L) <= 0L -> {
+                finalState = RecordingScheduleState.FAILED
+                reason = "zero_bytes_captured"
+            }
+            else -> {
+                finalState = RecordingScheduleState.COMPLETED
+                reason = null
+            }
+        }
+        Log.i(
+            TAG,
+            "end[$scheduleId] row=${row?.id} status=${row?.status} bytes=${row?.fileSizeBytes} -> $finalState",
+        )
         runCatching {
-            schedules.transitionTo(scheduleId, RecordingScheduleState.COMPLETED)
-        }.onFailure { Log.w(TAG, "schedule[$scheduleId] complete-transition failed", it) }
+            schedules.transitionTo(scheduleId, finalState, errorReason = reason)
+        }.onFailure { Log.w(TAG, "schedule[$scheduleId] $finalState-transition failed", it) }
     }
 
     private fun startRecording(
@@ -227,17 +269,38 @@ class RecordingScheduleReceiver :
             Log.e(TAG, "transitionTo(FIRING) failed for ${schedule.id}; aborting fire", t)
             return
         }
-        RecordingService.start(
-            context = context,
-            input =
-                RecordInput(
-                    recordId = recordId,
-                    sourceUrl = schedule.streamUrl,
-                    title = schedule.title,
-                    format = detectRecordingFormat(schedule.streamUrl),
-                    contentId = schedule.contentId,
-                ),
-        )
+        // **MB-208 (2026-04-27).** Wrap the FGS start in runCatching so
+        // a thrown `ForegroundServiceStartNotAllowedException` (Fire TV
+        // background-restriction edge), `SecurityException` (revoked
+        // FGS_DATA_SYNC permission on some OEMs), or any other crash
+        // here transitions the schedule to FAILED instead of leaving it
+        // in FIRING for the end alarm to optimistically COMPLETE. The
+        // exemption window granted by setExactAndAllowWhileIdle is real
+        // but not universally honoured.
+        val started =
+            runCatching {
+                RecordingService.start(
+                    context = context,
+                    input =
+                        RecordInput(
+                            recordId = recordId,
+                            sourceUrl = schedule.streamUrl,
+                            title = schedule.title,
+                            format = detectRecordingFormat(schedule.streamUrl),
+                            contentId = schedule.contentId,
+                        ),
+                )
+            }
+        started.onFailure { t ->
+            Log.e(TAG, "RecordingService.start failed for ${schedule.id}", t)
+            runCatching {
+                schedules.transitionTo(
+                    schedule.id,
+                    RecordingScheduleState.FAILED,
+                    errorReason = "service_start_failed: ${t.message ?: t::class.simpleName}",
+                )
+            }
+        }
     }
 
     /**
