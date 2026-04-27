@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MK.10.4 — channel-zap numeric input overlay. Hosts a single ComposeView
+  that paints the "CH 503_" badge over the live stream. Anchored
+  bottom-start so it doesn't conflict with the right-side surf overlay
+  or the bottom-anchored Media3 controller.
+-->
+<androidx.compose.ui.platform.ComposeView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom|start"
+    android:layout_marginStart="32dp"
+    android:layout_marginBottom="48dp" />

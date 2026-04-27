@@ -75,6 +75,11 @@ class PlayerActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "YancoPlayerActivity"
         private const val CONTROLLER_TIMEOUT_MS = 4000
+
+        // MK.10.4 — auto-commit window for numeric channel-jump entry.
+        // 1.2 s is long enough to type "503" comfortably but short enough
+        // that a single-press digit still feels responsive.
+        private const val CHANNEL_ZAP_COMMIT_MS = 1200L
         private const val QUICK_INFO_AUTO_HIDE_MS = 10_000L
         private const val PROGRESS_TICK_MS = 15_000L
 
@@ -91,6 +96,14 @@ class PlayerActivity : AppCompatActivity() {
     private val epg: EpgRepository by inject()
     private val prefs: AppPreferences by inject()
     private val recordings: com.yancotv.shared.recording.RecordingsRepository by inject()
+
+    // MK.10.4 — numeric channel-jump state. Activity-scoped (a fresh
+    // PlayerActivity gets a fresh entry buffer); not Koin since nothing
+    // outside the activity needs it.
+    private val channelZapState = com.yancotv.android.player.zap.ChannelZapNumericState()
+    private val channelZapHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val channelZapCommitRunnable = Runnable { commitChannelDigits() }
+    private var channelZapOverlayInflated = false
 
     private lateinit var playerView: PlayerView
 
@@ -410,6 +423,10 @@ class PlayerActivity : AppCompatActivity() {
         dockProgressTickJob = null
         dockAutoHideJob?.cancel()
         dockAutoHideJob = null
+        // MK.10.4 — cancel any pending numeric-zap commit so a backgrounded
+        // activity doesn't fire it on resume.
+        channelZapHandler.removeCallbacksAndMessages(null)
+        channelZapState.clear()
 
         // MB-119 follow-up — explicit ordered surface detach symmetric to
         // PlayerLauncher's pre-launch clearVideoSurface(). Without this, the
@@ -797,6 +814,63 @@ class PlayerActivity : AppCompatActivity() {
             p.seekToDefaultPosition()
             p.playWhenReady = true
             liveJumpBar.visibility = View.GONE
+        }
+    }
+
+    // ───── MK.10.4 — numeric channel jump ─────
+
+    /**
+     * Push a digit into the entry buffer. First digit also lazy-inflates
+     * the overlay ViewStub. Re-arms the auto-commit timer so a fast
+     * typist gets multi-digit numbers without prematurely committing.
+     */
+    private fun onChannelDigit(digit: Char) {
+        ensureChannelZapOverlay()
+        channelZapState.pushDigit(digit)
+        channelZapHandler.removeCallbacks(channelZapCommitRunnable)
+        channelZapHandler.postDelayed(channelZapCommitRunnable, CHANNEL_ZAP_COMMIT_MS)
+    }
+
+    /**
+     * Commit the typed channel number. Looks up the live queue for an
+     * item with `sortOrder == typed`; if found, jumps via the existing
+     * `controller.play(...)` queue surface (which will reuse already-
+     * loaded MediaItems). On miss, just dismisses — silent fail beats
+     * a confusing toast.
+     */
+    private fun commitChannelDigits() {
+        channelZapHandler.removeCallbacks(channelZapCommitRunnable)
+        val target = channelZapState.consume() ?: return
+        val items = controller.queue.value
+        if (items.isEmpty()) return
+        val index = items.indexOfFirst { it.sortOrder == target }
+        if (index < 0) return
+        ZapLatencyTracer.markZapStart("NUM:$target")
+        controller.play(items, index)
+    }
+
+    private fun cancelChannelDigits() {
+        channelZapHandler.removeCallbacks(channelZapCommitRunnable)
+        channelZapState.clear()
+    }
+
+    /**
+     * Lazy-inflate the channel-zap ViewStub on the first digit. Avoids
+     * paying the Compose host setup cost during PlayerActivity.onCreate
+     * — most playback sessions never type a channel number.
+     */
+    private fun ensureChannelZapOverlay() {
+        if (channelZapOverlayInflated) return
+        channelZapOverlayInflated = true
+        val stub = findViewById<android.view.ViewStub>(R.id.channel_zap_overlay_stub) ?: return
+        val view = stub.inflate() as? androidx.compose.ui.platform.ComposeView ?: return
+        view.setViewCompositionStrategy(
+            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+        )
+        view.setContent {
+            com.yancotv.android.ui.theme.YancoTheme(isTv = true) {
+                com.yancotv.android.player.zap.ChannelZapOverlay(state = channelZapState)
+            }
         }
     }
 
@@ -1427,6 +1501,20 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
         }
+        // MK.10.4 — numeric entry takes priority. OK commits, BACK cancels.
+        // Other keys fall through to the regular handler below.
+        if (channelZapState.visible.value) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    commitChannelDigits()
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                    cancelChannelDigits()
+                    return true
+                }
+            }
+        }
         when (keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 finish()
@@ -1466,11 +1554,31 @@ class PlayerActivity : AppCompatActivity() {
                 toggleQuickInfo()
                 return true
             }
+            // MK.10.4 — numeric channel jump. Only on live; VOD typing
+            // a digit would do nothing useful and would steal the digit
+            // from any future text-input surface.
+            KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_2,
+            KeyEvent.KEYCODE_3, KeyEvent.KEYCODE_4, KeyEvent.KEYCODE_5,
+            KeyEvent.KEYCODE_6, KeyEvent.KEYCODE_7, KeyEvent.KEYCODE_8,
+            KeyEvent.KEYCODE_9,
+            -> {
+                if (controller.currentItem.value?.type == ContentType.LIVE) {
+                    val digit = ('0' + (keyCode - KeyEvent.KEYCODE_0))
+                    onChannelDigit(digit)
+                    return true
+                }
+            }
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
+                // If a numeric entry is in progress, UP commits it instead
+                // of cancelling — a few real remotes auto-fire UP after a
+                // digit press, but our commit semantics are explicit OK
+                // anyway; treat UP as the "next channel" it always was.
+                if (channelZapState.visible.value) channelZapState.clear()
                 ZapLatencyTracer.markZapStart("UP")
                 if (controller.previous()) return true
             }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                if (channelZapState.visible.value) channelZapState.clear()
                 ZapLatencyTracer.markZapStart("DOWN")
                 if (controller.next()) return true
             }

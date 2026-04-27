@@ -334,6 +334,17 @@
         android:inflatedId="@+id/vod_dock"
         android:layout="@layout/player_vod_dock" />
 
+    <!-- MK.10.4 — channel-zap numeric input overlay. Slides up bottom-left
+         when the user types digits (0–9) on a live channel. Commits on OK
+         or after a short idle window. Inflated lazily on first digit —
+         most sessions never type a number. -->
+    <ViewStub
+        android:id="@+id/channel_zap_overlay_stub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:inflatedId="@+id/channel_zap_overlay"
+        android:layout="@layout/player_channel_zap_overlay" />
+
     <!-- VOD player chrome (MK.16.player.vod.chrome). Hosts Compose overlays
          for buffering + error states — the Concept A port of the "Tuning
          the stream" + "Couldn't open this stream" screens. Replaces the
