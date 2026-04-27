@@ -26,7 +26,6 @@ object BackupCanonicalJson {
         Json {
             prettyPrint = false
             encodeDefaults = true
-            classDiscriminator = "kind"
             ignoreUnknownKeys = true
         }
 
@@ -36,7 +35,6 @@ object BackupCanonicalJson {
             prettyPrint = true
             prettyPrintIndent = "  "
             encodeDefaults = true
-            classDiscriminator = "kind"
             ignoreUnknownKeys = true
         }
 }

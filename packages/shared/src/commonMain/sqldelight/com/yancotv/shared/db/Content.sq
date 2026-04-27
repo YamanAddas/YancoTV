@@ -180,6 +180,17 @@ WHERE source_id = :sourceId AND stream_url = :streamUrl
 ORDER BY created_at DESC
 LIMIT 1;
 
+-- MK.19.8 audit fix #1 — recording rows on import only have a stream_url
+-- (no source_id was exported), so re-link is by stream_url alone.
+-- Lossier than the (source, url) tuple but enough to restore the "play
+-- this recording's source channel" affordance for the common case where
+-- a stream_url is unique across the catalog.
+findIdByStreamUrl:
+SELECT id FROM content
+WHERE stream_url = :streamUrl
+ORDER BY created_at DESC
+LIMIT 1;
+
 deleteBySource:
 DELETE FROM content WHERE source_id = ?;
 

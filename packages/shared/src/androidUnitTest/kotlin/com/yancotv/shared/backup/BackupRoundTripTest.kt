@@ -244,6 +244,97 @@ class BackupRoundTripTest {
         assertEquals("ar", dst.settingsQueries.get("pref_audio_lang").executeAsOne())
     }
 
+    @Test fun relink_overridesAndParentalLockedHidden_resolveAfterContentSeed() {
+        // Audit fix #4 — coverage parity for the four content-id-keyed
+        // record types beyond favorites. Same buffer-then-drain contract
+        // as the favorites relink test: import → all four types buffer →
+        // seed content → retry → all four resolve.
+        val src = testDb()
+        seedSource(src)
+        seedContent(src, "ch-1", streamUrl = "http://stream/ch-1", title = "Ch 1")
+        // content override (rename + custom logo).
+        src.contentQueries.setOverrides(
+            nameOverride = "My Channel",
+            logoOverride = "http://logo/custom.png",
+            id = "ch-1",
+        )
+        // channel override (custom number, group reassignment).
+        src.parentalQueries.upsertOverride(
+            content_id = "ch-1",
+            custom_name = null,
+            custom_logo_url = null,
+            custom_number = 42L,
+            custom_group = "MyFavs",
+            updated_at = 7L,
+        )
+        src.parentalQueries.lockChannel("ch-1", 8L)
+        src.parentalQueries.hideChannel("ch-1", 9L)
+
+        val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", 8, 1L)
+
+        val dst = testDb()
+        val importer = BackupImporter(dst, PlaintextCredentialStore())
+        val first = importer.import(file, currentSchemaVersion = 8)
+
+        // All four buffered (no content yet).
+        assertEquals(1, first.unlinked["contentOverrides"])
+        assertEquals(1, first.unlinked["channelOverrides"])
+        assertEquals(1, first.unlinked["lockedChannels"])
+        assertEquals(1, first.unlinked["hiddenChannels"])
+
+        // Source-sync simulation.
+        seedContent(dst, "ch-1", streamUrl = "http://stream/ch-1", title = "Ch 1")
+        val second = importer.retryPendingLinks()
+
+        assertEquals(1, second.restored["contentOverrides"])
+        assertEquals(1, second.restored["channelOverrides"])
+        assertEquals(1, second.restored["lockedChannels"])
+        assertEquals(1, second.restored["hiddenChannels"])
+
+        // Verify they actually landed.
+        val ch = dst.contentQueries.selectById("ch-1").executeAsOne()
+        assertEquals("My Channel", ch.name_override)
+        assertEquals("http://logo/custom.png", ch.logo_override)
+        val override = dst.parentalQueries.selectOverride("ch-1").executeAsOne()
+        assertEquals(42L, override.custom_number)
+        assertEquals("MyFavs", override.custom_group)
+        assertTrue(dst.parentalQueries.isLocked("ch-1").executeAsOne())
+        assertTrue(dst.parentalQueries.isHidden("ch-1").executeAsOne())
+        assertTrue(importer.pendingLinks.value.isEmpty())
+    }
+
+    @Test fun relink_recordingContentIdResolvesByStreamUrl() {
+        // Audit fix #1 — recording rows on import re-resolve content_id
+        // via stream_url (no source_id was exported). Pre-seed content
+        // in dst so the lookup succeeds during the synchronous phase.
+        val src = testDb()
+        seedSource(src)
+        seedContent(src, "ch-1", streamUrl = "http://stream/movie")
+        src.recordingsQueries.insert(
+            id = "rec-1",
+            content_id = "ch-1",
+            title = "My Movie",
+            stream_url = "http://stream/movie",
+            file_path = "content://recording/1",
+            status = "completed",
+            started_at = 1L,
+            ended_at = 100L,
+            duration_seconds = 99L,
+            file_size_bytes = 1024L,
+            error = null,
+            format = "mpeg_ts",
+        )
+        val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", 8, 1L)
+
+        val dst = testDb()
+        seedSource(dst)
+        seedContent(dst, "ch-1", streamUrl = "http://stream/movie")
+        BackupImporter(dst, PlaintextCredentialStore()).import(file, currentSchemaVersion = 8)
+
+        val restored = dst.recordingsQueries.selectById("rec-1").executeAsOne()
+        assertEquals("ch-1", restored.content_id)
+    }
+
     @Test fun import_existingSourceById_skipsNotOverwrites() {
         val src = testDb()
         seedSource(src, id = "src-A", username = "from-export", password = "x")

@@ -248,9 +248,31 @@ class BackupImporter(
         skipped: MutableMap<String, Int>,
     ): Int {
         // Settings is upsert by primary key so "merge mode" overwrites
-        // existing keys with backup values. Skip nothing.
-        for (r in records) db.settingsQueries.upsert(r.key, r.value)
-        return records.size
+        // existing keys with backup values.
+        //
+        // Audit note (#3, MK.19.8): the current key set is all portable
+        // (theme, languages, smart grouping, EPG window, decoder choice,
+        // etc.). When future settings introduce device-bound state —
+        // a SAF tree URI for the recording folder, an Android-specific
+        // permission flag, or a per-device push token — add the key to
+        // [DEVICE_BOUND_SETTING_KEYS] and the deny-list filter below
+        // will skip it on import. Empty today; concrete keys land
+        // alongside the features that introduce them.
+        var imported = 0
+        for (r in records) {
+            if (r.key in DEVICE_BOUND_SETTING_KEYS) {
+                skipped["settings"] = (skipped["settings"] ?: 0) + 1
+                continue
+            }
+            db.settingsQueries.upsert(r.key, r.value)
+            imported++
+        }
+        return imported
+    }
+
+    private companion object {
+        /** Setting keys that should NOT travel across devices on restore. */
+        val DEVICE_BOUND_SETTING_KEYS: Set<String> = emptySet()
     }
 
     private fun importGroupPreferences(
@@ -311,12 +333,18 @@ class BackupImporter(
                 skipped["recordings"] = (skipped["recordings"] ?: 0) + 1
                 continue
             }
-            // content_id stored as null on import — re-resolve via stream_url
-            // is too lossy for recordings (the file is the canonical artefact).
-            // The recordings browser handles null content_id gracefully.
+            // Audit fix #1 — re-resolve content_id by stream_url alone
+            // (the recording row didn't carry a sourceId on export, so
+            // we use the looser by-stream-url lookup). Lossier than the
+            // (source, url) tuple in case of collisions, but restores
+            // the "play this recording's source channel" affordance for
+            // the common case where stream_url is unique. Falls back to
+            // null when the source hasn't resynced yet — recordings
+            // browser handles null content_id gracefully.
+            val resolvedContentId = db.contentQueries.findIdByStreamUrl(r.streamUrl).executeAsOneOrNull()
             db.recordingsQueries.insert(
                 id = r.id,
-                content_id = null,
+                content_id = resolvedContentId,
                 title = r.title,
                 stream_url = r.streamUrl,
                 file_path = r.fileUri,
@@ -419,10 +447,16 @@ class BackupImporter(
                 bufferIfUnresolved.add(r)
                 continue
             }
-            // episode_id resolution: best-effort; if the episode hasn't
-            // been re-fetched yet this is fine (resume-point still keys on
-            // content_id at the series-container level).
-            val episodeId: String? = null // simplified for v1; episodes refresh independently
+            // Audit fix #2 — re-resolve episode_id by stream_url. Catalog
+            // re-syncs regenerate episode ids but stream_urls are stable
+            // (provider-side), so episode-level resume survives across
+            // restore. Falls back to null when the series detail hasn't
+            // been hydrated yet — the row still works as a series-
+            // container resume point.
+            val episodeId: String? =
+                r.episodeStreamUrl?.let { url ->
+                    db.episodesQueries.findIdByStreamUrl(url).executeAsOneOrNull()
+                }
             db.watchHistoryQueries.upsert(
                 id = r.historyId,
                 content_id = cid,

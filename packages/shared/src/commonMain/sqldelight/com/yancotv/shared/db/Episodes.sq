@@ -18,6 +18,15 @@ ORDER BY season_number, episode_number;
 selectById:
 SELECT * FROM episodes WHERE id = ?;
 
+-- MK.19.8 audit fix #2 — backup importer re-resolves episode rows by
+-- their stream_url. Catalog re-fetches generate fresh ids per episode,
+-- but the stream_url is stable (provider-side) so it's the only
+-- portable key for episode-level resume points.
+findIdByStreamUrl:
+SELECT id FROM episodes
+WHERE stream_url = :streamUrl
+LIMIT 1;
+
 insert:
 INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
 VALUES (?, ?, ?, ?, ?, ?, ?);
