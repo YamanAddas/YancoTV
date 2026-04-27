@@ -225,8 +225,19 @@ fun SettingsBackupTab(
     LaunchedEffect(customFolderString) {
         initialImportUri =
             customFolder ?: withContext(Dispatchers.IO) {
+                // Default-folder fallback — point the picker at
+                // Download/YancoTV (where exportToDefault writes via
+                // MediaStore.Downloads). This is the SAF tree URI
+                // format ExternalStorageProvider uses for that
+                // path. EXTRA_INITIAL_URI accepts tree URIs as a
+                // hint; if the device's picker doesn't recognize
+                // it, it falls back to the system default
+                // harmlessly.
                 runCatching {
-                    db.backupMetadataQueries.selectLatest().executeAsOneOrNull()?.file_uri?.let(Uri::parse)
+                    DocumentsContract.buildTreeDocumentUri(
+                        "com.android.externalstorage.documents",
+                        "primary:Download/YancoTV",
+                    )
                 }.getOrNull()
             }
     }
