@@ -352,9 +352,17 @@ fun SettingsBackupTab(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // NOTE: button stays focusable while exporting. Disabling
+                // it (`enabled = !exporting`) makes Compose drop focus the
+                // moment the click commits — focus search then escapes
+                // Settings entirely and lands on HomeScreen's sidebar.
+                // We guard the work with `if (!exporting)` instead so a
+                // double-tap is a no-op without ever un-focusing.
+                val canExport = !encryptToggle || exportPassword.length >= 8
                 Button(
-                    enabled = !exporting && (!encryptToggle || exportPassword.length >= 8),
+                    enabled = canExport,
                     onClick = {
+                        if (exporting) return@Button
                         if (customFolder != null) {
                             runExportToCustomFolder(customFolder)
                         } else {
@@ -445,8 +453,8 @@ fun SettingsBackupTab(
                     bare = true,
                 )
                 Button(
-                    enabled = !importing,
                     onClick = {
+                        if (importing) return@Button
                         importing = true
                         importStatus = "Restoring…"
                         scope.launch {
@@ -515,19 +523,41 @@ fun SettingsBackupTab(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                 )
+                Text(
+                    "Press to use as the restore source — bypasses the file picker.",
+                    color = LocalYancoPalette.current.TextMuted,
+                    fontSize = 10.sp,
+                )
                 recent.forEach { row ->
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            row.label,
-                            color = LocalYancoPalette.current.TextPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            "${formatBytes(row.sizeBytes)} · schema v${row.schemaVersion} · sha256 ${row.checksum.take(8)}… · ${row.fileUri ?: "(uri lost)"}",
-                            color = LocalYancoPalette.current.TextMuted,
-                            fontSize = 10.sp,
-                        )
+                    val rowUri = row.fileUri
+                    OutlinedButton(
+                        enabled = rowUri != null,
+                        onClick = {
+                            if (rowUri != null) {
+                                importPickedUriString = rowUri
+                                importStatus = "Selected: ${row.label}"
+                                importFocusBump++
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                row.label,
+                                color = LocalYancoPalette.current.TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                "${formatBytes(row.sizeBytes)} · schema v${row.schemaVersion} · sha256 ${row.checksum.take(8)}… · ${rowUri ?: "(uri lost)"}",
+                                color = LocalYancoPalette.current.TextMuted,
+                                fontSize = 10.sp,
+                            )
+                        }
                     }
                 }
             }
