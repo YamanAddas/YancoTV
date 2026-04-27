@@ -115,6 +115,19 @@ WHERE content_fts MATCH :query
 ORDER BY c.type, c.sort_order
 LIMIT :limitCount;
 
+-- MK.search.rails — per-type FTS search. Needed because the unified
+-- `searchFts` orders by `c.type` and a heavy live catalog can exhaust
+-- a 100-row limit entirely within live, leaving zero movies/series in
+-- the results. Caller hits this three times (one per type) so each
+-- rail gets its own slice independently.
+searchFtsByType:
+SELECT c.*
+FROM content c
+JOIN content_fts f ON f.content_id = c.id
+WHERE content_fts MATCH :query AND c.type = :type
+ORDER BY c.sort_order
+LIMIT :limitCount;
+
 insert:
 INSERT INTO content (
     id, source_id, type, title, clean_title, group_name,

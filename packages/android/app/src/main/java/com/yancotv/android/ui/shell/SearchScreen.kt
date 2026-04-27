@@ -132,11 +132,27 @@ fun SearchScreen(
         }
         searching = true
         delay(220L)
+        // MK.search.rails — per-type fetch so each rail gets a fair slice
+        // (a large live catalog used to exhaust the unified 100-row
+        // limit within live alone, hiding all movies/series). Three
+        // sequential SQLite reads are still <10ms total on Fire TV;
+        // moving to parallel adds dispatcher complexity for no
+        // measurable win at this row count.
         val matches =
             withContext(Dispatchers.IO) {
-                runCatching { repo.search(trimmed, limit = 100) }
-                    .onFailure { Log.w("Yanco", "SearchScreen.search('$trimmed') failed: ${it.message}", it) }
-                    .getOrElse { emptyList() }
+                val live =
+                    runCatching { repo.searchByType(trimmed, ContentType.LIVE, limit = 100) }
+                        .onFailure { Log.w("Yanco", "SearchScreen.searchByType(live) failed: ${it.message}", it) }
+                        .getOrElse { emptyList() }
+                val movies =
+                    runCatching { repo.searchByType(trimmed, ContentType.MOVIE, limit = 100) }
+                        .onFailure { Log.w("Yanco", "SearchScreen.searchByType(movie) failed: ${it.message}", it) }
+                        .getOrElse { emptyList() }
+                val series =
+                    runCatching { repo.searchByType(trimmed, ContentType.SERIES, limit = 100) }
+                        .onFailure { Log.w("Yanco", "SearchScreen.searchByType(series) failed: ${it.message}", it) }
+                        .getOrElse { emptyList() }
+                live + movies + series
             }
         results.clear()
         results.addAll(matches)

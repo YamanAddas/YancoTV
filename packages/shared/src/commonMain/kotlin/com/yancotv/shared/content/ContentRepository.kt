@@ -89,6 +89,41 @@ class ContentRepository(
             .map { it.toDomain() }
     }
 
+    /**
+     * MK.search.rails — per-type FTS search. The unified [search] orders
+     * by `c.type` and a heavy live catalog can exhaust the row limit
+     * entirely within live before any movie/series row is reached. The
+     * search-rails UI calls this once per [ContentType] so each rail
+     * gets its own slice.
+     */
+    fun searchByType(
+        query: String,
+        type: ContentType,
+        limit: Long = 100,
+    ): List<ContentItem> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val ftsQuery =
+            buildString {
+                val tokens = trimmed.split(Regex("\\s+"))
+                tokens.forEachIndexed { i, tok ->
+                    if (tok.isEmpty()) return@forEachIndexed
+                    if (i > 0) append(' ')
+                    append('"').append(tok.replace("\"", "\"\"")).append("\"*")
+                }
+            }
+        val typeKey =
+            when (type) {
+                ContentType.LIVE -> "live"
+                ContentType.MOVIE -> "movie"
+                ContentType.SERIES -> "series"
+            }
+        return db.contentQueries
+            .searchFtsByType(ftsQuery, typeKey, limit)
+            .executeAsList()
+            .map { it.toDomain() }
+    }
+
     fun findById(id: String): ContentItem? =
         db.contentQueries
             .selectById(id)
