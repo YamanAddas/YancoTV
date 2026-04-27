@@ -3,6 +3,9 @@ package com.yancotv.android.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,20 +149,37 @@ private fun ThemeRow(
     palette: YancoPalette,
     onClick: () -> Unit,
 ) {
+    // Audit-pass-5: focus + selected as separate visual states. Without
+    // a shared interactionSource the border only updated on `selected`,
+    // so D-pad navigation across rows had no visible cursor — user had
+    // to commit blind. Matches the canonical pattern used by the main
+    // sidebar TabItem, GroupRow, SettingsChip, etc.
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val pal = LocalYancoPalette.current
     val borderColour =
-        if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.BorderSubtle
+        when {
+            focused -> pal.FocusRing
+            selected -> pal.Accent
+            else -> pal.BorderSubtle
+        }
+    val borderWidth = if (focused || selected) 2.dp else 1.dp
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
+                .background(pal.BackgroundRaised)
                 .border(
-                    width = if (selected) 2.dp else 1.dp,
+                    width = borderWidth,
                     color = borderColour,
                     shape = RoundedCornerShape(8.dp),
-                ).clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                ).focusable(interactionSource = interaction)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
+                ).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -205,19 +226,34 @@ private fun AccentChip(
     swatch: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
 ) {
-    val border =
-        if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.BorderSubtle
+    // Audit-pass-5: same fix as ThemeRow — focus chrome via shared
+    // interactionSource so D-pad navigation across the chip strip
+    // shows where the cursor is.
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val pal = LocalYancoPalette.current
+    val borderColour =
+        when {
+            focused -> pal.FocusRing
+            selected -> pal.Accent
+            else -> pal.BorderSubtle
+        }
+    val borderWidth = if (focused || selected) 2.dp else 1.dp
     Row(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
+                .background(pal.BackgroundRaised)
                 .border(
-                    width = if (selected) 2.dp else 1.dp,
-                    color = border,
+                    width = borderWidth,
+                    color = borderColour,
                     shape = RoundedCornerShape(6.dp),
-                ).clickable(onClick = onClick)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                ).focusable(interactionSource = interaction)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
+                ).padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
