@@ -45,6 +45,14 @@ class AppPreferences(
     private val _epg = MutableStateFlow(readEpg())
     val epgFlow: StateFlow<EpgPrefs> = _epg.asStateFlow()
 
+    // MK.18.2 — default external-player choice per content type. INTERNAL
+    // (the app's own PlayerActivity) is the default for every bucket; users
+    // who prefer VLC for live and the internal player for VOD set per
+    // bucket from Settings → Playback. Read by PlayerLauncher to short-
+    // circuit before opening the fullscreen activity.
+    private val _externalPlayer = MutableStateFlow(readExternalPlayer())
+    val externalPlayerFlow: StateFlow<ExternalPlayerPrefs> = _externalPlayer.asStateFlow()
+
     // Synchronous snapshot for bootstrapping — MainActivity/HomeScreen need
     // the "open app on" value on first composition before any flow has had
     // a chance to emit. Reads the settings table directly.
@@ -92,6 +100,30 @@ class AppPreferences(
         write(KEY_BUFFER_PROFILE, profile.key) {
             _playback.value = _playback.value.copy(bufferProfile = profile)
         }
+
+    // MK.18.2 — default external player per content bucket. Series and
+    // episodes share the SERIES bucket (the user's intent is "the kind of
+    // long-form content I watch" — distinguishing the wrapper from its
+    // episodes adds knobs without value).
+    suspend fun setDefaultExternalPlayer(
+        bucket: ExternalPlayerBucket,
+        choice: DefaultExternalPlayer,
+    ) {
+        val key =
+            when (bucket) {
+                ExternalPlayerBucket.LIVE -> KEY_EXT_PLAYER_LIVE
+                ExternalPlayerBucket.MOVIE -> KEY_EXT_PLAYER_MOVIE
+                ExternalPlayerBucket.SERIES -> KEY_EXT_PLAYER_SERIES
+            }
+        write(key, choice.key) {
+            _externalPlayer.value =
+                when (bucket) {
+                    ExternalPlayerBucket.LIVE -> _externalPlayer.value.copy(live = choice)
+                    ExternalPlayerBucket.MOVIE -> _externalPlayer.value.copy(movie = choice)
+                    ExternalPlayerBucket.SERIES -> _externalPlayer.value.copy(series = choice)
+                }
+        }
+    }
 
     // ───── Network ─────
 
@@ -277,6 +309,13 @@ class AppPreferences(
             channelNumberFormat = ChannelNumberFormat.fromKey(readString(KEY_CHANNEL_NUMBER_FORMAT)),
         )
 
+    private fun readExternalPlayer(): ExternalPlayerPrefs =
+        ExternalPlayerPrefs(
+            live = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_LIVE)),
+            movie = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_MOVIE)),
+            series = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_SERIES)),
+        )
+
     private fun readEpg(): EpgPrefs =
         EpgPrefs(
             daysBack =
@@ -357,7 +396,52 @@ class AppPreferences(
         private const val KEY_FONT_SCALE_PCT = "pref_appearance_font_scale_pct"
         private const val KEY_CHANNEL_NUMBER_FORMAT = "pref_general_channel_number_format"
         private const val KEY_ACCENT_ID = "pref_accent_id"
+        private const val KEY_EXT_PLAYER_LIVE = "pref_ext_player_live"
+        private const val KEY_EXT_PLAYER_MOVIE = "pref_ext_player_movie"
+        private const val KEY_EXT_PLAYER_SERIES = "pref_ext_player_series"
     }
+}
+
+/** MK.18.2 — content buckets for the per-type external-player default. */
+enum class ExternalPlayerBucket { LIVE, MOVIE, SERIES }
+
+/**
+ * MK.18.2 — default external-player choice. INTERNAL keeps the in-app
+ * PlayerActivity; every other value resolves to an [ExternalPlayerApp]
+ * and short-circuits PlayerLauncher to fire `Intent.ACTION_VIEW` at
+ * that package. If the chosen app is not installed at launch time the
+ * launcher falls through to INTERNAL — picking a player you uninstalled
+ * later shouldn't strand playback.
+ */
+enum class DefaultExternalPlayer(
+    val key: String,
+    val displayName: String,
+    val app: com.yancotv.android.player.ExternalPlayerApp?,
+) {
+    INTERNAL("internal", "Internal", null),
+    VLC("vlc", "VLC", com.yancotv.android.player.ExternalPlayerApp.VLC),
+    MX_PRO("mx_pro", "MX Player Pro", com.yancotv.android.player.ExternalPlayerApp.MX_PRO),
+    MX_FREE("mx_free", "MX Player", com.yancotv.android.player.ExternalPlayerApp.MX_FREE),
+    JUST_PLAYER("just_player", "Just Player", com.yancotv.android.player.ExternalPlayerApp.JUST_PLAYER),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): DefaultExternalPlayer =
+            values().firstOrNull { it.key == key } ?: INTERNAL
+    }
+}
+
+data class ExternalPlayerPrefs(
+    val live: DefaultExternalPlayer = DefaultExternalPlayer.INTERNAL,
+    val movie: DefaultExternalPlayer = DefaultExternalPlayer.INTERNAL,
+    val series: DefaultExternalPlayer = DefaultExternalPlayer.INTERNAL,
+) {
+    fun forContentType(type: com.yancotv.shared.types.ContentType): DefaultExternalPlayer =
+        when (type) {
+            com.yancotv.shared.types.ContentType.LIVE -> live
+            com.yancotv.shared.types.ContentType.MOVIE -> movie
+            com.yancotv.shared.types.ContentType.SERIES -> series
+        }
 }
 
 /**

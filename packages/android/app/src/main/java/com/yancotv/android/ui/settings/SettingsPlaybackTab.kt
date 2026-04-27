@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,7 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.DefaultExternalPlayer
+import com.yancotv.android.prefs.ExternalPlayerBucket
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlinx.coroutines.launch
@@ -161,8 +166,77 @@ fun SettingsPlaybackTab(
             checked = snapshot.enableDecoderFallback,
             onCheckedChange = { scope.launch { prefs.setDecoderFallback(it) } },
         )
+
+        // MK.18.2 — default external player per content bucket. The
+        // installed-app probe runs once on tab entry; toggling it during
+        // a session won't pick up a freshly-installed player without a
+        // recompose. Acceptable for v1 (Settings is rarely re-entered
+        // mid-task). Picks become effective on the next launch from any
+        // surface (HomeScreen, Favorites, Recommendations cards, etc.)
+        // because PlayerLauncher reads the pref synchronously before
+        // starting the fullscreen activity.
+        val externalSnap by prefs.externalPlayerFlow.collectAsStateValue()
+        val ctx = LocalContext.current
+        val installed = remember(ctx) { ExternalPlayer.installed(ctx) }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Default player",
+                color = LocalYancoPalette.current.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Hand off playback to a third-party app per content type. Internal keeps the in-app player; only installed apps appear.",
+                color = LocalYancoPalette.current.TextMuted,
+                fontSize = 11.sp,
+            )
+            ExternalPlayerBucket.values().forEach { bucket ->
+                val current =
+                    when (bucket) {
+                        ExternalPlayerBucket.LIVE -> externalSnap.live
+                        ExternalPlayerBucket.MOVIE -> externalSnap.movie
+                        ExternalPlayerBucket.SERIES -> externalSnap.series
+                    }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = bucketLabel(bucket),
+                        color = LocalYancoPalette.current.TextPrimary,
+                        fontSize = 13.sp,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsChip(
+                            label = "Internal",
+                            selected = current == DefaultExternalPlayer.INTERNAL,
+                            onClick = {
+                                scope.launch {
+                                    prefs.setDefaultExternalPlayer(bucket, DefaultExternalPlayer.INTERNAL)
+                                }
+                            },
+                        )
+                        DefaultExternalPlayer.values()
+                            .filter { it.app != null && it.app in installed }
+                            .forEach { choice ->
+                                SettingsChip(
+                                    label = choice.displayName,
+                                    selected = current == choice,
+                                    onClick = {
+                                        scope.launch { prefs.setDefaultExternalPlayer(bucket, choice) }
+                                    },
+                                )
+                            }
+                    }
+                }
+            }
+        }
     }
 }
+
+private fun bucketLabel(bucket: ExternalPlayerBucket): String =
+    when (bucket) {
+        ExternalPlayerBucket.LIVE -> "Live TV"
+        ExternalPlayerBucket.MOVIE -> "Movies"
+        ExternalPlayerBucket.SERIES -> "Series & episodes"
+    }
 
 // Small convenience — .collectAsState() returns State<T>, `by` delegates
 // to its `.value` via the `getValue` import at the top.
