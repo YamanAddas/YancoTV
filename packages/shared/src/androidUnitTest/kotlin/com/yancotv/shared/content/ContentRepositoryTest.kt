@@ -108,6 +108,61 @@ class ContentRepositoryTest {
             assertEquals(5, repo.search("Match", limit = 5L).size)
         }
 
+    /**
+     * MK.search.rails — per-type FTS slice. Pins the contract that the
+     * search-rails UI depends on: each rail (Live / Movies / Series)
+     * gets its own slice, so a 100-item live catalog cannot starve the
+     * other types the way unified `searchFts` did when it ordered by
+     * `c.type` and capped at the same total limit.
+     */
+    @Test fun searchByType_returnsOnlyMatchingType() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "live-1", "src-A", "x1", "Marvel Live", type = "live")
+            insertContent(db, "live-2", "src-A", "x2", "Marvel Live HD", type = "live")
+            insertContent(db, "movie-1", "src-A", null, "Marvel Movie", type = "movie")
+            insertContent(db, "series-1", "src-A", null, "Marvel Show", type = "series")
+            val repo = ContentRepository(db)
+
+            assertEquals(2, repo.searchByType("Marvel", ContentType.LIVE).size)
+            assertEquals(1, repo.searchByType("Marvel", ContentType.MOVIE).size)
+            assertEquals(1, repo.searchByType("Marvel", ContentType.SERIES).size)
+            // Type filter is exclusive — no cross-bleed.
+            assertTrue(
+                repo.searchByType("Marvel", ContentType.MOVIE).single().title == "Marvel Movie",
+            )
+        }
+
+    @Test fun searchByType_independentLimit() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            // 150 live matches — way past the 100 unified-search limit
+            // would ever surface alongside movies/series.
+            for (i in 0 until 150) {
+                insertContent(db, "live-$i", "src-A", "c$i", "Marvel Live $i", type = "live")
+            }
+            insertContent(db, "movie-1", "src-A", null, "Marvel Movie", type = "movie")
+            val repo = ContentRepository(db)
+
+            // Per-type cap of 100: live returns 100 (capped), movies returns
+            // its 1 row regardless. The unified search would have surfaced
+            // 100 lives + 0 movies; per-type fixes that.
+            assertEquals(100, repo.searchByType("Marvel", ContentType.LIVE, limit = 100L).size)
+            assertEquals(1, repo.searchByType("Marvel", ContentType.MOVIE, limit = 100L).size)
+        }
+
+    @Test fun searchByType_emptyQueryReturnsNothing() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            insertContent(db, "ch-1", "src-A", "c1", "Channel", type = "live")
+            val repo = ContentRepository(db)
+            assertTrue(repo.searchByType("", ContentType.LIVE).isEmpty())
+            assertTrue(repo.searchByType("   ", ContentType.LIVE).isEmpty())
+        }
+
     @Test fun page_offsetPastEndReturnsEmpty() =
         runTest {
             val db = testDb()

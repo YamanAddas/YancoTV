@@ -149,12 +149,173 @@ class RecordingDataSinkTest {
 
     @Test
     fun bytesSinceBeginAccumulatesOnlyWritesAfterBegin() {
+        // MB-206 (2026-04-27) — `bytesSinceBegin` reflects bytes
+        // **flushed to disk**, not bytes buffered in the PAT/PMT
+        // preroll. Small non-TS-shaped writes therefore stay at 0
+        // until end()'s fail-open flush dumps them. Bytes pre-begin
+        // are dropped entirely. Bytes post-end are dropped entirely.
         sink.write(byteArrayOf(0, 0), 0, 2) // dropped (pre-begin)
-        sink.begin(ByteArrayOutputStream())
+        val out = ByteArrayOutputStream()
+        sink.begin(out)
         assertEquals(0L, sink.bytesSinceBegin)
         sink.write(byteArrayOf(1, 2, 3, 4), 0, 4)
-        assertEquals(4L, sink.bytesSinceBegin)
         sink.write(byteArrayOf(5, 6), 0, 2)
-        assertEquals(6L, sink.bytesSinceBegin)
+        // Still buffered (no PAT detected) — counter at 0 until flush.
+        assertEquals(0L, sink.bytesSinceBegin)
+        assertEquals(6L, sink.end())
+        assertContentEquals(byteArrayOf(1, 2, 3, 4, 5, 6), out.toByteArray())
     }
+
+    // ── MB-206 — TS PAT/PMT preroll ──────────────────────────────────
+
+    /**
+     * The PAT/PMT preroll is the difference between a recording that
+     * plays in ExoPlayer and one that fails with
+     * `ERROR_CODE_PARSING_CONTAINER_MALFORMED`. These tests pin the
+     * three behaviours the user depends on:
+     *
+     *   1. Garbage at the head is dropped — file starts at the first
+     *      PAT-aligned packet whose buffer also contains the PMT.
+     *   2. After the prelude lands, subsequent bytes flow straight to
+     *      disk (the buffer is one-shot for a recording).
+     *   3. If a recording ends before any PAT/PMT was seen, whatever
+     *      was buffered still flushes to the file (fail-open) so the
+     *      user doesn't see a 0-byte row when bytes were captured.
+     */
+
+    @Test
+    fun preroll_dropsGarbageBeforePat_thenFlushesFromPat() {
+        val out = ByteArrayOutputStream()
+        sink.begin(out)
+        // 200 bytes of mid-payload garbage that happens to contain a 0x47
+        // at offset 50 but no follow-up sync 188 bytes later — the
+        // two-packet alignment check rejects it as a false positive.
+        val garbage = ByteArray(200) { (it * 7 + 13).toByte() }
+        garbage[50] = 0x47
+        sink.write(garbage, 0, garbage.size)
+        // Nothing flushed yet — no PAT in sight.
+        assertEquals(0, out.size())
+
+        // Now feed a real PAT followed by a PMT packet.
+        val pat = patPacket(programNumber = 1, pmtPid = 0x0100)
+        val pmt = pmtPacket(pmtPid = 0x0100)
+        sink.write(pat + pmt, 0, pat.size + pmt.size)
+
+        // File should now contain bytes starting from the PAT — the
+        // 200-byte garbage at the head is dropped. Total written =
+        // pat.size + pmt.size.
+        assertEquals((pat.size + pmt.size).toLong(), sink.bytesSinceBegin)
+        assertEquals(pat.size + pmt.size, out.size())
+        // First byte of the file is the TS sync of the PAT packet.
+        assertEquals(0x47.toByte(), out.toByteArray()[0])
+    }
+
+    @Test
+    fun preroll_subsequentWritesBypassBufferAfterHeaderSeen() {
+        val out = ByteArrayOutputStream()
+        sink.begin(out)
+        // Land the prelude in one go.
+        val pat = patPacket(programNumber = 1, pmtPid = 0x0100)
+        val pmt = pmtPacket(pmtPid = 0x0100)
+        sink.write(pat + pmt, 0, pat.size + pmt.size)
+        val afterHeader = out.size()
+
+        // Now write a non-TS-shaped chunk. With the prelude already
+        // seen, the buffer is bypassed — these bytes must flush through
+        // immediately, even though they don't contain a sync byte.
+        val tail = byteArrayOf(1, 2, 3, 4, 5)
+        sink.write(tail, 0, tail.size)
+        assertEquals(afterHeader + tail.size, out.size())
+        assertContentEquals(
+            tail,
+            out.toByteArray().copyOfRange(afterHeader, out.size()),
+        )
+    }
+
+    @Test
+    fun preroll_endFlushesBufferIfPatNeverArrives() {
+        // Short recording: user pressed Stop before the broadcast emitted
+        // its periodic PAT (every ~100 ms in practice). Without the
+        // fail-open in end(), the buffered bytes would silently vanish.
+        val out = ByteArrayOutputStream()
+        sink.begin(out)
+        val payload = ByteArray(50) { it.toByte() }
+        sink.write(payload, 0, payload.size)
+        assertEquals(0, out.size()) // still buffered
+
+        val total = sink.end()
+        assertEquals(payload.size.toLong(), total)
+        assertContentEquals(payload, out.toByteArray())
+    }
+
+    @Test
+    fun preroll_secondPatStartsCleanBuffer() {
+        // Each begin() resets the buffer + headerSeen so the prelude
+        // logic re-runs from scratch. A second recording in the same
+        // session (sequential, not concurrent) must not inherit any
+        // state from the first.
+        val first = ByteArrayOutputStream()
+        sink.begin(first)
+        val pat = patPacket(programNumber = 1, pmtPid = 0x0200)
+        val pmt = pmtPacket(pmtPid = 0x0200)
+        sink.write(pat + pmt, 0, pat.size + pmt.size)
+        sink.end()
+
+        val second = ByteArrayOutputStream()
+        sink.begin(second)
+        // Junk before any prelude; new recording should buffer until
+        // PAT lands again.
+        sink.write(ByteArray(100), 0, 100)
+        assertEquals(0, second.size())
+        sink.end() // fail-open dump
+        assertTrue(second.size() > 0)
+    }
+
+    /** Build a 188-byte TS packet for [pid] with optional [payload]. */
+    private fun tsPacket(
+        pid: Int,
+        pusi: Boolean = false,
+        payload: ByteArray = ByteArray(184),
+    ): ByteArray {
+        require(pid in 0..0x1FFF) { "pid out of range: $pid" }
+        require(payload.size <= 184)
+        val packet = ByteArray(188)
+        packet[0] = 0x47
+        // byte 1: payload_unit_start_indicator + PID high (5 bits)
+        packet[1] = ((if (pusi) 0x40 else 0) or ((pid shr 8) and 0x1F)).toByte()
+        // byte 2: PID low (8 bits)
+        packet[2] = (pid and 0xFF).toByte()
+        // byte 3: AFC=01 (payload only) + cc=0
+        packet[3] = 0x10.toByte()
+        System.arraycopy(payload, 0, packet, 4, payload.size)
+        return packet
+    }
+
+    /** PAT (PID=0) advertising one program → [pmtPid]. */
+    private fun patPacket(
+        programNumber: Int,
+        pmtPid: Int,
+    ): ByteArray {
+        val payload = ByteArray(184)
+        payload[0] = 0x00 // pointer_field
+        // section header (table_id, length, tsid, flags, section nums)
+        payload[1] = 0x00 // table_id = PAT
+        payload[2] = 0x80.toByte()
+        payload[3] = 0x09
+        payload[4] = 0x00
+        payload[5] = 0x01
+        payload[6] = 0xC1.toByte()
+        payload[7] = 0x00
+        payload[8] = 0x00
+        // first program entry
+        payload[9] = ((programNumber shr 8) and 0xFF).toByte()
+        payload[10] = (programNumber and 0xFF).toByte()
+        payload[11] = (((pmtPid shr 8) and 0x1F) or 0xE0).toByte()
+        payload[12] = (pmtPid and 0xFF).toByte()
+        return tsPacket(pid = 0, pusi = true, payload = payload)
+    }
+
+    /** Minimal PMT packet — content doesn't matter, only PID match. */
+    private fun pmtPacket(pmtPid: Int): ByteArray =
+        tsPacket(pid = pmtPid, pusi = true)
 }

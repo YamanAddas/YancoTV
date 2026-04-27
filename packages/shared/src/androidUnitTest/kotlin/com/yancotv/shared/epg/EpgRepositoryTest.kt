@@ -94,6 +94,7 @@ class EpgRepositoryTest {
         db: com.yancotv.shared.db.YancoDb,
         id: String,
         epgUrl: String?,
+        epgPriority: Long = 0L,
     ) {
         db.sourcesQueries.insert(
             id = id,
@@ -113,7 +114,7 @@ class EpgRepositoryTest {
             priority = 0,
             channel_count = 0,
             auto_sync_interval = 0,
-            epg_priority = 0,
+            epg_priority = epgPriority,
             created_at = 0,
             updated_at = 0,
         )
@@ -374,6 +375,111 @@ class EpgRepositoryTest {
             insertProgramme(db, tvg, windowCenter - 100L, windowCenter + 100L, "src-A")
         }
     }
+
+    /**
+     * MK.15.7 — multi-EPG priority. When two sources cover the same
+     * `tvg_id` at the same time, queries that have a `LEFT JOIN
+     * sources … ORDER BY epg_priority DESC` (nowForChannel,
+     * nowNextForChannel, forChannelRange, futureByChannelAndTitle,
+     * guideWindow) must return the higher-priority source's row first.
+     * These tests pin that contract so a future refactor that drops
+     * the JOIN can't silently regress.
+     */
+    @Test fun `getNowProgramme picks higher epg_priority source`() =
+        runTest {
+            val (db, driver) = newDbPair()
+            insertSource(db, "src-low", null, epgPriority = 0L)
+            insertSource(db, "src-high", null, epgPriority = 5L)
+
+            // Both sources publish a programme covering "now".
+            val nowSec = 1_000L
+            db.epgProgrammesQueries.upsert(
+                id = "low-prog",
+                source_id = "src-low",
+                channel_tvg_id = "cnn.us",
+                title = "Low source show",
+                description = null,
+                start_time = nowSec - 500L,
+                end_time = nowSec + 500L,
+                category = null,
+                icon_url = null,
+            )
+            db.epgProgrammesQueries.upsert(
+                id = "high-prog",
+                source_id = "src-high",
+                channel_tvg_id = "cnn.us",
+                title = "High source show",
+                description = null,
+                start_time = nowSec - 500L,
+                end_time = nowSec + 500L,
+                category = null,
+                icon_url = null,
+            )
+
+            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { nowSec * 1_000L })
+            val now = repo.getNowProgramme("cnn.us")
+            assertNotNull(now)
+            assertEquals("High source show", now.title)
+        }
+
+    @Test fun `single-source case unchanged by priority JOIN`() =
+        runTest {
+            val (db, driver) = newDbPair()
+            insertSource(db, "src-A", null, epgPriority = 0L)
+            val nowSec = 1_000L
+            db.epgProgrammesQueries.upsert(
+                id = "p1",
+                source_id = "src-A",
+                channel_tvg_id = "cnn.us",
+                title = "Solo show",
+                description = null,
+                start_time = nowSec - 500L,
+                end_time = nowSec + 500L,
+                category = null,
+                icon_url = null,
+            )
+
+            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { nowSec * 1_000L })
+            assertEquals("Solo show", repo.getNowProgramme("cnn.us")?.title)
+        }
+
+    @Test fun `getProgrammesForChannel orders priority then start_time`() =
+        runTest {
+            val (db, driver) = newDbPair()
+            insertSource(db, "src-low", null, epgPriority = 0L)
+            insertSource(db, "src-high", null, epgPriority = 10L)
+
+            // Same channel, two sources, programmes interleaved in time.
+            // forChannelRange's ORDER BY priority DESC, start_time means
+            // ALL high-priority rows come before any low-priority rows
+            // even when their start_time is later.
+            val low1 = 1000L
+            val low2 = 2000L
+            val high1 = 1500L
+            db.epgProgrammesQueries.upsert(
+                id = "low-1", source_id = "src-low", channel_tvg_id = "cnn.us",
+                title = "Low 1", description = null, start_time = low1, end_time = low1 + 100,
+                category = null, icon_url = null,
+            )
+            db.epgProgrammesQueries.upsert(
+                id = "low-2", source_id = "src-low", channel_tvg_id = "cnn.us",
+                title = "Low 2", description = null, start_time = low2, end_time = low2 + 100,
+                category = null, icon_url = null,
+            )
+            db.epgProgrammesQueries.upsert(
+                id = "high-1", source_id = "src-high", channel_tvg_id = "cnn.us",
+                title = "High 1", description = null, start_time = high1, end_time = high1 + 100,
+                category = null, icon_url = null,
+            )
+
+            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 0L })
+            val rows = repo.getProgrammesForChannel("cnn.us", startTime = 0L, endTime = 10_000L)
+            assertEquals(3, rows.size)
+            // High-priority row first, then low-priority by start_time.
+            assertEquals("High 1", rows[0].title)
+            assertEquals("Low 1", rows[1].title)
+            assertEquals("Low 2", rows[2].title)
+        }
 
     private fun insertContent(
         db: com.yancotv.shared.db.YancoDb,

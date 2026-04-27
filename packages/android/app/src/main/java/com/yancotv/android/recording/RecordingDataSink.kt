@@ -101,6 +101,17 @@ class RecordingDataSink(
     fun begin(stream: OutputStream) {
         synchronized(lock) {
             output?.let { prior ->
+                // MB-206 — fail-open flush on duplicate begin too. If the
+                // prior recording's prelude never resolved (PAT not seen
+                // yet) we still dump whatever's buffered so the prior
+                // stream isn't a silent zero-byte file. Symmetric with
+                // [end].
+                if (!headerSeen) {
+                    val pending = headerBuf?.toByteArray()
+                    if (pending != null && pending.isNotEmpty()) {
+                        runCatching { prior.write(pending, 0, pending.size) }
+                    }
+                }
                 runCatching { prior.flush() }
                 runCatching { prior.close() }
             }
@@ -118,6 +129,23 @@ class RecordingDataSink(
      */
     fun end(): Long {
         synchronized(lock) {
+            // MB-206 — if the recording stops before a PAT/PMT pair was
+            // ever seen (very short recording, or a stream that never
+            // emits PAT in the buffer window), flush whatever's been
+            // buffered so the user at least sees bytes on disk. The
+            // file may be unplayable but it's not a silent zero-byte
+            // confusion. Same fail-open posture as the buffer-cap
+            // bail in [write].
+            if (!headerSeen) {
+                val pending = headerBuf?.toByteArray()
+                val stream = output
+                if (pending != null && pending.isNotEmpty() && stream != null) {
+                    runCatching {
+                        stream.write(pending, 0, pending.size)
+                        bytesWritten += pending.size.toLong()
+                    }
+                }
+            }
             val total = bytesWritten
             output?.let { stream ->
                 runCatching { stream.flush() }
