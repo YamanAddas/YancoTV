@@ -370,6 +370,9 @@ fun HomeScreen(
             } else if (section == AppSection.Guide) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     GuideScreen(
+                        panelFocus = panelFocus,
+                        onPanelFocusChanged = { panelFocus = it },
+                        onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
                         onPlay = { channel, _ ->
                             val item = guideChannelToContentItem(channel) ?: return@GuideScreen
                             gatedPlay(item.id) {

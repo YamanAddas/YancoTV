@@ -7,7 +7,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -124,6 +129,15 @@ fun GuideScreen(
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,
     onPlayCatchup: (ContentItem) -> Unit,
     modifier: Modifier = Modifier,
+    // MK.guide.groups — Sidebar ↔ Categories ↔ Content cascade, driven
+    // from HomeScreen the same way BrowseSection (Live/Movies/Series)
+    // is. RIGHT/CENTER walks forward; LEFT/BACK walks back. `panelFocus`
+    // is the single source of truth; the LaunchedEffect below moves
+    // focus on every transition. Defaults preserve the old standalone
+    // behaviour for any future caller that doesn't host the cascade.
+    panelFocus: PanelFocus = PanelFocus.Categories,
+    onPanelFocusChanged: (PanelFocus) -> Unit = {},
+    onExitToSidebar: () -> Unit = {},
     epg: EpgRepository = koinInject(),
     scheduler: ReminderScheduler = koinInject(),
     catchup: CatchupService = koinInject(),
@@ -159,6 +173,21 @@ fun GuideScreen(
     var reloadTick by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    // MK.guide.groups — focus anchors for the cascade (mirrors
+    // BrowseSection's pattern). Pill anchor uses the placed-focus
+    // primitive so requestFocus() always lands on a placed node;
+    // gridFocus is a plain FocusRequester targeting the right-pane
+    // wrapper.
+    val pillAnchor = com.yancotv.android.ui.focus.rememberPlacedFocusAnchor()
+    val gridFocus = remember { FocusRequester() }
+    LaunchedEffect(panelFocus) {
+        when (panelFocus) {
+            PanelFocus.Categories -> pillAnchor.awaitAndRequest()
+            PanelFocus.Content -> runCatching { gridFocus.requestFocus() }
+            PanelFocus.Sidebar -> { /* shell sidebar owns focus */ }
+        }
+    }
 
     // Reload when the user changes the EPG window prefs OR picks a
     // different group filter. We deliberately do NOT blank `channels`
@@ -354,6 +383,13 @@ fun GuideScreen(
     // Combined with B (channels not blanked on switch), the focused
     // pill survives the press → no unmount-while-focused crash.
     val railSelected = selectedGroup ?: ALL_GROUPS
+    // BackHandler is gated on grid focus so BACK from a programme cell
+    // returns to the rail rather than exiting the screen. Hardware BACK
+    // when the rail itself is focused bubbles up to the shell.
+    var gridHasFocus by remember { mutableStateOf(false) }
+    BackHandler(enabled = gridHasFocus) {
+        onPanelFocusChanged(PanelFocus.Categories)
+    }
     Row(modifier = modifier.fillMaxSize()) {
         if (groups.isNotEmpty()) {
             CategoryRail(
@@ -362,13 +398,33 @@ fun GuideScreen(
                 onSelect = { picked ->
                     selectedGroup = if (picked == ALL_GROUPS) null else picked
                 },
-                onEnterContent = { /* grid takes focus via natural traversal */ },
-                onExitToSidebar = { /* shell sidebar is the parent's BACK target */ },
-                onPanelFocusChanged = { /* no shell collapse for the guide */ },
+                onEnterContent = {
+                    // CENTER on a pill commits selection AND walks
+                    // forward into the grid. RIGHT-arrow does the same
+                    // via Compose's natural focus traversal between
+                    // sibling Row children.
+                    onPanelFocusChanged(PanelFocus.Content)
+                },
+                onExitToSidebar = {
+                    onPanelFocusChanged(PanelFocus.Sidebar)
+                    onExitToSidebar()
+                },
+                onPanelFocusChanged = { hasFocus ->
+                    if (hasFocus) onPanelFocusChanged(PanelFocus.Categories)
+                },
+                selectedAnchor = pillAnchor,
                 showFavorites = false,
             )
         }
-        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .focusRequester(gridFocus)
+                    .focusGroup()
+                    .onFocusChanged { gridHasFocus = it.hasFocus },
+        ) {
             if (guideEmpty) {
                 if (loading) {
                     GuideEmptyState(text = "Loading guide…", modifier = Modifier.fillMaxSize())
