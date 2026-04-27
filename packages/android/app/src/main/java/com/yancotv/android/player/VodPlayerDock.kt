@@ -691,3 +691,32 @@ private fun HintItem(prefix: String, label: String) {
         )
     }
 }
+
+/**
+ * 2026-04-27 — slim chip-route enum. Originally the tab key for
+ * PlayerOptionsSheet.kt (a 700-line side sheet with per-tab metadata
+ * fields). The sheet was retired when both LIVE and VOD migrated to
+ * the new options popup + per-category panels (`PlayerOptionsMenu` /
+ * `PlayerOptionsPanelHost`). This enum survives only because the
+ * dock's secondary chips still emit a route hint to the activity,
+ * which maps it to a `PlayerOptionCategory` for `showOptionsV2`.
+ *
+ * Could be replaced by `PlayerOptionCategory` directly to drop the
+ * mapping; left as a separate UI-side enum so the dock stays
+ * unaware of the options-package internals.
+ */
+enum class SheetMode {
+    AUDIO,
+    SUBS,
+    SPEED,
+    ASPECT,
+    SLEEP,
+    RECORD,
+    FAV,
+    EXT,
+    /** No matching V2 panel; activity falls through to the popup root. */
+    CAST,
+
+    /** No matching V2 panel; activity falls through to the popup root. */
+    LOOK,
+}

@@ -311,17 +311,11 @@
         android:inflatedId="@+id/surf_overlay"
         android:layout="@layout/player_surf_overlay" />
 
-    <!-- Player-options bottom sheet (MK.12a.1). MENU on the remote / long-press
-         CENTER opens it; it hosts audio/subtitle/speed/aspect pickers + the
-         sleep timer from MK.12a.2–12a.5 + MK.12b. Inflated lazily like the
-         surf overlay — most sessions never open it. -->
-    <ViewStub
-        android:id="@+id/player_options_sheet_stub"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="bottom"
-        android:inflatedId="@+id/player_options_sheet"
-        android:layout="@layout/player_options_sheet" />
+    <!-- 2026-04-27 — legacy player-options sheet retired. MENU now
+         opens the V2 popup (player_options_v2_stub below) for both
+         LIVE and VOD; PlayerOptionsSheet.kt was deleted in the same
+         commit. The player_options_sheet drawable layout file is
+         orphaned and can be removed in a follow-up sweep. -->
 
     <!-- VOD dock (MK.16.player.vod.dock). Compose replacement for Media3's
          built-in PlayerControlView when the current item is non-live.

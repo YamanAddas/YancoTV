@@ -182,12 +182,11 @@ class PlayerActivity : AppCompatActivity() {
     private var surfOverlay: ComposeView? = null
     private var surfVisible by mutableStateOf(false)
 
-    // Player-options sheet (MK.12a.1) — same lazy-inflation pattern as the
-    // surf overlay. Hosts audio/subtitle/speed/aspect/sleep pickers as
-    // MK.12a.2+ land. Opened via KEYCODE_MENU or long-press CENTER.
-    private var sheetOverlay: ComposeView? = null
-    private var sheetVisible by mutableStateOf(false)
-    private var sheetMode by mutableStateOf(SheetMode.AUDIO)
+    // 2026-04-27 — legacy player-options sheet retired. Both LIVE and
+    // VOD now route through `optionsV2State` / `showOptionsV2`.
+    // PlayerOptionsSheet.kt was deleted in the same commit. The slim
+    // SheetMode enum (defined in VodPlayerDock.kt now) survives only
+    // as a chip-route hint from the dock to the activity.
 
     // MK.12a.3 — SAF picker for external subtitle files. Registered in
     // onCreate (must happen before STARTED) and dispatched via
@@ -921,12 +920,11 @@ class PlayerActivity : AppCompatActivity() {
                     controller = controller,
                     prefs = prefs,
                     onPickSubtitleFile = {
-                        // Reuse the existing SAF launcher in the legacy
-                        // path — slice 2 wires this directly. For now,
-                        // dropping into the legacy sheet's Subs panel
-                        // is a clean fallback.
-                        hideOptionsV2()
-                        showSheet(SheetMode.SUBS)
+                        // 2026-04-27 — direct SAF launch. No more
+                        // legacy-sheet fallback. launchSubtitlePicker
+                        // closes the popup itself before the picker
+                        // pops.
+                        launchSubtitlePicker()
                     },
                     onDismiss = { hideOptionsV2() },
                 )
@@ -1546,35 +1544,14 @@ class PlayerActivity : AppCompatActivity() {
         playerView.requestFocus()
     }
 
-    // ───── Player options sheet (MK.12a.1) ─────
-
-    private fun ensureSheetOverlay(): ComposeView {
-        sheetOverlay?.let { return it }
-        val stub = findViewById<android.view.ViewStub>(R.id.player_options_sheet_stub)
-        val inflated = stub.inflate() as ComposeView
-        inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        inflated.setContent {
-            if (sheetVisible) {
-                PlayerOptionsSheet(
-                    mode = sheetMode,
-                    onModeChange = { sheetMode = it },
-                    onDismiss = { hideSheet() },
-                    onPickSubtitleFile = { launchSubtitlePicker() },
-                )
-            }
-        }
-        sheetOverlay = inflated
-        return inflated
-    }
-
     /**
      * Launch the SAF "Open document" picker filtered to common subtitle
-     * MIME types. Hide the sheet first — the picker opens as a new activity
-     * and seeing the sheet still up when we return reads as broken. The
-     * callback [onSubtitleUriPicked] applies the pick.
+     * MIME types. Closes the V2 popup first — the picker opens as a
+     * new activity and seeing the popup still up when we return reads
+     * as broken. The callback [onSubtitleUriPicked] applies the pick.
      */
     private fun launchSubtitlePicker() {
-        hideSheet()
+        if (optionsV2Inflated && optionsV2State.menuVisible.value) hideOptionsV2()
         // Wildcard because most file explorers don't claim a MIME for .srt/
         // .vtt/.ass — filtering on explicit MIMEs hides most user files.
         // Sniffing happens downstream off the file extension.
@@ -1599,47 +1576,6 @@ class PlayerActivity : AppCompatActivity() {
             name.endsWith(".ass") || name.endsWith(".ssa") -> androidx.media3.common.MimeTypes.TEXT_SSA
             else -> null
         }
-    }
-
-    private fun showSheet(initialMode: SheetMode = SheetMode.AUDIO) {
-        if (sheetVisible) return
-        // Hide the Media3 controller if it was up — the sheet sits over the
-        // controls and a two-layer overlay reads as broken.
-        playerView.hideController()
-        // Block PlayerView (and its Media3 PlayerControlView descendants)
-        // from receiving D-pad focus while the sheet owns the screen. Without
-        // this, Compose's 2D focus search inside a panel can escape the sheet
-        // when the focused row vanishes (e.g. after Stop recording flips the
-        // panel) and land on a transport button underneath — the user then
-        // controls play/pause through the sheet's scrim. Restored in hideSheet().
-        playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-        playerView.isFocusable = false
-        // Open on the requested tab. Default is AUDIO: the MK.16.sheet
-        // Concept A port dropped the old root "OPTIONS" list in favour of
-        // tab-driven navigation, and audio is both the most-used tab and
-        // the one shown first in the old root list. The VOD dock's
-        // secondary chips pass their own tab (CC → SUBS, SPEED → SPEED,
-        // etc.) so each chip lands the user directly on the relevant
-        // panel. Persisting the last-used tab ships with MK.16.2.
-        sheetMode = initialMode
-        sheetVisible = true
-        val v = ensureSheetOverlay()
-        v.visibility = View.VISIBLE
-        v.post { v.requestFocus() }
-    }
-
-    private fun hideSheet() {
-        if (!sheetVisible) return
-        sheetVisible = false
-        sheetMode = SheetMode.AUDIO
-        sheetOverlay?.visibility = View.GONE
-        // Restore PlayerView focus so Media3's transport buttons + the
-        // controller chrome are reachable again. FOCUS_AFTER_DESCENDANTS is
-        // PlayerView's default — it lets the controller's buttons take focus
-        // first when visible, falling back to the View itself otherwise.
-        playerView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-        playerView.isFocusable = true
-        playerView.requestFocus()
     }
 
     // ───── Keys ─────
@@ -1672,7 +1608,7 @@ class PlayerActivity : AppCompatActivity() {
             // which zaps channels even though the popup is visible — the
             // user could see the menu but not navigate it.
             val optionsV2Visible = optionsV2Inflated && optionsV2State.menuVisible.value
-            val noOverlay = !surfVisible && !dockVisible && !sheetVisible && !optionsV2Visible
+            val noOverlay = !surfVisible && !dockVisible && !optionsV2Visible
             val isLiveNow = controller.currentItem.value?.type == ContentType.LIVE
             // MK.10.4 fix — LIVE LEFT / RIGHT / TV_CONTENTS_MENU / CHANNEL_UP /
             // CHANNEL_DOWN always go through our handler, even when the
@@ -1771,21 +1707,6 @@ class PlayerActivity : AppCompatActivity() {
         if (dockVisible) {
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
                 hideVodDock()
-                return true
-            }
-            return super.onKeyDown(keyCode, event)
-        }
-        // Options sheet takes precedence over surf — BACK dismisses it and
-        // D-pad drives its Compose focus. Everything else falls through so
-        // Compose's own key handling gets the event.
-        if (sheetVisible) {
-            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                // MK.16.sheet: the Concept A port made the sheet a
-                // tab-driven side panel with no root list, so BACK
-                // dismisses directly from any tab. Tabs are their own
-                // focus targets — users move between them with D-pad, not
-                // BACK.
-                hideSheet()
                 return true
             }
             return super.onKeyDown(keyCode, event)
