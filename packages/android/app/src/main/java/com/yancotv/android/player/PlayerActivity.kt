@@ -1701,10 +1701,15 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
         }
-        // MK.options.redesign — popup/panel intercepts BACK first. BACK
-        // in a panel returns to the popup; BACK in the popup closes the
-        // whole thing. OK and arrows are handled by the Compose layer
-        // itself — we only own BACK + a global escape.
+        // MK.options.redesign — popup/panel takes priority while up.
+        // BACK closes one level (panel → popup → dismissed). UP/DOWN/
+        // LEFT/RIGHT/CENTER are owned by the Compose layer; if Compose
+        // declines them (e.g. UP at the first row), we swallow them here
+        // so the activity's channel-zap / seek handlers below don't
+        // hijack focus back to the player. Without this, pressing UP
+        // from the first popup row sent focus to PlayerView and
+        // triggered controller.previous() — channels zapped while the
+        // popup was visible.
         if (optionsV2Inflated && optionsV2State.menuVisible.value) {
             when (keyCode) {
                 KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
@@ -1715,6 +1720,11 @@ class PlayerActivity : AppCompatActivity() {
                     }
                     return true
                 }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
+                -> return true
             }
         }
         // MK.10.4 — numeric entry takes priority. OK commits, BACK cancels.
