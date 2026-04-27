@@ -1,10 +1,14 @@
 package com.yancotv.android.ui.settings
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,8 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -96,11 +100,13 @@ fun SettingsBackupTab(
     val customFolder = customFolderString?.let(Uri::parse)
 
     // Focus anchors — when an SAF picker returns, Compose puts focus
-    // wherever it lands by default (often on the sidebar tab item).
-    // Re-grab focus on the Export / Restore button after operations
-    // complete so the user stays in this tab, in this section.
-    val exportButtonFocus = remember { FocusRequester() }
-    val importButtonFocus = remember { FocusRequester() }
+    // wherever it lands by default (often on the sidebar root). Use
+    // PlacedFocusAnchor (project's race-free focus primitive) so the
+    // request waits for the button's onPlaced callback before firing
+    // — bare FocusRequester.requestFocus() races the activity-resume
+    // recomposition and silently no-ops on Fire TV.
+    val exportButtonAnchor = rememberPlacedFocusAnchor()
+    val importButtonAnchor = rememberPlacedFocusAnchor()
 
     // Generate a timestamped filename.
     fun makeFilename(): String {
@@ -131,7 +137,7 @@ fun SettingsBackupTab(
             exporting = false
             exportStatus = formatExportResult(result, filename)
             // Re-grab focus after the picker / coroutine round-trip.
-            runCatching { exportButtonFocus.requestFocus() }
+            runCatching { exportButtonAnchor.awaitAndRequest() }
         }
     }
 
@@ -150,7 +156,7 @@ fun SettingsBackupTab(
                 }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
             exporting = false
             exportStatus = formatExportResult(result, filename)
-            runCatching { exportButtonFocus.requestFocus() }
+            runCatching { exportButtonAnchor.awaitAndRequest() }
         }
     }
 
@@ -159,7 +165,7 @@ fun SettingsBackupTab(
             contract = ActivityResultContracts.OpenDocumentTree(),
         ) { treeUri: Uri? ->
             if (treeUri == null) {
-                runCatching { exportButtonFocus.requestFocus() }
+                scope.launch { runCatching { exportButtonAnchor.awaitAndRequest() } }
                 return@rememberLauncherForActivityResult
             }
             runCatching {
@@ -178,17 +184,31 @@ fun SettingsBackupTab(
             runExportToCustomFolder(treeUri)
         }
 
+    // Initial URI for the import picker — opens to wherever the user
+    // last saved a backup so they don't have to navigate from scratch.
+    // Priority: persisted custom-folder SAF tree → most recent
+    // BackupMetadata.file_uri → null (system default).
+    var initialImportUri by remember { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(customFolderString) {
+        initialImportUri =
+            customFolder ?: withContext(Dispatchers.IO) {
+                runCatching {
+                    db.backupMetadataQueries.selectLatest().executeAsOneOrNull()?.file_uri?.let(Uri::parse)
+                }.getOrNull()
+            }
+    }
+
     val importPickLauncher =
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.OpenDocument(),
+            contract = OpenDocumentWithInitialUri(initialImportUri),
         ) { uri: Uri? ->
             if (uri == null) {
-                runCatching { importButtonFocus.requestFocus() }
+                scope.launch { runCatching { importButtonAnchor.awaitAndRequest() } }
                 return@rememberLauncherForActivityResult
             }
             importPickedUriString = uri.toString()
             importStatus = "Picked ${uri.lastPathSegment ?: uri}"
-            runCatching { importButtonFocus.requestFocus() }
+            scope.launch { runCatching { importButtonAnchor.awaitAndRequest() } }
         }
 
     Column(
@@ -297,7 +317,7 @@ fun SettingsBackupTab(
                             runExportToDefault()
                         }
                     },
-                    modifier = Modifier.focusRequester(exportButtonFocus),
+                    modifier = Modifier.placedFocus(exportButtonAnchor).focusable(),
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text(if (exporting) "Exporting…" else "Export backup")
@@ -312,8 +332,10 @@ fun SettingsBackupTab(
                     OutlinedButton(
                         onClick = {
                             customFolderString = null
-                            scope.launch { prefs.setBackupFolderUri(null) }
-                            runCatching { exportButtonFocus.requestFocus() }
+                            scope.launch {
+                                prefs.setBackupFolderUri(null)
+                                runCatching { exportButtonAnchor.awaitAndRequest() }
+                            }
                         },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextMuted),
                     ) {
@@ -359,7 +381,7 @@ fun SettingsBackupTab(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { importPickLauncher.launch(arrayOf("application/json", "*/*")) },
-                    modifier = Modifier.focusRequester(importButtonFocus),
+                    modifier = Modifier.placedFocus(importButtonAnchor).focusable(),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
                     Text(if (importPickedUri == null) "Choose backup file…" else "Choose another file…")
@@ -387,7 +409,7 @@ fun SettingsBackupTab(
                             val result = coordinator.import(importPickedUri, password = importPassword.takeIf { it.isNotBlank() })
                             importing = false
                             importStatus = formatImportResult(result)
-                            runCatching { importButtonFocus.requestFocus() }
+                            runCatching { importButtonAnchor.awaitAndRequest() }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
@@ -466,6 +488,32 @@ fun SettingsBackupTab(
                 }
             }
         }
+    }
+}
+
+/**
+ * MK.19.8.3 (UX fix #2) — `ActivityResultContracts.OpenDocument`
+ * doesn't expose the standard `EXTRA_INITIAL_URI` knob, so the SAF
+ * picker always opens to the system default ("Recent" on most
+ * Android skins). This subclass adds the extra so we can land the
+ * picker on the user's last backup folder. Falls back to the system
+ * default when [initialUri] is null or the extra isn't supported.
+ *
+ * EXTRA_INITIAL_URI was added in API 26. Older devices ignore the
+ * extra harmlessly — picker opens to default and the user navigates.
+ */
+private class OpenDocumentWithInitialUri(
+    private val initialUri: Uri?,
+) : ActivityResultContracts.OpenDocument() {
+    override fun createIntent(
+        context: Context,
+        input: Array<String>,
+    ): Intent {
+        val intent = super.createIntent(context, input)
+        if (initialUri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
+        }
+        return intent
     }
 }
 
