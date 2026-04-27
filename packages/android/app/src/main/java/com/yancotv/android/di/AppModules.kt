@@ -90,6 +90,7 @@ val appModule =
                 prefs = get(),
                 history = get(),
                 recordingSink = get(),
+                sources = get(),
             )
         }
         single {

@@ -22,6 +22,7 @@ import com.yancotv.android.recording.RecordingDataSink
 import com.yancotv.android.recording.TeeingDataSourceFactory
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.playback.Playable
+import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -48,6 +49,19 @@ import java.util.concurrent.TimeUnit
  * computed at pick time from the channel's current EPG programme end time
  * and passed to [PlaybackController.setSleepTimer] explicitly.
  */
+/**
+ * MK.17.5 — per-source HTTP override staged by
+ * [PlaybackController.applySourceOverride] and read by the OkHttp
+ * interceptor on every request. Either field can be null/blank
+ * independently — a source might want a custom UA without a Referer
+ * (Xtream typical) or a Referer with the global UA (Akamai-style hosts
+ * that gate on Referer only).
+ */
+internal data class SourceNetworkOverride(
+    val userAgent: String?,
+    val referer: String?,
+)
+
 enum class SleepTimerOption(val durationMs: Long?) {
     MIN_15(15L * 60_000L),
     MIN_30(30L * 60_000L),
@@ -104,7 +118,24 @@ class PlaybackController(
      * tee in that case.
      */
     private val recordingSink: RecordingDataSink? = null,
+    /**
+     * MK.17.5 — per-source HTTP override. When non-null, [loadCurrent]
+     * looks up the playing item's source and stages its `userAgent` /
+     * `referer` for the OkHttp interceptor. The global UA from
+     * [AppPreferences.networkFlow] is the fallback when a source has
+     * no override or this dependency is absent (test paths).
+     */
+    private val sources: SourceRepository? = null,
 ) {
+    /**
+     * MK.17.5 — staged per-source HTTP override read by the OkHttp
+     * interceptor on every request. Updated by [loadCurrent] on item
+     * change. `null` = use the global UA / no Referer. Volatile because
+     * the interceptor reads from OkHttp's IO threads while writes
+     * originate on the controller's coroutine scope.
+     */
+    @Volatile
+    private var currentSourceNet: SourceNetworkOverride? = null
     /**
      * The shared ExoPlayer. Mutable to support MK.9.4's FFmpeg crash
      * watchdog: on a confirmed FFmpeg-renderer crash the controller
@@ -163,20 +194,28 @@ class PlaybackController(
                 .followSslRedirects(true)
                 .addInterceptor { chain ->
                     val net = prefs.networkFlow.value
+                    // MK.17.5 — per-source override wins over the global
+                    // UA. Same fallback chain as before for sources that
+                    // don't carry an override: source UA → global UA →
+                    // hard-coded default. Referer is only sent when the
+                    // active source explicitly opts in.
+                    val perSource = currentSourceNet
                     val ua =
-                        net.userAgentOverride
-                            ?.takeIf { it.isNotBlank() }
+                        perSource?.userAgent?.takeIf { it.isNotBlank() }
+                            ?: net.userAgentOverride?.takeIf { it.isNotBlank() }
                             ?: DEFAULT_USER_AGENT
                     val connect = net.connectTimeoutSec.takeIf { it > 0 } ?: DEFAULT_CONNECT_TIMEOUT_SEC
                     val read = net.readTimeoutSec.takeIf { it > 0 } ?: DEFAULT_READ_TIMEOUT_SEC
-                    val req =
+                    val builder =
                         chain.request().newBuilder()
                             .header("User-Agent", ua)
-                            .build()
+                    perSource?.referer?.takeIf { it.isNotBlank() }?.let {
+                        builder.header("Referer", it)
+                    }
                     chain
                         .withConnectTimeout(connect, TimeUnit.SECONDS)
                         .withReadTimeout(read, TimeUnit.SECONDS)
-                        .proceed(req)
+                        .proceed(builder.build())
                 }.build()
         // OkHttpDataSource.Factory.setUserAgent is intentionally NOT called —
         // the interceptor above is the sole source of the UA so user
@@ -639,8 +678,46 @@ class PlaybackController(
                 .build()
     }
 
+    /**
+     * MK.17.5 — stage [currentSourceNet] for the OkHttp interceptor by
+     * resolving [sourceId] against [SourceRepository] off the main thread.
+     * No-op when no [sources] dependency is wired (test paths) or the
+     * source carries no override; the interceptor falls back to the
+     * global UA either way.
+     *
+     * Drops the result if the playing item has changed by the time the
+     * IO read completes — a fast cross-source zap shouldn't apply the
+     * older source's headers to the new stream.
+     */
+    private fun applySourceOverride(sourceId: String) {
+        val repo = sources ?: return
+        val itemAtCall = _currentItem.value ?: _queue.value.getOrNull(_index.value)
+        scope.launch(Dispatchers.IO) {
+            val src = runCatching { repo.getById(sourceId) }.getOrNull()
+            if (_currentItem.value?.id != itemAtCall?.id) return@launch
+            currentSourceNet =
+                if (src?.userAgent.isNullOrBlank() && src?.referer.isNullOrBlank()) {
+                    null
+                } else {
+                    SourceNetworkOverride(
+                        userAgent = src?.userAgent?.takeIf { it.isNotBlank() },
+                        referer = src?.referer?.takeIf { it.isNotBlank() },
+                    )
+                }
+        }
+    }
+
     private fun loadCurrent() {
         val item = _queue.value.getOrNull(_index.value) ?: return
+        // MK.17.5 — stage the playing source's UA / Referer so the OkHttp
+        // interceptor applies them on the imminent prepare(). Look up runs
+        // off-main; the interceptor reads whatever's staged at request
+        // time. First HTTP open after a same-source play is already
+        // covered (override carries over from the prior load); the only
+        // race is the first HTTP open after a cross-source switch with
+        // no prior override staged for the new source — falls back to
+        // the global UA, which is the same behaviour as pre-MK.17.5.
+        applySourceOverride(item.sourceId)
         // MK.12b.1 — end-of-program timers tie to the *current* channel's
         // EPG. Zapping to a different channel invalidates the deadline; cancel.
         // Fixed-duration timers stay armed because their deadline is

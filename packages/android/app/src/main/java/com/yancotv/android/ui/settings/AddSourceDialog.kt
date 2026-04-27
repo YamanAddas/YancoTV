@@ -64,6 +64,12 @@ fun AddSourceDialog(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var epgUrl by remember { mutableStateOf("") }
+    // MK.17.5 — per-source HTTP override fields. Both optional. UA
+    // overrides the app-wide pref; Referer is sent only when set
+    // (some providers gate playback on Referer presence — see
+    // PlaybackController interceptor).
+    var userAgent by remember { mutableStateOf("") }
+    var referer by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
 
     fun submit() {
@@ -94,6 +100,8 @@ fun AddSourceDialog(
                 username = username.takeIf { it.isNotBlank() }?.trim(),
                 password = password.takeIf { it.isNotBlank() },
                 epgUrl = epgUrl.takeIf { it.isNotBlank() }?.trim(),
+                userAgent = userAgent.takeIf { it.isNotBlank() }?.trim(),
+                referer = referer.takeIf { it.isNotBlank() }?.trim(),
             ),
         )
     }
@@ -207,6 +215,26 @@ fun AddSourceDialog(
                     hint = "Optional — leave blank for the provider's built-in guide",
                     value = epgUrl,
                     onValueChange = { epgUrl = it },
+                    keyboardType = KeyboardType.Uri,
+                    bare = true,
+                )
+
+                // MK.17.5 — advanced HTTP overrides. Most users leave
+                // these blank; providers that gate on UA / Referer will
+                // surface the requirement in their docs.
+                SectionLabel("Advanced — HTTP headers")
+                SettingsClickToEditField(
+                    label = "User-Agent",
+                    hint = "Optional — overrides the app-wide UA for this source's streams",
+                    value = userAgent,
+                    onValueChange = { userAgent = it },
+                    bare = true,
+                )
+                SettingsClickToEditField(
+                    label = "Referer",
+                    hint = "Optional — sent only when set (required by TikiLive / OkLivetv-class hosts)",
+                    value = referer,
+                    onValueChange = { referer = it },
                     keyboardType = KeyboardType.Uri,
                     bare = true,
                 )
