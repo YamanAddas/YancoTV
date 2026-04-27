@@ -74,10 +74,16 @@ fun ChannelActionsMenu(
     val isFav by favorites.isFavoriteFlow(item.id).collectAsState(initial = false)
     val lockedIds by repo.lockedIds.collectAsState()
     val locked = item.id in lockedIds
+    // MK.13.4 — multi-list. When more than one list exists, the
+    // Favourite action prompts which list rather than silently writing
+    // to default. Single-list installs (the common case) keep the
+    // one-tap toggle behaviour.
+    val lists by favorites.listsFlow().collectAsState(initial = emptyList<com.yancotv.shared.types.FavoriteList>())
 
     var gateForUnlock by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showLogoUrl by remember { mutableStateOf(false) }
+    var showListPicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -99,13 +105,18 @@ fun ChannelActionsMenu(
                 ActionRow(
                     label = if (isFav) "Remove from favourites" else "Add to favourites",
                     onClick = {
-                        // Favorites repo write — IO per the threading rule. Toggle is
-                        // best-effort; if the DB write fails the live `isFavoriteFlow`
-                        // simply doesn't flip and the user retries.
-                        scope.launch(Dispatchers.IO) {
-                            runCatching { favorites.toggle(item.id) }
+                        // MK.13.4 — when multiple lists exist, picking
+                        // "Add to favourites" should let the user choose
+                        // a destination. Removal still goes through the
+                        // single-content delete (deletes from every list).
+                        if (!isFav && lists.size > 1) {
+                            showListPicker = true
+                        } else {
+                            scope.launch(Dispatchers.IO) {
+                                runCatching { favorites.toggle(item.id) }
+                            }
+                            onDismiss()
                         }
-                        onDismiss()
                     },
                 )
                 ActionRow(
@@ -209,6 +220,42 @@ fun ChannelActionsMenu(
                 onDismiss()
             },
             onDismiss = { showRename = false },
+        )
+    }
+
+    if (showListPicker) {
+        AlertDialog(
+            onDismissRequest = { showListPicker = false },
+            containerColor = LocalYancoPalette.current.BackgroundRaised,
+            title = { Text("Add to which list?", color = LocalYancoPalette.current.TextPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    lists.forEach { list ->
+                        TextButton(
+                            onClick = {
+                                scope.launch(Dispatchers.IO) {
+                                    runCatching { favorites.addToList(item.id, list.id) }
+                                }
+                                showListPicker = false
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = list.name + if (list.isDefault) "  (default)" else "",
+                                color = LocalYancoPalette.current.TextPrimary,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showListPicker = false }) {
+                    Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                }
+            },
         )
     }
 

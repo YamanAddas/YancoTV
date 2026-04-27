@@ -7,6 +7,7 @@ import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.FavoriteEntry
+import com.yancotv.shared.types.FavoriteList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -123,6 +124,137 @@ class FavoritesRepository(
     fun remove(contentId: String) {
         db.favoritesQueries.deleteByContent(contentId)
     }
+
+    // ───── MK.13.4 — multi-list ─────
+
+    /** Snapshot of every list, sorted by [FavoriteList.sortOrder]. */
+    fun lists(): List<FavoriteList> =
+        db.favoriteListsQueries.selectAll().executeAsList().map { it.toEntity() }
+
+    /** Reactive [lists] for a tab bar that re-renders when the user creates,
+     *  renames, or deletes a list. Default list is always present. */
+    fun listsFlow(): Flow<List<FavoriteList>> =
+        db.favoriteListsQueries
+            .selectAll()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toEntity() } }
+
+    /** Reactive list of entries for [listId]. Empty when the list has no
+     *  members (or doesn't exist — caller should still validate against
+     *  [listsFlow]). */
+    fun byListFlow(listId: String): Flow<List<FavoriteEntry>> =
+        db.favoritesQueries
+            .selectByList(listId)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toFavoriteEntry() } }
+
+    /** Create a new list with [name] at the end of the order. Returns its id. */
+    fun createList(name: String): String {
+        val trimmed = name.trim().ifEmpty { "Untitled list" }
+        val now = clock()
+        val nextOrder = (lists().maxOfOrNull { it.sortOrder } ?: 0) + 1
+        val id = "list:${now}:${trimmed.hashCode().toUInt().toString(16)}"
+        db.favoriteListsQueries.insert(
+            id = id,
+            name = trimmed,
+            sort_order = nextOrder.toLong(),
+            is_default = 0,
+            created_at = now,
+            updated_at = now,
+        )
+        return id
+    }
+
+    fun renameList(
+        id: String,
+        name: String,
+    ) {
+        val trimmed = name.trim().ifEmpty { return }
+        db.favoriteListsQueries.rename(name = trimmed, updated_at = clock(), id = id)
+    }
+
+    /** Delete a user-created list. The default list is guarded at the SQL
+     *  layer via `WHERE is_default = 0` — calling this on `default` is a
+     *  silent no-op. Members of the deleted list are removed (FK CASCADE). */
+    fun deleteList(id: String) {
+        db.favoriteListsQueries.deleteById(id)
+    }
+
+    fun setListSortOrder(
+        id: String,
+        sortOrder: Int,
+    ) {
+        db.favoriteListsQueries.setSortOrder(
+            sort_order = sortOrder.toLong(),
+            updated_at = clock(),
+            id = id,
+        )
+    }
+
+    /**
+     * Add [contentId] to [listId]. If the same content is already in that
+     * list this is a silent no-op (PK collision on the synthetic favorite
+     * id `fav:<list>:<content>`). The single-list [toggle] above keys on
+     * `fav:<content>` for legacy parity; the per-list id lets the same
+     * content live in multiple lists simultaneously.
+     */
+    fun addToList(
+        contentId: String,
+        listId: String,
+    ) {
+        val favoriteId = "fav:$listId:$contentId"
+        runCatching {
+            db.favoritesQueries.insert(
+                id = favoriteId,
+                content_id = contentId,
+                list_id = listId,
+                added_at = clock(),
+            )
+        }
+    }
+
+    fun removeFromList(
+        contentId: String,
+        listId: String,
+    ) {
+        db.favoritesQueries.deleteByContentInList(content_id = contentId, list_id = listId)
+    }
+
+    private fun com.yancotv.shared.db.Favorite_lists.toEntity(): FavoriteList =
+        FavoriteList(
+            id = id,
+            name = name,
+            sortOrder = sort_order.toInt(),
+            isDefault = is_default == 1L,
+            createdAt = created_at,
+            updatedAt = updated_at,
+        )
+
+    private fun com.yancotv.shared.db.SelectByList.toFavoriteEntry(): FavoriteEntry =
+        FavoriteEntry(
+            favoriteId = favorite_id,
+            addedAt = added_at,
+            listId = list_id,
+            content =
+                ContentItem(
+                    id = id,
+                    sourceId = source_id,
+                    type = contentTypeFromDb(type),
+                    title = title,
+                    cleanTitle = clean_title,
+                    groupName = group_name,
+                    streamUrl = stream_url,
+                    logoUrl = logo_url,
+                    tvgId = tvg_id,
+                    metadataJson = metadata_json,
+                    sortOrder = sort_order.toInt(),
+                    createdAt = created_at,
+                    nameOverride = name_override,
+                    logoOverride = logo_override,
+                ),
+        )
 
     private companion object {
         // Stage 2.2 — id of the seeded "default" list. Created by the v4 → v5

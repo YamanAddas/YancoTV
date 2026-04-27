@@ -177,3 +177,16 @@ data class FavoriteEntry(
      *  shipped builds since the v4 → v5 migration backfills 'default'). */
     val listId: String? = null,
 )
+
+/** MK.13.4 — named favorites bucket. `default` ships seeded and cannot
+ *  be deleted (UI guards on [isDefault]); user-created lists carry
+ *  user-supplied [name] and a [sortOrder] for display ordering. */
+@Serializable
+data class FavoriteList(
+    val id: String,
+    val name: String,
+    val sortOrder: Int,
+    val isDefault: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+)

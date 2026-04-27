@@ -15,17 +15,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
@@ -48,6 +53,7 @@ import com.yancotv.shared.parental.AdultContentFilter
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.FavoriteList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -73,9 +79,29 @@ fun FavoritesScreen(
     // updates this list without a navigation round-trip.
     val favorited by favorites.allFlow().collectAsState(initial = null)
     val loading = favorited == null
-    val allItems = remember(favorited) { favorited?.map { it.content } ?: emptyList() }
+    // MK.13.4 — list tabs. `lists` reactive so creating / renaming /
+    // deleting a list reflects without a navigation round-trip. Selected
+    // list survives recomposition via rememberSaveable; falls back to
+    // 'default' if the saved id no longer exists (e.g. user deleted the
+    // list while we weren't looking).
+    val lists by favorites.listsFlow().collectAsState(initial = emptyList<FavoriteList>())
+    var selectedListId by rememberSaveable { mutableStateOf("default") }
+    LaunchedEffect(lists) {
+        if (lists.isNotEmpty() && lists.none { it.id == selectedListId }) {
+            selectedListId = lists.firstOrNull { it.isDefault }?.id ?: lists.first().id
+        }
+    }
+    val allItems =
+        remember(favorited, selectedListId) {
+            favorited
+                ?.filter { it.listId == selectedListId }
+                ?.map { it.content }
+                ?: emptyList()
+        }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showCreateList by remember { mutableStateOf(false) }
+    var manageListId by remember { mutableStateOf<String?>(null) }
 
     // Parental filters: hidden_ids drop out of favourites entirely (a hide
     // should feel consistent everywhere), lockedIds flag the row + gate the
@@ -104,85 +130,45 @@ fun FavoritesScreen(
     // scroll position rather than snapping back to the top.
     val listState = rememberLazyListState()
 
-    if (items.isEmpty() && !loading) {
-        Box(
-            modifier =
-                modifier
-                    .fillMaxSize()
-                    .background(LocalYancoPalette.current.BackgroundDeep)
-                    .padding(32.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "No favourites yet", color = LocalYancoPalette.current.TextPrimary)
-                Text(
-                    text = "Focus a channel or title and press the star in the info panel.",
-                    color = LocalYancoPalette.current.TextMuted,
-                )
-            }
-        }
-        return
-    }
-
-    LazyColumn(
-        state = listState,
+    Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+                .background(LocalYancoPalette.current.BackgroundDeep),
     ) {
-        // Keep sections in a stable order (Live first — fastest to consume).
-        if (live.isNotEmpty()) {
-            item(key = "header-live") { SectionHeader("Live channels") }
-            items(live, key = { "live:${it.id}" }) { row ->
-                FavoriteRow(
-                    item = row,
-                    onActivate = {
-                        gatedPlay(row.id) {
-                            val action = resolveActivation(controller.currentId, row.id, isTv)
-                            if (action.shouldCallPlay) controller.play(live, live.indexOf(row))
-                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
-                        }
-                    },
-                    onRemove = { removeFavorite(row, scope, favorites) },
-                )
+        FavoriteListsTabBar(
+            lists = lists,
+            selectedId = selectedListId,
+            onSelect = { selectedListId = it },
+            onCreate = { showCreateList = true },
+            onManage = { manageListId = it },
+        )
+        if (items.isEmpty() && !loading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "No favourites in this list", color = LocalYancoPalette.current.TextPrimary)
+                    Text(
+                        text = "Focus a channel or title and press the star in the info panel.",
+                        color = LocalYancoPalette.current.TextMuted,
+                    )
+                }
             }
-        }
-        if (movies.isNotEmpty()) {
-            item(key = "header-movies") { SectionHeader("Movies") }
-            items(movies, key = { "movie:${it.id}" }) { row ->
-                FavoriteRow(
-                    item = row,
-                    onActivate = {
-                        gatedPlay(row.id) {
-                            val action = resolveActivation(controller.currentId, row.id, isTv)
-                            if (action.shouldCallPlay) controller.play(movies, movies.indexOf(row))
-                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
-                        }
-                    },
-                    onRemove = { removeFavorite(row, scope, favorites) },
-                )
-            }
-        }
-        if (series.isNotEmpty()) {
-            item(key = "header-series") { SectionHeader("Series") }
-            items(series, key = { "series:${it.id}" }) { row ->
-                FavoriteRow(
-                    item = row,
-                    onActivate = {
-                        // Series containers are not Playable — calling
-                        // controller.play would silently no-op (toPlayable
-                        // returns null) but PlayerLauncher.launch would
-                        // still open an empty fullscreen surface. Route
-                        // through the host's detail overlay instead, same
-                        // as HomeScreen.onBrowseActivate's SERIES branch.
-                        gatedPlay(row.id) { onOpenDetail(row) }
-                    },
-                    onRemove = { removeFavorite(row, scope, favorites) },
-                )
-            }
+        } else {
+            FavoritesListBody(
+                live = live,
+                movies = movies,
+                series = series,
+                listState = listState,
+                isTv = isTv,
+                controller = controller,
+                context = context,
+                gatedPlay = gatedPlay,
+                onRemove = { row -> removeFavorite(row, scope, favorites, selectedListId) },
+                onOpenDetail = onOpenDetail,
+            )
         }
     }
 
@@ -201,17 +187,323 @@ fun FavoritesScreen(
             onDismiss = { pendingPlay = null },
         )
     }
+
+    if (showCreateList) {
+        TextEntryDialog(
+            title = "New favorites list",
+            body = "Name your list (e.g. Sports, News, Kids).",
+            initial = "",
+            confirmLabel = "Create",
+            onConfirm = { name ->
+                if (name.isNotBlank()) {
+                    scope.launch(Dispatchers.IO) {
+                        val newId = favorites.createList(name)
+                        selectedListId = newId
+                    }
+                }
+                showCreateList = false
+            },
+            onDismiss = { showCreateList = false },
+        )
+    }
+
+    val target = manageListId?.let { id -> lists.firstOrNull { it.id == id } }
+    if (target != null) {
+        ListManageDialog(
+            list = target,
+            onRename = { newName ->
+                scope.launch(Dispatchers.IO) { favorites.renameList(target.id, newName) }
+                manageListId = null
+            },
+            onDelete = {
+                scope.launch(Dispatchers.IO) { favorites.deleteList(target.id) }
+                manageListId = null
+            },
+            onDismiss = { manageListId = null },
+        )
+    }
+}
+
+@UnstableApi
+@Composable
+private fun FavoritesListBody(
+    live: List<ContentItem>,
+    movies: List<ContentItem>,
+    series: List<ContentItem>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    isTv: Boolean,
+    controller: PlaybackController,
+    context: android.content.Context,
+    gatedPlay: (String, () -> Unit) -> Unit,
+    onRemove: (ContentItem) -> Unit,
+    onOpenDetail: (ContentItem) -> Unit,
+) {
+    LazyColumn(
+        state = listState,
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Keep sections in a stable order (Live first — fastest to consume).
+        if (live.isNotEmpty()) {
+            item(key = "header-live") { SectionHeader("Live channels") }
+            items(live, key = { "live:${it.id}" }) { row ->
+                FavoriteRow(
+                    item = row,
+                    onActivate = {
+                        gatedPlay(row.id) {
+                            val action = resolveActivation(controller.currentId, row.id, isTv)
+                            if (action.shouldCallPlay) controller.play(live, live.indexOf(row))
+                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
+                        }
+                    },
+                    onRemove = { onRemove(row) },
+                )
+            }
+        }
+        if (movies.isNotEmpty()) {
+            item(key = "header-movies") { SectionHeader("Movies") }
+            items(movies, key = { "movie:${it.id}" }) { row ->
+                FavoriteRow(
+                    item = row,
+                    onActivate = {
+                        gatedPlay(row.id) {
+                            val action = resolveActivation(controller.currentId, row.id, isTv)
+                            if (action.shouldCallPlay) controller.play(movies, movies.indexOf(row))
+                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
+                        }
+                    },
+                    onRemove = { onRemove(row) },
+                )
+            }
+        }
+        if (series.isNotEmpty()) {
+            item(key = "header-series") { SectionHeader("Series") }
+            items(series, key = { "series:${it.id}" }) { row ->
+                FavoriteRow(
+                    item = row,
+                    onActivate = {
+                        // Series containers are not Playable — calling
+                        // controller.play would silently no-op (toPlayable
+                        // returns null) but PlayerLauncher.launch would
+                        // still open an empty fullscreen surface. Route
+                        // through the host's detail overlay instead, same
+                        // as HomeScreen.onBrowseActivate's SERIES branch.
+                        gatedPlay(row.id) { onOpenDetail(row) }
+                    },
+                    onRemove = { onRemove(row) },
+                )
+            }
+        }
+    }
 }
 
 private fun removeFavorite(
     row: ContentItem,
     scope: kotlinx.coroutines.CoroutineScope,
     favorites: FavoritesRepository,
+    listId: String,
 ) {
-    // SQLDelight is blocking and a main-thread write would jank focus. The
-    // UI-side list updates automatically via `favorites.allFlow()` once the
-    // delete commits — no manual list mutation needed here.
-    scope.launch(Dispatchers.IO) { favorites.remove(row.id) }
+    // MK.13.4 — scope removal to the visible list only. Removing from
+    // `default` should not orphan a copy that exists in another list.
+    // SQLDelight is blocking and a main-thread write would jank focus.
+    scope.launch(Dispatchers.IO) { favorites.removeFromList(row.id, listId) }
+}
+
+/**
+ * MK.13.4 — list tab strip. Renders one chip per list plus a trailing
+ * "+" chip that opens the create-list dialog. Tapping a chip switches
+ * the visible list; long-press / MENU on a non-default chip opens the
+ * rename / delete sub-dialog.
+ */
+@Composable
+private fun FavoriteListsTabBar(
+    lists: List<FavoriteList>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+    onCreate: () -> Unit,
+    onManage: (String) -> Unit,
+) {
+    if (lists.isEmpty()) return
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        lists.forEach { list ->
+            ListTabChip(
+                label = list.name,
+                selected = list.id == selectedId,
+                onClick = { onSelect(list.id) },
+                onLongPress = if (list.isDefault) null else { -> onManage(list.id) },
+            )
+        }
+        ListTabChip(
+            label = "+ New",
+            selected = false,
+            onClick = onCreate,
+            onLongPress = null,
+        )
+    }
+}
+
+@Composable
+private fun ListTabChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)?,
+) {
+    val palette = LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val border =
+        when {
+            focused -> palette.Accent
+            selected -> palette.Accent
+            else -> palette.BorderSubtle
+        }
+    val bg = if (selected) palette.AccentMuted.copy(alpha = 0.25f) else palette.BackgroundRaised
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .border(if (focused || selected) 2.dp else 1.dp, border, RoundedCornerShape(6.dp))
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null) {
+                    // Tap a non-selected tab → switch to it. Tap an
+                    // already-selected non-default tab → open manage
+                    // (rename / delete). Default list never opens
+                    // manage; the SQL guard ignores delete on it anyway.
+                    if (selected && onLongPress != null) {
+                        onLongPress()
+                    } else {
+                        onClick()
+                    }
+                }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = label,
+            color = if (selected) palette.Accent else palette.TextPrimary,
+            fontSize = 13.sp,
+        )
+    }
+}
+
+@Composable
+private fun ListManageDialog(
+    list: FavoriteList,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var mode by remember { mutableStateOf("menu") } // "menu" | "rename" | "confirm-delete"
+    when (mode) {
+        "rename" ->
+            TextEntryDialog(
+                title = "Rename list",
+                body = "Pick a new name for this favorites list.",
+                initial = list.name,
+                confirmLabel = "Save",
+                onConfirm = { onRename(it) },
+                onDismiss = onDismiss,
+            )
+        "confirm-delete" ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = onDismiss,
+                containerColor = LocalYancoPalette.current.BackgroundRaised,
+                title = { Text("Delete '${list.name}'?", color = LocalYancoPalette.current.TextPrimary) },
+                text = {
+                    Text(
+                        "All favorites pinned to this list will be removed (they remain available in other lists).",
+                        color = LocalYancoPalette.current.TextMuted,
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = onDelete) {
+                        Text("Delete", color = LocalYancoPalette.current.Accent)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                    }
+                },
+            )
+        else ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = onDismiss,
+                containerColor = LocalYancoPalette.current.BackgroundRaised,
+                title = { Text(list.name, color = LocalYancoPalette.current.TextPrimary) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        androidx.compose.material3.TextButton(onClick = { mode = "rename" }) {
+                            Text("Rename", color = LocalYancoPalette.current.TextPrimary)
+                        }
+                        androidx.compose.material3.TextButton(onClick = { mode = "confirm-delete" }) {
+                            Text("Delete list", color = LocalYancoPalette.current.Accent)
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = onDismiss) {
+                        Text("Close", color = LocalYancoPalette.current.TextMuted)
+                    }
+                },
+            )
+    }
+}
+
+/**
+ * Reused single-field text entry dialog (mirror of
+ * [com.yancotv.android.ui.parental.ChannelActionsMenu]'s private one —
+ * kept local here to avoid a cross-package dependency on a TV-focus dialog).
+ */
+@Composable
+private fun TextEntryDialog(
+    title: String,
+    body: String,
+    initial: String,
+    confirmLabel: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf(initial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = LocalYancoPalette.current.BackgroundRaised,
+        title = { Text(title, color = LocalYancoPalette.current.TextPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(body, color = LocalYancoPalette.current.TextMuted)
+                androidx.compose.material3.OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onConfirm(text) }) {
+                Text(confirmLabel, color = LocalYancoPalette.current.Accent)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+            }
+        },
+    )
 }
 
 @Composable
