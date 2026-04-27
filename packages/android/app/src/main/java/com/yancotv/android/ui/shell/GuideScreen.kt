@@ -357,34 +357,48 @@ fun GuideScreen(
                 )
             }
         } else {
-            GuideSyncPanel(
-                compact = true,
-                onRefreshed = { reloadTick++ },
-            )
-            // MK.guide.groups — group filter strip. Hidden when there's
-            // only one group available (the All chip would be the only
-            // option, which is just clutter).
-            if (groups.size > 1) {
-                GuideGroupStrip(
-                    groups = groups,
-                    selected = selectedGroup,
-                    onSelect = { selectedGroup = it },
-                )
+            // MK.guide.groups — same CategoryRail used by Live TV /
+            // Movies / Series. Sentinel ALL_GROUPS maps to "no filter"
+            // (selectedGroup = null) so the existing repo path
+            // (groupName = null → guideChannelsAllPaged) handles it.
+            // Favorites pill is hidden — favoriting is a per-channel
+            // concept that doesn't fit a programme guide.
+            val railSelected = selectedGroup ?: ALL_GROUPS
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (groups.isNotEmpty()) {
+                    CategoryRail(
+                        groups = groups,
+                        selected = railSelected,
+                        onSelect = { picked ->
+                            selectedGroup = if (picked == ALL_GROUPS) null else picked
+                        },
+                        onEnterContent = { /* grid takes focus via natural traversal */ },
+                        onExitToSidebar = { /* shell sidebar is the parent's BACK target */ },
+                        onPanelFocusChanged = { /* no shell collapse for the guide */ },
+                        showFavorites = false,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    GuideSyncPanel(
+                        compact = true,
+                        onRefreshed = { reloadTick++ },
+                    )
+                    GuideGrid(
+                        guide = guide!!,
+                        nowSeconds = nowSeconds,
+                        listState = listState,
+                        totalCount = totalChannels,
+                        loadingMore = loadingMore,
+                        onPlay = onPlay,
+                        onProgrammeAction = { channel, programme ->
+                            actionTarget = ProgrammeAction(channel, programme)
+                        },
+                        onChannelLongPress = onChannelLongPress,
+                        pxPerMin = pxPerMinFor(epgPrefs.timelineMinutes),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
-            GuideGrid(
-                guide = guide!!,
-                nowSeconds = nowSeconds,
-                listState = listState,
-                totalCount = totalChannels,
-                loadingMore = loadingMore,
-                onPlay = onPlay,
-                onProgrammeAction = { channel, programme ->
-                    actionTarget = ProgrammeAction(channel, programme)
-                },
-                onChannelLongPress = onChannelLongPress,
-                pxPerMin = pxPerMinFor(epgPrefs.timelineMinutes),
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 
@@ -564,82 +578,6 @@ private data class ProgrammeAction(
     val programme: EpgProgramme,
 )
 
-/**
- * MK.guide.groups — horizontal group filter strip rendered above the
- * guide grid. "All" is always present; user-defined live groups follow.
- * Sits in a horizontalScroll so wide group lists stay reachable without
- * eating the grid's vertical space (a left-side rail á la Live TV would
- * trade away the time grid's most-valuable axis).
- */
-@Composable
-private fun GuideGroupStrip(
-    groups: List<String>,
-    selected: String?,
-    onSelect: (String?) -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(androidx.compose.foundation.rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        GuideGroupChip(
-            label = "All",
-            selected = selected == null,
-            onClick = { onSelect(null) },
-        )
-        groups.forEach { name ->
-            GuideGroupChip(
-                label = name,
-                selected = selected == name,
-                onClick = { onSelect(name) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun GuideGroupChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val palette = com.yancotv.android.ui.theme.LocalYancoPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-    val bg =
-        when {
-            focused -> palette.Accent
-            selected -> palette.AccentMuted.copy(alpha = 0.3f)
-            else -> palette.BackgroundRaised
-        }
-    val borderColor =
-        when {
-            focused -> palette.Accent
-            selected -> palette.Accent
-            else -> palette.BorderSubtle
-        }
-    val fg = if (focused) palette.BackgroundDeep else palette.TextPrimary
-    Box(
-        modifier =
-            Modifier
-                .clip(shape)
-                .background(bg)
-                .border(width = if (focused || selected) 2.dp else 1.dp, color = borderColor, shape = shape)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        androidx.compose.material3.Text(
-            text = label,
-            color = fg,
-            fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp),
-        )
-    }
-}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
