@@ -319,6 +319,65 @@ class ContentRepositoryTest {
         )
     }
 
+    // MK.20.2 — Hierarchy builder. With a mix of prefixed + unprefixed
+    // groups, the tree should bucket multi-child prefixes under a Parent,
+    // leave singletons as Leaves, and preserve provider order at every
+    // level (parent slot = first appearance of any child).
+    @Test fun groupsHierarchical_bucketsMultiChildPrefixesAndPreservesOrder() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            // Provider order: Sports (no prefix), AR | Movies, EN | News,
+            // AR | Sports, AR | Kids, EN | Drama, FR | Cinema (single → Leaf).
+            insertContent(db, "ch-1", "src-A", "c1", "Ch1", groupName = "Sports", sortOrder = 0L)
+            insertContent(db, "ch-2", "src-A", "c2", "Ch2", groupName = "AR | Movies", sortOrder = 1L)
+            insertContent(db, "ch-3", "src-A", "c3", "Ch3", groupName = "EN | News", sortOrder = 2L)
+            insertContent(db, "ch-4", "src-A", "c4", "Ch4", groupName = "AR | Sports", sortOrder = 3L)
+            insertContent(db, "ch-5", "src-A", "c5", "Ch5", groupName = "AR | Kids", sortOrder = 4L)
+            insertContent(db, "ch-6", "src-A", "c6", "Ch6", groupName = "EN | Drama", sortOrder = 5L)
+            insertContent(db, "ch-7", "src-A", "c7", "Ch7", groupName = "FR | Cinema", sortOrder = 6L)
+
+            val tree = ContentRepository(db).groupsHierarchical(ContentType.LIVE)
+
+            // Expected top-level shape:
+            //   [Leaf "Sports", Parent "Arabic", Parent "English", Leaf "FR | Cinema"]
+            // Sports first (provider order); then Arabic bucket (first-seen at
+            // sortOrder=1); then English (first-seen sortOrder=2); FR has only
+            // one child so it stays flat as Leaf with original group_name.
+            assertEquals(4, tree.size)
+            assertTrue(tree[0] is CategoryNode.Leaf)
+            assertEquals("Sports", (tree[0] as CategoryNode.Leaf).groupName)
+
+            val arabic = tree[1]
+            assertTrue(arabic is CategoryNode.Parent)
+            assertEquals("Arabic", arabic.label)
+            assertEquals(PrefixCatalog.Kind.Language, arabic.kind)
+            // Arabic children in provider order: Movies, Sports, Kids.
+            assertEquals(
+                listOf("AR | Movies", "AR | Sports", "AR | Kids"),
+                arabic.children.map { it.groupName },
+            )
+
+            val english = tree[2]
+            assertTrue(english is CategoryNode.Parent)
+            assertEquals("English", english.label)
+            assertEquals(
+                listOf("EN | News", "EN | Drama"),
+                english.children.map { it.groupName },
+            )
+
+            // FR | Cinema collapses to Leaf because it's a single-child bucket.
+            assertTrue(tree[3] is CategoryNode.Leaf)
+            assertEquals("FR | Cinema", (tree[3] as CategoryNode.Leaf).groupName)
+        }
+
+    @Test fun groupsHierarchical_emptyReturnsEmpty() =
+        runTest {
+            val db = testDb()
+            insertSource(db, "src-A", priority = 0)
+            assertEquals(emptyList(), ContentRepository(db).groupsHierarchical(ContentType.LIVE))
+        }
+
     // MK.20.1 — provider-order group sort. Insert three groups in non-
     // alphabetical arrival order; assert groups() returns insertion order
     // (Sports, AR Movies, News), NOT the legacy alphabetical order

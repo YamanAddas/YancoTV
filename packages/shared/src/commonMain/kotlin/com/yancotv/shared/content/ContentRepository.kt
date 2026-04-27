@@ -27,6 +27,17 @@ class ContentRepository(
 
     fun groups(type: ContentType): List<String> = db.contentQueries.distinctGroupsForType(type.dbValue).executeAsList()
 
+    /**
+     * MK.20.2 — Group list bucketed by detected language/region prefix.
+     * Top level preserves provider order; multi-child buckets collapse the
+     * `AR | …` / `EN | …` siblings into a single `Arabic` / `English`
+     * [CategoryNode.Parent]. Single-child buckets stay flat as [CategoryNode.Leaf].
+     *
+     * Pure: builds on [groups] (already provider-ordered via MK.20.1) and
+     * runs the catalog over each entry. iOS gets it for free.
+     */
+    fun groupsHierarchical(type: ContentType): List<CategoryNode> = CategoryTreeBuilder.build(groups(type))
+
     fun page(
         type: ContentType,
         group: String? = null,
