@@ -867,7 +867,9 @@ class PlayerActivity : AppCompatActivity() {
 
     // ───── MK.options.redesign — new options popup + per-category panels ─────
 
-    private fun showOptionsV2() {
+    private fun showOptionsV2(
+        initialCategory: com.yancotv.android.player.options.PlayerOptionCategory? = null,
+    ) {
         ensureOptionsV2()
         playerView.hideController()
         // Audit: same defense the legacy sheet uses. Block PlayerView's
@@ -877,6 +879,11 @@ class PlayerActivity : AppCompatActivity() {
         playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         playerView.isFocusable = false
         optionsV2State.showMenu()
+        // 2026-04-27 — VOD migration: chip on the dock can pre-open a
+        // specific category panel (CC → SUBTITLES, AUDIO → AUDIO,
+        // etc.) so the user lands directly on the relevant controls
+        // instead of the popup root.
+        initialCategory?.let { optionsV2State.openPanel(it) }
         optionsV2View?.visibility = View.VISIBLE
         optionsV2View?.post { optionsV2View?.requestFocus() }
     }
@@ -1028,13 +1035,23 @@ class PlayerActivity : AppCompatActivity() {
                 it.contentId == currentItem?.id &&
                     it.status == com.yancotv.shared.recording.RecordingStatus.RECORDING
             }
-        rows +=
-            com.yancotv.android.player.options.PlayerOptionsRow(
-                category = com.yancotv.android.player.options.PlayerOptionCategory.RECORD,
-                label = "Record",
-                currentValue = if (isRecordingNow) "Recording" else "—",
-                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.RECORD) },
-            )
+        // 2026-04-27 — Record row is live-only. The live-tee path
+        // depends on a continuously-refilling broadcast; VOD streams
+        // are finite and don't fit the "tap the watching channel"
+        // model. For VOD users wanting to save the file, the
+        // recording is already on the source server (catch-up) — they
+        // can use External player to download via a third-party app
+        // if needed.
+        val isLiveItem = currentItem?.type == com.yancotv.shared.types.ContentType.LIVE
+        if (isLiveItem) {
+            rows +=
+                com.yancotv.android.player.options.PlayerOptionsRow(
+                    category = com.yancotv.android.player.options.PlayerOptionCategory.RECORD,
+                    label = "Record",
+                    currentValue = if (isRecordingNow) "Recording" else "—",
+                    onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.RECORD) },
+                )
+        }
         // Favorites row reads `isFavoriteFlow` for the current id (or
         // series id for episode play). Empty current item → "—".
         val favoriteId =
@@ -1139,7 +1156,7 @@ class PlayerActivity : AppCompatActivity() {
                 },
                 onPlaybackOptions = {
                     hideChrome()
-                    showSheet()
+                    showOptionsV2()
                 },
                 onSwitchQuality = { hideChrome() },
                 onTrySource = { hideChrome() },
@@ -1338,8 +1355,30 @@ class PlayerActivity : AppCompatActivity() {
                     resetDockAutoHide()
                 },
                 onOpenSheet = { mode ->
+                    // 2026-04-27 — VOD migration: dock chips now drop
+                    // into the new options popup pre-focused on the
+                    // matching category panel. Legacy SheetMode is
+                    // preserved as the chip-side enum (the dock UI
+                    // didn't change), but the consumer side maps to
+                    // PlayerOptionCategory and uses the V2 surface.
                     hideVodDock()
-                    showSheet(mode)
+                    val category =
+                        when (mode) {
+                            SheetMode.AUDIO -> com.yancotv.android.player.options.PlayerOptionCategory.AUDIO
+                            SheetMode.SUBS -> com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES
+                            SheetMode.SPEED -> com.yancotv.android.player.options.PlayerOptionCategory.SPEED
+                            SheetMode.ASPECT -> com.yancotv.android.player.options.PlayerOptionCategory.ASPECT
+                            SheetMode.SLEEP -> com.yancotv.android.player.options.PlayerOptionCategory.SLEEP
+                            SheetMode.RECORD -> com.yancotv.android.player.options.PlayerOptionCategory.RECORD
+                            SheetMode.FAV -> com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES
+                            SheetMode.EXT -> com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL
+                            // CAST / LOOK had no V2 panel — drop to
+                            // popup root so the user can still navigate
+                            // to whatever they wanted (or pick another
+                            // category).
+                            else -> null
+                        }
+                    showOptionsV2(category)
                 },
                 onSeekTo = { offsetMs ->
                     val p = controller.player
@@ -1852,17 +1891,15 @@ class PlayerActivity : AppCompatActivity() {
             }
             // MK.options.redesign — MENU (Fire TV's 3-dot / Android TV
             // options key) now opens the lightweight popup. Live channels
-            // get the new menu; VOD still uses the legacy sheet for now
-            // (slice 2 ports VOD over). The popup itself routes
-            // unimplemented categories back to `showSheet(mode)` so the
-            // user never loses access during the rollout.
+            // 2026-04-27 — both LIVE and VOD use the new popup +
+            // panels (MK.options.redesign). VOD-specific gating
+            // (hide the live-only Record row) is done inside
+            // buildOptionsV2Rows. Legacy sheet is still wired but no
+            // longer reachable from MENU; will be deleted in a follow-up
+            // once any remaining callers (e.g. SAF subtitle picker
+            // fallback) are unwound.
             KeyEvent.KEYCODE_MENU -> {
-                val isLive = controller.currentItem.value?.type == ContentType.LIVE
-                if (isLive) {
-                    showOptionsV2()
-                } else {
-                    showSheet()
-                }
+                showOptionsV2()
                 return true
             }
             // OK / ENTER toggles the control surface. LIVE keeps Media3's
