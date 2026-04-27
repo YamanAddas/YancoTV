@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +96,13 @@ fun SettingsAppearanceTab(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(top = 8.dp),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Horizontal scroll keeps all 5 chips reachable on narrow panes /
+        // when the app is in a constrained settings column. D-pad RIGHT
+        // past the last visible chip auto-scrolls.
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             AccentId.values().forEach { id ->
                 AccentChip(
                     id = id,
