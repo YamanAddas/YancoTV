@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.documentfile.provider.DocumentFile
 import com.yancotv.android.BuildConfig
 import com.yancotv.shared.backup.BackupCanonicalJson
 import com.yancotv.shared.backup.BackupChecksumMismatchException
@@ -79,13 +80,16 @@ class BackupCoordinator(
             .launchIn(scope)
     }
     /**
-     * Build a backup for the current DB and write it to [destination].
-     * Returns the [BackupFileV1] (for caller-side reporting); the
-     * [BackupMetadata] row tracking this export is persisted as a
-     * side-effect.
+     * Build a backup and write it as `[filename]` inside [folderUri]
+     * (an SAF tree URI from `ACTION_OPEN_DOCUMENT_TREE`). Fire TV's
+     * file picker handles `OPEN_DOCUMENT_TREE` cleanly with D-pad —
+     * unlike `CREATE_DOCUMENT` which can trap focus on the Save
+     * button. We mirror the recording-folder pattern from
+     * [com.yancotv.android.recording.RecordingStorageResolver].
      */
     suspend fun export(
-        destination: Uri,
+        folderUri: Uri,
+        filename: String,
         password: String?,
         label: String?,
     ): ExportResult =
@@ -105,10 +109,24 @@ class BackupCoordinator(
             val pretty = BackupCanonicalJson.encodePretty(file)
             val bytes = pretty.encodeToByteArray()
 
-            context.contentResolver.openOutputStream(destination, "w")?.use { out ->
+            // Resolve the tree URI to a writable DocumentFile, create
+            // (or replace) the named file inside, write bytes.
+            val tree =
+                DocumentFile.fromTreeUri(context, folderUri)
+                    ?: return@withContext ExportResult.Failed("Could not open folder")
+            // If a file with the same name already exists, delete it
+            // first — SAF createFile silently appends "(1)" suffixes
+            // otherwise, which fragments the user's backup folder.
+            tree.findFile(filename)?.delete()
+            val doc =
+                tree.createFile("application/json", filename)
+                    ?: return@withContext ExportResult.Failed("Could not create file '$filename' in folder")
+
+            context.contentResolver.openOutputStream(doc.uri, "w")?.use { out ->
                 out.write(bytes)
                 out.flush()
-            } ?: error("ContentResolver returned null OutputStream for $destination")
+            } ?: return@withContext ExportResult.Failed("Could not open file for writing")
+            val destination = doc.uri
 
             // MK.19.8.5 — record the export in BackupMetadata so the
             // Settings tab can show "your last 3 backups" and the user

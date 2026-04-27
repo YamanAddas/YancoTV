@@ -1,8 +1,10 @@
 package com.yancotv.android.ui.settings
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -70,6 +72,7 @@ fun SettingsBackupTab(
     db: YancoDb = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var label by remember { mutableStateOf("") }
     var encryptToggle by remember { mutableStateOf(false) }
@@ -82,18 +85,46 @@ fun SettingsBackupTab(
     var importStatus by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
 
+    // Folder picker (OPEN_DOCUMENT_TREE) instead of CREATE_DOCUMENT —
+    // Fire TV's CREATE_DOCUMENT picker often traps focus on the Save
+    // button so the user can't actually save anything. Tree-pick is the
+    // same flow the Recordings tab uses; D-pad navigation is reliable.
+    // Once a folder is chosen, [BackupCoordinator.export] creates a
+    // timestamped JSON file inside it via DocumentFile.
     val exportLauncher =
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.CreateDocument("application/json"),
-        ) { uri: Uri? ->
-            if (uri == null) return@rememberLauncherForActivityResult
+            contract = ActivityResultContracts.OpenDocumentTree(),
+        ) { treeUri: Uri? ->
+            if (treeUri == null) return@rememberLauncherForActivityResult
+            // Take persistable read+write so a follow-up restore can
+            // reach the same folder without re-prompting.
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            // Default filename includes timestamp so successive exports
+            // into the same folder don't collide.
+            val now = java.time.LocalDateTime.now()
+            val stamp =
+                "%04d-%02d-%02d-%02d%02d".format(
+                    now.year,
+                    now.monthValue,
+                    now.dayOfMonth,
+                    now.hour,
+                    now.minute,
+                )
+            val filename = "yancotv-backup-$stamp.json"
             exporting = true
-            exportStatus = "Exporting…"
+            exportStatus = "Exporting to $filename…"
             scope.launch {
                 val result =
                     runCatching {
                         coordinator.export(
-                            destination = uri,
+                            folderUri = treeUri,
+                            filename = filename,
                             password = exportPassword.takeIf { encryptToggle && it.isNotBlank() },
                             label = label.takeIf { it.isNotBlank() },
                         )
@@ -102,9 +133,8 @@ fun SettingsBackupTab(
                 exportStatus =
                     when (result) {
                         is ExportResult.Success ->
-                            "Exported ${formatBytes(result.bytesWritten)} — schema v${result.file.dbSchemaVersion}, " +
-                                "${result.file.recordCounts.values.sum()} records, " +
-                                "checksum ${result.file.checksum.take(8)}…"
+                            "Exported $filename · ${formatBytes(result.bytesWritten)} · schema v${result.file.dbSchemaVersion} · " +
+                                "${result.file.recordCounts.values.sum()} records · checksum ${result.file.checksum.take(8)}…"
                         is ExportResult.Failed -> "Export failed: ${result.message}"
                     }
             }
@@ -210,23 +240,15 @@ fun SettingsBackupTab(
                 Button(
                     enabled = !exporting && (!encryptToggle || exportPassword.length >= 8),
                     onClick = {
-                        // Default filename includes a UTC-ish timestamp
-                        // so successive exports don't collide if the
-                        // user keeps clicking the same folder.
-                        val now = java.time.LocalDateTime.now()
-                        val stamp =
-                            "%04d-%02d-%02d-%02d%02d".format(
-                                now.year,
-                                now.monthValue,
-                                now.dayOfMonth,
-                                now.hour,
-                                now.minute,
-                            )
-                        exportLauncher.launch("yancotv-backup-$stamp.json")
+                        // Pass `null` to OpenDocumentTree so the picker
+                        // opens the system default (usually Downloads).
+                        // The launcher creates the file inside whichever
+                        // folder the user picks.
+                        exportLauncher.launch(null)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
-                    Text(if (exporting) "Exporting…" else "Export backup…")
+                    Text(if (exporting) "Exporting…" else "Choose folder & export…")
                 }
             }
             exportStatus?.let { status ->
