@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
@@ -515,27 +516,31 @@ private fun SectionHeader(text: String) {
     )
 }
 
+/**
+ * Favorite row with explicit Play + Remove buttons. Matches the
+ * Recordings row pattern (commit b311dad / MK.14.5): the row container
+ * is purely visual — actions live exclusively in their own focusable
+ * buttons. A "whole row activates play" model with a separate Remove
+ * button is ambiguous on TV (D-pad CENTER could land on either depending
+ * on focus); two explicit buttons is unambiguous.
+ */
 @Composable
 private fun FavoriteRow(
     item: ContentItem,
     onActivate: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
     val badges = remember(item.id) { QualityBadge.parse(item.title) }
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
     HexSurface(
         shape = YancoShapes.HexCapsule,
-        focused = focused,
+        focused = false,
         bevelInset = 2.dp,
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(72.dp)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onActivate),
+                .height(72.dp),
     ) {
         Row(
             modifier =
@@ -543,7 +548,7 @@ private fun FavoriteRow(
                     .fillMaxSize()
                     .padding(horizontal = 28.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
                 modifier =
@@ -563,7 +568,7 @@ private fun FavoriteRow(
                 }
             }
             Column(
-                modifier = Modifier.fillMaxWidth(0.7f),
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(text = displayTitle, color = LocalYancoPalette.current.TextPrimary, maxLines = 1)
@@ -577,13 +582,70 @@ private fun FavoriteRow(
                     QualityChips(badges = badges)
                 }
             }
-            UnstarButton(onClick = onRemove)
+            FavoriteActionButton(label = "Play", primary = true, onClick = onActivate)
+            FavoriteActionButton(label = "Remove", primary = false, onClick = onRemove)
         }
     }
 }
 
+/**
+ * Compact action button — mirror of RecordingsScreen.FocusableInlineButton
+ * adapted to the favorites palette. Same focus / clickable wiring per the
+ * native-android-mk skill: focusable(interactionSource) + clickable
+ * (interactionSource, indication=null) so D-pad navigation reliably lights
+ * up on Fire TV.
+ */
 @Composable
-private fun UnstarButton(onClick: () -> Unit) {
+private fun FavoriteActionButton(
+    label: String,
+    primary: Boolean,
+    onClick: () -> Unit,
+) {
+    val palette = LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(6.dp)
+    val bg =
+        when {
+            focused -> palette.Accent
+            primary -> palette.AccentSoft
+            else -> palette.BackgroundElevated
+        }
+    val borderColor =
+        when {
+            focused -> palette.Accent
+            primary -> palette.Accent
+            else -> palette.PanelBorder
+        }
+    val fg =
+        when {
+            focused -> palette.BackgroundDeep
+            primary -> palette.Accent
+            else -> palette.TextPrimary
+        }
+    Box(
+        modifier =
+            Modifier
+                .clip(shape)
+                .background(bg)
+                .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = label,
+            color = fg,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun UnstarButton_unused_(onClick: () -> Unit) {
+    // Replaced by FavoriteActionButton above. This stub exists only because
+    // a literal-escape edit can't match the original body atomically.
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else Color.Transparent
