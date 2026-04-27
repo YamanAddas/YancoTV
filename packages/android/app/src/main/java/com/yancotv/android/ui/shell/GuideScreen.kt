@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.parental.ChannelActionsMenu
@@ -72,19 +74,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
-// Layout constants. 4 dp per minute = 24 dp per 10min = 120 dp per 30min =
-// 1440 dp across the 6h window. Wide enough to read programme titles on
-// typical TV panels (1080p ≈ 960 dp logical width, so ~1.5 screens scroll).
-private const val PX_PER_MIN = 4
+// MK.15.2 — timeline density is derived from the user's selected
+// "timeline minutes visible" pref. Assumes ~1080 dp of horizontal space
+// after the channel column on a 1080p TV; phones squeeze tighter. The
+// resulting dp-per-minute is clamped so we never lose readability or
+// overload Compose with absurdly wide canvases.
 private val ROW_HEIGHT = 56.dp
 private val HEADER_HEIGHT = 28.dp
 private val CHANNEL_COL_WIDTH = 160.dp
 private val MIN_PROG_WIDTH = 48.dp
+private const val ASSUMED_TIMELINE_DP = 1080
 
-// 6-hour window is the sweet spot: longer = tiny programme blocks that
-// don't fit a title; shorter = user scrolls too often. TiviMate / desktop
-// default matches.
-private const val WINDOW_HOURS = 6L
+private fun pxPerMinFor(timelineMinutes: Int): Int =
+    (ASSUMED_TIMELINE_DP / timelineMinutes.coerceAtLeast(1)).coerceIn(2, 24)
 
 // Recompute the red "now" line every minute. Programme blocks only redraw
 // when the window slides — which happens on a coarser 30-min grain.
@@ -129,7 +131,12 @@ fun GuideScreen(
     parental: ParentalRepository = koinInject(),
     recordScheduler: RecordingScheduleScheduler = koinInject(),
     recordSchedules: RecordingScheduleRepository = koinInject(),
+    appPrefs: AppPreferences = koinInject(),
 ) {
+    // MK.15.1 — EPG window is now driven by user prefs (daysBack /
+    // daysForward). Reactive: changing the slider in Settings rebuilds
+    // the visible range without restart.
+    val epgPrefs by appPrefs.epgFlow.collectAsState()
     // Channel list is grown via pagination — initial 100, then more as the
     // user scrolls. Holds bounded memory even for 250k-channel catalogs.
     var channels by remember { mutableStateOf<List<EpgGuideChannel>>(emptyList()) }
@@ -145,13 +152,19 @@ fun GuideScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    // Reload when the user changes the EPG window prefs.
+    LaunchedEffect(epgPrefs.daysBack, epgPrefs.daysForward) {
+        if (channels.isNotEmpty()) reloadTick++
+    }
+
     // Initial / forced reload — resets pagination and fetches page 0.
     LaunchedEffect(reloadTick) {
         val initial = channels.isEmpty()
         if (initial) loading = true
         val now = System.currentTimeMillis() / 1000L
-        val windowStart = now - (now % (30L * 60L))
-        val windowEnd = windowStart + WINDOW_HOURS * 60L * 60L
+        val nowAligned = now - (now % (30L * 60L))
+        val windowStart = nowAligned - epgPrefs.daysBack * 24L * 60L * 60L
+        val windowEnd = nowAligned + epgPrefs.daysForward * 24L * 60L * 60L
         windowStartState = windowStart
         windowEndState = windowEnd
 
@@ -325,6 +338,7 @@ fun GuideScreen(
                     actionTarget = ProgrammeAction(channel, programme)
                 },
                 onChannelLongPress = onChannelLongPress,
+                pxPerMin = pxPerMinFor(epgPrefs.timelineMinutes),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -517,11 +531,27 @@ private fun GuideGrid(
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,
     onProgrammeAction: (EpgGuideChannel, EpgProgramme) -> Unit,
     onChannelLongPress: (EpgGuideChannel) -> Unit,
+    pxPerMin: Int,
     modifier: Modifier,
 ) {
     val hScroll = rememberScrollState()
     val totalMinutes = ((guide.endTime - guide.startTime) / 60L).toInt()
-    val timelineWidth = (totalMinutes * PX_PER_MIN).dp
+    val timelineWidth = (totalMinutes * pxPerMin).dp
+    val gridScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    // MK.15.4 — auto-snap to "now" on first paint so the grid opens with
+    // the current programme visible even when the window has hours of
+    // catch-up to its left. Re-runs only when the window's start changes
+    // (window refresh / pref bump).
+    LaunchedEffect(guide.startTime, pxPerMin) {
+        val nowOffsetMin = ((nowSeconds - guide.startTime) / 60L).toInt().coerceAtLeast(0)
+        val targetPx = with(density) { (nowOffsetMin * pxPerMin).dp.toPx() }.toInt()
+        // Land "now" ~80 dp from the left edge of the timeline so the user
+        // can see a sliver of context before it.
+        val padPx = with(density) { 80.dp.toPx() }.toInt()
+        hScroll.scrollTo((targetPx - padPx).coerceAtLeast(0))
+    }
 
     Column(
         modifier =
@@ -533,6 +563,7 @@ private fun GuideGrid(
             startTime = guide.startTime,
             totalMinutes = totalMinutes,
             timelineWidth = timelineWidth,
+            pxPerMin = pxPerMin,
             hScroll = hScroll,
         )
 
@@ -569,6 +600,7 @@ private fun GuideGrid(
                         windowStart = guide.startTime,
                         windowEnd = guide.endTime,
                         timelineWidth = timelineWidth,
+                        pxPerMin = pxPerMin,
                         hScroll = hScroll,
                         onPlayChannel = { onPlay(channel, null) },
                         onLongPressChannel = { onChannelLongPress(channel) },
@@ -584,10 +616,9 @@ private fun GuideGrid(
             // ticks every frame during a swipe.
             val nowOffsetMin = ((nowSeconds - guide.startTime) / 60L).toInt()
             if (nowOffsetMin in 0..totalMinutes) {
-                val density = LocalDensity.current
                 val leftPx =
                     with(density) {
-                        CHANNEL_COL_WIDTH.toPx() + (nowOffsetMin * PX_PER_MIN).dp.toPx() - hScroll.value
+                        CHANNEL_COL_WIDTH.toPx() + (nowOffsetMin * pxPerMin).dp.toPx() - hScroll.value
                     }
                 Box(
                     modifier =
@@ -598,6 +629,35 @@ private fun GuideGrid(
                             .background(Color(0xFFE25555)),
                 )
             }
+
+            // MK.15.4 — "Jump to now" floating button. Visible only when the
+            // user has scrolled away from the now-line by more than ~half a
+            // screen. Tapping snaps the timeline back so the now-line sits
+            // ~80 dp from the left edge of the lane.
+            val nowPx =
+                with(density) {
+                    ((nowOffsetMin * pxPerMin).dp.toPx()).toInt()
+                }
+            val padPx = with(density) { 80.dp.toPx() }.toInt()
+            val target = (nowPx - padPx).coerceAtLeast(0)
+            val drift = kotlin.math.abs(hScroll.value - target)
+            val driftThresholdPx = with(density) { 200.dp.toPx() }.toInt()
+            if (nowOffsetMin in 0..totalMinutes && drift > driftThresholdPx) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 16.dp),
+                ) {
+                    androidx.compose.material3.FilledTonalButton(
+                        onClick = {
+                            gridScope.launch { hScroll.animateScrollTo(target) }
+                        },
+                    ) {
+                        Text(text = "Jump to now")
+                    }
+                }
+            }
         }
     }
 }
@@ -607,6 +667,7 @@ private fun TimeHeader(
     startTime: Long,
     totalMinutes: Int,
     timelineWidth: androidx.compose.ui.unit.Dp,
+    pxPerMin: Int,
     hScroll: androidx.compose.foundation.ScrollState,
 ) {
     Row(
@@ -634,7 +695,7 @@ private fun TimeHeader(
                 Box(
                     modifier =
                         Modifier
-                            .width((slice * PX_PER_MIN).dp)
+                            .width((slice * pxPerMin).dp)
                             .fillMaxHeight()
                             .border(0.5.dp, LocalYancoPalette.current.BorderSubtle),
                     contentAlignment = Alignment.CenterStart,
@@ -659,6 +720,7 @@ private fun ChannelRow(
     windowStart: Long,
     windowEnd: Long,
     timelineWidth: androidx.compose.ui.unit.Dp,
+    pxPerMin: Int,
     hScroll: androidx.compose.foundation.ScrollState,
     onPlayChannel: () -> Unit,
     onLongPressChannel: () -> Unit,
@@ -696,12 +758,12 @@ private fun ChannelRow(
                 if (clampedEnd <= clampedStart) continue
                 val gapMin = ((clampedStart - cursor) / 60L).toInt().coerceAtLeast(0)
                 if (gapMin > 0) {
-                    Box(modifier = Modifier.width((gapMin * PX_PER_MIN).dp).fillMaxHeight())
+                    Box(modifier = Modifier.width((gapMin * pxPerMin).dp).fillMaxHeight())
                 }
                 val durMin = ((clampedEnd - clampedStart) / 60L).toInt().coerceAtLeast(1)
                 ProgrammeBlock(
                     programme = prog,
-                    widthDp = (durMin * PX_PER_MIN).dp.coerceAtLeast(MIN_PROG_WIDTH),
+                    widthDp = (durMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
                     onActivate = { onProgrammeAction(prog) },
                 )
                 cursor = clampedEnd
@@ -864,6 +926,26 @@ private fun ProgrammeActionDialog(
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
+                // MK.15.5 — surface synopsis + category when XMLTV provides
+                // them. Most providers ship at least description; category
+                // is rarer but cheap to render when present.
+                programme.category?.takeIf { it.isNotBlank() }?.let { cat ->
+                    Text(
+                        text = cat.uppercase(),
+                        color = LocalYancoPalette.current.Accent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                programme.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        text = desc,
+                        color = LocalYancoPalette.current.TextPrimary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
             }
         },
         confirmButton = {

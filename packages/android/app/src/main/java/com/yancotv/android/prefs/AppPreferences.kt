@@ -38,6 +38,13 @@ class AppPreferences(
     private val _recording = MutableStateFlow(readRecording())
     val recordingFlow: StateFlow<RecordingPrefs> = _recording.asStateFlow()
 
+    // MK.15.1 / 15.2 — EPG display window. `daysBack` / `daysForward`
+    // bound the timeline range (catch-up + upcoming). `timelineMinutes`
+    // is the visible-at-once strip width in the guide grid; the user
+    // scrolls horizontally inside the larger range.
+    private val _epg = MutableStateFlow(readEpg())
+    val epgFlow: StateFlow<EpgPrefs> = _epg.asStateFlow()
+
     // Synchronous snapshot for bootstrapping — MainActivity/HomeScreen need
     // the "open app on" value on first composition before any flow has had
     // a chance to emit. Reads the settings table directly.
@@ -130,6 +137,23 @@ class AppPreferences(
             _recording.value = _recording.value.copy(storageMode = mode)
         }
 
+    // ───── EPG (MK.15.1 / 15.2) ─────
+
+    suspend fun setEpgDaysBack(days: Int) =
+        write(KEY_EPG_DAYS_BACK, days.coerceIn(0, 14).toString()) {
+            _epg.value = _epg.value.copy(daysBack = days.coerceIn(0, 14))
+        }
+
+    suspend fun setEpgDaysForward(days: Int) =
+        write(KEY_EPG_DAYS_FORWARD, days.coerceIn(1, 14).toString()) {
+            _epg.value = _epg.value.copy(daysForward = days.coerceIn(1, 14))
+        }
+
+    suspend fun setEpgTimelineMinutes(minutes: Int) =
+        write(KEY_EPG_TIMELINE_MIN, minutes.toString()) {
+            _epg.value = _epg.value.copy(timelineMinutes = minutes)
+        }
+
     suspend fun setRecordingFolderUri(uri: String?) =
         write(KEY_RECORDING_FOLDER_URI, uri.orEmpty()) {
             _recording.value =
@@ -195,6 +219,19 @@ class AppPreferences(
             smartGrouping = readString(KEY_SMART_GROUPING) == "1",
         )
 
+    private fun readEpg(): EpgPrefs =
+        EpgPrefs(
+            daysBack =
+                readString(KEY_EPG_DAYS_BACK)?.toIntOrNull()?.coerceIn(0, 14)
+                    ?: EpgPrefs.DEFAULT_DAYS_BACK,
+            daysForward =
+                readString(KEY_EPG_DAYS_FORWARD)?.toIntOrNull()?.coerceIn(1, 14)
+                    ?: EpgPrefs.DEFAULT_DAYS_FORWARD,
+            timelineMinutes =
+                readString(KEY_EPG_TIMELINE_MIN)?.toIntOrNull()
+                    ?: EpgPrefs.DEFAULT_TIMELINE_MIN,
+        )
+
     private fun readRecording(): RecordingPrefs {
         val folderUri = readString(KEY_RECORDING_FOLDER_URI)?.takeIf { it.isNotBlank() }
         val explicitMode = readString(KEY_RECORDING_STORAGE_MODE)
@@ -253,6 +290,31 @@ class AppPreferences(
         private const val KEY_SPEED = "pref_playback_speed"
         private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"
         private const val KEY_RECORDING_STORAGE_MODE = "pref_recording_storage_mode"
+        private const val KEY_EPG_DAYS_BACK = "pref_epg_days_back"
+        private const val KEY_EPG_DAYS_FORWARD = "pref_epg_days_forward"
+        private const val KEY_EPG_TIMELINE_MIN = "pref_epg_timeline_minutes"
+    }
+}
+
+/**
+ * MK.15.1 / 15.2 — EPG display prefs.
+ *
+ *  - [daysBack] (0–14) bounds catch-up scroll backward from now.
+ *  - [daysForward] (1–14) bounds upcoming scroll forward from now.
+ *  - [timelineMinutes] is the visible-at-once strip in the guide grid;
+ *    a longer span shows more programmes per screen at smaller width.
+ *    Allowed: 30 / 60 / 90 / 120 / 180.
+ */
+data class EpgPrefs(
+    val daysBack: Int = DEFAULT_DAYS_BACK,
+    val daysForward: Int = DEFAULT_DAYS_FORWARD,
+    val timelineMinutes: Int = DEFAULT_TIMELINE_MIN,
+) {
+    companion object {
+        const val DEFAULT_DAYS_BACK = 1
+        const val DEFAULT_DAYS_FORWARD = 2
+        const val DEFAULT_TIMELINE_MIN = 60
+        val TIMELINE_PRESETS = listOf(30, 60, 90, 120, 180)
     }
 }
 
