@@ -179,11 +179,15 @@ class RecordingScheduleReceiver :
             Log.i(TAG, "end[$scheduleId] schedule in state ${schedule.state} — no-op")
             return
         }
-        val recordId = schedule.recordingId
-        if (recordId != null) {
-            Log.i(TAG, "end[$scheduleId] stopping recording $recordId")
-            RecordingService.stop(context, recordId)
-        }
+        // Derive the recordId from the schedule id (same as
+        // [startRecording]). schedule.recordingId is intentionally null
+        // — see the FK-timing comment in [startRecording] — so we
+        // can't read it here.
+        val recordId =
+            schedule.recordingId
+                ?: RecordingScheduleScheduler.recordIdForSchedule(scheduleId)
+        Log.i(TAG, "end[$scheduleId] stopping recording $recordId")
+        RecordingService.stop(context, recordId)
         // Optimistically transition the schedule to COMPLETED. The recording
         // row's terminal status is the source of truth for whether bytes
         // actually landed (a 0-byte recording transitions to FAILED via
@@ -199,11 +203,28 @@ class RecordingScheduleReceiver :
         context: Context,
         schedule: RecordingScheduleEntry,
     ) {
-        val recordId = "sched-${schedule.id}-${System.currentTimeMillis()}"
-        runCatching {
-            schedules.linkRecording(schedule.id, recordId)
-        }.onFailure {
-            Log.e(TAG, "linkRecording failed for ${schedule.id}; aborting fire", it)
+        // **MK.14.3 fix (2026-04-26 hands-on bug)**. The original receiver
+        // called `schedules.linkRecording(scheduleId, recordId)` BEFORE
+        // `RecordingService.start` inserted the recordings row. The
+        // schema's `recording_schedules.recording_id REFERENCES recordings(id)`
+        // FK is enforced at UPDATE time — the row didn't exist yet, so
+        // SQLite threw a foreign-key constraint failure. The throw was
+        // caught by the surrounding `runCatching` and the schedule
+        // never transitioned. The user saw the schedule stuck in ARMED
+        // with the alarm-fire silently no-op'd.
+        //
+        // Fix: don't touch `recording_id` at all. Derive the recordId
+        // deterministically from the schedule id via
+        // [RecordingScheduleScheduler.recordIdForSchedule]. State
+        // transition is decoupled from the FK link — receiver moves
+        // ARMED → FIRING via `transitionTo`, which only writes `state`
+        // (no FK constraint involved). Cancel/end paths re-derive the
+        // recordId from the schedule id without needing the DB link.
+        val recordId = RecordingScheduleScheduler.recordIdForSchedule(schedule.id)
+        try {
+            schedules.transitionTo(schedule.id, RecordingScheduleState.FIRING)
+        } catch (t: Throwable) {
+            Log.e(TAG, "transitionTo(FIRING) failed for ${schedule.id}; aborting fire", t)
             return
         }
         RecordingService.start(

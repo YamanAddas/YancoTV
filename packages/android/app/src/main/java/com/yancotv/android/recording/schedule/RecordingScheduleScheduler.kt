@@ -104,7 +104,14 @@ class RecordingScheduleScheduler(
                 }
             }
             RecordingScheduleState.FIRING -> {
-                entry.recordingId?.let { recId -> RecordingService.stop(context, recId) }
+                // Recording id is derived deterministically from the
+                // schedule id (see [recordIdForSchedule] for the
+                // rationale — schedule.recording_id stays NULL because
+                // the schema's FK can't be set before the recordings
+                // row exists). Use the derivation here so cancel-during-fire
+                // can reach the right active recording.
+                val recId = entry.recordingId ?: recordIdForSchedule(scheduleId)
+                RecordingService.stop(context, recId)
                 runCatching {
                     repo.transitionTo(scheduleId, RecordingScheduleState.CANCELLED)
                 }
@@ -151,5 +158,32 @@ class RecordingScheduleScheduler(
 
         /** 5 minutes — absorbs stoppage time / programme overruns / next-programme overlap. */
         const val DEFAULT_POST_PADDING_S: Long = 5L * 60L
+
+        /**
+         * Deterministic recording id derived from a schedule id.
+         *
+         * The naive flow ("generate fresh recordId, set
+         * `recording_schedules.recording_id = recordId`, start the
+         * service which inserts the recordings row with that id")
+         * trips the schema's FK constraint:
+         * `recording_schedules.recording_id REFERENCES recordings(id)`
+         * is enforced at update-time, but the recordings row doesn't
+         * exist yet when the receiver runs. The throw is caught by
+         * the receiver's `runCatching`, the schedule never transitions,
+         * and nothing fires.
+         *
+         * Solution (no schema change): make recordId deterministic
+         * from scheduleId. The receiver doesn't need to store the
+         * mapping in the DB — cancel/end paths can re-derive the
+         * recordId from the schedule id. The schedule's `recording_id`
+         * column stays NULL throughout the lifecycle (we'll wire a
+         * cleanup migration when we add recurring schedules and need
+         * a fire-counter discriminator).
+         *
+         * Format: `sched-rec-<scheduleId>`. The prefix differentiates
+         * scheduled-recording rows from manual-recording rows in
+         * logcat/Recordings UI scans.
+         */
+        fun recordIdForSchedule(scheduleId: String): String = "sched-rec-$scheduleId"
     }
 }
