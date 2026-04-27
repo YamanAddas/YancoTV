@@ -146,22 +146,32 @@ private fun PlayerOptionsRowItem(
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(6.dp))
                 .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null) { row.onPick() }
+                // onPreviewKeyEvent must wrap focusable so it sees the
+                // event before the focusable's default arrow-key focus
+                // search runs. Earlier order (after focusable + clickable)
+                // didn't fire because Compose had already moved focus or
+                // the modifier chain didn't expose preview events on the
+                // focusable's children-side. Returns true on a successful
+                // cycle so the activity's swallow guard doesn't double-
+                // handle the key.
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     when (event.key) {
                         Key.DirectionLeft -> {
-                            row.onCyclePrev?.invoke()?.also { return@onPreviewKeyEvent true }
-                            false
+                            val handler = row.onCyclePrev ?: return@onPreviewKeyEvent false
+                            handler()
+                            true
                         }
                         Key.DirectionRight -> {
-                            row.onCycleNext?.invoke()?.also { return@onPreviewKeyEvent true }
-                            false
+                            val handler = row.onCycleNext ?: return@onPreviewKeyEvent false
+                            handler()
+                            true
                         }
                         else -> false
                     }
-                }.padding(horizontal = 14.dp, vertical = 12.dp),
+                }.focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null) { row.onPick() }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
