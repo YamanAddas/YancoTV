@@ -17,8 +17,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -125,11 +128,19 @@ fun PlayerOptionsMenu(
             Column(
                 modifier =
                     Modifier
-                        .padding(end = 32.dp, bottom = 96.dp)
+                        // Reduced bottom inset (96 → 24) so the menu has
+                        // room to fully render all 8 rows without
+                        // clipping the last one ("External player").
+                        // heightIn cap + verticalScroll handles short
+                        // viewports gracefully — rows scroll instead of
+                        // being silently cut off the screen.
+                        .padding(end = 32.dp, bottom = 24.dp)
                         .width(MENU_WIDTH.dp)
+                        .heightIn(max = MENU_MAX_HEIGHT.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xEE0A1410))
                         .border(1.dp, palette.BorderSubtle, RoundedCornerShape(12.dp))
+                        .verticalScroll(rememberScrollState())
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -242,3 +253,9 @@ data class PlayerOptionsRow(
 }
 
 private const val MENU_WIDTH = 320
+
+/** Cap so the popup never exceeds usable screen real estate. 560 dp
+ *  fits all 8 rows + the kicker comfortably on a 720dp landscape
+ *  layout; if the device is shorter, verticalScroll picks up the
+ *  remainder. */
+private const val MENU_MAX_HEIGHT = 560

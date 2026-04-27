@@ -723,6 +723,12 @@ private fun RecordPanelContent(
             selected = true,
             focusRequester = firstRowFocus,
             onPick = {
+                // Diagnostic log so a "stop didn't stop" report can be
+                // confirmed via `adb logcat -s YancoRecsPanel`.
+                android.util.Log.i(
+                    "YancoRecsPanel",
+                    "stop tap: recordId=${active.id} contentId=${active.contentId} status=${active.status}",
+                )
                 RecordingService.stop(context, active.id)
                 onPickOption()
             },
