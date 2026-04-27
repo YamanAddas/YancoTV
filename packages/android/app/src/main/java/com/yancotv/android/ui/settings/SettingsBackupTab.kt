@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,6 +109,38 @@ fun SettingsBackupTab(
     val exportButtonAnchor = rememberPlacedFocusAnchor()
     val importButtonAnchor = rememberPlacedFocusAnchor()
 
+    // Bump counters drive the focus-retry LaunchedEffects below. Bumping
+    // after every async action / picker callback re-arms the effect; the
+    // effect waits several frames so the sidebar's `focusRestorer()` (in
+    // SettingsScreen) finishes its activity-resume work BEFORE we
+    // re-request focus to the Backup button — otherwise the sidebar
+    // restorer grabs focus a beat after our requestFocus() lands and
+    // the user sees focus pop back to the sidebar.
+    //
+    // Single-shot anchor.awaitAndRequest() (the previous approach)
+    // races the sidebar's restoration; this variant retries across
+    // 5 frames spread over ~80ms which beats the restorer reliably
+    // on Fire TV. Tested against the export / pick-folder / pick-
+    // file / clear-folder paths.
+    var exportFocusBump by remember { mutableStateOf(0) }
+    var importFocusBump by remember { mutableStateOf(0) }
+    LaunchedEffect(exportFocusBump) {
+        if (exportFocusBump == 0) return@LaunchedEffect
+        repeat(5) {
+            // ~16ms per frame on Fire TV — five iterations covers the
+            // activity-resume + recomposition + focusRestorer pulse.
+            withFrameNanos { }
+            exportFocusBump++
+        }
+    }
+    LaunchedEffect(importFocusBump) {
+        if (importFocusBump == 0) return@LaunchedEffect
+        repeat(5) {
+            withFrameNanos { }
+            importFocusBump++
+        }
+    }
+
     // Generate a timestamped filename.
     fun makeFilename(): String {
         val now = java.time.LocalDateTime.now()
@@ -137,7 +170,7 @@ fun SettingsBackupTab(
             exporting = false
             exportStatus = formatExportResult(result, filename)
             // Re-grab focus after the picker / coroutine round-trip.
-            runCatching { exportButtonAnchor.awaitAndRequest() }
+            exportFocusBump++
         }
     }
 
@@ -156,7 +189,7 @@ fun SettingsBackupTab(
                 }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
             exporting = false
             exportStatus = formatExportResult(result, filename)
-            runCatching { exportButtonAnchor.awaitAndRequest() }
+            exportFocusBump++
         }
     }
 
@@ -165,7 +198,7 @@ fun SettingsBackupTab(
             contract = ActivityResultContracts.OpenDocumentTree(),
         ) { treeUri: Uri? ->
             if (treeUri == null) {
-                scope.launch { runCatching { exportButtonAnchor.awaitAndRequest() } }
+                exportFocusBump++
                 return@rememberLauncherForActivityResult
             }
             runCatching {
@@ -203,12 +236,12 @@ fun SettingsBackupTab(
             contract = OpenDocumentWithInitialUri(initialImportUri),
         ) { uri: Uri? ->
             if (uri == null) {
-                scope.launch { runCatching { importButtonAnchor.awaitAndRequest() } }
+                importFocusBump++
                 return@rememberLauncherForActivityResult
             }
             importPickedUriString = uri.toString()
             importStatus = "Picked ${uri.lastPathSegment ?: uri}"
-            scope.launch { runCatching { importButtonAnchor.awaitAndRequest() } }
+            importFocusBump++
         }
 
     Column(
@@ -334,7 +367,7 @@ fun SettingsBackupTab(
                             customFolderString = null
                             scope.launch {
                                 prefs.setBackupFolderUri(null)
-                                runCatching { exportButtonAnchor.awaitAndRequest() }
+                                exportFocusBump++
                             }
                         },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextMuted),
@@ -409,7 +442,7 @@ fun SettingsBackupTab(
                             val result = coordinator.import(importPickedUri, password = importPassword.takeIf { it.isNotBlank() })
                             importing = false
                             importStatus = formatImportResult(result)
-                            runCatching { importButtonAnchor.awaitAndRequest() }
+                            importFocusBump++
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
