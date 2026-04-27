@@ -467,7 +467,10 @@ data class EpgPrefs(
         // hours of past programmes, which the user reported was hard
         // to navigate.
         const val DEFAULT_DAYS_BACK = 0
-        const val DEFAULT_DAYS_FORWARD = 2
+        // 2026-04-27: cut from 2 days to 1. 24 h of upcoming guide is
+        // typically all the user needs; multi-day reminder browsing is
+        // a power-user case the slider still covers (1–14).
+        const val DEFAULT_DAYS_FORWARD = 1
 
         /** Always-included tail of catch-up history regardless of
          *  [daysBack], so a 0-day setting still shows the most-recent

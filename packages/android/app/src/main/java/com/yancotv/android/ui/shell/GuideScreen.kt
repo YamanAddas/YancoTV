@@ -93,6 +93,12 @@ import org.koin.compose.koinInject
 private val ROW_HEIGHT = 56.dp
 private val HEADER_HEIGHT = 28.dp
 private val CHANNEL_COL_WIDTH = 160.dp
+
+// 2026-04-27 — distance between the channel column and the now-line
+// when the timeline auto-snaps or the user taps "Now". Down from 80 dp;
+// user reported the indicator sat too far right and was hard to find
+// after browsing.
+private val NOW_LEAD_IN = 16.dp
 private val MIN_PROG_WIDTH = 48.dp
 private const val ASSUMED_TIMELINE_DP = 1080
 
@@ -697,19 +703,21 @@ private fun GuideGrid(
     LaunchedEffect(guide.startTime, pxPerMin) {
         val nowOffsetMin = ((nowSeconds - guide.startTime) / 60L).toInt().coerceAtLeast(0)
         val targetPx = with(density) { (nowOffsetMin * pxPerMin).dp.toPx() }.toInt()
-        // Land "now" ~80 dp from the left edge of the timeline so the user
-        // can see a sliver of context before it.
-        val padPx = with(density) { 80.dp.toPx() }.toInt()
+        // 2026-04-27 — land "now" 16 dp from the left edge of the
+        // timeline (down from 80 dp). User feedback: the indicator
+        // sat too far right; reducing the lead-in puts the now-line
+        // closer to the channel column so the eye doesn't have to
+        // scan as far to find the live edge.
+        val padPx = with(density) { NOW_LEAD_IN.toPx() }.toInt()
         hScroll.scrollTo((targetPx - padPx).coerceAtLeast(0))
     }
 
-    // 2026-04-27 — "Jump to now" snap helper. Hoisted to a closure so
-    // the button in the time header (always visible, D-pad-reachable)
-    // and the floating button below the grid both use the same target.
+    // "Jump to now" snap helper. Hoisted to a closure so the button in
+    // the time header uses the same target.
     val nowOffsetMinTop = ((nowSeconds - guide.startTime) / 60L).toInt().coerceAtLeast(0)
     val jumpTarget =
         with(density) {
-            (nowOffsetMinTop * pxPerMin).dp.toPx().toInt() - 80.dp.toPx().toInt()
+            (nowOffsetMinTop * pxPerMin).dp.toPx().toInt() - NOW_LEAD_IN.toPx().toInt()
         }.coerceAtLeast(0)
     val onJumpToNow: () -> Unit = {
         gridScope.launch { hScroll.animateScrollTo(jumpTarget) }
