@@ -145,6 +145,108 @@ class RecordingsRepositoryTest {
         assertEquals(RecordingStatus.FAILED, repo.getById("a")?.status)
     }
 
+    // ─── MB-219 — boot-recovery via fileBytesIfExists hook ───────────────
+
+    @Test fun sweepOrphans_fileHookFindsBytes_marksCompletedNotFailed() {
+        // Process died between handleStop's cancelAndJoin and the
+        // markCompleted DB write. Recorder's `finally` flushed bytes
+        // to disk, file is on the filesystem, but the row's status
+        // never flipped. sweepOrphans must salvage as COMPLETED so
+        // the user can actually play the recording instead of seeing
+        // a "Failed" badge on a perfectly good file.
+        var nowMs = 1_700_000_000_000L
+        val db = makeDb()
+        val repo =
+            RecordingsRepository(
+                db = db,
+                clock = { nowMs },
+                fileBytesIfExists = { uri ->
+                    if (uri == "/storage/movies/orphan.ts") 5L * 1024L * 1024L else null
+                },
+            )
+        repo.markStarted(
+            id = "orphan",
+            contentId = null,
+            title = "Orphan",
+            streamUrl = "u",
+            filePath = "/storage/movies/orphan.ts",
+            format = RecordingFormat.MPEG_TS,
+        )
+        nowMs += 11L * 60_000L
+
+        assertEquals(1, repo.sweepOrphans())
+
+        val row = repo.getById("orphan")
+        assertNotNull(row)
+        assertEquals(RecordingStatus.COMPLETED, row.status, "file present + bytes ≥ floor → recovery to COMPLETED")
+        assertEquals(5L * 1024L * 1024L, row.fileSizeBytes, "row reflects actual on-disk byte count")
+        assertEquals(11L * 60L, row.durationSeconds, "duration derived from (sweep_now - started_at)")
+        assertNull(row.error)
+        assertNotNull(row.endedAt)
+    }
+
+    @Test fun sweepOrphans_fileHookReturnsBelowFloor_marksFailedNotRecovered() {
+        // 32 KB is below the 64 KB recovery floor — likely an HTTP
+        // error response body or a header-only capture, not a real
+        // recording. Mark FAILED so the user doesn't tap Play and
+        // hit a parsing error.
+        var nowMs = 1_700_000_000_000L
+        val db = makeDb()
+        val repo =
+            RecordingsRepository(
+                db = db,
+                clock = { nowMs },
+                fileBytesIfExists = { _ -> 32L * 1024L },
+            )
+        repo.markStarted("partial", null, "Partial", "u", "/p", RecordingFormat.HLS)
+        nowMs += 11L * 60_000L
+
+        assertEquals(1, repo.sweepOrphans())
+
+        val row = repo.getById("partial")
+        assertNotNull(row)
+        assertEquals(RecordingStatus.FAILED, row.status)
+        assertEquals("orphaned_by_app_kill", row.error)
+    }
+
+    @Test fun sweepOrphans_fileHookReturnsNull_marksFailed() {
+        // Hook reports the file doesn't exist on disk (process died
+        // before recorder's finally flushed; or the file was wiped
+        // externally between the recording and the reboot). Nothing
+        // to salvage — fall through to the legacy FAILED path.
+        var nowMs = 1_700_000_000_000L
+        val db = makeDb()
+        val repo =
+            RecordingsRepository(
+                db = db,
+                clock = { nowMs },
+                fileBytesIfExists = { _ -> null },
+            )
+        repo.markStarted("gone", null, "Gone", "u", "/p", RecordingFormat.MPEG_TS)
+        nowMs += 11L * 60_000L
+
+        assertEquals(1, repo.sweepOrphans())
+
+        val row = repo.getById("gone")
+        assertNotNull(row)
+        assertEquals(RecordingStatus.FAILED, row.status)
+        assertEquals("orphaned_by_app_kill", row.error)
+    }
+
+    @Test fun sweepOrphans_noFileHookConfigured_legacyAlwaysFailedBehaviorPreserved() {
+        // Default constructor (no hook) keeps the pre-MB-219
+        // behaviour: every stale RECORDING row → FAILED. Pinned so
+        // KMP targets / tests that don't wire a platform file API
+        // continue to work without changes.
+        var nowMs = 1_700_000_000_000L
+        val repo = makeRepo(clock = { nowMs }) // helper passes null hook
+        repo.markStarted("legacy", null, "Legacy", "u", "/storage/legacy.ts", RecordingFormat.HLS)
+        nowMs += 11L * 60_000L
+
+        assertEquals(1, repo.sweepOrphans())
+        assertEquals(RecordingStatus.FAILED, repo.getById("legacy")?.status)
+    }
+
     @Test fun deleteRemovesRow() {
         val repo = makeRepo()
         repo.markStarted("d", null, "T", "u", "/p", RecordingFormat.HLS)

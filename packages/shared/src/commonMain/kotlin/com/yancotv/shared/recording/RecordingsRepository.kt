@@ -72,6 +72,33 @@ data class RecordingEntry(
 class RecordingsRepository(
     private val db: YancoDb,
     private val clock: () -> Long,
+    /**
+     * MB-219 — boot-recovery hook for [sweepOrphans].
+     *
+     * `RecordingService.handleStop` runs in this order:
+     *   1. `cancelAndJoin` (recorder's `finally` flushes bytes to disk)
+     *   2. `output.close()` (flips MediaStore `IS_PENDING=0` so the
+     *      file is visible to Gallery / queries)
+     *   3. `output.size()` (reads the on-disk byte count)
+     *   4. `markCompleted` / `markFailed` (status flip)
+     *
+     * Process death anywhere between (1) and (4) leaves the file on
+     * disk but the row in `RECORDING`. Without this hook, [sweepOrphans]
+     * blindly transitions every stale `RECORDING` row to
+     * `FAILED("orphaned_by_app_kill")` — which loses a perfectly-
+     * playable file behind a "Failed" badge in the Recordings list.
+     *
+     * When non-null, [sweepOrphans] queries the file at the row's
+     * `file_path` first; if the file exists with bytes ≥
+     * [MIN_RECOVERED_BYTES] the row lands as `COMPLETED` instead.
+     * Default `null` preserves prior behaviour for tests / KMP
+     * targets that don't have a platform file API wired up.
+     *
+     * Android binds this in `AppModules.kt` to a ContentResolver-
+     * backed query for `content://` URIs and a `File.length()` for
+     * file paths.
+     */
+    private val fileBytesIfExists: ((fileUri: String) -> Long?)? = null,
 ) {
     /** Insert a fresh `RECORDING` row. Caller supplies an id (typically
      *  a UUID); throws if the id collides. */
@@ -171,14 +198,30 @@ class RecordingsRepository(
 
     /**
      * Recovery sweep called by the service on app start: any rows
-     * left in `RECORDING` after a crash get marked
-     * `FAILED("orphaned_by_app_kill")` so they don't appear stuck
-     * in the UI forever. Returns the count swept so the caller can
-     * surface a one-time toast.
+     * left in `RECORDING` after a crash get transitioned out of the
+     * non-terminal state so they don't appear stuck in the UI forever.
+     * Returns the count swept so the caller can surface a one-time
+     * toast.
      *
      * Per the design spec §2 Q10, recordings ≥ [orphanThresholdMs]
      * old at sweep time are reaped; younger ones may still be picked
      * up by the service for resume (out of scope for v1.0).
+     *
+     * MB-219 — when [fileBytesIfExists] is wired up, each orphan's
+     * file is probed before deciding the terminal state:
+     *   - File present with ≥ [MIN_RECOVERED_BYTES] → `COMPLETED`,
+     *     with `duration_seconds` derived from `(now - started_at)`
+     *     and `file_size_bytes` set to the on-disk byte count.
+     *     The recorder's `finally` ran successfully; only the
+     *     status flip was missed.
+     *   - File missing / smaller than the floor / hook unset →
+     *     `FAILED("orphaned_by_app_kill")` (existing behaviour).
+     *
+     * The 64 KB floor filters out empty files and very small
+     * partial writes (HTTP error response bodies, header-only
+     * captures) that wouldn't play back even if the row were
+     * COMPLETED. A real stream that wrote ≥ 64 KB has at least
+     * captured a few TS packets / one HLS segment.
      */
     fun sweepOrphans(orphanThresholdMs: Long = ORPHAN_THRESHOLD_MS_DEFAULT): Int {
         val now = clock()
@@ -186,14 +229,31 @@ class RecordingsRepository(
             getByStatus(RecordingStatus.RECORDING)
                 .filter { now - it.startedAt >= orphanThresholdMs }
         orphans.forEach { entry ->
-            db.recordingsQueries.updateStatus(
-                status = RecordingStatus.FAILED.sql,
-                ended_at = now,
-                duration_seconds = entry.durationSeconds,
-                file_size_bytes = entry.fileSizeBytes,
-                error = "orphaned_by_app_kill",
-                id = entry.id,
-            )
+            val recoveredBytes = fileBytesIfExists?.invoke(entry.filePath)
+            if (recoveredBytes != null && recoveredBytes >= MIN_RECOVERED_BYTES) {
+                // Process died between handleStop's cancelAndJoin and
+                // markCompleted — recorder finished writing to disk
+                // but the status flip never landed. Salvage as
+                // COMPLETED so the user can play the recording.
+                val secs = ((now - entry.startedAt) / 1000L).coerceAtLeast(0L)
+                db.recordingsQueries.updateStatus(
+                    status = RecordingStatus.COMPLETED.sql,
+                    ended_at = now,
+                    duration_seconds = secs,
+                    file_size_bytes = recoveredBytes,
+                    error = null,
+                    id = entry.id,
+                )
+            } else {
+                db.recordingsQueries.updateStatus(
+                    status = RecordingStatus.FAILED.sql,
+                    ended_at = now,
+                    duration_seconds = entry.durationSeconds,
+                    file_size_bytes = entry.fileSizeBytes,
+                    error = "orphaned_by_app_kill",
+                    id = entry.id,
+                )
+            }
         }
         return orphans.size
     }
@@ -263,5 +323,14 @@ class RecordingsRepository(
         // started_at older than this at sweep time are reaped
         // outright; v1.0 doesn't attempt resume.
         const val ORPHAN_THRESHOLD_MS_DEFAULT: Long = 10L * 60_000L
+
+        // MB-219 — minimum on-disk byte count for an orphan row to
+        // be salvaged as COMPLETED instead of FAILED. Filters HTTP
+        // error response bodies (a few KB), header-only captures,
+        // and truncated stream prefixes that wouldn't play. A real
+        // recording that made it past the recorder's first flush
+        // has captured at least one HLS segment (~250 KB+) or
+        // several TS packets (188 B × N).
+        const val MIN_RECOVERED_BYTES: Long = 64L * 1024L
     }
 }

@@ -136,10 +136,20 @@ val appModule =
         }
         // Stage 3.1 / MK.14.1c — recording state-machine repo. Used by
         // RecordingService and (eventually) the Recordings screen.
+        //
+        // MB-219 — `fileBytesIfExists` is the boot-recovery hook for
+        // `sweepOrphans`. When the service's `handleStop` is interrupted
+        // by process death between `cancelAndJoin` and `markCompleted`,
+        // the file is on disk but the row's status never flipped. On
+        // the next boot, sweep probes the file via this resolver; if
+        // bytes are present the row lands as COMPLETED instead of the
+        // default FAILED("orphaned_by_app_kill"), so a fully-recorded
+        // file isn't lost behind a "Failed" badge.
         single {
             com.yancotv.shared.recording.RecordingsRepository(
                 db = get(),
                 clock = { System.currentTimeMillis() },
+                fileBytesIfExists = com.yancotv.android.recording.recordingFileBytesResolver(androidContext()),
             )
         }
         // MK.14.3 — scheduled-recording state machine. Owned by
