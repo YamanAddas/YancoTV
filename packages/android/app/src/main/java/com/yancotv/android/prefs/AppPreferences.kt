@@ -459,8 +459,20 @@ data class EpgPrefs(
     val timelineMinutes: Int = DEFAULT_TIMELINE_MIN,
 ) {
     companion object {
-        const val DEFAULT_DAYS_BACK = 1
+        // 2026-04-27: cut from 1 day to 0. The hard-coded 2-hour
+        // catch-up baseline added in GuideScreen's window math gives a
+        // fresh install just enough history to revisit the show that
+        // just ended; users who want full catch-up can crank the
+        // slider up to 14 days. Past behaviour buried "now" under 24
+        // hours of past programmes, which the user reported was hard
+        // to navigate.
+        const val DEFAULT_DAYS_BACK = 0
         const val DEFAULT_DAYS_FORWARD = 2
+
+        /** Always-included tail of catch-up history regardless of
+         *  [daysBack], so a 0-day setting still shows the most-recent
+         *  programmes (the show that just ended). */
+        const val CATCHUP_BASELINE_HOURS = 2
         const val DEFAULT_TIMELINE_MIN = 60
         val TIMELINE_PRESETS = listOf(30, 60, 90, 120, 180)
     }

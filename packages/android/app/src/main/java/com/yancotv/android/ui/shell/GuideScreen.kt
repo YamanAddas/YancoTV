@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.parental.ChannelActionsMenu
@@ -225,7 +226,12 @@ fun GuideScreen(
         if (initial) loading = true
         val now = System.currentTimeMillis() / 1000L
         val nowAligned = now - (now % (30L * 60L))
-        val windowStart = nowAligned - epgPrefs.daysBack * 24L * 60L * 60L
+        // 2026-04-27 — always include a 2-hour baseline of catch-up so
+        // even with daysBack=0 (the new default) the user can scroll
+        // back to the show that just ended. Cuts the "buried under 24
+        // hours of past programmes" UX the user flagged.
+        val baselineSec = EpgPrefs.CATCHUP_BASELINE_HOURS * 60L * 60L
+        val windowStart = nowAligned - epgPrefs.daysBack * 24L * 60L * 60L - baselineSec
         val windowEnd = nowAligned + epgPrefs.daysForward * 24L * 60L * 60L
         windowStartState = windowStart
         windowEndState = windowEnd
@@ -697,6 +703,18 @@ private fun GuideGrid(
         hScroll.scrollTo((targetPx - padPx).coerceAtLeast(0))
     }
 
+    // 2026-04-27 — "Jump to now" snap helper. Hoisted to a closure so
+    // the button in the time header (always visible, D-pad-reachable)
+    // and the floating button below the grid both use the same target.
+    val nowOffsetMinTop = ((nowSeconds - guide.startTime) / 60L).toInt().coerceAtLeast(0)
+    val jumpTarget =
+        with(density) {
+            (nowOffsetMinTop * pxPerMin).dp.toPx().toInt() - 80.dp.toPx().toInt()
+        }.coerceAtLeast(0)
+    val onJumpToNow: () -> Unit = {
+        gridScope.launch { hScroll.animateScrollTo(jumpTarget) }
+    }
+
     Column(
         modifier =
             modifier
@@ -709,6 +727,7 @@ private fun GuideGrid(
             timelineWidth = timelineWidth,
             pxPerMin = pxPerMin,
             hScroll = hScroll,
+            onJumpToNow = onJumpToNow,
         )
 
         if (totalCount > guide.channels.size) {
@@ -775,35 +794,47 @@ private fun GuideGrid(
                 )
             }
 
-            // MK.15.4 — "Jump to now" floating button. Visible only when the
-            // user has scrolled away from the now-line by more than ~half a
-            // screen. Tapping snaps the timeline back so the now-line sits
-            // ~80 dp from the left edge of the lane.
-            val nowPx =
-                with(density) {
-                    ((nowOffsetMin * pxPerMin).dp.toPx()).toInt()
-                }
-            val padPx = with(density) { 80.dp.toPx() }.toInt()
-            val target = (nowPx - padPx).coerceAtLeast(0)
-            val drift = kotlin.math.abs(hScroll.value - target)
-            val driftThresholdPx = with(density) { 200.dp.toPx() }.toInt()
-            if (nowOffsetMin in 0..totalMinutes && drift > driftThresholdPx) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 16.dp),
-                ) {
-                    androidx.compose.material3.FilledTonalButton(
-                        onClick = {
-                            gridScope.launch { hScroll.animateScrollTo(target) }
-                        },
-                    ) {
-                        Text(text = "Jump to now")
-                    }
-                }
-            }
+            // 2026-04-27 — the floating BottomEnd "Jump to now" button
+            // was removed. The same action is now in the time header's
+            // channel-column slot (TimeHeader → JumpToNowButton),
+            // always visible and D-pad-reachable via UP from any
+            // channel row.
         }
+    }
+}
+
+/**
+ * 2026-04-27 — header-level "Now" jump button. Sits in the time
+ * header's channel-column area so D-pad UP from any channel row
+ * naturally focuses it. Always visible (no drift threshold) — the
+ * button is the user's anchor back to the live edge whenever they're
+ * browsing past or future programmes.
+ */
+@Composable
+private fun JumpToNowButton(onClick: () -> Unit) {
+    val palette = LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(6.dp)
+    val bg = if (focused) palette.Accent else palette.BackgroundElevated
+    val borderColor = if (focused) palette.Accent else palette.PanelBorder
+    val fg = if (focused) palette.BackgroundDeep else palette.Accent
+    Box(
+        modifier =
+            Modifier
+                .clip(shape)
+                .background(bg)
+                .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = "Now",
+            color = fg,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -814,6 +845,7 @@ private fun TimeHeader(
     timelineWidth: androidx.compose.ui.unit.Dp,
     pxPerMin: Int,
     hScroll: androidx.compose.foundation.ScrollState,
+    onJumpToNow: () -> Unit,
 ) {
     Row(
         modifier =
@@ -823,7 +855,17 @@ private fun TimeHeader(
                 .background(LocalYancoPalette.current.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.width(CHANNEL_COL_WIDTH))
+        // 2026-04-27 — "Now" jump button lives in the channel-column
+        // slot so it's always reachable: D-pad UP from any channel row
+        // lands on it via natural focus traversal. Sticky regardless
+        // of timeline scroll. Tapping snaps the timeline so the now-
+        // line sits ~80 dp from the lane edge.
+        Box(
+            modifier = Modifier.width(CHANNEL_COL_WIDTH).fillMaxHeight(),
+            contentAlignment = Alignment.Center,
+        ) {
+            JumpToNowButton(onClick = onJumpToNow)
+        }
         Row(
             modifier =
                 Modifier
