@@ -225,23 +225,21 @@ class PlaybackController(
         //     a line you missed", which is the actually-used pattern.
         //   - bufferForPlayback 1s, bufferForPlaybackAfterRebuffer 2.5s
         //     — unchanged; channel-zap UX stays snappy.
+        // MK.17.4 — buffer profile is user-selectable via Settings.
+        // Profile values land in `BufferProfile` (LOW_LATENCY / BALANCED /
+        // STABLE). Default BALANCED matches the pre-prefs hardcode.
+        val profile = prefs.playbackFlow.value.bufferProfile
         val loadControl =
             DefaultLoadControl
                 .Builder()
                 .setBufferDurationsMs(
-                    // minBufferMs =
-                    15_000,
-                    // maxBufferMs =
-                    15_000,
-                    // bufferForPlaybackMs =
-                    1_000,
-                    // bufferForPlaybackAfterRebufferMs =
-                    2_500,
+                    profile.minBufferMs,
+                    profile.maxBufferMs,
+                    profile.playbackMs,
+                    profile.rebufferMs,
                 ).setBackBuffer(
-                    // backBufferDurationMs =
-                    30_000,
-                    // retainBackBufferFromKeyframe =
-                    true,
+                    profile.backBufferMs,
+                    /* retainBackBufferFromKeyframe = */ true,
                 ).build()
         // MK.9 — vendor the FFmpeg AUDIO extension to fix MB-14
         // (Fire TV ships without licensed AC3/EAC3/DTS/TrueHD decoders, so
@@ -281,10 +279,11 @@ class PlaybackController(
             } else {
                 DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
             }
+        // MK.17.3 — fallback toggle is user-controlled. Default ON.
         val renderersFactory =
             DefaultRenderersFactory(context)
                 .setExtensionRendererMode(extensionMode)
-                .setEnableDecoderFallback(true)
+                .setEnableDecoderFallback(prefs.playbackFlow.value.enableDecoderFallback)
         val exo =
             ExoPlayer
                 .Builder(context)

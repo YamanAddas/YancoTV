@@ -122,6 +122,45 @@ fun SettingsPlaybackTab(
             onValueChange = { scope.launch { prefs.setSubtitleLanguage(it.take(6).lowercase()) } },
             keyboardType = KeyboardType.Ascii,
         )
+
+        // MK.17.4 — buffer profile presets. Picks land on the next
+        // ExoPlayer rebuild (channel zap / app restart). Default
+        // BALANCED matches the pre-prefs hardcode.
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Buffer profile",
+                color = LocalYancoPalette.current.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Trades startup speed against rebuffer resilience. Restart playback to apply.",
+                color = LocalYancoPalette.current.TextMuted,
+                fontSize = 11.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (profile in com.yancotv.android.prefs.BufferProfile.values()) {
+                    SettingsChip(
+                        label = profile.displayName,
+                        selected = snapshot.bufferProfile == profile,
+                        onClick = {
+                            scope.launch { prefs.setBufferProfile(profile) }
+                        },
+                    )
+                }
+            }
+        }
+
+        // MK.17.3 — decoder fallback toggle. Default ON; flipping off
+        // makes hard codec failures more visible (the player will
+        // surface an error rather than silently retry on a different
+        // renderer).
+        SettingsToggleRow(
+            label = "Enable decoder fallback",
+            description = "If a hardware decoder fails to start, retry on the software decoder. Turn off to surface decoder errors directly (debugging only).",
+            checked = snapshot.enableDecoderFallback,
+            onCheckedChange = { scope.launch { prefs.setDecoderFallback(it) } },
+        )
     }
 }
 

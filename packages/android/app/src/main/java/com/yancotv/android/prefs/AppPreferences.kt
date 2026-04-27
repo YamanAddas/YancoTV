@@ -81,6 +81,18 @@ class AppPreferences(
             _playback.value = _playback.value.copy(speed = speed)
         }
 
+    // MK.17.3 — decoder fallback toggle. Stored as "1" / "0".
+    suspend fun setDecoderFallback(enabled: Boolean) =
+        write(KEY_DECODER_FALLBACK, if (enabled) "1" else "0") {
+            _playback.value = _playback.value.copy(enableDecoderFallback = enabled)
+        }
+
+    // MK.17.4 — buffer profile preset.
+    suspend fun setBufferProfile(profile: BufferProfile) =
+        write(KEY_BUFFER_PROFILE, profile.key) {
+            _playback.value = _playback.value.copy(bufferProfile = profile)
+        }
+
     // ───── Network ─────
 
     suspend fun setUserAgent(ua: String) =
@@ -203,6 +215,8 @@ class AppPreferences(
             audioLanguage = readString(KEY_AUDIO_LANG).orEmpty(),
             subtitleLanguage = readString(KEY_SUBTITLE_LANG).orEmpty(),
             speed = readString(KEY_SPEED)?.toFloatOrNull() ?: 1.0f,
+            enableDecoderFallback = readString(KEY_DECODER_FALLBACK) != "0",
+            bufferProfile = BufferProfile.fromKey(readString(KEY_BUFFER_PROFILE)),
         )
 
     private fun readNetwork(): NetworkPrefs =
@@ -293,6 +307,8 @@ class AppPreferences(
         private const val KEY_EPG_DAYS_BACK = "pref_epg_days_back"
         private const val KEY_EPG_DAYS_FORWARD = "pref_epg_days_forward"
         private const val KEY_EPG_TIMELINE_MIN = "pref_epg_timeline_minutes"
+        private const val KEY_DECODER_FALLBACK = "pref_playback_decoder_fallback"
+        private const val KEY_BUFFER_PROFILE = "pref_playback_buffer_profile"
     }
 }
 
@@ -418,7 +434,65 @@ data class PlaybackPrefs(
      * override, not a persisted pref).
      */
     val speed: Float = 1.0f,
+    /** MK.17.3 — when on (default), ExoPlayer falls back to a different
+     *  decoder if the first one fails to initialise. Off makes hard
+     *  failures more visible for debugging. */
+    val enableDecoderFallback: Boolean = true,
+    /** MK.17.4 — `LoadControl` profile. */
+    val bufferProfile: BufferProfile = BufferProfile.BALANCED,
 )
+
+/** MK.17.4 — three preset profiles for `DefaultLoadControl`. Free
+ *  sliders are deliberately avoided; pick a profile, ship it. */
+enum class BufferProfile(
+    val key: String,
+    val displayName: String,
+    val minBufferMs: Int,
+    val maxBufferMs: Int,
+    val playbackMs: Int,
+    val rebufferMs: Int,
+    val backBufferMs: Int,
+) {
+    LOW_LATENCY("low_latency", "Low latency", 5_000, 5_000, 500, 1_000, 10_000),
+    BALANCED("balanced", "Balanced", 15_000, 15_000, 1_000, 2_500, 30_000),
+    STABLE("stable", "Stable", 30_000, 45_000, 2_000, 5_000, 60_000),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): BufferProfile =
+            values().firstOrNull { it.key == key } ?: BALANCED
+    }
+}
+
+/** MK.17.1a — known-good IPTV User-Agent strings. The default
+ *  ("system") leaves the network layer to pick its own; everything
+ *  else writes a verbatim UA into [NetworkPrefs.userAgentOverride]. */
+enum class UserAgentPreset(
+    val key: String,
+    val displayName: String,
+    val value: String?,
+) {
+    SYSTEM("system", "System default", null),
+    VLC("vlc", "VLC", "VLC/3.0.20 LibVLC/3.0.20"),
+    EXOPLAYER("exoplayer", "ExoPlayer", "ExoPlayerLib/2.19.1"),
+    KODI("kodi", "Kodi", "Kodi/20.5 (Linux; Android 11) Mobile"),
+    SMART_TV("smart_tv", "Smart TV", "Mozilla/5.0 (SMART-TV; Linux; Tizen 7.0)"),
+    CHROME_ANDROID(
+        "chrome_android",
+        "Chrome Android",
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
+    ),
+    CUSTOM("custom", "Custom…", null),
+    ;
+
+    companion object {
+        fun matchValue(value: String?): UserAgentPreset {
+            if (value.isNullOrBlank()) return SYSTEM
+            val hit = values().firstOrNull { it.value == value }
+            return hit ?: CUSTOM
+        }
+    }
+}
 
 data class NetworkPrefs(
     val userAgentOverride: String? = null,
