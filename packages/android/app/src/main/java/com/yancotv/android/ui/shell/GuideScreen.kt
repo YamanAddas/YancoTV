@@ -161,11 +161,17 @@ fun GuideScreen(
     val coroutineScope = rememberCoroutineScope()
 
     // Reload when the user changes the EPG window prefs OR picks a
-    // different group filter. Group switches reset pagination because
-    // the result set is fundamentally different.
+    // different group filter. We deliberately do NOT blank `channels`
+    // here: blanking flips `guideEmpty` to true mid-press, which would
+    // unmount the Row containing the just-pressed CategoryRail pill —
+    // a focused-composable-disposed-mid-event race that crashed the
+    // previous slice (2026-04-27 hands-on). Letting the old list stay
+    // visible until the new load returns also reads as a snappier
+    // fetch (no "Loading…" flash). LaunchedEffect(reloadTick) cancels
+    // its prior coroutine when tick increments, so spam-pressing
+    // Sports → News → Movies doesn't stack in-flight loads.
     LaunchedEffect(epgPrefs.daysBack, epgPrefs.daysForward, selectedGroup) {
         if (channels.isNotEmpty()) {
-            channels = emptyList()
             allLoaded = false
             reloadTick++
         }
@@ -342,62 +348,59 @@ fun GuideScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        if (guideEmpty) {
-            if (loading) {
-                GuideEmptyState(text = "Loading guide…", modifier = Modifier.fillMaxSize())
-            } else {
-                // Diagnostics panel takes over the full area, carrying the
-                // refresh + re-sync actions so the user never has to dig
-                // through Settings to unstick an empty guide.
-                GuideSyncPanel(
-                    compact = false,
-                    onRefreshed = { reloadTick++ },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        } else {
-            // MK.guide.groups — same CategoryRail used by Live TV /
-            // Movies / Series. Sentinel ALL_GROUPS maps to "no filter"
-            // (selectedGroup = null) so the existing repo path
-            // (groupName = null → guideChannelsAllPaged) handles it.
-            // Favorites pill is hidden — favoriting is a per-channel
-            // concept that doesn't fit a programme guide.
-            val railSelected = selectedGroup ?: ALL_GROUPS
-            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                if (groups.isNotEmpty()) {
-                    CategoryRail(
-                        groups = groups,
-                        selected = railSelected,
-                        onSelect = { picked ->
-                            selectedGroup = if (picked == ALL_GROUPS) null else picked
-                        },
-                        onEnterContent = { /* grid takes focus via natural traversal */ },
-                        onExitToSidebar = { /* shell sidebar is the parent's BACK target */ },
-                        onPanelFocusChanged = { /* no shell collapse for the guide */ },
-                        showFavorites = false,
-                    )
-                }
-                Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+    // MK.guide.groups — A+B fix (2026-04-27). Rail is hoisted ABOVE the
+    // guideEmpty branch so it never unmounts during a category swap;
+    // only the right pane swaps between Loading / SyncPanel / Grid.
+    // Combined with B (channels not blanked on switch), the focused
+    // pill survives the press → no unmount-while-focused crash.
+    val railSelected = selectedGroup ?: ALL_GROUPS
+    Row(modifier = modifier.fillMaxSize()) {
+        if (groups.isNotEmpty()) {
+            CategoryRail(
+                groups = groups,
+                selected = railSelected,
+                onSelect = { picked ->
+                    selectedGroup = if (picked == ALL_GROUPS) null else picked
+                },
+                onEnterContent = { /* grid takes focus via natural traversal */ },
+                onExitToSidebar = { /* shell sidebar is the parent's BACK target */ },
+                onPanelFocusChanged = { /* no shell collapse for the guide */ },
+                showFavorites = false,
+            )
+        }
+        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            if (guideEmpty) {
+                if (loading) {
+                    GuideEmptyState(text = "Loading guide…", modifier = Modifier.fillMaxSize())
+                } else {
+                    // Diagnostics panel for stuck/empty guides. Carries the
+                    // refresh + re-sync actions so users don't have to dig
+                    // through Settings.
                     GuideSyncPanel(
-                        compact = true,
+                        compact = false,
                         onRefreshed = { reloadTick++ },
-                    )
-                    GuideGrid(
-                        guide = guide!!,
-                        nowSeconds = nowSeconds,
-                        listState = listState,
-                        totalCount = totalChannels,
-                        loadingMore = loadingMore,
-                        onPlay = onPlay,
-                        onProgrammeAction = { channel, programme ->
-                            actionTarget = ProgrammeAction(channel, programme)
-                        },
-                        onChannelLongPress = onChannelLongPress,
-                        pxPerMin = pxPerMinFor(epgPrefs.timelineMinutes),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
+            } else {
+                GuideSyncPanel(
+                    compact = true,
+                    onRefreshed = { reloadTick++ },
+                )
+                GuideGrid(
+                    guide = guide!!,
+                    nowSeconds = nowSeconds,
+                    listState = listState,
+                    totalCount = totalChannels,
+                    loadingMore = loadingMore,
+                    onPlay = onPlay,
+                    onProgrammeAction = { channel, programme ->
+                        actionTarget = ProgrammeAction(channel, programme)
+                    },
+                    onChannelLongPress = onChannelLongPress,
+                    pxPerMin = pxPerMinFor(epgPrefs.timelineMinutes),
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
