@@ -169,6 +169,39 @@ class BackupRoundTripTest {
         }
     }
 
+    @Test fun import_passwordModeWithWrongPassword_landsEmptyCredsWithWarning() {
+        // Option C fallback path — the file is password-encrypted, the
+        // user supplies a non-null but wrong password, PBKDF2 happily
+        // derives a key from it (it doesn't validate), the AES/GCM
+        // auth-tag check then fails per credential blob. The importer
+        // surfaces this via report.warnings and lands the row with
+        // empty credentials rather than aborting the whole restore —
+        // sources/url/etc. survive; the user re-enters creds.
+        //
+        // Distinct from import_passwordModeWithoutPassword_throws —
+        // null password aborts before key derivation. Wrong-but-present
+        // password is the case the importer absorbs.
+        val src = testDb()
+        seedSource(src, username = "secret-user", password = "secret-pass")
+        val file =
+            BackupExporter(src, PlaintextCredentialStore())
+                .export("0.1.0", 8, 1L, password = "right-password")
+
+        val dst = testDb()
+        val importer = BackupImporter(dst, PlaintextCredentialStore())
+        val report = importer.import(file, password = "wrong-password", currentSchemaVersion = 8)
+
+        assertEquals(1, report.restored["sources"])
+        assertTrue(
+            report.warnings.any { it.contains("credential decrypt failed") },
+            "expected a credential-decrypt warning in: ${report.warnings}",
+        )
+        val store = PlaintextCredentialStore()
+        val row = dst.sourcesQueries.selectById("src-A").executeAsOne()
+        assertEquals("", store.decrypt(row.username_encrypted!!))
+        assertEquals("", store.decrypt(row.password_encrypted!!))
+    }
+
     @Test fun import_schemaTooNew_throws() {
         val src = testDb()
         val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", dbSchemaVersion = 99, nowMs = 1L)
