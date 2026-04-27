@@ -954,10 +954,20 @@ class PlayerActivity : AppCompatActivity() {
                         ?.uppercase(java.util.Locale.ROOT) ?: "Auto",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.AUDIO) },
                 onCyclePrev = {
-                    com.yancotv.android.player.options.cycleAudioTrack(controller, forward = false)
+                    com.yancotv.android.player.options.cycleAudioTrack(
+                        controller,
+                        forward = false,
+                        scope = scope,
+                        prefs = prefs,
+                    )
                 },
                 onCycleNext = {
-                    com.yancotv.android.player.options.cycleAudioTrack(controller, forward = true)
+                    com.yancotv.android.player.options.cycleAudioTrack(
+                        controller,
+                        forward = true,
+                        scope = scope,
+                        prefs = prefs,
+                    )
                 },
             )
         rows +=
@@ -969,10 +979,20 @@ class PlayerActivity : AppCompatActivity() {
                         ?.uppercase(java.util.Locale.ROOT) ?: "Off",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES) },
                 onCyclePrev = {
-                    com.yancotv.android.player.options.cycleTextTrack(controller, forward = false)
+                    com.yancotv.android.player.options.cycleTextTrack(
+                        controller,
+                        forward = false,
+                        scope = scope,
+                        prefs = prefs,
+                    )
                 },
                 onCycleNext = {
-                    com.yancotv.android.player.options.cycleTextTrack(controller, forward = true)
+                    com.yancotv.android.player.options.cycleTextTrack(
+                        controller,
+                        forward = true,
+                        scope = scope,
+                        prefs = prefs,
+                    )
                 },
             )
         rows +=

@@ -582,12 +582,22 @@ private fun sleepLabel(opt: SleepTimerOption): String =
 
 // ───── Audio / Subs cycle helpers ─────
 
-/** Picks the next supported audio track and applies it. Wraps; if no
- *  selectable tracks, no-op. */
+/**
+ * Picks the next supported audio track and applies it. Wraps; if no
+ * selectable tracks, no-op.
+ *
+ * 2026-04-27 — also persists the selected track's language via
+ * [AppPreferences.setAudioLanguage]. Without that, the popup row's
+ * `currentValue` (read from `prefs.playbackFlow`) stayed stale after a
+ * LEFT/RIGHT cycle: track did switch on the player, but the popup
+ * label still showed the old language code until the next reopen.
+ */
 @UnstableApi
 fun cycleAudioTrack(
     controller: PlaybackController,
     forward: Boolean,
+    scope: kotlinx.coroutines.CoroutineScope? = null,
+    prefs: AppPreferences? = null,
 ) {
     val tracks = readAudioTracks(controller.player)
     if (tracks.isEmpty()) return
@@ -595,15 +605,28 @@ fun cycleAudioTrack(
     val nextIdx =
         if (forward) (currentIdx + 1) % tracks.size
         else (currentIdx - 1 + tracks.size) % tracks.size
-    applyAudioTrack(controller.player, tracks[nextIdx])
+    val nextTrack = tracks[nextIdx]
+    applyAudioTrack(controller.player, nextTrack)
+    if (scope != null && prefs != null) {
+        val lang = nextTrack.language?.takeIf { it.isNotBlank() }.orEmpty()
+        scope.launch { prefs.setAudioLanguage(lang) }
+    }
 }
 
-/** Cycle subtitle selection: walks through tracks, then OFF, then back
- *  to first track. */
+/**
+ * Cycle subtitle selection: walks through tracks, then OFF, then back
+ * to first track.
+ *
+ * 2026-04-27 — also persists the selected track's language (or empty
+ * for Off) via [AppPreferences.setSubtitleLanguage] so the popup row's
+ * `currentValue` reflects the cycle without reopening.
+ */
 @UnstableApi
 fun cycleTextTrack(
     controller: PlaybackController,
     forward: Boolean,
+    scope: kotlinx.coroutines.CoroutineScope? = null,
+    prefs: AppPreferences? = null,
 ) {
     val player = controller.player
     val tracks = readTextTracks(player)
@@ -621,6 +644,7 @@ fun cycleTextTrack(
     val nextIdx =
         if (forward) (currentIdx + 1) % states
         else (currentIdx - 1 + states) % states
+    val newLang: String
     if (nextIdx == tracks.size) {
         // Off
         val params =
@@ -630,8 +654,13 @@ fun cycleTextTrack(
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
         player.trackSelectionParameters = params
+        newLang = ""
     } else {
         applyTextTrack(player, tracks[nextIdx])
+        newLang = tracks[nextIdx].language?.takeIf { it.isNotBlank() }.orEmpty()
+    }
+    if (scope != null && prefs != null) {
+        scope.launch { prefs.setSubtitleLanguage(newLang) }
     }
 }
 
