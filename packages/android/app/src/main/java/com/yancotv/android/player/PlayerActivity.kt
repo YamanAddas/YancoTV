@@ -1475,6 +1475,13 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showSurf() {
         if (surfVisible) return
+        // MK.10.4 fix — hide the Media3 controller first if it's up so
+        // surf and the controller bar don't co-render (they overlap
+        // visually and compete for D-pad input). LEFT routes through
+        // dispatchKeyEvent's live-LEFT bypass regardless of
+        // controllerVisible now, so this hide is the visual side of
+        // that fix.
+        if (controllerVisible) playerView.hideController()
         surfVisible = true
         val v = ensureSurfOverlay()
         v.visibility = View.VISIBLE
@@ -1616,7 +1623,30 @@ class PlayerActivity : AppCompatActivity() {
             // which zaps channels even though the popup is visible — the
             // user could see the menu but not navigate it.
             val optionsV2Visible = optionsV2Inflated && optionsV2State.menuVisible.value
-            if (!controllerVisible && !surfVisible && !dockVisible && !sheetVisible && !optionsV2Visible) {
+            val noOverlay = !surfVisible && !dockVisible && !sheetVisible && !optionsV2Visible
+            val isLiveNow = controller.currentItem.value?.type == ContentType.LIVE
+            // MK.10.4 fix — LIVE LEFT / RIGHT / TV_CONTENTS_MENU / CHANNEL_UP /
+            // CHANNEL_DOWN always go through our handler, even when the
+            // Media3 controller is visible. Otherwise LEFT was ambiguous:
+            // controller hidden → surf, controller visible → Media3's
+            // internal controller-bar navigation (skip-prev / focus
+            // sibling button). Routing live channel-zap keys here
+            // regardless of controllerVisible eliminates that conflict.
+            // showSurf() / handleZap() etc. hide the controller as a
+            // side-effect so the visual is clean.
+            if (isLiveNow && noOverlay) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_TV_CONTENTS_MENU,
+                    KeyEvent.KEYCODE_CHANNEL_UP,
+                    KeyEvent.KEYCODE_CHANNEL_DOWN,
+                    -> {
+                        if (onKeyDown(event.keyCode, event)) return true
+                    }
+                }
+            }
+            if (!controllerVisible && noOverlay) {
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_CENTER,
                     KeyEvent.KEYCODE_ENTER,
