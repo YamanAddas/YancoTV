@@ -230,7 +230,7 @@ GROUP BY c.tvg_id
 ORDER BY c.title ASC, c.tvg_id ASC;
 
 guideChannelsAllPaged:
-SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
 FROM content c
 WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
   AND EXISTS (
@@ -243,7 +243,7 @@ ORDER BY c.title ASC, c.tvg_id ASC
 LIMIT :limit OFFSET :offset;
 
 guideChannelsBySourcePaged:
-SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, c.sort_order
 FROM content c
 WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
   AND c.source_id = :sourceId

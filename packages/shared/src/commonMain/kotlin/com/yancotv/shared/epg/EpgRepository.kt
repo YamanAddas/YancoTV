@@ -148,11 +148,11 @@ class EpgRepository(
         val channels =
             if (sourceId == null) {
                 db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
-                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
+                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
                 }
             } else {
                 db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
-                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url)
+                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
                 }
             }
         if (channels.isEmpty()) {
@@ -177,6 +177,7 @@ class EpgRepository(
                     logoUrl = ch.logoUrl,
                     streamUrl = ch.streamUrl,
                     programmes = progs,
+                    channelNumber = ch.sortOrder?.takeIf { it > 0 }?.toInt(),
                 ),
             )
         }
@@ -410,6 +411,9 @@ class EpgRepository(
         val cleanTitle: String?,
         val logoUrl: String?,
         val streamUrl: String,
+        /** MK.16.5 — channel number from M3U `tvg-chno` (or sequential
+         *  position fallback). NULL when the source didn't provide one. */
+        val sortOrder: Long?,
     )
 
     companion object {

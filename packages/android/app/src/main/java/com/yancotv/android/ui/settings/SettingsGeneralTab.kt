@@ -93,6 +93,28 @@ fun SettingsGeneralTab(
             checked = state.showChannelNumbers,
             onCheckedChange = { scope.launch { prefs.setShowChannelNumbers(it) } },
         )
+        if (state.showChannelNumbers) {
+            // MK.16.5 — number padding format. Disabled-feel chips when
+            // the toggle is off; only render the picker when on so the
+            // dependency is visible.
+            Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+                androidx.compose.material3.Text(
+                    text = "Number format",
+                    color = com.yancotv.android.ui.theme.LocalYancoPalette.current.TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                )
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    com.yancotv.android.prefs.ChannelNumberFormat.values().forEach { f ->
+                        SettingsChip(
+                            label = f.displayName,
+                            selected = state.channelNumberFormat == f,
+                            onClick = { scope.launch { prefs.setChannelNumberFormat(f) } },
+                        )
+                    }
+                }
+            }
+        }
 
         SettingsToggleRow(
             label = "Smart grouping",

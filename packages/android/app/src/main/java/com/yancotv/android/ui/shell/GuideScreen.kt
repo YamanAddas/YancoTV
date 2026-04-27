@@ -784,6 +784,17 @@ private fun ChannelCell(
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
     val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
 
+    // MK.16.5 — channel-number prefix when toggled on. Uses the
+    // user-picked padding format. Absent when source has no number.
+    val prefs: AppPreferences = koinInject()
+    val general by prefs.generalFlow.collectAsState()
+    val numberPrefix =
+        if (general.showChannelNumbers) {
+            general.channelNumberFormat.format(channel.channelNumber).takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+
     Row(
         modifier =
             Modifier
@@ -817,6 +828,14 @@ private fun ChannelCell(
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                 )
             }
+        }
+        if (numberPrefix != null) {
+            Text(
+                text = numberPrefix,
+                color = LocalYancoPalette.current.TextMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+            )
         }
         Text(
             text = channel.name,

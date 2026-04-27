@@ -37,6 +37,9 @@ data class EpgGuideChannel(
     /** Stream URL for direct playback — avoids a second getLive() call from the Guide page */
     val streamUrl: String? = null,
     val programmes: List<EpgProgramme>,
+    /** MK.16.5 — channel number from M3U `tvg-chno` (or sequential
+     *  position fallback). NULL when the source didn't provide one. */
+    val channelNumber: Int? = null,
 )
 
 /** EPG guide slice — programmes for a time range, grouped by channel */

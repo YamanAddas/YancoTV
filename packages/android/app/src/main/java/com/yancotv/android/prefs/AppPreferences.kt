@@ -122,6 +122,13 @@ class AppPreferences(
             _general.value = _general.value.copy(showChannelNumbers = enabled)
         }
 
+    // MK.16.5 — channel-number padding format. Only meaningful when
+    // [GeneralPrefs.showChannelNumbers] is true.
+    suspend fun setChannelNumberFormat(format: ChannelNumberFormat) =
+        write(KEY_CHANNEL_NUMBER_FORMAT, format.key) {
+            _general.value = _general.value.copy(channelNumberFormat = format)
+        }
+
     suspend fun setSmartGrouping(enabled: Boolean) =
         write(KEY_SMART_GROUPING, if (enabled) "1" else "0") {
             _general.value = _general.value.copy(smartGrouping = enabled)
@@ -259,6 +266,7 @@ class AppPreferences(
             openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
             showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
             smartGrouping = readString(KEY_SMART_GROUPING) == "1",
+            channelNumberFormat = ChannelNumberFormat.fromKey(readString(KEY_CHANNEL_NUMBER_FORMAT)),
         )
 
     private fun readEpg(): EpgPrefs =
@@ -339,6 +347,7 @@ class AppPreferences(
         private const val KEY_BUFFER_PROFILE = "pref_playback_buffer_profile"
         private const val KEY_THEME_ID = "pref_theme_id"
         private const val KEY_FONT_SCALE_PCT = "pref_appearance_font_scale_pct"
+        private const val KEY_CHANNEL_NUMBER_FORMAT = "pref_general_channel_number_format"
     }
 }
 
@@ -432,7 +441,37 @@ data class GeneralPrefs(
      * exact group name when a sub-entry is selected.
      */
     val smartGrouping: Boolean = false,
+    /** MK.16.5 — padding style applied when [showChannelNumbers] is on. */
+    val channelNumberFormat: ChannelNumberFormat = ChannelNumberFormat.NONE,
 )
+
+/**
+ * MK.16.5 — channel-number padding presets. Applied only when the
+ * "Show channel numbers" toggle is on; ignored otherwise.
+ */
+enum class ChannelNumberFormat(
+    val key: String,
+    val displayName: String,
+    private val pad: Int,
+) {
+    NONE("none", "No padding", 0),
+    PAD3("pad3", "001", 3),
+    PAD4("pad4", "0001", 4),
+    ;
+
+    /** Renders [number] per this format. Returns blank when [number] is null. */
+    fun format(number: Int?): String {
+        if (number == null || number <= 0) return ""
+        if (pad == 0) return number.toString()
+        val s = number.toString()
+        return if (s.length >= pad) s else "0".repeat(pad - s.length) + s
+    }
+
+    companion object {
+        fun fromKey(key: String?): ChannelNumberFormat =
+            values().firstOrNull { it.key == key } ?: NONE
+    }
+}
 
 enum class ResizeMode(
     val key: String,
