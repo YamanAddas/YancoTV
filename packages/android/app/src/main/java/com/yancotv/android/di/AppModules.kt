@@ -166,7 +166,15 @@ val appModule =
         // MK.16.1 — theme controller. Singleton so every composable
         // in the app reads from the same StateFlow<ThemeId>. Pref
         // persistence (AppPreferences-backed) wires in MK.16.2.
-        single { ThemeController() }
+        single {
+            // MK.16.2 — restore last-picked theme from prefs at app start.
+            val prefs = get<AppPreferences>()
+            val controller = ThemeController()
+            prefs.readThemeId()?.let { name ->
+                controller.setTheme(com.yancotv.android.ui.theme.ThemeId.fromKey(name))
+            }
+            controller
+        }
         single {
             ContentDetailService(
                 db = get(),

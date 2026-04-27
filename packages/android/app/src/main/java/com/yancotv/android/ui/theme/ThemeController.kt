@@ -5,17 +5,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Stable identifiers for the built-in themes. Persisted as the `name`
- * string so renaming an entry is a migration, not a silent corruption.
- *
- * Only `FrostedEmerald` is wired today (MK.16.1 = refactor only). The
- * remaining three land in MK.16.2 with the Appearance picker.
+ * Stable identifiers for the built-in themes. Persisted as the [name]
+ * string so renaming an entry is an explicit migration, not silent
+ * corruption. Order here is the order the picker renders.
  */
-enum class ThemeId {
-    FrostedEmerald,
-    // MidnightSapphire,  // MK.16.2
-    // WarmAmber,         // MK.16.2
-    // Monochrome,        // MK.16.2
+enum class ThemeId(val displayName: String) {
+    FrostedEmerald("Frosted Emerald"),
+    MidnightSapphire("Midnight Sapphire"),
+    WarmAmber("Warm Amber"),
+    Monochrome("Monochrome"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): ThemeId =
+            values().firstOrNull { it.name == key } ?: FrostedEmerald
+    }
 }
 
 /**
@@ -24,13 +28,8 @@ enum class ThemeId {
  * it through [LocalYancoPalette] — so the whole UI recomposes to a new
  * palette without restart.
  *
- * Koin-registered as a singleton in `AppModules`. Pref persistence wires
- * in MK.16.2 (AppPreferences gains a `themeIdFlow`); until then cold
- * launch always starts on [ThemeId.FrostedEmerald], matching the
- * pre-refactor behaviour.
- *
- * [setTheme] is safe to call from any thread — `MutableStateFlow.value=`
- * is atomic.
+ * Koin-registered as a singleton in `AppModules`. MK.16.2 wires
+ * `AppPreferences.setThemeId` so cold launch restores the user's pick.
  */
 class ThemeController {
     private val _themeId = MutableStateFlow(ThemeId.FrostedEmerald)
@@ -40,14 +39,11 @@ class ThemeController {
         _themeId.value = id
     }
 
-    /**
-     * Resolves a [ThemeId] to its [YancoPalette]. Pure function — safe
-     * to call from a composable without wrapping; the `when` is
-     * exhaustive so adding a new [ThemeId] is a compile-time nudge to
-     * add the matching palette.
-     */
     fun paletteFor(id: ThemeId): YancoPalette =
         when (id) {
             ThemeId.FrostedEmerald -> FrostedEmerald
+            ThemeId.MidnightSapphire -> MidnightSapphire
+            ThemeId.WarmAmber -> WarmAmber
+            ThemeId.Monochrome -> Monochrome
         }
 }

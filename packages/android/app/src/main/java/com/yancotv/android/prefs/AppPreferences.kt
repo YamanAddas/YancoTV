@@ -127,6 +127,16 @@ class AppPreferences(
             _general.value = _general.value.copy(smartGrouping = enabled)
         }
 
+    // MK.16.2 — theme picker. Persisted as the enum name; cold launch
+    // reads it back via [readThemeId] and primes [ThemeController].
+    suspend fun setThemeId(name: String) {
+        withContext(Dispatchers.IO) {
+            db.settingsQueries.upsert(KEY_THEME_ID, name)
+        }
+    }
+
+    fun readThemeId(): String? = readString(KEY_THEME_ID)
+
     // ───── Recording (Stage 3.1 / MK.14.2-storage, MK.14.X audit revision) ─────
     //
     // Two interlocking prefs:
@@ -309,6 +319,7 @@ class AppPreferences(
         private const val KEY_EPG_TIMELINE_MIN = "pref_epg_timeline_minutes"
         private const val KEY_DECODER_FALLBACK = "pref_playback_decoder_fallback"
         private const val KEY_BUFFER_PROFILE = "pref_playback_buffer_profile"
+        private const val KEY_THEME_ID = "pref_theme_id"
     }
 }
 
