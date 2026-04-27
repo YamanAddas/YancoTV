@@ -37,8 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +49,9 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.player.SleepTimerOption
 import com.yancotv.android.player.SleepTimerState
 import com.yancotv.android.prefs.AppPreferences
@@ -194,9 +195,9 @@ private fun AudioPanelContent(
 ) {
     val tracks = rememberAudioTracks(controller.player)
     val scope = rememberCoroutineScope()
-    val firstRowFocus = remember { FocusRequester() }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
     LaunchedEffect(tracks) {
-        if (tracks.isNotEmpty()) runCatching { firstRowFocus.requestFocus() }
+        if (tracks.isNotEmpty()) firstRowAnchor.awaitAndRequest()
     }
     if (tracks.isEmpty()) {
         EmptyLine("No audio tracks reported yet.")
@@ -206,7 +207,7 @@ private fun AudioPanelContent(
         OptionRow(
             label = t.displayName,
             selected = t.selected,
-            focusRequester = if (idx == 0) firstRowFocus else null,
+            focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {
                 applyAudioTrack(controller.player, t)
                 t.language?.takeIf { it.isNotBlank() }?.let { lang ->
@@ -300,14 +301,14 @@ private fun SubtitlesPanelContent(
     val tracks = rememberTextTracks(controller.player)
     val disabled = rememberTextDisabled(controller.player)
     val scope = rememberCoroutineScope()
-    val firstRowFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(Unit) { firstRowAnchor.awaitAndRequest() }
 
     val offSelected = disabled || tracks.none { it.selected }
     OptionRow(
         label = "Off",
         selected = offSelected,
-        focusRequester = firstRowFocus,
+        focusAnchor = firstRowAnchor,
         onPick = {
             val params =
                 controller.player.trackSelectionParameters
@@ -437,14 +438,14 @@ private fun AspectPanelContent(
 ) {
     val state by prefs.playbackFlow.collectAsState()
     val scope = rememberCoroutineScope()
-    val firstRowFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(Unit) { firstRowAnchor.awaitAndRequest() }
 
     ResizeMode.values().forEachIndexed { idx, mode ->
         OptionRow(
             label = mode.displayName,
             selected = state.resizeMode == mode,
-            focusRequester = if (idx == 0) firstRowFocus else null,
+            focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {
                 scope.launch { prefs.setResizeMode(mode) }
                 onPickOption()
@@ -478,15 +479,15 @@ private fun SpeedPanelContent(
 ) {
     val state by prefs.playbackFlow.collectAsState()
     val scope = rememberCoroutineScope()
-    val firstRowFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(Unit) { firstRowAnchor.awaitAndRequest() }
 
     SPEED_PRESETS.forEachIndexed { idx, speed ->
         val selected = kotlin.math.abs(state.speed - speed) < 0.01f
         OptionRow(
             label = formatSpeed(speed),
             selected = selected,
-            focusRequester = if (idx == 0) firstRowFocus else null,
+            focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {
                 applySpeed(controller, prefs, speed, scope)
                 onPickOption()
@@ -537,8 +538,8 @@ private fun SleepPanelContent(
     onPickOption: () -> Unit,
 ) {
     val sleep by controller.sleepTimer.collectAsState()
-    val firstRowFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(Unit) { firstRowAnchor.awaitAndRequest() }
 
     val isActive = sleep is SleepTimerState.Active
     val activeOption = (sleep as? SleepTimerState.Active)?.option
@@ -546,7 +547,7 @@ private fun SleepPanelContent(
     OptionRow(
         label = "Off",
         selected = !isActive,
-        focusRequester = firstRowFocus,
+        focusAnchor = firstRowAnchor,
         onPick = {
             controller.cancelSleepTimer()
             onPickOption()
@@ -636,7 +637,7 @@ private fun OptionRow(
     label: String,
     selected: Boolean,
     onPick: () -> Unit,
-    focusRequester: FocusRequester? = null,
+    focusAnchor: PlacedFocusAnchor? = null,
 ) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -655,7 +656,7 @@ private fun OptionRow(
                 .clip(RoundedCornerShape(6.dp))
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(6.dp))
-                .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
+                .let { m -> if (focusAnchor != null) m.placedFocus(focusAnchor) else m }
                 .focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null) { onPick() }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -706,9 +707,9 @@ private fun RecordPanelContent(
         inflight.firstOrNull {
             it.contentId == currentItem?.id && it.status == RecordingStatus.RECORDING
         }
-    val firstRowFocus = remember { FocusRequester() }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
     LaunchedEffect(currentItem?.id) {
-        if (currentItem != null) runCatching { firstRowFocus.requestFocus() }
+        if (currentItem != null) firstRowAnchor.awaitAndRequest()
     }
     val item = currentItem
     if (item == null) {
@@ -721,7 +722,7 @@ private fun RecordPanelContent(
         OptionRow(
             label = "Stop recording",
             selected = true,
-            focusRequester = firstRowFocus,
+            focusAnchor = firstRowAnchor,
             onPick = {
                 // Diagnostic log so a "stop didn't stop" report can be
                 // confirmed via `adb logcat -s YancoRecsPanel`.
@@ -740,7 +741,7 @@ private fun RecordPanelContent(
     OptionRow(
         label = "Record this channel",
         selected = false,
-        focusRequester = firstRowFocus,
+        focusAnchor = firstRowAnchor,
         onPick = {
             RecordingService.start(
                 context = context,
@@ -784,7 +785,7 @@ private fun FavoritesPanelContent(
     val scope = rememberCoroutineScope()
     val currentItem by controller.currentItem.collectAsState()
     val currentEpisode by controller.currentEpisode.collectAsState()
-    val firstRowFocus = remember { FocusRequester() }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
 
     // Episodes don't have content rows — favorite the series. Live /
     // movie use the item's own id. Mirrors the legacy panel's contract.
@@ -795,7 +796,7 @@ private fun FavoritesPanelContent(
     }.collectAsState(initial = false)
 
     LaunchedEffect(favoriteId) {
-        if (favoriteId != null) runCatching { firstRowFocus.requestFocus() }
+        if (favoriteId != null) firstRowAnchor.awaitAndRequest()
     }
 
     if (favoriteId == null) {
@@ -806,7 +807,7 @@ private fun FavoritesPanelContent(
     OptionRow(
         label = if (isFav) "Remove from favorites" else "Add to favorites",
         selected = isFav,
-        focusRequester = firstRowFocus,
+        focusAnchor = firstRowAnchor,
         onPick = {
             scope.launch(Dispatchers.IO) { runCatching { favorites.toggle(favoriteId) } }
             onPickOption()
@@ -825,11 +826,11 @@ private fun ExternalPanelContent(
     val context = androidx.compose.ui.platform.LocalContext.current
     val currentItem by controller.currentItem.collectAsState()
     val installed = remember { ExternalPlayer.installed(context) }
-    val firstRowFocus = remember { FocusRequester() }
+    val firstRowAnchor = rememberPlacedFocusAnchor()
 
     val streamUrl = currentItem?.streamUrl?.takeIf { it.isNotBlank() }
     LaunchedEffect(streamUrl) {
-        if (streamUrl != null) runCatching { firstRowFocus.requestFocus() }
+        if (streamUrl != null) firstRowAnchor.awaitAndRequest()
     }
     if (streamUrl == null) {
         EmptyLine("Nothing playing — start a stream to hand off.")
@@ -844,7 +845,7 @@ private fun ExternalPanelContent(
         OptionRow(
             label = app.displayName,
             selected = false,
-            focusRequester = if (idx == 0) firstRowFocus else null,
+            focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {
                 controller.player.pause()
                 ExternalPlayer.launch(
@@ -860,7 +861,7 @@ private fun ExternalPanelContent(
     OptionRow(
         label = "Choose another player…",
         selected = false,
-        focusRequester = if (installed.isEmpty()) firstRowFocus else null,
+        focusAnchor = if (installed.isEmpty()) firstRowAnchor else null,
         onPick = {
             controller.player.pause()
             ExternalPlayer.launch(
