@@ -949,19 +949,25 @@ private fun ProgrammeActionDialog(
             }
         },
         confirmButton = {
-            // For past programmes with a resolvable catchup URL, surface the
-            // replay button as the primary action — that's what the user
-            // almost certainly wants when they tap an ended programme. The
-            // live "Watch channel" option stays available underneath so the
-            // user can still bail out to live playback.
-            if (isPast && catchupItem != null) {
-                TextButton(onClick = { onPlayCatchup(catchupItem) }) {
-                    Text(text = "Play catch-up", color = LocalYancoPalette.current.Accent)
+            // State-gated primary action:
+            //   - currently airing → "Watch channel"
+            //   - past + has catch-up → "Play catch-up"
+            //   - past without catch-up OR future → no primary; the
+            //     user closes the dialog (future has reminder / record
+            //     in the dismiss row, past-without-catchup has nothing
+            //     useful here so we don't fake one)
+            when {
+                !isPast && !isFuture -> {
+                    TextButton(onClick = onWatch) {
+                        Text(text = "Watch channel", color = LocalYancoPalette.current.Accent)
+                    }
                 }
-            } else {
-                TextButton(onClick = onWatch) {
-                    Text(text = "Watch channel", color = LocalYancoPalette.current.Accent)
+                isPast && catchupItem != null -> {
+                    TextButton(onClick = { onPlayCatchup(catchupItem) }) {
+                        Text(text = "Play catch-up", color = LocalYancoPalette.current.Accent)
+                    }
                 }
+                else -> Unit
             }
         },
         dismissButton = {
@@ -1003,11 +1009,6 @@ private fun ProgrammeActionDialog(
                                     Text(text = "Record series", color = LocalYancoPalette.current.TextPrimary)
                                 }
                             }
-                        }
-                    }
-                    isPast && catchupItem != null -> {
-                        TextButton(onClick = onWatch) {
-                            Text(text = "Watch channel", color = LocalYancoPalette.current.TextPrimary)
                         }
                     }
                     else -> Unit

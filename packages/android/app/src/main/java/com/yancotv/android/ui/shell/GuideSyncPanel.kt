@@ -317,25 +317,15 @@ fun GuideSyncPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(
+                // Click-to-edit (MB-117): D-pad CENTER on the field opens
+                // the keyboard; D-pad navigation alone doesn't, so the user
+                // can scroll past the row without the IME jumping in.
+                com.yancotv.android.ui.settings.SettingsClickToEditField(
+                    label = "EPG URL",
                     value = globalUrlDraft,
                     onValueChange = { globalUrlDraft = it },
+                    hint = "https://example.com/xmltv.xml",
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    placeholder = { Text("https://example.com/xmltv.xml", fontSize = 12.sp) },
-                    textStyle =
-                        androidx.compose.ui.text.TextStyle(
-                            color = LocalYancoPalette.current.TextPrimary,
-                            fontSize = 13.sp,
-                        ),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = LocalYancoPalette.current.TextPrimary,
-                            unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
-                            focusedBorderColor = LocalYancoPalette.current.Accent,
-                            unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
-                            cursorColor = LocalYancoPalette.current.Accent,
-                        ),
                 )
                 Button(
                     onClick = {
