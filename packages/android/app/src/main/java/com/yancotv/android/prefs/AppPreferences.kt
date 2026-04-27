@@ -137,6 +137,24 @@ class AppPreferences(
 
     fun readThemeId(): String? = readString(KEY_THEME_ID)
 
+    // MK.16.4 — font scale (90/100/110/125%). Stored as the integer
+    // percent. Applied via LocalDensity override in [YancoTheme] so
+    // every Compose Text on screen rescales without restart.
+    private val _appearance = MutableStateFlow(readAppearance())
+    val appearanceFlow: StateFlow<AppearancePrefs> = _appearance.asStateFlow()
+
+    suspend fun setFontScalePercent(percent: Int) =
+        write(KEY_FONT_SCALE_PCT, percent.toString()) {
+            _appearance.value = _appearance.value.copy(fontScalePercent = percent)
+        }
+
+    private fun readAppearance(): AppearancePrefs =
+        AppearancePrefs(
+            fontScalePercent =
+                readString(KEY_FONT_SCALE_PCT)?.toIntOrNull()?.takeIf { it in 50..200 }
+                    ?: AppearancePrefs.DEFAULT_FONT_SCALE_PCT,
+        )
+
     // ───── Recording (Stage 3.1 / MK.14.2-storage, MK.14.X audit revision) ─────
     //
     // Two interlocking prefs:
@@ -320,6 +338,7 @@ class AppPreferences(
         private const val KEY_DECODER_FALLBACK = "pref_playback_decoder_fallback"
         private const val KEY_BUFFER_PROFILE = "pref_playback_buffer_profile"
         private const val KEY_THEME_ID = "pref_theme_id"
+        private const val KEY_FONT_SCALE_PCT = "pref_appearance_font_scale_pct"
     }
 }
 
@@ -510,3 +529,19 @@ data class NetworkPrefs(
     val connectTimeoutSec: Int = AppPreferences.DEFAULT_CONNECT_TIMEOUT,
     val readTimeoutSec: Int = AppPreferences.DEFAULT_READ_TIMEOUT,
 )
+
+/**
+ * MK.16.4 — appearance prefs orthogonal to theme palette. Currently
+ * just font scale; future home for other dimension-driven knobs (row
+ * density, etc.).
+ */
+data class AppearancePrefs(
+    val fontScalePercent: Int = DEFAULT_FONT_SCALE_PCT,
+) {
+    val fontScale: Float get() = fontScalePercent / 100f
+
+    companion object {
+        const val DEFAULT_FONT_SCALE_PCT = 100
+        val FONT_SCALE_PRESETS = listOf(90, 100, 110, 125)
+    }
+}

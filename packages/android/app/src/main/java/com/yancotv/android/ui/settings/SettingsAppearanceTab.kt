@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.AppearancePrefs
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.ThemeController
 import com.yancotv.android.ui.theme.ThemeId
@@ -47,6 +48,7 @@ fun SettingsAppearanceTab(
     prefs: AppPreferences = koinInject(),
 ) {
     val active by themeController.themeId.collectAsState()
+    val appearance by prefs.appearanceFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
     Column(
@@ -79,6 +81,26 @@ fun SettingsAppearanceTab(
                     scope.launch { prefs.setThemeId(id.name) }
                 },
             )
+        }
+
+        // MK.16.4 — font scale picker. Live-applies via LocalDensity
+        // override in YancoTheme; sp-sized text rescales without restart,
+        // dp layouts stay put.
+        Text(
+            text = "Font size",
+            color = LocalYancoPalette.current.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppearancePrefs.FONT_SCALE_PRESETS.forEach { pct ->
+                SettingsChip(
+                    label = "$pct%",
+                    selected = appearance.fontScalePercent == pct,
+                    onClick = { scope.launch { prefs.setFontScalePercent(pct) } },
+                )
+            }
         }
     }
 }

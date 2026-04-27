@@ -7,6 +7,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import com.yancotv.android.prefs.AppPreferences
 import org.koin.compose.koinInject
 
 /**
@@ -43,7 +46,24 @@ fun YancoTheme(
     val themeId by themeController.themeId.collectAsState()
     val palette = remember(themeId) { themeController.paletteFor(themeId) }
 
-    CompositionLocalProvider(LocalYancoPalette provides palette) {
+    // MK.16.4 — font scale via LocalDensity override. Multiplies the
+    // ambient density's fontScale; physical density (dp sizing) is
+    // untouched so layouts don't drift, only sp-sized text rescales.
+    val prefs: AppPreferences = koinInject()
+    val appearance by prefs.appearanceFlow.collectAsState()
+    val baseDensity = LocalDensity.current
+    val scaledDensity =
+        remember(baseDensity, appearance.fontScalePercent) {
+            Density(
+                density = baseDensity.density,
+                fontScale = baseDensity.fontScale * appearance.fontScale,
+            )
+        }
+
+    CompositionLocalProvider(
+        LocalYancoPalette provides palette,
+        LocalDensity provides scaledDensity,
+    ) {
         if (isTv) {
             val scheme = remember(palette) { tvColorScheme(palette) }
             androidx.tv.material3.MaterialTheme(
