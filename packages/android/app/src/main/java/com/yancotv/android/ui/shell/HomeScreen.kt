@@ -2,7 +2,8 @@ package com.yancotv.android.ui.shell
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -461,17 +462,21 @@ fun HomeScreen(
         }
 
         // Search overlay — rides above the Row so it dims everything.
+        // Audit-pass-1: `.clickable` on the scrim and the inner Box was
+        // creating two extra focusable D-pad targets on TV (same root
+        // cause the legacy PlayerOptionsSheet documented). Touch dismiss
+        // now goes through `pointerInput { detectTapGestures }` so the
+        // scrim doesn't register as a focus target — D-pad navigation
+        // reaches the actual SearchScreen widgets directly.
         if (searchOverlayVisible) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.72f))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { SearchOverlayState.hide() },
-                        ),
+                        .pointerInput(Unit) {
+                            detectTapGestures { SearchOverlayState.hide() }
+                        },
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Box(
@@ -480,11 +485,11 @@ fun HomeScreen(
                             .fillMaxWidth(if (isTv) 0.6f else 1f)
                             .fillMaxHeight()
                             .background(LocalYancoPalette.current.BackgroundDeep)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { /* swallow */ },
-                            ),
+                            // Eat tap so the outer scrim's dismiss
+                            // doesn't fire when the user taps inside the
+                            // search panel itself. Empty handler is
+                            // enough — touch consumed by pointerInput.
+                            .pointerInput(Unit) { detectTapGestures { } },
                 ) {
                     SearchScreen(isTv = isTv)
                 }
