@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,6 +98,7 @@ class PlayerActivity : AppCompatActivity() {
     private val epg: EpgRepository by inject()
     private val prefs: AppPreferences by inject()
     private val recordings: com.yancotv.shared.recording.RecordingsRepository by inject()
+    private val favoritesRepo: com.yancotv.shared.favorites.FavoritesRepository by inject()
 
     // MK.10.4 — numeric channel-jump state. Activity-scoped (a fresh
     // PlayerActivity gets a fresh entry buffer); not Koin since nothing
@@ -1016,35 +1018,48 @@ class PlayerActivity : AppCompatActivity() {
                     },
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SLEEP) },
             )
+        // Slice 2b — these rows open native floating panels matching the
+        // popup's visual language; no more legacy-sheet fallthrough.
+        val currentItem by controller.currentItem.collectAsState()
+        val recordingsInflight by remember { recordings.allFlow() }
+            .collectAsState(initial = emptyList())
+        val isRecordingNow =
+            recordingsInflight.any {
+                it.contentId == currentItem?.id &&
+                    it.status == com.yancotv.shared.recording.RecordingStatus.RECORDING
+            }
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.RECORD,
                 label = "Record",
-                currentValue = "—",
-                onPick = {
-                    hideOptionsV2()
-                    showSheet(SheetMode.RECORD)
-                },
+                currentValue = if (isRecordingNow) "Recording" else "—",
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.RECORD) },
             )
+        // Favorites row reads `isFavoriteFlow` for the current id (or
+        // series id for episode play). Empty current item → "—".
+        val favoriteId =
+            controller.currentEpisode.collectAsState().value?.seriesId
+                ?: currentItem?.id
+        val isFav by remember(favoriteId) {
+            if (favoriteId != null) {
+                favoritesRepo.isFavoriteFlow(favoriteId)
+            } else {
+                kotlinx.coroutines.flow.flowOf(false)
+            }
+        }.collectAsState(initial = false)
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES,
                 label = "Favorites",
-                currentValue = "—",
-                onPick = {
-                    hideOptionsV2()
-                    showSheet(SheetMode.FAV)
-                },
+                currentValue = if (isFav) "Saved" else "—",
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES) },
             )
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL,
                 label = "External player",
                 currentValue = "—",
-                onPick = {
-                    hideOptionsV2()
-                    showSheet(SheetMode.EXT)
-                },
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL) },
             )
         return rows
     }

@@ -49,12 +49,21 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.SleepTimerOption
 import com.yancotv.android.player.SleepTimerState
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
+import com.yancotv.android.recording.RecordingService
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.recording.RecordInput
+import com.yancotv.shared.recording.RecordingFormat
+import com.yancotv.shared.recording.RecordingStatus
+import com.yancotv.shared.recording.RecordingsRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -135,7 +144,12 @@ fun PlayerOptionsPanelHost(
                                 SpeedPanelContent(controller, prefs, onPickOption)
                             PlayerOptionCategory.SLEEP ->
                                 SleepPanelContent(controller, onPickOption)
-                            else -> Unit
+                            PlayerOptionCategory.RECORD ->
+                                RecordPanelContent(controller, onPickOption)
+                            PlayerOptionCategory.FAVORITES ->
+                                FavoritesPanelContent(controller, onPickOption)
+                            PlayerOptionCategory.EXTERNAL ->
+                                ExternalPanelContent(controller, onPickOption)
                         }
                     }
                 }
@@ -672,6 +686,185 @@ private fun EmptyLine(text: String) {
         color = LocalYancoPalette.current.TextMuted,
         fontSize = 13.sp,
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+    )
+}
+
+// ───── Record (slice 2b) ─────
+
+@UnstableApi
+@Composable
+private fun RecordPanelContent(
+    controller: PlaybackController,
+    onPickOption: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val recordings: RecordingsRepository =
+        org.koin.compose.koinInject()
+    val currentItem by controller.currentItem.collectAsState()
+    val inflight by remember { recordings.allFlow() }.collectAsState(initial = emptyList())
+    val active =
+        inflight.firstOrNull {
+            it.contentId == currentItem?.id && it.status == RecordingStatus.RECORDING
+        }
+    val firstRowFocus = remember { FocusRequester() }
+    LaunchedEffect(currentItem?.id) {
+        if (currentItem != null) runCatching { firstRowFocus.requestFocus() }
+    }
+    val item = currentItem
+    if (item == null) {
+        EmptyLine("Nothing playing — start a stream to record it.")
+        return
+    }
+    val displayTitle = item.cleanTitle?.takeIf { it.isNotBlank() } ?: item.title
+
+    if (active != null) {
+        OptionRow(
+            label = "Stop recording",
+            selected = true,
+            focusRequester = firstRowFocus,
+            onPick = {
+                RecordingService.stop(context, active.id)
+                onPickOption()
+            },
+        )
+        return
+    }
+
+    val format = detectRecordingFormat(item.streamUrl)
+    OptionRow(
+        label = "Record this channel",
+        selected = false,
+        focusRequester = firstRowFocus,
+        onPick = {
+            RecordingService.start(
+                context = context,
+                input =
+                    RecordInput(
+                        recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
+                        sourceUrl = item.streamUrl,
+                        title = displayTitle,
+                        format = format,
+                        contentId = item.id,
+                    ),
+            )
+            android.widget.Toast.makeText(
+                context,
+                "Recording started — open Recordings to manage.",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            onPickOption()
+        },
+    )
+}
+
+private fun detectRecordingFormat(streamUrl: String): RecordingFormat {
+    val withoutQuery = streamUrl.substringBefore('?').substringBefore('#')
+    return if (withoutQuery.endsWith(".m3u8", ignoreCase = true)) {
+        RecordingFormat.HLS
+    } else {
+        RecordingFormat.MPEG_TS
+    }
+}
+
+// ───── Favorites (slice 2b) ─────
+
+@UnstableApi
+@Composable
+private fun FavoritesPanelContent(
+    controller: PlaybackController,
+    onPickOption: () -> Unit,
+) {
+    val favorites: FavoritesRepository = org.koin.compose.koinInject()
+    val scope = rememberCoroutineScope()
+    val currentItem by controller.currentItem.collectAsState()
+    val currentEpisode by controller.currentEpisode.collectAsState()
+    val firstRowFocus = remember { FocusRequester() }
+
+    // Episodes don't have content rows — favorite the series. Live /
+    // movie use the item's own id. Mirrors the legacy panel's contract.
+    val favoriteId = currentEpisode?.seriesId ?: currentItem?.id
+
+    val isFav by remember(favoriteId) {
+        if (favoriteId != null) favorites.isFavoriteFlow(favoriteId) else flowOf(false)
+    }.collectAsState(initial = false)
+
+    LaunchedEffect(favoriteId) {
+        if (favoriteId != null) runCatching { firstRowFocus.requestFocus() }
+    }
+
+    if (favoriteId == null) {
+        EmptyLine("Nothing playing — start a stream to favorite it.")
+        return
+    }
+
+    OptionRow(
+        label = if (isFav) "Remove from favorites" else "Add to favorites",
+        selected = isFav,
+        focusRequester = firstRowFocus,
+        onPick = {
+            scope.launch(Dispatchers.IO) { runCatching { favorites.toggle(favoriteId) } }
+            onPickOption()
+        },
+    )
+}
+
+// ───── External player (slice 2b) ─────
+
+@UnstableApi
+@Composable
+private fun ExternalPanelContent(
+    controller: PlaybackController,
+    onPickOption: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val currentItem by controller.currentItem.collectAsState()
+    val installed = remember { ExternalPlayer.installed(context) }
+    val firstRowFocus = remember { FocusRequester() }
+
+    val streamUrl = currentItem?.streamUrl?.takeIf { it.isNotBlank() }
+    LaunchedEffect(streamUrl) {
+        if (streamUrl != null) runCatching { firstRowFocus.requestFocus() }
+    }
+    if (streamUrl == null) {
+        EmptyLine("Nothing playing — start a stream to hand off.")
+        return
+    }
+
+    val isLive = currentItem?.type == com.yancotv.shared.types.ContentType.LIVE
+    val positionMs =
+        if (isLive) null else controller.player.currentPosition.takeIf { it > 0L }
+
+    installed.forEachIndexed { idx, app ->
+        OptionRow(
+            label = app.displayName,
+            selected = false,
+            focusRequester = if (idx == 0) firstRowFocus else null,
+            onPick = {
+                controller.player.pause()
+                ExternalPlayer.launch(
+                    context = context,
+                    streamUrl = streamUrl,
+                    positionMs = positionMs,
+                    app = app,
+                )
+                onPickOption()
+            },
+        )
+    }
+    OptionRow(
+        label = "Choose another player…",
+        selected = false,
+        focusRequester = if (installed.isEmpty()) firstRowFocus else null,
+        onPick = {
+            controller.player.pause()
+            ExternalPlayer.launch(
+                context = context,
+                streamUrl = streamUrl,
+                positionMs = positionMs,
+                app = null,
+            )
+            onPickOption()
+        },
     )
 }
 
