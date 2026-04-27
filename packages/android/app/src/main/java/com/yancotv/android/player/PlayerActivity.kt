@@ -1039,6 +1039,21 @@ class PlayerActivity : AppCompatActivity() {
         return rows
     }
 
+    /**
+     * Returns true when a live stream is paused or already past the
+     * "behind live edge" threshold. Used by LEFT/RIGHT to flip from
+     * "open surf overlay" to "scrub the back buffer." Threshold matches
+     * [LIVE_BEHIND_THRESHOLD_MS] so this and the JUMP TO LIVE pill
+     * surface together — if the user can see the timeshift pill, they
+     * can also seek with arrow keys.
+     */
+    private fun isTimeshifting(p: androidx.media3.exoplayer.ExoPlayer): Boolean {
+        if (!p.playWhenReady) return true
+        val raw = p.currentLiveOffset
+        if (raw == androidx.media3.common.C.TIME_UNSET) return false
+        return raw >= LIVE_BEHIND_THRESHOLD_MS
+    }
+
     private fun sleepRowLabel(opt: SleepTimerOption): String =
         when (opt) {
             SleepTimerOption.MIN_15 -> "15 min"
@@ -1703,20 +1718,45 @@ class PlayerActivity : AppCompatActivity() {
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (isLive) {
-                        showSurf()
+                        // MK.options.redesign — once the user has paused
+                        // or rewound a live stream, LEFT/RIGHT need to
+                        // do timeshift seek instead of opening the surf
+                        // overlay. Detection: paused OR currentLiveOffset
+                        // already past the LIVE_BEHIND threshold (the
+                        // same signal that surfaces the JUMP TO LIVE
+                        // pill). Otherwise LEFT keeps its zap-to-surf
+                        // role — playing at the edge, the user wants to
+                        // browse channels.
+                        val p = controller.player
+                        if (isTimeshifting(p)) {
+                            p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                        } else {
+                            showSurf()
+                        }
                         return true
                     } else {
-                        // Silent seek — stay on the plain video surface so
+                        // VOD: silent seek (stays on plain video surface so
                         // the user can press LEFT/RIGHT repeatedly without
-                        // the dock auto-hide timer gating each press. The
-                        // dock only opens on explicit OK/CENTER.
+                        // the dock auto-hide timer gating each press).
                         val p = controller.player
                         p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
                         return true
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (!isLive) {
+                    if (isLive) {
+                        // Mirror LEFT: when timeshifted, RIGHT scrubs
+                        // forward toward the live edge. At-edge it has
+                        // no meaning on live, so leave it alone (existing
+                        // behaviour — fall through).
+                        val p = controller.player
+                        if (isTimeshifting(p)) {
+                            // Cap at live edge: liveOffset 0 == at edge.
+                            val target = p.currentPosition + 10_000L
+                            p.seekTo(target)
+                            return true
+                        }
+                    } else {
                         val p = controller.player
                         val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
                         p.seekTo((p.currentPosition + 10_000L).coerceAtMost(dur))
