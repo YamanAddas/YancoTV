@@ -141,6 +141,14 @@ fun GuideScreen(
     // user scrolls. Holds bounded memory even for 250k-channel catalogs.
     var channels by remember { mutableStateOf<List<EpgGuideChannel>>(emptyList()) }
     var totalChannels by remember { mutableStateOf(0L) }
+    // MK.guide.groups — group filter (null = All). The chip strip above
+    // the grid lets the user narrow to a single live group; same data
+    // model as the Live TV CategoryRail but rendered horizontally so the
+    // guide keeps its full-width time grid.
+    var groups by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedGroup by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
     var windowStartState by remember { mutableStateOf(0L) }
     var windowEndState by remember { mutableStateOf(0L) }
     var loading by remember { mutableStateOf(true) }
@@ -152,9 +160,15 @@ fun GuideScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    // Reload when the user changes the EPG window prefs.
-    LaunchedEffect(epgPrefs.daysBack, epgPrefs.daysForward) {
-        if (channels.isNotEmpty()) reloadTick++
+    // Reload when the user changes the EPG window prefs OR picks a
+    // different group filter. Group switches reset pagination because
+    // the result set is fundamentally different.
+    LaunchedEffect(epgPrefs.daysBack, epgPrefs.daysForward, selectedGroup) {
+        if (channels.isNotEmpty()) {
+            channels = emptyList()
+            allLoaded = false
+            reloadTick++
+        }
     }
 
     // Initial / forced reload — resets pagination and fetches page 0.
@@ -172,7 +186,11 @@ fun GuideScreen(
             withContext(Dispatchers.IO) {
                 val total =
                     runCatching {
-                        epg.countGuideChannels(startTime = windowStart, endTime = windowEnd)
+                        epg.countGuideChannels(
+                            startTime = windowStart,
+                            endTime = windowEnd,
+                            groupName = selectedGroup,
+                        )
                     }.onFailure { Log.w("Yanco", "GuideScreen.countGuideChannels failed: ${it.message}", it) }
                         .getOrElse { 0L }
                 val page =
@@ -181,19 +199,34 @@ fun GuideScreen(
                             startTime = windowStart,
                             endTime = windowEnd,
                             sourceId = null,
+                            groupName = selectedGroup,
                             limit = GUIDE_PAGE_SIZE,
                             offset = 0L,
                         )
                     }.onFailure { Log.w("Yanco", "GuideScreen.getGuideData(initial) failed: ${it.message}", it) }
                         .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStart, endTime = windowEnd) }
-                total to page
+                // Refresh the group list off the same window — keeps the
+                // chip strip in sync with what's filterable. Cheap; runs
+                // once per reloadTick.
+                val grps =
+                    runCatching { epg.getGuideGroups(windowStart, windowEnd) }
+                        .onFailure { Log.w("Yanco", "GuideScreen.getGuideGroups failed: ${it.message}", it) }
+                        .getOrElse { emptyList() }
+                Triple(total, page, grps)
             }
         totalChannels = loaded.first
+        groups = loaded.third
         // Defensive dedup: LazyColumn crashes hard on duplicate keys, and the
         // SQL is supposed to return one row per tvg_id — but this belt-and-
         // suspenders keeps the UI alive if the query ever regresses.
         channels = loaded.second.channels.distinctBy { it.tvgId }
         allLoaded = channels.size >= totalChannels.toInt() || loaded.second.channels.isEmpty()
+        // If the selected group disappeared from the catalog (provider
+        // refreshed and dropped it), fall back to All so the user isn't
+        // stranded on a chip with no chips selected.
+        if (selectedGroup != null && groups.none { it == selectedGroup }) {
+            selectedGroup = null
+        }
         if (initial) loading = false
     }
 
@@ -216,6 +249,7 @@ fun GuideScreen(
                         startTime = windowStartState,
                         endTime = windowEndState,
                         sourceId = null,
+                        groupName = selectedGroup,
                         limit = GUIDE_PAGE_SIZE,
                         offset = channels.size.toLong(),
                     )
@@ -327,6 +361,16 @@ fun GuideScreen(
                 compact = true,
                 onRefreshed = { reloadTick++ },
             )
+            // MK.guide.groups — group filter strip. Hidden when there's
+            // only one group available (the All chip would be the only
+            // option, which is just clutter).
+            if (groups.size > 1) {
+                GuideGroupStrip(
+                    groups = groups,
+                    selected = selectedGroup,
+                    onSelect = { selectedGroup = it },
+                )
+            }
             GuideGrid(
                 guide = guide!!,
                 nowSeconds = nowSeconds,
@@ -519,6 +563,83 @@ private data class ProgrammeAction(
     val channel: EpgGuideChannel,
     val programme: EpgProgramme,
 )
+
+/**
+ * MK.guide.groups — horizontal group filter strip rendered above the
+ * guide grid. "All" is always present; user-defined live groups follow.
+ * Sits in a horizontalScroll so wide group lists stay reachable without
+ * eating the grid's vertical space (a left-side rail á la Live TV would
+ * trade away the time grid's most-valuable axis).
+ */
+@Composable
+private fun GuideGroupStrip(
+    groups: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        GuideGroupChip(
+            label = "All",
+            selected = selected == null,
+            onClick = { onSelect(null) },
+        )
+        groups.forEach { name ->
+            GuideGroupChip(
+                label = name,
+                selected = selected == name,
+                onClick = { onSelect(name) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuideGroupChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val palette = com.yancotv.android.ui.theme.LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+    val bg =
+        when {
+            focused -> palette.Accent
+            selected -> palette.AccentMuted.copy(alpha = 0.3f)
+            else -> palette.BackgroundRaised
+        }
+    val borderColor =
+        when {
+            focused -> palette.Accent
+            selected -> palette.Accent
+            else -> palette.BorderSubtle
+        }
+    val fg = if (focused) palette.BackgroundDeep else palette.TextPrimary
+    Box(
+        modifier =
+            Modifier
+                .clip(shape)
+                .background(bg)
+                .border(width = if (focused || selected) 2.dp else 1.dp, color = borderColor, shape = shape)
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        androidx.compose.material3.Text(
+            text = label,
+            color = fg,
+            fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp),
+        )
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

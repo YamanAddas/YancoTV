@@ -142,18 +142,30 @@ class EpgRepository(
         startTime: Long,
         endTime: Long,
         sourceId: String? = null,
+        groupName: String? = null,
         limit: Long = 100L,
         offset: Long = 0L,
     ): EpgGuideData {
+        // MK.guide.groups — the three-way switch matters for query
+        // selectivity. Group-filtered installs hit the smallest result
+        // set; sourceId-filtered next; everything else falls through to
+        // the unfiltered All path. Combining group + source isn't
+        // supported yet (no caller needs it); add a dedicated query if
+        // a future surface does.
         val channels =
-            if (sourceId == null) {
-                db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
-                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
-                }
-            } else {
-                db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
-                    GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
-                }
+            when {
+                groupName != null ->
+                    db.contentQueries.guideChannelsByGroupPaged(groupName, startTime, endTime, limit, offset).executeAsList().map {
+                        GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
+                    }
+                sourceId != null ->
+                    db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
+                        GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
+                    }
+                else ->
+                    db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
+                        GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
+                    }
             }
         if (channels.isEmpty()) {
             return EpgGuideData(channels = emptyList(), startTime = startTime, endTime = endTime)
@@ -189,12 +201,22 @@ class EpgRepository(
         startTime: Long,
         endTime: Long,
         sourceId: String? = null,
+        groupName: String? = null,
     ): Long =
-        if (sourceId == null) {
-            db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
-        } else {
-            db.contentQueries.countGuideChannelsBySource(sourceId, startTime, endTime).executeAsOne()
+        when {
+            groupName != null -> db.contentQueries.countGuideChannelsByGroup(groupName, startTime, endTime).executeAsOne()
+            sourceId != null -> db.contentQueries.countGuideChannelsBySource(sourceId, startTime, endTime).executeAsOne()
+            else -> db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
         }
+
+    /** MK.guide.groups — distinct live group names with guide-covered
+     *  channels in the window. Drives GuideScreen's group filter chip
+     *  strip; only groups the user can actually filter by appear. */
+    fun getGuideGroups(
+        startTime: Long,
+        endTime: Long,
+    ): List<String> =
+        db.contentQueries.distinctGuideGroups(startTime, endTime).executeAsList().mapNotNull { it }
 
     fun getStats(): EpgStats {
         val programmes = db.epgProgrammesQueries.countAll().executeAsOne()
