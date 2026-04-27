@@ -173,6 +173,9 @@ val appModule =
             prefs.readThemeId()?.let { name ->
                 controller.setTheme(com.yancotv.android.ui.theme.ThemeId.fromKey(name))
             }
+            prefs.readAccentId()?.let { name ->
+                controller.setAccent(com.yancotv.android.ui.theme.AccentId.fromKey(name))
+            }
             controller
         }
         single {

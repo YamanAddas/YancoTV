@@ -44,7 +44,9 @@ fun YancoTheme(
 ) {
     val themeController: ThemeController = koinInject()
     val themeId by themeController.themeId.collectAsState()
-    val palette = remember(themeId) { themeController.paletteFor(themeId) }
+    val accentId by themeController.accentId.collectAsState()
+    val palette =
+        remember(themeId, accentId) { themeController.resolved(themeId, accentId) }
 
     // MK.16.4 — font scale via LocalDensity override. Multiplies the
     // ambient density's fontScale; physical density (dp sizing) is

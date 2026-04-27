@@ -144,6 +144,14 @@ class AppPreferences(
 
     fun readThemeId(): String? = readString(KEY_THEME_ID)
 
+    suspend fun setAccentId(name: String) {
+        withContext(Dispatchers.IO) {
+            db.settingsQueries.upsert(KEY_ACCENT_ID, name)
+        }
+    }
+
+    fun readAccentId(): String? = readString(KEY_ACCENT_ID)
+
     // MK.16.4 — font scale (90/100/110/125%). Stored as the integer
     // percent. Applied via LocalDensity override in [YancoTheme] so
     // every Compose Text on screen rescales without restart.
@@ -348,6 +356,7 @@ class AppPreferences(
         private const val KEY_THEME_ID = "pref_theme_id"
         private const val KEY_FONT_SCALE_PCT = "pref_appearance_font_scale_pct"
         private const val KEY_CHANNEL_NUMBER_FORMAT = "pref_general_channel_number_format"
+        private const val KEY_ACCENT_ID = "pref_accent_id"
     }
 }
 

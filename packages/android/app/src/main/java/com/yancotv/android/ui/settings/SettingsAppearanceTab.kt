@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.AppearancePrefs
+import com.yancotv.android.ui.theme.AccentId
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.ThemeController
 import com.yancotv.android.ui.theme.ThemeId
@@ -48,6 +49,7 @@ fun SettingsAppearanceTab(
     prefs: AppPreferences = koinInject(),
 ) {
     val active by themeController.themeId.collectAsState()
+    val activeAccent by themeController.accentId.collectAsState()
     val appearance by prefs.appearanceFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -81,6 +83,30 @@ fun SettingsAppearanceTab(
                     scope.launch { prefs.setThemeId(id.name) }
                 },
             )
+        }
+
+        // MK.16.3 — accent overlay. Independent of the theme palette
+        // pick: any base theme can carry any accent. "Match theme" keeps
+        // the palette's native accent (the previous behaviour).
+        Text(
+            text = "Accent",
+            color = LocalYancoPalette.current.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AccentId.values().forEach { id ->
+                AccentChip(
+                    id = id,
+                    selected = id == activeAccent,
+                    swatch = swatchColourFor(id, themeController, active),
+                    onClick = {
+                        themeController.setAccent(id)
+                        scope.launch { prefs.setAccentId(id.name) }
+                    },
+                )
+            }
         }
 
         // MK.16.4 — font scale picker. Live-applies via LocalDensity
@@ -161,6 +187,48 @@ private fun SwatchTriple(palette: YancoPalette) {
         Swatch(palette.FocusRing)
     }
 }
+
+/** Accent chip — circular swatch + label. Selected state borders match
+ *  the theme accent so the active row is unambiguous regardless of which
+ *  accent is currently applied. */
+@Composable
+private fun AccentChip(
+    id: AccentId,
+    selected: Boolean,
+    swatch: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+) {
+    val border =
+        if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.BorderSubtle
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = border,
+                    shape = RoundedCornerShape(6.dp),
+                ).clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Swatch(swatch)
+        Text(
+            text = id.displayName,
+            color = LocalYancoPalette.current.TextPrimary,
+            fontSize = 13.sp,
+        )
+    }
+}
+
+private fun swatchColourFor(
+    id: AccentId,
+    controller: ThemeController,
+    activeTheme: ThemeId,
+): androidx.compose.ui.graphics.Color =
+    controller.resolved(activeTheme, id).Accent
 
 @Composable
 private fun Swatch(colour: androidx.compose.ui.graphics.Color) {

@@ -166,6 +166,72 @@ val WarmAmber =
  * distracting; also a useful sanity check that no UI relies on hue
  * to convey state (everything must still be legible here).
  */
+/**
+ * MK.16.3 — accent overlays. Each [AccentBundle] is a five-tuple
+ * (Accent / Soft / Deep / Glow / Muted) plus a focus ring. The
+ * `applyAccent` extension on [YancoPalette] swaps these fields onto
+ * any base palette so the user can mix-and-match (e.g. Sapphire base
+ * canvases + Amber accent).
+ */
+data class AccentBundle(
+    val accent: Color,
+    val soft: Color,
+    val deep: Color,
+    val glow: Color,
+    val muted: Color,
+    val focusRing: Color,
+)
+
+val EmeraldAccent =
+    AccentBundle(
+        accent = Color(0xFF00E28A),
+        soft = Color(0xFF66F0B5),
+        deep = Color(0xFF00B872),
+        glow = Color(0xFF66F0B5),
+        muted = Color(0xFF1C7A55),
+        focusRing = Color(0xFF66F0B5),
+    )
+
+val SapphireAccent =
+    AccentBundle(
+        accent = Color(0xFF4A8CFF),
+        soft = Color(0xFF8FB6FF),
+        deep = Color(0xFF2A6BD8),
+        glow = Color(0xFF8FB6FF),
+        muted = Color(0xFF1F3F7A),
+        focusRing = Color(0xFF8FB6FF),
+    )
+
+val AmberAccent =
+    AccentBundle(
+        accent = Color(0xFFFFB14A),
+        soft = Color(0xFFFFD18F),
+        deep = Color(0xFFE08826),
+        glow = Color(0xFFFFD18F),
+        muted = Color(0xFF7A4A1F),
+        focusRing = Color(0xFFFFD18F),
+    )
+
+val RedAccent =
+    AccentBundle(
+        accent = Color(0xFFFF4A6B),
+        soft = Color(0xFFFF8FA3),
+        deep = Color(0xFFD8284A),
+        glow = Color(0xFFFF8FA3),
+        muted = Color(0xFF7A1F30),
+        focusRing = Color(0xFFFF8FA3),
+    )
+
+fun YancoPalette.applyAccent(bundle: AccentBundle): YancoPalette =
+    copy(
+        Accent = bundle.accent,
+        AccentSoft = bundle.soft,
+        AccentDeep = bundle.deep,
+        AccentGlow = bundle.glow,
+        AccentMuted = bundle.muted,
+        FocusRing = bundle.focusRing,
+    )
+
 val Monochrome =
     YancoPalette(
         BackgroundDeep = Color(0xFF080808),
