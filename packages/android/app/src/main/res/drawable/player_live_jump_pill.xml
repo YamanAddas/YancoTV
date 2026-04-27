@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MK.options.redesign — promoted styling for the liveJumpBar. Brighter
+  emerald accent border + slightly more opaque charcoal fill so the bar
+  reads as a live actionable callout rather than a passive status pill.
+  Visible only when timeshifted; while live, the bar is hidden anyway.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#CC050A08" />
+    <corners android:radius="14dp" />
+    <stroke android:width="2dp" android:color="#FF00E28A" />
+</shape>

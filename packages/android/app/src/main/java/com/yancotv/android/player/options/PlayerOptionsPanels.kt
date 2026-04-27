@@ -50,6 +50,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.player.SleepTimerOption
+import com.yancotv.android.player.SleepTimerState
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -121,6 +123,10 @@ fun PlayerOptionsPanelHost(
                                 SubtitlesPanelContent(controller, prefs, onPickSubtitleFile, onDismiss)
                             PlayerOptionCategory.ASPECT ->
                                 AspectPanelContent(prefs, onDismiss)
+                            PlayerOptionCategory.SPEED ->
+                                SpeedPanelContent(controller, prefs, onDismiss)
+                            PlayerOptionCategory.SLEEP ->
+                                SleepPanelContent(controller, onDismiss)
                             else -> Unit
                         }
                     }
@@ -435,6 +441,170 @@ suspend fun cycleAspect(
     val idx = all.indexOf(current).coerceAtLeast(0)
     val next = if (forward) (idx + 1) % all.size else (idx - 1 + all.size) % all.size
     prefs.setResizeMode(all[next])
+}
+
+// ───── Speed ─────
+
+private val SPEED_PRESETS = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+
+@UnstableApi
+@Composable
+private fun SpeedPanelContent(
+    controller: PlaybackController,
+    prefs: AppPreferences,
+    onDismiss: () -> Unit,
+) {
+    val state by prefs.playbackFlow.collectAsState()
+    val scope = rememberCoroutineScope()
+    val firstRowFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+
+    SPEED_PRESETS.forEachIndexed { idx, speed ->
+        val selected = kotlin.math.abs(state.speed - speed) < 0.01f
+        OptionRow(
+            label = formatSpeed(speed),
+            selected = selected,
+            focusRequester = if (idx == 0) firstRowFocus else null,
+            onPick = {
+                applySpeed(controller, prefs, speed, scope)
+                onDismiss()
+            },
+        )
+    }
+}
+
+private fun formatSpeed(speed: Float): String =
+    if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "${speed}×"
+
+@UnstableApi
+private fun applySpeed(
+    controller: PlaybackController,
+    prefs: AppPreferences,
+    speed: Float,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    controller.player.setPlaybackSpeed(speed)
+    scope.launch { prefs.setSpeed(speed) }
+}
+
+/** Cycle helper for the popup-row LEFT/RIGHT gesture on Speed. */
+@UnstableApi
+suspend fun cycleSpeed(
+    controller: PlaybackController,
+    prefs: AppPreferences,
+    forward: Boolean,
+) {
+    val current = prefs.playbackFlow.value.speed
+    val idx =
+        SPEED_PRESETS.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
+            .takeIf { it >= 0 } ?: SPEED_PRESETS.indexOf(1.0f)
+    val next =
+        if (forward) (idx + 1) % SPEED_PRESETS.size
+        else (idx - 1 + SPEED_PRESETS.size) % SPEED_PRESETS.size
+    val target = SPEED_PRESETS[next]
+    controller.player.setPlaybackSpeed(target)
+    prefs.setSpeed(target)
+}
+
+// ───── Sleep ─────
+
+@UnstableApi
+@Composable
+private fun SleepPanelContent(
+    controller: PlaybackController,
+    onDismiss: () -> Unit,
+) {
+    val sleep by controller.sleepTimer.collectAsState()
+    val firstRowFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+
+    val isActive = sleep is SleepTimerState.Active
+    val activeOption = (sleep as? SleepTimerState.Active)?.option
+
+    OptionRow(
+        label = "Off",
+        selected = !isActive,
+        focusRequester = firstRowFocus,
+        onPick = {
+            controller.cancelSleepTimer()
+            onDismiss()
+        },
+    )
+    SleepTimerOption.values().forEach { opt ->
+        if (opt == SleepTimerOption.END_OF_PROGRAM) return@forEach // EOP needs EPG lookup; defer
+        OptionRow(
+            label = sleepLabel(opt),
+            selected = activeOption == opt,
+            onPick = {
+                controller.setSleepTimer(opt)
+                onDismiss()
+            },
+        )
+    }
+}
+
+private fun sleepLabel(opt: SleepTimerOption): String =
+    when (opt) {
+        SleepTimerOption.MIN_15 -> "15 minutes"
+        SleepTimerOption.MIN_30 -> "30 minutes"
+        SleepTimerOption.MIN_45 -> "45 minutes"
+        SleepTimerOption.MIN_60 -> "60 minutes"
+        SleepTimerOption.END_OF_PROGRAM -> "End of programme"
+    }
+
+// ───── Audio / Subs cycle helpers ─────
+
+/** Picks the next supported audio track and applies it. Wraps; if no
+ *  selectable tracks, no-op. */
+@UnstableApi
+fun cycleAudioTrack(
+    controller: PlaybackController,
+    forward: Boolean,
+) {
+    val tracks = readAudioTracks(controller.player)
+    if (tracks.isEmpty()) return
+    val currentIdx = tracks.indexOfFirst { it.selected }.coerceAtLeast(0)
+    val nextIdx =
+        if (forward) (currentIdx + 1) % tracks.size
+        else (currentIdx - 1 + tracks.size) % tracks.size
+    applyAudioTrack(controller.player, tracks[nextIdx])
+}
+
+/** Cycle subtitle selection: walks through tracks, then OFF, then back
+ *  to first track. */
+@UnstableApi
+fun cycleTextTrack(
+    controller: PlaybackController,
+    forward: Boolean,
+) {
+    val player = controller.player
+    val tracks = readTextTracks(player)
+    if (tracks.isEmpty()) {
+        // No tracks → nothing to cycle (Off is the only state).
+        return
+    }
+    val disabled = player.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+    val states = tracks.size + 1 // tracks + Off
+    val currentIdx =
+        when {
+            disabled -> tracks.size // "Off" is last
+            else -> tracks.indexOfFirst { it.selected }.coerceAtLeast(0)
+        }
+    val nextIdx =
+        if (forward) (currentIdx + 1) % states
+        else (currentIdx - 1 + states) % states
+    if (nextIdx == tracks.size) {
+        // Off
+        val params =
+            player.trackSelectionParameters
+                .buildUpon()
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+        player.trackSelectionParameters = params
+    } else {
+        applyTextTrack(player, tracks[nextIdx])
+    }
 }
 
 // ───── Shared ─────

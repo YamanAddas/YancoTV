@@ -936,6 +936,12 @@ class PlayerActivity : AppCompatActivity() {
                     playback.audioLanguage.takeIf { it.isNotBlank() }
                         ?.uppercase(java.util.Locale.ROOT) ?: "Auto",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.AUDIO) },
+                onCyclePrev = {
+                    com.yancotv.android.player.options.cycleAudioTrack(controller, forward = false)
+                },
+                onCycleNext = {
+                    com.yancotv.android.player.options.cycleAudioTrack(controller, forward = true)
+                },
             )
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
@@ -945,6 +951,12 @@ class PlayerActivity : AppCompatActivity() {
                     playback.subtitleLanguage.takeIf { it.isNotBlank() }
                         ?.uppercase(java.util.Locale.ROOT) ?: "Off",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES) },
+                onCyclePrev = {
+                    com.yancotv.android.player.options.cycleTextTrack(controller, forward = false)
+                },
+                onCycleNext = {
+                    com.yancotv.android.player.options.cycleTextTrack(controller, forward = true)
+                },
             )
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
@@ -969,20 +981,30 @@ class PlayerActivity : AppCompatActivity() {
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SPEED,
                 label = "Speed",
                 currentValue = "${playback.speed}×",
-                onPick = {
-                    hideOptionsV2()
-                    showSheet(SheetMode.SPEED)
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SPEED) },
+                onCyclePrev = {
+                    scope.launch {
+                        com.yancotv.android.player.options.cycleSpeed(controller, prefs, forward = false)
+                    }
+                },
+                onCycleNext = {
+                    scope.launch {
+                        com.yancotv.android.player.options.cycleSpeed(controller, prefs, forward = true)
+                    }
                 },
             )
+        val sleepState by controller.sleepTimer.collectAsState()
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SLEEP,
                 label = "Sleep",
-                currentValue = "Off",
-                onPick = {
-                    hideOptionsV2()
-                    showSheet(SheetMode.SLEEP)
-                },
+                currentValue =
+                    when (val s = sleepState) {
+                        is com.yancotv.android.player.SleepTimerState.Off -> "Off"
+                        is com.yancotv.android.player.SleepTimerState.Active ->
+                            sleepRowLabel(s.option)
+                    },
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SLEEP) },
             )
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
@@ -1016,6 +1038,15 @@ class PlayerActivity : AppCompatActivity() {
             )
         return rows
     }
+
+    private fun sleepRowLabel(opt: SleepTimerOption): String =
+        when (opt) {
+            SleepTimerOption.MIN_15 -> "15 min"
+            SleepTimerOption.MIN_30 -> "30 min"
+            SleepTimerOption.MIN_45 -> "45 min"
+            SleepTimerOption.MIN_60 -> "60 min"
+            SleepTimerOption.END_OF_PROGRAM -> "End of programme"
+        }
 
     /**
      * Lazy-inflate the channel-zap ViewStub on the first digit. Avoids

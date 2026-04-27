@@ -250,41 +250,41 @@
         android:layout_marginEnd="32dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/player_overlay_pill"
-        android:paddingStart="12dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
+        android:background="@drawable/player_live_jump_pill"
+        android:paddingStart="14dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         android:visibility="gone">
 
         <View
-            android:layout_width="10dp"
-            android:layout_height="10dp"
-            android:layout_marginEnd="8dp"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="10dp"
             android:background="@drawable/player_live_dot"
-            android:alpha="0.6" />
+            android:alpha="1.0" />
 
         <TextView
             android:id="@+id/live_offset_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#FFE6EDF3"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:fontFamily="monospace"
-            android:layout_marginEnd="12dp" />
+            android:layout_marginEnd="14dp" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/live_jump_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="JUMP TO LIVE"
-            android:textSize="12sp"
+            android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#FFE53935"
+            android:textColor="#FF00E28A"
             android:background="@android:color/transparent"
-            android:letterSpacing="0.1"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
+            android:letterSpacing="0.15"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
             android:paddingTop="4dp"
             android:paddingBottom="4dp"
             android:focusable="true"
