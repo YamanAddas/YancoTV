@@ -15,6 +15,12 @@
     <!-- WAKE_LOCK lets ExoPlayer hold a partial wake lock while buffering so
          the screen-off phone doesn't drop the stream mid-segment. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- MB-209 hardening — RecordingService.wifiLock holds a high-perf
+         Wi-Fi lock while a recording is in flight so devices that
+         power-save Wi-Fi during standby don't stall the OkHttp read
+         mid-recording. CHANGE_WIFI_STATE is implied by createWifiLock
+         on older API levels; declared explicitly for clarity. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <!-- Programme reminders need exact-alarm scheduling. USE_EXACT_ALARM is
          the non-revocable variant for bona-fide alarm/reminder apps (which we
          are). Without it, `setExactAndAllowWhileIdle` throws SecurityException

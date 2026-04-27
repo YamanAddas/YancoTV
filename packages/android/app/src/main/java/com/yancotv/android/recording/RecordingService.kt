@@ -82,6 +82,28 @@ class RecordingService : Service() {
     private val activeOutputs = ConcurrentHashMap<String, RecordingOutput>()
     private val notificationLock = Mutex()
 
+    /**
+     * **MB-209 hardening (2026-04-27).** High-perf Wi-Fi lock held while
+     * any recording is in flight. Fire TV usually keeps Wi-Fi up during
+     * standby (Alexa wake-word) so the FGS's implicit CPU wake lock is
+     * sufficient on AFTDCT31, but generic Android TV boxes / mobile
+     * devices in doze can power-save Wi-Fi to the point that the OkHttp
+     * read stalls mid-recording. The lock is acquired the first time
+     * `activeJobs` becomes non-empty and released when it drains,
+     * matching the recording lifetime exactly.
+     *
+     * `WIFI_MODE_FULL_HIGH_PERF` requests no power saving on the radio
+     * — appropriate for sustained-throughput streaming. Reference-counted
+     * so concurrent recordings (catch-up + scheduled, theoretically)
+     * don't double-acquire / drop early.
+     */
+    private val wifiLock: android.net.wifi.WifiManager.WifiLock by lazy {
+        @Suppress("DEPRECATION")
+        (getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager)
+            .createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "yanco:recording")
+            .also { it.setReferenceCounted(false) }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -123,6 +145,12 @@ class RecordingService : Service() {
         serviceScope.cancel()
         activeJobs.clear()
         activeOutputs.clear()
+        // MB-209 hardening — final-line release. If maybeStop() didn't
+        // run (process killed, abrupt destroy), Android's lock-leak
+        // detection logs a warning at process exit but the lock is GCd
+        // either way. Releasing here keeps the system cleaner.
+        runCatching { if (wifiLock.isHeld) wifiLock.release() }
+            .onFailure { Log.w(TAG, "wifiLock.release in onDestroy failed", it) }
     }
 
     // ── Action handlers ───────────────────────────────────────────
@@ -148,6 +176,11 @@ class RecordingService : Service() {
         // within 5s of startForegroundService; doing it before the
         // recording coroutine even starts is the safest pattern.
         startForegroundIfNeeded()
+        // MB-209 hardening — pin Wi-Fi at full power while any
+        // recording is in flight. Non-refcounted: idempotent acquire
+        // here, single release in maybeStop() once activeJobs drains.
+        runCatching { if (!wifiLock.isHeld) wifiLock.acquire() }
+            .onFailure { Log.w(TAG, "wifiLock.acquire failed", it) }
 
         if (useLiveTee) {
             handleStartLiveTee(input)
@@ -424,6 +457,12 @@ class RecordingService : Service() {
 
     private fun maybeStop() {
         if (activeJobs.isEmpty()) {
+            // MB-209 hardening — release the high-perf Wi-Fi lock now
+            // that no recording remains. isHeld guard so we don't fault
+            // when no acquire ever ran (fresh service whose first
+            // intent had a malformed input).
+            runCatching { if (wifiLock.isHeld) wifiLock.release() }
+                .onFailure { Log.w(TAG, "wifiLock.release failed", it) }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
