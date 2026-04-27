@@ -1605,6 +1605,30 @@ class PlayerActivity : AppCompatActivity() {
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        // MK.options.redesign — popup/panel takes priority over every
+        // other handler. Without this, the `if (!controllerVisible)`
+        // branch below was matching DPAD_LEFT first and opening the
+        // surf overlay underneath the popup ("bleeds to the player").
+        // BACK closes one level; arrows / CENTER / channel keys are
+        // handled by the Compose layer when it has a target — boundary
+        // presses become no-ops here so they don't leak.
+        if (optionsV2Inflated && optionsV2State.menuVisible.value) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                    if (optionsV2State.activePanel.value != null) {
+                        optionsV2State.closePanel()
+                    } else {
+                        hideOptionsV2()
+                    }
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
+                -> return true
+            }
+        }
         // Chrome (buffering / error) overlay takes precedence over
         // everything. BACK dismisses; on ERROR it also exits the player
         // because the overlay is blocking — the user is saying "I'm done
@@ -1699,32 +1723,6 @@ class PlayerActivity : AppCompatActivity() {
                         return true
                     }
                 }
-            }
-        }
-        // MK.options.redesign — popup/panel takes priority while up.
-        // BACK closes one level (panel → popup → dismissed). UP/DOWN/
-        // LEFT/RIGHT/CENTER are owned by the Compose layer; if Compose
-        // declines them (e.g. UP at the first row), we swallow them here
-        // so the activity's channel-zap / seek handlers below don't
-        // hijack focus back to the player. Without this, pressing UP
-        // from the first popup row sent focus to PlayerView and
-        // triggered controller.previous() — channels zapped while the
-        // popup was visible.
-        if (optionsV2Inflated && optionsV2State.menuVisible.value) {
-            when (keyCode) {
-                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                    if (optionsV2State.activePanel.value != null) {
-                        optionsV2State.closePanel()
-                    } else {
-                        hideOptionsV2()
-                    }
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
-                -> return true
             }
         }
         // MK.10.4 — numeric entry takes priority. OK commits, BACK cancels.
