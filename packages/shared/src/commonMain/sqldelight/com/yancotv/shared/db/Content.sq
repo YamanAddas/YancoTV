@@ -160,6 +160,15 @@ SET name_override = :nameOverride,
     logo_override = :logoOverride
 WHERE id = :id;
 
+-- MK.19.8 — backup engine dumps just the override columns paired with
+-- the (source_id, stream_url) tuple used to re-link on import. The
+-- content rows themselves are re-fetched from sources after restore so
+-- only the user-applied overrides need to round-trip.
+selectOverridesForBackup:
+SELECT source_id, stream_url, name_override, logo_override
+FROM content
+WHERE name_override IS NOT NULL OR logo_override IS NOT NULL;
+
 deleteBySource:
 DELETE FROM content WHERE source_id = ?;
 
