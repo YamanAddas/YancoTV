@@ -120,8 +120,20 @@ fun PlayerOptionsMenu(
                 },
         contentAlignment = Alignment.BottomEnd,
     ) {
+        // Hide the popup while a panel is active. RCA: when both the
+        // popup and the panel composed in the same ComposeView, the
+        // popup's focused row (the one the user OK'd) stayed in the
+        // focus tree and competed with the panel's `awaitAndRequest`.
+        // On single-row panels (RECORD / FAVORITES / EXTERNAL) focus
+        // reliably stuck on the popup row, so CENTER re-fired
+        // `openPanel(SAME)` — a no-op — and Stop / Add-to-favorites /
+        // External-launch never reached their onPick. Removing the
+        // popup from the tree while a panel is up forces focus onto
+        // the panel's row. Return-to-popup focus is handled by the
+        // LaunchedEffect above (keyed on activePanel flipping back to
+        // null).
         AnimatedVisibility(
-            visible = visible,
+            visible = visible && activePanel == null,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
         ) {
