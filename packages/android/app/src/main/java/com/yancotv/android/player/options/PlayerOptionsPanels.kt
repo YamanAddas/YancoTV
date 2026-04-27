@@ -38,6 +38,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -657,6 +662,29 @@ private fun OptionRow(
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(6.dp))
                 .let { m -> if (focusAnchor != null) m.placedFocus(focusAnchor) else m }
+                // Explicit CENTER/ENTER handler. RCA for the
+                // "Stop recording doesn't respond" report: with the
+                // focusable + clickable(interactionSource) split, the
+                // clickable's internal key-event listener can miss
+                // ACTION_UP for CENTER when the focused node is the
+                // focusable (separate Compose modifier node from the
+                // clickable). Handling the key directly here
+                // guarantees onPick fires once the row owns focus,
+                // regardless of clickable's internal wiring.
+                .onPreviewKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                    when (e.key) {
+                        Key.DirectionCenter,
+                        Key.Enter,
+                        Key.NumPadEnter,
+                        Key.Spacebar,
+                        -> {
+                            onPick()
+                            true
+                        }
+                        else -> false
+                    }
+                }
                 .focusable(interactionSource = interaction)
                 .clickable(interactionSource = interaction, indication = null) { onPick() }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
