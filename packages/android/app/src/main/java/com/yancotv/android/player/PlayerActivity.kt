@@ -1465,6 +1465,7 @@ class PlayerActivity : AppCompatActivity() {
                         controller.play(list, idx)
                         playerView.requestFocus()
                     },
+                    onIdleDismiss = { hideSurf() },
                 )
             }
         }
