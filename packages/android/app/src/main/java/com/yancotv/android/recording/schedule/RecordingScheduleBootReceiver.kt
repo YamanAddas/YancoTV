@@ -53,15 +53,25 @@ class RecordingScheduleBootReceiver :
         ) {
             return
         }
-        val swept = repo.reconcileAfterBoot()
-        if (swept.total > 0) {
-            Log.i(
-                TAG,
-                "boot reconcile: missed=${swept.markedMissed}, " +
-                    "orphaned-firing=${swept.markedFailedFromOrphan}",
-            )
-        }
-        scheduler.rescheduleAll()
+        // Wrap each step independently — if reconcileAfterBoot throws
+        // (e.g. DB corruption, partially-restored backup state), the
+        // rescheduleAll pass must still run or every ARMED row loses
+        // its alarms across reboot. Conversely, a rescheduleAll failure
+        // mustn't block the reconciliation that's already happened.
+        runCatching { repo.reconcileAfterBoot() }
+            .onSuccess { swept ->
+                if (swept.total > 0) {
+                    Log.i(
+                        TAG,
+                        "boot reconcile: missed=${swept.markedMissed}, " +
+                            "orphaned-firing=${swept.markedFailedFromOrphan}",
+                    )
+                }
+            }
+            .onFailure { Log.w(TAG, "reconcileAfterBoot failed: ${it.message}", it) }
+
+        runCatching { scheduler.rescheduleAll() }
+            .onFailure { Log.w(TAG, "rescheduleAll failed: ${it.message}", it) }
     }
 
     companion object {

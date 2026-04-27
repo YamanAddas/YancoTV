@@ -11,7 +11,11 @@ CREATE TABLE recordings (
     status TEXT NOT NULL CHECK(status IN ('recording', 'completed', 'failed', 'cancelled')),
     started_at INTEGER NOT NULL,    -- ms since epoch (actual fire time)
     ended_at INTEGER,               -- ms since epoch
-    duration_seconds INTEGER,       -- media offset, NOT wall-clock
+    duration_seconds INTEGER,       -- wall-clock duration (fire→stop), seconds. NOT media duration —
+                                    -- the actual broadcast/file duration depends on codec/bitrate
+                                    -- and is not derivable from this. If a future feature needs
+                                    -- media duration (e.g. resume-on-playback), read it from the
+                                    -- file via ExoPlayer metadata at playback time.
     file_size_bytes INTEGER,
     error TEXT,
     -- 'hls' / 'mpeg_ts' / NULL. NULL on rows created before Stage 2.1
