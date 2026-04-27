@@ -334,6 +334,18 @@
         android:inflatedId="@+id/vod_dock"
         android:layout="@layout/player_vod_dock" />
 
+    <!-- MK.options.redesign — lightweight options popup + per-category
+         floating panels. Replaces the heavy MK.16.sheet entry path on the
+         live player. Hosts a single ComposeView that paints both the menu
+         and the active panel in one layer. Lazy-inflated on first MENU
+         press. -->
+    <ViewStub
+        android:id="@+id/player_options_v2_stub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:inflatedId="@+id/player_options_v2"
+        android:layout="@layout/player_options_v2_overlay" />
+
     <!-- MK.10.4 — channel-zap numeric input overlay. Slides up bottom-left
          when the user types digits (0–9) on a live channel. Commits on OK
          or after a short idle window. Inflated lazily on first digit —

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MK.options.redesign — single ComposeView host for the new lightweight
+  options popup + per-category panels. Spans the full player; the
+  Compose layer positions itself bottom-right and stays out of the
+  video's top/left.
+-->
+<androidx.compose.ui.platform.ComposeView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />

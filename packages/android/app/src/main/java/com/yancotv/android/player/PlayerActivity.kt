@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -104,6 +105,14 @@ class PlayerActivity : AppCompatActivity() {
     private val channelZapHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val channelZapCommitRunnable = Runnable { commitChannelDigits() }
     private var channelZapOverlayInflated = false
+
+    // MK.options.redesign — new lightweight options menu state. Replaces
+    // the MK.16.sheet entry path for the slice-1 categories (Audio /
+    // Subtitles / Aspect); other categories still fall through to the
+    // legacy sheet via row.onPick until the slice-2/3 panels land.
+    private val optionsV2State = com.yancotv.android.player.options.PlayerOptionsState()
+    private var optionsV2Inflated = false
+    private var optionsV2View: androidx.compose.ui.platform.ComposeView? = null
 
     private lateinit var playerView: PlayerView
 
@@ -854,6 +863,160 @@ class PlayerActivity : AppCompatActivity() {
         channelZapState.clear()
     }
 
+    // ───── MK.options.redesign — new options popup + per-category panels ─────
+
+    private fun showOptionsV2() {
+        ensureOptionsV2()
+        playerView.hideController()
+        optionsV2State.showMenu()
+        optionsV2View?.visibility = View.VISIBLE
+        optionsV2View?.post { optionsV2View?.requestFocus() }
+    }
+
+    private fun hideOptionsV2() {
+        optionsV2State.hideMenu()
+        optionsV2View?.visibility = View.GONE
+    }
+
+    private fun ensureOptionsV2() {
+        if (optionsV2Inflated) return
+        optionsV2Inflated = true
+        val stub = findViewById<android.view.ViewStub>(R.id.player_options_v2_stub) ?: return
+        val view = stub.inflate() as? androidx.compose.ui.platform.ComposeView ?: return
+        view.setViewCompositionStrategy(
+            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+        )
+        view.isFocusable = true
+        view.isFocusableInTouchMode = true
+        view.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+        view.setContent {
+            com.yancotv.android.ui.theme.YancoTheme(isTv = true) {
+                val rows = buildOptionsV2Rows()
+                com.yancotv.android.player.options.PlayerOptionsMenu(
+                    state = optionsV2State,
+                    rows = rows,
+                    onDismiss = { hideOptionsV2() },
+                )
+                com.yancotv.android.player.options.PlayerOptionsPanelHost(
+                    state = optionsV2State,
+                    controller = controller,
+                    prefs = prefs,
+                    onPickSubtitleFile = {
+                        // Reuse the existing SAF launcher in the legacy
+                        // path — slice 2 wires this directly. For now,
+                        // dropping into the legacy sheet's Subs panel
+                        // is a clean fallback.
+                        hideOptionsV2()
+                        showSheet(SheetMode.SUBS)
+                    },
+                    onDismiss = { hideOptionsV2() },
+                )
+            }
+        }
+        optionsV2View = view
+    }
+
+    /**
+     * Build the popup row list. Slice 1 implements Audio / Subtitles /
+     * Aspect natively; the remaining categories fall back to the legacy
+     * sheet at the right tab. LEFT/RIGHT cycling is wired for Aspect
+     * (small enum); the rest open the panel for full controls.
+     */
+    @androidx.compose.runtime.Composable
+    private fun buildOptionsV2Rows(): List<com.yancotv.android.player.options.PlayerOptionsRow> {
+        val playback by prefs.playbackFlow.collectAsState()
+        val scope = rememberCoroutineScope()
+        val rows =
+            mutableListOf<com.yancotv.android.player.options.PlayerOptionsRow>()
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.AUDIO,
+                label = "Audio",
+                currentValue =
+                    playback.audioLanguage.takeIf { it.isNotBlank() }
+                        ?.uppercase(java.util.Locale.ROOT) ?: "Auto",
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.AUDIO) },
+            )
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES,
+                label = "Subtitles",
+                currentValue =
+                    playback.subtitleLanguage.takeIf { it.isNotBlank() }
+                        ?.uppercase(java.util.Locale.ROOT) ?: "Off",
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES) },
+            )
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.ASPECT,
+                label = "Aspect",
+                currentValue = playback.resizeMode.displayName,
+                onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.ASPECT) },
+                onCyclePrev = {
+                    scope.launch {
+                        com.yancotv.android.player.options.cycleAspect(prefs, forward = false)
+                    }
+                },
+                onCycleNext = {
+                    scope.launch {
+                        com.yancotv.android.player.options.cycleAspect(prefs, forward = true)
+                    }
+                },
+            )
+        // Slice-1 fallthroughs — open the legacy sheet at the matching tab.
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.SPEED,
+                label = "Speed",
+                currentValue = "${playback.speed}×",
+                onPick = {
+                    hideOptionsV2()
+                    showSheet(SheetMode.SPEED)
+                },
+            )
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.SLEEP,
+                label = "Sleep",
+                currentValue = "Off",
+                onPick = {
+                    hideOptionsV2()
+                    showSheet(SheetMode.SLEEP)
+                },
+            )
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.RECORD,
+                label = "Record",
+                currentValue = "—",
+                onPick = {
+                    hideOptionsV2()
+                    showSheet(SheetMode.RECORD)
+                },
+            )
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES,
+                label = "Favorites",
+                currentValue = "—",
+                onPick = {
+                    hideOptionsV2()
+                    showSheet(SheetMode.FAV)
+                },
+            )
+        rows +=
+            com.yancotv.android.player.options.PlayerOptionsRow(
+                category = com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL,
+                label = "External player",
+                currentValue = "—",
+                onPick = {
+                    hideOptionsV2()
+                    showSheet(SheetMode.EXT)
+                },
+            )
+        return rows
+    }
+
     /**
      * Lazy-inflate the channel-zap ViewStub on the first digit. Avoids
      * paying the Compose host setup cost during PlayerActivity.onCreate
@@ -1501,6 +1664,22 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
         }
+        // MK.options.redesign — popup/panel intercepts BACK first. BACK
+        // in a panel returns to the popup; BACK in the popup closes the
+        // whole thing. OK and arrows are handled by the Compose layer
+        // itself — we only own BACK + a global escape.
+        if (optionsV2Inflated && optionsV2State.menuVisible.value) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                    if (optionsV2State.activePanel.value != null) {
+                        optionsV2State.closePanel()
+                    } else {
+                        hideOptionsV2()
+                    }
+                    return true
+                }
+            }
+        }
         // MK.10.4 — numeric entry takes priority. OK commits, BACK cancels.
         // Other keys fall through to the regular handler below.
         if (channelZapState.visible.value) {
@@ -1520,12 +1699,19 @@ class PlayerActivity : AppCompatActivity() {
                 finish()
                 return true
             }
-            // MENU (Fire TV's 3-dot key / Android TV options key) opens the
-            // player-options sheet. Previously showed the Media3 controller,
-            // but CENTER/ENTER already does that — MENU now owns the deeper
-            // options surface (audio / subs / speed / aspect / sleep).
+            // MK.options.redesign — MENU (Fire TV's 3-dot / Android TV
+            // options key) now opens the lightweight popup. Live channels
+            // get the new menu; VOD still uses the legacy sheet for now
+            // (slice 2 ports VOD over). The popup itself routes
+            // unimplemented categories back to `showSheet(mode)` so the
+            // user never loses access during the rollout.
             KeyEvent.KEYCODE_MENU -> {
-                showSheet()
+                val isLive = controller.currentItem.value?.type == ContentType.LIVE
+                if (isLive) {
+                    showOptionsV2()
+                } else {
+                    showSheet()
+                }
                 return true
             }
             // OK / ENTER toggles the control surface. LIVE keeps Media3's
