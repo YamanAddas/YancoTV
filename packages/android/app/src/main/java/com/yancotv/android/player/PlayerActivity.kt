@@ -1476,12 +1476,16 @@ class PlayerActivity : AppCompatActivity() {
     private fun showSurf() {
         if (surfVisible) return
         // MK.10.4 fix — hide the Media3 controller first if it's up so
-        // surf and the controller bar don't co-render (they overlap
-        // visually and compete for D-pad input). LEFT routes through
-        // dispatchKeyEvent's live-LEFT bypass regardless of
-        // controllerVisible now, so this hide is the visual side of
-        // that fix.
+        // surf and the controller bar don't co-render. Block PlayerView's
+        // descendant focus (transport buttons, etc.) too — without this
+        // fence, Compose's 2D focus search inside surf can escape via
+        // LEFT/RIGHT into a hidden controller button, which Media3 then
+        // reacts to by re-showing the controller. Same lesson the sheet
+        // and optionsV2 paths already encode (search "FOCUS_BLOCK_DESCENDANTS"
+        // for the canonical pattern).
         if (controllerVisible) playerView.hideController()
+        playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        playerView.isFocusable = false
         surfVisible = true
         val v = ensureSurfOverlay()
         v.visibility = View.VISIBLE
@@ -1494,6 +1498,12 @@ class PlayerActivity : AppCompatActivity() {
         if (!surfVisible) return
         surfVisible = false
         surfOverlay?.visibility = View.GONE
+        // Restore PlayerView focus / descendants. Use FOCUS_AFTER_DESCENDANTS
+        // (Media3 default) so the controller's transport buttons can take
+        // focus when the controller is visible, falling back to the View
+        // itself otherwise.
+        playerView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        playerView.isFocusable = true
         playerView.requestFocus()
     }
 
