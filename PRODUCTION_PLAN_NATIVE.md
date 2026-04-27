@@ -115,6 +115,18 @@ YancoTV/                        # pnpm workspace root (desktop stays pnpm)
 
 **v1.0 = a packed, signed, distributed APK that's complete and safe for daily personal use or store publishing.** No timeline — work proceeds at user's pace.
 
+### Active work queue (set 2026-04-27)
+
+User-set ordering for the immediate next sessions (overrides Stage 5 default order):
+
+1. **MK.19.8 / Stage 5.1 — Backup / restore** (current investigation session 2026-04-27)
+2. **MK.13.3 — Channel actions: custom-logo SAF picker** (revisit "on hold" UX decision, then close out)
+3. **Settings redesign** (full UX overhaul of the settings shell — to be scoped as MK.21 in a follow-up investigation session)
+4. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones
+5. **MB-208 / MB-209 / MB-210 receiver-path test hardening** — pinned before or alongside the polish sweep
+
+After this queue clears, return to Stage 5 default order (5.2 sideload auto-update, 5.3 a11y audit, …).
+
 The MK.* numbering below stays as a reference catalog; what's authoritative going forward is the **5-stage dependency + risk ordering** in this section.
 
 ### Status (per 2026-04-25 audit)
@@ -691,6 +703,146 @@ This collapses MK.20 to almost-pure read-side work. One small migration only if 
 | **Total** | **7–11 h** | — |
 
 Each slice is independently shippable; recommended order is 20.1 → 20.2 → 20.3.
+
+---
+
+## MK.19.8 — Backup / restore (full app state) — investigated 2026-04-27
+
+**Why now.** First entry in the user-set active work queue (set 2026-04-27). Gates two real scenarios: (a) buying a second Fire TV and not having to re-enter every source / favorite / recording schedule by hand, (b) factory-resetting or replacing the canonical Fire TV and not losing months of curation.
+
+### Investigation findings — what the codebase already gives us
+
+- **Schema is at v8.** `BackupMetadata.sq` (Stage 2.5, `7.sqm`) already ships an empty user-export tracker: `id, file_uri, label, schema_version, checksum (SHA-256 hex), size_bytes, record_counts (JSON map), notes, created_at`. **No schema migration needed for MK.19.8.**
+- **A non-user-facing backup pattern exists.** [SourcesBackup.kt](packages/shared/src/androidMain/kotlin/com/yancotv/shared/db/SourcesBackup.kt) silently dumps `<filesDir>/sources-backup.json` after every successful DB open as the corruption-recovery safety net. Format + version-guard + insert pattern are reusable but the credential-handling story is wrong for portable backup (see below).
+- **Desktop has a full backup service we can mirror.** [src/main/services/backup-service.ts](src/main/services/backup-service.ts) ships v1 JSON with sources/favorites/history/settings/parental/group-prefs and a `(sourceId, streamUrl, title, tvgId)` re-link pattern for content-id-bearing rows. Mirror its schema so a future desktop ↔ Android transfer is plausible without protocol negotiation.
+- **No user-facing export/import UI exists yet** — greenfield on the Android side for the SAF flow + restore semantics.
+- **SAF picker pattern is established** in [RecordingStorageResolver.kt](packages/android/app/src/main/java/com/yancotv/android/recording/RecordingStorageResolver.kt) (custom-folder picker for recordings — `ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission`). Reuse the same shape for backup-folder selection.
+
+### Backup data inventory
+
+**Back up** (user-curated state):
+- `sources` — credentials need special handling, see below
+- `favorites` + `favorite_lists` — re-link by `(sourceId, streamUrl, title, tvgId)`
+- `watch_history` — re-link the same way
+- `recording_schedules` — re-link by `(content_id, programme_id, title, stream_url)` AND check programme_id still resolves on import
+- `recordings` — file_path URIs exported; on import validate `DocumentFile.exists()` before creating row, drop orphans
+- `content.name_override`, `content.logo_override` (MK.13.2 user renames + logo overrides) — exported as `(sourceId, streamUrl, name_override, logo_override)` tuples, applied post-resync
+- `channel_overrides` (custom_number, custom_group from Parental.sq) — same re-link strategy
+- `locked_channels`, `hidden_channels` (parental — by content_id, re-link via stream_url)
+- `group_preferences` — by (content_type, group_key); group_key is the raw `group_name` string from the M3U so it's directly portable
+- `settings` table — entire key-value dump (~20 keys: theme, accent, font scale, smart grouping, audio_lang, etc.)
+- `reminders` — optional v1; user-created EPG reminders
+- `downloads` — **skip** v1 (ephemeral; user can re-queue)
+
+**Skip** (cache / re-fetched on source sync):
+- `content` (rows themselves — only the override columns are kept)
+- `epg_programmes`, `episodes`, `subtitle_cache`, `tmdb_cache`
+
+**Skip** (system / Keystore — unrecoverable across devices):
+- PIN hash (lives in Android Keystore via [AndroidPinHasher.kt](packages/shared/src/androidMain/kotlin/com/yancotv/shared/parental/AndroidPinHasher.kt) — NOT in DB).
+- Recording files themselves (the bytes on disk). Files in `MediaStore.Video` survive uninstall on Android 11+; SAF custom folders survive too. App-private dir is wiped. The `recordings` row tracks the file path; on a NEW device, neither survive — restore drops orphans.
+
+### The credential portability problem (single biggest design call)
+
+[AndroidKeystoreCredentialStore.kt](packages/shared/src/androidMain/kotlin/com/yancotv/shared/sources/AndroidKeystoreCredentialStore.kt) encrypts `username_encrypted` / `password_encrypted` / `mac_address_encrypted` with an **AES/GCM key generated on-device, never exported, sometimes living in the StrongBox TEE**. Result: ciphertexts in the `sources` table are useless on any other device.
+
+Three options, with honest trade-offs:
+
+| Option | Export cost | Restore UX | Security | Recommendation |
+|---|---|---|---|---|
+| **A. Decrypt-then-export plaintext** (matches desktop's safeStorage flow) | Trivial — call `decrypt()` per source, write strings into JSON | Works on any device; user double-clicks restore and is done | Backup file on disk has plaintext IPTV creds — Downloads / Drive / email leakage risk | Default for "local / personal" backup, with a giant warning row in the dialog |
+| **B. Re-encrypt with user-supplied password** (PBKDF2 → AES-GCM, mirror PIN hasher's primitives) | ~30 lines: PBKDF2 the password, encrypt creds, write ciphertext + salt + iter count to JSON | User must remember the backup password; if forgotten the file is unrecoverable | Strong; the file is portable AND safe to leave on a USB stick | Default for "transfer between devices"; offer alongside Option A |
+| **C. Strip credentials, force re-auth on restore** | Smallest export | Worst — user re-enters every source from scratch | Strong (no creds in file) | Reject as default; surface only as a fallback when Keystore decrypt fails |
+
+**Recommended UX:** the export dialog has two paths — "Quick backup (no password, contains credentials)" and "Encrypted backup (password protected)". Both run the same body; only the credential-encryption step differs. Restore auto-detects the file shape (presence of `encryption.kdf` field) and prompts for password when needed. Failed decryption → fall back to Option C and warn the user.
+
+### File format (v1 — mirror desktop)
+
+```json
+{
+  "schemaVersion": 1,
+  "appVersion": "0.1.0-mk0",
+  "dbSchemaVersion": 8,
+  "createdAt": "2026-04-27T19:42:00Z",
+  "encryption": {
+    "kdf": "pbkdf2-sha256",
+    "iterations": 100000,
+    "salt": "<hex>"
+  } | null,
+  "records": {
+    "sources": [...],
+    "favoriteLists": [...],
+    "favorites": [{ "sourceId", "streamUrl", "title", "tvgId", "listId", "addedAt" }],
+    "watchHistory": [{ "sourceId", "streamUrl", "title", "tvgId", "episodeStreamUrl"?, "positionSeconds", "durationSeconds", "watchedAt" }],
+    "recordingSchedules": [...],
+    "recordings": [{ "fileUri", "title", "format", "startedAt", ... }],
+    "contentOverrides": [{ "sourceId", "streamUrl", "nameOverride", "logoOverride" }],
+    "channelOverrides": [{ "sourceId", "streamUrl", "customNumber", "customGroup" }],
+    "lockedChannels": [{ "sourceId", "streamUrl" }],
+    "hiddenChannels": [{ "sourceId", "streamUrl" }],
+    "groupPreferences": [{ "contentType", "groupKey", "sortOrder", "isHidden", "isPinned", "customName" }],
+    "settings": [{ "key", "value" }],
+    "reminders": [...]
+  },
+  "recordCounts": { "sources": N, ... },
+  "checksum": "<sha256-of-records-canonical-json>"
+}
+```
+
+`schemaVersion` (the backup format) is independent of `dbSchemaVersion` (the SQLDelight version). Restore guards on both: refuse if `dbSchemaVersion > YancoDb.Schema.version`; warn if `<` and rely on auto-migration after row insert.
+
+### Restore semantics
+
+Two modes (mirror desktop):
+- **Merge** (default) — upsert each row by primary key. New favorites add to existing; existing rows updated.
+- **Replace** — wipe the relevant tables first, then bulk-insert. Sources are NEVER auto-wiped (user could lose access to streams during the operation if the source-id-keyed re-link fails). Replace mode wipes favorites/history/schedules/overrides/parental; sources upsert by id.
+
+Re-link behavior:
+- **Sources are restored first.** Their stable `id` is preserved (UUIDs).
+- All content-keyed records (favorites, history, schedules, overrides) have the foreign content_id stripped from the JSON; on import, after sources are restored, the import loop re-resolves content_id by `(source_id, stream_url)` lookup against the local `content` table.
+- If the matching `content` row doesn't exist yet (source hasn't been re-synced), the import buffers the record and re-tries after the next source-sync completion. Surface unresolved-after-sync rows in a "couldn't link" report screen.
+
+### Slices
+
+| # | Task | Bucket | DoD |
+|---|---|---|---|
+| MK.19.8.1 | **`BackupExporter` in `packages/shared/`** — pure (no Android types). Takes `YancoDb` + `CredentialStore` + optional password; returns a `BackupFileV1` data class. Skips schema-only / cache tables. Computes record counts. SHA-256 checksum over canonical JSON of `records`. | 🔴 new | Round-trips against fixture DB; checksum stable across runs |
+| MK.19.8.2 | **`BackupImporter`** in same package — consumes `BackupFileV1`, applies merge or replace mode. Re-link pass for content-id-keyed records. Returns `RestoreReport(restored, skipped, unlinked)`. Schema-version guard. | 🔴 new | Fixture round-trip is lossless; lower-version fixture migrates correctly via SQLDelight; higher-version fixture rejected |
+| MK.19.8.3 | **Settings → Backup section** Compose UI in [packages/android/](packages/android/). Two row groups: "Export" (label input, password optional, SAF Save dialog) and "Import" (SAF Open dialog, mode picker, password if encrypted, dry-run preview before commit). Toast / dialog on completion with restore report counts. | 🔴 new | TalkBack labels per native-android-mk; D-pad path tested on Fire TV |
+| MK.19.8.4 | **Re-link buffer wired to source-sync completion** — `BackupImporter` exposes `pendingLinks: Flow<Unlinked>` consumed by a `SourceSyncObserver` that fires on every source sync completion to retry resolution. After 3 sync passes with no progress, surface "couldn't link" report. | 🟡 glue | Restore on a fresh install where sources haven't synced yet completes; favorites materialise after the first source sync |
+| MK.19.8.5 | **`BackupMetadata` rows persisted on every export.** UI shows last-3 backups in Settings → Backup with "Open in file manager" + "Delete from device" rows. | 🟢 wire | Row written; UI lists; matches BackupMetadata.sq schema (Stage 2.5) |
+| MK.19.8.6 | **Tests** — `BackupRoundTripTest` (export then import on a fresh DB → state equivalent), `BackupSchemaGuardTest` (refuse newer schema), `BackupCredentialModesTest` (Option A / B / C decrypt paths), `BackupRelinkTest` (favorites land after delayed source sync). | 🔴 new | All four green; round-trip sets compared by record-count + checksum |
+| MK.19.8.7 | **Manual two-Fire-TV verification.** Export from canonical AFTDCT31, install fresh on a second device, import (option A first then option B), confirm sources/favorites/history/recordings re-link cleanly after source resync. **User-driven** — schedule once second device is available. | — | Hands-on green |
+
+### Out of scope for MK.19.8 (file as MB-* / future MK if asked)
+
+- **Cloud sync** (Google Drive / Dropbox auto-export). Defer to post-v1; would need OAuth + privacy policy + GDPR considerations.
+- **Selective export** ("just my favorites"). Full-app only in v1; partial exports add UI surface for marginal value.
+- **Cross-platform desktop ↔ Android transfer** verified end-to-end. The schema mirrors desktop, but actually testing both sides round-tripping is its own session.
+- **Restoring recording files themselves** (just the metadata). Files survive only if MediaStore-stored on Android 11+ (system handles persistence) or in a SAF custom folder the user chose.
+- **PIN restore.** Skipped by design — Keystore won't release the hash. User sets a new PIN on the new device.
+
+### Open questions before slice MK.19.8.1 starts
+
+1. **Default credential-handling mode**: Option A (plaintext) or Option B (password)? My pick: **A as default with a clear warning, B available via toggle.** Most users back up to a personal Drive folder or USB stick where Option A is fine; B is for the security-conscious / shared-cloud case.
+2. **Replace mode**: include or skip in v1? My pick: **skip — merge only.** Replace adds destructive-action UX (confirm dialog, undo path); merge covers the realistic restore flow ("new device, want my stuff back"). Add later if users complain.
+3. **Re-link retries**: how many sync passes before we give up? My pick: **3, then surface to user.** Most catalogs sync in <30s; 3 passes is generous.
+4. **Where does Backup live in Settings?** Suggest **its own top-level "Backup" tab** (sibling to General / Playback / Network / Recording). Settings redesign (queue item 3) will revisit; for v1 backup ships with a Backup tab.
+
+### Cost (honest)
+
+| Slice | Estimate | Risk |
+|---|---|---|
+| 19.8.1 | 3–4 h | Medium — JSON schema design + canonical serialization for stable checksums |
+| 19.8.2 | 4–6 h | High — re-link buffer is the tricky part; schema-version guards need tests |
+| 19.8.3 | 3–4 h | Medium — SAF flows + dialogs + TalkBack |
+| 19.8.4 | 2–3 h | Medium — coupling to source-sync completion observer |
+| 19.8.5 | 1 h | Low |
+| 19.8.6 | 2–3 h | Low — fixtures + assertions |
+| 19.8.7 | — | hands-on, deferred until second Fire TV available |
+| **Total** | **15–21 h** | Highest-cost milestone since MK.14. Build incrementally; ship 19.8.1+2+6 first (no UI), then 19.8.3+4+5 (UI + lifecycle wiring) |
+
+Recommended order: 19.8.1 → 19.8.2 → 19.8.6 (test the engine before building UI) → 19.8.3 → 19.8.5 → 19.8.4 → 19.8.7.
 
 ---
 
