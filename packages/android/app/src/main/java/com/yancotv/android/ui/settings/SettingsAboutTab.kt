@@ -3,6 +3,10 @@ package com.yancotv.android.ui.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,30 +102,21 @@ fun SettingsAboutTab(
         )
 
         // ───── Version block — aspirational v1.0.0 ─────
-        // Version is hardcoded "v 1.0.0" — the target stability number
-        // we'll ship under once the app is feature-complete + stable.
-        // The actual current BuildConfig.VERSION_NAME / VERSION_CODE
-        // still surface in the Build section below for diagnostics; this
-        // is identity, not telemetry.
+        // Hardcoded "v 1.0.0" — the target stability number we'll ship
+        // under once the app is feature-complete. Actual BuildConfig
+        // versionName / versionCode still appear in Build section
+        // below for diagnostics.
+        //
+        // Custom focusable row instead of `SettingsRow` because we need
+        // the arabesque face on the left-aligned label, and SettingsRow
+        // hardcodes the label font. Visual match (rounded corners,
+        // background tint, focus border) so it reads as part of the
+        // same primitives family. `readOnlyFocusable = true`-equivalent:
+        // the Box itself is focusable so D-pad traversal walks through
+        // it, and the parent verticalScroll's bringIntoView pulls it
+        // into the safety-margin gap on focus.
         SettingsSection(title = "Version") {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(palette.BackgroundRaised.copy(alpha = 0.55f))
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "v 1.0.0",
-                    color = palette.TextPrimary,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = arabesque,
-                    letterSpacing = 0.6.sp,
-                )
-            }
+            VersionRow(text = "v 1.0.0", arabesque = arabesque)
         }
 
         // ───── Updates (Stage 5.2.2) ─────
@@ -195,30 +190,93 @@ fun SettingsAboutTab(
             }
         }
 
-        // ───── Build metadata + credits ─────
+        // ───── Build metadata ─────
+        // `readOnlyFocusable = true` on every read-only row makes them
+        // participate in D-pad traversal. Without this the read-only
+        // section was unreachable: D-pad DOWN from the Updates toggle
+        // (the last focusable above) had nothing focusable to land on
+        // here, so the user never saw the Build / Credits content even
+        // though it was rendered just below the viewport. Integrating
+        // focus + scroll into ONE thing — every row is focusable, the
+        // verticalScroll's bringIntoView pulls each focused row into
+        // view with the safety margin, and the natural top-to-bottom
+        // focus order matches the natural top-to-bottom reading order.
         SettingsSection(title = "Build") {
-            SettingsRow(label = "Version", right = { ValueText(info.version) })
+            SettingsRow(
+                label = "Version",
+                readOnlyFocusable = true,
+                right = { ValueText(info.version) },
+            )
             SettingsRowSpacer()
-            SettingsRow(label = "Build", right = { ValueText(info.versionCode.toString()) })
+            SettingsRow(
+                label = "Build",
+                readOnlyFocusable = true,
+                right = { ValueText(info.versionCode.toString()) },
+            )
             SettingsRowSpacer()
-            SettingsRow(label = "Package", right = { ValueText(info.packageName) })
+            SettingsRow(
+                label = "Package",
+                readOnlyFocusable = true,
+                right = { ValueText(info.packageName) },
+            )
         }
 
         SettingsSection(
             title = "Credits",
             sub = "Built with Media3 ExoPlayer, SQLDelight, Ktor, Coil, and Jetpack Compose. Shared business logic (parsers, clients, classifier, EPG) lives in packages/shared via Kotlin Multiplatform — the iOS app in MK.iOS.* will consume the same code.",
-        ) {}
+        ) {
+            // Empty section body. The `sub` line above carries the
+            // content; an additional read-only-focusable spacer here
+            // gives D-pad somewhere to land at the very bottom so the
+            // scroll comes to rest WITH the safety-margin gap below
+            // the Credits text.
+            SettingsRow(
+                label = "Open-source licenses",
+                hint = "Bundled at app/src/main/res/raw — review for full notices.",
+                readOnlyFocusable = true,
+            )
+        }
+    }
+}
 
-        // 0dp focusable that participates in focus traversal so D-pad
-        // DOWN past the last user-actionable row (Updates "Check now")
-        // can reach this anchor. When focus lands here, Compose's
-        // bringIntoView walks the parent verticalScroll past the
-        // read-only Build + Credits sections; combined with the
-        // padding(bottom = 80.dp) on the parent column the user lands
-        // with the safety margin the rest of Settings uses. Without
-        // this anchor the read-only sections sit below the last
-        // focusable and never come into view by D-pad.
-        com.yancotv.android.ui.focus.FocusableSpacer()
+/**
+ * Custom focusable version row — visually matches `SettingsRow` but
+ * lets the label render in the arabesque face. Used only on the
+ * About hero's Version block. Drives D-pad traversal + bringIntoView
+ * scroll the same way every other read-only-focusable row does.
+ */
+@Composable
+private fun VersionRow(
+    text: String,
+    arabesque: FontFamily,
+) {
+    val palette = LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(palette.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
+                .border(
+                    width = if (focused) 1.5.dp else 1.dp,
+                    color = if (focused) palette.FocusRing else palette.BorderSubtle,
+                    shape = shape,
+                )
+                .focusable(interactionSource = interaction)
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            color = palette.TextPrimary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = arabesque,
+            letterSpacing = 0.4.sp,
+        )
     }
 }
 
