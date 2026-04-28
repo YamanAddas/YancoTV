@@ -3,7 +3,6 @@ package com.yancotv.shared.db
 import android.content.Context
 import android.util.Log
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import java.io.File
 
 actual class DatabaseFactory(
     private val context: Context,
@@ -65,48 +64,38 @@ actual class DatabaseFactory(
     /**
      * Stage 1.5 corruption recovery. Attempts to read the proactive
      * [SourcesBackup] (best-effort), deletes every file SQLite might
-     * leave behind for [DB_NAME] (`<name>`, `<name>-journal`, `<name>
-     * -wal`, `<name>-shm`), then opens fresh and replays the backup.
+     * leave behind for [DB_NAME] (via [dbArtifactPaths]), then opens
+     * fresh and replays the backup if [decideRecoveryAction] approves.
+     *
+     * MK.24.G.2 — the schema-version guard + null-backup branching is
+     * hoisted into [decideRecoveryAction] so unit tests can pin every
+     * branch (FreshOnly / Restore / RefuseRestore) without standing up
+     * an Android `Context`. This function is now the thin platform
+     * adapter that wires the pure decision to file I/O + AndroidSqlite.
      */
     private fun recoverWithFreshDb(backup: SourcesBackup): YancoDatabase {
         val saved = backup.read()
         deleteDbArtifacts()
         val fresh = openNormally()
-        if (saved != null) {
-            // Schema-version guard: refuse to restore a backup created by
-            // a newer schema than the current binary supports. A user
-            // running an older build after a newer one (downgrade /
-            // sideload) would otherwise see odd column behaviour. Better
-            // to start fresh.
-            if (saved.schemaVersion > YancoDb.Schema.version.toInt()) {
-                Log.w(
-                    TAG,
-                    "Sources backup schemaVersion=${saved.schemaVersion} is newer than " +
-                        "current schema ${YancoDb.Schema.version}; refusing to restore.",
-                )
-            } else {
-                backup.restoreInto(fresh.db, saved.sources)
-            }
-        } else {
-            Log.i(TAG, "No sources backup found; fresh DB will be empty.")
+        when (val action = decideRecoveryAction(saved, YancoDb.Schema.version.toInt())) {
+            RecoveryAction.FreshOnly ->
+                Log.i(TAG, "No sources backup found; fresh DB will be empty.")
+            is RecoveryAction.RefuseRestore ->
+                Log.w(TAG, action.reason)
+            is RecoveryAction.Restore ->
+                backup.restoreInto(fresh.db, action.sources)
         }
         return fresh
     }
 
     /**
-     * Delete the SQLite file plus its journal / WAL / shm sidecars. WAL
-     * mode (enabled in [SchemaCallback.onConfigure]) creates the latter
-     * two on every open; leaving them around after deleting the main file
-     * causes the next open to find an inconsistent state.
+     * Delete the SQLite file plus its journal / WAL / shm sidecars.
+     * Path enumeration is in the pure [dbArtifactPaths] so a unit test
+     * can pin the "we still cover all four files" contract.
      */
     private fun deleteDbArtifacts() {
         val dbFile = context.getDatabasePath(DB_NAME)
-        listOf(
-            dbFile,
-            File("${dbFile.path}-journal"),
-            File("${dbFile.path}-wal"),
-            File("${dbFile.path}-shm"),
-        ).forEach { f ->
+        dbArtifactPaths(dbFile).forEach { f ->
             if (f.exists() && !f.delete()) {
                 Log.w(TAG, "Failed to delete DB artifact ${f.path} during recovery.")
             }
