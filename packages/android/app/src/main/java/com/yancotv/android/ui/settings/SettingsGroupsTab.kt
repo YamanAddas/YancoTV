@@ -70,7 +70,10 @@ fun SettingsGroupsTab(
     }
 
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Groups",

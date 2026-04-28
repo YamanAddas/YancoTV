@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -600,9 +601,11 @@ private fun ContentPane(
         // the section title visible at the top and the focused chip a
         // few rows down — both visible, no auto-scroll surprises.
         @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+        val bringIntoViewSpec = rememberSafeMarginBringIntoViewSpec()
+        @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides
-                ConservativeBringIntoViewSpec,
+                bringIntoViewSpec,
         ) {
         Box(
             modifier =
@@ -641,46 +644,72 @@ private fun ContentPane(
 }
 
 /**
- * Custom [BringIntoViewSpec] for the Settings ContentPane. Suppresses
- * the eager "snap focused element to viewport top" behaviour that was
- * pushing section titles ('Video', 'User-Agent', 'Guide window') under
- * the breadcrumb when MB-108's moveFocus(Right) lands focus on the
- * first focusable inside a tab body.
+ * Custom [BringIntoViewSpec] for the Settings ContentPane. Two jobs:
  *
- * Behaviour rules (mirrors the documented Compose default — this spec
- * just guarantees the conservative variant in case any future Compose
- * release ships a more eager default):
- *   - Element fully in view → no scroll.
- *   - Element extends below viewport AND starts inside viewport → scroll
- *     forward just enough to bring the trailing edge to the bottom.
- *   - Element starts above viewport AND fits inside viewport → scroll
- *     backward to bring the leading edge to the top.
+ *  1. Suppresses the eager "snap focused element to viewport top"
+ *     behaviour that was pushing section titles ('Video', 'User-Agent',
+ *     'Guide window') under the breadcrumb when MB-108's
+ *     moveFocus(Right) landed focus on the first focusable inside a tab.
+ *
+ *  2. Leaves a [SAFETY_MARGIN_DP]-wide gap between the focused row and
+ *     the viewport edges so the focused last row never sits flush
+ *     against the panel border. The previous spec brought the trailing
+ *     edge to *exactly* `containerSize`, which made D-pad DOWN to the
+ *     last row pin that row to the panel bottom — the per-tab
+ *     `bottom = 80.dp` padding lives inside the scroll content but
+ *     BringIntoView only positions the focused element, so the padding
+ *     never scrolled into view. Reported three times before this fix.
+ *
+ * Behaviour rules:
+ *   - Element fully in view (with margin clear) → no scroll.
+ *   - Element extends below viewport (or sits within bottom margin) →
+ *     scroll forward so trailing edge lands [SAFETY_MARGIN_DP] above
+ *     the viewport bottom.
+ *   - Element starts above viewport (or sits within top margin) →
+ *     scroll backward so leading edge lands [SAFETY_MARGIN_DP] below
+ *     the viewport top.
  *   - Element bigger than the viewport (e.g. the dpadVerticalScroll
  *     Column-as-focusable that About uses) → no scroll. Without this
- *     case, the spec was returning a positive scroll delta on every
- *     focus event, which combined with About's animateScrollBy created
- *     a feedback loop that read as flicker on D-pad UP/DOWN.
+ *     case, the spec returned a positive scroll delta on every focus
+ *     event, which combined with About's animateScrollBy created a
+ *     feedback loop that read as flicker on D-pad UP/DOWN.
  */
+private const val SAFETY_MARGIN_DP = 32
+
+@Composable
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-private val ConservativeBringIntoViewSpec =
-    object : androidx.compose.foundation.gestures.BringIntoViewSpec {
-        override fun calculateScrollDistance(
-            offset: Float,
-            size: Float,
-            containerSize: Float,
-        ): Float {
-            val trailingEdge = offset + size
-            return when {
-                // Element extends below viewport AND starts inside it.
-                trailingEdge > containerSize && offset > 0f -> trailingEdge - containerSize
-                // Element starts above viewport AND fits inside it.
-                offset < 0f && trailingEdge < containerSize -> offset
-                // Otherwise: no scroll. Covers fully-in-view AND
-                // larger-than-viewport (the About Column case).
-                else -> 0f
+private fun rememberSafeMarginBringIntoViewSpec(): androidx.compose.foundation.gestures.BringIntoViewSpec {
+    val density = LocalDensity.current
+    return remember(density) {
+        val safetyPx = with(density) { SAFETY_MARGIN_DP.dp.toPx() }
+        object : androidx.compose.foundation.gestures.BringIntoViewSpec {
+            override fun calculateScrollDistance(
+                offset: Float,
+                size: Float,
+                containerSize: Float,
+            ): Float {
+                // Element bigger than viewport — leave alone (About body case).
+                if (size >= containerSize) return 0f
+                val trailingEdge = offset + size
+                val bottomBoundary = containerSize - safetyPx
+                return when {
+                    // Element extends below the bottom safety boundary AND has
+                    // moved past the top boundary — scroll forward so trailing
+                    // edge lands at (containerSize - safetyMargin).
+                    trailingEdge > bottomBoundary && offset > safetyPx ->
+                        trailingEdge - bottomBoundary
+                    // Element sits within the top safety margin (or starts
+                    // above viewport entirely) — scroll back so leading edge
+                    // lands at safetyMargin.
+                    offset < safetyPx && trailingEdge < containerSize ->
+                        offset - safetyPx
+                    // Otherwise: fully in view with margin clear — no scroll.
+                    else -> 0f
+                }
             }
         }
     }
+}
 
 @Composable
 private fun Breadcrumb(current: SettingsTab) {

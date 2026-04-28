@@ -97,7 +97,7 @@ fun SettingsParentalTab(
             modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(

@@ -156,7 +156,7 @@ fun SourcesScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 24.dp),
+                    .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         ) {
             SourceDetailScreen(
                 sourceId = openDetailId,
@@ -175,7 +175,7 @@ fun SourcesScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 24.dp),
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         active?.let { state ->
