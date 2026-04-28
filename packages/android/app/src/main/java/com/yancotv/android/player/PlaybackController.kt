@@ -88,6 +88,55 @@ sealed interface SleepTimerState {
 }
 
 /**
+ * MK.24.E.3 — pure decision for [PlaybackController.play] to gate the
+ * two-tap no-op contract from the production guards. Extracted so the
+ * decision table can be unit-tested without standing up an ExoPlayer
+ * (the controller's constructor pulls in Android Context, OkHttp,
+ * DefaultDataSource — none testable from `androidUnitTest`).
+ *
+ * Same shape as MK.23.C.1's `resumePointDecision`: callers pass in the
+ * inputs, this function returns one of three actions, the production
+ * code's when-branch maps each action to its side effects.
+ *
+ * The two-tap-on-same-tile case (Reject / SameTarget) is the
+ * load-bearing one. A regression that lets `NewTarget` fire when ids
+ * match would re-prepare the MediaItem on every tap, dropping the
+ * buffer and forcing a 1–3 s rebuffer (= the bug MB-225 was filed
+ * against). The `Reject` case (out-of-range / non-playable target)
+ * keeps the controller silent for series containers and blank URLs
+ * the way `ContentItem.toPlayable()` already gates them.
+ */
+internal sealed interface PlayLaunchDecision {
+    /** Out-of-range index, or target is a series container / blank URL. No-op. */
+    data object Reject : PlayLaunchDecision
+
+    /** Target id matches current id. Caller updates queue/index but does NOT re-prepare the player. */
+    data object SameTarget : PlayLaunchDecision
+
+    /** Different target. Caller persists outgoing resume point, swaps queue, calls loadCurrent. */
+    data object NewTarget : PlayLaunchDecision
+}
+
+internal fun playLaunchDecision(
+    list: List<ContentItem>,
+    startIndex: Int,
+    currentId: String?,
+): PlayLaunchDecision {
+    if (startIndex !in list.indices) return PlayLaunchDecision.Reject
+    val target = list[startIndex]
+    if (target.toPlayable() == null) return PlayLaunchDecision.Reject
+    return if (currentId == target.id) PlayLaunchDecision.SameTarget else PlayLaunchDecision.NewTarget
+}
+
+internal fun episodeLaunchDecision(
+    episode: Playable.Episode,
+    currentId: String?,
+): PlayLaunchDecision {
+    if (episode.streamUrl.isBlank()) return PlayLaunchDecision.Reject
+    return if (currentId == episode.id) PlayLaunchDecision.SameTarget else PlayLaunchDecision.NewTarget
+}
+
+/**
  * App-scoped playback holder. Owns the single [ExoPlayer] shared between
  * [com.yancotv.android.ui.shell.MiniPlayer] and [PlayerActivity] via
  * direct assignment: `PlayerView.player = controller.player`.
@@ -461,24 +510,25 @@ class PlaybackController(
         list: List<ContentItem>,
         startIndex: Int,
     ) {
-        if (startIndex !in list.indices) return
-        val target = list[startIndex]
-        // Sealed-type gate — rejects Series containers and blank URLs.
-        target.toPlayable() ?: return
-        // Same-id: update the navigation queue for next/prev zap but don't
-        // touch the player — second OK on the current item must be a no-op.
-        if (_currentItem.value?.id == target.id) {
-            _queue.value = list
-            _index.value = startIndex
-            return
+        when (playLaunchDecision(list, startIndex, _currentItem.value?.id)) {
+            PlayLaunchDecision.Reject -> return
+            PlayLaunchDecision.SameTarget -> {
+                // Same-id: update the navigation queue for next/prev zap
+                // but don't touch the player — second OK on the current
+                // item must be a no-op.
+                _queue.value = list
+                _index.value = startIndex
+            }
+            PlayLaunchDecision.NewTarget -> {
+                // Different item: capture the outgoing offset before the queue swap.
+                if (_currentItem.value != null) persistResumePoint()
+                _currentEpisode.value = null
+                _externalSubtitle = null
+                _queue.value = list
+                _index.value = startIndex
+                loadCurrent()
+            }
         }
-        // Different item: capture the outgoing offset before the queue swap.
-        if (_currentItem.value != null) persistResumePoint()
-        _currentEpisode.value = null
-        _externalSubtitle = null
-        _queue.value = list
-        _index.value = startIndex
-        loadCurrent()
     }
 
     /**
@@ -498,20 +548,22 @@ class PlaybackController(
      * if used as content_id (episodes live in their own table).
      */
     fun play(episode: Playable.Episode) {
-        if (episode.streamUrl.isBlank()) return
-        val view = episode.toContentItemView()
-        if (_currentItem.value?.id == view.id) {
-            _currentEpisode.value = episode
-            _queue.value = listOf(view)
-            _index.value = 0
-            return
+        when (episodeLaunchDecision(episode, _currentItem.value?.id)) {
+            PlayLaunchDecision.Reject -> return
+            PlayLaunchDecision.SameTarget -> {
+                _currentEpisode.value = episode
+                _queue.value = listOf(episode.toContentItemView())
+                _index.value = 0
+            }
+            PlayLaunchDecision.NewTarget -> {
+                if (_currentItem.value != null) persistResumePoint()
+                _currentEpisode.value = episode
+                _externalSubtitle = null
+                _queue.value = listOf(episode.toContentItemView())
+                _index.value = 0
+                loadCurrent()
+            }
         }
-        if (_currentItem.value != null) persistResumePoint()
-        _currentEpisode.value = episode
-        _externalSubtitle = null
-        _queue.value = listOf(view)
-        _index.value = 0
-        loadCurrent()
     }
 
     /**
