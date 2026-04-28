@@ -35,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.shared.content.CategoryNode
+import com.yancotv.shared.content.CategoryTreeBuilder
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.content.PrefixCatalog
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -56,6 +59,8 @@ fun SettingsGroupsTab(
     repo: ContentRepository = koinInject(),
 ) {
     val hidden by prefs.hiddenGroupsFlow.collectAsState()
+    val pinnedParentsByType by prefs.pinnedParentsFlow.collectAsState()
+    val general by prefs.generalFlow.collectAsState()
     val scope = rememberCoroutineScope()
     var selectedType by rememberSaveable { mutableStateOf(ContentType.LIVE) }
     val groups = remember { mutableStateListOf<String>() }
@@ -68,6 +73,22 @@ fun SettingsGroupsTab(
         groups.clear()
         groups.addAll(loaded.sorted())
     }
+
+    // Compute available parent buckets for the selected type by running
+    // the same tree-builder the rail uses on the un-sorted, un-hidden
+    // group list. Single-child collapsed buckets are NOT pinnable as
+    // parents (they're leaves now); we filter them out so the UI only
+    // surfaces actionable rows. Re-derives on every recomposition that
+    // affects the input — `groups` size + `hidden`. Cheap because the
+    // parser + bucket build are linear in the group count.
+    val pinnedForType = pinnedParentsByType[selectedType] ?: emptyList()
+    val availableParents =
+        remember(groups.toList(), hidden, pinnedForType) {
+            val visibleGroups = groups.filterNot { it in hidden }
+            CategoryTreeBuilder
+                .build(visibleGroups, pinnedParentCodes = pinnedForType)
+                .filterIsInstance<CategoryNode.Parent>()
+        }
 
     Column(
         modifier =
@@ -101,6 +122,67 @@ fun SettingsGroupsTab(
                     )
                 },
             )
+        }
+
+        // MK.20 polish-sweep — Pin-a-bucket. Lives inside the existing
+        // Settings → Categories tab so users have one place to manage all
+        // group-level prefs. Visible only when smart grouping is on
+        // (pinning a parent is meaningless if the rail is rendering a
+        // flat list anyway). Parent rows show the resolved displayName,
+        // the prefix code, and the child count. Pin toggle writes through
+        // to AppPreferences.setParentPinned in pin-list order.
+        if (general.smartGrouping && availableParents.isNotEmpty()) {
+            SettingsSection(
+                title = "Pinned categories",
+                sub = "Pin language / region buckets to the top of the rail. Order follows the sequence you pin them in.",
+                right = {
+                    if (pinnedForType.isNotEmpty()) {
+                        SettingsOutlinedButton(
+                            onClick = { scope.launch { prefs.clearPinnedParents(selectedType) } },
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Unpin all (${pinnedForType.size})")
+                        }
+                    }
+                },
+            ) {
+                val palette = LocalYancoPalette.current
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(palette.BackgroundRaised.copy(alpha = 0.5f))
+                            .border(
+                                width = 1.dp,
+                                color = palette.BorderSubtle,
+                                shape = RoundedCornerShape(12.dp),
+                            ),
+                ) {
+                    availableParents.forEach { parent ->
+                        val isPinned =
+                            pinnedForType.any {
+                                it == parent.prefixCode.lowercase() || it == parent.label.lowercase()
+                            }
+                        ParentPinRow(
+                            label = parent.label,
+                            prefixCode = parent.prefixCode,
+                            kind = parent.kind,
+                            childCount = parent.children.size,
+                            pinned = isPinned,
+                            onToggle = { shouldPin ->
+                                scope.launch {
+                                    prefs.setParentPinned(
+                                        selectedType,
+                                        parent.prefixCode,
+                                        shouldPin,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
+            }
         }
 
         // Group list — single container card with hairline-divided rows so the
@@ -209,6 +291,61 @@ private fun GroupRow(
             )
         }
         SettingsInlineSwitch(checked = !hidden)
+    }
+}
+
+@Composable
+private fun ParentPinRow(
+    label: String,
+    prefixCode: String,
+    kind: PrefixCatalog.Kind,
+    childCount: Int,
+    pinned: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val palette = LocalYancoPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val rowBg = if (focused) palette.BackgroundElevated.copy(alpha = 0.6f) else Color.Transparent
+    val kindLabel =
+        when (kind) {
+            PrefixCatalog.Kind.Language -> "language"
+            PrefixCatalog.Kind.Region -> "region"
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(rowBg)
+                .border(
+                    width = if (focused) 1.5.dp else 0.dp,
+                    color = if (focused) palette.FocusRing else Color.Transparent,
+                    shape = RoundedCornerShape(0.dp),
+                )
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = { onToggle(!pinned) },
+                )
+                .padding(horizontal = 22.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                color = if (pinned) palette.Accent else palette.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "$kindLabel · $prefixCode · $childCount channel${if (childCount == 1) "" else "s"}",
+                color = palette.TextMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        SettingsInlineSwitch(checked = pinned)
     }
 }
 

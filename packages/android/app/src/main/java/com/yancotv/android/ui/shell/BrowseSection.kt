@@ -177,14 +177,16 @@ fun BrowseSection(
     // a UI nicety) so we accept that a Set<String> isn't trivially Saveable
     // — we wrap it via the standard MutableStateFlow + remember pattern.
     val smartGroupingEnabled = general.smartGrouping
+    val pinnedParentsByType by prefs.pinnedParentsFlow.collectAsState()
+    val pinnedParents = pinnedParentsByType[type] ?: emptyList()
     var expandedParents by remember(type) { mutableStateOf(emptySet<String>()) }
     val railRows =
-        remember(groupsState.toList(), hiddenGroups, smartGroupingEnabled, expandedParents) {
+        remember(groupsState.toList(), hiddenGroups, smartGroupingEnabled, expandedParents, pinnedParents) {
             if (!smartGroupingEnabled) {
                 null
             } else {
                 val filtered = applySmartGroupingHidden(groupsState.toList(), hiddenGroups)
-                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered)
+                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered, pinnedParents)
                 flattenCategoryTree(tree, expandedParents)
             }
         }

@@ -423,14 +423,17 @@ fun GuideScreen(
     val guideHiddenGroups by appPrefs.hiddenGroupsFlow.collectAsState()
     val guideGeneral by appPrefs.generalFlow.collectAsState()
     val guideSmartEnabled = guideGeneral.smartGrouping
+    val guidePinnedParentsByType by appPrefs.pinnedParentsFlow.collectAsState()
+    // Guide is a live-only surface — pin list is keyed off ContentType.LIVE.
+    val guidePinnedParents = guidePinnedParentsByType[com.yancotv.shared.types.ContentType.LIVE] ?: emptyList()
     var guideExpandedParents by remember { mutableStateOf(emptySet<String>()) }
     val guideRailRows =
-        remember(groups, guideHiddenGroups, guideSmartEnabled, guideExpandedParents) {
+        remember(groups, guideHiddenGroups, guideSmartEnabled, guideExpandedParents, guidePinnedParents) {
             if (!guideSmartEnabled) {
                 null
             } else {
                 val filtered = applySmartGroupingHidden(groups, guideHiddenGroups)
-                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered)
+                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered, guidePinnedParents)
                 flattenCategoryTree(tree, guideExpandedParents)
             }
         }

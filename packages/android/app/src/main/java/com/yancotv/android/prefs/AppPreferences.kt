@@ -1,6 +1,7 @@
 package com.yancotv.android.prefs
 
 import com.yancotv.shared.db.YancoDb
+import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,24 @@ class AppPreferences(
 
     private val _hiddenGroups = MutableStateFlow(readHiddenGroups())
     val hiddenGroupsFlow: StateFlow<Set<String>> = _hiddenGroups.asStateFlow()
+
+    // MK.20 polish-sweep — pin-a-bucket. Per-content-type ordered list of
+    // pinned parent codes (e.g. "ar", "us"). Storage shape: 3 settings
+    // keys, one per content type, each holding a newline-delimited list.
+    // Order is preserved so the user's pin sequence is honoured by
+    // CategoryTreeBuilder. Codes are lowercase by convention; the tree
+    // builder also matches against lowercased displayName so the user
+    // can pin "Saudi Arabia" via the displayName form too (Settings UI
+    // writes the code by default, displayName is for backup symmetry).
+    private val _pinnedParents =
+        MutableStateFlow(
+            mapOf(
+                ContentType.LIVE to readPinnedParents(KEY_PINNED_PARENTS_LIVE),
+                ContentType.MOVIE to readPinnedParents(KEY_PINNED_PARENTS_MOVIE),
+                ContentType.SERIES to readPinnedParents(KEY_PINNED_PARENTS_SERIES),
+            ),
+        )
+    val pinnedParentsFlow: StateFlow<Map<ContentType, List<String>>> = _pinnedParents.asStateFlow()
 
     private val _recording = MutableStateFlow(readRecording())
     val recordingFlow: StateFlow<RecordingPrefs> = _recording.asStateFlow()
@@ -280,6 +299,58 @@ class AppPreferences(
 
     suspend fun clearHiddenGroups() = writeHiddenGroups(emptySet())
 
+    // ───── Pinned parents (MK.20 polish-sweep) ─────
+
+    /**
+     * Add or remove a parent code from the per-type pin list. Adding an
+     * already-pinned code is a no-op (idempotent); removing one that
+     * isn't pinned is also a no-op. Order is preserved so the user's
+     * pin sequence drives the rail's top-of-list ordering.
+     */
+    suspend fun setParentPinned(
+        type: ContentType,
+        code: String,
+        pinned: Boolean,
+    ) {
+        val codeNorm = code.lowercase()
+        val current = _pinnedParents.value[type] ?: emptyList()
+        val next =
+            when {
+                pinned && codeNorm !in current -> current + codeNorm
+                !pinned && codeNorm in current -> current.filterNot { it == codeNorm }
+                else -> return // no change
+            }
+        writePinnedParents(type, next)
+    }
+
+    suspend fun clearPinnedParents(type: ContentType) {
+        if (_pinnedParents.value[type].isNullOrEmpty()) return
+        writePinnedParents(type, emptyList())
+    }
+
+    private suspend fun writePinnedParents(
+        type: ContentType,
+        next: List<String>,
+    ) {
+        val key = pinnedParentsKey(type)
+        val value = next.joinToString("\n")
+        withContext(Dispatchers.IO) {
+            if (next.isEmpty()) {
+                db.settingsQueries.delete(key)
+            } else {
+                db.settingsQueries.upsert(key, value)
+            }
+        }
+        _pinnedParents.value = _pinnedParents.value.toMutableMap().apply { put(type, next) }
+    }
+
+    private fun pinnedParentsKey(type: ContentType): String =
+        when (type) {
+            ContentType.LIVE -> KEY_PINNED_PARENTS_LIVE
+            ContentType.MOVIE -> KEY_PINNED_PARENTS_MOVIE
+            ContentType.SERIES -> KEY_PINNED_PARENTS_SERIES
+        }
+
     private suspend fun writeHiddenGroups(next: Set<String>) {
         val value = next.joinToString("\n")
         withContext(Dispatchers.IO) {
@@ -361,6 +432,12 @@ class AppPreferences(
             ?.toSet()
             ?: emptySet()
 
+    private fun readPinnedParents(key: String): List<String> =
+        readString(key)
+            ?.split('\n')
+            ?.mapNotNull { it.takeIf(String::isNotBlank)?.lowercase() }
+            ?: emptyList()
+
     private fun readString(key: String): String? = db.settingsQueries.get(key).executeAsOneOrNull()
 
     private suspend inline fun write(
@@ -394,6 +471,9 @@ class AppPreferences(
         private const val KEY_OPEN_ON = "pref_general_open_on"
         private const val KEY_SHOW_NUMBERS = "pref_general_show_channel_numbers"
         private const val KEY_HIDDEN_GROUPS = "pref_hidden_groups"
+        private const val KEY_PINNED_PARENTS_LIVE = "pref_pinned_parents_live"
+        private const val KEY_PINNED_PARENTS_MOVIE = "pref_pinned_parents_movie"
+        private const val KEY_PINNED_PARENTS_SERIES = "pref_pinned_parents_series"
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
         private const val KEY_SPEED = "pref_playback_speed"
         private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"

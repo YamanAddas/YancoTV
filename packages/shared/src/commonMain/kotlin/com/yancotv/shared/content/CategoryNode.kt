@@ -53,8 +53,30 @@ object CategoryTreeBuilder {
      * original group_name), so a feed with a single `AR | Sports` row
      * doesn't surface an `Arabic` dropdown of one. Multi-child parents
      * render with the resolved [PrefixCatalog.Entry.displayName] as label.
+     *
+     * **Pin-a-bucket (MK.20 polish-sweep, 2026-04-28).** [pinnedParentCodes]
+     * is the user's per-content-type ordered list of parent codes (lowercase,
+     * e.g. `"ar"`, `"us"`, `"saudi arabia"`). When non-empty, parents whose
+     * `prefixCode` (lowercase compare, falling back to displayName lowercase
+     * for multi-word matches) appears in the list float to the top of the
+     * root-level output IN PIN-LIST ORDER. The remaining root entries
+     * (unpinned parents + collapsed-leaves + unprefixed leaves) keep their
+     * provider-order position. Pinned codes that don't resolve to a parent
+     * in the current tree (e.g. user pinned "ar" but the catalog has no
+     * Arabic content this session, OR Arabic collapsed to a single-child
+     * leaf) are silently ignored.
+     *
+     * Comparison is on the catalog's lowercased prefixCode + displayName so
+     * the user can pin via either the 2-letter code (`"ar"`, `"sa"`) or the
+     * displayName (`"arabic"`, `"saudi arabia"`) and the implementation
+     * handles both. The Settings UI typically writes the code; the catalog
+     * displayName form is supported for backup-restore symmetry across
+     * future code-renames.
      */
-    fun build(flatGroups: List<String>): List<CategoryNode> {
+    fun build(
+        flatGroups: List<String>,
+        pinnedParentCodes: List<String> = emptyList(),
+    ): List<CategoryNode> {
         if (flatGroups.isEmpty()) return emptyList()
 
         // Two-pass: first pass collects buckets in first-seen order and
@@ -88,24 +110,58 @@ object CategoryTreeBuilder {
             bucket.children.add(CategoryNode.Leaf(group))
         }
 
-        return slots.map { slot ->
-            when (slot) {
-                is CategoryNode.Leaf -> slot
-                is String -> {
-                    val bucket = buckets.getValue(slot)
-                    if (bucket.children.size == 1) {
-                        bucket.children.single()
-                    } else {
-                        CategoryNode.Parent(
-                            label = bucket.label,
-                            kind = bucket.kind,
-                            prefixCode = bucket.code,
-                            children = bucket.children.toList(),
-                        )
+        val materialised =
+            slots.map { slot ->
+                when (slot) {
+                    is CategoryNode.Leaf -> slot
+                    is String -> {
+                        val bucket = buckets.getValue(slot)
+                        if (bucket.children.size == 1) {
+                            bucket.children.single()
+                        } else {
+                            CategoryNode.Parent(
+                                label = bucket.label,
+                                kind = bucket.kind,
+                                prefixCode = bucket.code,
+                                children = bucket.children.toList(),
+                            )
+                        }
                     }
+                    else -> error("unreachable")
                 }
-                else -> error("unreachable")
+            }
+        if (pinnedParentCodes.isEmpty()) return materialised
+
+        // Re-order: pinned parents in pin-list order at the top, everything
+        // else preserves its existing position. Single-child collapsed
+        // leaves and unprefixed leaves are NOT pinnable as parents — only
+        // multi-child Parents survive the lookup. This matches the UX
+        // expectation: a "pin Arabic" with only one Arabic channel is a
+        // no-op (the bucket disappeared into a leaf).
+        val pinSet = pinnedParentCodes.map { it.lowercase() }.toSet()
+        val pinnedParents = mutableListOf<CategoryNode>()
+        val unpinned = mutableListOf<CategoryNode>()
+        for (node in materialised) {
+            if (node is CategoryNode.Parent &&
+                (node.prefixCode.lowercase() in pinSet || node.label.lowercase() in pinSet)
+            ) {
+                pinnedParents += node
+            } else {
+                unpinned += node
             }
         }
+        // Re-order pinnedParents to match the pin-list ordering. A parent
+        // not in pinSet via prefixCode but matched via label still goes
+        // into the slot keyed by whichever form appears in the user's list.
+        val ordered =
+            pinnedParentCodes
+                .map { it.lowercase() }
+                .mapNotNull { code ->
+                    pinnedParents.firstOrNull {
+                        it is CategoryNode.Parent &&
+                            (it.prefixCode.lowercase() == code || it.label.lowercase() == code)
+                    }
+                }
+        return ordered + unpinned
     }
 }
