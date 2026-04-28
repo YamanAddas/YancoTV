@@ -156,13 +156,22 @@ internal fun SettingsSection(
 }
 
 /**
- * One settings row. By default it's a static card; if you pass [onClick]
- * the row becomes the focus target and is fully clickable (used by rows
- * that own a single tap action — e.g. "Open hidden list", "Browse folder").
+ * One settings row. Three modes:
+ *   - [onClick] non-null: row is the focus target and a tap commits.
+ *     Used for navigational rows (e.g. 'Open hidden list', 'Browse
+ *     folder', source list rows).
+ *   - [onClick] null + [readOnlyFocusable] true: row is focusable but
+ *     CENTER does nothing. Used for read-only info rows that should
+ *     still be reachable by D-pad so the screen scrolls smoothly
+ *     through them — without this, D-pad jumps over the row and the
+ *     content never scrolls into view.
+ *   - [onClick] null + [readOnlyFocusable] false (default): row is
+ *     pure static framing for child focusables (chip rows, sliders,
+ *     toggles in [content] / [right]).
  *
- * Use [right] for inline controls (Toggle, Select, button) and [content]
- * for full-width body controls (Slider, ChipRow). Both can be present on
- * the same row.
+ * Use [right] for inline controls (Toggle, Select, button) and
+ * [content] for full-width body controls (Slider, ChipRow). Both can
+ * be present on the same row.
  */
 @Composable
 internal fun SettingsRow(
@@ -172,6 +181,7 @@ internal fun SettingsRow(
     kicker: String? = null,
     right: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    readOnlyFocusable: Boolean = false,
     content: (@Composable () -> Unit)? = null,
 ) {
     val palette = LocalYancoPalette.current
@@ -179,13 +189,14 @@ internal fun SettingsRow(
     val focused by interaction.collectIsFocusedAsState()
     val shape = RoundedCornerShape(12.dp)
     val activeTabFocus = LocalActiveSettingsTabFocus.current
+    val isFocusTarget = onClick != null || readOnlyFocusable
 
     val border =
         when {
-            onClick != null && focused -> palette.FocusRing
+            isFocusTarget && focused -> palette.FocusRing
             else -> palette.BorderSubtle
         }
-    val borderWidth = if (onClick != null && focused) 1.5.dp else 1.dp
+    val borderWidth = if (isFocusTarget && focused) 1.5.dp else 1.dp
 
     val rowModifier =
         modifier
@@ -195,25 +206,25 @@ internal fun SettingsRow(
             .border(borderWidth, border, shape)
             // Each row owns its LEFT-exit boundary. Without this, Compose's
             // spatial focus search for D-pad LEFT would find a focusable in
-            // a *different* row above (e.g. 'System default' chip in the
-            // User-Agent Preset row when LEFT is pressed from '5s' in the
-            // Connect-timeout preset row) and move focus there. Wrapping
-            // the row in its own focusGroup with exit-to-activeTabFocus
-            // means in-row LEFT navigation works (chip 2 → chip 1) but the
-            // moment LEFT crosses the row boundary, focus lands on the
-            // active tab in the inner sidebar — the user's "previous menu".
+            // a *different* row above and move focus there. Wrapping the
+            // row in its own focusGroup with exit-to-activeTabFocus means
+            // in-row LEFT navigation works (chip 2 → chip 1) but the moment
+            // LEFT crosses the row boundary, focus lands on the active tab
+            // in the inner sidebar — the user's "previous menu".
             .leftExitsTo(activeTabFocus)
             .let {
-                if (onClick != null) {
-                    it
-                        .focusable(interactionSource = interaction)
-                        .clickable(
-                            interactionSource = interaction,
-                            indication = null,
-                            onClick = onClick,
-                        )
-                } else {
-                    it
+                when {
+                    onClick != null ->
+                        it
+                            .focusable(interactionSource = interaction)
+                            .clickable(
+                                interactionSource = interaction,
+                                indication = null,
+                                onClick = onClick,
+                            )
+                    readOnlyFocusable ->
+                        it.focusable(interactionSource = interaction)
+                    else -> it
                 }
             }
             .padding(horizontal = 22.dp, vertical = 16.dp)

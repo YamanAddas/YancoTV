@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.sources.SourceRepository
@@ -126,6 +128,15 @@ fun SourceDetailScreen(
 
     val palette = LocalYancoPalette.current
 
+    // When the user activates a row in the list, the row's clickable
+    // unmounts and Compose's focus manager loses its anchor — without
+    // this, focus falls back to the first focusable in the global tree
+    // (the main app sidebar) on the way down. PlacedFocusAnchor waits
+    // for the back button's `onPlaced` callback before requesting
+    // focus — race-free across the recompose pulse.
+    val backButtonAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(sourceId) { backButtonAnchor.awaitAndRequest() }
+
     if (loadError != null) {
         ErrorPane(message = loadError!!, onBack = onBack)
         return
@@ -142,6 +153,7 @@ fun SourceDetailScreen(
             source = current,
             palette = palette,
             onBack = onBack,
+            backAnchorModifier = Modifier.placedFocus(backButtonAnchor),
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -151,20 +163,42 @@ fun SourceDetailScreen(
             sub = "Last sync result + when this source will refresh next.",
         ) {
             val status = remember(current) { computeRowStatus(current, isSyncing = false) }
+            // Every row in this section is read-only but [readOnlyFocusable]
+            // so D-pad can stop on each one. Without that, DOWN from the
+            // back button would skip the entire Status section and land on
+            // the Connection form's first text field, never scrolling these
+            // facts into view.
             SettingsRow(
                 label = "Health",
                 kicker = statusKicker(status),
-                hint = status.subLine(current),
+                right = {
+                    Text(
+                        text = healthSummary(status),
+                        color = status.subColor(palette),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+                readOnlyFocusable = true,
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Live channels",
-                right = { ValueText("${current.channelCount}") },
+                label = "Refresh in",
+                kicker = "AUTO-SYNC",
+                right = { ValueText(formatRefreshIn(current)) },
+                readOnlyFocusable = true,
             )
             SettingsRowSpacer()
             SettingsRow(
                 label = "Last synced",
                 right = { ValueText(formatLastSynced(current.lastSynced)) },
+                readOnlyFocusable = true,
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Live channels",
+                right = { ValueText("${current.channelCount}") },
+                readOnlyFocusable = true,
             )
             current.lastSyncError?.let { err ->
                 SettingsRowSpacer()
@@ -172,6 +206,7 @@ fun SourceDetailScreen(
                     label = "Last error",
                     kicker = "ERROR",
                     hint = err,
+                    readOnlyFocusable = true,
                 )
             }
         }
@@ -282,9 +317,11 @@ fun SourceDetailScreen(
             title = "Actions",
             sub = "Sync forces a refresh; Delete removes this source and its catalog from local storage.",
         ) {
-            // The button row owns its own LEFT-exit boundary so D-pad
-            // LEFT from Save/Sync escapes to the active inner-sidebar
-            // tab (Sources) instead of jumping up into the form fields.
+            // Action buttons are Compact size with short labels (SAVE /
+            // SYNC / DELETE) so all three fit in a single row at every
+            // viewport width without DELETE wrapping. The button row
+            // owns its own LEFT-exit boundary so D-pad LEFT from any
+            // button escapes to the active inner-sidebar tab.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
@@ -306,8 +343,6 @@ fun SourceDetailScreen(
                                         usernameField.takeIf {
                                             current.type == SourceType.XTREAM && it.isNotBlank()
                                         },
-                                    // Only push password if the user actually typed
-                                    // a new one — empty means "keep existing".
                                     password =
                                         passwordField.takeIf {
                                             current.type == SourceType.XTREAM && it.isNotBlank()
@@ -339,21 +374,20 @@ fun SourceDetailScreen(
                     },
                     enabled = dirty && !saving,
                     translucent = true,
+                    size = ButtonSize.Compact,
                 ) {
-                    Text(text = if (saving) "Saving…" else "Save changes", maxLines = 1, softWrap = false)
+                    Text(text = if (saving) "SAVING…" else "SAVE", maxLines = 1, softWrap = false)
                 }
                 SettingsOutlinedButton(
                     onClick = {
                         scope.launch {
                             coordinator.start(current.id, current.name)
-                            // Pop back to the list so the user sees the sync
-                            // banner there — the detail screen would otherwise
-                            // hide the running sync indicator.
                             onBack()
                         }
                     },
+                    size = ButtonSize.Compact,
                 ) {
-                    Text(text = "Sync now", maxLines = 1, softWrap = false)
+                    Text(text = "SYNC", maxLines = 1, softWrap = false)
                 }
                 SettingsDangerButton(
                     onClick = {
@@ -371,8 +405,9 @@ fun SourceDetailScreen(
                             onBack()
                         }
                     },
+                    size = ButtonSize.Compact,
                 ) {
-                    Text(text = "Delete source", maxLines = 1, softWrap = false)
+                    Text(text = "DELETE", maxLines = 1, softWrap = false)
                 }
             }
             saveError?.let { err ->
@@ -396,6 +431,7 @@ private fun DetailHero(
     source: Source,
     palette: YancoPalette,
     onBack: () -> Unit,
+    backAnchorModifier: Modifier,
 ) {
     val status = remember(source) { computeRowStatus(source, isSyncing = false) }
     Row(
@@ -430,8 +466,12 @@ private fun DetailHero(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        SettingsOutlinedButton(onClick = onBack, size = ButtonSize.Compact) {
-            Text(text = "Back to list", maxLines = 1, softWrap = false)
+        SettingsOutlinedButton(
+            onClick = onBack,
+            size = ButtonSize.Compact,
+            modifier = backAnchorModifier,
+        ) {
+            Text(text = "BACK", maxLines = 1, softWrap = false)
         }
     }
 }
@@ -472,9 +512,40 @@ private fun statusKicker(status: RowStatus): String =
         RowStatus.Syncing -> "SYNCING"
         RowStatus.Ready -> "READY"
         RowStatus.Stale -> "STALE"
-        RowStatus.NeverSynced -> "NEVER SYNCED"
+        RowStatus.NeverSynced -> "NEW"
         RowStatus.Error -> "ERROR"
     }
+
+private fun healthSummary(status: RowStatus): String =
+    when (status) {
+        RowStatus.Syncing -> "Syncing now"
+        RowStatus.Ready -> "Healthy"
+        RowStatus.Stale -> "Stale — sync to refresh"
+        RowStatus.NeverSynced -> "Never synced"
+        RowStatus.Error -> "Last sync failed"
+    }
+
+private fun formatRefreshIn(source: Source): String {
+    if (source.lastSyncError != null) return "—"
+    val last = source.lastSynced ?: return "—"
+    val intervalMs = source.autoSyncInterval.coerceAtLeast(1) * 60L * 60L * 1000L
+    val remaining = (last + intervalMs) - System.currentTimeMillis()
+    if (remaining <= 0L) return "Due now"
+    val totalMin = remaining / 60_000L
+    return when {
+        totalMin < 60 -> "${totalMin}m"
+        totalMin < 24 * 60 -> {
+            val h = totalMin / 60
+            val m = totalMin % 60
+            if (m == 0L) "${h}h" else "${h}h ${m}m"
+        }
+        else -> {
+            val d = totalMin / (24 * 60)
+            val h = (totalMin % (24 * 60)) / 60
+            if (h == 0L) "${d}d" else "${d}d ${h}h"
+        }
+    }
+}
 
 private fun serverFieldLabel(type: SourceType): String =
     when (type) {
