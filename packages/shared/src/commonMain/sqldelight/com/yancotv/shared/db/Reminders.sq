@@ -1,3 +1,14 @@
+-- DELIBERATELY NOT FK on programme_id: reminders survive EPG re-sync.
+-- recording_schedules.programme_id has REFERENCES epg_programmes(id) ON DELETE
+-- SET NULL because the schedule is orphaned by intent if the programme it
+-- pinned to disappears. Reminders are different: a destructive XMLTV re-write
+-- (BulkEpgWriter.replaceAll wipes + re-inserts every programme row) would
+-- silently delete or null every user reminder if this column had an FK,
+-- because the deterministic ContentIds.epgProgramme can rotate when the
+-- provider re-issues programme metadata. The reminder must keep firing on
+-- its captured fire_at even if the EPG-side row is gone — UI fallback uses
+-- (channel_tvg_id, title, start_time) when the programme lookup fails.
+-- MK.24.E.4 + MB-226: design pinned by this comment, no FK to add.
 CREATE TABLE reminders (
     id TEXT PRIMARY KEY NOT NULL,
     programme_id TEXT NOT NULL,
