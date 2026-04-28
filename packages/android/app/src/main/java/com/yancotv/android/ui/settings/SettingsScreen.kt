@@ -3,6 +3,7 @@ package com.yancotv.android.ui.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -111,6 +118,14 @@ fun SettingsScreen(
 ) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val scope = rememberCoroutineScope()
+    // User contract: "left dpad and back button go back" — i.e. one
+    // BACK press from inside a tab body should return focus to the
+    // sidebar, not pop the entire Settings screen. Track when focus
+    // is in the content pane and intercept BACK only then; when focus
+    // is in the sidebar BACK passes through to the host so the user
+    // can leave Settings normally. Mirrors the CategoryRail /
+    // CoverflowSectionScreen pattern in the home shell.
+    var contentHasFocus by remember { mutableStateOf(false) }
     // MB-108 v2 (hardened): simulate D-pad RIGHT after the tab commits.
     // A focusGroup+focusRestorer wrapper (v1) sometimes lost focus
     // entirely on Fire TV — focus searched up the tree and bounced back
@@ -129,6 +144,17 @@ fun SettingsScreen(
     //      (the user can press RIGHT manually) and log so a Fire TV
     //      regression is diagnosable from logcat instead of by feel.
     val focusManager = LocalFocusManager.current
+
+    BackHandler(enabled = contentHasFocus) {
+        // Push focus left out of the content pane; the sidebar's
+        // focusGroup + focusRestorer (lines below) lands on the
+        // last-focused TabItem, so the user returns to where they
+        // entered the body from. If for some reason there's no
+        // focusable to the left (heavy tab without a left-edge
+        // focusable), the move silently no-ops and the user can
+        // press BACK again — host handles it on the second press.
+        focusManager.moveFocus(FocusDirection.Left)
+    }
 
     Row(
         modifier =
@@ -174,7 +200,10 @@ fun SettingsScreen(
         )
         ContentPane(
             current = tab,
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .onFocusChanged { contentHasFocus = it.hasFocus },
         )
     }
 }
@@ -285,6 +314,32 @@ private fun TabItem(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
+    // User contract: forward = OK *or* D-pad RIGHT. Without this, RIGHT
+    // alone just navigates focus into the currently-active tab's
+    // content — so hovering on a different tab and pressing RIGHT lands
+    // you in the wrong tab's body. CENTER already commits the tab
+    // (clickable's onClick) and the parent's `scope.launch` chain
+    // moves focus right after composition + layout settle.
+    //
+    // Intercept RIGHT only when this tab is NOT already selected:
+    //   - Already selected → RIGHT should be a normal focus move into
+    //     the content body, no re-commit needed (Compose handles it).
+    //   - Not selected → trigger onClick (which commits + chains the
+    //     deferred moveFocus), and consume the event so the natural
+    //     RIGHT traversal doesn't fight the manual one.
+    val onTabKey =
+        Modifier.onPreviewKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown &&
+                event.key == Key.DirectionRight &&
+                !selected
+            ) {
+                onClick()
+                true
+            } else {
+                false
+            }
+        }
+
     val rowBrush =
         when {
             focused ->
@@ -331,6 +386,7 @@ private fun TabItem(
                 .height(58.dp)
                 .background(rowBrush)
                 .border(if (focused) 2.dp else 0.dp, borderColor)
+                .then(onTabKey)
                 .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
