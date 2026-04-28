@@ -419,18 +419,26 @@ private fun EmptyState(
 }
 
 /**
- * One row in the sources list. **NOT focusable itself** — only its
- * SYNC and DELETE buttons are. The row uses [onFocusChanged] to
- * detect when any descendant has focus and paints accent
- * background + border accordingly.
+ * One row in the sources list — redesigned (rev. 5).
  *
- * D-pad behaviour:
- * - RIGHT moves SYNC → DELETE within the same row (sibling Row
- *   children).
- * - UP / DOWN moves between rows (geometric focus search finds the
- *   closest button at the same X in the next row).
- * - LEFT from SYNC exits the list to the Settings sidebar (default
- *   focus search; the row's left edge has no other focusable).
+ * Layout: `[live-dot] [name + sub-line] [SYNC] [DELETE]`. The 44dp type
+ * icon and the verbose READY chip are gone — replaced by a single 10dp
+ * status dot whose colour encodes the state (green = healthy, amber =
+ * stale / never synced, red = error). The name is the dominant element;
+ * the sub-line consolidates type + item count + time-until-next-sync
+ * into one muted caption so the row reads in a single sweep.
+ *
+ * **Focus model:**
+ * - Row is NOT focusable. Only SYNC + DELETE buttons are.
+ * - `onFocusChanged` lights the row when any descendant has focus.
+ * - LEFT from SYNC escapes via `leftExitsTo(activeTabFocus)` — same
+ *   contract every Settings row uses, so D-pad LEFT always returns to
+ *   the inner sidebar's active tab.
+ * - RIGHT cycles SYNC → DELETE within the row.
+ *
+ * **Wrap fix:** both buttons set `maxLines = 1` + `softWrap = false`
+ * on their Text so DELETE never breaks across lines (the user's "DEL /
+ * ET / E" complaint).
  */
 @Composable
 private fun SourceListRow(
@@ -442,6 +450,7 @@ private fun SourceListRow(
     onDelete: () -> Unit,
 ) {
     var hasFocus by remember { mutableStateOf(false) }
+    val activeTabFocus = LocalActiveSettingsTabFocus.current
 
     val targetScale = if (hasFocus) 1.005f else 1.0f
     val scale by animateFloatAsState(
@@ -461,6 +470,8 @@ private fun SourceListRow(
             hasFocus -> palette.FocusRing
             else -> Color.Transparent
         }
+
+    val status = remember(source, isSyncing) { computeRowStatus(source, isSyncing) }
 
     Row(
         modifier =
@@ -482,17 +493,18 @@ private fun SourceListRow(
                     width = if (hasFocus) 1.5.dp else 0.dp,
                     color = rowBorder,
                 )
-                .padding(start = 24.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
+                .leftExitsTo(activeTabFocus)
+                .padding(start = 22.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        TypeIcon(type = source.type, palette = palette)
+        LiveDot(color = status.dotColor(palette), pulsing = isSyncing)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
-                text = source.name,
+                text = source.name.ifBlank { "Untitled source" },
                 color = palette.TextPrimary,
                 fontSize = 18.sp,
                 lineHeight = 22.sp,
@@ -502,81 +514,132 @@ private fun SourceListRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${typeLabel(source.type)} · ${formatItemCount(source.channelCount)}",
-                color = palette.TextMuted,
+                text = status.subLine(source),
+                color = status.subColor(palette),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                letterSpacing = 0.4.sp,
+                letterSpacing = 0.3.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        StatusChip(
-            text = if (isSyncing) "SYNCING" else "READY",
-            accent = if (isSyncing) palette.Accent else palette.TextSecondary,
-            bg =
-                if (isSyncing) {
-                    palette.Accent.copy(alpha = 0.18f)
-                } else {
-                    Color.White.copy(alpha = 0.05f)
-                },
-        )
-        if (!isSyncing) {
-            // Compact buttons — these are the ONLY focusable nodes in
-            // the row. D-pad RIGHT cycles SYNC → DELETE; UP / DOWN
-            // moves to the corresponding button in the next row.
+        if (isSyncing) {
+            // Show a compact "syncing" chip in place of the action
+            // buttons so the user can't double-trigger a sync.
+            StatusChip(
+                text = "SYNCING",
+                accent = palette.Accent,
+                bg = palette.Accent.copy(alpha = 0.18f),
+            )
+        } else {
+            // The ONLY focusable nodes in the row. D-pad RIGHT cycles
+            // SYNC → DELETE; UP / DOWN moves to the corresponding
+            // button in the next row.
             SettingsOutlinedButton(
                 onClick = onSync,
                 enabled = !isAnotherSyncing,
                 size = ButtonSize.Compact,
             ) {
-                Text("SYNC")
+                Text(text = "SYNC", maxLines = 1, softWrap = false)
             }
             SettingsDangerButton(
                 onClick = onDelete,
                 size = ButtonSize.Compact,
             ) {
-                Text("DELETE")
+                Text(text = "DELETE", maxLines = 1, softWrap = false)
             }
         }
     }
 }
 
-@Composable
-private fun TypeIcon(
-    type: SourceType,
-    palette: YancoPalette,
-) {
-    val icon: ImageVector =
-        when (type) {
-            SourceType.XTREAM -> YancoIcons.Signal
-            SourceType.M3U_URL -> YancoIcons.Link
-            SourceType.M3U_FILE -> YancoIcons.Save
-            SourceType.STALKER -> YancoIcons.Live
+/** Status of a single source row — drives the dot colour and sub-line text. */
+private enum class RowStatus { Syncing, Ready, Stale, NeverSynced, Error }
+
+private fun RowStatus.dotColor(palette: YancoPalette): Color =
+    when (this) {
+        RowStatus.Syncing, RowStatus.Ready -> palette.Accent
+        RowStatus.Stale, RowStatus.NeverSynced -> palette.Premium
+        RowStatus.Error -> palette.Error
+    }
+
+private fun RowStatus.subColor(palette: YancoPalette): Color =
+    when (this) {
+        RowStatus.Error -> palette.Error.copy(alpha = 0.85f)
+        else -> palette.TextMuted
+    }
+
+private fun RowStatus.subLine(source: Source): String {
+    val type = typeLabel(source.type)
+    val items = formatItemCount(source.channelCount)
+    val timing =
+        when (this) {
+            RowStatus.Syncing -> "syncing now"
+            RowStatus.Ready -> nextSyncSuffix(source)
+            RowStatus.Stale -> "stale · sync to refresh"
+            RowStatus.NeverSynced -> "never synced"
+            RowStatus.Error -> source.lastSyncError?.take(48) ?: "last sync failed"
         }
+    return "$type · $items · $timing"
+}
+
+private fun computeRowStatus(source: Source, isSyncing: Boolean): RowStatus {
+    if (isSyncing) return RowStatus.Syncing
+    if (source.lastSyncError != null) return RowStatus.Error
+    val last = source.lastSynced ?: return RowStatus.NeverSynced
+    val intervalMs = source.autoSyncInterval.coerceAtLeast(1) * 60L * 60L * 1000L
+    val ageMs = System.currentTimeMillis() - last
+    return if (ageMs > intervalMs) RowStatus.Stale else RowStatus.Ready
+}
+
+private fun nextSyncSuffix(source: Source): String {
+    val last = source.lastSynced ?: return "never synced"
+    val intervalMs = source.autoSyncInterval.coerceAtLeast(1) * 60L * 60L * 1000L
+    val nextMs = last + intervalMs
+    val remaining = nextMs - System.currentTimeMillis()
+    if (remaining <= 0L) return "due now"
+    val totalMin = remaining / 60_000L
+    return when {
+        totalMin < 60 -> "refresh in ${totalMin}m"
+        totalMin < 24 * 60 -> {
+            val h = totalMin / 60
+            val m = totalMin % 60
+            if (m == 0L) "refresh in ${h}h" else "refresh in ${h}h ${m}m"
+        }
+        else -> {
+            val d = totalMin / (24 * 60)
+            val h = (totalMin % (24 * 60)) / 60
+            if (h == 0L) "refresh in ${d}d" else "refresh in ${d}d ${h}h"
+        }
+    }
+}
+
+/** Small status dot. Pulses softly while syncing. 10dp diameter at the
+ *  far left of every row — the single "is this alive?" indicator that
+ *  replaces the previous 44dp type icon + READY chip combo. */
+@Composable
+private fun LiveDot(
+    color: Color,
+    pulsing: Boolean,
+) {
+    val alpha by animateFloatAsState(
+        targetValue = if (pulsing) 0.55f else 1.0f,
+        animationSpec = tween(durationMillis = 600),
+        label = "liveDotAlpha",
+    )
     Box(
         modifier =
             Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            palette.Accent.copy(alpha = 0.20f),
-                            palette.AccentDeep.copy(alpha = 0.10f),
-                        ),
-                    ),
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(color)
+                .shadow(
+                    elevation = 6.dp,
+                    shape = CircleShape,
+                    ambientColor = color,
+                    spotColor = color,
                 )
-                .border(1.dp, palette.Accent.copy(alpha = 0.24f), RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = palette.Accent,
-            modifier = Modifier.size(22.dp),
-        )
-    }
+                .graphicsLayer { this.alpha = alpha },
+    )
 }
 
 @Composable

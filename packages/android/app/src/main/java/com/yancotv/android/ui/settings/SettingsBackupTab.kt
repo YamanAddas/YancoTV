@@ -8,18 +8,20 @@ import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -306,38 +308,23 @@ fun SettingsBackupTab(
                 hint = "e.g. \"Before reinstall\" or \"Living-room TV\"",
                 bare = true,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Switch(
-                    checked = encryptToggle,
-                    onCheckedChange = { encryptToggle = it },
-                    colors =
-                        SwitchDefaults.colors(
-                            checkedThumbColor = LocalYancoPalette.current.Accent,
-                            checkedTrackColor = LocalYancoPalette.current.Accent.copy(alpha = 0.4f),
-                        ),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Encrypt with password",
-                        color = LocalYancoPalette.current.TextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        if (encryptToggle) {
-                            "Source credentials will be re-encrypted under your password (PBKDF2 + AES/GCM). You'll need this password to restore."
-                        } else {
-                            "Source credentials will be in PLAINTEXT in the file. Don't share or upload this file."
-                        },
-                        color = LocalYancoPalette.current.TextMuted,
-                        fontSize = 11.sp,
-                    )
-                }
-            }
+            // Replaced Material3 Switch with SettingsToggleRow — Material3
+            // Switch's unchecked thumb is invisible against BackgroundRaised
+            // on Fire TV (3 m viewing distance), and it has no per-row focus
+            // halo. SettingsToggleRow uses the Verdant emerald pill and
+            // paints a 1.5dp focus ring around the entire row, so the
+            // selector is unmistakable.
+            SettingsToggleRow(
+                label = "Encrypt with password",
+                description =
+                    if (encryptToggle) {
+                        "Source credentials will be re-encrypted under your password (PBKDF2 + AES/GCM). You'll need this password to restore."
+                    } else {
+                        "Source credentials will be in PLAINTEXT in the file. Don't share or upload this file."
+                    },
+                checked = encryptToggle,
+                onCheckedChange = { encryptToggle = it },
+            )
             if (encryptToggle) {
                 SettingsClickToEditField(
                     label = "Password",
@@ -348,7 +335,14 @@ fun SettingsBackupTab(
                     bare = true,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // Each button row owns its own LEFT-exit boundary so the
+                // leftmost button escapes to the active inner-sidebar tab
+                // (Backup) instead of letting Compose's spatial search
+                // jump UP-LEFT to a focusable in the row above.
+                modifier = Modifier.leftExitsTo(LocalActiveSettingsTabFocus.current),
+            ) {
                 // NOTE: button stays focusable while exporting. Disabling
                 // it (`enabled = !exporting`) makes Compose drop focus the
                 // moment the click commits — focus search then escapes
@@ -368,12 +362,12 @@ fun SettingsBackupTab(
                     },
                     modifier = Modifier.placedFocus(exportButtonAnchor).focusable(),
                 ) {
-                    Text(if (exporting) "Exporting…" else "Export backup")
+                    Text(text = if (exporting) "Exporting…" else "Export backup", maxLines = 1, softWrap = false)
                 }
                 SettingsOutlinedButton(
                     onClick = { changeFolderLauncher.launch(null) },
                 ) {
-                    Text(if (customFolder != null) "Change folder…" else "Pick folder…")
+                    Text(text = if (customFolder != null) "Change folder…" else "Pick folder…", maxLines = 1, softWrap = false)
                 }
                 if (customFolder != null) {
                     SettingsOutlinedButton(
@@ -385,7 +379,7 @@ fun SettingsBackupTab(
                             }
                         },
                     ) {
-                        Text("Reset to default")
+                        Text(text = "Reset to default", maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -424,12 +418,19 @@ fun SettingsBackupTab(
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 11.sp,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.leftExitsTo(LocalActiveSettingsTabFocus.current),
+            ) {
                 SettingsOutlinedButton(
                     onClick = { importPickLauncher.launch(arrayOf("application/json", "*/*")) },
                     modifier = Modifier.placedFocus(importButtonAnchor).focusable(),
                 ) {
-                    Text(if (importPickedUri == null) "Choose backup file…" else "Choose another file…")
+                    Text(
+                        text = if (importPickedUri == null) "Choose backup file…" else "Choose another file…",
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
             if (importPickedUri != null) {
@@ -516,42 +517,104 @@ fun SettingsBackupTab(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "Press to use as the restore source — bypasses the file picker.",
+                    "Use → load this backup as the restore source. Delete → remove the metadata row (the file on disk is left untouched).",
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 10.sp,
                 )
                 recent.forEach { row ->
-                    val rowUri = row.fileUri
-                    SettingsOutlinedButton(
-                        enabled = rowUri != null,
-                        onClick = {
-                            if (rowUri != null) {
-                                importPickedUriString = rowUri
-                                importStatus = "Selected: ${row.label}"
-                                importFocusBump++
+                    RecentExportRow(
+                        row = row,
+                        onUse = {
+                            val rowUri = row.fileUri ?: return@RecentExportRow
+                            importPickedUriString = rowUri
+                            importStatus = "Selected: ${row.label}"
+                            importFocusBump++
+                        },
+                        onDelete = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    runCatching { db.backupMetadataQueries.deleteById(row.id) }
+                                }
+                                recent.remove(row)
+                                // If the user had this entry pre-selected for
+                                // restore, drop it so the Restore button
+                                // doesn't point at a stale id.
+                                if (importPickedUriString == row.fileUri) {
+                                    importPickedUriString = null
+                                    importStatus = null
+                                }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                row.label,
-                                color = LocalYancoPalette.current.TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                "${formatBytes(row.sizeBytes)} · schema v${row.schemaVersion} · sha256 ${row.checksum.take(8)}… · ${rowUri ?: "(uri lost)"}",
-                                color = LocalYancoPalette.current.TextMuted,
-                                fontSize = 10.sp,
-                            )
-                        }
-                    }
+                    )
                 }
             }
+        }
+    }
+}
+
+/** One row in the "Recent exports" list. Card frame holds the metadata
+ *  on the left and Use + Delete buttons on the right. The card itself
+ *  is NOT focusable — only the two buttons are, so D-pad RIGHT cycles
+ *  Use → Delete and UP / DOWN moves between rows. Mirrors the Sources
+ *  row pattern so the navigation feels identical across the two
+ *  Settings list surfaces. */
+@Composable
+private fun RecentExportRow(
+    row: RecentBackup,
+    onUse: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val palette = LocalYancoPalette.current
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(palette.BackgroundElevated.copy(alpha = 0.6f))
+                .border(1.dp, palette.BorderSubtle, RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Tiny dot for visual anchor — same vocabulary as the Sources rows.
+        Box(
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (row.fileUri != null) palette.Accent else palette.TextMuted),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = row.label.ifBlank { "Untitled backup" },
+                color = palette.TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text =
+                    buildString {
+                        append(formatBytes(row.sizeBytes))
+                        append(" · schema v")
+                        append(row.schemaVersion)
+                        append(" · sha256 ")
+                        append(row.checksum.take(8))
+                        append('…')
+                        if (row.fileUri == null) append(" · file location lost")
+                    },
+                color = palette.TextMuted,
+                fontSize = 10.sp,
+            )
+        }
+        SettingsOutlinedButton(
+            onClick = onUse,
+            enabled = row.fileUri != null,
+            size = ButtonSize.Compact,
+        ) {
+            Text(text = "USE", maxLines = 1, softWrap = false)
+        }
+        SettingsDangerButton(onClick = onDelete, size = ButtonSize.Compact) {
+            Text(text = "DELETE", maxLines = 1, softWrap = false)
         }
     }
 }
