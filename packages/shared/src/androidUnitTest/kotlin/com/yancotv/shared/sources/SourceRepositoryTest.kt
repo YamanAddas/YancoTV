@@ -434,6 +434,181 @@ class SourceRepositoryTest {
             )
         }
 
+    /**
+     * MK.24.E.1 — strengthens MK.23.D.3 by landing the cancel AFTER the
+     * chunk loop has written rows, not during the upstream HTTP fetch.
+     *
+     * The D.3 test cancels by suspending the HTTP body forever, so the
+     * sync never reaches `writeM3uBulk`'s try block — the abort path
+     * exercised is "abort with no prepareSource ran". This test forces
+     * the sync past `prepareSource` + at least one `bulk.writeM3uChunk`
+     * call by giving the HTTP client a real M3U body of CHUNK_SIZE+1
+     * entries; the collector then cancels itself the moment the first
+     * `WRITING` progress emits. Cancellation propagates back through
+     * `send → channelFlow → writeM3uBulk` while-loop → catch block →
+     * `bulk.abortSource()`. Post-state proves the catch path actually
+     * ran end-to-end after writes had started, not just before.
+     *
+     * Critical assertion: FK is back ON. A bug that left `PRAGMA
+     * foreign_keys = OFF` after a partial-write abort would silently
+     * break cascade semantics for the rest of the connection's life —
+     * the same family as MB-220 but on the cancellation side.
+     */
+    @Test fun `cancelling syncSource after first chunk written runs abortSource and restores FK`() =
+        kotlinx.coroutines.test.runTest {
+            // CHUNK_SIZE = 500 in SourceRepository — give it 600 entries
+            // so the first chunk completes and the second chunk is
+            // queued, but cancellation lands before the second runs.
+            val entryCount = 600
+            val m3uBody = buildString {
+                appendLine("#EXTM3U")
+                repeat(entryCount) { i ->
+                    appendLine("#EXTINF:-1 tvg-id=\"ch$i\",Channel $i")
+                    appendLine("http://stream.example/$i")
+                }
+            }
+            val http =
+                object : HttpClient {
+                    override suspend fun getJson(
+                        url: String,
+                        options: HttpRequestOptions,
+                    ): Any? = error("not used")
+
+                    override suspend fun getText(
+                        url: String,
+                        options: HttpRequestOptions,
+                    ): String = m3uBody
+                }
+
+            val bundle = testDatabase()
+            val repository =
+                SourceRepository(
+                    db = bundle.db,
+                    driver = bundle.driver,
+                    credentialStore = PlaintextCredentialStore(),
+                    http = http,
+                    fileReader = FakeFileReader(emptyMap()),
+                    clock = { 1_000L },
+                    idGenerator =
+                        run {
+                            var n = 0
+                            { "id-${++n}" }
+                        },
+                )
+
+            // Source A — seeded directly + favorited as the
+            // "user data we must protect" baseline.
+            val a =
+                repository.addSource(
+                    AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://a/list.m3u"),
+                )
+            bundle.db.contentQueries.insert(
+                id = "ch-a",
+                source_id = a.id,
+                type = "live",
+                title = "Ch A",
+                clean_title = "Ch A",
+                group_name = null,
+                stream_url = "http://stream/a",
+                logo_url = null,
+                tvg_id = null,
+                metadata_json = null,
+                sort_order = 0L,
+                created_at = 0L,
+            )
+            bundle.db.favoritesQueries.insert(
+                id = "fav:ch-a",
+                content_id = "ch-a",
+                list_id = "default",
+                added_at = 1L,
+            )
+
+            // Source B — sync this one. Cancel on first WRITING emit.
+            val b =
+                repository.addSource(
+                    AddSourceInput(name = "B", type = SourceType.M3U_URL, url = "http://b/list.m3u"),
+                )
+
+            var sawWriting = false
+            val firstChunkSeen = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val job =
+                launch {
+                    repository.syncSource(b.id).collect { p ->
+                        if (p.phase == SyncProgress.Phase.WRITING && p.current > 0 && !sawWriting) {
+                            // First chunk has landed — signal back to the
+                            // test scope so it can cancel us from outside.
+                            // Cancelling from inside the collect via
+                            // coroutineContext.cancel() works too but the
+                            // outside-job pattern matches the existing
+                            // D.3 test for consistency.
+                            sawWriting = true
+                            firstChunkSeen.complete(Unit)
+                        }
+                    }
+                }
+            firstChunkSeen.await()
+            // Cancel — propagates back through send → channelFlow into
+            // writeM3uBulk's chunk loop. Next suspend point (the next
+            // withContext + writeM3uChunk for chunk #2) throws
+            // CancellationException; the catch routes to abortSource.
+            job.cancel()
+            job.join()
+
+            assertTrue(
+                sawWriting,
+                "Test invariant: cancellation must land AFTER a WRITING emit (= chunk loop ran), not during fetch — otherwise this is a duplicate of the D.3 test",
+            )
+
+            // Post-conditions:
+            //   1. Source A's favorite intact — unrelated to B's sync.
+            assertTrue(
+                bundle.db.favoritesQueries.isFavorite("ch-a").executeAsOne(),
+                "Source A's favorite must survive a mid-chunk cancellation on source B",
+            )
+
+            //   2. PRAGMA foreign_keys = 1 — proven by triggering a real
+            //      cascade. Insert a probe content + favorite, delete the
+            //      probe content, observe the favorite cascades.
+            bundle.db.contentQueries.insert(
+                id = "probe-after-mid-chunk-cancel",
+                source_id = a.id,
+                type = "live",
+                title = "Probe",
+                clean_title = "Probe",
+                group_name = null,
+                stream_url = "http://stream/probe",
+                logo_url = null,
+                tvg_id = null,
+                metadata_json = null,
+                sort_order = 999L,
+                created_at = 0L,
+            )
+            bundle.db.favoritesQueries.insert(
+                id = "fav:probe-after-mid-chunk-cancel",
+                content_id = "probe-after-mid-chunk-cancel",
+                list_id = "default",
+                added_at = 999L,
+            )
+            assertTrue(bundle.db.favoritesQueries.isFavorite("probe-after-mid-chunk-cancel").executeAsOne())
+
+            bundle.driver.execute(null, "DELETE FROM content WHERE id = ?", 1) {
+                bindString(0, "probe-after-mid-chunk-cancel")
+            }
+            assertFalse(
+                bundle.db.favoritesQueries.isFavorite("probe-after-mid-chunk-cancel").executeAsOne(),
+                "FK must be back ON after abortSource — cascade fires on the probe",
+            )
+
+            //   3. Source B's content was wiped by abortSource. The
+            //      first chunk's 500 rows were inserted then deleted by
+            //      abortSource's `DELETE FROM content WHERE source_id = ?`.
+            assertEquals(
+                0L,
+                bundle.db.contentQueries.countBySource(b.id).executeAsOne(),
+                "abortSource MUST wipe the partial chunk writes — leaving them would mean a half-synced source visible to UI",
+            )
+        }
+
     private fun assertFails(block: () -> Unit) {
         var threw = false
         try {
