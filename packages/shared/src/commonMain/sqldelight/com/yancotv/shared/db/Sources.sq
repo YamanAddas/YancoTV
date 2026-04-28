@@ -25,6 +25,12 @@ CREATE TABLE sources (
     -- sources cover the same tvg_id. Default 0 keeps single-source
     -- behaviour unchanged.
     epg_priority INTEGER NOT NULL DEFAULT 0,
+    -- v9 → v10 (MK.18.x): when 1, the Android shell triggers a
+    -- background refresh for this source the moment MainActivity is
+    -- created. Default 0 = opt-in only. Keyed per-source so the user
+    -- can pick which catalogs are stable enough to warm-resync without
+    -- their input.
+    auto_sync_on_start INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -47,9 +53,9 @@ INSERT INTO sources (
     username_encrypted, password_encrypted, mac_address_encrypted,
     epg_url, user_agent, referer, last_synced, last_sync_error,
     is_active, priority, channel_count, auto_sync_interval,
-    epg_priority,
+    epg_priority, auto_sync_on_start,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateSyncResult:
 UPDATE sources
@@ -87,6 +93,16 @@ UPDATE sources SET epg_priority = ?, updated_at = ? WHERE id = ?;
 -- the derived Xtream `xmltv.php` endpoint) when the user never provided one.
 setEpgUrl:
 UPDATE sources SET epg_url = ?, updated_at = ? WHERE id = ?;
+
+-- v9 → v10: per-source auto-sync-on-app-start setter, used by the
+-- Settings → Sources → detail toggle.
+setAutoSyncOnStart:
+UPDATE sources SET auto_sync_on_start = ?, updated_at = ? WHERE id = ?;
+
+-- v9 → v10: list of sources opted into the on-app-start auto-sync.
+-- Read by the Android shell once at MainActivity creation.
+selectAutoSyncOnStart:
+SELECT * FROM sources WHERE auto_sync_on_start = 1 AND is_active = 1;
 
 deleteById:
 DELETE FROM sources WHERE id = ?;

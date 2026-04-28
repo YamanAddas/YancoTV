@@ -212,6 +212,33 @@ fun SourceDetailScreen(
         }
 
         SettingsSection(
+            title = "Sync",
+            sub = "How aggressively this source refreshes its catalog.",
+        ) {
+            SettingsToggleRow(
+                label = "Auto-sync on app start",
+                description =
+                    "When on, this source kicks off a background refresh every time you open YancoTV. Off keeps catalog reads fast on launch and only syncs when you press Sync manually or the auto-sync interval elapses.",
+                checked = current.autoSyncOnStart,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { repo.setAutoSyncOnStart(current.id, enabled) }
+                                .onFailure {
+                                    Log.w(
+                                        "Yanco",
+                                        "SourceDetail.setAutoSyncOnStart(${current.id}) failed: ${it.message}",
+                                        it,
+                                    )
+                                }
+                        }
+                        loadSource()
+                    }
+                },
+            )
+        }
+
+        SettingsSection(
             title = "Connection",
             sub = "Editable. Save changes when you're done; the next sync uses the new values.",
         ) {

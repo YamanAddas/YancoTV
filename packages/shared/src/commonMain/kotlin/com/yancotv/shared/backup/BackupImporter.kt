@@ -206,6 +206,7 @@ class BackupImporter(
                 channel_count = 0,
                 auto_sync_interval = r.autoSyncInterval,
                 epg_priority = r.epgPriority,
+                auto_sync_on_start = r.autoSyncOnStart,
                 created_at = r.createdAt,
                 updated_at = r.updatedAt,
             )

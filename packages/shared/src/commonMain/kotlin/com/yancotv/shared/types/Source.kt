@@ -42,6 +42,10 @@ data class Source(
      *  cover the same tvg_id. Default 0 = "no preference, last writer
      *  wins" which matches single-EPG installs. */
     val epgPriority: Int = 0,
+    /** v9 → v10 — when true, the Android shell triggers a background
+     *  refresh for this source on every MainActivity creation. Off by
+     *  default; the user opts in per-source from the Sources detail UI. */
+    val autoSyncOnStart: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 )
@@ -72,4 +76,5 @@ data class UpdateSourceInput(
     val userAgent: String? = null,
     val referer: String? = null,
     val autoSyncInterval: Int? = null,
+    val autoSyncOnStart: Boolean? = null,
 )

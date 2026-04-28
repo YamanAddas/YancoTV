@@ -129,6 +129,7 @@ class SourceRepository(
             channel_count = 0,
             auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now,
             updated_at = now,
         )
@@ -230,6 +231,26 @@ class SourceRepository(
     ) {
         db.sourcesQueries.setEpgPriority(priority.toLong(), clock(), id)
     }
+
+    /** v9 → v10 — toggle whether [id] auto-syncs every time the app
+     *  starts. Read by [autoSyncOnStartList] from the Android shell. */
+    fun setAutoSyncOnStart(
+        id: String,
+        enabled: Boolean,
+    ) {
+        db.sourcesQueries.setAutoSyncOnStart(enabled, clock(), id)
+    }
+
+    /** v9 → v10 — every source whose `auto_sync_on_start` flag is set.
+     *  Skips inactive sources (the user may have toggled the flag on a
+     *  source they later deactivated; respect the deactivation). The
+     *  Android shell calls this once per MainActivity creation and
+     *  enqueues a sync via SourceSyncCoordinator for each row. */
+    fun autoSyncOnStartList(): List<Source> =
+        db.sourcesQueries
+            .selectAutoSyncOnStart()
+            .executeAsList()
+            .map { it.toDomain() }
 
     /** Reactive source list for Settings UIs that need to repaint after a
      *  setEpgPriority / setActive write. SQLDelight emits on any sources-
@@ -709,6 +730,7 @@ class SourceRepository(
             lastSyncError = last_sync_error,
             autoSyncInterval = auto_sync_interval.toInt(),
             epgPriority = epg_priority.toInt(),
+            autoSyncOnStart = auto_sync_on_start,
             createdAt = created_at,
             updatedAt = updated_at,
         )

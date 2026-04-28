@@ -30,6 +30,8 @@ import com.yancotv.android.ui.theme.YancoTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
     private val controller: PlaybackController by inject()
     private val syncCoordinator: SourceSyncCoordinator by inject()
     private val contentRepo: com.yancotv.shared.content.ContentRepository by inject()
+    private val sourceRepo: com.yancotv.shared.sources.SourceRepository by inject()
 
     // Keep the shell's window awake only while the shared ExoPlayer is
     // actually playing — covers the mini-preview case where MainActivity
@@ -103,6 +106,35 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 controller.playerRebuilt.collect {
                     attachKeepAwake()
+                }
+            }
+        }
+
+        // v9 → v10 — per-source "auto-sync on app start" toggle. Read
+        // every source flagged on, kick a sync via the same coordinator
+        // the manual Sync button uses (so the running-sync banner shows
+        // up normally in Settings → Sources). Process-scoped one-shot:
+        // a config-change-driven onCreate doesn't re-trigger.
+        //
+        // Sources are synced sequentially because [SourceSyncCoordinator]
+        // refuses concurrent syncs (one shared Active state, one shared
+        // banner). The for-loop awaits each completion via
+        // `state.filter { it == null }.first()` before starting the next.
+        if (!didStartAutoSync) {
+            didStartAutoSync = true
+            lifecycleScope.launch {
+                val targets =
+                    withContext(Dispatchers.IO) {
+                        runCatching { sourceRepo.autoSyncOnStartList() }.getOrElse { emptyList() }
+                    }
+                for (source in targets) {
+                    syncCoordinator.start(source.id, source.name)
+                    // Wait for this sync to clear before kicking the next
+                    // — otherwise start() refuses with "another sync is
+                    // active" and the queue silently drops.
+                    syncCoordinator.state
+                        .filter { it == null }
+                        .first()
                 }
             }
         }
@@ -286,6 +318,13 @@ class MainActivity : ComponentActivity() {
         // default and what users have been trained to expect from the
         // platform (settings dialogs, launcher icon edits, etc.).
         private const val LONG_PRESS_TIMEOUT_MS = 500L
+
+        // Process-scoped one-shot guard for the v9 → v10 auto-sync-on-app-
+        // start flag. A configuration-change activity recreate (rotation,
+        // font scale) calls onCreate again, but auto-sync should fire at
+        // most once per process — i.e. once per cold app launch.
+        @Volatile
+        private var didStartAutoSync = false
     }
 
     private fun requestNotificationsPermissionIfNeeded() {

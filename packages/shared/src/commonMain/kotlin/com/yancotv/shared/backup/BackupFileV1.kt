@@ -91,6 +91,9 @@ data class SourceRecord(
     val priority: Long,
     val epgPriority: Long,
     val autoSyncInterval: Long,
+    /** v9 → v10. Default false so backups produced by older builds (no
+     *  `auto_sync_on_start` column) deserialise cleanly. */
+    val autoSyncOnStart: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 )

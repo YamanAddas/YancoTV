@@ -133,6 +133,7 @@ class BackupExporter(
                 priority = row.priority,
                 epgPriority = row.epg_priority,
                 autoSyncInterval = row.auto_sync_interval,
+                autoSyncOnStart = row.auto_sync_on_start,
                 createdAt = row.created_at,
                 updatedAt = row.updated_at,
             )
