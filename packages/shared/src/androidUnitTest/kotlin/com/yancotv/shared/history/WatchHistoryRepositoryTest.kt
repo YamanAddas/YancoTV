@@ -212,6 +212,67 @@ class WatchHistoryRepositoryTest {
             assertTrue(repo.recent().isEmpty())
         }
 
+    /**
+     * MK.23.D.4 — `recent()` must not crash on orphan history rows.
+     *
+     * Schema declares `watch_history.content_id` as `REFERENCES
+     * content(id) ON DELETE CASCADE`, so under normal FK enforcement
+     * an orphan row can't exist. But:
+     *   - During a sync, `BulkContentWriter.prepareSource()` toggles
+     *     PRAGMA foreign_keys = OFF (MB-220 fix). If the process
+     *     crashes mid-sync, the next launch sees content rows missing
+     *     for one source while watch_history rows still reference
+     *     them — until `finishSource`'s orphan sweep runs.
+     *   - Future code that disables FK for any reason (corruption
+     *     recovery, batch import) creates the same window.
+     *
+     * The repo's `recent()` does a client-side LEFT-JOIN-like via
+     * `mapNotNull` — it skips watch_history rows whose `content_id`
+     * doesn't resolve. Pin that contract so a future refactor that
+     * changes the join shape (e.g., flatMap or a SQL JOIN that NPEs
+     * on missing rows) doesn't crash the home screen.
+     */
+    @Test fun recent_silentlyDropsOrphanRowsWhoseContentIsMissing() =
+        runTest {
+            val database = com.yancotv.shared.sources.testDatabase()
+            val db = database.db
+            insertSource(db, "src-A")
+            insertContent(db, "m-1", "src-A", type = "movie")
+            val repo = WatchHistoryRepository(db, clock = { 1_000L })
+
+            // Real watched movie with a real content row.
+            repo.upsert("m-1", positionSeconds = 60L)
+            // Manually-injected orphan: an episode-like history row
+            // pointing at a content_id that doesn't exist. Achieved by
+            // toggling FK off for the insert, mirroring the production
+            // window described in the docstring above.
+            database.driver.execute(null, "PRAGMA foreign_keys = OFF", 0)
+            database.driver.execute(
+                null,
+                "INSERT INTO watch_history (id, content_id, episode_id, " +
+                    "position_seconds, duration_seconds, watched_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                6,
+            ) {
+                bindString(0, "wh:orphan-series:ep-1")
+                bindString(1, "orphan-series") // content_id pointing at nothing
+                bindString(2, "ep-1")
+                bindLong(3, 90L)
+                bindLong(4, 1800L)
+                bindLong(5, 2_000L)
+            }
+            database.driver.execute(null, "PRAGMA foreign_keys = ON", 0)
+
+            // Sanity — both rows exist in watch_history.
+            assertEquals(2, db.watchHistoryQueries.selectRecent(50L).executeAsList().size)
+
+            // recent() must not throw, must skip the orphan, must return
+            // only the real entry.
+            val result = repo.recent()
+            assertEquals(1, result.size, "recent() must drop the orphan row")
+            assertEquals("m-1", result[0].contentId)
+        }
+
     @Test fun cascade_removingContentRemovesHistoryRow() =
         runTest {
             val db = testDb()
