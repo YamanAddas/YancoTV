@@ -55,7 +55,7 @@ fun SettingsNetworkTab(
             modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 32.dp),
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "User-Agent",

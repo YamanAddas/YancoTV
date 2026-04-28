@@ -641,13 +641,25 @@ private fun ContentPane(
 }
 
 /**
- * Custom [BringIntoViewSpec] for the Settings ContentPane. Returns 0
- * when the requested rect is already fully visible — Compose's default
- * spec on Compose 1.7+ was eagerly scrolling to put the focused
- * focusable near the top of the viewport, which pushed the section
- * title above (e.g. 'Video' over 'Resize mode') out from under the
- * breadcrumb on tab entry. This spec scrolls only when the element is
- * actually outside the viewport, and then by the minimum amount.
+ * Custom [BringIntoViewSpec] for the Settings ContentPane. Suppresses
+ * the eager "snap focused element to viewport top" behaviour that was
+ * pushing section titles ('Video', 'User-Agent', 'Guide window') under
+ * the breadcrumb when MB-108's moveFocus(Right) lands focus on the
+ * first focusable inside a tab body.
+ *
+ * Behaviour rules (mirrors the documented Compose default — this spec
+ * just guarantees the conservative variant in case any future Compose
+ * release ships a more eager default):
+ *   - Element fully in view → no scroll.
+ *   - Element extends below viewport AND starts inside viewport → scroll
+ *     forward just enough to bring the trailing edge to the bottom.
+ *   - Element starts above viewport AND fits inside viewport → scroll
+ *     backward to bring the leading edge to the top.
+ *   - Element bigger than the viewport (e.g. the dpadVerticalScroll
+ *     Column-as-focusable that About uses) → no scroll. Without this
+ *     case, the spec was returning a positive scroll delta on every
+ *     focus event, which combined with About's animateScrollBy created
+ *     a feedback loop that read as flicker on D-pad UP/DOWN.
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private val ConservativeBringIntoViewSpec =
@@ -657,12 +669,16 @@ private val ConservativeBringIntoViewSpec =
             size: Float,
             containerSize: Float,
         ): Float {
-            // Element fully in view → no scroll.
-            if (offset >= 0f && offset + size <= containerSize) return 0f
-            // Element above viewport → scroll backward to bring leading edge to 0.
-            if (offset < 0f) return offset
-            // Element below viewport → scroll forward to bring trailing edge to bottom.
-            return offset + size - containerSize
+            val trailingEdge = offset + size
+            return when {
+                // Element extends below viewport AND starts inside it.
+                trailingEdge > containerSize && offset > 0f -> trailingEdge - containerSize
+                // Element starts above viewport AND fits inside it.
+                offset < 0f && trailingEdge < containerSize -> offset
+                // Otherwise: no scroll. Covers fully-in-view AND
+                // larger-than-viewport (the About Column case).
+                else -> 0f
+            }
         }
     }
 

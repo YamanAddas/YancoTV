@@ -50,7 +50,7 @@ fun SettingsAboutTab(modifier: Modifier = Modifier) {
                 // the focus from the sub-sidebar lands on ContentPane's
                 // sibling FocusableSpacer and D-pad arrows do nothing.
                 .dpadVerticalScroll(scroll)
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 32.dp),
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(title = "Version") {
             // Hero card — gradient Y tile + wordmark + version + build.
