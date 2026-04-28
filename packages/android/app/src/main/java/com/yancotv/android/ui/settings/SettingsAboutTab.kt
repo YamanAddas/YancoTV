@@ -79,49 +79,40 @@ fun SettingsAboutTab(
                 .dpadVerticalScroll(scroll)
                 .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
-        // ───── Hero: logo + version (no wordmark, no Y tile) ─────
+        // ───── Hero: centered logo + aspirational v1.0.0 version ─────
+        // Version is hardcoded "v 1.0.0" — the target stability number
+        // we'll ship under once the app is feature-complete + stable.
+        // The actual current BuildConfig.VERSION_NAME / VERSION_CODE
+        // still surface in the Build section below for diagnostics; this
+        // hero is identity, not telemetry.
         SettingsSection(title = "Version") {
-            Row(
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(palette.BackgroundRaised.copy(alpha = 0.55f))
-                        .padding(horizontal = 24.dp, vertical = 22.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Logo bitmap — 88dp square fits the previous Y-tile
-                // footprint without overpowering the row. Fit (not
-                // crop) so any logo aspect ratio renders complete.
                 Image(
                     painter = painterResource(id = R.drawable.ic_logo),
                     contentDescription = "YancoTV logo",
                     contentScale = ContentScale.Fit,
                     modifier =
                         Modifier
-                            .size(88.dp)
-                            .clip(RoundedCornerShape(14.dp)),
+                            .size(140.dp)
+                            .clip(RoundedCornerShape(20.dp)),
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    // Version in the arabesque face. Bigger than the
-                    // previous wordmark line so it carries the row's
-                    // visual weight on its own.
-                    Text(
-                        text = info.version,
-                        color = palette.TextPrimary,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = arabesque,
-                        letterSpacing = 0.5.sp,
-                    )
-                    Text(
-                        text = "Build ${info.versionCode}",
-                        color = palette.TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
+                Text(
+                    text = "v 1.0.0",
+                    color = palette.TextPrimary,
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = arabesque,
+                    letterSpacing = 1.sp,
+                )
             }
         }
 
