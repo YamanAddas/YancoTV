@@ -18,9 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -359,10 +356,10 @@ fun SettingsBackupTab(
                 // We guard the work with `if (!exporting)` instead so a
                 // double-tap is a no-op without ever un-focusing.
                 val canExport = !encryptToggle || exportPassword.length >= 8
-                Button(
+                SettingsAccentButton(
                     enabled = canExport,
                     onClick = {
-                        if (exporting) return@Button
+                        if (exporting) return@SettingsAccentButton
                         if (customFolder != null) {
                             runExportToCustomFolder(customFolder)
                         } else {
@@ -370,18 +367,16 @@ fun SettingsBackupTab(
                         }
                     },
                     modifier = Modifier.placedFocus(exportButtonAnchor).focusable(),
-                    colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text(if (exporting) "Exporting…" else "Export backup")
                 }
-                OutlinedButton(
+                SettingsOutlinedButton(
                     onClick = { changeFolderLauncher.launch(null) },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
                     Text(if (customFolder != null) "Change folder…" else "Pick folder…")
                 }
                 if (customFolder != null) {
-                    OutlinedButton(
+                    SettingsOutlinedButton(
                         onClick = {
                             customFolderString = null
                             scope.launch {
@@ -389,7 +384,6 @@ fun SettingsBackupTab(
                                 exportFocusBump++
                             }
                         },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextMuted),
                     ) {
                         Text("Reset to default")
                     }
@@ -431,10 +425,9 @@ fun SettingsBackupTab(
                 fontSize = 11.sp,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
+                SettingsOutlinedButton(
                     onClick = { importPickLauncher.launch(arrayOf("application/json", "*/*")) },
                     modifier = Modifier.placedFocus(importButtonAnchor).focusable(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
                     Text(if (importPickedUri == null) "Choose backup file…" else "Choose another file…")
                 }
@@ -452,9 +445,9 @@ fun SettingsBackupTab(
                     transformation = PasswordVisualTransformation(),
                     bare = true,
                 )
-                Button(
+                SettingsAccentButton(
                     onClick = {
-                        if (importing) return@Button
+                        if (importing) return@SettingsAccentButton
                         importing = true
                         importStatus = "Restoring…"
                         scope.launch {
@@ -464,7 +457,6 @@ fun SettingsBackupTab(
                             importFocusBump++
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text(if (importing) "Restoring…" else "Restore")
                 }
@@ -530,7 +522,7 @@ fun SettingsBackupTab(
                 )
                 recent.forEach { row ->
                     val rowUri = row.fileUri
-                    OutlinedButton(
+                    SettingsOutlinedButton(
                         enabled = rowUri != null,
                         onClick = {
                             if (rowUri != null) {
@@ -540,7 +532,6 @@ fun SettingsBackupTab(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),

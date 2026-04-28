@@ -13,9 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -150,7 +147,7 @@ fun SettingsParentalTab(
                     label = "Confirm PIN",
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+                    SettingsAccentButton(
                         enabled = newPin.length in 4..8 && newPin == confirmPin,
                         onClick = {
                             scope.launch {
@@ -161,19 +158,17 @@ fun SettingsParentalTab(
                                 status = "PIN saved"
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                     ) {
                         Text(if (awaitingNewPin) "Save new PIN" else "Set PIN")
                     }
                     if (awaitingNewPin) {
-                        OutlinedButton(
+                        SettingsOutlinedButton(
                             onClick = {
                                 awaitingNewPin = false
                                 newPin = ""
                                 confirmPin = ""
                                 status = null
                             },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                         ) {
                             Text("Cancel")
                         }
@@ -186,15 +181,13 @@ fun SettingsParentalTab(
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+                    SettingsAccentButton(
                         onClick = { showGate = GateAction.CHANGE },
-                        colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                     ) {
                         Text("Change PIN")
                     }
-                    OutlinedButton(
+                    SettingsOutlinedButton(
                         onClick = { showGate = GateAction.REMOVE },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                     ) {
                         Text("Remove PIN")
                     }
@@ -245,13 +238,12 @@ fun SettingsParentalTab(
                     modifier = Modifier.weight(1f),
                 )
                 if (hiddenIds.isNotEmpty()) {
-                    OutlinedButton(
+                    SettingsOutlinedButton(
                         onClick = {
                             // Bulk unhide — snapshot first so the flow-driven
                             // remove doesn't ConcurrentModification the set.
                             hiddenIds.toList().forEach(repo::unhideChannel)
                         },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                     ) {
                         Text("Unhide all", fontSize = 12.sp)
                     }
@@ -364,9 +356,8 @@ private fun HiddenRow(
                 Text(text = it, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp, maxLines = 1)
             }
         }
-        OutlinedButton(
+        SettingsOutlinedButton(
             onClick = onUnhide,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.Accent),
         ) {
             Text("Unhide", fontSize = 11.sp)
         }
