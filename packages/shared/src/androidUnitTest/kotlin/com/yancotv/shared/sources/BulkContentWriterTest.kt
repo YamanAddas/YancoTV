@@ -65,6 +65,7 @@ class BulkContentWriterTest {
             channel_count = 0,
             auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = 1L,
             updated_at = 1L,
         )
@@ -408,5 +409,148 @@ class BulkContentWriterTest {
         // And the sync didn't wipe everything — this is the regression
         // guarantee: before INSERT OR IGNORE, this call would leave 0 rows.
         assertTrue(db.contentQueries.countBySource("s1").executeAsOne() > 0)
+    }
+
+    // ───── Favorites + watch_history survival across re-sync ─────
+
+    /**
+     * Regression: every source sync was wiping the user's favorites and
+     * watch history for that source via `ON DELETE CASCADE` on
+     * `favorites.content_id` and `watch_history.content_id`.
+     * `prepareSource()` runs `DELETE FROM content WHERE source_id = ?` to
+     * clear the prior catalog snapshot, the cascade then silently wiped
+     * every dependent row, and even though the chunked re-INSERT puts the
+     * same content_ids back (deterministic via `ContentIds.*`) the
+     * favorites + history were already gone. Symptom: home screen
+     * showing only "Recently added" because every other rail filters off
+     * favorites or history that no longer exist.
+     *
+     * Fix toggles `PRAGMA foreign_keys = OFF` across the prepare → chunks
+     * → finish window so the cascade doesn't fire on the sync's
+     * delete-then-recreate. [finishSource] sweeps actual orphans
+     * (content the provider rotated out) and re-enables FK.
+     *
+     * This test inserts a favorite + history row pointing at content
+     * that the next sync still publishes (same content_id), and asserts
+     * both rows survive the re-sync.
+     */
+    @Test
+    fun `prepareSource preserves favorites and watch_history when content is recreated`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver)
+        val client = xtreamClient()
+
+        // Initial sync — 3 live channels.
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2"), liveStream(3, "Ch 3")),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        val ch1Id = ContentIds.xtreamLive("s1", "1")
+        val ch2Id = ContentIds.xtreamLive("s1", "2")
+
+        // User favorites ch1 and ch2, builds watch history on ch1.
+        db.favoritesQueries.insert(id = "fav:$ch1Id", content_id = ch1Id, list_id = "default", added_at = 200L)
+        db.favoritesQueries.insert(id = "fav:$ch2Id", content_id = ch2Id, list_id = "default", added_at = 201L)
+        db.watchHistoryQueries.upsert(
+            id = "wh:$ch1Id",
+            content_id = ch1Id,
+            episode_id = null,
+            position_seconds = 60,
+            duration_seconds = 3600,
+            watched_at = 300L,
+        )
+        // Sanity — both favorites + history are persisted.
+        assertTrue(db.favoritesQueries.isFavorite(ch1Id).executeAsOne())
+        assertTrue(db.favoritesQueries.isFavorite(ch2Id).executeAsOne())
+        assertEquals(1, db.watchHistoryQueries.selectByContent(ch1Id).executeAsList().size)
+
+        // Re-sync — same channels published again.
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2"), liveStream(3, "Ch 3")),
+            categoryNames = mapOf("1" to "News"),
+            now = 200L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        // The two favorites + the history row must survive.
+        assertTrue(db.favoritesQueries.isFavorite(ch1Id).executeAsOne(), "ch1 favorite must survive resync")
+        assertTrue(db.favoritesQueries.isFavorite(ch2Id).executeAsOne(), "ch2 favorite must survive resync")
+        assertEquals(1, db.watchHistoryQueries.selectByContent(ch1Id).executeAsList().size,
+            "watch_history row for ch1 must survive resync")
+    }
+
+    /**
+     * Companion to the survival test: when a re-sync DROPS a channel
+     * (provider rotated it out), the favorite + history pointing at it
+     * should be cleaned up. [finishSource]'s orphan sweep covers this —
+     * with the FK off, dependents would otherwise pile up as dead
+     * pointers to nothing.
+     */
+    @Test
+    fun `finishSource sweeps orphan favorites and watch_history when content removed`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver)
+        val client = xtreamClient()
+
+        // Initial sync publishes ch1 + ch2.
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2")),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        val ch1Id = ContentIds.xtreamLive("s1", "1")
+        val ch2Id = ContentIds.xtreamLive("s1", "2")
+
+        // User favorites both, watches ch2.
+        db.favoritesQueries.insert(id = "fav:$ch1Id", content_id = ch1Id, list_id = "default", added_at = 200L)
+        db.favoritesQueries.insert(id = "fav:$ch2Id", content_id = ch2Id, list_id = "default", added_at = 201L)
+        db.watchHistoryQueries.upsert(
+            id = "wh:$ch2Id",
+            content_id = ch2Id,
+            episode_id = null,
+            position_seconds = 30,
+            duration_seconds = 1800,
+            watched_at = 300L,
+        )
+
+        // Re-sync drops ch2 (provider rotated it out). ch1 stays.
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1")),
+            categoryNames = mapOf("1" to "News"),
+            now = 200L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        // ch1 is still in catalog — its favorite survives.
+        assertTrue(db.favoritesQueries.isFavorite(ch1Id).executeAsOne(), "ch1 favorite must survive")
+        // ch2 was dropped — finishSource's orphan sweep removes its favorite + history.
+        assertTrue(!db.favoritesQueries.isFavorite(ch2Id).executeAsOne(), "ch2 favorite must be swept as orphan")
+        assertEquals(0, db.watchHistoryQueries.selectByContent(ch2Id).executeAsList().size,
+            "ch2 watch_history must be swept as orphan")
     }
 }

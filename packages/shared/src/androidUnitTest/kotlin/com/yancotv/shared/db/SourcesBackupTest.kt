@@ -76,6 +76,7 @@ class SourcesBackupTest {
             channel_count = 1234,
             auto_sync_interval = 86400,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now,
             updated_at = now,
         )
@@ -100,6 +101,7 @@ class SourcesBackupTest {
             channel_count = 0,
             auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now,
             updated_at = now,
         )
@@ -144,6 +146,7 @@ class SourcesBackupTest {
             epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = true, priority = 0, channel_count = 0, auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now, updated_at = now,
         )
         originalDb.sourcesQueries.insert(
@@ -153,6 +156,7 @@ class SourcesBackupTest {
             epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = false, priority = 1, channel_count = 0, auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now, updated_at = now,
         )
 
@@ -202,6 +206,7 @@ class SourcesBackupTest {
             epg_url = null, user_agent = null, referer = null, last_synced = null, last_sync_error = null,
             is_active = true, priority = 0, channel_count = 0, auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now, updated_at = now,
         )
         backup.writeFromDb(db)

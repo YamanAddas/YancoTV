@@ -153,6 +153,7 @@ class MigrationTest {
             channel_count = 0,
             auto_sync_interval = 0,
             epg_priority = 0,
+            auto_sync_on_start = false,
             created_at = now,
             updated_at = now,
         )

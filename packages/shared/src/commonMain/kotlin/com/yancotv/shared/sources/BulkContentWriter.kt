@@ -69,8 +69,33 @@ class BulkContentWriter(
      * single `IMMEDIATE` transaction so a mid-call crash leaves the schema
      * either fully cleared or untouched — never half-cleared with the
      * trigger still firing.
+     *
+     * **Foreign-key handling — the favorites/history-survival fix.**
+     * Schema declares `favorites.content_id` and `watch_history.content_id`
+     * as `REFERENCES content(id) ON DELETE CASCADE`. With `foreign_keys=ON`
+     * (the production default — see DatabaseFactory.android.kt's onOpen),
+     * the `DELETE FROM content WHERE source_id = ?` below cascades and
+     * silently wipes every favorite + history row pointing at this
+     * source's content. Since `ContentIds.*` are deterministic, the
+     * chunked re-INSERT recreates the same content_ids — but the
+     * favorites are already gone.
+     *
+     * Sync's intent is "replace the catalog snapshot for this source";
+     * the FK cascade's intent is "if the user removed a content row,
+     * clean up its dependents." Sync isn't an actual content removal, so
+     * we toggle the FK off across the entire prepare → chunks → finish
+     * window and let [finishSource] sweep up genuinely-stale dependents
+     * (favorites pointing at content that's no longer in the catalog
+     * because the provider rotated it out). [abortSource] re-enables FK
+     * on the error path; if the process crashes mid-sync, FK is re-armed
+     * by the `setForeignKeyConstraintsEnabled(true)` call in
+     * `DatabaseFactory.android.kt`'s `onOpen` on next launch.
+     *
+     * `PRAGMA foreign_keys` is a no-op inside a transaction (per SQLite
+     * docs), so it must be issued BEFORE `BEGIN`.
      */
     fun prepareSource(sourceId: String) {
+        driver.execute(null, "PRAGMA foreign_keys = OFF", 0)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             driver.execute(
@@ -85,21 +110,27 @@ class BulkContentWriter(
             driver.execute(null, "COMMIT", 0)
         } catch (t: Throwable) {
             runCatching { driver.execute(null, "ROLLBACK", 0) }
+            // Re-enable FK on the error path so the session doesn't leave
+            // FK off if the caller doesn't call abortSource.
+            runCatching { driver.execute(null, "PRAGMA foreign_keys = ON", 0) }
             throw t
         }
     }
 
     /**
      * Bulk-populates the FTS table for this source in a single
-     * `INSERT … SELECT`, then recreates the trigger. Called once at the end
-     * of a successful sync.
+     * `INSERT … SELECT`, then recreates the trigger and sweeps up
+     * orphan favorites + watch_history rows whose content_ids no longer
+     * exist in the catalog (provider rotated them out). Re-enables FK
+     * after the cleanup. Called once at the end of a successful sync.
      *
      * Safety-net: if [prepareSource] ran but [finishSource] is never
      * called (caller crashed mid-sync), the next call to
      * [prepareSource] for this source will DELETE the half-written rows
-     * before reinstalling clean data. The trigger is recreated defensively
-     * on the error path too so non-bulk inserts (M3U, Stalker) stay
-     * FTS-consistent.
+     * before reinstalling clean data. FK is re-enabled on next process
+     * launch via DatabaseFactory.android.kt's `onOpen`. The trigger is
+     * recreated defensively on the error path too so non-bulk inserts
+     * (M3U, Stalker) stay FTS-consistent.
      */
     fun finishSource(sourceId: String) {
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
@@ -117,6 +148,20 @@ class BulkContentWriter(
                     "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
                 0,
             )
+            // Sweep up genuine orphans — favorites + history rows whose
+            // content_id is no longer in the catalog because the provider
+            // dropped that channel/movie. Without FK enforcement during
+            // sync, these would otherwise pile up forever.
+            driver.execute(
+                null,
+                "DELETE FROM favorites WHERE content_id NOT IN (SELECT id FROM content)",
+                0,
+            )
+            driver.execute(
+                null,
+                "DELETE FROM watch_history WHERE content_id NOT IN (SELECT id FROM content)",
+                0,
+            )
             driver.execute(null, "COMMIT", 0)
         } catch (t: Throwable) {
             runCatching { driver.execute(null, "ROLLBACK", 0) }
@@ -132,15 +177,21 @@ class BulkContentWriter(
                     0,
                 )
             }
+            // Re-enable FK so the next normal write re-arms cascade
+            // semantics for actual content removal.
+            runCatching { driver.execute(null, "PRAGMA foreign_keys = ON", 0) }
             throw t
         }
+        // Success path — re-enable FK after the orphan sweep committed.
+        driver.execute(null, "PRAGMA foreign_keys = ON", 0)
     }
 
     /**
      * Called from the error path when a sync aborts after [prepareSource]
      * but before [finishSource]. Brings the schema back to a sane state:
-     * clears any partially-written rows for this source and reinstalls the
-     * FTS trigger. Safe to call even if `prepareSource` never ran.
+     * clears any partially-written rows for this source, reinstalls the
+     * FTS trigger, and re-enables FK. Safe to call even if `prepareSource`
+     * never ran.
      */
     fun abortSource(sourceId: String) {
         runCatching {
@@ -166,6 +217,10 @@ class BulkContentWriter(
                 runCatching { driver.execute(null, "ROLLBACK", 0) }
             }
         }
+        // Always re-enable FK on the abort path. If prepareSource ran and
+        // turned FK off, leaving it off would silently break cascade
+        // semantics for the rest of the connection lifetime.
+        runCatching { driver.execute(null, "PRAGMA foreign_keys = ON", 0) }
     }
 
     // ───── Per-chunk writers ─────

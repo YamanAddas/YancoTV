@@ -115,6 +115,7 @@ class EpgRepositoryTest {
             channel_count = 0,
             auto_sync_interval = 0,
             epg_priority = epgPriority,
+            auto_sync_on_start = false,
             created_at = 0,
             updated_at = 0,
         )
