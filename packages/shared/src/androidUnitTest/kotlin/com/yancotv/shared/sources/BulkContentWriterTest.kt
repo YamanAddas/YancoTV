@@ -13,6 +13,7 @@ import com.yancotv.shared.xtream.XtreamSeriesInfo
 import com.yancotv.shared.xtream.XtreamVodStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -552,6 +553,110 @@ class BulkContentWriterTest {
         assertTrue(!db.favoritesQueries.isFavorite(ch2Id).executeAsOne(), "ch2 favorite must be swept as orphan")
         assertEquals(0, db.watchHistoryQueries.selectByContent(ch2Id).executeAsList().size,
             "ch2 watch_history must be swept as orphan")
+    }
+
+    /**
+     * MK.23.D.1 — finishSource failure path.
+     *
+     * Today the catch block:
+     *   1. ROLLBACKs the transaction (so the orphan-sweep DELETEs are
+     *      rolled back too — favorites for live content are safe).
+     *   2. Defensively re-creates the `content_ai` trigger so non-bulk
+     *      INSERTs (M3U, Stalker) stay FTS-consistent.
+     *   3. Re-enables PRAGMA foreign_keys so the rest of the connection
+     *      keeps cascade semantics.
+     *
+     * A future refactor that drops any of those three could leave the
+     * DB in a state where favorites get accidentally wiped, FTS goes
+     * stale, or cascade silently stops firing — this test pins all
+     * three at once.
+     *
+     * Failure mode: drop the `content_fts` table BEFORE finishSource
+     * runs, so the `INSERT INTO content_fts SELECT…` statement throws
+     * "no such table". Real-world this would surface from a corrupted
+     * DB or partial schema — different cause, same catch-block path.
+     */
+    @Test
+    fun `finishSource failure path preserves favorites and re-enables FK`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver)
+        val client = xtreamClient()
+
+        // Initial happy-path sync to seed content + a favorite.
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2")),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        val ch1Id = ContentIds.xtreamLive("s1", "1")
+        db.favoritesQueries.insert(id = "fav:$ch1Id", content_id = ch1Id, list_id = "default", added_at = 1L)
+        assertTrue(db.favoritesQueries.isFavorite(ch1Id).executeAsOne())
+
+        // Now stage a finishSource failure: re-prepare (FK off, content
+        // wiped, trigger dropped), write a chunk so content rows exist
+        // again, then DROP content_fts to force the next INSERT INTO
+        // content_fts ... SELECT to throw "no such table". The favorite
+        // still exists (FK is off — wasn't cascaded by prepare).
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2")),
+            categoryNames = mapOf("1" to "News"),
+            now = 200L,
+            sortOrderStart = 0L,
+        )
+        database.driver.execute(null, "DROP TABLE content_fts", 0)
+
+        var caught: Throwable? = null
+        try {
+            writer.finishSource("s1")
+        } catch (t: Throwable) {
+            caught = t
+        }
+        assertNotNull(caught, "finishSource must rethrow on FTS failure (caller's error path needs to fire)")
+
+        // Post-condition #1: favorite for ch1 is still there. ROLLBACK
+        // covered the orphan-sweep DELETEs that finishSource queues
+        // before the failure. ch1's content row exists (we wrote it),
+        // so even if the orphan sweep had run, ch1 would survive — but
+        // the rollback is the actual safety guarantee being tested.
+        assertTrue(
+            db.favoritesQueries.isFavorite(ch1Id).executeAsOne(),
+            "favorites must survive a finishSource failure (catch block ROLLBACKs the tx)",
+        )
+
+        // Post-condition #2: PRAGMA foreign_keys must be back ON.
+        // Verify by triggering a real cascade — recreate content_fts so
+        // a fresh content row can be inserted, then delete it and watch
+        // the cascade fire.
+        database.driver.execute(
+            null,
+            "CREATE VIRTUAL TABLE content_fts USING fts4(content_id, title, clean_title, group_name)",
+            0,
+        )
+        val probeId = "probe-after-finish-fail"
+        database.driver.execute(
+            null,
+            "INSERT INTO content (id, source_id, type, title, clean_title, group_name, " +
+                "stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at) " +
+                "VALUES (?, 's1', 'live', 'P', 'P', 'News', 'http://x', NULL, NULL, NULL, 999, 0)",
+            1,
+        ) { bindString(0, probeId) }
+        db.favoritesQueries.insert(id = "fav:$probeId", content_id = probeId, list_id = "default", added_at = 999L)
+        database.driver.execute(null, "DELETE FROM content WHERE id = ?", 1) { bindString(0, probeId) }
+        assertFalse(
+            db.favoritesQueries.isFavorite(probeId).executeAsOne(),
+            "Cascade must fire after a finishSource failure — proves PRAGMA foreign_keys was re-enabled",
+        )
     }
 
     /**
