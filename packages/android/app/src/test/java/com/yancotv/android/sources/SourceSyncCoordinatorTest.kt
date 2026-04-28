@@ -7,6 +7,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -83,19 +85,26 @@ class SourceSyncCoordinatorTest {
             assertEquals("src-A", coordinator.state.value?.sourceId)
         }
 
-    @Test fun `start after previous run completes is allowed`() =
+    /**
+     * MK.24.E.2 — full lifecycle teardown: after the first run's flow
+     * terminates (DONE), the launch's `finally` must clear `_state.value`
+     * so a fresh start() with the SAME or a different source can succeed.
+     * Without this, the re-entrancy guard would lock out the source for
+     * the rest of the process — once-and-done. Pins that the production
+     * code's `finally { _state.value = null; activeJob = null }` actually
+     * fires on the success path AND that a follow-up start() is observed
+     * by the fake repo (one repo invocation per call, total of 2 here).
+     */
+    @Test fun `start completed then restarted observes second invocation and clears state between runs`() =
         runTest {
             val invocations = AtomicInteger(0)
-            val flow1 = MutableSharedFlow<SyncProgress>(replay = 1)
-            val flow2 = MutableSharedFlow<SyncProgress>(replay = 1)
-            val flowQueue = mutableListOf(flow1, flow2)
-
             val coordinator =
                 SourceSyncCoordinator(
                     syncSource = { _ ->
                         invocations.incrementAndGet()
-                        @Suppress("UNCHECKED_CAST")
-                        flowQueue.removeAt(0) as Flow<SyncProgress>
+                        // Finite flow that terminates after DONE so the
+                        // launch's collect returns and finally fires.
+                        flowOf(SyncProgress(SyncProgress.Phase.DONE, message = "ok"))
                     },
                     logger = NoopLogger,
                     kickEpgRefresh = {},
@@ -103,18 +112,64 @@ class SourceSyncCoordinatorTest {
                     scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
                 )
 
-            // First sync runs to completion (DONE phase clears state in
-            // the coordinator's collect handler).
             coordinator.start("src-A", "A")
+            testScheduler.advanceUntilIdle()
+            assertEquals(1, invocations.get(), "first start invokes syncSource")
+            assertNull(
+                coordinator.state.value,
+                "finally MUST clear _state after DONE so subsequent starts can run",
+            )
+
+            // Fresh start after teardown — the re-entrancy guard sees
+            // _state.value == null and lets it through. A regression
+            // that left state non-null after DONE would fail right here.
+            coordinator.start("src-B", "B")
+            testScheduler.advanceUntilIdle()
+            assertEquals(
+                2,
+                invocations.get(),
+                "second start after first completes MUST invoke syncSource a second time",
+            )
+            assertNull(coordinator.state.value, "second run also tears down")
+        }
+
+    /**
+     * MK.24.E.2 — failure-path teardown. The launch's outer catch logs +
+     * emits an error toast but the `finally` still runs, so a non-DONE
+     * exit (network failure, parse crash) leaves the coordinator ready
+     * for the user to retry. This is the recovery contract: a transient
+     * failure must NOT lock the source out for the session.
+     */
+    @Test fun `start failed then restarted clears state and allows second invocation`() =
+        runTest {
+            val invocations = AtomicInteger(0)
+            val coordinator =
+                SourceSyncCoordinator(
+                    syncSource = { _ ->
+                        invocations.incrementAndGet()
+                        flow<SyncProgress> { throw RuntimeException("network down") }
+                    },
+                    logger = NoopLogger,
+                    kickEpgRefresh = {},
+                    dispatcher = UnconfinedTestDispatcher(testScheduler),
+                    scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
+                )
+
+            coordinator.start("src-A", "A")
+            testScheduler.advanceUntilIdle()
             assertEquals(1, invocations.get())
-            flow1.emit(SyncProgress(SyncProgress.Phase.DONE, message = "ok"))
-            // After DONE the flow has no more emissions; collect needs the
-            // flow to terminate for the launch's finally to fire and clear
-            // _state. SharedFlow is hot — we close this test path by
-            // confirming start was invoked once but skip waiting on
-            // teardown (the contract under test is the re-entrancy guard,
-            // not lifecycle teardown).
-            assertNotNull(coordinator.state.value)
+            assertNull(
+                coordinator.state.value,
+                "finally MUST clear _state on the failure path too — user retry depends on it",
+            )
+
+            coordinator.start("src-A", "A")
+            testScheduler.advanceUntilIdle()
+            assertEquals(
+                2,
+                invocations.get(),
+                "retry after failure MUST invoke syncSource a second time",
+            )
         }
 
     @Test fun `cancel sets activeJob to null but state observable until launch finally fires`() =
