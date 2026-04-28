@@ -6,6 +6,7 @@ import com.yancotv.shared.types.AddSourceInput
 import com.yancotv.shared.types.SourceType
 import com.yancotv.shared.types.UpdateSourceInput
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -274,6 +275,164 @@ class SourceRepositoryTest {
         )
         assertEquals(0, repo.getAll().size)
     }
+
+    /**
+     * MK.23.D.3 — cancellation mid-flight leaves the DB consistent.
+     *
+     * Contract under test: when the user cancels a sync (or the
+     * coordinator's CoroutineScope is torn down), the post-conditions
+     * are:
+     *   • PRAGMA foreign_keys is back ON. Critical — without this, a
+     *     subsequent user-initiated source removal silently fails to
+     *     cascade, leaking dependents (favorites pointing at gone
+     *     content). Same family as MB-220.
+     *   • Cross-source data is untouched. A cancellation on source B
+     *     must not affect source A's favorites or content.
+     *   • The cancelled source ends with no half-written rows or with
+     *     a clean rollback to the previous catalog.
+     *
+     * Approach: stage the sync to suspend in HTTP fetch (before
+     * prepareSource toggles FK off), cancel the collector, verify
+     * post-state. The cancellation-during-fetch case is the simpler
+     * but more frequent path — user dismisses Settings while a sync
+     * is starting up. The harder case (cancel mid-chunk-write) is
+     * covered indirectly by the abortSource cross-source FK survival
+     * test in BulkContentWriterTest (MK.23.C.2).
+     */
+    @Test fun `cancelling syncSource mid-flight preserves FK and other sources`() =
+        kotlinx.coroutines.test.runTest {
+            // Source A is set up with a normal HTTP — but we never sync
+            // it through the same client. Use a separate inserts to seed
+            // A's content + favorite directly into the DB.
+            val signal = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val slowHttp =
+                object : HttpClient {
+                    override suspend fun getJson(
+                        url: String,
+                        options: HttpRequestOptions,
+                    ): Any? = error("not used")
+
+                    override suspend fun getText(
+                        url: String,
+                        options: HttpRequestOptions,
+                    ): String {
+                        signal.complete(Unit)
+                        // Suspend until cancelled — cancellation propagates
+                        // up through syncSource's channelFlow.
+                        kotlinx.coroutines.suspendCancellableCoroutine<String> { }
+                        error("unreachable")
+                    }
+                }
+
+            val bundle = testDatabase()
+            val repository =
+                SourceRepository(
+                    db = bundle.db,
+                    driver = bundle.driver,
+                    credentialStore = PlaintextCredentialStore(),
+                    http = slowHttp,
+                    fileReader = FakeFileReader(emptyMap()),
+                    clock = { 1_000L },
+                    idGenerator =
+                        run {
+                            var n = 0
+                            { "id-${++n}" }
+                        },
+                )
+
+            // Source A — seeded directly so we don't go through the
+            // slowHttp client. Add a content row + favorite as the
+            // "user data we must protect" baseline.
+            val a =
+                repository.addSource(
+                    AddSourceInput(name = "A", type = SourceType.M3U_URL, url = "http://a/list.m3u"),
+                )
+            bundle.db.contentQueries.insert(
+                id = "ch-a",
+                source_id = a.id,
+                type = "live",
+                title = "Ch A",
+                clean_title = "Ch A",
+                group_name = null,
+                stream_url = "http://stream/a",
+                logo_url = null,
+                tvg_id = null,
+                metadata_json = null,
+                sort_order = 0L,
+                created_at = 0L,
+            )
+            bundle.db.favoritesQueries.insert(
+                id = "fav:ch-a",
+                content_id = "ch-a",
+                list_id = "default",
+                added_at = 1L,
+            )
+            assertTrue(bundle.db.favoritesQueries.isFavorite("ch-a").executeAsOne())
+
+            // Source B — sync this one and cancel mid-flight.
+            val b =
+                repository.addSource(
+                    AddSourceInput(name = "B", type = SourceType.M3U_URL, url = "http://b/list.m3u"),
+                )
+
+            val job =
+                launch {
+                    repository.syncSource(b.id).collect { /* drain */ }
+                }
+            // Wait until the sync's HTTP fetch is in flight.
+            signal.await()
+            // Now cancel — propagates into the suspended getText.
+            job.cancel()
+            job.join()
+
+            // Post-conditions:
+            //   1. Source A's favorite is intact — cancellation on B
+            //      didn't touch A.
+            assertTrue(
+                bundle.db.favoritesQueries.isFavorite("ch-a").executeAsOne(),
+                "Source A's favorite must survive cancelling a sync on a different source",
+            )
+            //   2. PRAGMA foreign_keys = 1 — verified by triggering a
+            //      real cascade. Insert a probe content + favorite for A,
+            //      delete the probe content row, observe the favorite
+            //      follows via cascade.
+            bundle.db.contentQueries.insert(
+                id = "probe-after-cancel",
+                source_id = a.id,
+                type = "live",
+                title = "Probe",
+                clean_title = "Probe",
+                group_name = null,
+                stream_url = "http://stream/probe",
+                logo_url = null,
+                tvg_id = null,
+                metadata_json = null,
+                sort_order = 999L,
+                created_at = 0L,
+            )
+            bundle.db.favoritesQueries.insert(
+                id = "fav:probe-after-cancel",
+                content_id = "probe-after-cancel",
+                list_id = "default",
+                added_at = 999L,
+            )
+            assertTrue(bundle.db.favoritesQueries.isFavorite("probe-after-cancel").executeAsOne())
+
+            bundle.driver.execute(null, "DELETE FROM content WHERE id = ?", 1) {
+                bindString(0, "probe-after-cancel")
+            }
+            assertFalse(
+                bundle.db.favoritesQueries.isFavorite("probe-after-cancel").executeAsOne(),
+                "Cascade must fire after cancelling syncSource — proves FK was never left disabled",
+            )
+            //   3. Source B has no content rows (sync was cancelled
+            //      before any chunk was written).
+            assertEquals(
+                0L,
+                bundle.db.contentQueries.countBySource(b.id).executeAsOne(),
+                "Cancelled-during-fetch sync must not have written content",
+            )
+        }
 
     private fun assertFails(block: () -> Unit) {
         var threw = false
