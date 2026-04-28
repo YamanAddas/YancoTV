@@ -195,10 +195,19 @@ private fun ReadOnlyFieldBody(
                 .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
+        // Single-line clamp + ellipsis — long URLs like
+        // 'https://example.com/xmltv.xml?token=…' would wrap to two lines
+        // and push the field to ~64dp tall, which the user called out
+        // ("box too small / not put right" — the wrap was making the
+        // field look wonky). Single line keeps the field a clean strip
+        // and the value still scrolls horizontally if you tap to edit.
         Text(
             text = if (empty) placeholder else display,
             color = if (empty) LocalYancoPalette.current.TextMuted else LocalYancoPalette.current.TextPrimary,
             fontSize = 14.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }

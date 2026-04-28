@@ -2,6 +2,7 @@ package com.yancotv.android.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -12,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.BufferProfile
@@ -43,7 +45,8 @@ fun SettingsPlaybackTab(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 32.dp),
     ) {
         SettingsSection(
             title = "Video",

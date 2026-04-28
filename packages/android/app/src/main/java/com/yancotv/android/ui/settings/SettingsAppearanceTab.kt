@@ -63,7 +63,8 @@ fun SettingsAppearanceTab(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 32.dp),
     ) {
         SettingsSection(
             title = "Theme",

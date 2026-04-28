@@ -38,7 +38,8 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
             modifier
                 .fillMaxSize()
                 .verticalScroll(scroll)
-                .dpadVerticalScroll(scroll),
+                .dpadVerticalScroll(scroll)
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 32.dp),
     ) {
         SettingsSection(
             title = "Remote &amp; keyboard",

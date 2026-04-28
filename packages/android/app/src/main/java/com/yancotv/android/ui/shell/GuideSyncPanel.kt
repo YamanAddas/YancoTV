@@ -320,11 +320,18 @@ fun GuideSyncPanel(
                 // Click-to-edit (MB-117): D-pad CENTER on the field opens
                 // the keyboard; D-pad navigation alone doesn't, so the user
                 // can scroll past the row without the IME jumping in.
+                //
+                // Bare mode: tighter layout — label sits inline with the
+                // hint text, then the field strip below. The previous card
+                // mode wrapped the field in its own background + padding,
+                // making the input feel small and boxy next to the wide
+                // Save button.
                 com.yancotv.android.ui.settings.SettingsClickToEditField(
                     label = "EPG URL",
                     value = globalUrlDraft,
                     onValueChange = { globalUrlDraft = it },
                     hint = "https://example.com/xmltv.xml",
+                    bare = true,
                     modifier = Modifier.weight(1f),
                 )
                 Button(
