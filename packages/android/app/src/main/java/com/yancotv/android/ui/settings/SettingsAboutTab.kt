@@ -75,43 +75,50 @@ fun SettingsAboutTab(
             modifier
                 .fillMaxSize()
                 .verticalScroll(scroll)
-                // MB-116: focusable + D-pad UP/DOWN drive scroll.
-                .dpadVerticalScroll(scroll)
                 .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        // dpadVerticalScroll deliberately NOT applied here — once the
+        // tab has focusable rows (Updates toggle + Check-now button +
+        // future control rows), Compose's natural focus traversal
+        // drives scrolling automatically. Re-adding it would consume
+        // D-pad UP/DOWN before focus could reach the controls, leaving
+        // the user unable to hit them. The original MB-116 wrap was
+        // for a fully-read-only tab — that's no longer this tab.
     ) {
-        // ───── Hero: centered logo + aspirational v1.0.0 version ─────
+        // ───── Logo (above the Version block) ─────
+        Image(
+            painter = painterResource(id = R.drawable.ic_logo),
+            contentDescription = "YancoTV logo",
+            contentScale = ContentScale.Fit,
+            modifier =
+                Modifier
+                    .size(140.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .padding(bottom = 12.dp),
+        )
+
+        // ───── Version block — aspirational v1.0.0 ─────
         // Version is hardcoded "v 1.0.0" — the target stability number
         // we'll ship under once the app is feature-complete + stable.
         // The actual current BuildConfig.VERSION_NAME / VERSION_CODE
         // still surface in the Build section below for diagnostics; this
-        // hero is identity, not telemetry.
+        // is identity, not telemetry.
         SettingsSection(title = "Version") {
-            Column(
+            Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(palette.BackgroundRaised.copy(alpha = 0.55f))
-                        .padding(horizontal = 24.dp, vertical = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_logo),
-                    contentDescription = "YancoTV logo",
-                    contentScale = ContentScale.Fit,
-                    modifier =
-                        Modifier
-                            .size(140.dp)
-                            .clip(RoundedCornerShape(20.dp)),
-                )
                 Text(
                     text = "v 1.0.0",
                     color = palette.TextPrimary,
-                    fontSize = 36.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = arabesque,
-                    letterSpacing = 1.sp,
+                    letterSpacing = 0.6.sp,
                 )
             }
         }
