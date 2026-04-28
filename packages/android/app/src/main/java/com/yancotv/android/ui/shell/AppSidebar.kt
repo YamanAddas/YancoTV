@@ -1,14 +1,8 @@
 package com.yancotv.android.ui.shell
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -40,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -98,11 +93,29 @@ fun AppSidebar(
     // doesn't snap; labels cross-fade so the transition reads as a graceful
     // collapse rather than a jump cut.
     val targetWidth = if (expanded) ShellDim.sidebarExpanded else ShellDim.sidebarCollapsed
+    // MK.22.A.2 (MB-221): swapped from spring(0.85f, 320f) — that settled
+    // in ~280-320 ms with an overshoot tail that read as a wobble at 10 ft
+    // on a 168 dp delta (92 → 260). Width-only animations don't need
+    // physics; tween(180, FastOutSlowIn) lands cleanly without overshoot
+    // and matches the timing curve used elsewhere in Settings.
     val width by animateDpAsState(
         targetValue = targetWidth,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
         label = "sidebar-width",
     )
+    // MK.22.A.3 (MB-221): drive label visibility from the same width
+    // animation as a single shared alpha — `(width - collapsed) /
+    // (expanded - collapsed)` clamped to [0..1]. Replaces N per-row
+    // `AnimatedVisibility(expandHorizontally / shrinkHorizontally)`
+    // (~9 simultaneous layout-shifting animations on Fire TV). Reading
+    // `width.value` here is fine — Compose snapshots it on each
+    // recomposition the animation triggers.
+    val expandSpan =
+        (ShellDim.sidebarExpanded - ShellDim.sidebarCollapsed).value
+            .takeIf { it > 0f } ?: 1f
+    val labelAlpha =
+        ((width - ShellDim.sidebarCollapsed).value / expandSpan)
+            .coerceIn(0f, 1f)
     // Rail background: a softly lit vertical gradient against the
     // cinematic canvas so the three-column shell has real edge
     // definition without resorting to a hard divider line. Concept A
@@ -187,6 +200,7 @@ fun AppSidebar(
                     icon = iconFor(section),
                     selected = section == current,
                     showLabel = expanded,
+                    labelAlpha = labelAlpha,
                     onClick = { onSelect(section) },
                     focusRequester = bindActiveRowFocus(section, current, activeRowFocus),
                 )
@@ -270,11 +284,13 @@ private fun SidebarRow(
     icon: ImageVector,
     selected: Boolean,
     showLabel: Boolean,
+    labelAlpha: Float,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val palette = LocalYancoPalette.current
 
     // Three visual states layered onto the hex-cut active row. The split
     // between "where am I" (focus) and "where I am rooted" (selected) has
@@ -304,8 +320,8 @@ private fun SidebarRow(
                 Brush.horizontalGradient(
                     colors =
                         listOf(
-                            LocalYancoPalette.current.Accent.copy(alpha = 0.28f),
-                            LocalYancoPalette.current.Accent.copy(alpha = 0.10f),
+                            palette.Accent.copy(alpha = 0.28f),
+                            palette.Accent.copy(alpha = 0.10f),
                             Color.Transparent,
                         ),
                 )
@@ -319,24 +335,28 @@ private fun SidebarRow(
     // breadcrumb cue. Selected-and-focused gets the focus frame on top
     // of the same fill, so it reads as "I'm rooted here AND my cursor is
     // here right now".
-    val border =
-        if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
+    val border = if (focused) palette.FocusRing else Color.Transparent
     val borderWidth = if (focused) 2.dp else 0.dp
-    val fg by animateColorAsState(
-        targetValue =
-            when {
-                focused -> LocalYancoPalette.current.TextPrimary
-                selected -> LocalYancoPalette.current.Accent
-                else -> LocalYancoPalette.current.TextSecondary
-            },
-        label = "sidebar-fg",
-    )
-    val accentBarHeight by animateFloatAsState(
-        targetValue = if (selected || focused) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
-        label = "sidebar-bar",
-    )
-    val accentInsetFraction = accentInsetFraction(accentBarHeight)
+    // MK.22.A.4 (MB-221): foreground colour was previously
+    // `animateColorAsState` — at 10 ft on Fire TV a 200 ms tween between
+    // TextSecondary → Accent → TextPrimary is invisible AND every row
+    // holds its own animation instance, so when the sidebar collapses /
+    // expands all N rows recompose with their animations restarting in
+    // step. Hard switch keeps the snap legible and removes ~9 concurrent
+    // colour animations from the expand path.
+    val fg =
+        when {
+            focused -> palette.TextPrimary
+            selected -> palette.Accent
+            else -> palette.TextSecondary
+        }
+    // MK.22.A.4 (MB-221): accent rail inset was driven by an
+    // `animateFloatAsState(spring 420f)` per row — same N-restart
+    // problem. The bar's only on/off transition is on focus or
+    // selection change which is a discrete user action, not a
+    // continuous gesture; a hard switch is fine. `accentInsetFraction`
+    // still caps at [0,1] so the inset math below is unchanged.
+    val accentInsetFraction = accentInsetFraction(if (selected || focused) 1f else 0f)
 
     Box(
         modifier =
@@ -356,13 +376,13 @@ private fun SidebarRow(
                     .shadow(
                         elevation = if (selected || focused) 12.dp else 0.dp,
                         shape = RoundedCornerShape(Radius.pill),
-                        ambientColor = LocalYancoPalette.current.Accent,
-                        spotColor = LocalYancoPalette.current.Accent,
+                        ambientColor = palette.Accent,
+                        spotColor = palette.Accent,
                     ).clip(RoundedCornerShape(Radius.pill))
                     .background(
                         if (selected || focused) {
                             Brush.verticalGradient(
-                                listOf(LocalYancoPalette.current.AccentSoft, LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
+                                listOf(palette.AccentSoft, palette.Accent, palette.AccentDeep),
                             )
                         } else {
                             Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
@@ -408,20 +428,22 @@ private fun SidebarRow(
                 tint = fg,
                 modifier = Modifier.size(22.dp),
             )
-            // Cross-fade the label so the collapsed icon-only state reads as
-            // a graceful shrink, not a label suddenly disappearing on rebuild.
-            // AnimatedVisibility keeps the icon stable while the label slides
-            // in/out from the leading edge.
-            AnimatedVisibility(
-                visible = showLabel,
-                enter = expandHorizontally() + fadeIn(),
-                exit = shrinkHorizontally() + fadeOut(),
-            ) {
+            // MK.22.A.3 (MB-221): label cross-fade was previously
+            // `AnimatedVisibility(expandHorizontally + fadeIn / shrinkHorizontally
+            // + fadeOut)` PER ROW — that's ~9 simultaneous layout-shifting
+            // animations during sidebar open. Each one re-measures its row
+            // every frame, contending with the parent width tween. Replaced
+            // with a single shared `labelAlpha` driven from the same width
+            // animation in [AppSidebar] (parent), applied via `Modifier.alpha`.
+            // The label widget is only emitted while showLabel-or-mid-collapse
+            // (alpha > 0) so the collapsed state has no Text in the layout.
+            if (showLabel || labelAlpha > 0f) {
                 Text(
                     text = section.label,
                     color = fg,
                     style = if (selected || focused) YancoType.LabelStrong else YancoType.Label,
                     maxLines = 1,
+                    modifier = Modifier.alpha(labelAlpha),
                 )
             }
         }

@@ -184,7 +184,16 @@ fun HomeScreen(
     LaunchedEffect(section) {
         if (section == lastFocusedSection) return@LaunchedEffect
         lastFocusedSection = section
-        delay(120)
+        // MK.22.A.1 (MB-221): the old code slept 120 ms here before
+        // flipping panelFocus, gating the sidebar's expand-on-focus from
+        // re-firing for ~120 ms after the user pressed BACK / LEFT to
+        // return. The original justification ("wait for the previous
+        // section's composable to leave") is obsolete — section content
+        // is wrapped in `key()` so the new composition is ready by the
+        // next frame. One `withFrameNanos` gives the new tree one
+        // layout pass; that's all `mainContentFocus.requestFocus()`
+        // needs to land on a placed node.
+        withFrameNanos { }
         // Browse sections enter via the CategoryRail so the user lands on
         // a pill (one press away from the coverflow). Flipping panelFocus
         // to Categories lets BrowseSection's PlacedFocusAnchor land focus

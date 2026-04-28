@@ -123,6 +123,20 @@ fun HomeContent(
     val upNextItems = remember { mutableStateListOf<NowPairing>() }
     val recentlyAdded = remember { mutableStateListOf<ContentItem>() }
 
+    // MK.22.A.5 (MB-222): one shared "now" tick. OnNowTile previously
+    // captured `nowSec = remember { System.currentTimeMillis() / 1000 }`
+    // per tile, which is read once at first composition and never
+    // updates — programme progress bars on Home never advanced. Mirrors
+    // GuideScreen.kt:330-335's pattern: single LaunchedEffect ticks every
+    // 30 s; every consumer reads the same value via parameter.
+    val nowSec = remember { mutableStateOf(System.currentTimeMillis() / 1000) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowSec.value = System.currentTimeMillis() / 1000
+            kotlinx.coroutines.delay(30_000L)
+        }
+    }
+
     // Continue watching + resume lookup map come from the same table;
     // load both in one pass so the resume map is ready as soon as the
     // rail renders.
@@ -303,6 +317,7 @@ fun HomeContent(
             OnNowRail(
                 items = onNowItems,
                 lockedIds = lockedIds,
+                nowSec = nowSec.value,
                 onPlay = { item ->
                     val snapshot = onNowItems.toList()
                     val list = snapshot.map { it.channel }
@@ -723,6 +738,7 @@ private fun PosterRail(
 private fun OnNowRail(
     items: List<NowPairing>,
     lockedIds: Set<String>,
+    nowSec: Long,
     onPlay: (ContentItem) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -743,6 +759,7 @@ private fun OnNowRail(
                 OnNowTile(
                     pair = pair,
                     locked = pair.channel.id in lockedIds,
+                    nowSec = nowSec,
                     onClick = { onPlay(pair.channel) },
                     modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
                 )
@@ -889,12 +906,18 @@ private fun PosterTile(
 private fun OnNowTile(
     pair: NowPairing,
     locked: Boolean,
+    nowSec: Long,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val nowSec = remember { System.currentTimeMillis() / 1000 }
+    // MK.22.A.5 (MB-222): nowSec is now passed in from a single ticking
+    // LaunchedEffect at the HomeContent level. Previously this was
+    // `remember { System.currentTimeMillis() / 1000 }` — captured once
+    // at first composition and never refreshed, so the progress bar was
+    // frozen at the moment the tile composed. Same value reaches every
+    // OnNowTile so they tick in sync.
     val dur = (pair.programme.endTime - pair.programme.startTime).coerceAtLeast(1)
     val elapsed = (nowSec - pair.programme.startTime).coerceIn(0, dur)
     val progressPct = (elapsed.toFloat() / dur.toFloat()).coerceIn(0f, 1f)
