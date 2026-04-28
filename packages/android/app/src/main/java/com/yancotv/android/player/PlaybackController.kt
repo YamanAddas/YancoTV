@@ -814,41 +814,23 @@ class PlaybackController(
      */
     fun persistResumePoint() {
         val item = _currentItem.value ?: return
-        if (item.type == ContentType.LIVE) return
-        // Stage 3.1 / MK.14.5 — local recordings play through this same
-        // path with a synthesized ContentItem whose id starts with
-        // `_rec_`. They have no `content` row, so writing a watch_history
-        // entry would FK-violate. Skip persisting resume for these
-        // ad-hoc plays; the user can rewind manually if needed.
-        if (item.id.startsWith(LOCAL_RECORDING_ID_PREFIX)) return
         val pos = player.currentPosition.coerceAtLeast(0L) / 1000L
         val dur = player.duration.takeIf { it > 0L }?.let { it / 1000L }
-        // Don't record positions near the very start — if the user opened a
-        // title and immediately bailed they probably don't want a resume card.
-        if (pos < 5L) return
-        val repo = history ?: return
-        // Episode sessions: write the *series* id into content_id (the FK
-        // target — series rows live in `content`, episode rows do not) and
-        // the episode id into the nullable episode_id column. Movies fall
-        // through to the simple item.id path. Snapshot the episode on the
-        // main thread before launching IO; the field can be cleared by the
-        // next loadCurrent() before the coroutine runs.
+        // Snapshot the episode on the main thread before launching IO;
+        // the field can be cleared by the next loadCurrent() before the
+        // coroutine runs.
         val episode = _currentEpisode.value
+        // Decision logic extracted (MK.23.C.1) so it can be tested
+        // without standing up the full controller / ExoPlayer / DB.
+        val write = resumePointDecision(item, episode, pos, dur) ?: return
+        val repo = history ?: return
         scope.launch(Dispatchers.IO) {
-            if (episode != null) {
-                repo.upsert(
-                    contentId = episode.seriesId,
-                    episodeId = episode.id,
-                    positionSeconds = pos,
-                    durationSeconds = dur,
-                )
-            } else {
-                repo.upsert(
-                    contentId = item.id,
-                    positionSeconds = pos,
-                    durationSeconds = dur,
-                )
-            }
+            repo.upsert(
+                contentId = write.contentId,
+                episodeId = write.episodeId,
+                positionSeconds = write.positionSeconds,
+                durationSeconds = write.durationSeconds,
+            )
         }
     }
 
@@ -912,3 +894,65 @@ internal fun isFfmpegRelatedError(error: PlaybackException): Boolean {
 }
 
 private const val FFMPEG_PACKAGE_PREFIX = "androidx.media3.decoder.ffmpeg."
+
+/**
+ * MK.23.C.1 — pure decision shape extracted from
+ * [PlaybackController.persistResumePoint]. The controller is
+ * main-thread-only and holds an ExoPlayer instance, so the contract
+ * was never test-coverable in JVM unit tests. This function captures
+ * the rules:
+ *
+ *   - LIVE channels never persist (no resume concept).
+ *   - Synthetic local-recording items (id prefix `_rec_`) never
+ *     persist — they have no `content` row, so a watch_history insert
+ *     would FK-violate.
+ *   - Positions under 5 seconds never persist — bailing out of a
+ *     title shouldn't leave a "resume" card on the home shelf.
+ *   - Episode sessions write the *series* id as `content_id` (FK
+ *     target — series rows live in `content`; episode rows live in
+ *     `episodes`) plus the episode id in the nullable `episode_id`
+ *     column.
+ *   - Movie sessions write `item.id` as `content_id`, `episodeId =
+ *     null`.
+ *
+ * Returns null when the contract says skip; returns a [ResumePointWrite]
+ * the controller threads into `WatchHistoryRepository.upsert(...)`
+ * verbatim.
+ *
+ * Public-ish (internal) so the app-side test harness in
+ * `app/src/test/.../ResumePointDecisionTest.kt` can exercise the full
+ * matrix without instantiating the controller.
+ */
+internal fun resumePointDecision(
+    item: ContentItem?,
+    episode: Playable.Episode?,
+    positionSeconds: Long,
+    durationSeconds: Long?,
+): ResumePointWrite? {
+    if (item == null) return null
+    if (item.type == ContentType.LIVE) return null
+    if (item.id.startsWith(PlaybackController.LOCAL_RECORDING_ID_PREFIX)) return null
+    if (positionSeconds < 5L) return null
+    return if (episode != null) {
+        ResumePointWrite(
+            contentId = episode.seriesId,
+            episodeId = episode.id,
+            positionSeconds = positionSeconds,
+            durationSeconds = durationSeconds,
+        )
+    } else {
+        ResumePointWrite(
+            contentId = item.id,
+            episodeId = null,
+            positionSeconds = positionSeconds,
+            durationSeconds = durationSeconds,
+        )
+    }
+}
+
+internal data class ResumePointWrite(
+    val contentId: String,
+    val episodeId: String?,
+    val positionSeconds: Long,
+    val durationSeconds: Long?,
+)
