@@ -125,7 +125,7 @@ User-set ordering for the immediate next sessions (overrides Stage 5 default ord
 4. ✅ **MK.22 — Motion polish** — Sprint A shipped 2026-04-28 (`94bb577`): closed MB-221 (sidebar focus → expand felt-lag) + MB-222 (OnNowTile frozen clock). Sprint B shipped 2026-04-28 (`41a83ac`): 7 polish fixes (Settings tab focus retry skip for cheap tabs, HexSurface 5-spring collapse, tab shadow tween, hero crossfade timing, CategoryRail debounce, remove `remember(index)` wrappers, hero backdrop debounce). User confirmed "yes its better" hands-on.
 5. ✅ **MK.23 — Test hardening** — Sprint C shipped 2026-04-28 (3 commits, `3ab8311` → `0ce8333`): PlaybackController.persistResumePoint regression suite (11 tests via extracted `resumePointDecision` pure function), BulkContentWriter.abortSource cross-source FK survival, FavoritesRepository multi-list (10 tests covering MK.13.4). Sprint D shipped 2026-04-28 (7 commits, `a51907c` → `88d67c1`): finishSource failure path, SourceSyncCoordinator re-entrancy (with refactor to drop Context dependency), syncSource cancellation, WatchHistory orphan rows, EPG re-sync vs `recording_schedules.programme_id` SET NULL, v9 → v10 migration, schedule.recording_id SET NULL.
 6. ✅ **MK.24 — Audit follow-ups + heap-pressure bug — COMPLETE 2026-04-28**. All 6 sprints shipped: H (4 MB filings) + E (4 test gap closures, closes MB-225 + MB-226) + I (heap-pressure root-cause + 3 fixes, MB-230 first-fix) + F (closed by audit, no items) + G.1 (5 per-hop migration tests, closes MB-227) + G.2 (corruption-recovery extraction + 9 tests, closes MB-228). ~14 commits. 6 follow-up items tracked as 24.I.X.1–6 (heap-pressure soak items — pick up only if F3 Sentry probe fires in the wild). MB-229 still blocked on MB-230 verification.
-7. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones. Subsumes the original "MB-208 / MB-209 / MB-210 receiver-path test hardening" item — those tests are largely covered by MK.23 Sprint D and the existing recording-subsystem tests added 2026-04-27.
+7. **Polish sweep** — MK.20 follow-ups. Multi-word region parsing + 10 missing 2-letter codes (BG/CZ/HR/HU/IS/KZ + BH/OM/PS/LY) shipped 2026-04-28 (`5eef8a0`). **Remaining:** pin-a-bucket (UI feature — let user pin a parent like "Arabic" to top of root list, not just children). Also any UX leftovers from prior milestones. Subsumes the original "MB-208 / MB-209 / MB-210 receiver-path test hardening" item — those tests are largely covered by MK.23 Sprint D and the existing recording-subsystem tests added 2026-04-27.
 8. ✅ **MB-224 — Set up CI** — shipped 2026-04-28. `.github/workflows/android-tests.yml` runs `:shared:testDebugUnitTest`, `:app:testDebugUnitTest`, `:app:assembleDebug` on every push to `master` + every PR targeting master. Java 17 Temurin + Android SDK 35 + Gradle cache keyed on wrapper + build files. Side-fix: `gradlew` exec bit was missing in git tracking (Windows authorship); fixed via `git update-index --chmod=+x` + workflow `chmod +x` belt-and-suspenders. Linux runner re-enables SQLDelight build-time migration verification that's Windows-disabled locally — extra safety net.
 
 After this queue clears, return to Stage 5 default order (5.2 sideload auto-update, 5.3 a11y audit, …).
@@ -682,10 +682,20 @@ This collapses MK.20 to almost-pure read-side work. One small migration only if 
 
 **Risky slice.** Focus model is the bulk of the cost. ~4–6 hours including the cascade-nav audit + manual Fire TV pass.
 
+### MK.20 polish-sweep status (2026-04-28)
+
+Three follow-ups noted in the active work queue:
+
+| Item | Status | Notes |
+|---|---|---|
+| Multi-word region names | ✅ done | `5eef8a0` — replaced single-word regex with delimiter-scan + catalog lookup. "Saudi Arabia | …", "South Korea | …", "Hong Kong | …", etc now bucket correctly. |
+| Missing 2-letter codes (BG/CZ/HR/HU/IS/KZ + ...) | ✅ done | `5eef8a0` — added 10 codes. Catalog now ~62 regions + 12 languages. |
+| Pin-a-bucket | 🟡 pending | UI feature — let user pin a parent (e.g. "Arabic") to top of root list, not just children. Larger slice; see Slice 20.3.4 + 20.3 design notes. |
+
 ### Out of scope for MK.20 (file as MB-* / future MK if asked)
 
 - In-app catalog editor ("rename AR to العربية"): defer to a later milestone. Static catalog file is enough for v1.
-- Pinning a whole parent bucket (mentioned in 20.3.4): file as MB-* if user asks.
+- Pinning a whole parent bucket (mentioned in 20.3.4): see status table above.
 - Forced-alphabetical override: don't add until requested. Provider order + smart grouping are already two axes; a third makes the mental model muddy.
 - `Search` rails: no hierarchy. FTS is type-rail driven; categories don't apply.
 - Stalker portals: groups arrive via `category_id → category_title`; same `parsePrefix` approach works on the title string. Confirm during 20.2.4 against a Stalker fixture.
