@@ -1,49 +1,32 @@
 package com.yancotv.android.ui.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.BufferProfile
 import com.yancotv.android.prefs.DefaultExternalPlayer
 import com.yancotv.android.prefs.ExternalPlayerBucket
 import com.yancotv.android.prefs.ResizeMode
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * Playback preferences — resize mode, auto-play next, default audio +
- * subtitle language. Every toggle writes through [AppPreferences] which
- * backs the `settings` table, so state survives process restart and
- * every read site (PlaybackController, PlayerActivity) sees the same
- * value.
- *
- * A few of the toggles' *effects* need follow-up wiring in the
- * consumers (PlaybackController honours some of them only after its
- * next play call; PlayerView.resizeMode reads on attach). That is
- * deliberate — this screen is the single source of truth, and the
- * downstream integration lands per-consumer in their own patches.
+ * Playback preferences. Each section maps cleanly onto a [SettingsRow]
+ * frame around either a chip strip ([SettingsChipRow]) or one of the
+ * existing toggles / fields. Buffer + decoder + resize have first-class
+ * support; external-player picks per content bucket nest under their
+ * own section since the option set varies with the installed apps.
  */
 @Composable
 fun SettingsPlaybackTab(
@@ -51,181 +34,130 @@ fun SettingsPlaybackTab(
     prefs: AppPreferences = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
-    val snapshot by prefs.playbackFlow.collectAsStateValue()
+    val snapshot by prefs.playbackFlow.collectAsState()
+    val externalSnap by prefs.externalPlayerFlow.collectAsState()
+    val ctx = LocalContext.current
+    val installed = remember(ctx) { ExternalPlayer.installed(ctx) }
 
     Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+                .verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            text = "Playback",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        // ── Resize mode ──
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        SettingsSection(
+            title = "Video",
+            sub = "Aspect-ratio handling and decoder behaviour. Picks apply on the next stream load.",
         ) {
-            Text(
-                text = "Video resize",
-                color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "How the stream's frame is mapped to the player's area. Fit preserves aspect ratio with letterboxing; Fill stretches to the screen edges; Zoom crops to fill without letterboxing.",
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (mode in ResizeMode.values()) {
-                    SettingsChip(
-                        label = mode.displayName,
-                        selected = snapshot.resizeMode == mode,
-                        onClick = {
-                            scope.launch { prefs.setResizeMode(mode) }
-                        },
+            SettingsRow(
+                label = "Resize mode",
+                hint = "Fit preserves aspect ratio with letterboxing; Fill stretches to the screen edges; Zoom crops to fill without letterboxing.",
+                content = {
+                    SettingsChipRow(
+                        options = ResizeMode.values().toList(),
+                        selected = snapshot.resizeMode,
+                        label = { it.displayName },
+                        onSelect = { mode -> scope.launch { prefs.setResizeMode(mode) } },
                     )
-                }
-            }
+                },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Buffer profile",
+                hint = "Trades startup speed against rebuffer resilience. Restart playback to apply.",
+                content = {
+                    SettingsChipRow(
+                        options = BufferProfile.values().toList(),
+                        selected = snapshot.bufferProfile,
+                        label = { it.displayName },
+                        onSelect = { profile -> scope.launch { prefs.setBufferProfile(profile) } },
+                    )
+                },
+            )
+            SettingsRowSpacer()
+            SettingsToggleRow(
+                label = "Enable decoder fallback",
+                description = "If a hardware decoder fails to start, retry on the software decoder. Turn off to surface decoder errors directly (debugging only).",
+                checked = snapshot.enableDecoderFallback,
+                onCheckedChange = { scope.launch { prefs.setDecoderFallback(it) } },
+            )
         }
 
-        // MB-107a: shared focus-aware row, see [SettingsToggleRow].
-        SettingsToggleRow(
-            label = "Auto-play next episode",
-            description = "When a series episode ends, automatically continue to the next episode in the same season.",
-            checked = snapshot.autoPlayNext,
-            onCheckedChange = { scope.launch { prefs.setAutoPlayNext(it) } },
-        )
-
-        // ── Default audio + subtitle language ──
-        // MB-117: SettingsClickToEditField — IME only on explicit OK press.
-        // The lowercase + 6-char cap lives in the onValueChange shim.
-        SettingsClickToEditField(
-            label = "Preferred audio language",
-            description = "Two- or three-letter ISO 639 code (e.g. en, eng, fre). Applied when a stream ships multiple audio tracks.",
-            value = snapshot.audioLanguage,
-            onValueChange = { scope.launch { prefs.setAudioLanguage(it.take(6).lowercase()) } },
-            keyboardType = KeyboardType.Ascii,
-        )
-        SettingsClickToEditField(
-            label = "Preferred subtitle language",
-            description = "ISO 639 code. Blank = subtitles off by default.",
-            value = snapshot.subtitleLanguage,
-            onValueChange = { scope.launch { prefs.setSubtitleLanguage(it.take(6).lowercase()) } },
-            keyboardType = KeyboardType.Ascii,
-        )
-
-        // MK.17.4 — buffer profile presets. Picks land on the next
-        // ExoPlayer rebuild (channel zap / app restart). Default
-        // BALANCED matches the pre-prefs hardcode.
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "Buffer profile",
-                color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+        SettingsSection(
+            title = "Continuity",
+            sub = "What YancoTV does between two pieces of content.",
+        ) {
+            SettingsToggleRow(
+                label = "Auto-play next episode",
+                description = "When a series episode ends, automatically continue to the next episode in the same season.",
+                checked = snapshot.autoPlayNext,
+                onCheckedChange = { scope.launch { prefs.setAutoPlayNext(it) } },
             )
-            Text(
-                text = "Trades startup speed against rebuffer resilience. Restart playback to apply.",
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (profile in com.yancotv.android.prefs.BufferProfile.values()) {
-                    SettingsChip(
-                        label = profile.displayName,
-                        selected = snapshot.bufferProfile == profile,
-                        onClick = {
-                            scope.launch { prefs.setBufferProfile(profile) }
-                        },
-                    )
-                }
-            }
         }
 
-        // MK.17.3 — decoder fallback toggle. Default ON; flipping off
-        // makes hard codec failures more visible (the player will
-        // surface an error rather than silently retry on a different
-        // renderer).
-        SettingsToggleRow(
-            label = "Enable decoder fallback",
-            description = "If a hardware decoder fails to start, retry on the software decoder. Turn off to surface decoder errors directly (debugging only).",
-            checked = snapshot.enableDecoderFallback,
-            onCheckedChange = { scope.launch { prefs.setDecoderFallback(it) } },
-        )
+        SettingsSection(
+            title = "Languages",
+            sub = "Defaults applied when a stream ships multiple audio or subtitle tracks.",
+        ) {
+            SettingsClickToEditField(
+                label = "Preferred audio language",
+                description = "Two- or three-letter ISO 639 code (e.g. en, eng, fre).",
+                value = snapshot.audioLanguage,
+                onValueChange = { scope.launch { prefs.setAudioLanguage(it.take(6).lowercase()) } },
+                keyboardType = KeyboardType.Ascii,
+                hint = "—",
+            )
+            SettingsRowSpacer()
+            SettingsClickToEditField(
+                label = "Preferred subtitle language",
+                description = "ISO 639 code. Blank = subtitles off by default.",
+                value = snapshot.subtitleLanguage,
+                onValueChange = { scope.launch { prefs.setSubtitleLanguage(it.take(6).lowercase()) } },
+                keyboardType = KeyboardType.Ascii,
+                hint = "—",
+            )
+        }
 
-        // MK.18.2 — default external player per content bucket. The
-        // installed-app probe runs once on tab entry; toggling it during
-        // a session won't pick up a freshly-installed player without a
-        // recompose. Acceptable for v1 (Settings is rarely re-entered
-        // mid-task). Picks become effective on the next launch from any
-        // surface (HomeScreen, Favorites, Recommendations cards, etc.)
-        // because PlayerLauncher reads the pref synchronously before
-        // starting the fullscreen activity.
-        val externalSnap by prefs.externalPlayerFlow.collectAsStateValue()
-        val ctx = LocalContext.current
-        val installed = remember(ctx) { ExternalPlayer.installed(ctx) }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = "Default player",
-                color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Hand off playback to a third-party app per content type. Internal keeps the in-app player; only installed apps appear.",
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
-            )
-            ExternalPlayerBucket.values().forEach { bucket ->
+        SettingsSection(
+            title = "Default player",
+            sub = "Hand off playback to a third-party app per content type. Internal keeps the in-app player; only installed apps appear in the picker.",
+        ) {
+            ExternalPlayerBucket.values().forEachIndexed { idx, bucket ->
+                if (idx > 0) SettingsRowSpacer()
                 val current =
                     when (bucket) {
                         ExternalPlayerBucket.LIVE -> externalSnap.live
                         ExternalPlayerBucket.MOVIE -> externalSnap.movie
                         ExternalPlayerBucket.SERIES -> externalSnap.series
                     }
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = bucketLabel(bucket),
-                        color = LocalYancoPalette.current.TextPrimary,
-                        fontSize = 13.sp,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettingsChip(
-                            label = "Internal",
-                            selected = current == DefaultExternalPlayer.INTERNAL,
-                            onClick = {
-                                scope.launch {
-                                    prefs.setDefaultExternalPlayer(bucket, DefaultExternalPlayer.INTERNAL)
-                                }
-                            },
-                        )
-                        DefaultExternalPlayer.values()
-                            .filter { it.app != null && it.app in installed }
-                            .forEach { choice ->
-                                SettingsChip(
-                                    label = choice.displayName,
-                                    selected = current == choice,
-                                    onClick = {
-                                        scope.launch { prefs.setDefaultExternalPlayer(bucket, choice) }
-                                    },
+                SettingsRow(
+                    label = bucketLabel(bucket),
+                    kicker = bucketKicker(bucket),
+                    content = {
+                        val available =
+                            buildList {
+                                add(DefaultExternalPlayer.INTERNAL)
+                                addAll(
+                                    DefaultExternalPlayer.values()
+                                        .filter { it.app != null && it.app in installed },
                                 )
                             }
-                    }
-                }
+                        SettingsChipRow(
+                            options = available,
+                            selected = current,
+                            label = { choice ->
+                                if (choice == DefaultExternalPlayer.INTERNAL) {
+                                    "Internal"
+                                } else {
+                                    choice.displayName
+                                }
+                            },
+                            onSelect = { choice ->
+                                scope.launch { prefs.setDefaultExternalPlayer(bucket, choice) }
+                            },
+                        )
+                    },
+                )
             }
         }
     }
@@ -235,10 +167,12 @@ private fun bucketLabel(bucket: ExternalPlayerBucket): String =
     when (bucket) {
         ExternalPlayerBucket.LIVE -> "Live TV"
         ExternalPlayerBucket.MOVIE -> "Movies"
-        ExternalPlayerBucket.SERIES -> "Series & episodes"
+        ExternalPlayerBucket.SERIES -> "Series &amp; episodes"
     }
 
-// Small convenience — .collectAsState() returns State<T>, `by` delegates
-// to its `.value` via the `getValue` import at the top.
-@Composable
-private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateValue(): androidx.compose.runtime.State<T> = collectAsState()
+private fun bucketKicker(bucket: ExternalPlayerBucket): String =
+    when (bucket) {
+        ExternalPlayerBucket.LIVE -> "LIVE"
+        ExternalPlayerBucket.MOVIE -> "VOD"
+        ExternalPlayerBucket.SERIES -> "EPISODES"
+    }

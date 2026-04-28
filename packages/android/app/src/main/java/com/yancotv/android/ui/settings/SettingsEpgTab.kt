@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,7 +13,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,15 +29,11 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * EPG tab — hosts diagnostics + URL editor (via [GuideSyncPanel]) plus
- * MK.15.1 / 15.2 display prefs (days back/forward, visible timeline).
- *
- * Controls are deliberately TV-focusable:
- *   - Days are stepped via −/+ buttons (Material3 [androidx.compose.material3.Slider]
- *     doesn't honour D-pad LEFT/RIGHT cleanly on Fire TV).
- *   - Timeline span uses [SettingsChip] which is the same focus surface
- *     the rest of the settings screens use, so the focus ring renders
- *     consistently and CENTER picks the chip.
+ * EPG tab — diagnostics + URL editor (via [GuideSyncPanel]) plus the
+ * MK.15.1 / 15.2 display prefs (days back/forward, visible timeline)
+ * and MK.15.7 source priority. Re-skinned onto [SettingsSection] /
+ * [SettingsRow] / [SettingsSlider] so the type scale matches the rest
+ * of Settings.
  */
 @UnstableApi
 @Composable
@@ -50,8 +44,6 @@ fun SettingsEpgTab(
 ) {
     val epg by prefs.epgFlow.collectAsState()
     val scope = rememberCoroutineScope()
-    // MK.15.7 — reactive source list for the EPG priority section.
-    // Sorted highest-priority first so the user sees winners on top.
     val allSources by sources.allFlow().collectAsState(initial = emptyList())
     val orderedSources =
         remember(allSources) { allSources.sortedByDescending { it.epgPriority } }
@@ -62,63 +54,75 @@ fun SettingsEpgTab(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
     ) {
-        GuideSyncPanel(
-            compact = false,
-            onRefreshed = { /* Settings doesn't re-query guide data */ },
-        )
+        // Sync panel keeps its own card chrome — handed in as-is so the
+        // diagnostics summary at the top of the tab matches what
+        // appears on Home.
+        Column(modifier = Modifier.padding(bottom = 12.dp)) {
+            GuideSyncPanel(
+                compact = false,
+                onRefreshed = { /* Settings doesn't re-query guide data */ },
+            )
+        }
 
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        SettingsSection(
+            title = "Guide window",
+            sub = "How far back catch-up is fetched and how far forward upcoming programmes load.",
         ) {
-            SectionHeader(text = "Guide window")
-
-            DaysStepper(
-                label = "Days back (catch-up)",
-                value = epg.daysBack,
-                range = 0..14,
-                onChange = { v -> scope.launch { prefs.setEpgDaysBack(v) } },
-            )
-            DaysStepper(
-                label = "Days forward (upcoming)",
-                value = epg.daysForward,
-                range = 1..14,
-                onChange = { v -> scope.launch { prefs.setEpgDaysForward(v) } },
-            )
-
-            SectionHeader(text = "Timeline density")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EpgPrefs.TIMELINE_PRESETS.forEach { minutes ->
-                    SettingsChip(
-                        label = "$minutes min",
-                        selected = epg.timelineMinutes == minutes,
-                        onClick = { scope.launch { prefs.setEpgTimelineMinutes(minutes) } },
+            SettingsRow(
+                label = "Days back",
+                hint = "Catch-up window. Higher values increase the EPG payload pulled at every refresh.",
+                content = {
+                    SettingsSlider(
+                        value = epg.daysBack,
+                        range = 0..14,
+                        unit = " d",
+                        presets = listOf(0, 1, 3, 7),
+                        onValueChange = { v -> scope.launch { prefs.setEpgDaysBack(v) } },
                     )
-                }
-            }
+                },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Days forward",
+                hint = "Upcoming-programme window — applies to the guide and reminders.",
+                content = {
+                    SettingsSlider(
+                        value = epg.daysForward,
+                        range = 1..14,
+                        unit = " d",
+                        presets = listOf(1, 3, 7, 14),
+                        onValueChange = { v -> scope.launch { prefs.setEpgDaysForward(v) } },
+                    )
+                },
+            )
+        }
 
-            // MK.15.7 — multi-EPG source priority. When two sources cover
-            // the same `tvg_id`, the higher-priority source wins. List is
-            // ordered highest-first; ↑ raises this source above the one
-            // currently above it (swap priorities), ↓ does the inverse.
-            // Single-source installs see one row with the controls
-            // disabled. Edits propagate to EpgRepository's read queries
-            // (LEFT JOIN sources + ORDER BY epg_priority DESC) on the
-            // next read; nothing to invalidate here.
-            if (orderedSources.isNotEmpty()) {
-                SectionHeader(text = "Source priority (multi-EPG)")
-                Text(
-                    text =
-                        "When two sources provide programmes for the same channel, the higher-priority " +
-                            "source wins. Reorder with the arrows.",
-                    color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+        SettingsSection(
+            title = "Timeline density",
+            sub = "How many minutes of the timeline are visible at once in the guide grid.",
+        ) {
+            SettingsRow(
+                label = "Visible window",
+                content = {
+                    SettingsChipRow(
+                        options = EpgPrefs.TIMELINE_PRESETS.map { "$it min" },
+                        selected = "${epg.timelineMinutes} min",
+                        onSelect = { selection ->
+                            val minutes = selection.removeSuffix(" min").toIntOrNull() ?: return@SettingsChipRow
+                            scope.launch { prefs.setEpgTimelineMinutes(minutes) }
+                        },
+                    )
+                },
+            )
+        }
+
+        if (orderedSources.isNotEmpty()) {
+            SettingsSection(
+                title = "Source priority",
+                sub = "When two sources provide programmes for the same channel, the higher-priority source wins. Reorder with the arrows.",
+            ) {
                 orderedSources.forEachIndexed { idx, src ->
+                    if (idx > 0) SettingsRowSpacer()
                     EpgPriorityRow(
                         source = src,
                         canMoveUp = idx > 0,
@@ -127,8 +131,6 @@ fun SettingsEpgTab(
                             val above = orderedSources[idx - 1]
                             val a = src.epgPriority
                             val b = above.epgPriority
-                            // If they happen to share the same priority, bump
-                            // ours by 1 to break the tie and put us on top.
                             val newSelf = if (a == b) b + 1 else b
                             val newAbove = if (a == b) b else a
                             scope.launch(Dispatchers.IO) {
@@ -162,92 +164,26 @@ private fun EpgPriorityRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = source.name,
-                color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Priority ${source.epgPriority}",
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
-            )
-        }
-        if (canMoveUp) {
-            SettingsChip(label = "↑", selected = false, onClick = onMoveUp)
-        }
-        if (canMoveDown) {
-            SettingsChip(label = "↓", selected = false, onClick = onMoveDown)
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text.uppercase(),
-        color = LocalYancoPalette.current.TextMuted,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+    SettingsRow(
+        label = source.name,
+        kicker = "PRIORITY ${source.epgPriority}",
+        right = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (canMoveUp) {
+                    SettingsChip(label = "↑", selected = false, onClick = onMoveUp)
+                }
+                if (canMoveDown) {
+                    SettingsChip(label = "↓", selected = false, onClick = onMoveDown)
+                }
+                if (!canMoveUp && !canMoveDown) {
+                    Text(
+                        text = "Only source",
+                        color = LocalYancoPalette.current.TextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        },
     )
-}
-
-/**
- * Two-button stepper. CENTER on −/+ steps the value by 1 within
- * [range]; D-pad LEFT/RIGHT moves focus between the buttons. Replaces
- * Material3 Slider, which on Fire TV silently swallows CENTER.
- */
-@Composable
-private fun DaysStepper(
-    label: String,
-    value: Int,
-    range: IntRange,
-    onChange: (Int) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = label,
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 14.sp,
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SettingsChip(
-                label = "−",
-                selected = false,
-                onClick = {
-                    if (value > range.first) onChange(value - 1)
-                },
-            )
-            Text(
-                text = "$value day${if (value == 1) "" else "s"}",
-                color = LocalYancoPalette.current.Accent,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-            SettingsChip(
-                label = "+",
-                selected = false,
-                onClick = {
-                    if (value < range.last) onChange(value + 1)
-                },
-            )
-            Text(
-                text = "(${range.first}–${range.last})",
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
-            )
-        }
-    }
 }
