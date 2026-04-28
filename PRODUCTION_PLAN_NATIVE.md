@@ -115,15 +115,16 @@ YancoTV/                        # pnpm workspace root (desktop stays pnpm)
 
 **v1.0 = a packed, signed, distributed APK that's complete and safe for daily personal use or store publishing.** No timeline — work proceeds at user's pace.
 
-### Active work queue (set 2026-04-27)
+### Active work queue (last updated 2026-04-28)
 
 User-set ordering for the immediate next sessions (overrides Stage 5 default order):
 
-1. **MK.19.8 / Stage 5.1 — Backup / restore** (slices 19.8.1 → 19.8.6 shipped 2026-04-27; 19.8.7 two-Fire-TV verification deferred until second device is in hand)
-2. **MK.13.3 — Channel actions: custom-logo SAF picker** (revisit "on hold" UX decision, then close out)
-3. **Settings redesign** (full UX overhaul of the settings shell — to be scoped as MK.21 in a follow-up investigation session)
-4. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones
-5. **MB-208 / MB-209 / MB-210 receiver-path test hardening** — pinned before or alongside the polish sweep
+1. ✅ **MK.19.8 / Stage 5.1 — Backup / restore** — slices 19.8.1 → 19.8.6 shipped 2026-04-27. **19.8.7 two-Fire-TV verification deferred** until second device is in hand.
+2. ✅ **MK.13.3 — Channel actions: custom-logo SAF picker** — **dropped** 2026-04-27 (`e88c7f2`). UX decision: SAF picker was the wrong shape for the use case; revisit only if user requests.
+3. ✅ **MK.21 — Settings redesign** — Concept A "Configure" layout shipped across ~14 commits (`fd0dd2d` → `01690cb`, 2026-04-27 → 2026-04-28). Hex-cut sidebar + content pane, breadcrumb, unified `SettingsSection` / `SettingsRow` / `SettingsToggleRow` / `SettingsAccentButton` / `SettingsClickToEditField` primitives, source detail screen, per-source auto-sync toggle (MB-220 fix landed alongside this), EPG tab redesign (drops the embedded `GuideSyncPanel` card), scroll-bottom safety margin (root cause: `BringIntoViewSpec` was pinning the focused row to the panel border; fixed in `87fc40d` with a density-aware safe-margin spec). Footer (version + fake SYNCED chip) dropped 2026-04-28 (`01690cb`).
+4. **MK.22 — Motion polish** — Sprint A (felt-lag fix: MB-221 sidebar expand + MB-222 OnNowTile clock) then Sprint B (polish: 200ms tab focus retry, HexSurface 5-spring collapse, hero crossfade timing). See "MK.22 — Motion polish" section below.
+5. **MK.23 — Test hardening** — Sprint C (Critical: PlaybackController.persistResumePoint, BulkContentWriter.abortSource cross-source FK survival, FavoritesRepository multi-list) then Sprint D (High/Medium: SourceSyncCoordinator re-entrancy, syncSource cancellation, migration v8/v9, reminders FK SET NULL on EPG re-sync). See "MK.23 — Test hardening" section below.
+6. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones. Subsumes the original "MB-208 / MB-209 / MB-210 receiver-path test hardening" item — those tests are largely covered by MK.23 Sprint D and the existing recording-subsystem tests added 2026-04-27.
 
 After this queue clears, return to Stage 5 default order (5.2 sideload auto-update, 5.3 a11y audit, …).
 
@@ -703,6 +704,165 @@ This collapses MK.20 to almost-pure read-side work. One small migration only if 
 | **Total** | **7–11 h** | — |
 
 Each slice is independently shippable; recommended order is 20.1 → 20.2 → 20.3.
+
+---
+
+## MK.21 — Settings redesign — shipped 2026-04-27 → 2026-04-28
+
+**Concept A "Configure" layout** per Claude Design's Frosted Emerald spec. Promised in the 2026-04-27 active work queue, scoped and shipped across 14 commits — back-filled here so the catalog reflects what landed.
+
+### Slices (all ✅ shipped)
+
+| # | Task | Commit(s) | Notes |
+|---|---|---|---|
+| MK.21.1 | Settings shell — 380 dp hex-cut sidebar + content pane, breadcrumb, hex-nav rail of 12 tabs (Subtitles/Notifications/Storage placeholders dropped from sidebar; files stay in tree for post-v1) | `fd0dd2d` (escape semantics), `b89918e` (RIGHT-commits-tab + BACK), `ae6dc25` (drop placeholder tabs), `01690cb` (drop fake SYNCED footer) | `SettingsScreen.kt` |
+| MK.21.2 | Shared primitives: `SettingsSection`, `SettingsRow`, `SettingsSlider`, `SettingsKicker`, `SettingsSelect`, `SettingsChipRow`, `SettingsToggleRow`, `SettingsClickToEditField`, `SettingsAccentButton` (with translucent variant), `SettingsOutlinedButton`, `SettingsDangerButton`, `SettingsInlineSwitch`, `SettingsChip` | `4828b33` and earlier | `SettingsPrimitives.kt`, `SettingsButton.kt`, `SettingsTextField.kt`, `SettingsToggleRow.kt` |
+| MK.21.3 | Per-tab redesigns onto the primitives — General, Appearance, Playback, Network, EPG, Backup, About, Shortcuts, Parental, Recordings, Groups | `4828b33`, `bf6bcf7`, `87fc40d`, several earlier | EPG tab dropped the embedded `GuideSyncPanel` card and inlined diagnostics + override URL as native `SettingsSection` rows (`87fc40d`) |
+| MK.21.4 | Sources list redesign + `SourceDetailScreen` — row-as-card opens detail pane; per-source URL/credentials/EPG/UA/Referer editor; SAVE/SYNC/DELETE compact buttons; `PlacedFocusAnchor` on BACK button | several | Detail pane replaces the list view via `selectedSourceId` `rememberSaveable`; row click opens, BACK clears |
+| MK.21.5 | **Per-source "auto-sync on app start" toggle** + backing schema (`9.sqm` v8 → v9 added `auto_sync_on_start INTEGER NOT NULL DEFAULT 0`) + threading through `Source` / `SourceRepository` / `BackupFileV1.SourceRecord` / backup exporter + importer | `f157250` | MainActivity reads sources where the flag is set on `onCreate`, kicks `SourceSyncCoordinator.start` for each (sequential — coordinator gates concurrent syncs). **Caveat:** the schema-add broke 10 `:shared:androidUnitTest` files until 2026-04-28 (MB-223). |
+| MK.21.6 | Unified Settings escape semantics — LEFT and BACK both mean "escape one level up" (tab content → active tab in sidebar; tab sidebar → main app sidebar); per-row `leftExitsTo()` boundaries via `LocalActiveSettingsTabFocus` so chip-row LEFT navigation stays in-row but the moment LEFT crosses the row boundary it lands on the active tab | `fd0dd2d`, `b89918e` | Replaces a buggy `moveFocus(Left)` that returned false silently when there was no spatial neighbour |
+| MK.21.7 | Symmetric hex breadcrumb chips (`YancoShapes.HexCapsuleSoft`) replacing the asymmetric `ChipBevel`; logo + "Settings" wordmark via `Arrangement.SpaceBetween` (logo right, title left) | several | 64 dp logo height calibrated for 3 m readability on Fire TV |
+| MK.21.8 | **Scroll-bottom safety margin** — `BringIntoViewSpec` was bringing the focused row's trailing edge to *exactly* `containerSize`, pinning the focused last row to the panel border. The per-tab `bottom = 80.dp` lived inside the scroll content but BringIntoView only positions the focused element; padding never scrolled into view. | `87fc40d` | Replaced with `rememberSafeMarginBringIntoViewSpec()` (density-aware, leaves 32 dp gap above/below focused row). All 12 tabs now use `padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp)` consistently. |
+
+### Out of scope (post-v1 / future MK)
+
+- Subtitles / Notifications / Storage tabs — placeholder bodies remain in tree but are not wired into the sidebar. Re-enable when underlying features ship (e.g. notifications channel post-MK.10, storage manager when recording UX matures).
+- Two-Fire-TV verification of the auto-sync-on-start flow — same blocker as MK.19.8.7 (need second device).
+
+---
+
+## MK.22 — Motion polish — investigated 2026-04-28
+
+**Why now.** User-reported lag, headlined by the main app sidebar (HomeScreen) feeling slow on focus — when collapsed and the user navigates back to it, expansion doesn't fire immediately. Motion auditor (general-purpose subagent, run 2026-04-28) traced the headline complaint and surveyed the rest of the motion surface.
+
+### Investigation findings (motion auditor 2026-04-28)
+
+The audit produced a prioritized punch list of 16 items across P0/P1/P2. The one root cause behind the user's complaint is **MB-221** — a 120 ms hard delay before the sidebar focus flip + a spring tail on the width animation + 9 simultaneous per-row label animations. Total perceived: ~370 ms gap before the sidebar feels open, of which ~250 ms is fixable with three small edits.
+
+The audit also caught a real correctness bug: **MB-222** — `OnNowTile.nowSec` is captured once at first composition and never updates, so live-programme progress bars never advance.
+
+The remaining items group into Sprint B (polish):
+- Settings tab focus retry ladder (`SettingsScreen.kt:184-202`) — 3-frame `withFrameNanos` chain + 2 retries on every tab click; cheap tabs (Appearance, About, Shortcuts, Backup) don't need both retries.
+- `HexSurface` runs 5 parallel springs per focusable card — collapse to 2 (one shared scale/translate/elevation, hard-switch border).
+- `SettingsScreen.TabItem` shadow elevation pops 0 → 18 dp instantly while the scale tweens smoothly — visual mismatch.
+- `HomeContent.kt` hero cross-fade at 420 ms fadeIn / 280 ms fadeOut feels heavy because both layers paint full-bleed AsyncImage + 3 gradients + text simultaneously.
+- `CategoryRail` pill `LaunchedEffect(focused)` triggers `onSelect(group)` on every focus tick — D-pad arrow-spam churns the StateFlow + DB query.
+- `HomeContent.kt:715, 747, 779` `remember(index) { Modifier.wheelItemTransform(...) }` defeats the purpose of `remember` (closes over `listState`) — code-hygiene fix.
+
+Full audit report archived in commit log (parent of `acc86e9`); top items reproduced inline below.
+
+### Slice 22.A — Felt-lag fix (Sprint A) — closes MB-221 + MB-222
+
+Highest-leverage, smallest-effort. The single biggest user-visible win is fix #1 — that alone removes 120 ms of dead air. Together with #2 + #3 the sidebar should feel ~250 ms faster.
+
+| # | Task | File:line | Status | DoD |
+|---|---|---|---|---|
+| 22.A.1 | **Drop the `delay(120)` preamble** in `LaunchedEffect(section)` that gates `panelFocus` flip + `mainContentFocus.requestFocus()`. Original "wait for old composable to leave" justification is obsolete now that section content uses `key()`. If a beat is still needed, replace with a single `withFrameNanos { }`. | [HomeScreen.kt:184-199](packages/android/app/src/main/java/com/yancotv/android/ui/shell/HomeScreen.kt) | 🔴 new | Sidebar starts visibly expanding within one frame of focus arrival; no perceptible "not responding" gap. |
+| 22.A.2 | **Replace `animateDpAsState(spring(0.85f, 320f))` with `tween(180, FastOutSlowIn)`** on the sidebar width. Width-only animation; no need for spring physics or its overshoot tail. | [AppSidebar.kt:100-105](packages/android/app/src/main/java/com/yancotv/android/ui/shell/AppSidebar.kt) | 🔴 new | Sidebar opens in 180 ms with no overshoot. Visually settles cleanly at 260 dp. |
+| 22.A.3 | **Drop the per-row `AnimatedVisibility(expandHorizontally / shrinkHorizontally)`** on every row label — that's ~9 simultaneous layout-shifting animations contending with the parent width animation. Replace with static `if (showLabel) Text(...)` plus a single shared alpha driven from the parent width animation progress. | [AppSidebar.kt:415-419](packages/android/app/src/main/java/com/yancotv/android/ui/shell/AppSidebar.kt) | 🔴 new | Sidebar expand renders one width animation + one shared alpha curve, not 10 concurrent layout passes. |
+| 22.A.4 | **Hoist the accent-bar animation** to one instance keyed off `current` only; **switch row foreground from `animateColorAsState` to a plain ternary** — focus colour change at 10 ft doesn't need interpolation. | [AppSidebar.kt:325-338](packages/android/app/src/main/java/com/yancotv/android/ui/shell/AppSidebar.kt) | 🔴 new | One accent-bar animation instance; row foreground colors swap instantly on focus change. |
+| 22.A.5 | **Fix `OnNowTile` frozen clock** (MB-222). Lift `nowSec = remember { System.currentTimeMillis() / 1000 }` out of the per-tile composable; add a single `LaunchedEffect` ticking every 30 s in `HomeContent` and pass down as parameter. Mirrors `GuideScreen.kt:330-335`'s shape. | [HomeContent.kt:897](packages/android/app/src/main/java/com/yancotv/android/ui/shell/HomeContent.kt:897) | 🔴 new | Programme progress bars on Home advance over time. Snapshot at t=0 vs t=30s shows different progress percentage. |
+
+**Hands-on verification gate (Fire TV AFTDCT31):** open Home → press LEFT to land on sidebar collapsed → arrow up/down to a different section → press CENTER. Sidebar expands within ~200 ms (was ~370 ms). Repeat 3× to feel the consistency. Wait 60 s on Home with at least one favorited live channel: an On Now tile's progress bar must visibly advance.
+
+### Slice 22.B — Polish (Sprint B)
+
+Lower-leverage but real. Each item is independently shippable.
+
+| # | Task | File:line | Status | DoD |
+|---|---|---|---|---|
+| 22.B.1 | **Skip the Settings tab focus-retry ladder for cheap tabs.** Today every tab click runs `withFrameNanos { } × 2` then `moveFocus(Right)`, then a one-frame retry, then a second `moveFocus(Right)`. Cheap tabs (Appearance, About, Shortcuts, Backup, Recordings, Parental) don't need it. Alternative: bind a `FocusRequester` to the first focusable in each tab body and `requestFocus()` directly. | [SettingsScreen.kt:184-202](packages/android/app/src/main/java/com/yancotv/android/ui/settings/SettingsScreen.kt) | 🔴 new | Settings tab swap latency drops to ~16 ms for cheap tabs (was ~50 ms minimum). |
+| 22.B.2 | **Collapse `HexSurface`'s 5 parallel springs into 2.** Today every focusable card runs scale + translate + elevation + shellBorder springs plus inner-fill colour flip. Collapse to one `animateFloatAsState` driving scale + translate + elevation via a derived value; keep border as a hard switch. | [HexSurface.kt:79-99](packages/android/app/src/main/java/com/yancotv/android/ui/components/HexSurface.kt) | 🔴 new | Focus traversal across a rail of HexSurface tiles drops from 5 springs/tile to 2. |
+| 22.B.3 | **Tween the Settings tab shadow elevation** so the 0 → 18 dp transition matches the smooth scale tween. Or drop to a static low value (8 dp selected, 0 unfocused). Current pop-in reads as "row scales smoothly, halo flashes". | [SettingsScreen.kt:433-438](packages/android/app/src/main/java/com/yancotv/android/ui/settings/SettingsScreen.kt) | 🔴 new | Tab focus animation has consistent timing across scale + shadow. |
+| 22.B.4 | **Cut hero cross-fade durations** in `HomeContent`'s `AnimatedContent` between hero slides — `tween(420)` fadeIn + `tween(280)` fadeOut → `tween(240)` / `tween(200)`. Or switch to `crossfade` (single shared opacity). | [HomeContent.kt:451-457](packages/android/app/src/main/java/com/yancotv/android/ui/shell/HomeContent.kt) | 🔴 new | Hero swap feels snappier without losing the cross-fade. |
+| 22.B.5 | **Debounce `CategoryRail` pill `LaunchedEffect(focused) { onFocused() }`** by 100 ms inside `BrowseSection.onSelect` so D-pad arrow-spam scrolling pills doesn't churn the StateFlow + DB query for every pill the focus passes through. | [CategoryRail.kt:343, 366-374](packages/android/app/src/main/java/com/yancotv/android/ui/shell/CategoryRail.kt) | 🔴 new | Rapid arrow-key traversal across 10 pills triggers 1 commit at the end, not 10 mid-traversal. |
+| 22.B.6 | **Remove the `remember(index)` wrapper on `Modifier.wheelItemTransform(...)`** in 3 rails — the modifier returns a stable lambda-driven `graphicsLayer`; the `remember` adds nothing and closes over `listState` confusingly. Code-hygiene only. | [HomeContent.kt:715, 747, 779](packages/android/app/src/main/java/com/yancotv/android/ui/shell/HomeContent.kt) | 🔴 new | Three line removals; no behaviour change. |
+| 22.B.7 | **Tighten hero backdrop debounce** from 300 ms to 180 ms in `FeatureHero` — the AUTO_PREVIEW_DEBOUNCE_MS=400 ms already gates audio; the image swap can be quicker. | [FeatureHero.kt:155-159](packages/android/app/src/main/java/com/yancotv/android/ui/shell/FeatureHero.kt) | 🔴 new | Hero image refreshes ~120 ms faster as user moves through the rail. |
+
+### Out of scope for MK.22 (file as MB-* / future MK if asked)
+
+- **HomeContent outer `verticalScroll(Column)` → `LazyColumn`** (motion audit P1 #7). Rails currently re-evaluate `layoutInfo` on every vertical scroll because the outer `verticalScroll` keeps every rail in composition. Switching to `LazyColumn` lets off-screen rails fully unmount but is a non-trivial refactor (focus model, scroll restoration, hero pinning). Ship MK.22 felt-lag and polish first; re-evaluate after.
+- Per-tile `wheelItemTransform` micro-tuning — current pattern is documented as correct, just heavy on Fire TV class hardware.
+- TalkBack / a11y motion-reduction respect — Stage 5.3 covers this.
+
+### Cost (honest)
+
+| Slice | Estimate | Risk |
+|---|---|---|
+| 22.A (Sprint A) | 30–60 min | Low — 5 small edits, all reverts of existing animation overhead. Hands-on Fire TV verification dominates. |
+| 22.B (Sprint B) | 1.5–3 h | Low-medium — 7 edits, each independently shippable. Re-test Settings tab swap on Fire TV after 22.B.1. |
+| **Total** | **2–4 h** | — |
+
+Sprint A is one bundled commit (the 5 fixes hit different files but solve one user complaint). Sprint B is 7 small commits.
+
+---
+
+## MK.23 — Test hardening — investigated 2026-04-28
+
+**Why now.** MB-220 was a Critical-class silent-data-loss bug that lived in the codebase for months without being caught. Fix landed 2026-04-28 with two new tests, but the audit asked the obvious question: what other latent bugs of the same family is the test suite NOT catching?
+
+### Investigation findings (test auditor 2026-04-28)
+
+**Inventory:** 37 test files / 428 `@Test` methods on `:shared` (`packages/shared`); 8 test files on Android app proper (`packages/android/app/src/test/`); zero on `androidTest/`. Strong coverage on parsers / classifiers / URL builders / recording sub-units. **Thin coverage on the Android-app side** (PlaybackController, sync orchestration, lifecycle wiring) and on the cascading-FK family that produced MB-220.
+
+The audit produced a prioritized list of 25 missing-coverage gaps:
+
+- **5 Critical** (silent data-loss / corruption class — same family as MB-220)
+- **7 High** (user-visible breakage)
+- **9 Medium** (edge cases)
+- **4 Low** (polish / correctness drift)
+
+Top three highest-leverage to ship first:
+1. `PlaybackController.persistResumePoint` — gates resume across the whole app, **zero tests today**.
+2. `BulkContentWriter.abortSource` cross-source FK survival — direct MB-220 sibling.
+3. `FavoritesRepository` multi-list (Stage 2.2 / MK.13.4 surface) — entirely unguarded.
+
+Full audit report archived in commit log (parent of `acc86e9`).
+
+### Slice 23.C — Critical tests (Sprint C)
+
+Three commits, each independently bisectable.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 23.C.1 | **`PlaybackController.persistResumePoint` regression suite.** Fake `WatchHistoryRepository` capturing `upsert` calls; drive the controller through the full transition matrix and assert the contract: episode flow writes (seriesId, episodeId), movie writes itemId, LIVE flow writes nothing, `_rec_` prefix writes nothing, `< 5L` minimum guard holds. Also covers `applyExternalSubtitle` resume-after-subtitle-load: capture position → swap → seek to captured offset. | [PlaybackController.kt:815](packages/android/app/src/main/java/com/yancotv/android/player/PlaybackController.kt) | 🔴 new | At least 6 test methods covering: episode persist, movie persist, LIVE skip, `_rec_` skip, `< 5L` guard, subtitle-swap resume. New file `:app/src/test/.../PlaybackControllerPersistResumePointTest.kt`. |
+| 23.C.2 | **`BulkContentWriter.abortSource` cross-source FK survival.** Seed source A (with favorite + history) + source B; force `writeM3uChunk` to throw on B mid-chunk; assert source A's favorites + history intact, FK back ON afterwards (write a content row, delete it, observe cascade fires). Same family as MB-220 — guards against future refactors that might leave FK off across sources. | [BulkContentWriter.kt:196](packages/shared/src/commonMain/kotlin/com/yancotv/shared/sources/BulkContentWriter.kt) | 🔴 new | Test in `BulkContentWriterTest.kt`. After abort: A's data intact, `PRAGMA foreign_keys` reads 1, cascade fires on a fresh `DELETE FROM content WHERE id = ?`. |
+| 23.C.3 | **`FavoritesRepository` multi-list (MK.13.4) surface.** Zero tests today. Cover: `createList` returns a stable id and trims whitespace; `addToList` is idempotent on collision; `removeFromList` is list-scoped (doesn't touch other lists); `deleteList("default")` is a silent no-op (the `WHERE is_default = 0` guard); `deleteList(custom)` cascades to its members; `setListSortOrder` updates `updated_at`; `byListFlow` reactivity (`turbine`-style — collect, write from another coroutine, assert second emission). | [FavoritesRepository.kt:154-223](packages/shared/src/commonMain/kotlin/com/yancotv/shared/favorites/FavoritesRepository.kt) | 🔴 new | At least 7 tests in `FavoritesRepositoryTest.kt`. The `deleteList("default") is no-op` test is the load-bearing one — guards against schema changes that might drop the guard. |
+
+### Slice 23.D — High + Medium tests (Sprint D)
+
+Each row a single commit. Order doesn't matter strongly; pick by which surface you next touch.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 23.D.1 | **`BulkContentWriter.finishSource` failure path.** Inject a driver wrapper that throws on `INSERT INTO content_fts SELECT…`; assert the catch block re-creates the trigger + re-enables FK + favorites for live content unchanged + `PRAGMA foreign_keys = 1` afterwards. | `BulkContentWriter.kt:148` | 🔴 new | One test asserting all four post-conditions on the catch path. |
+| 23.D.2 | **`SourceSyncCoordinator.start()` re-entrancy.** Pure unit on the coordinator with a fake repo whose `syncSource` flow stays open; second `start()` is a no-op + only one `repo.syncSource` invocation observed. Currently rejected by `if (_state.value != null)` but unpinned. | `SourceSyncCoordinator.kt` | 🔴 new | Test with two rapid `start()` calls; assert second returns early, repo invoked once. |
+| 23.D.3 | **`SourceRepository.syncSource` cancellation mid-flight.** Start syncSource, collect a few progress emits, cancel scope; assert `bulk.abortSource()` ran, `PRAGMA foreign_keys` is back ON, no partial content rows for that source, favorites for OTHER sources untouched. | `SourceRepository.kt` | 🔴 new | One integration test in `SourceRepositoryTest.kt`. |
+| 23.D.4 | **`WatchHistoryRepository.recent` ignores stray episode rows.** Insert an episode row with `content_id` pointing at a non-existent series; call `recent()`; assert empty list returned without exception. (Pre-MB-220 this scenario could happen post-CASCADE; post-fix it shouldn't, but defending the join is cheap.) | `WatchHistoryRepository.kt` | 🔴 new | One test in `WatchHistoryRepositoryTest.kt`. |
+| 23.D.5 | **EPG re-sync vs reminders FK.** Insert reminder pointing at programme P; run an EPG full re-write that includes P with the same id; assert reminder still pointing at P (or at minimum reminder row survives — the schema has `ON DELETE SET NULL` so the worst case is the FK going null, not the row vanishing). | `BulkEpgWriterTest.kt` | 🔴 new | One test with a seeded reminder + a programme that survives the rewrite. |
+| 23.D.6 | **Schema migration v8 → v9 dedicated test.** Today `Stage2MigrationTest` runs v3 → current as one bundle; v9's `auto_sync_on_start` ride-alongs aren't pinned. Seed v8 fixture with rows lacking the column; migrate to v9; assert column exists with default 0; query `WHERE auto_sync_on_start = 1` returns 0 rows; insert a row with `auto_sync_on_start = 1`; query returns it. | `MigrationTest.kt` (or new file) | 🔴 new | One test class focused on the v8→v9 hop. |
+| 23.D.7 | **`RecordingScheduleRepository` `schedule.recording_id` FK SET NULL.** Insert recording R, schedule S referencing R, delete R via `recordingsQueries.deleteById`, assert `schedules.selectById(S).recording_id == null`. Pins MB-211's deferred dead-FK contract — the column is currently dead but the FK is latent. | `RecordingScheduleRepositoryTest.kt` | 🔴 new | One test pinning the SET NULL behaviour. |
+
+### Out of scope for MK.23 (file as future MK if pursued)
+
+- **Compose-test cascade-nav smoke** (sidebar→rail RIGHT, rail→content RIGHT, type swap remount) — `.claude/skills/native-android-mk/SKILL.md` documents this as a manual test. Could be `composeTestRule`-automated but adds Robolectric / `androidTest` infra weight. Defer until the focus model touches a refactor.
+- **DB driver corruption-recovery integration test** (truncate WAL mid-write, assert `DatabaseFactory.create()` cleans + recovers from `SourcesBackup`). High value but needs a Robolectric harness; defer.
+- **`XmltvParser` malformed-input fixtures** (timezone variants, CDATA, broken `<programme>` tags) — Medium-priority polish; file as separate work.
+- **Catchup URL building DST boundary tests** — Medium; file as separate.
+- **`ContentIds.m3u` FNV-1a 32-bit collision stress** — Low; file as separate.
+- **`redactCredentials` end-to-end on `last_sync_error` write path** — Medium; one targeted test, but the redaction primitive is well-tested already.
+
+### Cost (honest)
+
+| Slice | Estimate | Risk |
+|---|---|---|
+| 23.C.1 (PlaybackController) | 1.5–2 h | Medium — needs a fake `WatchHistoryRepository` + a way to drive the controller without ExoPlayer. The controller is main-thread-only so test harness must dispatch on Main. |
+| 23.C.2 (abortSource FK) | 30–45 min | Low — additive to existing `BulkContentWriterTest`. |
+| 23.C.3 (multi-list) | 1–1.5 h | Low — additive to existing `FavoritesRepositoryTest`. Turbine usage if reactive cases included. |
+| 23.D (7 tasks) | 4–6 h | Low — each is a single test; expect 30–45 min per. |
+| **Total** | **7–10 h** | — |
+
+Sprint C should ship as 3 separate commits; Sprint D as 7 small commits or 2-3 themed bundles depending on cadence.
 
 ---
 
