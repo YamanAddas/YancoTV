@@ -124,8 +124,9 @@ User-set ordering for the immediate next sessions (overrides Stage 5 default ord
 3. ✅ **MK.21 — Settings redesign** — Concept A "Configure" layout shipped across ~14 commits (`fd0dd2d` → `01690cb`, 2026-04-27 → 2026-04-28). Hex-cut sidebar + content pane, breadcrumb, unified `SettingsSection` / `SettingsRow` / `SettingsToggleRow` / `SettingsAccentButton` / `SettingsClickToEditField` primitives, source detail screen, per-source auto-sync toggle (MB-220 fix landed alongside this), EPG tab redesign (drops the embedded `GuideSyncPanel` card), scroll-bottom safety margin (root cause: `BringIntoViewSpec` was pinning the focused row to the panel border; fixed in `87fc40d` with a density-aware safe-margin spec). Footer (version + fake SYNCED chip) dropped 2026-04-28 (`01690cb`).
 4. ✅ **MK.22 — Motion polish** — Sprint A shipped 2026-04-28 (`94bb577`): closed MB-221 (sidebar focus → expand felt-lag) + MB-222 (OnNowTile frozen clock). Sprint B shipped 2026-04-28 (`41a83ac`): 7 polish fixes (Settings tab focus retry skip for cheap tabs, HexSurface 5-spring collapse, tab shadow tween, hero crossfade timing, CategoryRail debounce, remove `remember(index)` wrappers, hero backdrop debounce). User confirmed "yes its better" hands-on.
 5. ✅ **MK.23 — Test hardening** — Sprint C shipped 2026-04-28 (3 commits, `3ab8311` → `0ce8333`): PlaybackController.persistResumePoint regression suite (11 tests via extracted `resumePointDecision` pure function), BulkContentWriter.abortSource cross-source FK survival, FavoritesRepository multi-list (10 tests covering MK.13.4). Sprint D shipped 2026-04-28 (7 commits, `a51907c` → `88d67c1`): finishSource failure path, SourceSyncCoordinator re-entrancy (with refactor to drop Context dependency), syncSource cancellation, WatchHistory orphan rows, EPG re-sync vs `recording_schedules.programme_id` SET NULL, v9 → v10 migration, schedule.recording_id SET NULL.
-6. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones. Subsumes the original "MB-208 / MB-209 / MB-210 receiver-path test hardening" item — those tests are largely covered by MK.23 Sprint D and the existing recording-subsystem tests added 2026-04-27.
-7. **MB-224 — Set up CI** — GitHub Actions workflow that runs `:shared:testDebugUnitTest`, `:app:testDebugUnitTest`, and `:app:assembleDebug` on push to `master` + PRs. Surfaced 2026-04-28 as the root cause of why MB-223 (and any future test breakage) goes undetected. ~30 min one-time setup. Needs to land before relying on the test suite as a regression gate.
+6. **MK.24 — Audit follow-ups** — planned 2026-04-28 (red-teamed revision). Sprints H + E shipped 2026-04-28. ✅ Sprint H: MB-225/226/227/228 filed. ✅ Sprint E shipped (4 commits, `d390eff` → `ae56b4d`): E.4 schema comment in `Reminders.sq` (closes MB-226 — read-the-file gate retargeted to a load-bearing schema comment, not a test); E.2 SourceSyncCoordinator lifecycle teardown tests covering both DONE and exception paths; E.1 mid-chunk syncSource cancellation test (cancellation lands AFTER first chunk written, proves abortSource ran + FK back ON); E.3 `playLaunchDecision` + `episodeLaunchDecision` pure-function extraction with 14-case test (closes MB-225 — read-the-file gate confirmed both call-site AND controller-level guards exist; pure-function path was the right call). All test suites green; APK on Fire TV. Three sprints remain: F (motion polish, 1–2 h), G.1 (per-migration tests, 4–6 h), G.2 (corruption-recovery, 3–6 h). Strict one-per-session for G.1 and G.2; soft bundle allowed for F. See full plan in MK.24 section below.
+7. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones. Subsumes the original "MB-208 / MB-209 / MB-210 receiver-path test hardening" item — those tests are largely covered by MK.23 Sprint D and the existing recording-subsystem tests added 2026-04-27.
+8. **MB-224 — Set up CI** — GitHub Actions workflow that runs `:shared:testDebugUnitTest`, `:app:testDebugUnitTest`, and `:app:assembleDebug` on push to `master` + PRs. Surfaced 2026-04-28 as the root cause of why MB-223 (and any future test breakage) goes undetected. ~30 min one-time setup. Needs to land before relying on the test suite as a regression gate.
 
 After this queue clears, return to Stage 5 default order (5.2 sideload auto-update, 5.3 a11y audit, …).
 
@@ -864,6 +865,85 @@ Each row a single commit. Order doesn't matter strongly; pick by which surface y
 | **Total** | **7–10 h** | — |
 
 Sprint C should ship as 3 separate commits; Sprint D as 7 small commits or 2-3 themed bundles depending on cadence.
+
+---
+
+## MK.24 — Audit follow-ups — planned 2026-04-28 (red-teamed revision)
+
+**Why now.** The Sprint A/B/C/D verification audits surfaced 8 follow-up items that were not in the original sprint scopes. The user wants all of them addressed but explicitly across **multiple sessions** to keep each session's working set small (the 29-bug MK.8 commit and the MB-220-hidden-by-MB-223 incident are the canonical examples of what large-bundle, single-session work produces). This milestone splits the follow-ups into three small sprints — E, F, G — each independently mergeable and each testable on Fire TV before the next starts.
+
+> **Sprint H (MB filings) shipped 2026-04-28** in the same session this plan was written. MB-225 / MB-226 / MB-227 / MB-228 are filed `Open · planned`. No remaining work in H.
+
+### Sprint scope ground rules
+
+- **Strict one-sprint-per-session for G.1 and G.2.** Highest blast radius (DB layer + schema). Do not chain.
+- **Soft one-sprint-per-session for E and F.** Both are isolated, low-blast-radius (test-only / UI-only). Bundling E + F in one session is acceptable if the session has the runway; if E surfaces unexpected scope (see read-the-file-first below), stop at E.
+- **One commit per item where possible.** Bundle only when items share a single file edit and a single test file edit.
+- **Each sprint ends with `:shared:testDebugUnitTest` + `:app:testDebugUnitTest` + `:app:installDebug` green.** No rolling debt.
+- **Do not deviate.** If something else looks worth fixing mid-sprint, file it as MK.24.X (or a new MB-*) and keep going. The rule that produced 29 bugs in MK.8 was "while I'm in here, also...".
+- **Read-the-file-first gate** (E.3, E.4, F.1, G.2 all have unverified assumptions baked into their plan-text — see per-task notes below). Open the source file at sprint start, confirm the assumption, then code. If the assumption is wrong, update this plan in the same session before sprinting.
+
+### Slice 24.E — Test gap closures (Sprint E)
+
+Two confirmed test gaps + two items pending a read-the-file-first check that may shrink, retarget, or downgrade.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 24.E.1 | **D.3 mid-chunk cancellation test.** Strengthens the existing `SourceRepository.syncSource cancellation` test by asserting cancellation lands *during* a chunk emit (not just before/after). | `SourceRepositoryTest.kt` | ✅ done | `2e0430e` — one new test (`cancelling syncSource after first chunk written runs abortSource and restores FK`) feeds a 600-entry M3U so the chunk loop emits its first WRITING progress, then cancels via CompletableDeferred + outside-job pattern. Assertions: source A's favorite intact, FK back ON (cascade-fire probe), source B wiped by abortSource. A `sawWriting` invariant guards against this becoming a duplicate of D.3. |
+| 24.E.2 | **D.2 lifecycle teardown verification.** Verify `_state.value` returns to null on BOTH success AND failure paths, *and* a fresh `start()` afterwards is observed by the fake repo (one repo invocation, not zero). | `SourceSyncCoordinatorTest.kt` | ✅ done | `a71c8ab` — replaced the vestigial "start after previous run completes is allowed" placeholder (body never actually called start a second time) with two real tests: `start completed then restarted observes second invocation and clears state between runs` (DONE path via `flowOf(DONE)`) and `start failed then restarted clears state and allows second invocation` (exception path via `flow { throw }`). Both assert `_state.value == null` after teardown + invocation count goes 1 → 2 across two start() calls. |
+| 24.E.3 | **`PlaybackController` two-tap no-op test — pure-function extraction.** Read-the-file-first gate confirmed the guard exists at BOTH layers: call-site (per skill checklist) AND controller-level defense-in-depth (`PlaybackController.play` line 470 + `play(episode)` line 503). Controller's KDoc explicitly documents the same-id no-op. Extract pure decision (analog to MK.23.C.1's `resumePointDecision`) so it's testable without standing up an ExoPlayer. | `PlaybackController.kt` + new `PlayLaunchDecisionTest.kt` | ✅ done | `ae56b4d` — extracted `playLaunchDecision(list, startIndex, currentId)` + `episodeLaunchDecision(episode, currentId)` returning `Reject` / `SameTarget` / `NewTarget`. Production `play()` and `play(episode)` `when`-branch on the decision; side effects (queue swap, persistResumePoint, loadCurrent) live at the call site. 14 test cases covering all branches. |
+| 24.E.4 | **`reminders.programme_id` design pin — schema comment, not test.** Read-the-file-first gate confirmed: `BulkEpgWriter` doesn't touch reminders by construction (no FK = no cascade), and `selectByProgrammeId` / `deleteByProgrammeId` are explicit user-action queries, not implicit triggers. A test that can only fail when the schema is already broken is low-value. Ship a load-bearing schema comment instead. | `Reminders.sq` | ✅ done | `d390eff` — added a multi-line comment block on `CREATE TABLE reminders` documenting why the column is deliberately not FK (reminder fires must outlive provider programme-id churn; UI falls back on (channel_tvg_id, title, start_time) when the programme row is gone), with the `MK.24.E.4 + MB-226` reference line a future "tidy up" refactor must explicitly delete to add the FK. |
+
+**Estimate (final):** ~2.5 h. E.1 ~45 min, E.2 ~30 min, E.3 ~1 h (incl. pure-function refactor), E.4 ~15 min. Within the 2–4 h band on the red-teamed revision.
+
+### Slice 24.F — Motion polish (Sprint F)
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 24.F.1 | **`CategoryRail` debounce stable-lambda wrap — verify the bug exists first.** ⚠️ Plan-text claim: "the debounce LaunchedEffect captures `onSelect` by-reference, fresh callback can land against stale closure." That's a hypothesis — not verified by reading the file. Read `CategoryRail.kt` + the parents that pass `onSelect`. **If parents pass a stable lambda (e.g. `remember { }` wrap or a method reference), there's no bug** and the wrap is noise; close MB-* equivalent (none filed for this) and skip. **If parents pass a fresh lambda each composition,** wrap with `rememberUpdatedState(onSelect)` and dereference via `.value` inside the LaunchedEffect. | `CategoryRail.kt` + parents | planned · **gated on file-read** | Either: file edit shipped (with hands-on Fire TV verification of fast pill switching) and parents documented, OR: skipped with one-line note in this plan explaining why no fix needed. |
+| 24.F.2 | **Re-audit motion polish backlog** before coding. Run the motion auditor (or self-audit using `.claude/skills/native-android-mk/SKILL.md`) over `HomeScreen.kt`, `HomeContent.kt`, `AppSidebar.kt`, `BrowseSection.kt`, `CategoryRail.kt`, `HexSurface.kt` to extract the 6 P2 items the original audit listed. Itemise each as a 24.F.2.a/b/c/… sub-task with a one-line fix, then decide: ≤3 cheap items → ship in this sprint; more or non-trivial → split to Sprint F.2 next session. | various | planned | Either: 6 fixes shipped + commit log lists each, OR: itemised in this plan + Sprint F.2 added with explicit scope. |
+
+**Estimate:** F.1 = 0 (skip) or 30 min (wrap). F.2 audit = ~45 min. Plan for 1–2 h, max one session.
+
+### Slice 24.G — DB hardening (Sprint G)
+
+The two test gaps `MK.23 — Out of scope` deferred. Both are higher-cost than Sprint E items because they need richer test scaffolding. **G.1 and G.2 each need their own session** (one in, one out). Strict one-per-session rule.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 24.G.1 | **Per-migration isolation tests for `3.sqm` … `8.sqm`.** Today `Stage2MigrationTest` exercises v3 → current as one bundle; `MigrationTest` covers v9 → v10 in isolation. The middle hops (v3 → v4 ... v7 → v8) are not isolated — a regression in `5.sqm` could be masked by a downstream fixup in `6.sqm`. Add one test per hop using the v3 → v4-style fixture pattern already in place. **Cost dominated by fixture authoring (each version's exact column set must be hand-crafted) — not the assertions.** | `MigrationTest.kt` (new test class per hop, or one file with 5 test methods) | planned | 5 tests, each named `migration_v{N}_to_v{N+1}_addsExpectedColumnsAndPreservesData`. Each pins the *new* artefacts that hop introduced (column / table / trigger / default backfill) and asserts existing rows survived unchanged. |
+| 24.G.2 | **DB driver corruption-recovery integration test.** ⚠️ Plan-text claim: "JVM-only `androidUnitTest`, no Robolectric needed." **Not verified.** Read `DatabaseFactory.android.kt` first to confirm: does it use `Context.getDatabasePath()`, `SQLiteOpenHelper`, or other Android-specific APIs that `androidUnitTest` cannot exercise without Robolectric? **If yes:** scope expands to refactor the recovery decision behind a `Path`-based interface (push Android specifics to a thin shim, integration test runs against the pure path). **If no:** plan stands. Either way, lift the recovery decision into a pure function `DatabaseRecoveryDecision.shouldRebuild(openResult: OpenResult): RecoveryAction` (analog to `resumePointDecision`), test the decision table, then a thin integration test using a real SQLDelight `JdbcSqliteDriver` that truncates the WAL/journal on disk and asserts the production path runs the rebuild + sources-restore. | `DatabaseFactory.android.kt` + `DatabaseFactoryTest.kt` (new) | planned · **gated on file-read** | At least 4 tests: (a) decision table for healthy / corrupt / missing / locked open results; (b) integration test that truncates a WAL mid-write and asserts `open` rebuilds + restores from `sources-backup.json`. If Android-API dependency forces a refactor, document the new shim in the commit message and update this plan. |
+
+**Estimate (red-teamed):** G.1 = 4–6 h (fixture authoring is the cost driver, ~45–60 min per hop × 5). G.2 = 3–6 h (3–4 h if pure-Java `DatabaseFactory`; 5–6 h if Android-API refactor needed). **Total: 7–12 h. Run as two separate sessions.**
+
+### Sprint sequencing (revised)
+
+Sprint H complete in the planning session. Remaining sequence:
+
+1. **Session 1 → Sprint E** (test gaps; soft bundle with F if runway permits and E doesn't surface scope-expanding reads).
+2. **Session 2 → Sprint F** (motion polish; soft bundle with G.1 only if F finishes cleanly under 1 h — usually means G.1 needs its own session).
+3. **Session 3 → Sprint G.1** (per-migration tests, test-only).
+4. **Session 4 → Sprint G.2** (corruption-recovery, scope depends on read-the-file gate).
+
+If a session ends mid-sprint (build red, hands-on regression found, scope creep, plan-text assumption falsified), ship what's green, document the cut line in this plan, and resume in the next session.
+
+### Cost summary (red-teamed)
+
+| Sprint | Items | Estimate | Net production code touched |
+|---|---|---|---|
+| E | 4 tests (E.3 + E.4 may shrink to 0) | 2–4 h | 0 lines (tests + 0–1 schema comment) |
+| F | 1 conditional + ≤3 from re-audit | 1–2 h | 0–6 small UI files |
+| G.1 | 5 migration tests | 4–6 h | 0 lines (tests only) |
+| G.2 | 1 refactor + 1 integration test (scope conditional on read) | 3–6 h | ~30–80 lines `DatabaseFactory.android.kt` + new test file |
+| **Total** | **8 audit findings (some may shrink)** | **12–18 h across 3–4 sessions** | **<100 lines production code if G.2 stays small; up to ~200 if G.2 refactor expands** |
+
+**Honest framing:** if E.3 drops, E.4 drops, F.1 is a non-bug, and G.2 stays JVM-only, total comes in at the low end (~10 h). If all the gates expand scope (E.3 needs extraction, F.1 confirmed, G.2 needs refactor), high end (~18 h). Plan for the middle (~14 h) and adjust per-sprint based on the file-read gate outcome.
+
+### Out of scope for MK.24 (file as new MK if pursued)
+
+- **Compose-test cascade-nav smoke automation** — still defers to manual cascade-nav smoke per the skill checklist.
+- **Robolectric harness adoption** — Sprint G.2 was scoped specifically to *not* require it. If the integration test ergonomics push that decision, file as a separate MK and bring it into the next planning round.
+- **CI pipeline (`MB-224`)** — scheduled at Stage 5.7. Sprints E/F/G all run locally with `:shared:testDebugUnitTest` + `:app:testDebugUnitTest`.
 
 ---
 
