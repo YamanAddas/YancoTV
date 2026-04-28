@@ -84,13 +84,14 @@ fun SettingsAboutTab(
         // the user unable to hit them. The original MB-116 wrap was
         // for a fully-read-only tab — that's no longer this tab.
     ) {
-        // ───── Logo (above the Version block) ─────
+        // ───── Logo (above the Version block, centered horizontally) ─────
         Image(
             painter = painterResource(id = R.drawable.ic_logo),
             contentDescription = "YancoTV logo",
             contentScale = ContentScale.Fit,
             modifier =
                 Modifier
+                    .align(Alignment.CenterHorizontally)
                     .size(140.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .padding(bottom = 12.dp),
@@ -207,6 +208,17 @@ fun SettingsAboutTab(
             title = "Credits",
             sub = "Built with Media3 ExoPlayer, SQLDelight, Ktor, Coil, and Jetpack Compose. Shared business logic (parsers, clients, classifier, EPG) lives in packages/shared via Kotlin Multiplatform — the iOS app in MK.iOS.* will consume the same code.",
         ) {}
+
+        // 0dp focusable that participates in focus traversal so D-pad
+        // DOWN past the last user-actionable row (Updates "Check now")
+        // can reach this anchor. When focus lands here, Compose's
+        // bringIntoView walks the parent verticalScroll past the
+        // read-only Build + Credits sections; combined with the
+        // padding(bottom = 80.dp) on the parent column the user lands
+        // with the safety margin the rest of Settings uses. Without
+        // this anchor the read-only sections sit below the last
+        // focusable and never come into view by D-pad.
+        com.yancotv.android.ui.focus.FocusableSpacer()
     }
 }
 
