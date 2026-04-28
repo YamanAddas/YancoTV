@@ -200,6 +200,112 @@ class BulkEpgWriterTest {
             session.rollback()
         }
 
+    /**
+     * MK.23.D.5 — EPG re-sync vs recording_schedules FK SET NULL.
+     *
+     * `recording_schedules.programme_id` declares
+     * `REFERENCES epg_programmes(id) ON DELETE SET NULL` (3.sqm:30).
+     * Intent: programme rows churn during EPG refresh, but a user's
+     * armed schedule must survive — at worst the link goes null so the
+     * schedule's title-snapshot still drives the firing decision.
+     *
+     * EPG re-sync calls `DELETE FROM epg_programmes` to wipe the prior
+     * snapshot before re-writing. Without `ON DELETE SET NULL`, the
+     * default FK behaviour (ON DELETE NO ACTION) would FAIL the DELETE
+     * with a constraint violation, breaking every EPG refresh after
+     * the user arms a schedule from EPG long-press.
+     *
+     * Pin both halves of the contract:
+     *   1. The `DELETE FROM epg_programmes` succeeds (no FK throw).
+     *   2. The schedule row survives.
+     *   3. The schedule's `programme_id` is NULL afterwards.
+     */
+    @Test fun epgReSync_setsScheduleProgrammeIdNull_andSurvivesSchedule() =
+        runTest {
+            val (db, driver) = testDbPair()
+            val writer = BulkEpgWriter(driver)
+
+            // Seed programme P that the schedule will reference.
+            writer.replaceAll(
+                listOf(
+                    BulkEpgWriter.ProgrammeBatch(
+                        sourceKey = "src-A",
+                        sourceIdForDb = "src-A",
+                        programmes =
+                            listOf(
+                                XmltvProgramme(
+                                    channelId = "ch-1",
+                                    title = "Live game",
+                                    startTime = 1_000_000L,
+                                    endTime = 1_010_000L,
+                                ),
+                            ),
+                    ),
+                ),
+            )
+
+            // Natural key from BulkEpgWriter is `channelId|startTime|sourceKey`.
+            val programmeId =
+                db.epgProgrammesQueries
+                    .forChannelRange("ch-1", 0L, 2_000_000L)
+                    .executeAsList()
+                    .single()
+                    .id
+
+            // Seed a recording_schedule referencing programme P.
+            db.recordingSchedulesQueries.insert(
+                id = "sched-1",
+                content_id = null,
+                programme_id = programmeId,
+                title = "Live game",
+                stream_url = "http://stream/x",
+                scheduled_start = 1_000_000L,
+                scheduled_end = 1_010_000L,
+                state = "armed",
+                recording_id = null,
+                error = null,
+                created_at = 1L,
+                updated_at = 1L,
+                series_key = null,
+            )
+            assertEquals(
+                programmeId,
+                db.recordingSchedulesQueries.selectById("sched-1").executeAsOne().programme_id,
+                "schedule must initially link to programme",
+            )
+
+            // Run an EPG re-sync via replaceAll with empty programme set —
+            // this triggers the internal `DELETE FROM epg_programmes`
+            // (mirrors a provider returning no programmes for this source).
+            // Without ON DELETE SET NULL on the FK, this DELETE would
+            // throw a constraint violation because the schedule references
+            // the programme.
+            writer.replaceAll(
+                listOf(
+                    BulkEpgWriter.ProgrammeBatch(
+                        sourceKey = "src-A",
+                        sourceIdForDb = "src-A",
+                        programmes = emptyList(),
+                    ),
+                ),
+            )
+
+            // Programme is gone.
+            assertEquals(0L, db.epgProgrammesQueries.countAll().executeAsOne())
+
+            // Schedule survives.
+            val schedule = db.recordingSchedulesQueries.selectById("sched-1").executeAsOneOrNull()
+            assertTrue(schedule != null, "schedule row must NOT be cascade-deleted by EPG re-sync")
+            // programme_id was set to NULL via ON DELETE SET NULL.
+            assertNull(
+                schedule!!.programme_id,
+                "ON DELETE SET NULL must null out programme_id when its programme is deleted",
+            )
+            // Title snapshot survives — the schedule still knows what to
+            // record even without the programme link.
+            assertEquals("Live game", schedule.title)
+        }
+
     private fun testDbPair(): Pair<com.yancotv.shared.db.YancoDb, app.cash.sqldelight.db.SqlDriver> {
         val pair = testDatabase()
         // Seed a sources row so epg_programmes rows with non-null source_id
