@@ -24,9 +24,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -50,6 +54,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -65,7 +70,6 @@ import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
-import com.yancotv.android.ui.theme.YancoType
 import kotlinx.coroutines.launch
 
 /**
@@ -220,12 +224,18 @@ private fun Sidebar(
     onSelect: (SettingsTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Verdant Frost — clean rounded panel (28dp `--r-xl`) replaces the
+    // hex-cut shell so the Settings screen reads as the design's
+    // "polished island" within the wider hex-cut app. The cut-corner
+    // shape is still used for chips / cards inside the tabs; only the
+    // outer Settings panels go rounded to match the redesign brief.
+    val panelShape = RoundedCornerShape(28.dp)
     Column(
         modifier =
             modifier
-                .clip(YancoShapes.CutCornerCardLarge)
+                .clip(panelShape)
                 .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, LocalYancoPalette.current.PanelBorder, YancoShapes.CutCornerCardLarge)
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
                 .focusGroup()
                 .focusRestorer(),
     ) {
@@ -255,32 +265,75 @@ private fun Sidebar(
 
 @Composable
 private fun SidebarHeader() {
+    val palette = LocalYancoPalette.current
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 18.dp),
     ) {
+        // Verdant Frost brand row — 36dp gradient logo + "YancoTV" wordmark
+        // with the "TV" rendered in accent. Replaces the old "YANCOTV ·
+        // SETTINGS" overline so the brand identity sits at the top of the
+        // sidebar (matches the design's `.shell-side-h .brand-row`).
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(palette.Accent, palette.AccentDeep),
+                            ),
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Y",
+                    color = OnAccentInk,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.4.sp,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Yanco",
+                    color = palette.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.2).sp,
+                )
+                Text(
+                    text = "TV",
+                    color = palette.Accent,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.2).sp,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(18.dp))
         Text(
-            text = "YANCOTV · SETTINGS",
-            color = LocalYancoPalette.current.Accent,
-            style = YancoType.Overline,
+            text = "Settings",
+            color = palette.TextPrimary,
+            fontSize = 28.sp,
+            lineHeight = 32.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.6).sp,
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Configure",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 34.sp,
-            lineHeight = 36.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = (-0.6).sp,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Preferences apply instantly and sync across restarts.",
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 12.sp,
-            lineHeight = 18.sp,
+            text = "System · ${SettingsTab.entries.size} sections",
+            color = palette.TextMuted,
+            fontSize = 11.sp,
+            lineHeight = 14.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 1.5.sp,
         )
     }
 }
@@ -318,6 +371,7 @@ private fun TabItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val palette = LocalYancoPalette.current
 
     // User contract: forward = OK *or* D-pad RIGHT. Without this, RIGHT
     // alone just navigates focus into the currently-active tab's
@@ -326,12 +380,7 @@ private fun TabItem(
     // (clickable's onClick) and the parent's `scope.launch` chain
     // moves focus right after composition + layout settle.
     //
-    // Intercept RIGHT only when this tab is NOT already selected:
-    //   - Already selected → RIGHT should be a normal focus move into
-    //     the content body, no re-commit needed (Compose handles it).
-    //   - Not selected → trigger onClick (which commits + chains the
-    //     deferred moveFocus), and consume the event so the natural
-    //     RIGHT traversal doesn't fight the manual one.
+    // Intercept RIGHT only when this tab is NOT already selected.
     val onTabKey =
         Modifier.onPreviewKeyEvent { event ->
             if (event.type == KeyEventType.KeyDown &&
@@ -345,52 +394,90 @@ private fun TabItem(
             }
         }
 
+    // Verdant Frost focus animation — 1.04 scale on the whole row, with
+    // graphicsLayer so it doesn't reflow neighbours. Selected rows stay
+    // at 1.0 unless also focused. Tween matches the design's 200ms
+    // transform-only animation.
+    val targetScale = if (focused) 1.04f else 1.0f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = tween(durationMillis = 200),
+        label = "tabScale",
+    )
+
+    val shape = RoundedCornerShape(14.dp)
     val rowBrush =
         when {
+            focused && selected ->
+                Brush.horizontalGradient(
+                    listOf(palette.Accent.copy(alpha = 0.32f), palette.Accent.copy(alpha = 0.14f)),
+                )
             focused ->
                 Brush.horizontalGradient(
-                    listOf(
-                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f),
-                        Color.Transparent,
-                    ),
+                    listOf(palette.BackgroundElevated, palette.BackgroundHover),
                 )
             selected ->
                 Brush.horizontalGradient(
-                    listOf(
-                        LocalYancoPalette.current.Accent.copy(alpha = 0.14f),
-                        Color.Transparent,
-                    ),
+                    listOf(palette.Accent.copy(alpha = 0.14f), Color.Transparent),
                 )
             else -> Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
         }
 
-    val iconBg =
-        if (selected) {
-            Brush.verticalGradient(
-                listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
-            )
-        } else {
-            Brush.verticalGradient(
-                listOf(Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.04f)),
-            )
-        }
-    val iconTint = if (selected) OnAccentInk else LocalYancoPalette.current.TextMuted
-    val labelColor =
+    // Translucent accent fill on the icon tile when selected/focused —
+    // matches the design's `--acc-bg-20` / `--acc-bg-14` (vs the previous
+    // saturated gradient + dark ink). Keeps the icon legible at 3 m
+    // without screaming for attention.
+    val iconBgColor =
         when {
-            focused -> LocalYancoPalette.current.TextPrimary
-            selected -> LocalYancoPalette.current.TextPrimary
-            else -> LocalYancoPalette.current.TextSecondary
+            selected -> palette.Accent.copy(alpha = 0.22f)
+            focused -> palette.Accent.copy(alpha = 0.14f)
+            else -> Color.White.copy(alpha = 0.04f)
         }
-    val subColor = if (selected) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted
-    val borderColor = if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
+    val iconTint =
+        when {
+            selected -> palette.Accent
+            focused -> palette.AccentGlow
+            else -> palette.TextSecondary
+        }
+    val labelColor =
+        if (focused || selected) palette.TextPrimary else palette.TextSecondary
+    val subColor =
+        if (selected) palette.Accent else palette.TextMuted
+    val ordinalColor =
+        when {
+            selected -> palette.Accent
+            focused -> palette.AccentGlow
+            else -> palette.TextMuted
+        }
+    val borderColor = if (focused) palette.FocusRing else Color.Transparent
 
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(64.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                // Soft accent halo on focus — colored shadow gives the
+                // design's "1.5dp ring + 28px halo" feel without a manual
+                // glow layer. Spot/ambient colors render colored on
+                // API 28+; on older builds it falls back to a neutral
+                // shadow which is still a useful focus cue.
+                .shadow(
+                    elevation = if (focused) 18.dp else 0.dp,
+                    shape = shape,
+                    ambientColor = palette.AccentGlow,
+                    spotColor = palette.AccentGlow,
+                )
+                .clip(shape)
                 .background(rowBrush)
-                .border(if (focused) 2.dp else 0.dp, borderColor)
+                .border(
+                    width = if (focused) 1.5.dp else 0.dp,
+                    color = borderColor,
+                    shape = shape,
+                )
                 .then(onTabKey)
                 .focusable(interactionSource = interaction)
                 .clickable(
@@ -403,19 +490,19 @@ private fun TabItem(
                 },
     ) {
         if (selected) {
-            // Left accent bar — 3dp wide, inset 10dp top/bottom so it reads as
-            // a marker rather than a full-height divider. Vertical gradient
-            // matches the hex-icon tile so the two accents feel linked.
+            // Selected accent rail — design spec: 3dp wide × 44dp tall,
+            // vertically centered. Reads as a "this is committed" marker
+            // distinct from the focus ring around the whole row.
             Box(
                 modifier =
                     Modifier
                         .align(Alignment.CenterStart)
                         .width(3.dp)
-                        .fillMaxHeight()
-                        .padding(vertical = 10.dp)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
                         .background(
                             Brush.verticalGradient(
-                                listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
+                                listOf(palette.Accent, palette.AccentDeep),
                             ),
                         ),
             )
@@ -424,23 +511,34 @@ private fun TabItem(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 22.dp, end = 18.dp),
+                    .padding(start = 18.dp, end = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // Ordinal moved LEFT to match the design's
+            // [ordinal | icon | label] order. Mono caption look at 11sp /
+            // 1.4sp tracking — the design's `.tab-ord` token.
+            Text(
+                text = twoDigit(entry.ordinal + 1),
+                color = ordinalColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
+                modifier = Modifier.width(20.dp),
+            )
             Box(
                 modifier =
                     Modifier
                         .size(36.dp)
-                        .clip(YancoShapes.HexCapsuleSoft)
-                        .background(iconBg),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(iconBgColor),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = entry.icon,
                     contentDescription = null,
                     tint = iconTint,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -450,7 +548,7 @@ private fun TabItem(
                     fontSize = 14.sp,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.14.sp,
+                    letterSpacing = (-0.05).sp,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -459,22 +557,7 @@ private fun TabItem(
                     fontSize = 10.sp,
                     lineHeight = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                )
-            }
-            Text(
-                text = twoDigit(entry.ordinal + 1),
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.4.sp,
-            )
-            if (selected) {
-                Icon(
-                    imageVector = YancoIcons.ChevronRight,
-                    contentDescription = null,
-                    tint = LocalYancoPalette.current.Accent,
-                    modifier = Modifier.size(14.dp),
+                    letterSpacing = 1.1.sp,
                 )
             }
         }
@@ -487,12 +570,13 @@ private fun ContentPane(
     current: SettingsTab,
     modifier: Modifier = Modifier,
 ) {
+    val panelShape = RoundedCornerShape(28.dp)
     Column(
         modifier =
             modifier
-                .clip(YancoShapes.CutCornerCardLarge)
+                .clip(panelShape)
                 .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, LocalYancoPalette.current.PanelBorder, YancoShapes.CutCornerCardLarge),
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape),
     ) {
         Breadcrumb(current = current)
         HairlineDivider()

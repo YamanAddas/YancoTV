@@ -137,28 +137,52 @@ object YancoIcons {
             close()
         }
 
+    /**
+     * Lucide-style cog — six rounded teeth around a 3-radius hub. Replaces
+     * the older spokes-only glyph that read as a plus sign on Fire TV at
+     * 3 m. Path is the canonical Lucide `settings` outline (24×24 viewbox)
+     * loaded via [addPathNodes] so the d-attr from the source SVG drops in
+     * verbatim — keeps it auditable against the design source without
+     * having to translate dozens of arcs into PathBuilder calls.
+     *
+     * Sourced from the YancoTV Settings Redesign brief
+     * (`design_handoff_yancotv/designs/YancoTV Settings Redesign.html`,
+     * sidebar General tab) — the same icon now reads as the system-wide
+     * Settings glyph everywhere `YancoIcons.Settings` is referenced
+     * (sidebar nav, Settings-tab General row, etc.).
+     */
     val Settings: ImageVector =
-        buildLine("settings") {
-            moveTo(12f, 8.5f)
-            arcToRelative(3.5f, 3.5f, 0f, true, true, 0f, 7f)
-            arcToRelative(3.5f, 3.5f, 0f, true, true, 0f, -7f)
-            moveTo(12f, 3.5f)
-            lineTo(12f, 6f)
-            moveTo(12f, 18f)
-            lineTo(12f, 20.5f)
-            moveTo(3.5f, 12f)
-            lineTo(6f, 12f)
-            moveTo(18f, 12f)
-            lineTo(20.5f, 12f)
-            moveTo(6f, 6f)
-            lineTo(7.8f, 7.8f)
-            moveTo(16.2f, 16.2f)
-            lineTo(18f, 18f)
-            moveTo(6f, 18f)
-            lineTo(7.8f, 16.2f)
-            moveTo(16.2f, 7.8f)
-            lineTo(18f, 6f)
-        }
+        ImageVector
+            .Builder(
+                name = "settings",
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            ).apply {
+                // Outer cog silhouette.
+                addPath(
+                    pathData =
+                        androidx.compose.ui.graphics.vector.addPathNodes(
+                            "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+                        ),
+                    stroke = SolidColor(Color.White),
+                    strokeLineWidth = 1.6f,
+                    strokeLineCap = StrokeCap.Round,
+                    strokeLineJoin = StrokeJoin.Round,
+                )
+                // Inner hub (radius 3 at center).
+                addPath(
+                    pathData =
+                        androidx.compose.ui.graphics.vector.addPathNodes(
+                            "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
+                        ),
+                    stroke = SolidColor(Color.White),
+                    strokeLineWidth = 1.6f,
+                    strokeLineCap = StrokeCap.Round,
+                    strokeLineJoin = StrokeJoin.Round,
+                )
+            }.build()
 
     val Play: ImageVector =
         buildLine("play") {
