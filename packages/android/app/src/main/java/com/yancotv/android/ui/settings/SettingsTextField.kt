@@ -134,6 +134,7 @@ fun SettingsClickToEditField(
         }
     }
 
+    val activeTabFocus = LocalActiveSettingsTabFocus.current
     if (bare) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(
@@ -155,6 +156,11 @@ fun SettingsClickToEditField(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .background(LocalYancoPalette.current.BackgroundRaised)
+                    // LEFT from the inner field escapes to the active inner-
+                    // sidebar tab — same boundary contract every Settings row
+                    // owns. Bare mode is used inside dialogs, so it doesn't
+                    // need this — the dialog owns its own focus boundary.
+                    .leftExitsTo(activeTabFocus)
                     .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

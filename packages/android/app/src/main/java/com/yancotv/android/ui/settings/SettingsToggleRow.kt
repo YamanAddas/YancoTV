@@ -72,6 +72,9 @@ internal fun SettingsToggleRow(
         animationSpec = tween(durationMillis = 200),
         label = "toggleScale",
     )
+    // LEFT from this row escapes to the active inner-sidebar tab — same
+    // boundary contract every Settings row owns. See [SettingsRow].
+    val activeTabFocus = LocalActiveSettingsTabFocus.current
 
     val rowBg =
         when {
@@ -107,6 +110,7 @@ internal fun SettingsToggleRow(
                     color = borderColor,
                     shape = shape,
                 )
+                .leftExitsTo(activeTabFocus)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,

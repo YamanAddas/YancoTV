@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -23,11 +24,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -42,6 +48,37 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.theme.LocalYancoPalette
+
+/**
+ * Carries the active Settings tab's [FocusRequester] down through the
+ * tab body so every [SettingsRow] / [SettingsChipRow] / [SettingsSlider]
+ * can register a LEFT-exit that lands on the inner sidebar's active
+ * tab — the user's "back to the previous menu" target.
+ *
+ * Provided by `SettingsScreen.ContentPane`. Default is
+ * [FocusRequester.Default] so a row used outside Settings doesn't
+ * crash; it just falls back to Compose's natural directional search.
+ */
+internal val LocalActiveSettingsTabFocus = compositionLocalOf { FocusRequester.Default }
+
+/**
+ * Modifier helper: turns its receiver into a focus group that redirects
+ * a LEFT-exit to the supplied [FocusRequester]. Used by the row-level
+ * primitives so each [SettingsRow] / chip strip / slider preset row has
+ * its OWN exit boundary — Compose's directional search would otherwise
+ * find a leftward-and-upward focusable in a sibling row above (e.g.
+ * 'System default' in User-Agent presets when LEFT is pressed from
+ * '5s' in Connect-timeout presets — same content pane, different row).
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+internal fun Modifier.leftExitsTo(target: FocusRequester): Modifier =
+    this
+        .focusGroup()
+        .focusProperties {
+            exit = { direction ->
+                if (direction == FocusDirection.Left) target else FocusRequester.Default
+            }
+        }
 
 /**
  * Shared submenu primitives. Maps the Claude-Design "Frosted Emerald"
@@ -141,6 +178,7 @@ internal fun SettingsRow(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = RoundedCornerShape(12.dp)
+    val activeTabFocus = LocalActiveSettingsTabFocus.current
 
     val border =
         when {
@@ -155,6 +193,16 @@ internal fun SettingsRow(
             .clip(shape)
             .background(palette.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
             .border(borderWidth, border, shape)
+            // Each row owns its LEFT-exit boundary. Without this, Compose's
+            // spatial focus search for D-pad LEFT would find a focusable in
+            // a *different* row above (e.g. 'System default' chip in the
+            // User-Agent Preset row when LEFT is pressed from '5s' in the
+            // Connect-timeout preset row) and move focus there. Wrapping
+            // the row in its own focusGroup with exit-to-activeTabFocus
+            // means in-row LEFT navigation works (chip 2 → chip 1) but the
+            // moment LEFT crosses the row boundary, focus lands on the
+            // active tab in the inner sidebar — the user's "previous menu".
+            .leftExitsTo(activeTabFocus)
             .let {
                 if (onClick != null) {
                     it

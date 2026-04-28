@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -207,14 +208,20 @@ fun SettingsScreen(
                     .width(380.dp)
                     .fillMaxHeight(),
         )
-        ContentPane(
-            current = tab,
-            activeTabFocus = activeTabFocus,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .onFocusChanged { contentHasFocus = it.hasFocus },
-        )
+        // Provide the active-tab requester to every Settings row primitive
+        // beneath this point so each row's focusGroup boundary can redirect
+        // a LEFT-exit back to the inner sidebar without per-call-site
+        // wiring (see [LocalActiveSettingsTabFocus] / [leftExitsTo]).
+        CompositionLocalProvider(LocalActiveSettingsTabFocus provides activeTabFocus) {
+            ContentPane(
+                current = tab,
+                activeTabFocus = activeTabFocus,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .onFocusChanged { contentHasFocus = it.hasFocus },
+            )
+        }
     }
 }
 
