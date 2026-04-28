@@ -306,33 +306,21 @@ private fun Sidebar(
 @Composable
 private fun SidebarHeader() {
     val palette = LocalYancoPalette.current
-    // Single horizontal row: shipped raster logo on the left, 'Settings'
-    // wordmark on the right. Replaces the previous `Y` gradient tile +
-    // 'YancoTV' wordmark + 'System · N sections' subtitle stack — the
-    // user wanted the brand mark to read as the brand mark (one element)
-    // and the screen's title to sit beside it instead of below.
+    // 'Settings' wordmark on the left, shipped raster logo pinned to the
+    // far right via SpaceBetween. The user's preferred order — title
+    // reads as the screen's title, the logo sits as a brand sign-off in
+    // the corner instead of leading the row.
     //
-    // The logo height drives the row height. 64dp is calibrated to read
-    // at 3 m on Fire TV without crowding the divider — same scale class
-    // as the main app sidebar's expanded brand mark (96dp), shrunk for
-    // the inner panel's narrower column.
+    // The logo height (64dp) drives the row height — calibrated to read
+    // at 3 m on Fire TV without crowding the divider.
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(id = com.yancotv.android.R.drawable.ic_logo),
-            contentDescription = "YancoTV",
-            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-            modifier =
-                Modifier
-                    .height(64.dp)
-                    .weight(1f, fill = false),
-        )
         Text(
             text = "Settings",
             color = palette.TextPrimary,
@@ -340,6 +328,12 @@ private fun SidebarHeader() {
             lineHeight = 30.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.5).sp,
+        )
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = com.yancotv.android.R.drawable.ic_logo),
+            contentDescription = "YancoTV",
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = Modifier.height(64.dp),
         )
     }
 }
