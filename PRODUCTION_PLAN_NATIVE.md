@@ -124,7 +124,7 @@ User-set ordering for the immediate next sessions (overrides Stage 5 default ord
 3. ✅ **MK.21 — Settings redesign** — Concept A "Configure" layout shipped across ~14 commits (`fd0dd2d` → `01690cb`, 2026-04-27 → 2026-04-28). Hex-cut sidebar + content pane, breadcrumb, unified `SettingsSection` / `SettingsRow` / `SettingsToggleRow` / `SettingsAccentButton` / `SettingsClickToEditField` primitives, source detail screen, per-source auto-sync toggle (MB-220 fix landed alongside this), EPG tab redesign (drops the embedded `GuideSyncPanel` card), scroll-bottom safety margin (root cause: `BringIntoViewSpec` was pinning the focused row to the panel border; fixed in `87fc40d` with a density-aware safe-margin spec). Footer (version + fake SYNCED chip) dropped 2026-04-28 (`01690cb`).
 4. ✅ **MK.22 — Motion polish** — Sprint A shipped 2026-04-28 (`94bb577`): closed MB-221 (sidebar focus → expand felt-lag) + MB-222 (OnNowTile frozen clock). Sprint B shipped 2026-04-28 (`41a83ac`): 7 polish fixes (Settings tab focus retry skip for cheap tabs, HexSurface 5-spring collapse, tab shadow tween, hero crossfade timing, CategoryRail debounce, remove `remember(index)` wrappers, hero backdrop debounce). User confirmed "yes its better" hands-on.
 5. ✅ **MK.23 — Test hardening** — Sprint C shipped 2026-04-28 (3 commits, `3ab8311` → `0ce8333`): PlaybackController.persistResumePoint regression suite (11 tests via extracted `resumePointDecision` pure function), BulkContentWriter.abortSource cross-source FK survival, FavoritesRepository multi-list (10 tests covering MK.13.4). Sprint D shipped 2026-04-28 (7 commits, `a51907c` → `88d67c1`): finishSource failure path, SourceSyncCoordinator re-entrancy (with refactor to drop Context dependency), syncSource cancellation, WatchHistory orphan rows, EPG re-sync vs `recording_schedules.programme_id` SET NULL, v9 → v10 migration, schedule.recording_id SET NULL.
-6. **MK.24 — Audit follow-ups** — planned 2026-04-28 (red-teamed revision). Sprints H + E shipped 2026-04-28. ✅ Sprint H: MB-225/226/227/228 filed. ✅ Sprint E shipped (4 commits, `d390eff` → `ae56b4d`): E.4 schema comment in `Reminders.sq` (closes MB-226 — read-the-file gate retargeted to a load-bearing schema comment, not a test); E.2 SourceSyncCoordinator lifecycle teardown tests covering both DONE and exception paths; E.1 mid-chunk syncSource cancellation test (cancellation lands AFTER first chunk written, proves abortSource ran + FK back ON); E.3 `playLaunchDecision` + `episodeLaunchDecision` pure-function extraction with 14-case test (closes MB-225 — read-the-file gate confirmed both call-site AND controller-level guards exist; pure-function path was the right call). All test suites green; APK on Fire TV. Three sprints remain: F (motion polish, 1–2 h), G.1 (per-migration tests, 4–6 h), G.2 (corruption-recovery, 3–6 h). Strict one-per-session for G.1 and G.2; soft bundle allowed for F. See full plan in MK.24 section below.
+6. **MK.24 — Audit follow-ups + recording bug** — planned 2026-04-28 (red-teamed revision). Sprints H + E shipped 2026-04-28. ✅ Sprint H: MB-225/226/227/228 filed. ✅ Sprint E shipped (4 commits, `d390eff` → `ae56b4d`): E.4 schema comment in `Reminders.sq` (closes MB-226); E.2 SourceSyncCoordinator lifecycle teardown tests; E.1 mid-chunk syncSource cancellation test; E.3 `playLaunchDecision` pure-function extraction with 14-case test (closes MB-225). All test suites green; APK on Fire TV. **Sprint I added 2026-04-28** for MB-229 — user-reported scheduled recording showing "recording AND failed" simultaneously; root-cause investigation gated on device state pull, no blind fixes (recording subsystem already has 8 incident-class bugs). Four sprints remain: **I (recording bug, ~2.5–6.5 h — ship next per user's request)**, F (motion polish, 1–2 h), G.1 (per-migration tests, 4–6 h), G.2 (corruption-recovery, 3–6 h). Strict one-per-session for I (high blast radius, recording subsystem) + G.1 + G.2; soft bundle allowed for F. See full plan in MK.24 section below.
 7. **Polish sweep** — MK.20 follow-ups (multi-word region names, missing 2-letter codes BG/CZ/HR/HU/IS/KZ/etc., pin-a-bucket), plus any UX leftovers from prior milestones. Subsumes the original "MB-208 / MB-209 / MB-210 receiver-path test hardening" item — those tests are largely covered by MK.23 Sprint D and the existing recording-subsystem tests added 2026-04-27.
 8. **MB-224 — Set up CI** — GitHub Actions workflow that runs `:shared:testDebugUnitTest`, `:app:testDebugUnitTest`, and `:app:assembleDebug` on push to `master` + PRs. Surfaced 2026-04-28 as the root cause of why MB-223 (and any future test breakage) goes undetected. ~30 min one-time setup. Needs to land before relying on the test suite as a regression gate.
 
@@ -916,12 +916,12 @@ The two test gaps `MK.23 — Out of scope` deferred. Both are higher-cost than S
 
 **Estimate (red-teamed):** G.1 = 4–6 h (fixture authoring is the cost driver, ~45–60 min per hop × 5). G.2 = 3–6 h (3–4 h if pure-Java `DatabaseFactory`; 5–6 h if Android-API refactor needed). **Total: 7–12 h. Run as two separate sessions.**
 
-### Sprint sequencing (revised)
+### Sprint sequencing (revised 2026-04-28 to include I)
 
-Sprint H complete in the planning session. Remaining sequence:
+Sprint H + Sprint E complete. Remaining sequence:
 
-1. **Session 1 → Sprint E** (test gaps; soft bundle with F if runway permits and E doesn't surface scope-expanding reads).
-2. **Session 2 → Sprint F** (motion polish; soft bundle with G.1 only if F finishes cleanly under 1 h — usually means G.1 needs its own session).
+1. **Session 1 (now) → Sprint I** — MB-229 scheduled-recording root-cause investigation. Slotted ahead of F/G/G.1 because (a) it's a real production correctness bug, not a test gap; (b) device state needs to be captured before rows age out; (c) user explicitly asked to start with this.
+2. **Session 2 → Sprint F** (motion polish; soft bundle with G.1 only if F finishes cleanly under 1 h).
 3. **Session 3 → Sprint G.1** (per-migration tests, test-only).
 4. **Session 4 → Sprint G.2** (corruption-recovery, scope depends on read-the-file gate).
 
@@ -938,6 +938,28 @@ If a session ends mid-sprint (build red, hands-on regression found, scope creep,
 | **Total** | **8 audit findings (some may shrink)** | **12–18 h across 3–4 sessions** | **<100 lines production code if G.2 stays small; up to ~200 if G.2 refactor expands** |
 
 **Honest framing:** if E.3 drops, E.4 drops, F.1 is a non-bug, and G.2 stays JVM-only, total comes in at the low end (~10 h). If all the gates expand scope (E.3 needs extraction, F.1 confirmed, G.2 needs refactor), high end (~18 h). Plan for the middle (~14 h) and adjust per-sprint based on the file-read gate outcome.
+
+### Slice 24.I — Scheduled-recording root-cause investigation (Sprint I)
+
+Added 2026-04-28 in response to user-reported MB-229: a scheduled recording that displays both "recording" AND "failed" states for the same attempt. **NOT a test gap or polish item — a real production correctness bug that must be investigated before any fix is scoped.**
+
+**Why this gets its own sprint, not folded into G:** the recording subsystem has 8 incident-class bugs already (MB-204/205/206/208/209/216/217/219). Each one was a specific race or lifecycle hole. A blind "tighten the lock" fix on this report risks adding a 9th. Investigation must produce a concrete hypothesis pinned by device data BEFORE any code changes.
+
+**Strict order — no shortcuts:**
+
+| # | Step | Status | DoD |
+|---|---|---|---|
+| 24.I.1 | **Capture device state.** Pull `/data/data/com.yancotv.android/databases/yanco.db` from Fire TV via `run-as` + `adb pull`, plus the last `~2000` lines of logcat filtered to recording-subsystem tags (`RecordingService`, `RecordingScheduleReceiver`, `RecordingsRepository`, `RecordingScheduleRepository`, `RecordingStorageResolver`). Store under `D:/tmp/mb-229-capture/` so they don't get committed. **Without this step, every subsequent step is a guess.** | planned | DB file pulled + logcat saved + timestamp recorded. |
+| 24.I.2 | **Query the captured DB.** Read the recent `recording_schedules` rows + the `recordings` rows for the same window; cross-reference by derived `RecordingScheduleScheduler.recordIdForSchedule(scheduleId)`. Tabulate: schedule.status, schedule.failure_reason, recording row presence, recording.status, recording.bytes_captured, recording.file_path. Look for the row pair that produced the "recording AND failed" UI. | planned · gated on I.1 | One row pair identified that explains the symptom OR a clear "no row pair matches" finding (= UI-side bug, not DB-side). |
+| 24.I.3 | **Map state to root-cause hypothesis.** Compare the captured row pair against the four candidate hypotheses in MB-229 (a: handleStop never markCompleted'd; b: stale UI subscription; c: MB-208 family resurfacing; d: MB-219 interaction). If none fit, characterise the new failure mode in one paragraph. | planned · gated on I.2 | Written hypothesis with ≤3 sentences explaining what state was observed and which production code path produced it. Pinned by specific row values from I.2 + specific log lines from I.1. |
+| 24.I.4 | **Scope the fix.** Only after I.3 lands, scope what changes. **Could be:** receiver / service code edit (cause a/c), UI subscription fix (cause b), boot-recovery edit (cause d), or schema-level invariant (orthogonal). **Could also be:** a regression test added without code changes if the bug is already fixed by an existing commit but the user hadn't pulled it. **No code is written before this slice's writeup is committed.** | planned · gated on I.3 | Fix-scope writeup committed to this plan as `24.I.4` body. Cost estimate (honest) included. |
+| 24.I.5 | **Ship the fix + regression test.** Code change + at least one test that fails before the fix and passes after. Hands-on verify on Fire TV: schedule a recording, confirm UI shows a single coherent state (recording → completed/failed, not both). | planned · gated on I.4 | Commit shipped, hands-on Fire TV verification logged in this plan, MB-229 status flipped to Fixed. |
+
+**Estimate (honest):** I.1 + I.2 + I.3 = ~1–2 h (mostly device shell + DB queries). I.4 scoping = 30 min. I.5 fix + test = 1–4 h depending on root cause (a UI race is ~1 h; a receiver/service rewrite is ~3–4 h). **Total: 2.5–6.5 h, single session if the root cause is shallow, two if it's deep.** Compare to the MB-208 fix which spanned 3 commits and revealed 3 nested causes.
+
+**Out of scope for Sprint I:** MB-212 fix. The deferral-reason-stale flag on MB-212 means it should be picked up alongside the next recording-subsystem touch — and Sprint I IS that touch. **If I.3 reveals MB-212 is the same root cause as MB-229, fold them; if not, file MB-212 fix as a Sprint I follow-up rather than expanding scope mid-sprint.** The 29-bugs-in-MK.8 lesson applies to scope creep here too.
+
+---
 
 ### Out of scope for MK.24 (file as new MK if pursued)
 
