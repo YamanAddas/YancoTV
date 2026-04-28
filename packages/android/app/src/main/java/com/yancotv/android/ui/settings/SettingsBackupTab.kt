@@ -259,7 +259,11 @@ fun SettingsBackupTab(
             modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp)
+                // Same outer padding as the SettingsSection-based tabs:
+                // 32dp horizontal aligns with the breadcrumb's optical
+                // edge; 24dp top + 80dp bottom give safety margin so the
+                // last row doesn't hug the panel edge when scrolled.
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp)
                 .semantics { contentDescription = "Backup settings" },
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,9 +24,25 @@ import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
- * Read-only key reference. Each [SettingsSection] groups shortcuts by
- * surface; each row uses the [SettingsRow] frame with the keys rendered
- * as an accent-tinted "kbd"-style chip on the right.
+ * Read-only key reference. Each shortcut row renders as a SettingsRow
+ * with the action label on the left and one or more compact key chips
+ * on the right (one chip per alternative key combo). The chips are
+ * sized to their natural width and pinned to a single line, so a long
+ * combo like 'Ctrl + K' or 'Channel +' never wraps to two rows the way
+ * the previous one-string-many-tokens layout did.
+ *
+ * Verified against the actual key-event handlers (audit 2026-04-28):
+ *   - MainActivity.onKeyDown / onKeyUp — global hotkeys (search,
+ *     long-press menu).
+ *   - PlayerActivity.onKeyDown — player-side keys (play/pause, channel,
+ *     info, stop, back, options menu).
+ *   - GuideScreen.combinedClickable — tap programme block, long-press
+ *     channel row.
+ *   - PinEntryDialog — implicit BACK / Cancel dismissal.
+ *
+ * Entries dropped: 'Show controller (Remote MENU)' was wrong — MENU
+ * opens the OPTIONS popup, not the controller. Replaced with
+ * 'Open options menu' pointing at the correct key.
  */
 @Composable
 fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
@@ -47,67 +61,82 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
         ) {}
 
         SettingsSection(title = "Shell") {
-            ShortcutRow("Open search", "Ctrl + K · Remote SEARCH")
+            ShortcutRow("Open search", listOf("Ctrl + K", "Search"))
             SettingsRowSpacer()
-            ShortcutRow("Sidebar up / down", "D-pad ↑ / ↓")
+            ShortcutRow("Sidebar up / down", listOf("D-pad ↑", "D-pad ↓"))
             SettingsRowSpacer()
-            ShortcutRow("Enter a section", "D-pad → · Enter")
+            ShortcutRow("Enter a section", listOf("D-pad →", "Enter"))
             SettingsRowSpacer()
-            ShortcutRow("Back out", "Back · Esc")
+            ShortcutRow("Back out", listOf("Back", "Esc"))
         }
 
         SettingsSection(title = "Playback") {
-            ShortcutRow("Play / Pause", "Remote PLAY · Space")
+            ShortcutRow("Play / Pause", listOf("Play", "Space"))
             SettingsRowSpacer()
-            ShortcutRow("Next / Previous channel", "Channel ± · D-pad ↑ / ↓ in player")
+            ShortcutRow("Next channel", listOf("Channel +", "D-pad ↓"))
             SettingsRowSpacer()
-            ShortcutRow("Show controller", "Remote MENU")
+            ShortcutRow("Previous channel", listOf("Channel −", "D-pad ↑"))
             SettingsRowSpacer()
-            ShortcutRow("Stream info overlay", "Remote INFO · GUIDE")
+            ShortcutRow("Open options menu", listOf("Menu"))
             SettingsRowSpacer()
-            ShortcutRow("Jump to live edge", "Remote STOP (live streams only)")
+            ShortcutRow("Stream info overlay", listOf("Info", "Guide"))
             SettingsRowSpacer()
-            ShortcutRow("Exit fullscreen", "Back · Esc")
+            ShortcutRow("Jump to live edge", listOf("Stop"))
+            SettingsRowSpacer()
+            ShortcutRow("Exit fullscreen", listOf("Back", "Esc"))
         }
 
         SettingsSection(title = "Guide + channel lists") {
-            ShortcutRow("Open channel actions", "Long-press a channel row or cell")
+            ShortcutRow("Open channel actions", listOf("Long-press channel"))
             SettingsRowSpacer()
-            ShortcutRow("Lock / Hide a channel", "Long-press → Lock or Hide")
+            ShortcutRow("Lock or hide a channel", listOf("Long-press → menu"))
             SettingsRowSpacer()
-            ShortcutRow("Open programme details", "Tap a programme block in Guide")
+            ShortcutRow("Open programme details", listOf("Tap programme"))
             SettingsRowSpacer()
-            ShortcutRow("Set reminder", "Programme dialog → Set reminder")
+            ShortcutRow("Set reminder", listOf("Programme dialog"))
             SettingsRowSpacer()
-            ShortcutRow("Play catch-up", "Programme dialog → Play catch-up")
+            ShortcutRow("Play catch-up", listOf("Programme dialog"))
         }
 
         SettingsSection(title = "Parental gate") {
-            ShortcutRow("Unlock a locked channel", "Tap to play → enter PIN")
+            ShortcutRow("Unlock a locked channel", listOf("Tap → enter PIN"))
             SettingsRowSpacer()
-            ShortcutRow("Dismiss PIN prompt", "Back · Cancel")
+            ShortcutRow("Dismiss PIN prompt", listOf("Back", "Cancel"))
         }
     }
 }
 
+/**
+ * Render one shortcut row. The right slot lays out N key chips with
+ * 6dp gaps; each chip is intrinsic-width so a 'D-pad →' chip is
+ * narrow and a 'Long-press → menu' chip is wider. Both stay one line
+ * because [KeyChip] sets `maxLines = 1, softWrap = false` on its Text.
+ */
 @Composable
 private fun ShortcutRow(
     label: String,
-    keys: String,
+    keys: List<String>,
 ) {
     SettingsRow(
         label = label,
-        right = { KeyChip(keys) },
+        right = {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                keys.forEach { combo -> KeyChip(combo) }
+            }
+        },
     )
 }
 
+/**
+ * One key combo. Sized to the text — never wraps. Accent-tinted
+ * 'kbd' aesthetic so the chips read as keyboard glyphs at a glance.
+ */
 @Composable
 private fun KeyChip(keys: String) {
     val palette = LocalYancoPalette.current
     Box(
         modifier =
             Modifier
-                .widthIn(min = 100.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(palette.Accent.copy(alpha = 0.12f))
                 .border(
@@ -125,6 +154,8 @@ private fun KeyChip(keys: String) {
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 0.4.sp,
+            maxLines = 1,
+            softWrap = false,
         )
     }
 }
