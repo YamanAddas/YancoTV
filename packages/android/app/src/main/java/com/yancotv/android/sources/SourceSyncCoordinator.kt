@@ -1,16 +1,15 @@
 package com.yancotv.android.sources
 
-import android.content.Context
-import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.shared.logger.Logger
-import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.sources.SyncProgress
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -31,13 +30,27 @@ import kotlinx.coroutines.launch
  * rows) against each other's chunked inserts. A future release can add a
  * per-source mutex if multi-sync ever matters; today the user only ever has
  * one provider.
+ *
+ * MK.23.D.2 refactor (2026-04-28): Context dependency replaced with a
+ * `kickEpgRefresh: () -> Unit` callback. The coordinator only used
+ * Context to call `EpgSyncWorker.enqueueOnce(context)` after a
+ * successful sync — making that an injected lambda removes the only
+ * Android dependency from this class so JVM unit tests can construct
+ * it directly. The DI module wires the callback to
+ * `EpgSyncWorker.enqueueOnce(androidContext())`.
+ *
+ * `dispatcher` and `scope` are also injectable for tests so they can
+ * use `UnconfinedTestDispatcher` (immediate execution, deterministic
+ * ordering) instead of the real `Dispatchers.IO`.
  */
 class SourceSyncCoordinator(
-    private val context: Context,
-    private val repo: SourceRepository,
+    private val syncSource: (String) -> Flow<SyncProgress>,
     private val logger: Logger,
+    private val kickEpgRefresh: () -> Unit,
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher),
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope: CoroutineScope = scope
 
     private val _state = MutableStateFlow<Active?>(null)
     val state: StateFlow<Active?> = _state.asStateFlow()
@@ -89,7 +102,7 @@ class SourceSyncCoordinator(
             scope.launch {
                 var completedOk = false
                 try {
-                    repo.syncSource(sourceId).collect { p ->
+                    syncSource(sourceId).collect { p ->
                         // Keep startedAtMs stable across progress updates so the
                         // UI's elapsed-time ticker doesn't reset each time.
                         _state.value = _state.value?.copy(progress = p)
@@ -114,7 +127,7 @@ class SourceSyncCoordinator(
                     // run is already in flight.
                     if (completedOk) {
                         logger.info("syncCoordinator kicking EPG refresh after catalog sync id=$sourceId")
-                        runCatching { EpgSyncWorker.enqueueOnce(context) }
+                        runCatching { kickEpgRefresh() }
                             .onFailure { logger.warn("EPG enqueue failed: ${it.message}") }
                     }
                 } catch (ce: CancellationException) {
