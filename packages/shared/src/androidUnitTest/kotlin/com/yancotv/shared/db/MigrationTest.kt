@@ -122,6 +122,77 @@ class MigrationTest {
     }
 
     /**
+     * MK.23.D.6 — v9 → v10 dedicated migration test.
+     *
+     * `9.sqm` adds `auto_sync_on_start INTEGER NOT NULL DEFAULT 0` to
+     * `sources` (produces schema v10). The MK.21 active-work-queue
+     * feature has MainActivity reading this on launch to kick the
+     * user-opted sources through SourceSyncCoordinator. A wrong-type
+     * or missing column would crash `db.sourcesQueries.selectAll()`
+     * with an SQLite column-not-found error at app launch.
+     *
+     * The full v3 → current path is covered by `Stage2MigrationTest`,
+     * but v10 rides along with no dedicated assertion. This test
+     * isolates the v9 → v10 hop so a regression in 9.sqm is caught
+     * even when Stage2's bundled assertions still pass.
+     */
+    @Test fun migrationV9ToV10AddsAutoSyncOnStartColumnDefaultingToFalse() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
+
+        // Build a minimal v9 `sources` table — every column the schema
+        // had at v9, NOT auto_sync_on_start. Mirrors the production
+        // schema before 9.sqm landed.
+        v9SourcesSchema().forEach { driver.execute(null, it, 0) }
+        driver.execute(null, "PRAGMA user_version = 9;", 0)
+
+        // Seed a v9 row so the migration's ALTER TABLE has data to
+        // backfill. The DEFAULT 0 should land for this row.
+        driver.execute(null, SEED_SOURCE_V9, 0)
+
+        // Apply 9.sqm (v9 → v10). Only touches sources, no need to
+        // pre-create recording_schedules / etc. tables here.
+        YancoDb.Schema.migrate(driver, oldVersion = 9, newVersion = 10)
+
+        // Wrap and read via the v10 query API. The SQLDelight-generated
+        // `Source` row exposes `auto_sync_on_start` as a Boolean; if
+        // the migration didn't add the column, the SELECT would throw
+        // here.
+        val db = YancoDb(driver)
+        val row = db.sourcesQueries.selectById("src-v9").executeAsOne()
+        assertEquals(false, row.auto_sync_on_start, "existing v9 rows must default to auto_sync_on_start = false (DEFAULT 0)")
+
+        // Insert a fresh v10 row with auto_sync_on_start = true and
+        // confirm round-trip — proves the column is functional, not
+        // just declared.
+        db.sourcesQueries.insert(
+            id = "src-v10",
+            name = "Auto-sync source",
+            type = "m3u_url",
+            url = "http://x",
+            file_path = null,
+            username_encrypted = null,
+            password_encrypted = null,
+            mac_address_encrypted = null,
+            epg_url = null,
+            user_agent = null,
+            referer = null,
+            last_synced = null,
+            last_sync_error = null,
+            is_active = true,
+            priority = 0L,
+            channel_count = 0,
+            auto_sync_interval = 0,
+            epg_priority = 0,
+            auto_sync_on_start = true,
+            created_at = 0L,
+            updated_at = 0L,
+        )
+        val auto = db.sourcesQueries.selectById("src-v10").executeAsOne()
+        assertEquals(true, auto.auto_sync_on_start)
+    }
+
+    /**
      * v3 schema fresh-create sanity: `Schema.create()` on a clean driver
      * yields a fully-functional database — write, read, FTS search round-
      * trip works. Catches schema-file syntax errors that only surface at
@@ -255,6 +326,66 @@ class MigrationTest {
                 'ch-1', 'src-v2', 'live', 'Test Channel', 'test channel', 'News',
                 'https://example.com/stream.ts', NULL, 'test.tvg', NULL,
                 0, 1700000000000
+            );
+        """
+
+        /**
+         * Hand-crafted v9 `sources` schema — every column added through
+         * 8.sqm but NOT `auto_sync_on_start` (which lands in 9.sqm,
+         * producing v10). Cumulative columns by migration that touch
+         * sources:
+         *   - genesis: id, name, type, url, file_path, username_encrypted,
+         *     password_encrypted, mac_address_encrypted, epg_url,
+         *     user_agent, last_synced, last_sync_error, is_active,
+         *     priority, channel_count, auto_sync_interval, created_at,
+         *     updated_at
+         *   - 5.sqm: + referer
+         *   - 6.sqm: + epg_priority
+         *   - 7.sqm: no sources column change (BackupMetadata table only)
+         *   - 8.sqm: no sources column change (recording_schedules.series_key)
+         *   - 9.sqm: + auto_sync_on_start  ← what this test verifies
+         */
+        fun v9SourcesSchema(): List<String> =
+            listOf(
+                """
+                CREATE TABLE sources (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL CHECK(type IN ('m3u_url', 'm3u_file', 'xtream', 'stalker')),
+                    url TEXT,
+                    file_path TEXT,
+                    username_encrypted BLOB,
+                    password_encrypted BLOB,
+                    mac_address_encrypted BLOB,
+                    epg_url TEXT,
+                    user_agent TEXT,
+                    referer TEXT,
+                    last_synced INTEGER,
+                    last_sync_error TEXT,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    priority INTEGER NOT NULL DEFAULT 0,
+                    channel_count INTEGER NOT NULL DEFAULT 0,
+                    auto_sync_interval INTEGER NOT NULL DEFAULT 0,
+                    epg_priority INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                """.trimIndent(),
+            )
+
+        const val SEED_SOURCE_V9 = """
+            INSERT INTO sources (
+                id, name, type, url, file_path,
+                username_encrypted, password_encrypted, mac_address_encrypted,
+                epg_url, user_agent, referer, last_synced, last_sync_error,
+                is_active, priority, channel_count, auto_sync_interval,
+                epg_priority, created_at, updated_at
+            ) VALUES (
+                'src-v9', 'Pre-9.sqm source', 'm3u_url', 'https://example.com/p.m3u', NULL,
+                NULL, NULL, NULL,
+                NULL, NULL, NULL, NULL, NULL,
+                1, 0, 0, 0,
+                0, 1700000000000, 1700000000000
             );
         """
     }
