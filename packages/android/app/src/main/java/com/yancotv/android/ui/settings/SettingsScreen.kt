@@ -44,11 +44,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
@@ -124,45 +127,40 @@ private val OnAccentInk: Color = Color(0xFF04130C)
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     initialTab: SettingsTab = SettingsTab.General,
+    onExitToMainSidebar: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val scope = rememberCoroutineScope()
-    // User contract: "left dpad and back button go back" — i.e. one
-    // BACK press from inside a tab body should return focus to the
-    // sidebar, not pop the entire Settings screen. Track when focus
-    // is in the content pane and intercept BACK only then; when focus
-    // is in the sidebar BACK passes through to the host so the user
-    // can leave Settings normally. Mirrors the CategoryRail /
-    // CoverflowSectionScreen pattern in the home shell.
-    var contentHasFocus by remember { mutableStateOf(false) }
-    // MB-108 v2 (hardened): simulate D-pad RIGHT after the tab commits.
-    // A focusGroup+focusRestorer wrapper (v1) sometimes lost focus
-    // entirely on Fire TV — focus searched up the tree and bounced back
-    // to the sidebar. moveFocus(Right) mimics exactly the manual press
-    // the user would otherwise do, so we get identical behaviour to
-    // pressing CENTER then RIGHT, with no extra focus indirection.
+    // Two layers, two keys, one rule per layer:
+    //   - Settings tab CONTENT: BACK or LEFT-from-leftmost → focus the
+    //     active tab in the inner sidebar.
+    //   - Settings tab SIDEBAR: BACK or LEFT → exit Settings entirely
+    //     ([onExitToMainSidebar]) — the host (HomeScreen) refocuses the
+    //     main app sidebar, which auto-expands.
     //
-    // Hardening over v2:
-    //   1. Wait TWO frames before the first moveFocus call. One frame
-    //      gets us past composition; the second covers layout. Heavy
-    //      tabs (Sources, Groups) didn't always have placed focusable
-    //      children after a single frame.
-    //   2. moveFocus returns false when no focus target was found —
-    //      retry once after another frame instead of giving up. If
-    //      both attempts fail we leave focus on the sidebar tab item
-    //      (the user can press RIGHT manually) and log so a Fire TV
-    //      regression is diagnosable from logcat instead of by feel.
+    // [contentHasFocus] gates the per-layer BackHandlers so the inner
+    // tab BACK and the outer sidebar BACK don't fire on the same press.
+    var contentHasFocus by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    // [activeTabFocus] is bound to the currently-selected TabItem only
+    // (mirrors `AppSidebar.activeRowFocus` — the canonical pattern from
+    // MB-106). `requestFocus()` lands on that exact node, so we no longer
+    // depend on `moveFocus(Left)` finding a spatial neighbour across the
+    // focusGroup boundary — that was the failure mode that left users
+    // stuck inside Network when a chip or slider was focused.
+    val activeTabFocus = remember { FocusRequester() }
 
     BackHandler(enabled = contentHasFocus) {
-        // Push focus left out of the content pane; the sidebar's
-        // focusGroup + focusRestorer (lines below) lands on the
-        // last-focused TabItem, so the user returns to where they
-        // entered the body from. If for some reason there's no
-        // focusable to the left (heavy tab without a left-edge
-        // focusable), the move silently no-ops and the user can
-        // press BACK again — host handles it on the second press.
-        focusManager.moveFocus(FocusDirection.Left)
+        // Explicit requester instead of moveFocus(Left). The previous
+        // implementation called moveFocus(Left), which on Fire TV
+        // returned false silently when the focused descendant (chip,
+        // slider knob, click-to-edit field) couldn't find a spatial
+        // neighbour to the left through the cross-pane focusGroup
+        // boundary. The BackHandler still consumed the event (enabled =
+        // contentHasFocus stayed true), so subsequent BACK presses also
+        // no-op'd — the user was trapped. requestFocus() always lands
+        // on the active tab node directly.
+        runCatching { activeTabFocus.requestFocus() }
     }
 
     Row(
@@ -202,6 +200,8 @@ fun SettingsScreen(
                     }
                 }
             },
+            onExit = onExitToMainSidebar,
+            activeTabFocus = activeTabFocus,
             modifier =
                 Modifier
                     .width(380.dp)
@@ -209,6 +209,7 @@ fun SettingsScreen(
         )
         ContentPane(
             current = tab,
+            onLeftEdgeEscape = { runCatching { activeTabFocus.requestFocus() } },
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -222,6 +223,8 @@ fun SettingsScreen(
 private fun Sidebar(
     current: SettingsTab,
     onSelect: (SettingsTab) -> Unit,
+    onExit: () -> Unit,
+    activeTabFocus: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     // Verdant Frost — clean rounded panel (28dp `--r-xl`) replaces the
@@ -230,12 +233,35 @@ private fun Sidebar(
     // shape is still used for chips / cards inside the tabs; only the
     // outer Settings panels go rounded to match the redesign brief.
     val panelShape = RoundedCornerShape(28.dp)
+    var sidebarHasFocus by remember { mutableStateOf(false) }
+
+    // BACK while focus is anywhere in the inner sidebar exits Settings.
+    // Mirrors CategoryRail: the host (HomeScreen) refocuses the main app
+    // sidebar, which auto-expands via the existing
+    // `LaunchedEffect(sidebarHasFocus)` chain.
+    BackHandler(enabled = sidebarHasFocus, onBack = onExit)
+
     Column(
         modifier =
             modifier
                 .clip(panelShape)
                 .background(LocalYancoPalette.current.BackgroundRaised)
                 .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
+                .onFocusChanged { sidebarHasFocus = it.hasFocus }
+                // D-pad LEFT inside the inner sidebar exits Settings.
+                // The sidebar is a vertical list with no horizontal
+                // siblings, so blanket-consuming LEFT is safe — there's
+                // no in-rail meaning for it. Same shape as CategoryRail's
+                // LEFT handler. Consume always so Compose's default focus
+                // search doesn't try to find an off-screen target.
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                        onExit()
+                        true
+                    } else {
+                        false
+                    }
+                }
                 .focusGroup()
                 .focusRestorer(),
     ) {
@@ -251,10 +277,15 @@ private fun Sidebar(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for (entry in SettingsTab.entries) {
+                val isActive = entry == current
                 TabItem(
                     entry = entry,
-                    selected = entry == current,
+                    selected = isActive,
                     onClick = { onSelect(entry) },
+                    // Bind the requester only to the active row. requestFocus
+                    // then lands on that exact node — no spatial / restorer
+                    // race. Mirrors AppSidebar.bindActiveRowFocus (MB-106).
+                    focusRequester = if (isActive) activeTabFocus else null,
                 )
             }
         }
@@ -368,6 +399,7 @@ private fun TabItem(
     entry: SettingsTab,
     selected: Boolean,
     onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -479,6 +511,12 @@ private fun TabItem(
                     shape = shape,
                 )
                 .then(onTabKey)
+                .let { base ->
+                    // Bind the requester to the SAME node as `.focusable`
+                    // (Modifier order matters in Compose 1.7) — putting it on a
+                    // wrapper Box made requestFocus unreliable, see MB-106 v2.
+                    if (focusRequester != null) base.focusRequester(focusRequester) else base
+                }
                 .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
@@ -564,10 +602,12 @@ private fun TabItem(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
 private fun ContentPane(
     current: SettingsTab,
+    onLeftEdgeEscape: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val panelShape = RoundedCornerShape(28.dp)
@@ -576,7 +616,24 @@ private fun ContentPane(
             modifier
                 .clip(panelShape)
                 .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape),
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
+                // Bubble-phase D-pad LEFT catch. onKeyEvent fires AFTER
+                // descendants and AFTER Compose's default focus traversal
+                // — so chip rows / sliders that handle LEFT internally
+                // still work, and we only see LEFT here when no focusable
+                // exists to the left of the focused node. That's the
+                // signal that the user is at the leftmost edge of the
+                // tab body, so we explicitly hop back to the active tab
+                // in the inner sidebar instead of leaving the press to
+                // silently no-op.
+                .onKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                        onLeftEdgeEscape()
+                        true
+                    } else {
+                        false
+                    }
+                },
     ) {
         Breadcrumb(current = current)
         HairlineDivider()

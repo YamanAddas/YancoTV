@@ -368,7 +368,11 @@ fun HomeScreen(
                     if (needsSettingsGate) {
                         SettingsLockedPlaceholder()
                     } else {
-                        SettingsScreen()
+                        SettingsScreen(
+                            onExitToMainSidebar = {
+                                runCatching { sidebarFocus.requestFocus() }
+                            },
+                        )
                     }
                 }
             } else if (section == AppSection.Guide) {
