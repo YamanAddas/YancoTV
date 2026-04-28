@@ -9,15 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,15 +43,11 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
- * Groups visibility manager. Providers often push 400+ category groups;
- * hiding the noise is the single biggest daily-use quality-of-life knob
- * for a personal catalog. Hidden groups disappear from the sidebar filter
- * without touching the underlying channel rows, so toggling back just
- * brings them back — no re-sync required.
- *
- * Filters across Live / Movies / Series are managed in one place with a
- * type-selector row so the user never has to remember which tab hides
- * which category.
+ * Groups visibility manager. Type chip strip + LazyColumn list of groups,
+ * each row a focus target with the new emerald [SettingsInlineSwitch].
+ * Fits inside the Settings ContentPane scroll: the LazyColumn weight(1f)
+ * binds the list to remaining vertical space, the chip strip stays
+ * pinned at the top (same pattern as [SourcesScreen]).
  */
 @Composable
 fun SettingsGroupsTab(
@@ -66,7 +59,6 @@ fun SettingsGroupsTab(
     val scope = rememberCoroutineScope()
     var selectedType by rememberSaveable { mutableStateOf(ContentType.LIVE) }
     val groups = remember { mutableStateListOf<String>() }
-    var query by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(selectedType) {
         val loaded =
@@ -78,82 +70,97 @@ fun SettingsGroupsTab(
     }
 
     Column(
-        modifier = modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = modifier.fillMaxSize(),
     ) {
-        Text(
-            text = "Groups",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Hide categories you never watch — keeps the channel sidebar short. Changes take effect immediately.",
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 12.sp,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (type in ContentType.values()) {
-                SettingsChip(
-                    label = typeChipLabel(type),
-                    selected = selectedType == type,
-                    onClick = { selectedType = type },
-                )
-            }
-            Spacer(modifier = Modifier.fillMaxWidth(0.02f))
-            if (hidden.isNotEmpty()) {
-                SettingsChip(
-                    label = "Show all (${hidden.size})",
-                    selected = false,
-                    onClick = { scope.launch { prefs.clearHiddenGroups() } },
-                )
-            }
+        SettingsSection(
+            title = "Groups",
+            sub = "Hide categories you never watch — keeps the channel sidebar short. Changes take effect immediately.",
+            right = {
+                if (hidden.isNotEmpty()) {
+                    SettingsOutlinedButton(
+                        onClick = { scope.launch { prefs.clearHiddenGroups() } },
+                        size = ButtonSize.Compact,
+                    ) {
+                        Text(text = "Show all (${hidden.size})")
+                    }
+                }
+            },
+        ) {
+            SettingsRow(
+                label = "Content type",
+                hint = "Toggling switches the group list below to that catalog's category set.",
+                content = {
+                    SettingsChipRow(
+                        options = ContentType.values().toList(),
+                        selected = selectedType,
+                        label = { typeChipLabel(it).uppercase() },
+                        onSelect = { selectedType = it },
+                    )
+                },
+            )
         }
 
-        val visible =
-            remember(groups.toList(), query) {
-                if (query.isBlank()) {
-                    groups.toList()
-                } else {
-                    groups.filter { it.contains(query, ignoreCase = true) }
-                }
-            }
-
+        // Group list — single container card with hairline-divided rows so the
+        // type-chip header above stays distinct and the list reads as ONE
+        // grouped pane instead of N stacked cards (same fix the Sources tab
+        // got after the user called the cards "horrible").
         if (groups.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
                     text = "No groups found for ${typeChipLabel(selectedType).lowercase()}. Sync a source first.",
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
             }
-            return@Column
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            items(visible, key = { it }) { group ->
-                GroupRow(
-                    name = group,
-                    hidden = group in hidden,
-                    onToggle = { isHidden -> scope.launch { prefs.setGroupHidden(group, isHidden) } },
-                )
+        } else {
+            val palette = LocalYancoPalette.current
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.BackgroundRaised.copy(alpha = 0.5f))
+                        .border(
+                            width = 1.dp,
+                            color = palette.BorderSubtle,
+                            shape = RoundedCornerShape(12.dp),
+                        ),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    items(groups, key = { it }) { group ->
+                        GroupRow(
+                            name = group,
+                            hidden = group in hidden,
+                            onToggle = { isHidden ->
+                                scope.launch { prefs.setGroupHidden(group, isHidden) }
+                            },
+                        )
+                        // Hairline between rows.
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp)
+                                    .background(palette.BorderSubtle)
+                                    .padding(top = 0.dp, bottom = 0.dp),
+                        ) {
+                            // Empty 1dp divider via height; keeps the modifier
+                            // tower simple compared to building Divider().
+                            Box(modifier = Modifier.fillMaxWidth().background(palette.BorderSubtle))
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-/**
- * MB-107a: same focus-aware row treatment as [SettingsToggleRow] but with
- * the Groups-tab specific shape — visible/hidden label slot in the middle,
- * inverted Switch semantics (`checked = !hidden`).
- *
- * Inlined rather than parameterised on [SettingsToggleRow] because the
- * extra label slot would push the shared composable into config-bag
- * territory; the focus-border pattern is small enough to copy.
- */
 @Composable
 private fun GroupRow(
     name: String,
@@ -163,54 +170,42 @@ private fun GroupRow(
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(8.dp)
+    val rowBg = if (focused) palette.BackgroundElevated.copy(alpha = 0.6f) else Color.Transparent
 
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(shape)
-                .background(palette.BackgroundRaised)
+                .background(rowBg)
                 .border(
-                    width = if (focused) 2.dp else 1.dp,
+                    width = if (focused) 1.5.dp else 0.dp,
                     color = if (focused) palette.FocusRing else Color.Transparent,
-                    shape = shape,
+                    shape = RoundedCornerShape(0.dp),
                 )
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
                     onClick = { onToggle(!hidden) },
                 )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 22.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            text = name,
-            color = if (hidden) palette.TextMuted else palette.TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
-        Text(
-            text = if (hidden) "Hidden" else "Visible",
-            color = palette.TextMuted,
-            fontSize = 11.sp,
-        )
-        // Display-only — row owns input via .clickable above. Keeps the
-        // focus target as the Row, not the Switch (which has an invisible
-        // halo against BackgroundRaised on Fire TV).
-        Switch(
-            checked = !hidden,
-            onCheckedChange = null,
-            colors =
-                SwitchDefaults.colors(
-                    checkedThumbColor = palette.Accent,
-                    checkedTrackColor = palette.Accent.copy(alpha = 0.4f),
-                    uncheckedThumbColor = palette.TextMuted,
-                    uncheckedTrackColor = palette.BackgroundHover,
-                ),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                color = if (hidden) palette.TextMuted else palette.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = if (hidden) "Hidden from sidebar and rails" else "Visible everywhere",
+                color = palette.TextMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        SettingsInlineSwitch(checked = !hidden)
     }
 }
 

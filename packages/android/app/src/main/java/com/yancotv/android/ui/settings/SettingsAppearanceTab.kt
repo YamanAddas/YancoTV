@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -11,10 +12,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +27,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,10 +42,11 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * MK.16.2 — theme picker. Lists every [ThemeId] as a row with a swatch
- * preview (background + accent + focus colours sampled from the
- * resolved palette). Tapping commits instantly via [ThemeController];
- * the whole UI recomposes via [LocalYancoPalette].
+ * Appearance — theme picker, accent picker, font scale. Wrapped in
+ * [SettingsSection]s so the type scale matches the rest of Settings,
+ * but the theme rows + accent chips keep their bespoke focus chrome
+ * (these are visual previews, not generic chips, so the existing
+ * MB-110 audit-pass-5 fix stays in place).
  */
 @Composable
 fun SettingsAppearanceTab(
@@ -62,82 +63,72 @@ fun SettingsAppearanceTab(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+                .verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            text = "Theme",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Pick a palette. Changes apply instantly across the app — no restart.",
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 12.sp,
-        )
-
-        ThemeId.values().forEach { id ->
-            ThemeRow(
-                id = id,
-                selected = id == active,
-                palette = themeController.paletteFor(id),
-                onClick = {
-                    themeController.setTheme(id)
-                    scope.launch { prefs.setThemeId(id.name) }
-                },
-            )
-        }
-
-        // MK.16.3 — accent overlay. Independent of the theme palette
-        // pick: any base theme can carry any accent. "Match theme" keeps
-        // the palette's native accent (the previous behaviour).
-        Text(
-            text = "Accent",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        // Horizontal scroll keeps all 5 chips reachable on narrow panes /
-        // when the app is in a constrained settings column. D-pad RIGHT
-        // past the last visible chip auto-scrolls.
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        SettingsSection(
+            title = "Theme",
+            sub = "Pick a palette. Changes apply instantly across the app — no restart.",
         ) {
-            AccentId.values().forEach { id ->
-                AccentChip(
+            ThemeId.values().forEachIndexed { idx, id ->
+                if (idx > 0) SettingsRowSpacer()
+                ThemeRow(
                     id = id,
-                    selected = id == activeAccent,
-                    swatch = swatchColourFor(id, themeController, active),
+                    selected = id == active,
+                    palette = themeController.paletteFor(id),
                     onClick = {
-                        themeController.setAccent(id)
-                        scope.launch { prefs.setAccentId(id.name) }
+                        themeController.setTheme(id)
+                        scope.launch { prefs.setThemeId(id.name) }
                     },
                 )
             }
         }
 
-        // MK.16.4 — font scale picker. Live-applies via LocalDensity
-        // override in YancoTheme; sp-sized text rescales without restart,
-        // dp layouts stay put.
-        Text(
-            text = "Font size",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AppearancePrefs.FONT_SCALE_PRESETS.forEach { pct ->
-                SettingsChip(
-                    label = "$pct%",
-                    selected = appearance.fontScalePercent == pct,
-                    onClick = { scope.launch { prefs.setFontScalePercent(pct) } },
-                )
-            }
+        SettingsSection(
+            title = "Accent",
+            sub = "Tint applied to focus rings, progress bars, chips and other interactive accents.",
+        ) {
+            SettingsRow(
+                label = "Accent colour",
+                hint = "Independent of the theme palette — any base theme can carry any accent.",
+                content = {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AccentId.values().forEach { id ->
+                            AccentChip(
+                                id = id,
+                                selected = id == activeAccent,
+                                swatch = swatchColourFor(id, themeController, active),
+                                onClick = {
+                                    themeController.setAccent(id)
+                                    scope.launch { prefs.setAccentId(id.name) }
+                                },
+                            )
+                        }
+                    }
+                },
+            )
+        }
+
+        SettingsSection(
+            title = "Type",
+            sub = "Live-applies via LocalDensity override — sp-sized text rescales without restart, dp layouts stay put.",
+        ) {
+            SettingsRow(
+                label = "Font scale",
+                hint = "Multiplies base body size. 100% is the default.",
+                content = {
+                    SettingsChipRow(
+                        options = AppearancePrefs.FONT_SCALE_PRESETS.map { "$it%" },
+                        selected = "${appearance.fontScalePercent}%",
+                        onSelect = { selection ->
+                            val pct = selection.removeSuffix("%").toIntOrNull() ?: return@SettingsChipRow
+                            scope.launch { prefs.setFontScalePercent(pct) }
+                        },
+                    )
+                },
+            )
         }
     }
 }
@@ -152,8 +143,7 @@ private fun ThemeRow(
     // Audit-pass-5: focus + selected as separate visual states. Without
     // a shared interactionSource the border only updated on `selected`,
     // so D-pad navigation across rows had no visible cursor — user had
-    // to commit blind. Matches the canonical pattern used by the main
-    // sidebar TabItem, GroupRow, SettingsChip, etc.
+    // to commit blind.
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val pal = LocalYancoPalette.current
@@ -163,44 +153,44 @@ private fun ThemeRow(
             selected -> pal.Accent
             else -> pal.BorderSubtle
         }
-    val borderWidth = if (focused || selected) 2.dp else 1.dp
+    val borderWidth = if (focused || selected) 1.5.dp else 1.dp
     Row(
         modifier =
             Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(pal.BackgroundRaised)
+                .clip(RoundedCornerShape(12.dp))
+                .background(pal.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
                 .border(
                     width = borderWidth,
                     color = borderColour,
-                    shape = RoundedCornerShape(8.dp),
-                ).focusable(interactionSource = interaction)
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
                     onClick = onClick,
-                ).padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                .padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         SwatchTriple(palette = palette)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = id.displayName,
-                color = LocalYancoPalette.current.TextPrimary,
+                color = pal.TextPrimary,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
             )
             Text(
                 text = if (selected) "Active" else "Tap to apply",
-                color =
-                    if (selected) {
-                        LocalYancoPalette.current.Accent
-                    } else {
-                        LocalYancoPalette.current.TextMuted
-                    },
-                fontSize = 11.sp,
+                color = if (selected) pal.Accent else pal.TextMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 2.dp),
             )
+        }
+        if (selected) {
+            SettingsKicker(text = "ACTIVE", accent = true)
         }
     }
 }
@@ -216,19 +206,13 @@ private fun SwatchTriple(palette: YancoPalette) {
     }
 }
 
-/** Accent chip — circular swatch + label. Selected state borders match
- *  the theme accent so the active row is unambiguous regardless of which
- *  accent is currently applied. */
 @Composable
 private fun AccentChip(
     id: AccentId,
     selected: Boolean,
-    swatch: androidx.compose.ui.graphics.Color,
+    swatch: Color,
     onClick: () -> Unit,
 ) {
-    // Audit-pass-5: same fix as ThemeRow — focus chrome via shared
-    // interactionSource so D-pad navigation across the chip strip
-    // shows where the cursor is.
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val pal = LocalYancoPalette.current
@@ -238,30 +222,33 @@ private fun AccentChip(
             selected -> pal.Accent
             else -> pal.BorderSubtle
         }
-    val borderWidth = if (focused || selected) 2.dp else 1.dp
+    val borderWidth = if (focused || selected) 1.5.dp else 1.dp
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(pal.BackgroundRaised)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (selected) pal.Accent.copy(alpha = 0.18f) else pal.BackgroundRaised)
                 .border(
                     width = borderWidth,
                     color = borderColour,
-                    shape = RoundedCornerShape(6.dp),
-                ).focusable(interactionSource = interaction)
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .focusable(interactionSource = interaction)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
                     onClick = onClick,
-                ).padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Swatch(swatch)
+        Swatch(swatch, size = 22.dp)
         Text(
             text = id.displayName,
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 13.sp,
+            color = if (selected || focused) pal.TextPrimary else pal.TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
 }
@@ -270,15 +257,17 @@ private fun swatchColourFor(
     id: AccentId,
     controller: ThemeController,
     activeTheme: ThemeId,
-): androidx.compose.ui.graphics.Color =
-    controller.resolved(activeTheme, id).Accent
+): Color = controller.resolved(activeTheme, id).Accent
 
 @Composable
-private fun Swatch(colour: androidx.compose.ui.graphics.Color) {
+private fun Swatch(
+    colour: Color,
+    size: androidx.compose.ui.unit.Dp = 28.dp,
+) {
     Box(
         modifier =
             Modifier
-                .size(28.dp)
+                .size(size)
                 .clip(CircleShape)
                 .background(colour)
                 .border(1.dp, LocalYancoPalette.current.BorderSubtle, CircleShape),
