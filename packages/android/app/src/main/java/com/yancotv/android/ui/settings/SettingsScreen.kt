@@ -45,13 +45,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
@@ -209,7 +209,7 @@ fun SettingsScreen(
         )
         ContentPane(
             current = tab,
-            onLeftEdgeEscape = { runCatching { activeTabFocus.requestFocus() } },
+            activeTabFocus = activeTabFocus,
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -607,7 +607,7 @@ private fun TabItem(
 @Composable
 private fun ContentPane(
     current: SettingsTab,
-    onLeftEdgeEscape: () -> Unit,
+    activeTabFocus: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     val panelShape = RoundedCornerShape(28.dp)
@@ -617,21 +617,22 @@ private fun ContentPane(
                 .clip(panelShape)
                 .background(LocalYancoPalette.current.BackgroundRaised)
                 .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
-                // Bubble-phase D-pad LEFT catch. onKeyEvent fires AFTER
-                // descendants and AFTER Compose's default focus traversal
-                // — so chip rows / sliders that handle LEFT internally
-                // still work, and we only see LEFT here when no focusable
-                // exists to the left of the focused node. That's the
-                // signal that the user is at the leftmost edge of the
-                // tab body, so we explicitly hop back to the active tab
-                // in the inner sidebar instead of leaving the press to
-                // silently no-op.
-                .onKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
-                        onLeftEdgeEscape()
-                        true
-                    } else {
-                        false
+                // Define the content pane as a focus group so we can
+                // redirect focus exits from it. `focusProperties.exit`
+                // runs inside Compose's focus traversal — it fires only
+                // when there is NO in-group target in the requested
+                // direction, so chip rows / sliders / button rows with
+                // horizontal LEFT siblings keep their natural navigation
+                // (e.g. "VLC chip" → "System chip" stays in-row). At the
+                // leftmost edge, the exit lambda redirects to the active
+                // tab in the inner sidebar instead of letting Compose's
+                // spatial search find an unrelated focusable above or
+                // below in the same column.
+                .focusGroup()
+                .focusProperties {
+                    exit = { direction ->
+                        if (direction == FocusDirection.Left) activeTabFocus
+                        else FocusRequester.Default
                     }
                 },
     ) {

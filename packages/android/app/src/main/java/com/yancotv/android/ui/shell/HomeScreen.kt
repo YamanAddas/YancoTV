@@ -300,7 +300,20 @@ fun HomeScreen(
                         }
                     }
                 },
-                expanded = panelFocus == PanelFocus.Sidebar,
+                // Direct focus binding: expanded ⇔ sidebar has focus.
+                // The previous binding routed through `panelFocus`, which
+                // had to be kept in sync from multiple call sites
+                // (LaunchedEffects + onSelect + onMoveRight + browse-section
+                // callbacks). Any path that didn't update panelFocus left
+                // the sidebar at the wrong width — most visibly when
+                // returning from a content pane via BACK / LEFT, where the
+                // focus animation finished but the panelFocus update lagged.
+                // Tying width straight to `sidebarHasFocus` makes the
+                // contract obvious: focus enters → expand; focus leaves →
+                // collapse. The `panelFocus` state is still used elsewhere
+                // (categories/content gating in browse + guide), so we keep
+                // it but stop using it as the width signal.
+                expanded = sidebarHasFocus,
                 onMoveRight = {
                     // RIGHT mirrors click — both navigate into the section.
                     // Browse sections (Live/Movies/Series) advance to the
