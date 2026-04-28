@@ -1,17 +1,10 @@
 package com.yancotv.android.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -19,12 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.Text
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.UserAgentPreset
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -37,8 +31,12 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
- * Network preferences — UA preset dropdown + custom escape hatch
- * (MK.17.1a), test-connection probe (MK.17.2), HTTP timeouts.
+ * Network preferences — User-Agent picker, HTTP timeouts, test-connection
+ * probe. The User-Agent picker is rendered as a horizontal chip strip
+ * (one chip per known preset + a Custom… escape hatch) so every option
+ * is reachable in a single D-pad sweep — the previous Material3
+ * `DropdownMenu` anchored a popup that ate leanback focus and made
+ * RIGHT-from-the-trigger land on whatever followed it in the layout.
  */
 @Composable
 fun SettingsNetworkTab(
@@ -49,123 +47,92 @@ fun SettingsNetworkTab(
 ) {
     val scope = rememberCoroutineScope()
     val state by prefs.networkFlow.collectAsState()
+    val activePreset = UserAgentPreset.matchValue(state.userAgentOverride)
 
     Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+                .verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            text = "Network",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        UserAgentPicker(
-            currentValue = state.userAgentOverride,
-            onPick = { preset ->
-                if (preset == UserAgentPreset.SYSTEM) {
-                    scope.launch { prefs.setUserAgent("") }
-                } else if (preset != UserAgentPreset.CUSTOM) {
-                    scope.launch { prefs.setUserAgent(preset.value.orEmpty()) }
-                }
-            },
-        )
-
-        // The Custom row only shows when the active preset is Custom — keeps
-        // the screen clean when a preset is selected. The user lands here by
-        // typing or by picking "Custom…" from the dropdown.
-        val activePreset = UserAgentPreset.matchValue(state.userAgentOverride)
-        if (activePreset == UserAgentPreset.CUSTOM) {
-            SettingsClickToEditField(
-                label = "Custom User-Agent",
-                description = "Verbatim string. Some IPTV providers require an exact match.",
-                value = state.userAgentOverride.orEmpty(),
-                onValueChange = { input -> scope.launch { prefs.setUserAgent(input.take(256)) } },
-                hint = "VLC/3.0.20 LibVLC/3.0.20",
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SettingsClickToEditField(
-                label = "Connect timeout (s)",
-                value = state.connectTimeoutSec.toString(),
-                onValueChange = { input ->
-                    val cleaned = input.filter { it.isDigit() }.take(4)
-                    cleaned.toIntOrNull()?.takeIf { it in 1..600 }?.let { v ->
-                        scope.launch { prefs.setConnectTimeout(v) }
-                    }
-                },
-                keyboardType = KeyboardType.Number,
-                modifier = Modifier.weight(1f),
-            )
-            SettingsClickToEditField(
-                label = "Read timeout (s)",
-                value = state.readTimeoutSec.toString(),
-                onValueChange = { input ->
-                    val cleaned = input.filter { it.isDigit() }.take(4)
-                    cleaned.toIntOrNull()?.takeIf { it in 1..600 }?.let { v ->
-                        scope.launch { prefs.setReadTimeout(v) }
-                    }
-                },
-                keyboardType = KeyboardType.Number,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        TestConnectionRow(scope = scope, sources = sources, http = http)
-
-        Text(
-            text = "Changes apply to new HTTP requests — restart playback or re-sync a source to pick them up for in-flight connections.",
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 11.sp,
-        )
-    }
-}
-
-@Composable
-private fun UserAgentPicker(
-    currentValue: String?,
-    onPick: (UserAgentPreset) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val active = UserAgentPreset.matchValue(currentValue)
-
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = "User-Agent",
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Preset known-good strings. Pick \"Custom…\" to type a verbatim UA.",
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 11.sp,
-        )
-        OutlinedButton(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(6.dp),
+        SettingsSection(
+            title = "User-Agent",
+            sub = "Some IPTV providers gate playlist or stream access by the request's User-Agent. Pick a known-good preset, or paste a custom string.",
         ) {
-            Text(text = active.displayName)
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            UserAgentPreset.values().forEach { preset ->
-                DropdownMenuItem(
-                    text = { Text(text = preset.displayName) },
-                    onClick = {
-                        expanded = false
-                        onPick(preset)
-                    },
+            SettingsRow(
+                label = "Preset",
+                hint = "Applied to every outgoing HTTP request from YancoTV. Switching is instant for new connections.",
+                content = {
+                    SettingsChipRow(
+                        options = UserAgentPreset.values().toList(),
+                        selected = activePreset,
+                        label = { it.displayName },
+                        onSelect = { preset ->
+                            scope.launch {
+                                if (preset == UserAgentPreset.SYSTEM) {
+                                    prefs.setUserAgent("")
+                                } else if (preset != UserAgentPreset.CUSTOM) {
+                                    prefs.setUserAgent(preset.value.orEmpty())
+                                }
+                            }
+                        },
+                    )
+                },
+            )
+            if (activePreset == UserAgentPreset.CUSTOM) {
+                SettingsRowSpacer()
+                SettingsClickToEditField(
+                    label = "Custom User-Agent",
+                    description = "Verbatim string. Some providers require an exact match.",
+                    value = state.userAgentOverride.orEmpty(),
+                    onValueChange = { input -> scope.launch { prefs.setUserAgent(input.take(256)) } },
+                    hint = "VLC/3.0.20 LibVLC/3.0.20",
                 )
             }
+        }
+
+        SettingsSection(
+            title = "Timeouts",
+            sub = "How long YancoTV waits before giving up on a slow source. Applied to playlists, EPG fetches and stream probes.",
+        ) {
+            SettingsRow(
+                label = "Connect timeout",
+                hint = "How long to wait for the TCP connection to open before retrying.",
+                content = {
+                    SettingsSlider(
+                        value = state.connectTimeoutSec,
+                        range = 1..120,
+                        unit = " s",
+                        presets = listOf(5, 15, 30, 60),
+                        onValueChange = { sec ->
+                            scope.launch { prefs.setConnectTimeout(sec) }
+                        },
+                    )
+                },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Read timeout",
+                hint = "Max idle time on an open connection before reconnecting.",
+                content = {
+                    SettingsSlider(
+                        value = state.readTimeoutSec,
+                        range = 1..600,
+                        unit = " s",
+                        presets = listOf(10, 30, 60, 180),
+                        onValueChange = { sec ->
+                            scope.launch { prefs.setReadTimeout(sec) }
+                        },
+                    )
+                },
+            )
+        }
+
+        SettingsSection(
+            title = "Diagnostics",
+            sub = "Probe a source URL to confirm credentials and reachability.",
+        ) {
+            TestConnectionRow(scope = scope, sources = sources, http = http)
         }
     }
 }
@@ -178,46 +145,51 @@ private fun TestConnectionRow(
 ) {
     var status by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
+    val palette = LocalYancoPalette.current
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        OutlinedButton(
-            onClick = {
-                if (running) return@OutlinedButton
-                running = true
-                status = "Testing…"
-                scope.launch {
-                    val result = probeFirstActiveSource(sources, http)
-                    status = result
-                    running = false
+    SettingsRow(
+        label = "Test connection",
+        hint = "Sends a small GET to your first active source. The credentials, URL and timeouts above are all exercised.",
+        right = {
+            SettingsAccentButton(
+                onClick = {
+                    if (running) return@SettingsAccentButton
+                    running = true
+                    status = "Testing…"
+                    scope.launch {
+                        val result = probeFirstActiveSource(sources, http)
+                        status = result
+                        running = false
+                    }
+                },
+                size = ButtonSize.Compact,
+            ) {
+                Text(text = if (running) "Testing…" else "Run test")
+            }
+        },
+        content =
+            status?.let { result ->
+                {
+                    val statusColor =
+                        when {
+                            result.startsWith("OK") -> palette.Accent
+                            result.startsWith("Failed") -> palette.Error
+                            else -> palette.TextSecondary
+                        }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsKicker(text = "STATUS")
+                        Text(
+                            text = result,
+                            color = statusColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             },
-            shape = RoundedCornerShape(6.dp),
-        ) {
-            Text(text = if (running) "Testing…" else "Test connection")
-        }
-        status?.let { s ->
-            Text(
-                text = s,
-                color = LocalYancoPalette.current.TextMuted,
-                fontSize = 12.sp,
-            )
-        }
-    }
+    )
 }
 
-/**
- * MK.17.2 — picks the first active source's URL and probes it via the
- * shared [HttpClient]. Returns a one-line status the UI can render.
- *
- * Implemented as a small GET (capped at 1 KB) instead of HEAD — Ktor's
- * shared interface doesn't expose HEAD and HEAD coverage on IPTV
- * endpoints is spotty (some Xtream panels return 405 on HEAD even
- * when GET works). The 1 KB cap keeps the probe cheap and avoids
- * dragging full M3U / Xtream catalogs.
- */
 private suspend fun probeFirstActiveSource(
     sources: SourceRepository,
     http: HttpClient,
