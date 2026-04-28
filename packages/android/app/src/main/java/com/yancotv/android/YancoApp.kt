@@ -27,6 +27,7 @@ import org.koin.core.context.startKoin
 class YancoApp : Application() {
     private val playbackController: PlaybackController by inject()
     private val recordingsRepo: RecordingsRepository by inject()
+    private val sharedHttpClient: okhttp3.OkHttpClient by inject()
     private var startedActivities = 0
 
     override fun onCreate() {
@@ -82,7 +83,7 @@ class YancoApp : Application() {
         // shows up in adb logcat -s YancoCrash immediately after launch.
         CrashReporter.readAndClear(this)
 
-        SingletonImageLoader.setSafe { buildYancoImageLoader(this) }
+        SingletonImageLoader.setSafe { buildYancoImageLoader(this, sharedHttpClient) }
         EpgSyncWorker.schedulePeriodic(this)
         // MK.10.1 — keep the launcher Recommendations channel current.
         // Periodic refresh + a one-shot so the channel exists on first

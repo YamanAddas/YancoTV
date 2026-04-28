@@ -18,12 +18,21 @@ import okhttp3.OkHttpClient
  *    during long sessions. Logos + posters cache-hit fine at 32 MB.
  *  * Disk LRU at 250MB in `cacheDir/yanco-images`; big enough for thousands
  *    of logos at typical 5–40KB each without blowing up the profile.
- *  * OkHttp network fetcher so requests share the same TLS/redirect stack
- *    the rest of the app uses.
+ *  * OkHttp network fetcher uses the **shared** app-level [OkHttpClient]
+ *    (Koin singleton) so we share the same connection pool + dispatcher +
+ *    DNS cache + TLS sessions as `AndroidEpgImporter`. MK.24.I.7 / MB-230 —
+ *    pre-fix this constructed `OkHttpClient()` fresh, doubling the
+ *    connection-pool / thread-executor / DNS / TLS infrastructure overhead.
  *  * Crossfade (120ms) so hot-cached frames don't flash on rapid focus
  *    changes.
+ *  * Memory cache responds to system pressure: see `YancoApp.onTrimMemory`
+ *    which clears or trims this cache on `RUNNING_LOW`/`RUNNING_CRITICAL`/
+ *    `BACKGROUND`/`COMPLETE` levels.
  */
-fun buildYancoImageLoader(context: Context): ImageLoader =
+fun buildYancoImageLoader(
+    context: Context,
+    sharedHttp: OkHttpClient,
+): ImageLoader =
     ImageLoader
         .Builder(context)
         .memoryCache {
@@ -38,6 +47,6 @@ fun buildYancoImageLoader(context: Context): ImageLoader =
                 .maxSizeBytes(250L * 1024 * 1024)
                 .build()
         }.components {
-            add(OkHttpNetworkFetcherFactory(OkHttpClient()))
+            add(OkHttpNetworkFetcherFactory(sharedHttp))
         }.crossfade(120)
         .build()

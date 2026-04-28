@@ -32,8 +32,10 @@ import com.yancotv.shared.sources.AndroidKeystoreCredentialStore
 import com.yancotv.shared.sources.CredentialStore
 import com.yancotv.shared.sources.FileContentReader
 import com.yancotv.shared.sources.SourceRepository
+import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
+import java.util.concurrent.TimeUnit
 
 /**
  * MK.4 DI wiring. Everything the shell needs (db, http, sources) is bound
@@ -48,6 +50,25 @@ val appModule =
         single<YancoDatabase> { DatabaseFactory(androidContext()).create() }
         single<YancoDb> { get<YancoDatabase>().db }
         single<SqlDriver> { get<YancoDatabase>().driver }
+        // MK.24.I.7 / MB-230 — single shared OkHttpClient for non-player
+        // HTTP (Coil image fetches, AndroidEpgImporter XMLTV downloads).
+        // Pre-fix the app had three separate OkHttpClient instances (player,
+        // Coil, EPG importer), each with its own connection pool, dispatcher
+        // thread executor, DNS cache, and TLS session cache. Consolidating
+        // the non-player ones into one shared instance halves that overhead.
+        // PlaybackController stays on its own OkHttp because its interceptor
+        // applies per-source User-Agent and Referer headers that Coil + EPG
+        // sync should NOT inherit. Callers that need use-case-specific
+        // timeouts should `newBuilder()` from this client — that preserves
+        // the connection pool + dispatcher while letting them override
+        // timeouts per request.
+        single<OkHttpClient> {
+            OkHttpClient
+                .Builder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        }
         single<HttpClient> {
             val prefs = get<AppPreferences>()
             createAndroidHttpClient(
@@ -119,6 +140,7 @@ val appModule =
                 db = get(),
                 writer = get(),
                 logger = get(),
+                sharedHttp = get(),
             )
         }
         single {

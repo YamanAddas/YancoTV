@@ -60,7 +60,24 @@ class AndroidEpgImporter(
     private val db: YancoDb,
     private val writer: BulkEpgWriter,
     private val logger: Logger,
+    sharedHttp: OkHttpClient,
 ) {
+    /**
+     * MK.24.I.7 / MB-230 — derived from the shared app-level [OkHttpClient]
+     * (Koin singleton), so we share the same connection pool + dispatcher
+     * + DNS cache + TLS session cache as Coil. `newBuilder()` keeps those
+     * resources shared while letting us override the timeouts EPG needs:
+     * residential connections frequently take 30+ seconds to start streaming
+     * a multi-MB XMLTV body and full downloads can run several minutes.
+     */
+    private val http: OkHttpClient =
+        sharedHttp
+            .newBuilder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)
+            .callTimeout(600, TimeUnit.SECONDS)
+            .build()
+
     /** Progress callback — sent on phase transitions and every ~5 s during streaming. */
     fun interface Progress {
         suspend fun report(msg: String)
@@ -156,7 +173,7 @@ class AndroidEpgImporter(
         dest: File,
     ): Long {
         val client =
-            HTTP.newCall(
+            http.newCall(
                 Request
                     .Builder()
                     .url(url)
@@ -407,17 +424,10 @@ class AndroidEpgImporter(
         private const val FLUSH_EVERY = 500
         private const val PROGRESS_TICK_MS = 5_000L
 
-        // Shared OkHttp instance. Timeouts sized for multi-MB XMLTV files on
-        // slow residential connections. Follow redirects so providers that
-        // 302 to a CDN work.
-        private val HTTP: OkHttpClient =
-            OkHttpClient
-                .Builder()
-                .connectTimeout(20, TimeUnit.SECONDS)
-                .readTimeout(300, TimeUnit.SECONDS)
-                .callTimeout(600, TimeUnit.SECONDS)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .build()
+        // MK.24.I.7 / MB-230 — replaced the per-class private OkHttpClient
+        // with a `newBuilder()` from the Koin-provided shared instance
+        // (see constructor's `sharedHttp` + `http` field). Eliminates the
+        // duplicate connection pool / dispatcher / DNS / TLS that the old
+        // private static `HTTP` field carried.
     }
 }
