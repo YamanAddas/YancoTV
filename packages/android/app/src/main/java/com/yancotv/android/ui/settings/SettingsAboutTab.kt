@@ -101,28 +101,25 @@ fun SettingsAboutTab(
                     .padding(bottom = 12.dp),
         )
 
-        // ───── Version block — aspirational v1.0.0 ─────
-        // Hardcoded "v 1.0.0" — the target stability number we'll ship
-        // under once the app is feature-complete. Actual BuildConfig
-        // versionName / versionCode still appear in Build section
-        // below for diagnostics.
-        //
-        // Custom focusable row instead of `SettingsRow` because we need
-        // the arabesque face on the left-aligned label, and SettingsRow
-        // hardcodes the label font. Visual match (rounded corners,
-        // background tint, focus border) so it reads as part of the
-        // same primitives family. `readOnlyFocusable = true`-equivalent:
-        // the Box itself is focusable so D-pad traversal walks through
-        // it, and the parent verticalScroll's bringIntoView pulls it
-        // into the safety-margin gap on focus.
-        SettingsSection(title = "Version") {
-            VersionRow(text = "v 1.0.0", arabesque = arabesque)
-        }
+        // ───── Version row + tagline ─────
+        // No section header — the row IS the version. "v 1.0.0" is the
+        // aspirational target we'll ship under at feature-complete +
+        // stable; the "Preview" kicker on the right tells the user
+        // this is a pre-release build so the number doesn't read as a
+        // promise. Actual BuildConfig version surfaces in Diagnostics
+        // at the bottom for bug-report context.
+        VersionRow(text = "v 1.0.0", kicker = "Preview", arabesque = arabesque)
+        Text(
+            text = "IPTV for Android TV, Fire TV, and phone.",
+            color = palette.TextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
+        )
 
         // ───── Updates (Stage 5.2.2) ─────
         SettingsSection(
             title = "Updates",
-            sub = "Periodic check against the configured release endpoint. Disable to skip the 24-hour poll; \"Check now\" runs immediately regardless.",
+            sub = "YancoTV will tell you when a new version is ready.",
             right = {
                 SettingsOutlinedButton(
                     onClick = { UpdateCheckWorker.enqueueOnce(ctx) },
@@ -133,8 +130,8 @@ fun SettingsAboutTab(
             },
         ) {
             SettingsToggleRow(
-                label = "Auto-check for updates",
-                description = "Polls the release endpoint every 24 hours. Honors the system network policy (skips on metered if you've set the OS-wide preference).",
+                label = "Check for updates automatically",
+                description = "Once a day, quietly in the background.",
                 checked = updatePrefs.autoCheckEnabled,
                 onCheckedChange = { enabled ->
                     scope.launch {
@@ -180,60 +177,65 @@ fun SettingsAboutTab(
                             )
                         }
                         Text(
-                            text = "Install flow lands in a follow-up update.",
+                            text = "Open the release page to download and install.",
                             color = palette.TextMuted,
-                            fontSize = 10.sp,
-                            modifier = Modifier.padding(top = 6.dp),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
                         )
+                        SettingsOutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    ctx.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(uinfo.downloadUrl),
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                }
+                            },
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Open release page")
+                        }
                     }
                 }
             }
         }
 
-        // ───── Build metadata ─────
-        // `readOnlyFocusable = true` on every read-only row makes them
-        // participate in D-pad traversal. Without this the read-only
-        // section was unreachable: D-pad DOWN from the Updates toggle
-        // (the last focusable above) had nothing focusable to land on
-        // here, so the user never saw the Build / Credits content even
-        // though it was rendered just below the viewport. Integrating
-        // focus + scroll into ONE thing — every row is focusable, the
-        // verticalScroll's bringIntoView pulls each focused row into
-        // view with the safety margin, and the natural top-to-bottom
-        // focus order matches the natural top-to-bottom reading order.
-        SettingsSection(title = "Build") {
-            SettingsRow(
-                label = "Version",
-                readOnlyFocusable = true,
-                right = { ValueText(info.version) },
-            )
-            SettingsRowSpacer()
+        // ───── About YancoTV ─────
+        // Replaces the previous "Credits" section, which was a developer
+        // architecture lecture (mentioning packages/shared, milestone
+        // codes, etc — none of which mean anything to users). One human
+        // sentence about what the app does + who it's for.
+        SettingsSection(
+            title = "About YancoTV",
+            sub = "An IPTV client for Android TV, Fire TV, and phones. Bring your M3U or Xtream playlist; we handle the EPG, recordings, favourites, multi-list, and smart category grouping.",
+        ) {}
+
+        // ───── Diagnostics ─────
+        // Renamed from "Build" — these are debugging fields, not user
+        // identity. Combined version + build into one row, dropped the
+        // useless "Package: com.yancotv.android" row, added a Device
+        // row that's actually useful when filing a bug report. Each
+        // row is readOnlyFocusable so D-pad walks the whole tab top-
+        // to-bottom and the verticalScroll's bringIntoView pulls each
+        // focused row into the safety-margin gap inherited from
+        // SettingsScreen (MK.21.8) — focus + scroll integrated, not
+        // bolted together.
+        SettingsSection(
+            title = "Diagnostics",
+            sub = "Useful when reporting a bug.",
+        ) {
             SettingsRow(
                 label = "Build",
                 readOnlyFocusable = true,
-                right = { ValueText(info.versionCode.toString()) },
+                right = { ValueText("${info.version} (build ${info.versionCode})") },
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Package",
+                label = "Device",
                 readOnlyFocusable = true,
-                right = { ValueText(info.packageName) },
-            )
-        }
-
-        SettingsSection(
-            title = "Credits",
-            sub = "Built with Media3 ExoPlayer, SQLDelight, Ktor, Coil, and Jetpack Compose. Shared business logic (parsers, clients, classifier, EPG) lives in packages/shared via Kotlin Multiplatform — the iOS app in MK.iOS.* will consume the same code.",
-        ) {
-            // Empty section body. The `sub` line above carries the
-            // content; an additional read-only-focusable spacer here
-            // gives D-pad somewhere to land at the very bottom so the
-            // scroll comes to rest WITH the safety-margin gap below
-            // the Credits text.
-            SettingsRow(
-                label = "Open-source licenses",
-                hint = "Bundled at app/src/main/res/raw — review for full notices.",
-                readOnlyFocusable = true,
+                right = { ValueText("${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}") },
             )
         }
     }
@@ -248,6 +250,7 @@ fun SettingsAboutTab(
 @Composable
 private fun VersionRow(
     text: String,
+    kicker: String? = null,
     arabesque: FontFamily,
 ) {
     val palette = LocalYancoPalette.current
@@ -276,7 +279,15 @@ private fun VersionRow(
             fontWeight = FontWeight.Bold,
             fontFamily = arabesque,
             letterSpacing = 0.4.sp,
+            modifier = Modifier.weight(1f),
         )
+        if (kicker != null) {
+            // Soft tag on the right — "Preview" / "Pre-release" so the
+            // aspirational v1.0.0 doesn't read as a shipping promise.
+            // Uses the same SettingsKicker primitive other tabs use for
+            // status pills so the visual language is consistent.
+            SettingsKicker(text = kicker)
+        }
     }
 }
 
