@@ -90,6 +90,21 @@ object PrefixCatalog {
             "ng" to Entry("Nigeria", Kind.Region),
             "ke" to Entry("Kenya", Kind.Region),
 
+            // MK.20 polish-sweep additions — common gaps the original
+            // catalog missed. Eastern + Central Europe, plus Arab states
+            // that complete the existing cluster (sa/ae/eg/ma/dz/qa/kw/
+            // lb/sy/iq/jo/ye + tn/tr → bh/om/ps/ly).
+            "bg" to Entry("Bulgaria", Kind.Region),
+            "cz" to Entry("Czech Republic", Kind.Region),
+            "hr" to Entry("Croatia", Kind.Region),
+            "hu" to Entry("Hungary", Kind.Region),
+            "is" to Entry("Iceland", Kind.Region),
+            "kz" to Entry("Kazakhstan", Kind.Region),
+            "bh" to Entry("Bahrain", Kind.Region),
+            "om" to Entry("Oman", Kind.Region),
+            "ps" to Entry("Palestine", Kind.Region),
+            "ly" to Entry("Libya", Kind.Region),
+
             // Languages — included when no country code shadows them.
             "ar" to Entry("Arabic", Kind.Language),
             "en" to Entry("English", Kind.Language),

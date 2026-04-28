@@ -4,15 +4,16 @@ package com.yancotv.shared.content
  * MK.20.2 — Pure parser for IPTV-style group-name prefixes.
  *
  * Real-world M3U group_name shapes seen in the field:
- *   "AR| Sports"           pipe-delimited, code first
- *   "|AR| Sports"          double-pipe wrapper
- *   "[AR] Sports"          bracket
- *   "AR - Sports"          dash (en/em-dash too)
- *   "AR: Sports"           colon
- *   "AR Sports"            space-only (matched only when next token is uppercase
- *                          so we don't eat "US Open" → "Open")
- *   "Arabic | Sports"      full-word, looked up via reverse catalog
- *   "Sports"               unprefixed → null prefix
+ *   "AR| Sports"               pipe-delimited, code first
+ *   "|AR| Sports"              double-pipe wrapper
+ *   "[AR] Sports"              bracket
+ *   "AR - Sports"              dash (en/em-dash too)
+ *   "AR: Sports"               colon
+ *   "AR Sports"                space-only (matched only when next token is
+ *                              uppercase so we don't eat "US Open" → "Open")
+ *   "Arabic | Sports"          full-word, looked up via reverse catalog
+ *   "Saudi Arabia | beIN HD"   multi-word full-name (MK.20 polish-sweep)
+ *   "Sports"                   unprefixed → null prefix
  *
  * Returns a [ParsedGroup] with the original name, the detected (uppercase)
  * code or full-word match, the catalog [PrefixCatalog.Entry] when resolvable,
@@ -55,15 +56,28 @@ object PrefixParser {
             }
         }
 
-        // 2) Try full-word match (Arabic | Foo, English - Foo, …).
-        val wordMatch =
-            Regex("^([A-Za-zÀ-ÿ]{3,})\\s*[\\|:\\-\\u2013\\u2014]\\s*(.*)$").matchEntire(raw)
-        if (wordMatch != null) {
-            val word = wordMatch.groupValues[1]
-            val rest = wordMatch.groupValues[2].trim()
-            val resolved = PrefixCatalog.resolveByDisplayName(word)
+        // 2) Try full-word match. Find the first structural delimiter and
+        //    look up everything before it in the catalog by displayName
+        //    (case-insensitive). Handles single-word (`Arabic | Foo`) AND
+        //    multi-word (`Saudi Arabia | Foo`, `Hong Kong | Foo`,
+        //    `South Korea - News`) — the regex-based version this replaced
+        //    only matched a single `[A-Za-zÀ-ÿ]{3,}` token before the
+        //    delimiter, so any multi-word name fell through silently even
+        //    though [PrefixCatalog] already knew them.
+        //
+        //    Hyphen handling is tricky: catalog displayNames don't contain
+        //    `-`, so any hyphen in `raw` is a structural delimiter. If
+        //    that ever changes (e.g. `Bosnia-Herzegovina`), prefer the
+        //    delimiter set `[|:]` and add explicit handling for the new
+        //    name shape.
+        val delimChars = charArrayOf('|', ':', '-', '–', '—')
+        val firstDelim = raw.indexOfAny(delimChars)
+        if (firstDelim > 0) {
+            val before = raw.substring(0, firstDelim).trim()
+            val rest = raw.substring(firstDelim + 1).trim()
+            val resolved = PrefixCatalog.resolveByDisplayName(before)
             if (resolved != null) {
-                return ParsedGroup(groupName, word, resolved, rest.ifEmpty { resolved.displayName })
+                return ParsedGroup(groupName, before, resolved, rest.ifEmpty { resolved.displayName })
             }
         }
 
