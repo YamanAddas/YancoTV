@@ -2,6 +2,7 @@ package com.yancotv.android
 
 import android.app.Activity
 import android.app.Application
+import android.content.ComponentCallbacks2
 import android.os.Bundle
 import android.os.StrictMode
 import androidx.media3.common.util.UnstableApi
@@ -15,9 +16,13 @@ import com.yancotv.android.reminders.ReminderNotificationChannel
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.image.buildYancoImageLoader
 import com.yancotv.shared.recording.RecordingsRepository
+import io.sentry.Breadcrumb
+import io.sentry.Sentry
+import io.sentry.SentryLevel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.android.ext.koin.androidContext
@@ -106,6 +111,18 @@ class YancoApp : Application() {
         // so in-flight syncs are unaffected.
         WorkManager.getInstance(this).pruneWork()
 
+        // MK.24.I.7 / MB-230 — heap-watermark Sentry breadcrumb. Polls
+        // Runtime memory every 60s; when used/max crosses thresholds, emits
+        // a breadcrumb (>75%) or a Sentry event (>90%) so future heap-pressure
+        // occurrences self-report. Pre-fix MB-230 hit 376/384 MB (98%) without
+        // any Sentry event firing — the app just stalled silently. With this
+        // probe the next occurrence captures rich context BEFORE the stall.
+        // Single coroutine on a SupervisorJob so a transient Sentry failure
+        // doesn't kill the watcher; never cancelled (process-scoped).
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            startHeapWatermarkProbe()
+        }
+
         // Pause playback whenever the last visible Activity stops — pressing
         // Home or switching apps should silence the stream immediately. We
         // dropped the MediaSessionService (MK.9.5), so Media3's automatic
@@ -143,5 +160,140 @@ class YancoApp : Application() {
                 override fun onActivityDestroyed(activity: Activity) {}
             },
         )
+    }
+
+    /**
+     * MK.24.I.7 / MB-230 — heap-watermark probe. Polls every 60 s; emits a
+     * Sentry breadcrumb when used/max heap crosses 75% and a Sentry event
+     * (warning level) when it crosses 90%. Each event carries the runtime
+     * snapshot (used MB / max MB / GC counts since process start) so we
+     * can correlate against navigation patterns or background work.
+     *
+     * Hysteresis so we don't spam: only re-emit when the watermark CHANGES
+     * tier (e.g. NONE → WATCH on first cross of 75%, WATCH → ALERT on first
+     * cross of 90%, ALERT → WATCH when it drops below 90% again). A
+     * sustained ALERT state stays at one event per crossing, not one per
+     * 60s tick.
+     *
+     * Pre-fix MB-230 saw the process at 376/384 MB (98%) for tens of
+     * seconds without Sentry firing once — there was no probe at all. With
+     * this in place, the next occurrence's ALERT event lands in Sentry
+     * with breadcrumbs from the preceding 60s, which is enough to ask the
+     * user to capture an hprof.
+     */
+    private suspend fun startHeapWatermarkProbe() {
+        var tier = HeapTier.NONE
+        while (true) {
+            delay(60_000L)
+            if (!Sentry.isEnabled()) continue
+            val rt = Runtime.getRuntime()
+            val used = rt.totalMemory() - rt.freeMemory()
+            val max = rt.maxMemory()
+            val pct = used.toDouble() / max * 100
+            val newTier =
+                when {
+                    pct >= 90.0 -> HeapTier.ALERT
+                    pct >= 75.0 -> HeapTier.WATCH
+                    else -> HeapTier.NONE
+                }
+            if (newTier == tier) continue
+            tier = newTier
+            val usedMb = used / (1024 * 1024)
+            val maxMb = max / (1024 * 1024)
+            val msg = "Heap watermark $newTier: ${pct.toInt()}% (${usedMb}MB / ${maxMb}MB)"
+            when (newTier) {
+                HeapTier.WATCH -> {
+                    val crumb =
+                        Breadcrumb().apply {
+                            this.level = SentryLevel.WARNING
+                            this.category = "memory"
+                            this.message = msg
+                            setData("heap_pct", pct.toInt())
+                            setData("heap_used_mb", usedMb)
+                            setData("heap_max_mb", maxMb)
+                        }
+                    Sentry.addBreadcrumb(crumb)
+                }
+                HeapTier.ALERT -> {
+                    Sentry.captureMessage(msg, SentryLevel.WARNING)
+                }
+                HeapTier.NONE -> {
+                    val crumb =
+                        Breadcrumb().apply {
+                            this.level = SentryLevel.INFO
+                            this.category = "memory"
+                            this.message = "Heap watermark recovered: ${pct.toInt()}% (${usedMb}MB / ${maxMb}MB)"
+                            setData("heap_pct", pct.toInt())
+                        }
+                    Sentry.addBreadcrumb(crumb)
+                }
+            }
+        }
+    }
+
+    private enum class HeapTier { NONE, WATCH, ALERT }
+
+    /**
+     * MK.24.I.7 / MB-230 — release reclaimable caches on system memory pressure.
+     *
+     * Captured 2026-04-28 on Fire TV: an `am send-trim-memory RUNNING_CRITICAL`
+     * released only -0.5 MB Java heap with Graphics + Native unchanged because
+     * the app had no `onTrimMemory` override. Coil's bitmap cache (32 MB cap,
+     * but native-allocated decoded bitmaps push the Graphics column much
+     * higher) was holding everything regardless of system pressure. Over a
+     * long session that contributed to the 376/384 MB heap-thrash state where
+     * GC ran 101 times back-to-back freeing 0 bytes and every coroutine
+     * stalled.
+     *
+     * Levels:
+     *   - `RUNNING_MODERATE` (5) — system caches getting low, app still in
+     *     foreground. Mild trim — halve the Coil memory cache.
+     *   - `RUNNING_LOW` (10) — system needs memory now, app still foreground.
+     *     Halve again.
+     *   - `RUNNING_CRITICAL` (15) — system about to start killing background
+     *     processes. Drop the entire Coil memory cache (disk cache survives;
+     *     re-decode on next request).
+     *   - `BACKGROUND` (40) / `MODERATE` (60) / `COMPLETE` (80) — app is
+     *     backgrounded; system may kill us. Drop everything.
+     *
+     * The disk cache is never cleared here — it's a separate budget and
+     * surviving it lets logos re-cache fast on the next foreground.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        val loader =
+            runCatching { SingletonImageLoader.get(this) }.getOrNull() ?: return
+        val cache = loader.memoryCache ?: return
+        val before = cache.size
+        when (level) {
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE,
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
+            -> {
+                cache.trimToSize(cache.size / 2)
+            }
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL,
+            ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
+            ComponentCallbacks2.TRIM_MEMORY_MODERATE,
+            ComponentCallbacks2.TRIM_MEMORY_COMPLETE,
+            -> {
+                cache.clear()
+            }
+            else -> return
+        }
+        // Sentry breadcrumb so we can confirm trim activity in the wild
+        // (paired with the F3 heap-watermark probe).
+        if (Sentry.isEnabled()) {
+            val crumb =
+                Breadcrumb().apply {
+                    this.level = SentryLevel.INFO
+                    this.category = "memory"
+                    this.message =
+                        "onTrimMemory level=$level — Coil cache trimmed: ${before / 1024}KB → ${cache.size / 1024}KB"
+                    setData("trim_level", level)
+                    setData("coil_before_kb", before / 1024)
+                    setData("coil_after_kb", cache.size / 1024)
+                }
+            Sentry.addBreadcrumb(crumb)
+        }
     }
 }
