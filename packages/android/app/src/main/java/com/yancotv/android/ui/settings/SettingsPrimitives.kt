@@ -7,7 +7,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -516,7 +518,9 @@ internal fun SettingsChipRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        modifier =
+            modifier
+                .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { option ->
@@ -540,7 +544,9 @@ internal fun <T> SettingsChipRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        modifier =
+            modifier
+                .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { option ->

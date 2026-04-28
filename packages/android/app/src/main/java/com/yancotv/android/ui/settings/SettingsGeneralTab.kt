@@ -2,6 +2,7 @@ package com.yancotv.android.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -9,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ChannelNumberFormat
 import com.yancotv.android.prefs.OpenOn
@@ -17,9 +19,16 @@ import org.koin.compose.koinInject
 
 /**
  * General tab — startup destination + channel-number formatting + smart
- * grouping. Re-skinned onto the [SettingsSection] / [SettingsRow]
- * primitives so it shares the same vertical rhythm and focus chrome
- * as every other tab. Contents and persistence behaviour are unchanged.
+ * grouping. Uses the SettingsSection / SettingsRow / SettingsToggleRow
+ * primitives so the row chrome and font scale match every other tab in
+ * Settings.
+ *
+ * Outer padding is calibrated against the breadcrumb (start/end 40dp +
+ * top 24 + bottom 20). The tab body indents 32dp horizontally so the
+ * row cards align with the breadcrumb's optical edge while leaving a
+ * touch of breathing room. Top 8dp keeps the first section title from
+ * crowding the breadcrumb's bottom hairline; bottom 32dp gives the
+ * last row room to scroll past the panel edge without feeling clipped.
  */
 @Composable
 fun SettingsGeneralTab(
@@ -33,7 +42,8 @@ fun SettingsGeneralTab(
         modifier =
             modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(start = 32.dp, end = 32.dp, top = 8.dp, bottom = 32.dp),
     ) {
         SettingsSection(
             title = "Startup",

@@ -64,7 +64,12 @@ internal fun SettingsToggleRow(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
-    val shape = RoundedCornerShape(14.dp)
+    // Unified with SettingsRow (12dp / 22×16 / 15sp label / 12sp hint).
+    // Mixed primitives previously rendered at different shapes (14dp vs
+    // 12dp) and paddings (18×14 vs 22×16) so a column with both row
+    // types looked "all over" — same vertical rhythm now reads as one
+    // family.
+    val shape = RoundedCornerShape(12.dp)
 
     val targetScale = if (focused && enabled) 1.02f else 1.0f
     val scale by animateFloatAsState(
@@ -78,13 +83,13 @@ internal fun SettingsToggleRow(
 
     val rowBg =
         when {
-            !enabled -> palette.BackgroundRaised
-            focused -> palette.BackgroundElevated
-            else -> palette.BackgroundRaised
+            !enabled -> palette.BackgroundRaised.copy(alpha = 0.5f)
+            focused -> palette.BackgroundRaised.copy(alpha = 0.65f)
+            else -> palette.BackgroundRaised.copy(alpha = 0.5f)
         }
     val borderColor =
         when {
-            !enabled -> Color.Transparent
+            !enabled -> palette.BorderSubtle.copy(alpha = 0.4f)
             focused -> palette.FocusRing
             else -> palette.BorderSubtle
         }
@@ -117,23 +122,24 @@ internal fun SettingsToggleRow(
                     enabled = enabled,
                     onClick = { onCheckedChange(!checked) },
                 )
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+                .padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
                 color = if (enabled) palette.TextPrimary else palette.TextMuted,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                lineHeight = 19.sp,
+                fontWeight = FontWeight.Bold,
             )
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = description,
                 color = if (enabled) palette.TextMuted else palette.TextFaint,
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
             )
         }
         VerdantSwitch(checked = checked, enabled = enabled)
