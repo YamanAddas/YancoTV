@@ -676,6 +676,17 @@ private fun HexChip(
     active: Boolean,
     icon: ImageVector? = null,
 ) {
+    // Symmetric horizontal hex with slightly rounded points. The previous
+    // `ChipBevel` was asymmetric — a sharp angular cut on the left and a
+    // half-pill rounded right — which read as 'half circle on a side and
+    // pointed in the other'. HexCapsuleSoft matches the rest of the
+    // theme's hex family (the live-TV channel tiles, the category rail
+    // pills) so the breadcrumb belongs to the same vocabulary.
+    //
+    // Bumped horizontal padding to 22dp so the label clears the side
+    // points — at 30dp tall the cut is ~9dp wide on each side, so 22dp
+    // padding leaves ~13dp of flat space on each end of the text.
+    val shape = YancoShapes.HexCapsuleSoft
     val bg =
         if (active) {
             Brush.verticalGradient(
@@ -691,13 +702,13 @@ private fun HexChip(
         modifier =
             Modifier
                 .height(30.dp)
-                .clip(YancoShapes.ChipBevel)
+                .clip(shape)
                 .background(bg)
                 .border(
                     1.dp,
                     if (active) Color.Transparent else LocalYancoPalette.current.BorderSubtle,
-                    YancoShapes.ChipBevel,
-                ).padding(horizontal = 14.dp),
+                    shape,
+                ).padding(horizontal = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
