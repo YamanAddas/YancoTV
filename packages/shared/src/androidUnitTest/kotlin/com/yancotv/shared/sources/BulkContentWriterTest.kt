@@ -553,4 +553,125 @@ class BulkContentWriterTest {
         assertEquals(0, db.watchHistoryQueries.selectByContent(ch2Id).executeAsList().size,
             "ch2 watch_history must be swept as orphan")
     }
+
+    /**
+     * MK.23.C.2 — abortSource cross-source FK survival.
+     *
+     * Direct sibling to MB-220 (source sync was wiping favorites +
+     * watch_history via FK cascade). The fix toggles
+     * `PRAGMA foreign_keys = OFF` across the sync window; abortSource
+     * is the error-path cleanup that must re-enable FK so the rest of
+     * the connection lifetime keeps cascade semantics for actual
+     * content removal. Without that re-enable, a future code path that
+     * relies on cascade (e.g. user removes a source) silently fails to
+     * clean up dependents.
+     *
+     * Scenario:
+     *   1. Seed sources A + B; sync each so content rows exist.
+     *   2. User favorites a channel in A, builds watch history on A,
+     *      AND favorites a channel in B.
+     *   3. A "sync of B" begins via prepareSource("b") (FK toggles off,
+     *      content for b is wiped).
+     *   4. Mid-sync the chunked write fails (simulated by calling
+     *      abortSource directly).
+     *   5. Assert: source A's favorites + history are intact (the
+     *      abort didn't accidentally cascade through to A's content).
+     *      Source B's favorite is gone (its content was wiped in
+     *      prepare; the abort doesn't restore content).
+     *   6. Assert: PRAGMA foreign_keys is back ON.
+     *   7. Assert: cascade still fires for genuine content removal —
+     *      manually DELETE A's channel content row, observe its
+     *      favorite + history follow via cascade.
+     */
+    @Test
+    fun `abortSource preserves cross-source data and re-enables FK`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db, id = "a")
+        insertSource(db, id = "b")
+        val writer = BulkContentWriter(database.driver)
+        val client = xtreamClient()
+
+        // Initial sync of both sources.
+        writer.prepareSource("a")
+        writer.writeLiveChunk(
+            sourceId = "a",
+            client = client,
+            items = listOf(liveStream(1, "A Ch 1")),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("a")
+        writer.prepareSource("b")
+        writer.writeLiveChunk(
+            sourceId = "b",
+            client = client,
+            items = listOf(liveStream(1, "B Ch 1")),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("b")
+
+        val aChId = ContentIds.xtreamLive("a", "1")
+        val bChId = ContentIds.xtreamLive("b", "1")
+
+        // User favorites + history on A; favorite on B.
+        db.favoritesQueries.insert(id = "fav:$aChId", content_id = aChId, list_id = "default", added_at = 200L)
+        db.favoritesQueries.insert(id = "fav:$bChId", content_id = bChId, list_id = "default", added_at = 201L)
+        db.watchHistoryQueries.upsert(
+            id = "wh:$aChId",
+            content_id = aChId,
+            episode_id = null,
+            position_seconds = 30,
+            duration_seconds = 1800,
+            watched_at = 300L,
+        )
+
+        // Sync of B begins, then mid-sync the chunk write fails. We
+        // simulate the failure by calling abortSource directly after
+        // prepareSource — no chunk written.
+        writer.prepareSource("b")
+        writer.abortSource("b")
+
+        // Source A's data must be untouched.
+        assertTrue(
+            db.favoritesQueries.isFavorite(aChId).executeAsOne(),
+            "Source A's favorite must survive abortSource on a different source (B)",
+        )
+        assertEquals(
+            1,
+            db.watchHistoryQueries.selectByContent(aChId).executeAsList().size,
+            "Source A's watch_history must survive abortSource on a different source (B)",
+        )
+
+        // Source B's content was wiped by prepareSource; the favorite
+        // pointed at content that no longer exists. With FK still off
+        // mid-abort the row may be orphaned; the next finishSource on B
+        // would sweep it, but that's not what's under test here. The
+        // load-bearing assertion is the next one — FK must be re-armed.
+
+        // FK must be back ON. Verify by inserting a fresh content row
+        // for source A, attaching a favorite, deleting the content row,
+        // and observing the favorite follows via cascade.
+        val probeId = "probe-after-abort"
+        database.driver.execute(
+            null,
+            "INSERT INTO content (id, source_id, type, title, clean_title, group_name, " +
+                "stream_url, logo_url, tvg_id, metadata_json, sort_order, created_at) " +
+                "VALUES (?, 'a', 'live', 'Probe', 'Probe', 'News', 'http://x', NULL, NULL, NULL, 999, 0)",
+            1,
+        ) { bindString(0, probeId) }
+        db.favoritesQueries.insert(id = "fav:$probeId", content_id = probeId, list_id = "default", added_at = 999L)
+        assertTrue(db.favoritesQueries.isFavorite(probeId).executeAsOne(), "probe favorite inserted")
+
+        // Trigger a real cascade (not a sync delete — a direct user-style
+        // removal). With FK back ON, the favorite must follow.
+        database.driver.execute(null, "DELETE FROM content WHERE id = ?", 1) { bindString(0, probeId) }
+        assertTrue(
+            !db.favoritesQueries.isFavorite(probeId).executeAsOne(),
+            "Cascade must fire after abortSource — proves PRAGMA foreign_keys was re-enabled",
+        )
+    }
 }
