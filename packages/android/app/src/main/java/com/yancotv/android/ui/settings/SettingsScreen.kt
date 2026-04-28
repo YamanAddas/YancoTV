@@ -87,21 +87,26 @@ enum class SettingsTab(
     val sub: String,
     val icon: ImageVector,
 ) {
+    // Subtitles, Notifications, Storage tabs are removed from the
+    // sidebar (2026-04-27) — they were never more than placeholder
+    // bodies. Their `Settings*Tab.kt` files stay in tree so post-v1
+    // work can wire them back when the underlying features ship
+    // (subtitle defaults need a player-prefs flow; notifications
+    // route through a WorkManager event bus that doesn't exist yet;
+    // storage needs a cache size aggregator). Bringing the tab back
+    // is one line in this enum + one branch in `TabContent`.
     General("General", "01 · lang · startup", YancoIcons.Settings),
     Appearance("Appearance", "02 · theme · font", YancoIcons.Theme),
     Playback("Playback", "03 · video · audio", YancoIcons.Play),
-    Subtitles("Subtitles", "04 · captions", YancoIcons.Subtitles),
-    Network("Network", "05 · http · proxy", YancoIcons.Signal),
-    Sources("Sources", "06 · playlists · sync", YancoIcons.Link),
-    Groups("Groups", "07 · rails · pin", YancoIcons.Grid),
-    Epg("EPG", "08 · guide · timing", YancoIcons.Guide),
-    Parental("Parental", "09 · pin · adult", YancoIcons.Shield),
-    Recordings("Recordings", "10 · dvr · storage", YancoIcons.Record),
-    Notifications("Notifications", "11 · events", YancoIcons.Bell),
-    Storage("Storage", "12 · cache", YancoIcons.Hdd),
-    Shortcuts("Shortcuts", "13 · remote · key", YancoIcons.Key),
-    Backup("Backup", "14 · export · import", YancoIcons.Save),
-    About("About", "15 · version · data", YancoIcons.Info),
+    Network("Network", "04 · http · proxy", YancoIcons.Signal),
+    Sources("Sources", "05 · playlists · sync", YancoIcons.Link),
+    Groups("Groups", "06 · rails · pin", YancoIcons.Grid),
+    Epg("EPG", "07 · guide · timing", YancoIcons.Guide),
+    Parental("Parental", "08 · pin · adult", YancoIcons.Shield),
+    Recordings("Recordings", "09 · dvr · storage", YancoIcons.Record),
+    Shortcuts("Shortcuts", "10 · remote · key", YancoIcons.Key),
+    Backup("Backup", "11 · export · import", YancoIcons.Save),
+    About("About", "12 · version · data", YancoIcons.Info),
 }
 
 // Dark ink used for text/icons on top of the accent gradient fills. Matches
@@ -573,15 +578,12 @@ private fun TabContent(tab: SettingsTab) {
         SettingsTab.General -> SettingsGeneralTab()
         SettingsTab.Appearance -> SettingsAppearanceTab()
         SettingsTab.Playback -> SettingsPlaybackTab()
-        SettingsTab.Subtitles -> SettingsSubtitlesTab()
         SettingsTab.Network -> SettingsNetworkTab()
         SettingsTab.Sources -> SourcesScreen()
         SettingsTab.Groups -> SettingsGroupsTab()
         SettingsTab.Epg -> SettingsEpgTab()
         SettingsTab.Parental -> SettingsParentalTab()
         SettingsTab.Recordings -> SettingsRecordingsTab()
-        SettingsTab.Notifications -> SettingsNotificationsTab()
-        SettingsTab.Storage -> SettingsStorageTab()
         SettingsTab.Shortcuts -> SettingsShortcutsTab()
         SettingsTab.Backup -> SettingsBackupTab()
         SettingsTab.About -> SettingsAboutTab()
