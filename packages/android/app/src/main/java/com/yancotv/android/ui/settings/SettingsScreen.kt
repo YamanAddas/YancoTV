@@ -1,7 +1,5 @@
 package com.yancotv.android.ui.settings
 
-import android.content.Context
-import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -60,7 +58,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -299,8 +296,6 @@ private fun Sidebar(
                 )
             }
         }
-        HairlineDivider()
-        SidebarFooter()
     }
 }
 
@@ -336,30 +331,6 @@ private fun SidebarHeader() {
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             modifier = Modifier.height(64.dp),
         )
-    }
-}
-
-@Composable
-private fun SidebarFooter() {
-    val context = LocalContext.current
-    val version = remember(context) { readVersionName(context) }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 28.dp, end = 28.dp, top = 18.dp, bottom = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = "v$version · MK.16.shell",
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 1.4.sp,
-            modifier = Modifier.weight(1f),
-        )
-        HexChip(text = "SYNCED", active = false, icon = YancoIcons.Cloud)
     }
 }
 
@@ -827,14 +798,3 @@ private fun HairlineDivider() {
     )
 }
 
-// --- helpers ----------------------------------------------------------------
-
-private fun readVersionName(ctx: Context): String =
-    try {
-        ctx.packageManager
-            .getPackageInfo(ctx.packageName, 0)
-            .versionName
-            ?: "?"
-    } catch (_: PackageManager.NameNotFoundException) {
-        "?"
-    }
