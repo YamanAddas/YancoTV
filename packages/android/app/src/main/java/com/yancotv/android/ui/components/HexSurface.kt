@@ -1,6 +1,5 @@
 package com.yancotv.android.ui.components
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -76,27 +75,24 @@ fun HexSurface(
     raised: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val scale by animateFloatAsState(
-        targetValue = if (focused) liftScale else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 420f),
-        label = "hex-scale",
+    // MK.22.B.2: was four parallel springs (scale, translate, elevation,
+    // shellBorder) — focus traversal across a rail of N HexSurface tiles
+    // ran 4N animations on Fire TV's modest GPU. Collapsed to one
+    // animation driving a single 0..1 progress that scale/translate/
+    // elevation derive via lerp; the 1 → 2 dp border swap is invisible
+    // at 10 ft mid-animation, so it's now a hard switch (no animation).
+    val progress by animateFloatAsState(
+        targetValue = if (focused) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 420f),
+        label = "hex-focus",
     )
+    val scale = 1f + (liftScale - 1f) * progress
     val translatePx = with(LocalDensity.current) { liftDp.toPx() }
-    val translate by animateFloatAsState(
-        targetValue = if (focused) -translatePx else 0f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 420f),
-        label = "hex-translate",
-    )
-    val elevation by animateDpAsState(
-        targetValue = if (focused && raised) 28.dp else 6.dp,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 420f),
-        label = "hex-elev",
-    )
-    val shellBorder by animateDpAsState(
-        targetValue = if (focused) 2.dp else 1.dp,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 600f),
-        label = "hex-shell-bw",
-    )
+    val translate = -translatePx * progress
+    val elevationBase = 6.dp
+    val elevationFocused = if (raised) 28.dp else elevationBase
+    val elevation = elevationBase + (elevationFocused - elevationBase) * progress
+    val shellBorder = if (focused) 2.dp else 1.dp
 
     Box(
         modifier =

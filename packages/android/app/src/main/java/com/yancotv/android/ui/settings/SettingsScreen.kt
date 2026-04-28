@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -182,14 +183,27 @@ fun SettingsScreen(
             onSelect = {
                 tab = it
                 scope.launch {
-                    // Two frames: composition pass + layout pass. Heavier
-                    // tab bodies (Sources, Groups, Parental) need both.
+                    // MK.22.B.1: tabs with heavy bodies (LazyColumn-based)
+                    // need two frames + a retry — the first moveFocus(Right)
+                    // can land before the LazyColumn places its first item.
+                    // Cheap tabs (verticalScroll-based or read-only Column)
+                    // place every focusable in their first composition, so
+                    // one frame is enough and the retry never fires.
+                    // Skipping the retry on cheap tabs trims ~16-32 ms off
+                    // every settings tab swap (was ~50 ms minimum).
+                    val isHeavyTab =
+                        it == SettingsTab.Sources ||
+                            it == SettingsTab.Groups ||
+                            it == SettingsTab.Parental ||
+                            it == SettingsTab.Recordings
                     withFrameNanos { }
-                    withFrameNanos { }
+                    if (isHeavyTab) withFrameNanos { }
                     val moved = focusManager.moveFocus(FocusDirection.Right)
-                    if (!moved) {
-                        // One retry — sometimes the first attempt lands
-                        // before the LazyColumn has placed its first item.
+                    if (!moved && isHeavyTab) {
+                        // Retry only on heavy tabs — the original "first
+                        // attempt sometimes loses to LazyColumn placement"
+                        // race. Cheap tabs that fail to land focus here
+                        // would also fail the retry; logging once is fine.
                         withFrameNanos { }
                         val movedRetry = focusManager.moveFocus(FocusDirection.Right)
                         if (!movedRetry) {
@@ -198,6 +212,11 @@ fun SettingsScreen(
                                 "MB-108: moveFocus(Right) failed twice for tab=$it; focus stays on sidebar",
                             )
                         }
+                    } else if (!moved) {
+                        Log.w(
+                            "SettingsScreen",
+                            "MB-108: moveFocus(Right) failed for cheap tab=$it; focus stays on sidebar",
+                        )
                     }
                 }
             },
@@ -415,6 +434,16 @@ private fun TabItem(
     val labelColor =
         if (focused || selected) palette.TextPrimary else palette.TextSecondary
     val borderColor = if (focused) palette.FocusRing else Color.Transparent
+    // MK.22.B.3: previously this shadow popped 0 → 18 dp instantly while
+    // the scale tweened smoothly over 200 ms — visual mismatch read as
+    // "row scales smoothly, halo flashes." Tween the elevation on the
+    // same curve as the scale so the focus transition lands as one
+    // motion. animateDpAsState shares the scale tween's 200 ms duration.
+    val shadowElevation by animateDpAsState(
+        targetValue = if (focused) 18.dp else 0.dp,
+        animationSpec = tween(durationMillis = 200),
+        label = "tabShadow",
+    )
 
     Box(
         modifier =
@@ -431,7 +460,7 @@ private fun TabItem(
                 // API 28+; on older builds it falls back to a neutral
                 // shadow which is still a useful focus cue.
                 .shadow(
-                    elevation = if (focused) 18.dp else 0.dp,
+                    elevation = shadowElevation,
                     shape = shape,
                     ambientColor = palette.AccentGlow,
                     spotColor = palette.AccentGlow,

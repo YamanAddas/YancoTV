@@ -340,7 +340,17 @@ private fun HexPillRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    LaunchedEffect(focused) { if (focused) onFocused() }
+    // MK.22.B.5: 100 ms debounce so D-pad arrow-spam scrolling pills
+    // doesn't fire onFocused (and thus onSelect → StateFlow + DB query)
+    // for every pill the focus passes through. LaunchedEffect cancels
+    // its block when `focused` changes, so a pill the user passes
+    // through in <100 ms never commits.
+    LaunchedEffect(focused) {
+        if (focused) {
+            kotlinx.coroutines.delay(100L)
+            onFocused()
+        }
+    }
 
     val bg: Brush =
         when {

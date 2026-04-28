@@ -152,9 +152,14 @@ private fun HeroBackdrop(
 ) {
     // Debounce the URL so rapid D-pad traversal doesn't fire a new Coil
     // request on every frame — wait until the user rests on a channel.
+    // MK.22.B.7: tightened from 300 ms → 180 ms. AUTO_PREVIEW_DEBOUNCE_MS
+    // (400 ms elsewhere) already gates the *audio* of the mini-player;
+    // the *image* swap can be quicker without thrashing Coil because the
+    // image cache absorbs near-misses cheaply, and 180 ms reads as
+    // "responsive" while still filtering arrow-key spam.
     var debouncedUrl by remember { mutableStateOf(focused?.logoUrl) }
     LaunchedEffect(focused?.logoUrl) {
-        delay(300L)
+        delay(180L)
         debouncedUrl = focused?.logoUrl
     }
     // Only LIVE channels surface the MiniPlayer in the hero — for VOD

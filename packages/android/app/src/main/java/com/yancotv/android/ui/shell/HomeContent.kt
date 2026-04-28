@@ -466,8 +466,14 @@ private fun HomeHero(
             AnimatedContent(
                 targetState = slide,
                 transitionSpec = {
-                    (fadeIn(tween(durationMillis = 420))) togetherWith
-                        fadeOut(tween(durationMillis = 280))
+                    // MK.22.B.4: was 420 ms fadeIn + 280 ms fadeOut. Both
+                    // layers paint full-bleed AsyncImage + 3 gradients +
+                    // text simultaneously during the cross-fade, which on
+                    // Fire TV reads as a heavy swap. Cut to 240/200 so the
+                    // hero feels snappier without losing the cross-fade
+                    // character.
+                    (fadeIn(tween(durationMillis = 240))) togetherWith
+                        fadeOut(tween(durationMillis = 200))
                 },
                 label = "hero-slide",
                 modifier = Modifier.fillMaxSize(),
@@ -727,7 +733,10 @@ private fun PosterRail(
                     locked = item.id in lockedIds,
                     resume = resumeByContent[item.id],
                     onClick = { onPlay(item) },
-                    modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
+                    // MK.22.B.6: remember(index) wrapper closed over listState
+                    // (an unstable input) and added nothing — wheelItemTransform
+                    // already returns a stable lambda-driven graphicsLayer.
+                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
                 )
             }
         }
@@ -761,7 +770,10 @@ private fun OnNowRail(
                     locked = pair.channel.id in lockedIds,
                     nowSec = nowSec,
                     onClick = { onPlay(pair.channel) },
-                    modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
+                    // MK.22.B.6: remember(index) wrapper closed over listState
+                    // (an unstable input) and added nothing — wheelItemTransform
+                    // already returns a stable lambda-driven graphicsLayer.
+                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
                 )
             }
         }
@@ -793,7 +805,10 @@ private fun UpNextRail(
                     pair = pair,
                     locked = pair.channel.id in lockedIds,
                     onClick = { onPlay(pair.channel) },
-                    modifier = remember(index) { Modifier.wheelItemTransform(listState = listState, index = index) },
+                    // MK.22.B.6: remember(index) wrapper closed over listState
+                    // (an unstable input) and added nothing — wheelItemTransform
+                    // already returns a stable lambda-driven graphicsLayer.
+                    modifier = Modifier.wheelItemTransform(listState = listState, index = index),
                 )
             }
         }
