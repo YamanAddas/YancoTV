@@ -1,12 +1,10 @@
 package com.yancotv.android.ui.settings
 
 import android.util.Log
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,9 +33,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.YancoIcons
+import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.sources.SyncProgress
 import com.yancotv.shared.types.Source
@@ -48,11 +60,39 @@ import kotlinx.coroutines.withTimeout
 import org.koin.compose.koinInject
 
 /**
- * Sources management. MK.6-minimal: list existing sources, add a new Xtream
- * or M3U URL entry, kick off a sync, delete.
+ * Sources tab — Verdant Frost redesign (rev. 4).
  *
- * Heavy work (add/sync/delete) runs on [Dispatchers.IO] to keep the TV
- * input loop responsive; the list refreshes after each mutation.
+ * Architecture is **one container card with a list inside**, not "many
+ * cards stacked." The container has a header (kicker + title + ADD
+ * SOURCE) at top, then a hairline-divided list below. Each list row is
+ * a single horizontal Row whose meta (name big, type+count caption) sits
+ * left, status chip in the middle, and two compact action buttons on
+ * the right.
+ *
+ * **Focus model — what was broken in rev. 3:**
+ * - The row Row had `.clickable(onClick = no-op)` which made the row
+ *   itself a focus target. That ate D-pad RIGHT presses on the row and
+ *   starved the inner SYNC / DELETE buttons. The user couldn't
+ *   navigate between Sync and Delete because focus never reached them.
+ *
+ * Rev. 4 fix:
+ * - The row is a pure visual container. NOT focusable, NOT clickable.
+ * - Only SYNC and DELETE inside each row are focusable (via the
+ *   SettingsOutlinedButton / SettingsDangerButton wrappers).
+ * - The row uses `onFocusChanged { hasFocus }` to detect when ANY
+ *   descendant has focus, and lights up its background + border when
+ *   it does.
+ * - D-pad RIGHT now moves SYNC → DELETE within the same row (they're
+ *   horizontal siblings). UP / DOWN moves between rows (closest button
+ *   in same x). LEFT from SYNC goes back out to the sidebar.
+ *
+ * **Information hierarchy fix:**
+ * - Source name is 18sp Bold (was 15sp SemiBold) — the dominant
+ *   element on each row. The point of a sources list is reading the
+ *   names; everything else (icon, type/count, chip, actions) is
+ *   secondary.
+ * - The meta caption (`Xtream · 12.3k items`) and the status chip read
+ *   as supporting context, not competing widgets.
  */
 @Composable
 fun SourcesScreen(
@@ -65,13 +105,10 @@ fun SourcesScreen(
     var addError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Active sync state lives in the app-scoped coordinator, not a composable
-    // scope — so navigating away from Settings no longer kills the sync, and
-    // coming back re-binds to the live progress instead of an empty screen.
     val active by coordinator.state.collectAsState()
 
-    // Tick once a second so "Listing categories (12s)" updates in place. No
-    // tick when no sync is running — cheap idle cost.
+    // Tick once per second so the sync banner's elapsed counter updates
+    // in place. No tick when no sync is running.
     var tick by remember { mutableStateOf(0L) }
     LaunchedEffect(active != null) {
         if (active == null) return@LaunchedEffect
@@ -93,68 +130,88 @@ fun SourcesScreen(
     }
 
     LaunchedEffect(Unit) { refresh() }
-    // Refresh the list when a sync completes (active transitions to null).
     LaunchedEffect(active?.sourceId) {
         if (active == null) refresh()
     }
 
-    val syncMessage =
-        active?.let { a ->
-            val elapsed = ((tick.coerceAtLeast(a.startedAtMs) - a.startedAtMs) / 1000).coerceAtLeast(0)
-            phaseLabel(a.sourceName, a.progress, elapsedSec = elapsed)
-        }
+    val palette = LocalYancoPalette.current
 
     Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        active?.let { state ->
+            val elapsed =
+                ((tick.coerceAtLeast(state.startedAtMs) - state.startedAtMs) / 1000)
+                    .coerceAtLeast(0)
+            SyncBanner(
+                sourceName = state.sourceName,
+                progress = state.progress,
+                elapsedSec = elapsed,
+                onCancel = { coordinator.cancel() },
+            )
+        }
+
+        // Single container card holds the header + the list. Reads as
+        // ONE list of sources, not 12 stacked cards.
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(palette.BackgroundRaised.copy(alpha = 0.55f))
+                    .border(1.dp, palette.PanelBorder, RoundedCornerShape(20.dp)),
         ) {
-            Text(text = "Sources", color = LocalYancoPalette.current.TextPrimary)
-            ActionButton(label = "Add source", onClick = { showAdd = true })
-        }
+            ListHeader(
+                count = sources.size,
+                onAddClick = { showAdd = true },
+            )
+            HairLine(palette = palette)
 
-        syncMessage?.let {
-            Text(text = it, color = LocalYancoPalette.current.TextMuted)
-        }
-
-        if (sources.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "No sources yet. Add an Xtream or M3U URL to start.",
-                    color = LocalYancoPalette.current.TextMuted,
+            if (sources.isEmpty()) {
+                EmptyState(
+                    onAddClick = { showAdd = true },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 )
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(sources, key = { it.id }) { source ->
-                    val isSyncing = active?.sourceId == source.id
-                    SourceRow(
-                        source = source,
-                        isSyncing = isSyncing,
-                        onSync = {
-                            // Coordinator enforces single-sync; navigating away
-                            // no longer stops the work in progress.
-                            coordinator.start(source.id, source.name)
-                        },
-                        onCancel = { coordinator.cancel() },
-                        onDelete = {
-                            if (active?.sourceId == source.id) return@SourceRow
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    runCatching { repo.removeSource(source.id) }
-                                        .onFailure { Log.w("Yanco", "SourcesScreen.removeSource(${source.id}) failed: ${it.message}", it) }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    val last = sources.size - 1
+                    items(sources, key = { it.id }) { source ->
+                        val isSyncing = active?.sourceId == source.id
+                        val isAnotherSyncing = active != null && !isSyncing
+                        SourceListRow(
+                            source = source,
+                            isSyncing = isSyncing,
+                            isAnotherSyncing = isAnotherSyncing,
+                            palette = palette,
+                            onSync = { coordinator.start(source.id, source.name) },
+                            onDelete = {
+                                if (active?.sourceId == source.id) return@SourceListRow
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        runCatching { repo.removeSource(source.id) }
+                                            .onFailure {
+                                                Log.w(
+                                                    "Yanco",
+                                                    "SourcesScreen.removeSource(${source.id}) failed: ${it.message}",
+                                                    it,
+                                                )
+                                            }
+                                    }
+                                    refresh()
                                 }
-                                refresh()
-                            }
-                        },
-                    )
+                            },
+                        )
+                        if (sources.indexOf(source) != last) {
+                            HairLine(palette = palette, indent = 24.dp)
+                        }
+                    }
                 }
             }
         }
@@ -174,10 +231,6 @@ fun SourcesScreen(
                 scope.launch {
                     addSaving = true
                     addError = null
-                    // 15s ceiling so a Keystore or SQLite stall shows as a
-                    // real error instead of a forever-"Saving…" spinner. Most
-                    // addSource() runs finish in <100ms; anything >15s is a
-                    // hang worth surfacing.
                     val result =
                         runCatching {
                             withTimeout(15_000L) {
@@ -195,7 +248,10 @@ fun SourcesScreen(
                                 when (t) {
                                     is TimeoutCancellationException ->
                                         "Save timed out after 15s — DB or Keystore is stuck. Restart the app and try again; logcat (adb logcat -s Yanco:*) shows which step stalled."
-                                    else -> t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "Unknown error"
+                                    else ->
+                                        t.message?.takeIf { it.isNotBlank() }
+                                            ?: t::class.simpleName
+                                            ?: "Unknown error"
                                 }
                         }
                 }
@@ -204,62 +260,361 @@ fun SourcesScreen(
     }
 }
 
+/**
+ * Header for the single container card. Lives at the top of the
+ * Sources panel, NOT a separate card — keeps the visual "one list,
+ * one identity" instead of stacking multiple framed sections.
+ */
 @Composable
-private fun SourceRow(
-    source: Source,
-    isSyncing: Boolean,
-    onSync: () -> Unit,
-    onCancel: () -> Unit,
-    onDelete: () -> Unit,
+private fun ListHeader(
+    count: Int,
+    onAddClick: () -> Unit,
 ) {
+    val palette = LocalYancoPalette.current
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = 24.dp, end = 16.dp, top = 18.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth(0.6f)) {
-            Text(text = source.name, color = LocalYancoPalette.current.TextPrimary)
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${typeLabel(source.type)} · ${source.channelCount} items",
-                color = LocalYancoPalette.current.TextMuted,
+                text = "YOUR SOURCES",
+                color = palette.Accent,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = if (count == 0) "No sources yet" else "Playlists & providers",
+                    color = palette.TextPrimary,
+                    fontSize = 22.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.4).sp,
+                )
+                if (count > 0) {
+                    Spacer(modifier = Modifier.size(10.dp))
+                    Text(
+                        text = "$count",
+                        color = palette.Accent,
+                        fontSize = 22.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.4).sp,
+                    )
+                }
+            }
+        }
+        SettingsAccentButton(onClick = onAddClick) {
+            Text(text = "ADD SOURCE")
+        }
+    }
+}
+
+/**
+ * Active-sync banner. Lives ABOVE the container card so a running sync
+ * is impossible to miss but doesn't crowd the list itself. Cancel
+ * action lives here, not on the per-row card — single source of truth.
+ */
+@Composable
+private fun SyncBanner(
+    sourceName: String,
+    progress: SyncProgress,
+    elapsedSec: Long,
+    onCancel: () -> Unit,
+) {
+    val palette = LocalYancoPalette.current
+    val message = phaseLabel(sourceName, progress, elapsedSec)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(palette.Accent.copy(alpha = 0.10f))
+                .border(1.dp, palette.Accent.copy(alpha = 0.32f), RoundedCornerShape(14.dp))
+                .padding(start = 18.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(palette.Accent),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "SYNC IN PROGRESS",
+                color = palette.Accent,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = message,
+                color = palette.TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.height(0.dp))
-        if (isSyncing) {
-            ActionButton(label = "Cancel", onClick = onCancel)
-        } else {
-            ActionButton(label = "Sync", onClick = onSync)
-            ActionButton(label = "Delete", onClick = onDelete)
+        SettingsOutlinedButton(onClick = onCancel, size = ButtonSize.Compact) {
+            Text("CANCEL")
         }
     }
 }
 
 @Composable
-fun ActionButton(
-    label: String,
-    onClick: () -> Unit,
+private fun EmptyState(
+    onAddClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.BackgroundHover
-    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
+    val palette = LocalYancoPalette.current
+    Column(
+        modifier = modifier.padding(48.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(palette.Accent.copy(alpha = 0.12f))
+                    .border(1.dp, palette.Accent.copy(alpha = 0.32f), RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = YancoIcons.Link,
+                contentDescription = null,
+                tint = palette.Accent,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        Text(
+            text = "No sources configured",
+            color = palette.TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.3).sp,
+        )
+        Text(
+            text = "Add an Xtream login, M3U URL, M3U file, or Stalker portal to start streaming.",
+            color = palette.TextMuted,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+        )
+        SettingsAccentButton(onClick = onAddClick) {
+            Text(text = "ADD SOURCE")
+        }
+    }
+}
+
+/**
+ * One row in the sources list. **NOT focusable itself** — only its
+ * SYNC and DELETE buttons are. The row uses [onFocusChanged] to
+ * detect when any descendant has focus and paints accent
+ * background + border accordingly.
+ *
+ * D-pad behaviour:
+ * - RIGHT moves SYNC → DELETE within the same row (sibling Row
+ *   children).
+ * - UP / DOWN moves between rows (geometric focus search finds the
+ *   closest button at the same X in the next row).
+ * - LEFT from SYNC exits the list to the Settings sidebar (default
+ *   focus search; the row's left edge has no other focusable).
+ */
+@Composable
+private fun SourceListRow(
+    source: Source,
+    isSyncing: Boolean,
+    isAnotherSyncing: Boolean,
+    palette: YancoPalette,
+    onSync: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var hasFocus by remember { mutableStateOf(false) }
+
+    val targetScale = if (hasFocus) 1.005f else 1.0f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = tween(durationMillis = 200),
+        label = "rowScale",
+    )
+
+    val rowBg =
+        when {
+            hasFocus -> palette.Accent.copy(alpha = 0.10f)
+            isSyncing -> palette.Accent.copy(alpha = 0.05f)
+            else -> Color.Transparent
+        }
+    val rowBorder =
+        when {
+            hasFocus -> palette.FocusRing
+            else -> Color.Transparent
+        }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onFocusChanged { hasFocus = it.hasFocus }
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .shadow(
+                    elevation = if (hasFocus) 12.dp else 0.dp,
+                    shape = RoundedCornerShape(0.dp),
+                    ambientColor = palette.AccentGlow,
+                    spotColor = palette.AccentGlow,
+                )
+                .background(rowBg)
+                .border(
+                    width = if (hasFocus) 1.5.dp else 0.dp,
+                    color = rowBorder,
+                )
+                .padding(start = 24.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        TypeIcon(type = source.type, palette = palette)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = source.name,
+                color = palette.TextPrimary,
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.2).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${typeLabel(source.type)} · ${formatItemCount(source.channelCount)}",
+                color = palette.TextMuted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.4.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        StatusChip(
+            text = if (isSyncing) "SYNCING" else "READY",
+            accent = if (isSyncing) palette.Accent else palette.TextSecondary,
+            bg =
+                if (isSyncing) {
+                    palette.Accent.copy(alpha = 0.18f)
+                } else {
+                    Color.White.copy(alpha = 0.05f)
+                },
+        )
+        if (!isSyncing) {
+            // Compact buttons — these are the ONLY focusable nodes in
+            // the row. D-pad RIGHT cycles SYNC → DELETE; UP / DOWN
+            // moves to the corresponding button in the next row.
+            SettingsOutlinedButton(
+                onClick = onSync,
+                enabled = !isAnotherSyncing,
+                size = ButtonSize.Compact,
+            ) {
+                Text("SYNC")
+            }
+            SettingsDangerButton(
+                onClick = onDelete,
+                size = ButtonSize.Compact,
+            ) {
+                Text("DELETE")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypeIcon(
+    type: SourceType,
+    palette: YancoPalette,
+) {
+    val icon: ImageVector =
+        when (type) {
+            SourceType.XTREAM -> YancoIcons.Signal
+            SourceType.M3U_URL -> YancoIcons.Link
+            SourceType.M3U_FILE -> YancoIcons.Save
+            SourceType.STALKER -> YancoIcons.Live
+        }
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(6.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            palette.Accent.copy(alpha = 0.20f),
+                            palette.AccentDeep.copy(alpha = 0.10f),
+                        ),
+                    ),
+                )
+                .border(1.dp, palette.Accent.copy(alpha = 0.24f), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(text = label, color = LocalYancoPalette.current.TextPrimary)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = palette.Accent,
+            modifier = Modifier.size(22.dp),
+        )
     }
+}
+
+@Composable
+private fun StatusChip(
+    text: String,
+    accent: Color,
+    bg: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(bg)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+    ) {
+        Text(
+            text = text,
+            color = accent,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.0.sp,
+        )
+    }
+}
+
+@Composable
+private fun HairLine(
+    palette: YancoPalette,
+    indent: androidx.compose.ui.unit.Dp = 0.dp,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = indent)
+                .height(1.dp)
+                .background(palette.BorderSubtle),
+    )
 }
 
 private fun typeLabel(type: SourceType): String =
@@ -270,17 +625,20 @@ private fun typeLabel(type: SourceType): String =
         SourceType.STALKER -> "Stalker"
     }
 
+private fun formatItemCount(n: Int): String =
+    when {
+        n == 0 -> "no items yet"
+        n == 1 -> "1 item"
+        n < 1_000 -> "$n items"
+        n < 1_000_000 -> "%.1fk items".format(n / 1000.0)
+        else -> "%.1fM items".format(n / 1_000_000.0)
+    }
+
 private fun phaseLabel(
     name: String,
     p: SyncProgress,
     elapsedSec: Long = 0,
 ): String {
-    // Surface `p.message` during FETCHING and WRITING so the user sees which
-    // sub-step is live ("Authenticating" / "Live categories" / "Movie
-    // categories" / "Series categories" / "Live channels" / "Movies" /
-    // "Series") instead of a flat "fetching…" that sits there for up to 90s
-    // per retry with zero feedback. Elapsed seconds appended so the user can
-    // tell a long-but-progressing fetch from a genuine stall.
     val suffix = p.message?.takeIf { it.isNotBlank() }
     val elapsed = if (elapsedSec > 0) " (${elapsedSec}s)" else ""
     return when (p.phase) {
