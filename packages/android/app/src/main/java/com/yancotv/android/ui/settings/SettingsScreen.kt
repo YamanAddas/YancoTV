@@ -590,6 +590,20 @@ private fun ContentPane(
         // a LazyColumn. `key(current)` resets scroll state when the tab
         // swaps, so switching away from a scrolled tab and back lands at
         // top rather than keeping a stale offset.
+        //
+        // Conservative BringIntoViewSpec: when MB-108's moveFocus(Right)
+        // lands focus on the first focusable inside a tab, Compose's
+        // default spec was scrolling to put that focusable AT THE TOP
+        // of the viewport — pushing the section title above it under the
+        // breadcrumb. This spec returns 0 (no scroll) whenever the
+        // requested rect is already fully in view, so the tab opens with
+        // the section title visible at the top and the focused chip a
+        // few rows down — both visible, no auto-scroll surprises.
+        @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides
+                ConservativeBringIntoViewSpec,
+        ) {
         Box(
             modifier =
                 Modifier
@@ -622,8 +636,35 @@ private fun ContentPane(
             // body has no other focus targets.
             FocusableSpacer()
         }
+        }  // end CompositionLocalProvider
     }
 }
+
+/**
+ * Custom [BringIntoViewSpec] for the Settings ContentPane. Returns 0
+ * when the requested rect is already fully visible — Compose's default
+ * spec on Compose 1.7+ was eagerly scrolling to put the focused
+ * focusable near the top of the viewport, which pushed the section
+ * title above (e.g. 'Video' over 'Resize mode') out from under the
+ * breadcrumb on tab entry. This spec scrolls only when the element is
+ * actually outside the viewport, and then by the minimum amount.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private val ConservativeBringIntoViewSpec =
+    object : androidx.compose.foundation.gestures.BringIntoViewSpec {
+        override fun calculateScrollDistance(
+            offset: Float,
+            size: Float,
+            containerSize: Float,
+        ): Float {
+            // Element fully in view → no scroll.
+            if (offset >= 0f && offset + size <= containerSize) return 0f
+            // Element above viewport → scroll backward to bring leading edge to 0.
+            if (offset < 0f) return offset
+            // Element below viewport → scroll forward to bring trailing edge to bottom.
+            return offset + size - containerSize
+        }
+    }
 
 @Composable
 private fun Breadcrumb(current: SettingsTab) {
