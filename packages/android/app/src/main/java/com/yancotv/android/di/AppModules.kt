@@ -114,6 +114,26 @@ val appModule =
         // instance is shared between the PlaybackController data-source
         // chain (writer side) and RecordingService (begin / end side).
         single { com.yancotv.android.recording.RecordingDataSink(logger = get()) }
+        // Stage 5.2.2 — sideload auto-update plumbing. Endpoint URL
+        // baked in at build time via BuildConfig.UPDATE_ENDPOINT (empty
+        // when local.properties.update.endpoint is absent — checker
+        // short-circuits to null in that case so dev builds without
+        // configured updates are silent no-ops). versionCode lives on
+        // BuildConfig too.
+        single {
+            com.yancotv.shared.update.UpdateChecker(
+                http = get(),
+                endpointUrl = com.yancotv.android.BuildConfig.UPDATE_ENDPOINT,
+                currentVersionCode = com.yancotv.android.BuildConfig.VERSION_CODE,
+                logger = get(),
+            )
+        }
+        single {
+            com.yancotv.android.update.UpdateRepository(
+                checker = get(),
+                prefs = get(),
+            )
+        }
         single {
             PlaybackController(
                 context = androidContext(),

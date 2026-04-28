@@ -90,6 +90,11 @@ class YancoApp : Application() {
 
         SingletonImageLoader.setSafe { buildYancoImageLoader(this, sharedHttpClient) }
         EpgSyncWorker.schedulePeriodic(this)
+        // Stage 5.2.2 — sideload update check. The worker honors the
+        // user's auto-check pref (no-ops when disabled), so it's safe
+        // to schedule unconditionally. cancelPeriodic() runs from the
+        // Settings → About toggle when the user opts out.
+        com.yancotv.android.update.UpdateCheckWorker.schedulePeriodic(this)
         // MK.10.1 — keep the launcher Recommendations channel current.
         // Periodic refresh + a one-shot so the channel exists on first
         // boot without waiting 6 hours.

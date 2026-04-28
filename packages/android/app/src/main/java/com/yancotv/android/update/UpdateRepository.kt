@@ -1,0 +1,73 @@
+package com.yancotv.android.update
+
+import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.shared.update.UpdateChecker
+import com.yancotv.shared.update.UpdateInfo
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * Stage 5.2.2 — Android-side wrapper around the pure
+ * [com.yancotv.shared.update.UpdateChecker]. Owns the in-memory
+ * [StateFlow] of the latest known [UpdateInfo] (or null) and the
+ * single-flight check trigger.
+ *
+ * Why a thin wrapper instead of using `UpdateChecker` directly:
+ *   1. UI surfaces (Settings → About, sidebar badge in 5.2.3) need a
+ *      reactive `Flow` to subscribe to. The pure checker is one-shot.
+ *   2. Multiple call sites can request a check (the WorkManager worker,
+ *      the manual "Check now" button, future "auto-check on boot"). A
+ *      [Mutex]-guarded `triggerCheck()` makes overlapping requests
+ *      coalesce — never two in flight at once.
+ *   3. Persisting `lastCheckedAt` on every successful run lives here
+ *      so it's done once + tested in one place rather than duplicated
+ *      at every caller.
+ *
+ * State is in-memory only — across app restarts the UpdateInfo is null
+ * until the next worker tick. This is a deliberate trade: persisting
+ * the JSON would let a stale "update available" prompt linger after the
+ * user has already updated. Re-fetching on next tick costs ~1 KB of
+ * network and keeps the prompt source-of-truth = the live endpoint.
+ */
+class UpdateRepository(
+    private val checker: UpdateChecker,
+    private val prefs: AppPreferences,
+    private val now: () -> Long = { System.currentTimeMillis() },
+) {
+    private val _info = MutableStateFlow<UpdateInfo?>(null)
+    val info: StateFlow<UpdateInfo?> = _info.asStateFlow()
+
+    private val checkMutex = Mutex()
+
+    /**
+     * Run the underlying [UpdateChecker.check]. Idempotent on overlap —
+     * a second concurrent caller waits for the first to finish and
+     * sees the same result via [info]. Always updates `lastCheckedAt`
+     * on completion (regardless of result), so the user gets accurate
+     * "last checked X ago" feedback.
+     *
+     * Returns the resolved [UpdateInfo] (or null) for callers that want
+     * to act immediately rather than collecting from [info].
+     */
+    suspend fun triggerCheck(): UpdateInfo? =
+        checkMutex.withLock {
+            val result = checker.check()
+            _info.value = result
+            prefs.setLastUpdateCheckAt(now())
+            result
+        }
+
+    /**
+     * Used by [com.yancotv.android.ui.settings.SettingsAboutTab]'s
+     * "Dismiss" path (Stage 5.2.3 will add a UI dismissal). Clears the
+     * in-memory state without touching the persisted lastCheckedAt —
+     * next worker tick will re-populate if the update is still
+     * relevant.
+     */
+    fun clearKnownUpdate() {
+        _info.value = null
+    }
+}

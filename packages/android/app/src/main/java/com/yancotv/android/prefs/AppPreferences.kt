@@ -54,6 +54,13 @@ class AppPreferences(
         )
     val pinnedParentsFlow: StateFlow<Map<ContentType, List<String>>> = _pinnedParents.asStateFlow()
 
+    // Stage 5.2.2 — sideload auto-update prefs. autoCheckEnabled gates the
+    // periodic worker; lastCheckedAt is the last successful run timestamp
+    // (ms since epoch, null = never). Both surface in Settings → About so
+    // the user sees current state + can opt out.
+    private val _updatePrefs = MutableStateFlow(readUpdatePrefs())
+    val updatePrefsFlow: StateFlow<UpdatePrefs> = _updatePrefs.asStateFlow()
+
     private val _recording = MutableStateFlow(readRecording())
     val recordingFlow: StateFlow<RecordingPrefs> = _recording.asStateFlow()
 
@@ -323,6 +330,20 @@ class AppPreferences(
         writePinnedParents(type, next)
     }
 
+    // ───── Update prefs (Stage 5.2.2) ─────
+
+    suspend fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        write(KEY_AUTO_UPDATE_CHECK, if (enabled) "1" else "0") {
+            _updatePrefs.value = _updatePrefs.value.copy(autoCheckEnabled = enabled)
+        }
+    }
+
+    suspend fun setLastUpdateCheckAt(millis: Long) {
+        write(KEY_LAST_UPDATE_CHECK_AT, millis.toString()) {
+            _updatePrefs.value = _updatePrefs.value.copy(lastCheckedAt = millis)
+        }
+    }
+
     suspend fun clearPinnedParents(type: ContentType) {
         if (_pinnedParents.value[type].isNullOrEmpty()) return
         writePinnedParents(type, emptyList())
@@ -438,6 +459,15 @@ class AppPreferences(
             ?.mapNotNull { it.takeIf(String::isNotBlank)?.lowercase() }
             ?: emptyList()
 
+    private fun readUpdatePrefs(): UpdatePrefs =
+        UpdatePrefs(
+            // Default ON — we want users to know about new versions; the
+            // toggle is opt-out rather than opt-in. Empty string (= unset
+            // in DB) maps to enabled.
+            autoCheckEnabled = readString(KEY_AUTO_UPDATE_CHECK) != "0",
+            lastCheckedAt = readString(KEY_LAST_UPDATE_CHECK_AT)?.toLongOrNull(),
+        )
+
     private fun readString(key: String): String? = db.settingsQueries.get(key).executeAsOneOrNull()
 
     private suspend inline fun write(
@@ -474,6 +504,8 @@ class AppPreferences(
         private const val KEY_PINNED_PARENTS_LIVE = "pref_pinned_parents_live"
         private const val KEY_PINNED_PARENTS_MOVIE = "pref_pinned_parents_movie"
         private const val KEY_PINNED_PARENTS_SERIES = "pref_pinned_parents_series"
+        private const val KEY_AUTO_UPDATE_CHECK = "pref_auto_update_check"
+        private const val KEY_LAST_UPDATE_CHECK_AT = "pref_last_update_check_at"
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
         private const val KEY_SPEED = "pref_playback_speed"
         private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"
@@ -784,3 +816,17 @@ data class AppearancePrefs(
         val FONT_SCALE_PRESETS = listOf(90, 100, 110, 125)
     }
 }
+
+/**
+ * Stage 5.2.2 — sideload auto-update prefs surfaced to Settings → About.
+ * `autoCheckEnabled` gates the periodic worker (also acts as the
+ * user-facing on/off switch). `lastCheckedAt` is when the worker last
+ * ran successfully against the configured endpoint, or null if never.
+ * The actual `UpdateInfo?` lives in `UpdateRepository`'s in-memory
+ * StateFlow + is re-fetched on next worker tick rather than persisted
+ * through this class.
+ */
+data class UpdatePrefs(
+    val autoCheckEnabled: Boolean = true,
+    val lastCheckedAt: Long? = null,
+)

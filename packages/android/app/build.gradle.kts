@@ -27,6 +27,15 @@ val sentryDsn: String = sentryProps.getProperty("sentry.dsn", "")
 // build's release crashes).
 val sentryAuthToken: String = sentryProps.getProperty("sentry.auth.token", "")
 
+// Stage 5.2.2 — sideload auto-update endpoint URL. Read from
+// local.properties so per-machine / per-fork values stay out of git.
+// Empty = updates disabled at runtime (UpdateChecker short-circuits
+// when endpointUrl.isBlank()), so a clean checkout still builds + runs
+// without configuring this. Production users wanting auto-updates set
+//   update.endpoint=https://example.com/yancotv/update.json
+// in local.properties.
+val updateEndpoint: String = sentryProps.getProperty("update.endpoint", "").trim()
+
 // ktlint applied per-module (the version-catalog `libs` accessor isn't
 // available inside root `subprojects {}` blocks in Kotlin DSL, so each
 // module wires it directly). ignoreFailures while we burn down style
@@ -71,6 +80,10 @@ android {
         // The constant is read by YancoApp.onCreate; empty means "Sentry off
         // for this build" (init becomes a no-op).
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
+        // Stage 5.2.2 — read by AppModules' UpdateChecker singleton.
+        // Empty = updates disabled (the checker short-circuits before
+        // any HTTP call).
+        buildConfigField("String", "UPDATE_ENDPOINT", "\"$updateEndpoint\"")
     }
 
     buildTypes {
