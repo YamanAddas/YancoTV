@@ -92,29 +92,31 @@ import kotlinx.coroutines.launch
  */
 enum class SettingsTab(
     val label: String,
-    val sub: String,
     val icon: ImageVector,
 ) {
     // Subtitles, Notifications, Storage tabs are removed from the
     // sidebar (2026-04-27) — they were never more than placeholder
     // bodies. Their `Settings*Tab.kt` files stay in tree so post-v1
-    // work can wire them back when the underlying features ship
-    // (subtitle defaults need a player-prefs flow; notifications
-    // route through a WorkManager event bus that doesn't exist yet;
-    // storage needs a cache size aggregator). Bringing the tab back
-    // is one line in this enum + one branch in `TabContent`.
-    General("General", "01 · lang · startup", YancoIcons.Settings),
-    Appearance("Appearance", "02 · theme · font", YancoIcons.Theme),
-    Playback("Playback", "03 · video · audio", YancoIcons.Play),
-    Network("Network", "04 · http · proxy", YancoIcons.Signal),
-    Sources("Sources", "05 · playlists · sync", YancoIcons.Link),
-    Groups("Groups", "06 · rails · pin", YancoIcons.Grid),
-    Epg("EPG", "07 · guide · timing", YancoIcons.Guide),
-    Parental("Parental", "08 · pin · adult", YancoIcons.Shield),
-    Recordings("Recordings", "09 · dvr · storage", YancoIcons.Record),
-    Shortcuts("Shortcuts", "10 · remote · key", YancoIcons.Key),
-    Backup("Backup", "11 · export · import", YancoIcons.Save),
-    About("About", "12 · version · data", YancoIcons.Info),
+    // work can wire them back when the underlying features ship.
+    // Bringing the tab back is one line in this enum + one branch in
+    // `TabContent`.
+    //
+    // The previous `sub` ("01 · lang · startup", etc.) and ordinal
+    // numbering rendered in TabItem were dropped 2026-04-28 — the
+    // numbering / sub-caption read as visual noise on a 12-tab list
+    // and the user's redesign pass collapsed them away.
+    General("General", YancoIcons.Settings),
+    Appearance("Appearance", YancoIcons.Theme),
+    Playback("Playback", YancoIcons.Play),
+    Network("Network", YancoIcons.Signal),
+    Sources("Sources", YancoIcons.Link),
+    Groups("Groups", YancoIcons.Grid),
+    Epg("EPG", YancoIcons.Guide),
+    Parental("Parental", YancoIcons.Shield),
+    Recordings("Recordings", YancoIcons.Record),
+    Shortcuts("Shortcuts", YancoIcons.Key),
+    Backup("Backup", YancoIcons.Save),
+    About("About", YancoIcons.Info),
 }
 
 // Dark ink used for text/icons on top of the accent gradient fills. Matches
@@ -304,74 +306,40 @@ private fun Sidebar(
 @Composable
 private fun SidebarHeader() {
     val palette = LocalYancoPalette.current
-    Column(
+    // Single horizontal row: shipped raster logo on the left, 'Settings'
+    // wordmark on the right. Replaces the previous `Y` gradient tile +
+    // 'YancoTV' wordmark + 'System · N sections' subtitle stack — the
+    // user wanted the brand mark to read as the brand mark (one element)
+    // and the screen's title to sit beside it instead of below.
+    //
+    // The logo height drives the row height. 64dp is calibrated to read
+    // at 3 m on Fire TV without crowding the divider — same scale class
+    // as the main app sidebar's expanded brand mark (96dp), shrunk for
+    // the inner panel's narrower column.
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 18.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Verdant Frost brand row — 36dp gradient logo + "YancoTV" wordmark
-        // with the "TV" rendered in accent. Replaces the old "YANCOTV ·
-        // SETTINGS" overline so the brand identity sits at the top of the
-        // sidebar (matches the design's `.shell-side-h .brand-row`).
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(palette.Accent, palette.AccentDeep),
-                            ),
-                        ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Y",
-                    color = OnAccentInk,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.4.sp,
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Yanco",
-                    color = palette.TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.2).sp,
-                )
-                Text(
-                    text = "TV",
-                    color = palette.Accent,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.2).sp,
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(18.dp))
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = com.yancotv.android.R.drawable.ic_logo),
+            contentDescription = "YancoTV",
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier =
+                Modifier
+                    .height(64.dp)
+                    .weight(1f, fill = false),
+        )
         Text(
             text = "Settings",
             color = palette.TextPrimary,
-            fontSize = 28.sp,
-            lineHeight = 32.sp,
+            fontSize = 26.sp,
+            lineHeight = 30.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = (-0.6).sp,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "System · ${SettingsTab.entries.size} sections",
-            color = palette.TextMuted,
-            fontSize = 11.sp,
-            lineHeight = 14.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 1.5.sp,
+            letterSpacing = (-0.5).sp,
         )
     }
 }
@@ -480,14 +448,6 @@ private fun TabItem(
         }
     val labelColor =
         if (focused || selected) palette.TextPrimary else palette.TextSecondary
-    val subColor =
-        if (selected) palette.Accent else palette.TextMuted
-    val ordinalColor =
-        when {
-            selected -> palette.Accent
-            focused -> palette.AccentGlow
-            else -> palette.TextMuted
-        }
     val borderColor = if (focused) palette.FocusRing else Color.Transparent
 
     Box(
@@ -556,21 +516,15 @@ private fun TabItem(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 18.dp, end = 18.dp),
+                    .padding(start = 22.dp, end = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Ordinal moved LEFT to match the design's
-            // [ordinal | icon | label] order. Mono caption look at 11sp /
-            // 1.4sp tracking — the design's `.tab-ord` token.
-            Text(
-                text = twoDigit(entry.ordinal + 1),
-                color = ordinalColor,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.4.sp,
-                modifier = Modifier.width(20.dp),
-            )
+            // Single-glyph layout: icon tile + label. The ordinal number
+            // and the mono sub-caption (e.g. "03 · video · audio") were
+            // dropped 2026-04-28 — three text widgets per row read as
+            // visual noise on a 12-tab list and the user's redesign
+            // pass collapsed them away.
             Box(
                 modifier =
                     Modifier
@@ -586,25 +540,15 @@ private fun TabItem(
                     modifier = Modifier.size(18.dp),
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.label,
-                    color = labelColor,
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.05).sp,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = entry.sub.uppercase(),
-                    color = subColor,
-                    fontSize = 10.sp,
-                    lineHeight = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.1.sp,
-                )
-            }
+            Text(
+                text = entry.label,
+                color = labelColor,
+                fontSize = 15.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.1).sp,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -710,13 +654,6 @@ private fun Breadcrumb(current: SettingsTab) {
             icon = current.icon,
         )
         Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = current.sub.uppercase(),
-            color = LocalYancoPalette.current.TextMuted,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.8.sp,
-        )
     }
 }
 
@@ -800,8 +737,6 @@ private fun HairlineDivider() {
 }
 
 // --- helpers ----------------------------------------------------------------
-
-private fun twoDigit(n: Int): String = if (n < 10) "0$n" else n.toString()
 
 private fun readVersionName(ctx: Context): String =
     try {
