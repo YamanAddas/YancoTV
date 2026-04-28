@@ -5,6 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,16 +32,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,10 @@ fun SourcesScreen(
     var showAdd by remember { mutableStateOf(false) }
     var addSaving by remember { mutableStateOf(false) }
     var addError by remember { mutableStateOf<String?>(null) }
+    // When non-null, the detail pane replaces the list view. Persisted via
+    // rememberSaveable so process death / activity recreate doesn't bounce
+    // the user out of the source they were editing.
+    var selectedSourceId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     val active by coordinator.state.collectAsState()
@@ -136,6 +141,36 @@ fun SourcesScreen(
 
     val palette = LocalYancoPalette.current
 
+    // Detail mode: replace the list view with the per-source detail
+    // surface. BACK / LEFT inside SourceDetailScreen calls onBack() to
+    // close the detail and return here.
+    val openDetailId = selectedSourceId
+    if (openDetailId != null) {
+        // Re-fetch on every refresh — but if the source has been deleted,
+        // bail back to the list automatically.
+        val openSourceExists = sources.any { it.id == openDetailId }
+        LaunchedEffect(openSourceExists) {
+            if (!openSourceExists) selectedSourceId = null
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 24.dp),
+        ) {
+            SourceDetailScreen(
+                sourceId = openDetailId,
+                repo = repo,
+                coordinator = coordinator,
+                onBack = {
+                    selectedSourceId = null
+                    scope.launch { refresh() }
+                },
+            )
+        }
+        return
+    }
+
     Column(
         modifier =
             Modifier
@@ -156,7 +191,10 @@ fun SourcesScreen(
         }
 
         // Single container card holds the header + the list. Reads as
-        // ONE list of sources, not 12 stacked cards.
+        // ONE list of sources, not 12 stacked cards. Each row is a
+        // clickable card that opens [SourceDetailScreen] — no inline
+        // SYNC / DELETE buttons (they cramped the metadata into a tiny
+        // strip on Fire TV; the detail pane has the room for them).
         Column(
             modifier =
                 Modifier
@@ -184,29 +222,11 @@ fun SourcesScreen(
                     val last = sources.size - 1
                     items(sources, key = { it.id }) { source ->
                         val isSyncing = active?.sourceId == source.id
-                        val isAnotherSyncing = active != null && !isSyncing
                         SourceListRow(
                             source = source,
                             isSyncing = isSyncing,
-                            isAnotherSyncing = isAnotherSyncing,
                             palette = palette,
-                            onSync = { coordinator.start(source.id, source.name) },
-                            onDelete = {
-                                if (active?.sourceId == source.id) return@SourceListRow
-                                scope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        runCatching { repo.removeSource(source.id) }
-                                            .onFailure {
-                                                Log.w(
-                                                    "Yanco",
-                                                    "SourcesScreen.removeSource(${source.id}) failed: ${it.message}",
-                                                    it,
-                                                )
-                                            }
-                                    }
-                                    refresh()
-                                }
-                            },
+                            onClick = { selectedSourceId = source.id },
                         )
                         if (sources.indexOf(source) != last) {
                             HairLine(palette = palette, indent = 24.dp)
@@ -419,40 +439,32 @@ private fun EmptyState(
 }
 
 /**
- * One row in the sources list — redesigned (rev. 5).
+ * One row in the sources list — redesigned (rev. 6).
  *
- * Layout: `[live-dot] [name + sub-line] [SYNC] [DELETE]`. The 44dp type
- * icon and the verbose READY chip are gone — replaced by a single 10dp
- * status dot whose colour encodes the state (green = healthy, amber =
- * stale / never synced, red = error). The name is the dominant element;
- * the sub-line consolidates type + item count + time-until-next-sync
- * into one muted caption so the row reads in a single sweep.
+ * Each row is a single focusable card: `[live-dot] [name + sub-line]
+ * [chevron]`. The previous SYNC + DELETE buttons were cramming the
+ * source name and metadata into a tiny strip; activating the row now
+ * opens [SourceDetailScreen] which has all the room it needs for full
+ * info + edit form + Sync / Delete actions.
  *
  * **Focus model:**
- * - Row is NOT focusable. Only SYNC + DELETE buttons are.
- * - `onFocusChanged` lights the row when any descendant has focus.
- * - LEFT from SYNC escapes via `leftExitsTo(activeTabFocus)` — same
- *   contract every Settings row uses, so D-pad LEFT always returns to
- *   the inner sidebar's active tab.
- * - RIGHT cycles SYNC → DELETE within the row.
- *
- * **Wrap fix:** both buttons set `maxLines = 1` + `softWrap = false`
- * on their Text so DELETE never breaks across lines (the user's "DEL /
- * ET / E" complaint).
+ * - The row IS focusable (Row.clickable creates the focus target).
+ * - LEFT from anywhere on the row escapes via `leftExitsTo(activeTabFocus)`.
+ * - RIGHT / CENTER on the row activates [onClick] which navigates into
+ *   the detail surface.
  */
 @Composable
 private fun SourceListRow(
     source: Source,
     isSyncing: Boolean,
-    isAnotherSyncing: Boolean,
     palette: YancoPalette,
-    onSync: () -> Unit,
-    onDelete: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    var hasFocus by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     val activeTabFocus = LocalActiveSettingsTabFocus.current
 
-    val targetScale = if (hasFocus) 1.005f else 1.0f
+    val targetScale = if (focused) 1.01f else 1.0f
     val scale by animateFloatAsState(
         targetValue = targetScale,
         animationSpec = tween(durationMillis = 200),
@@ -461,13 +473,13 @@ private fun SourceListRow(
 
     val rowBg =
         when {
-            hasFocus -> palette.Accent.copy(alpha = 0.10f)
-            isSyncing -> palette.Accent.copy(alpha = 0.05f)
+            focused -> palette.Accent.copy(alpha = 0.12f)
+            isSyncing -> palette.Accent.copy(alpha = 0.06f)
             else -> Color.Transparent
         }
     val rowBorder =
         when {
-            hasFocus -> palette.FocusRing
+            focused -> palette.FocusRing
             else -> Color.Transparent
         }
 
@@ -477,31 +489,35 @@ private fun SourceListRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .onFocusChanged { hasFocus = it.hasFocus }
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
                 }
                 .shadow(
-                    elevation = if (hasFocus) 12.dp else 0.dp,
+                    elevation = if (focused) 14.dp else 0.dp,
                     shape = RoundedCornerShape(0.dp),
                     ambientColor = palette.AccentGlow,
                     spotColor = palette.AccentGlow,
                 )
                 .background(rowBg)
                 .border(
-                    width = if (hasFocus) 1.5.dp else 0.dp,
+                    width = if (focused) 1.5.dp else 0.dp,
                     color = rowBorder,
                 )
                 .leftExitsTo(activeTabFocus)
-                .padding(start = 22.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
+                )
+                .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         LiveDot(color = status.dotColor(palette), pulsing = isSyncing)
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = source.name.ifBlank { "Untitled source" },
@@ -524,51 +540,45 @@ private fun SourceListRow(
             )
         }
         if (isSyncing) {
-            // Show a compact "syncing" chip in place of the action
-            // buttons so the user can't double-trigger a sync.
             StatusChip(
                 text = "SYNCING",
                 accent = palette.Accent,
                 bg = palette.Accent.copy(alpha = 0.18f),
             )
         } else {
-            // The ONLY focusable nodes in the row. D-pad RIGHT cycles
-            // SYNC → DELETE; UP / DOWN moves to the corresponding
-            // button in the next row.
-            SettingsOutlinedButton(
-                onClick = onSync,
-                enabled = !isAnotherSyncing,
-                size = ButtonSize.Compact,
-            ) {
-                Text(text = "SYNC", maxLines = 1, softWrap = false)
-            }
-            SettingsDangerButton(
-                onClick = onDelete,
-                size = ButtonSize.Compact,
-            ) {
-                Text(text = "DELETE", maxLines = 1, softWrap = false)
-            }
+            // Chevron affordance — visual hint that activating the row
+            // opens a detail surface, mirroring the system Settings
+            // pattern (TiviMate, Android Settings).
+            Text(
+                text = "›",
+                color = if (focused) palette.Accent else palette.TextMuted,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(end = 4.dp),
+            )
         }
     }
 }
 
-/** Status of a single source row — drives the dot colour and sub-line text. */
-private enum class RowStatus { Syncing, Ready, Stale, NeverSynced, Error }
+/** Status of a single source row — drives the dot colour and sub-line text.
+ *  Shared with [SourceDetailScreen] so the dot/health vocabulary is identical
+ *  across the list and detail surfaces. */
+internal enum class RowStatus { Syncing, Ready, Stale, NeverSynced, Error }
 
-private fun RowStatus.dotColor(palette: YancoPalette): Color =
+internal fun RowStatus.dotColor(palette: YancoPalette): Color =
     when (this) {
         RowStatus.Syncing, RowStatus.Ready -> palette.Accent
         RowStatus.Stale, RowStatus.NeverSynced -> palette.Premium
         RowStatus.Error -> palette.Error
     }
 
-private fun RowStatus.subColor(palette: YancoPalette): Color =
+internal fun RowStatus.subColor(palette: YancoPalette): Color =
     when (this) {
         RowStatus.Error -> palette.Error.copy(alpha = 0.85f)
         else -> palette.TextMuted
     }
 
-private fun RowStatus.subLine(source: Source): String {
+internal fun RowStatus.subLine(source: Source): String {
     val type = typeLabel(source.type)
     val items = formatItemCount(source.channelCount)
     val timing =
@@ -582,7 +592,7 @@ private fun RowStatus.subLine(source: Source): String {
     return "$type · $items · $timing"
 }
 
-private fun computeRowStatus(source: Source, isSyncing: Boolean): RowStatus {
+internal fun computeRowStatus(source: Source, isSyncing: Boolean): RowStatus {
     if (isSyncing) return RowStatus.Syncing
     if (source.lastSyncError != null) return RowStatus.Error
     val last = source.lastSynced ?: return RowStatus.NeverSynced
@@ -680,7 +690,7 @@ private fun HairLine(
     )
 }
 
-private fun typeLabel(type: SourceType): String =
+internal fun typeLabel(type: SourceType): String =
     when (type) {
         SourceType.XTREAM -> "Xtream"
         SourceType.M3U_URL -> "M3U URL"

@@ -89,12 +89,25 @@ private fun metricsFor(size: ButtonSize): ButtonMetrics =
         ButtonSize.Compact -> ButtonMetrics(36, 14, 11, 64, 10)
     }
 
+/**
+ * Primary accent button.
+ *
+ * Two visual variants share the same focus chrome:
+ *   - Solid (default) — emerald gradient fill, dark ink text. The
+ *     "this is the action" CTA. Used for ADD SOURCE, Restore, etc.
+ *   - Translucent ([translucent] = true) — accent-tinted alpha fill,
+ *     accent text + accent border. Reads as "primary action, but
+ *     part of a longer Section" — see Backup → Export backup, where
+ *     the user wanted the action recognisable without dominating the
+ *     surrounding card chrome.
+ */
 @Composable
 internal fun SettingsAccentButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     size: ButtonSize = ButtonSize.Standard,
+    translucent: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -110,9 +123,38 @@ internal fun SettingsAccentButton(
         label = "primaryScale",
     )
 
-    val fill = primaryFillBrush(palette, enabled)
-    val borderColor = if (focused && enabled) palette.FocusRing else Color.Transparent
-    val textColor = if (enabled) OnAccentInk else palette.TextMuted
+    val fill: Brush
+    val borderColor: Color
+    val borderWidth: androidx.compose.ui.unit.Dp
+    val textColor: Color
+    if (translucent) {
+        fill =
+            Brush.verticalGradient(
+                listOf(
+                    palette.Accent.copy(alpha = if (focused && enabled) 0.32f else 0.18f),
+                    palette.Accent.copy(alpha = if (focused && enabled) 0.20f else 0.10f),
+                ),
+            )
+        borderColor =
+            when {
+                !enabled -> palette.Accent.copy(alpha = 0.20f)
+                focused -> palette.FocusRing
+                else -> palette.Accent.copy(alpha = 0.55f)
+            }
+        borderWidth = if (focused && enabled) 1.5.dp else 1.dp
+        textColor =
+            when {
+                !enabled -> palette.TextMuted
+                focused -> palette.AccentGlow
+                else -> palette.Accent
+            }
+    } else {
+        fill = primaryFillBrush(palette, enabled)
+        borderColor =
+            if (focused && enabled) palette.FocusRing else Color.White.copy(alpha = 0.18f)
+        borderWidth = if (focused && enabled) 1.5.dp else 1.dp
+        textColor = if (enabled) OnAccentInk else palette.TextMuted
+    }
 
     Row(
         modifier =
@@ -124,7 +166,7 @@ internal fun SettingsAccentButton(
                     scaleY = scale
                 }
                 .shadow(
-                    elevation = if (focused && enabled) 16.dp else 6.dp,
+                    elevation = if (focused && enabled) 16.dp else if (translucent) 0.dp else 6.dp,
                     shape = shape,
                     ambientColor = palette.AccentGlow,
                     spotColor = palette.AccentGlow,
@@ -132,8 +174,8 @@ internal fun SettingsAccentButton(
                 .clip(shape)
                 .background(fill)
                 .border(
-                    width = if (focused && enabled) 1.5.dp else 1.dp,
-                    color = if (focused && enabled) borderColor else Color.White.copy(alpha = 0.18f),
+                    width = borderWidth,
+                    color = borderColor,
                     shape = shape,
                 )
                 .clickable(

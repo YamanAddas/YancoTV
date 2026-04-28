@@ -352,6 +352,7 @@ fun SettingsBackupTab(
                 val canExport = !encryptToggle || exportPassword.length >= 8
                 SettingsAccentButton(
                     enabled = canExport,
+                    translucent = true,
                     onClick = {
                         if (exporting) return@SettingsAccentButton
                         if (customFolder != null) {
@@ -360,7 +361,18 @@ fun SettingsBackupTab(
                             runExportToDefault()
                         }
                     },
-                    modifier = Modifier.placedFocus(exportButtonAnchor).focusable(),
+                    // NOTE: was `Modifier.placedFocus(...).focusable()` —
+                    // the trailing `.focusable()` creates an OUTER focus
+                    // node that catches focus before the inner clickable
+                    // inside SettingsAccentButton. Result: focus lands on
+                    // the wrapper, the button's interactionSource never
+                    // flips, the scale/ring/halo never fire, and the
+                    // user sees no selector. `placedFocus` already calls
+                    // `focusRequester` which binds to the next focus
+                    // node down the chain — that's the inner clickable.
+                    // Drop the `.focusable()` and the requester targets
+                    // the button directly.
+                    modifier = Modifier.placedFocus(exportButtonAnchor),
                 ) {
                     Text(text = if (exporting) "Exporting…" else "Export backup", maxLines = 1, softWrap = false)
                 }
@@ -424,7 +436,11 @@ fun SettingsBackupTab(
             ) {
                 SettingsOutlinedButton(
                     onClick = { importPickLauncher.launch(arrayOf("application/json", "*/*")) },
-                    modifier = Modifier.placedFocus(importButtonAnchor).focusable(),
+                    // Same focus-stacking fix as Export above. `placedFocus`
+                    // already calls focusRequester; the redundant
+                    // `.focusable()` was creating a wrapper focus node
+                    // that ate focus before the inner clickable.
+                    modifier = Modifier.placedFocus(importButtonAnchor),
                 ) {
                     Text(
                         text = if (importPickedUri == null) "Choose backup file…" else "Choose another file…",
