@@ -1,9 +1,15 @@
 # YancoTV Terms of Service
 
-> **Draft.** Last updated 2026-04-29. Same caveat as `PRIVACY.md`:
-> review every section, customise jurisdiction + governing law +
-> contact details before publication, host at a stable HTTPS URL,
-> point `TERMS_OF_SERVICE_URL` at it.
+> **Draft, last updated 2026-04-29.** Built around standard indie-app
+> practice for a Kentucky-based US developer: governing-law clause
+> selects Kentucky law + Kentucky-USA courts as the dispute venue,
+> with a small-claims-court carve-out so users keep their normal
+> consumer remedy. Before any public store submission you should
+> (a) host this file at a stable HTTPS URL, (b) point
+> `TERMS_OF_SERVICE_URL` in
+> `packages/android/app/src/main/java/com/yancotv/android/ui/settings/SettingsAboutTab.kt`
+> at it, and (c) have a Kentucky-licensed attorney review — this
+> draft is a reasonable template, not legal advice.
 
 ---
 
@@ -120,15 +126,38 @@ These terms apply for as long as you use the app. You can terminate
 at any time by uninstalling. We can terminate by ceasing to publish
 new versions; existing installs continue to work as-is.
 
-## Governing law
+## Governing law and dispute resolution
 
-> **TODO**: pick a jurisdiction. Default is "the developer's country
-> of residence" — fill that in here. Many indie apps use a phrase
-> like:
->
->   *These terms are governed by the laws of \<country\>, without
->   regard to its conflict-of-laws principles. Any dispute shall be
->   resolved in the courts of \<city, country\>.*
+These Terms are governed by and construed in accordance with the
+laws of the **Commonwealth of Kentucky, United States of America**,
+without regard to its conflict-of-laws principles. The United Nations
+Convention on Contracts for the International Sale of Goods does not
+apply.
+
+Any dispute, claim, or controversy arising out of or relating to
+these Terms, your use of YancoTV, or the relationship between you
+and the developer shall be resolved exclusively in the state or
+federal courts located in Kentucky, USA, and you and the developer
+each consent to the personal jurisdiction of those courts.
+
+Notwithstanding the above, either party may bring an individual
+action in **small-claims court** in the consumer's county of
+residence for any claim that qualifies for that court's
+jurisdiction.
+
+## Severability and entire agreement
+
+If any provision of these Terms is held to be invalid, illegal, or
+unenforceable by a court of competent jurisdiction, that provision
+shall be limited or eliminated to the minimum extent necessary so
+that the remaining provisions stay in full force and effect.
+
+These Terms, together with the [Privacy Policy](PRIVACY.md),
+constitute the entire agreement between you and the developer
+regarding YancoTV and supersede any prior agreements between you
+and us regarding the app. The developer's failure to enforce any
+right or provision of these Terms shall not be a waiver of that
+right or provision.
 
 ## Changes to these terms
 
@@ -139,6 +168,4 @@ continued use after an update means acceptance of the new terms.
 
 ## Contact
 
-Questions or notices: **\<your-contact-email-here\>**
-
-> **TODO before publishing**: replace contact email + jurisdiction.
+Questions or notices: **contact@yancoverse.com**

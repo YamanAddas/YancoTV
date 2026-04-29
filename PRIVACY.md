@@ -1,13 +1,15 @@
 # YancoTV Privacy Policy
 
-> **Draft.** Last updated 2026-04-29. This is the policy that ships
-> with the v1 build for friend-group testing. Before any public store
-> submission you must (a) host this file at a stable HTTPS URL, (b)
-> update the `PRIVACY_POLICY_URL` constant in
+> **Draft, last updated 2026-04-29.** This is the policy that ships
+> with the v1 build for friend-group testing — built around standard
+> indie-app practice + the rights-disclosure clauses GDPR / CCPA /
+> KCDPA expect. Before any public store submission you should (a)
+> host this file at a stable HTTPS URL, (b) update the
+> `PRIVACY_POLICY_URL` constant in
 > `packages/android/app/src/main/java/com/yancotv/android/ui/settings/SettingsAboutTab.kt`
-> to point at it, and (c) review every section below — particularly
-> the contact email, jurisdiction, and any region-specific clauses
-> (GDPR / CCPA) your audience requires.
+> to point at it, and (c) have a Kentucky-licensed attorney review
+> the document — this draft is a reasonable starting template, not
+> legal advice.
 
 ---
 
@@ -109,12 +111,21 @@ exists to help, but it isn't a substitute for adult supervision).
   backup — uninstalling wipes everything.
 - **Export / import your sources + favourites + history** via
   Settings → Backup before uninstall, if you want to migrate.
-- **Right to access / deletion under GDPR / CCPA**: because YancoTV
-  doesn't operate a backend account, the only YancoTV-side data we
-  could be holding for you is in Sentry. Email the address below if
-  you want any Sentry-side data associated with your install
-  reviewed or deleted; include the device model + approximate first
-  install date so we can scope the search.
+- **Right to access / deletion under GDPR / CCPA / KCDPA**: because
+  YancoTV doesn't operate a backend account, the only YancoTV-side
+  data we could be holding for you is in Sentry. Email the address
+  below if you want any Sentry-side data associated with your
+  install reviewed or deleted; include the device model + approximate
+  first install date so we can scope the search.
+
+  Kentucky residents: the **Kentucky Consumer Data Protection Act
+  (KCDPA)** took effect 1 January 2026. It grants you rights to
+  access, correct, delete, and port your personal data, and to
+  opt out of targeted advertising / sale of personal data / profiling.
+  YancoTV doesn't engage in targeted advertising, doesn't sell
+  personal data, and doesn't profile users — so several of those
+  rights have nothing to act on. The access / correct / delete
+  rights are honoured via the email contact below.
 
 ## Third parties this policy covers
 
@@ -134,9 +145,4 @@ will be flagged in the in-app Updates banner when shipped.
 
 ## Contact
 
-Questions or requests: **\<your-contact-email-here\>**
-
-> **TODO before publishing**: replace the contact email above. A
-> dedicated address (`privacy@yourdomain` or similar) is better than a
-> personal one — easier to retire later without re-publishing the
-> policy.
+Questions or requests: **contact@yancoverse.com**
