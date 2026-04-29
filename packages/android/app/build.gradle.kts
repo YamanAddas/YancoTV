@@ -38,12 +38,19 @@ val updateEndpoint: String = sentryProps.getProperty("update.endpoint", "").trim
 
 // ktlint applied per-module (the version-catalog `libs` accessor isn't
 // available inside root `subprojects {}` blocks in Kotlin DSL, so each
-// module wires it directly). ignoreFailures while we burn down style
-// debt — flip to false in a later D.x once ktlintCheck is empty.
+// module wires it directly).
+//
+// MB-202 (2026-04-28) — flipped `ignoreFailures = false`. The
+// burn-down landed: ran ktlintFormat + manual fixups (5 line-length
+// breaks for description copy that wouldn't auto-wrap). Repo-level
+// `.editorconfig` disables `function-naming` (Compose convention),
+// `backing-property-naming` (StateFlow `_foo`/`foo`), and `filename`
+// (multi-decl Kotlin files we keep) — see the comments there for
+// rationale.
 ktlint {
     version.set(libs.versions.ktlintCli.get())
     android.set(true)
-    ignoreFailures.set(true)
+    ignoreFailures.set(false)
     filter {
         // Don't lint generated code (Compose, KSP, R-class, etc.) —
         // generators don't follow human style and we don't want those

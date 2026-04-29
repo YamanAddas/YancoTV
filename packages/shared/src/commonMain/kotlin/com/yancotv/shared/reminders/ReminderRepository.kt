@@ -13,33 +13,26 @@ import com.yancotv.shared.types.EpgProgramme
  * Android-only (iOS uses `UNUserNotificationCenter` with trigger dates and
  * lands later in MK.iOS).
  */
-class ReminderRepository(
-    private val db: YancoDb,
-    private val clock: () -> Long,
-) {
-    fun all(): List<Reminder> =
-        db.remindersQueries
-            .selectAll()
-            .executeAsList()
-            .map { it.toDomain() }
+class ReminderRepository(private val db: YancoDb, private val clock: () -> Long) {
+    fun all(): List<Reminder> = db.remindersQueries
+        .selectAll()
+        .executeAsList()
+        .map { it.toDomain() }
 
-    fun allUnfired(): List<Reminder> =
-        db.remindersQueries
-            .selectAllUnfired()
-            .executeAsList()
-            .map { it.toDomain() }
+    fun allUnfired(): List<Reminder> = db.remindersQueries
+        .selectAllUnfired()
+        .executeAsList()
+        .map { it.toDomain() }
 
-    fun forProgramme(programmeId: String): Reminder? =
-        db.remindersQueries
-            .selectByProgrammeId(programmeId)
-            .executeAsOneOrNull()
-            ?.toDomain()
+    fun forProgramme(programmeId: String): Reminder? = db.remindersQueries
+        .selectByProgrammeId(programmeId)
+        .executeAsOneOrNull()
+        ?.toDomain()
 
-    fun dueAt(unixSeconds: Long): List<Reminder> =
-        db.remindersQueries
-            .selectUnfiredDue(unixSeconds)
-            .executeAsList()
-            .map { it.toDomain() }
+    fun dueAt(unixSeconds: Long): List<Reminder> = db.remindersQueries
+        .selectUnfiredDue(unixSeconds)
+        .executeAsList()
+        .map { it.toDomain() }
 
     /**
      * Create (or replace) a reminder for [programme] on [channelTvgId]. Lead
@@ -47,11 +40,7 @@ class ReminderRepository(
      * Returns the reminder so the caller can feed its [Reminder.fireAt] to
      * `AlarmManager`.
      */
-    fun upsert(
-        channelTvgId: String,
-        programme: EpgProgramme,
-        leadSeconds: Long = 0L,
-    ): Reminder {
+    fun upsert(channelTvgId: String, programme: EpgProgramme, leadSeconds: Long = 0L): Reminder {
         // One reminder per programme — a second "set reminder" on the same
         // programme should overwrite the lead time, not create a duplicate.
         db.remindersQueries.deleteByProgrammeId(programme.id)
@@ -115,15 +104,14 @@ data class Reminder(
     val fired: Boolean,
 )
 
-private fun Reminders.toDomain(): Reminder =
-    Reminder(
-        id = id,
-        programmeId = programme_id,
-        channelTvgId = channel_tvg_id,
-        title = title,
-        startTime = start_time,
-        endTime = end_time,
-        leadSeconds = lead_seconds,
-        fireAt = fire_at,
-        fired = fired,
-    )
+private fun Reminders.toDomain(): Reminder = Reminder(
+    id = id,
+    programmeId = programme_id,
+    channelTvgId = channel_tvg_id,
+    title = title,
+    startTime = start_time,
+    endTime = end_time,
+    leadSeconds = lead_seconds,
+    fireAt = fire_at,
+    fired = fired,
+)

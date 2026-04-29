@@ -43,12 +43,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -56,11 +56,11 @@ import coil3.compose.AsyncImage
 import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.components.WheelRow
 import com.yancotv.android.ui.components.wheelItemTransform
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
@@ -72,12 +72,12 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgProgramme
 import com.yancotv.shared.types.HistoryEntry
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
  * Home landing dashboard. Six rails stacked on a cinematic canvas:
@@ -276,11 +276,11 @@ fun HomeContent(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .verticalScroll(rememberScrollState())
-                .padding(top = Space.xl, bottom = Space.section),
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .verticalScroll(rememberScrollState())
+            .padding(top = Space.xl, bottom = Space.section),
         verticalArrangement = Arrangement.spacedBy(Space.xxxl),
     ) {
         if (isTotallyEmpty) {
@@ -373,19 +373,9 @@ fun HomeContent(
 
 // ---------- Hero ----------
 
-private data class HeroSlide(
-    val item: ContentItem,
-    val eyebrow: String,
-    val accentIcon: ImageVector,
-    val headline: String,
-    val subhead: String,
-)
+private data class HeroSlide(val item: ContentItem, val eyebrow: String, val accentIcon: ImageVector, val headline: String, val subhead: String)
 
-private fun buildHeroSlides(
-    continueWatching: List<ContentItem>,
-    resumeByContent: Map<String, HistoryEntry>,
-    onNow: List<NowPairing>,
-): List<HeroSlide> {
+private fun buildHeroSlides(continueWatching: List<ContentItem>, resumeByContent: Map<String, HistoryEntry>, onNow: List<NowPairing>): List<HeroSlide> {
     val slides = mutableListOf<HeroSlide>()
     continueWatching.firstOrNull()?.let { item ->
         val resume = resumeByContent[item.id]
@@ -418,8 +408,8 @@ private fun buildHeroSlides(
                 accentIcon = YancoIcons.Live,
                 headline = pair.programme.title,
                 subhead =
-                    (pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title) +
-                        "  •  " + formatTimeWindow(pair.programme),
+                (pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title) +
+                    "  •  " + formatTimeWindow(pair.programme),
             ),
         )
     }
@@ -427,12 +417,7 @@ private fun buildHeroSlides(
 }
 
 @Composable
-private fun HomeHero(
-    slides: List<HeroSlide>,
-    lockedIds: Set<String>,
-    onPlay: (HeroSlide) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun HomeHero(slides: List<HeroSlide>, lockedIds: Set<String>, onPlay: (HeroSlide) -> Unit, modifier: Modifier = Modifier) {
     var index by remember(slides.size) { mutableStateOf(0) }
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -457,11 +442,11 @@ private fun HomeHero(
         focused = focused,
         bevelInset = 4.dp,
         modifier =
-            modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = { onPlay(slide) }),
+        modifier
+            .fillMaxWidth()
+            .height(320.dp)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = { onPlay(slide) }),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AnimatedContent(
@@ -493,24 +478,24 @@ private fun HomeHero(
             if (slides.size > 1) {
                 Row(
                     modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(Space.lg),
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(Space.lg),
                     horizontalArrangement = Arrangement.spacedBy(Space.xs),
                 ) {
                     slides.indices.forEach { i ->
                         Box(
                             modifier =
-                                Modifier
-                                    .size(width = if (i == safeIndex) 18.dp else 6.dp, height = 6.dp)
-                                    .clip(RoundedCornerShape(Radius.pill))
-                                    .background(
-                                        if (i == safeIndex) {
-                                            LocalYancoPalette.current.Accent
-                                        } else {
-                                            LocalYancoPalette.current.TextFaint
-                                        },
-                                    ),
+                            Modifier
+                                .size(width = if (i == safeIndex) 18.dp else 6.dp, height = 6.dp)
+                                .clip(RoundedCornerShape(Radius.pill))
+                                .background(
+                                    if (i == safeIndex) {
+                                        LocalYancoPalette.current.Accent
+                                    } else {
+                                        LocalYancoPalette.current.TextFaint
+                                    },
+                                ),
                         )
                     }
                 }
@@ -520,11 +505,7 @@ private fun HomeHero(
 }
 
 @Composable
-private fun HeroFrame(
-    slide: HeroSlide,
-    interaction: MutableInteractionSource,
-    locked: Boolean,
-) {
+private fun HeroFrame(slide: HeroSlide, interaction: MutableInteractionSource, locked: Boolean) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Backdrop — full-bleed artwork, falls back to a two-tone
         // gradient when the item has no logo so the hero still reads
@@ -539,57 +520,57 @@ private fun HeroFrame(
         } else {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors =
-                                    listOf(
-                                        LocalYancoPalette.current.BackgroundElevated,
-                                        LocalYancoPalette.current.BackgroundHover,
-                                    ),
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors =
+                            listOf(
+                                LocalYancoPalette.current.BackgroundElevated,
+                                LocalYancoPalette.current.BackgroundHover,
                             ),
                         ),
+                    ),
             )
         }
         // Cinematic gradient — darken left for text legibility + fade
         // bottom so the eyebrow/title/subhead float on a soft base.
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors =
-                                listOf(
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.40f),
-                                    Color.Transparent,
-                                ),
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors =
+                        listOf(
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.40f),
+                            Color.Transparent,
                         ),
                     ),
+                ),
         )
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    Color.Transparent,
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.45f),
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f),
-                                ),
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors =
+                        listOf(
+                            Color.Transparent,
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.45f),
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f),
                         ),
                     ),
+                ),
         )
 
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = Space.xxxl, vertical = Space.xxl),
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = Space.xxxl, vertical = Space.xxl),
             verticalArrangement = Arrangement.Bottom,
         ) {
             Row(
@@ -641,24 +622,21 @@ private fun HeroFrame(
 }
 
 @Composable
-private fun HeroCta(
-    interaction: MutableInteractionSource,
-    locked: Boolean,
-) {
+private fun HeroCta(interaction: MutableInteractionSource, locked: Boolean) {
     val focused by interaction.collectIsFocusedAsState()
     val label = if (locked) "Enter PIN" else "Watch now"
     val icon = if (locked) YancoIcons.Lock else YancoIcons.Play
     Row(
         modifier =
-            Modifier
-                .clip(YancoShapes.ButtonBevel)
-                .background(
-                    if (focused) {
-                        LocalYancoPalette.current.Accent
-                    } else {
-                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
-                    },
-                ).padding(horizontal = Space.lg, vertical = Space.sm),
+        Modifier
+            .clip(YancoShapes.ButtonBevel)
+            .background(
+                if (focused) {
+                    LocalYancoPalette.current.Accent
+                } else {
+                    LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+                },
+            ).padding(horizontal = Space.lg, vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -679,11 +657,7 @@ private fun HeroCta(
 // ---------- Rails (shared header + wheel row) ----------
 
 @Composable
-private fun RailHeader(
-    eyebrow: String,
-    title: String,
-    caption: String,
-) {
+private fun RailHeader(eyebrow: String, title: String, caption: String) {
     Column(modifier = Modifier.padding(horizontal = Space.section)) {
         Text(
             text = eyebrow,
@@ -745,12 +719,7 @@ private fun PosterRail(
 }
 
 @Composable
-private fun OnNowRail(
-    items: List<NowPairing>,
-    lockedIds: Set<String>,
-    nowSec: Long,
-    onPlay: (ContentItem) -> Unit,
-) {
+private fun OnNowRail(items: List<NowPairing>, lockedIds: Set<String>, nowSec: Long, onPlay: (ContentItem) -> Unit) {
     val listState = rememberLazyListState()
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
         RailHeader(
@@ -782,11 +751,7 @@ private fun OnNowRail(
 }
 
 @Composable
-private fun UpNextRail(
-    items: List<NowPairing>,
-    lockedIds: Set<String>,
-    onPlay: (ContentItem) -> Unit,
-) {
+private fun UpNextRail(items: List<NowPairing>, lockedIds: Set<String>, onPlay: (ContentItem) -> Unit) {
     val listState = rememberLazyListState()
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
         RailHeader(
@@ -819,13 +784,7 @@ private fun UpNextRail(
 // ---------- Tile variants ----------
 
 @Composable
-private fun PosterTile(
-    item: ContentItem,
-    locked: Boolean,
-    resume: HistoryEntry?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val progressPct =
@@ -839,33 +798,33 @@ private fun PosterTile(
         focused = focused,
         bevelInset = 3.dp,
         modifier =
-            modifier
-                .width(ShellDim.posterTile)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
+        modifier
+            .width(ShellDim.posterTile)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(ShellDim.posterTileAspect),
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ShellDim.posterTileAspect),
             ) {
                 TileArt(item = item, focused = focused)
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors =
-                                        listOf(
-                                            Color.Transparent,
-                                            Color.Transparent,
-                                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.9f),
-                                        ),
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.9f),
                                 ),
                             ),
+                        ),
                 )
                 if (locked) {
                     LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
@@ -874,17 +833,17 @@ private fun PosterTile(
                     ResumeBadge(
                         resume = resume,
                         modifier =
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(Space.sm),
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Space.sm),
                     )
                 }
                 TypeChip(
                     item = item,
                     modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(Space.sm),
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Space.sm),
                 )
                 if (progressPct > 0f) {
                     ProgressStripe(
@@ -895,10 +854,10 @@ private fun PosterTile(
             }
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
-                        .padding(horizontal = Space.md, vertical = Space.sm),
+                Modifier
+                    .fillMaxWidth()
+                    .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
+                    .padding(horizontal = Space.md, vertical = Space.sm),
                 verticalArrangement = Arrangement.spacedBy(Space.xxs),
             ) {
                 Text(
@@ -919,13 +878,7 @@ private fun PosterTile(
 }
 
 @Composable
-private fun OnNowTile(
-    pair: NowPairing,
-    locked: Boolean,
-    nowSec: Long,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     // MK.22.A.5 (MB-222): nowSec is now passed in from a single ticking
@@ -943,33 +896,33 @@ private fun OnNowTile(
         focused = focused,
         bevelInset = 3.dp,
         modifier =
-            modifier
-                .width(ShellDim.posterTile)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
+        modifier
+            .width(ShellDim.posterTile)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(ShellDim.posterTileAspect),
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ShellDim.posterTileAspect),
             ) {
                 TileArt(item = pair.channel, focused = focused)
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors =
-                                        listOf(
-                                            Color.Transparent,
-                                            Color.Transparent,
-                                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
-                                        ),
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
                                 ),
                             ),
+                        ),
                 )
                 if (locked) {
                     LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
@@ -978,9 +931,9 @@ private fun OnNowTile(
                 TypeChip(
                     item = pair.channel,
                     modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(Space.sm),
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Space.sm),
                 )
                 ProgressStripe(
                     progress = progressPct,
@@ -989,10 +942,10 @@ private fun OnNowTile(
             }
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
-                        .padding(horizontal = Space.md, vertical = Space.sm),
+                Modifier
+                    .fillMaxWidth()
+                    .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
+                    .padding(horizontal = Space.md, vertical = Space.sm),
                 verticalArrangement = Arrangement.spacedBy(Space.xxs),
             ) {
                 Text(
@@ -1013,12 +966,7 @@ private fun OnNowTile(
 }
 
 @Composable
-private fun UpNextTile(
-    pair: NowPairing,
-    locked: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun UpNextTile(pair: NowPairing, locked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
@@ -1027,33 +975,33 @@ private fun UpNextTile(
         focused = focused,
         bevelInset = 3.dp,
         modifier =
-            modifier
-                .width(ShellDim.posterTile)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
+        modifier
+            .width(ShellDim.posterTile)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(ShellDim.posterTileAspect),
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ShellDim.posterTileAspect),
             ) {
                 TileArt(item = pair.channel, focused = focused)
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors =
-                                        listOf(
-                                            Color.Transparent,
-                                            Color.Transparent,
-                                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
-                                        ),
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors =
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.92f),
                                 ),
                             ),
+                        ),
                 )
                 if (locked) {
                     LockBadge(modifier = Modifier.align(Alignment.TopStart).padding(Space.sm))
@@ -1065,17 +1013,17 @@ private fun UpNextTile(
                 TypeChip(
                     item = pair.channel,
                     modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(Space.sm),
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Space.sm),
                 )
             }
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
-                        .padding(horizontal = Space.md, vertical = Space.sm),
+                Modifier
+                    .fillMaxWidth()
+                    .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f))
+                    .padding(horizontal = Space.md, vertical = Space.sm),
                 verticalArrangement = Arrangement.spacedBy(Space.xxs),
             ) {
                 Text(
@@ -1098,10 +1046,7 @@ private fun UpNextTile(
 // ---------- Shared tile chrome ----------
 
 @Composable
-private fun TileArt(
-    item: ContentItem,
-    focused: Boolean,
-) {
+private fun TileArt(item: ContentItem, focused: Boolean) {
     if (!item.logoUrl.isNullOrBlank()) {
         AsyncImage(
             model = item.logoUrl,
@@ -1112,17 +1057,17 @@ private fun TileArt(
     } else {
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors =
-                                listOf(
-                                    LocalYancoPalette.current.BackgroundHover,
-                                    LocalYancoPalette.current.BackgroundElevated,
-                                ),
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors =
+                        listOf(
+                            LocalYancoPalette.current.BackgroundHover,
+                            LocalYancoPalette.current.BackgroundElevated,
                         ),
                     ),
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -1139,10 +1084,10 @@ private fun TileArt(
 private fun LockBadge(modifier: Modifier = Modifier) {
     Box(
         modifier =
-            modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f)),
+        modifier
+            .size(24.dp)
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -1155,10 +1100,7 @@ private fun LockBadge(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ResumeBadge(
-    resume: HistoryEntry,
-    modifier: Modifier = Modifier,
-) {
+private fun ResumeBadge(resume: HistoryEntry, modifier: Modifier = Modifier) {
     val dur = resume.durationSeconds
     val label =
         if (dur != null && dur > 0) {
@@ -1170,10 +1112,10 @@ private fun ResumeBadge(
         }
     Row(
         modifier =
-            modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f))
-                .padding(horizontal = Space.sm, vertical = 3.dp),
+        modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f))
+            .padding(horizontal = Space.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -1195,19 +1137,19 @@ private fun ResumeBadge(
 private fun LiveBadge(modifier: Modifier = Modifier) {
     Row(
         modifier =
-            modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(LocalYancoPalette.current.Live.copy(alpha = 0.88f))
-                .padding(horizontal = Space.sm, vertical = 3.dp),
+        modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(LocalYancoPalette.current.Live.copy(alpha = 0.88f))
+            .padding(horizontal = Space.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(6.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(LocalYancoPalette.current.TextPrimary),
+            Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(LocalYancoPalette.current.TextPrimary),
         )
         Text(
             text = "LIVE",
@@ -1218,16 +1160,13 @@ private fun LiveBadge(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StartTimeBadge(
-    programme: EpgProgramme,
-    modifier: Modifier = Modifier,
-) {
+private fun StartTimeBadge(programme: EpgProgramme, modifier: Modifier = Modifier) {
     Row(
         modifier =
-            modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.78f))
-                .padding(horizontal = Space.sm, vertical = 3.dp),
+        modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.78f))
+            .padding(horizontal = Space.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -1240,10 +1179,7 @@ private fun StartTimeBadge(
 }
 
 @Composable
-private fun TypeChip(
-    item: ContentItem,
-    modifier: Modifier = Modifier,
-) {
+private fun TypeChip(item: ContentItem, modifier: Modifier = Modifier) {
     val raw =
         item.groupName?.takeIf { it.isNotBlank() }
             ?: item.type.name
@@ -1252,10 +1188,10 @@ private fun TypeChip(
     val label = raw.take(28)
     Box(
         modifier =
-            modifier
-                .clip(YancoShapes.ChipBevel)
-                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.72f))
-                .padding(horizontal = Space.md, vertical = 3.dp),
+        modifier
+            .clip(YancoShapes.ChipBevel)
+            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.72f))
+            .padding(horizontal = Space.md, vertical = 3.dp),
     ) {
         Text(
             text = label,
@@ -1267,10 +1203,7 @@ private fun TypeChip(
 }
 
 @Composable
-private fun ProgressStripe(
-    progress: Float,
-    modifier: Modifier,
-) {
+private fun ProgressStripe(progress: Float, modifier: Modifier) {
     // Brush rebuilds only on palette swap (MK.16.1), not every recompose.
     val pal = LocalYancoPalette.current
     val tileProgressBrush =
@@ -1281,27 +1214,24 @@ private fun ProgressStripe(
         }
     Box(
         modifier =
-            modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .background(pal.BackgroundDeep.copy(alpha = 0.6f)),
+        modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .background(pal.BackgroundDeep.copy(alpha = 0.6f)),
     ) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .fillMaxHeight()
-                    .background(tileProgressBrush),
+            Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .background(tileProgressBrush),
         )
     }
 }
 
 // ---------- Utilities ----------
 
-private data class NowPairing(
-    val channel: ContentItem,
-    val programme: EpgProgramme,
-)
+private data class NowPairing(val channel: ContentItem, val programme: EpgProgramme)
 
 /**
  * Preferred-language filter for the Recently Added rail. This user's catalog is
@@ -1347,22 +1277,18 @@ private fun matchesPreferredLanguage(item: ContentItem): Boolean {
     return title.isNotEmpty() && asciiCount.toFloat() / title.length >= 0.7f
 }
 
-private fun secondaryLine(
-    item: ContentItem,
-    resume: HistoryEntry?,
-): String =
-    when {
-        resume != null && resume.durationSeconds != null -> {
-            val watched = formatMmSs(resume.positionSeconds.roundToInt())
-            val total = formatMmSs(resume.durationSeconds!!.roundToInt())
-            "$watched / $total"
-        }
-        !item.groupName.isNullOrBlank() -> item.groupName!!
-        else ->
-            item.type.name
-                .lowercase()
-                .replaceFirstChar(Char::uppercase)
+private fun secondaryLine(item: ContentItem, resume: HistoryEntry?): String = when {
+    resume != null && resume.durationSeconds != null -> {
+        val watched = formatMmSs(resume.positionSeconds.roundToInt())
+        val total = formatMmSs(resume.durationSeconds!!.roundToInt())
+        "$watched / $total"
     }
+    !item.groupName.isNullOrBlank() -> item.groupName!!
+    else ->
+        item.type.name
+            .lowercase()
+            .replaceFirstChar(Char::uppercase)
+}
 
 private fun formatMmSs(sec: Int): String {
     val s = sec.coerceAtLeast(0)
@@ -1402,23 +1328,23 @@ private fun EmptyHome(modifier: Modifier) {
         focused = false,
         bevelInset = 4.dp,
         modifier =
-            modifier
-                .fillMaxWidth()
-                .height(260.dp),
+        modifier
+            .fillMaxWidth()
+            .height(260.dp),
     ) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors =
-                                listOf(
-                                    LocalYancoPalette.current.BackgroundRaised,
-                                    LocalYancoPalette.current.BackgroundElevated,
-                                ),
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors =
+                        listOf(
+                            LocalYancoPalette.current.BackgroundRaised,
+                            LocalYancoPalette.current.BackgroundElevated,
                         ),
-                    ).padding(horizontal = Space.xxxl, vertical = Space.xxxl),
+                    ),
+                ).padding(horizontal = Space.xxxl, vertical = Space.xxxl),
         ) {
             Column(
                 horizontalAlignment = Alignment.Start,

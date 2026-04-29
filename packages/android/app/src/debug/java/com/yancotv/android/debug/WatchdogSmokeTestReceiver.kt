@@ -44,10 +44,7 @@ class WatchdogSmokeTestReceiver : BroadcastReceiver() {
         private const val TAG = "YancoWatchdogSmoke"
     }
 
-    override fun onReceive(
-        context: Context,
-        intent: Intent,
-    ) {
+    override fun onReceive(context: Context, intent: Intent) {
         // PlaybackController calls into ExoPlayer, which is main-thread-only.
         // BroadcastReceivers run on main by default but this is defensive —
         // posting to the main looper makes the threading guarantee explicit.

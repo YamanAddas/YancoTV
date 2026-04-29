@@ -15,9 +15,6 @@ import androidx.documentfile.provider.DocumentFile
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.RecordingStorageMode
 import com.yancotv.shared.recording.RecordingFormat
-import kotlinx.io.Sink
-import kotlinx.io.asSink
-import kotlinx.io.buffered
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -25,6 +22,9 @@ import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.io.Sink
+import kotlinx.io.asSink
+import kotlinx.io.buffered
 
 /**
  * Stage 3.1 / MK.14.2-storage (audit-revised) — abstracts "where does
@@ -108,10 +108,7 @@ internal class FileBackedOutput(val file: File) : RecordingOutput {
     override fun delete(): Boolean = file.delete()
 }
 
-internal class DocumentBackedOutput(
-    private val context: Context,
-    val documentFile: DocumentFile,
-) : RecordingOutput {
+internal class DocumentBackedOutput(private val context: Context, val documentFile: DocumentFile) : RecordingOutput {
     override val storagePath: String get() = documentFile.uri.toString()
 
     override fun openSink(): Sink {
@@ -146,11 +143,7 @@ internal class DocumentBackedOutput(
  * On reinstall we'd see "owner unknown" rows; reading them back may
  * require `READ_MEDIA_VIDEO` on API 33+. Out of scope for the v1.0 fix.
  */
-internal class MediaStoreRecordingOutput(
-    private val context: Context,
-    val uri: Uri,
-    private val markPendingOnFinalize: Boolean,
-) : RecordingOutput {
+internal class MediaStoreRecordingOutput(private val context: Context, val uri: Uri, private val markPendingOnFinalize: Boolean) : RecordingOutput {
     override val storagePath: String get() = uri.toString()
 
     override fun openSink(): Sink {
@@ -167,19 +160,17 @@ internal class MediaStoreRecordingOutput(
         return BufferedOutputStream(stream)
     }
 
-    override fun size(): Long =
-        runCatching {
-            context.contentResolver
-                .query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
-                ?.use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getLong(0).coerceAtLeast(0L) else 0L
-                } ?: 0L
-        }.getOrDefault(0L)
+    override fun size(): Long = runCatching {
+        context.contentResolver
+            .query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0).coerceAtLeast(0L) else 0L
+            } ?: 0L
+    }.getOrDefault(0L)
 
-    override fun delete(): Boolean =
-        runCatching {
-            context.contentResolver.delete(uri, null, null) > 0
-        }.getOrDefault(false)
+    override fun delete(): Boolean = runCatching {
+        context.contentResolver.delete(uri, null, null) > 0
+    }.getOrDefault(false)
 
     override fun close() {
         // IS_PENDING is API 29+. On API ≤28 this path doesn't exist (we
@@ -215,16 +206,8 @@ internal class MediaStoreRecordingOutput(
  * catches and marks the row failed. The caller then owns the user-facing
  * error surface.
  */
-internal class RecordingStorageResolver(
-    private val context: Context,
-    private val prefs: AppPreferences,
-) {
-    suspend fun resolve(
-        recordId: String,
-        title: String,
-        format: RecordingFormat,
-        onPermissionLost: suspend () -> Unit = {},
-    ): RecordingOutput {
+internal class RecordingStorageResolver(private val context: Context, private val prefs: AppPreferences) {
+    suspend fun resolve(recordId: String, title: String, format: RecordingFormat, onPermissionLost: suspend () -> Unit = {}): RecordingOutput {
         val recording = prefs.recordingFlow.value
         val ext = extensionFor(format)
         val friendlyName = friendlyFilename(title, recordId) + "." + ext
@@ -263,32 +246,27 @@ internal class RecordingStorageResolver(
      * "Record" instead of "Stop recording". Verified on Fire TV API 28
      * post-MK.14.X migration.
      */
-    private fun resolvePublic(
-        recordId: String,
-        ext: String,
-        filename: String,
-    ): RecordingOutput =
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                resolvePublicMediaStore(filename)
-            } else if (hasWriteExternalStoragePermission()) {
-                resolvePublicLegacy(filename)
-            } else {
-                // Throw into the fallback path below — same handling as
-                // a MediaStore.insert returning null on API 29+.
-                error(
-                    "WRITE_EXTERNAL_STORAGE not granted on API ${Build.VERSION.SDK_INT}; " +
-                        "Public mode falls back to app-private until the user grants from Settings.",
-                )
-            }
-        }.getOrElse { t ->
-            Log.w(
-                TAG,
-                "Public mode allocation failed (${t.message}); falling back to app-private. " +
-                    "Recording will save inside YancoTV's app data dir instead of Movies/YancoTV/.",
+    private fun resolvePublic(recordId: String, ext: String, filename: String): RecordingOutput = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolvePublicMediaStore(filename)
+        } else if (hasWriteExternalStoragePermission()) {
+            resolvePublicLegacy(filename)
+        } else {
+            // Throw into the fallback path below — same handling as
+            // a MediaStore.insert returning null on API 29+.
+            error(
+                "WRITE_EXTERNAL_STORAGE not granted on API ${Build.VERSION.SDK_INT}; " +
+                    "Public mode falls back to app-private until the user grants from Settings.",
             )
-            resolveAppPrivate(recordId, ext)
         }
+    }.getOrElse { t ->
+        Log.w(
+            TAG,
+            "Public mode allocation failed (${t.message}); falling back to app-private. " +
+                "Recording will save inside YancoTV's app data dir instead of Movies/YancoTV/.",
+        )
+        resolveAppPrivate(recordId, ext)
+    }
 
     /**
      * API 29+: scoped-storage MediaStore insert. No permission required.
@@ -346,10 +324,7 @@ internal class RecordingStorageResolver(
         return FileBackedOutput(File(publicDir, filename))
     }
 
-    private fun resolveAppPrivate(
-        recordId: String,
-        ext: String,
-    ): RecordingOutput {
+    private fun resolveAppPrivate(recordId: String, ext: String): RecordingOutput {
         val baseDir =
             context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
                 ?: error("No external Movies dir available — device storage unmounted?")
@@ -400,15 +375,13 @@ internal class RecordingStorageResolver(
         return resolveAppPrivate(fallbackRecordId, fallbackExt)
     }
 
-    private fun hasWriteExternalStoragePermission(): Boolean =
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-        ) == PackageManager.PERMISSION_GRANTED
+    private fun hasWriteExternalStoragePermission(): Boolean = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+    ) == PackageManager.PERMISSION_GRANTED
 
-    private fun hasPersistedPermission(uri: Uri): Boolean =
-        context.contentResolver.persistedUriPermissions
-            .any { it.uri == uri && it.isReadPermission && it.isWritePermission }
+    private fun hasPersistedPermission(uri: Uri): Boolean = context.contentResolver.persistedUriPermissions
+        .any { it.uri == uri && it.isReadPermission && it.isWritePermission }
 
     /**
      * Build a friendly filename for visible folders (SAF / MediaStore /
@@ -419,10 +392,7 @@ internal class RecordingStorageResolver(
      * Result: `BeIN Sport HD - 2026-04-26 22-08 - 19dc`.
      * Caller adds the extension.
      */
-    private fun friendlyFilename(
-        title: String,
-        recordId: String,
-    ): String {
+    private fun friendlyFilename(title: String, recordId: String): String {
         val sanitized =
             title
                 .replace(Regex("""[/\\:*?"<>|\n\r\t]+"""), " ")
@@ -439,11 +409,10 @@ internal class RecordingStorageResolver(
         return "$sanitized - $timestamp - $idSuffix"
     }
 
-    private fun extensionFor(format: RecordingFormat): String =
-        when (format) {
-            RecordingFormat.HLS -> "ts"
-            RecordingFormat.MPEG_TS -> "ts"
-        }
+    private fun extensionFor(format: RecordingFormat): String = when (format) {
+        RecordingFormat.HLS -> "ts"
+        RecordingFormat.MPEG_TS -> "ts"
+    }
 
     companion object {
         const val DEFAULT_DIR_NAME = "yanco-recordings"

@@ -3,8 +3,8 @@ package com.yancotv.android.player
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
-import org.junit.Test
 import kotlin.test.assertEquals
+import org.junit.Test
 
 /**
  * MK.24.E.3 — pin [playLaunchDecision] + [episodeLaunchDecision]
@@ -165,11 +165,7 @@ class PlayLaunchDecisionTest {
 
     // ───── Helpers ─────
 
-    private fun movie(
-        id: String = "movie-1",
-        type: ContentType = ContentType.MOVIE,
-        streamUrl: String = "http://example.test/$id.mp4",
-    ) = ContentItem(
+    private fun movie(id: String = "movie-1", type: ContentType = ContentType.MOVIE, streamUrl: String = "http://example.test/$id.mp4") = ContentItem(
         id = id,
         sourceId = "src-1",
         type = type,
@@ -179,11 +175,7 @@ class PlayLaunchDecisionTest {
         createdAt = 0L,
     )
 
-    private fun episode(
-        id: String = "ep-1",
-        seriesId: String = "series-1",
-        streamUrl: String = "http://example.test/$id.mp4",
-    ) = Playable.Episode(
+    private fun episode(id: String = "ep-1", seriesId: String = "series-1", streamUrl: String = "http://example.test/$id.mp4") = Playable.Episode(
         id = id,
         seriesId = seriesId,
         title = "Test episode",

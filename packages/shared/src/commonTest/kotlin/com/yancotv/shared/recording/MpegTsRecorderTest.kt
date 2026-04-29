@@ -3,6 +3,11 @@ package com.yancotv.shared.recording
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
@@ -14,11 +19,6 @@ import kotlinx.io.Buffer
 import kotlinx.io.Source
 import kotlinx.io.readByteArray
 import kotlinx.io.write
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 /**
  * Tests for [MpegTsRecorder]. Covers:
@@ -40,44 +40,42 @@ import kotlin.test.assertTrue
 class MpegTsRecorderTest {
     private val streamUrl = "https://catchup.example.com/stream.ts"
 
-    @Test fun completedBodyRoundTripsBytesIntoSink() =
-        runTest {
-            val payload =
-                ByteArray(40_000) { i -> (i and 0xFF).toByte() }
-            val http = OneShotSourceClient(payload)
+    @Test fun completedBodyRoundTripsBytesIntoSink() = runTest {
+        val payload =
+            ByteArray(40_000) { i -> (i and 0xFF).toByte() }
+        val http = OneShotSourceClient(payload)
 
-            val recorder = MpegTsRecorder(http, fixedClock())
-            val sink = Buffer()
-            val result =
-                recorder.record(
-                    RecordInput("r1", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
-                    sink,
-                )
+        val recorder = MpegTsRecorder(http, fixedClock())
+        val sink = Buffer()
+        val result =
+            recorder.record(
+                RecordInput("r1", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
+                sink,
+            )
 
-            assertIs<RecordResult.Success>(result)
-            assertEquals(payload.size.toLong(), result.bytesWritten)
-            val written = sink.readByteArray()
-            assertTrue(written.contentEquals(payload), "sink should hold the full server body")
-            val terminal = recorder.state.value
-            assertIs<RecorderState.Completed>(terminal)
-            assertEquals(payload.size.toLong(), terminal.bytesWritten)
-        }
+        assertIs<RecordResult.Success>(result)
+        assertEquals(payload.size.toLong(), result.bytesWritten)
+        val written = sink.readByteArray()
+        assertTrue(written.contentEquals(payload), "sink should hold the full server body")
+        val terminal = recorder.state.value
+        assertIs<RecorderState.Completed>(terminal)
+        assertEquals(payload.size.toLong(), terminal.bytesWritten)
+    }
 
-    @Test fun upstream4xxFailsWithStreamStatusReason() =
-        runTest {
-            val http = ErroringSourceClient(HttpResponseError(403, "Forbidden"))
-            val recorder = MpegTsRecorder(http, fixedClock())
-            val sink = Buffer()
-            val result =
-                recorder.record(
-                    RecordInput("r-403", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
-                    sink,
-                )
+    @Test fun upstream4xxFailsWithStreamStatusReason() = runTest {
+        val http = ErroringSourceClient(HttpResponseError(403, "Forbidden"))
+        val recorder = MpegTsRecorder(http, fixedClock())
+        val sink = Buffer()
+        val result =
+            recorder.record(
+                RecordInput("r-403", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
+                sink,
+            )
 
-            assertIs<RecordResult.Failure>(result)
-            assertEquals("stream_403", result.reason)
-            assertEquals(0L, result.bytesWritten)
-        }
+        assertIs<RecordResult.Failure>(result)
+        assertEquals("stream_403", result.reason)
+        assertEquals(0L, result.bytesWritten)
+    }
 
     /**
      * Regression: when the launching coroutine is cancelled (Android
@@ -89,76 +87,75 @@ class MpegTsRecorderTest {
      * See [MpegTsRecorder.record] catch chain.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun cancellationDuringGetSourcePropagatesAsCancellationException() =
-        runTest {
-            val http = NeverEndingSourceClient()
-            val recorder = MpegTsRecorder(http, fixedClock())
-            val sink = Buffer()
+    @Test
+    fun cancellationDuringGetSourcePropagatesAsCancellationException() = runTest {
+        val http = NeverEndingSourceClient()
+        val recorder = MpegTsRecorder(http, fixedClock())
+        val sink = Buffer()
 
-            var caught: Throwable? = null
-            val job =
-                launch {
-                    try {
-                        recorder.record(
-                            RecordInput("r-cancel", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
-                            sink,
-                        )
-                    } catch (t: Throwable) {
-                        caught = t
-                        throw t
-                    }
+        var caught: Throwable? = null
+        val job =
+            launch {
+                try {
+                    recorder.record(
+                        RecordInput("r-cancel", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
+                        sink,
+                    )
+                } catch (t: Throwable) {
+                    caught = t
+                    throw t
                 }
-            // Let the launch dispatch into record() so we're suspended
-            // inside the never-ending getSource.
-            runCurrent()
+            }
+        // Let the launch dispatch into record() so we're suspended
+        // inside the never-ending getSource.
+        runCurrent()
 
-            job.cancelAndJoin()
+        job.cancelAndJoin()
 
-            assertNotNull(caught, "expected the launch body to throw, got nothing")
-            assertIs<CancellationException>(
-                caught,
-                "expected CancellationException; got ${caught!!::class.simpleName}",
+        assertNotNull(caught, "expected the launch body to throw, got nothing")
+        assertIs<CancellationException>(
+            caught,
+            "expected CancellationException; got ${caught!!::class.simpleName}",
+        )
+        // The recorder must not transition to Failed on cancellation —
+        // that's the service's row-state job. Idle (never set anything)
+        // or Recording (mid-flight) are both acceptable.
+        val terminal = recorder.state.value
+        assertTrue(
+            terminal !is RecorderState.Failed,
+            "state must not be Failed after cancel; got $terminal",
+        )
+    }
+
+    @Test fun maxDurationCutoffEndsAsCompleted() = runTest {
+        // 100 KB body; the recorder's max duration is configured to
+        // land in mid-stream. StepClock advances 1 s per nowMs()
+        // read so a few read-loop iterations happen before the
+        // deadline check trips. With CHUNK_SIZE = 16 KiB we expect
+        // 2–3 chunks (~32–48 KiB) before the loop exits.
+        val payload = ByteArray(100_000) { 0xC0.toByte() }
+        val http = OneShotSourceClient(payload)
+        val clock = StepClock(start = 1_000_000L, stepMs = 1_000L)
+
+        val recorder = MpegTsRecorder(http, clock)
+        val sink = Buffer()
+        val result =
+            recorder.record(
+                RecordInput(
+                    recordId = "r-deadline",
+                    sourceUrl = streamUrl,
+                    title = "Catch-up",
+                    format = RecordingFormat.MPEG_TS,
+                    maxDurationMs = 5_000L,
+                ),
+                sink,
             )
-            // The recorder must not transition to Failed on cancellation —
-            // that's the service's row-state job. Idle (never set anything)
-            // or Recording (mid-flight) are both acceptable.
-            val terminal = recorder.state.value
-            assertTrue(
-                terminal !is RecorderState.Failed,
-                "state must not be Failed after cancel; got $terminal",
-            )
-        }
 
-    @Test fun maxDurationCutoffEndsAsCompleted() =
-        runTest {
-            // 100 KB body; the recorder's max duration is configured to
-            // land in mid-stream. StepClock advances 1 s per nowMs()
-            // read so a few read-loop iterations happen before the
-            // deadline check trips. With CHUNK_SIZE = 16 KiB we expect
-            // 2–3 chunks (~32–48 KiB) before the loop exits.
-            val payload = ByteArray(100_000) { 0xC0.toByte() }
-            val http = OneShotSourceClient(payload)
-            val clock = StepClock(start = 1_000_000L, stepMs = 1_000L)
-
-            val recorder = MpegTsRecorder(http, clock)
-            val sink = Buffer()
-            val result =
-                recorder.record(
-                    RecordInput(
-                        recordId = "r-deadline",
-                        sourceUrl = streamUrl,
-                        title = "Catch-up",
-                        format = RecordingFormat.MPEG_TS,
-                        maxDurationMs = 5_000L,
-                    ),
-                    sink,
-                )
-
-            assertIs<RecordResult.Success>(result)
-            // Some bytes landed (at least one chunk), but not all.
-            assertTrue(result.bytesWritten > 0L, "deadline should not pre-empt the first read")
-            assertTrue(result.bytesWritten < payload.size.toLong(), "deadline should pre-empt completion")
-        }
+        assertIs<RecordResult.Success>(result)
+        // Some bytes landed (at least one chunk), but not all.
+        assertTrue(result.bytesWritten > 0L, "deadline should not pre-empt the first read")
+        assertTrue(result.bytesWritten < payload.size.toLong(), "deadline should pre-empt completion")
+    }
 
     // ── helpers ────────────────────────────────────────────────────
 
@@ -181,24 +178,12 @@ class MpegTsRecorderTest {
      * Source, then exhaustion. Tests the normal "server closes after
      * sending everything" path.
      */
-    private class OneShotSourceClient(
-        private val body: ByteArray,
-    ) : HttpClient {
-        override suspend fun getJson(
-            url: String,
-            options: HttpRequestOptions,
-        ): Any? = throw UnsupportedOperationException()
+    private class OneShotSourceClient(private val body: ByteArray) : HttpClient {
+        override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = throw UnsupportedOperationException()
 
-        override suspend fun getText(
-            url: String,
-            options: HttpRequestOptions,
-        ): String = throw UnsupportedOperationException()
+        override suspend fun getText(url: String, options: HttpRequestOptions): String = throw UnsupportedOperationException()
 
-        override suspend fun <T> getSource(
-            url: String,
-            options: HttpRequestOptions,
-            block: suspend (Source) -> T,
-        ): T {
+        override suspend fun <T> getSource(url: String, options: HttpRequestOptions, block: suspend (Source) -> T): T {
             val buf = Buffer().apply { write(body) }
             return buf.use { block(it) }
         }
@@ -208,24 +193,12 @@ class MpegTsRecorderTest {
      * Client that throws on getSource — used to exercise the
      * 4xx / 5xx fast-fail path.
      */
-    private class ErroringSourceClient(
-        private val error: Throwable,
-    ) : HttpClient {
-        override suspend fun getJson(
-            url: String,
-            options: HttpRequestOptions,
-        ): Any? = throw UnsupportedOperationException()
+    private class ErroringSourceClient(private val error: Throwable) : HttpClient {
+        override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = throw UnsupportedOperationException()
 
-        override suspend fun getText(
-            url: String,
-            options: HttpRequestOptions,
-        ): String = throw UnsupportedOperationException()
+        override suspend fun getText(url: String, options: HttpRequestOptions): String = throw UnsupportedOperationException()
 
-        override suspend fun <T> getSource(
-            url: String,
-            options: HttpRequestOptions,
-            block: suspend (Source) -> T,
-        ): T = throw error
+        override suspend fun <T> getSource(url: String, options: HttpRequestOptions, block: suspend (Source) -> T): T = throw error
     }
 
     /**
@@ -236,26 +209,15 @@ class MpegTsRecorderTest {
      * recorder properly propagated cancellation.
      */
     private class NeverEndingSourceClient : HttpClient {
-        override suspend fun getJson(
-            url: String,
-            options: HttpRequestOptions,
-        ): Any? = throw UnsupportedOperationException()
+        override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = throw UnsupportedOperationException()
 
-        override suspend fun getText(
-            url: String,
-            options: HttpRequestOptions,
-        ): String = throw UnsupportedOperationException()
+        override suspend fun getText(url: String, options: HttpRequestOptions): String = throw UnsupportedOperationException()
 
-        override suspend fun <T> getSource(
-            url: String,
-            options: HttpRequestOptions,
-            block: suspend (Source) -> T,
-        ): T {
+        override suspend fun <T> getSource(url: String, options: HttpRequestOptions, block: suspend (Source) -> T): T {
             // Suspends forever; only completes when the parent coroutine
             // is cancelled, throwing CancellationException through.
             delay(Long.MAX_VALUE)
             throw IllegalStateException("unreachable")
         }
     }
-
 }

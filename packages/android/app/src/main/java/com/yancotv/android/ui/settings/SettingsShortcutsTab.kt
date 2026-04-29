@@ -49,15 +49,17 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
     val scroll = rememberScrollState()
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .dpadVerticalScroll(scroll)
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(scroll)
+            .dpadVerticalScroll(scroll)
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Remote &amp; keyboard",
-            sub = "Quick reference for the TV-remote and keyboard bindings YancoTV listens for. Shortcuts aren't user-configurable yet — let us know in the issues if any clash with your remote.",
+            sub =
+            "Quick reference for the TV-remote and keyboard bindings YancoTV listens for. " +
+                "Shortcuts aren't user-configurable yet — let us know in the issues if any clash with your remote.",
         ) {}
 
         SettingsSection(title = "Shell") {
@@ -113,10 +115,7 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
  * because [KeyChip] sets `maxLines = 1, softWrap = false` on its Text.
  */
 @Composable
-private fun ShortcutRow(
-    label: String,
-    keys: List<String>,
-) {
+private fun ShortcutRow(label: String, keys: List<String>) {
     SettingsRow(
         label = label,
         right = {
@@ -136,15 +135,15 @@ private fun KeyChip(keys: String) {
     val palette = LocalYancoPalette.current
     Box(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(palette.Accent.copy(alpha = 0.12f))
-                .border(
-                    width = 1.dp,
-                    color = palette.Accent.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(6.dp),
-                )
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(palette.Accent.copy(alpha = 0.12f))
+            .border(
+                width = 1.dp,
+                color = palette.Accent.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(6.dp),
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(

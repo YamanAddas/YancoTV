@@ -47,9 +47,9 @@ class CategoryTreeBuilderTest {
         val groups =
             listOf(
                 "AR | Sports", // first → Arabic slot 0
-                "US | News",   // second → USA slot 1
+                "US | News", // second → USA slot 1
                 "AR | Movies", // appends to Arabic
-                "US | Drama",  // appends to USA
+                "US | Drama", // appends to USA
             )
         val tree = CategoryTreeBuilder.build(groups, pinnedParentCodes = listOf("us"))
         assertEquals(2, tree.size)
@@ -67,10 +67,13 @@ class CategoryTreeBuilderTest {
     @Test fun build_multiplePins_orderFollowsInputList() {
         val groups =
             listOf(
-                "AR | Sports", "AR | Movies", // Arabic
-                "US | News", "US | Drama",    // USA
-                "FR | Sport", "FR | Drame",   // France
-                "Sports",                      // unprefixed leaf
+                "AR | Sports",
+                "AR | Movies", // Arabic
+                "US | News",
+                "US | Drama", // USA
+                "FR | Sport",
+                "FR | Drame", // France
+                "Sports", // unprefixed leaf
             )
         // User pinned in (FR, AR) order — France should be FIRST, then Arabic,
         // then USA (unpinned, kept in provider order), then leaf.
@@ -90,8 +93,10 @@ class CategoryTreeBuilderTest {
     @Test fun build_pinByDisplayName_alsoFloats() {
         val groups =
             listOf(
-                "AR | Sports", "AR | Movies",
-                "Saudi Arabia | beIN", "Saudi Arabia | KSA1",
+                "AR | Sports",
+                "AR | Movies",
+                "Saudi Arabia | beIN",
+                "Saudi Arabia | KSA1",
             )
         val tree =
             CategoryTreeBuilder.build(
@@ -126,7 +131,8 @@ class CategoryTreeBuilderTest {
         val groups =
             listOf(
                 "AR | Sports", // single Arabic → collapses to leaf
-                "US | News", "US | Drama", // USA stays as parent
+                "US | News",
+                "US | Drama", // USA stays as parent
             )
         val tree = CategoryTreeBuilder.build(groups, pinnedParentCodes = listOf("ar"))
         assertEquals(2, tree.size)

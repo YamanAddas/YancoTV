@@ -19,10 +19,7 @@ import kotlinx.coroutines.CancellationException
  * removed) — the DB still carries the orphan thanks to `ON DELETE CASCADE`
  * on the FK, but this is the belt to that suspenders.
  */
-class WatchHistoryRepository(
-    private val db: YancoDb,
-    private val clock: () -> Long,
-) {
+class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> Long) {
     /**
      * Save a resume point. Pass [positionSeconds] = 0 (or equal to
      * [durationSeconds]) to effectively mark a title as watched; caller
@@ -35,12 +32,7 @@ class WatchHistoryRepository(
      * [CancellationException] is re-thrown so coroutine cancellation
      * still propagates correctly.
      */
-    fun upsert(
-        contentId: String,
-        episodeId: String? = null,
-        positionSeconds: Long,
-        durationSeconds: Long? = null,
-    ) {
+    fun upsert(contentId: String, episodeId: String? = null, positionSeconds: Long, durationSeconds: Long? = null) {
         val id = if (episodeId != null) "wh:$contentId:$episodeId" else "wh:$contentId"
         try {
             db.watchHistoryQueries.upsert(
@@ -84,22 +76,22 @@ class WatchHistoryRepository(
                 durationSeconds = row.duration_seconds?.toDouble(),
                 watchedAt = row.watched_at,
                 content =
-                    ContentItem(
-                        id = c.id,
-                        sourceId = c.source_id,
-                        type = contentTypeFromDb(c.type),
-                        title = c.title,
-                        cleanTitle = c.clean_title,
-                        groupName = c.group_name,
-                        streamUrl = c.stream_url,
-                        logoUrl = c.logo_url,
-                        tvgId = c.tvg_id,
-                        metadataJson = c.metadata_json,
-                        sortOrder = c.sort_order.toInt(),
-                        createdAt = c.created_at,
-                        nameOverride = c.name_override,
-                        logoOverride = c.logo_override,
-                    ),
+                ContentItem(
+                    id = c.id,
+                    sourceId = c.source_id,
+                    type = contentTypeFromDb(c.type),
+                    title = c.title,
+                    cleanTitle = c.clean_title,
+                    groupName = c.group_name,
+                    streamUrl = c.stream_url,
+                    logoUrl = c.logo_url,
+                    tvgId = c.tvg_id,
+                    metadataJson = c.metadata_json,
+                    sortOrder = c.sort_order.toInt(),
+                    createdAt = c.created_at,
+                    nameOverride = c.name_override,
+                    logoOverride = c.logo_override,
+                ),
             )
         }
     }
@@ -126,10 +118,9 @@ class WatchHistoryRepository(
     }
 }
 
-private fun contentTypeFromDb(value: String): ContentType =
-    when (value) {
-        "live" -> ContentType.LIVE
-        "movie" -> ContentType.MOVIE
-        "series" -> ContentType.SERIES
-        else -> error("Unknown content type: $value")
-    }
+private fun contentTypeFromDb(value: String): ContentType = when (value) {
+    "live" -> ContentType.LIVE
+    "movie" -> ContentType.MOVIE
+    "series" -> ContentType.SERIES
+    else -> error("Unknown content type: $value")
+}

@@ -27,6 +27,8 @@ import com.yancotv.shared.recording.RecordingFormat
 import com.yancotv.shared.recording.RecordingScheduleRepository
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.recording.scheduleOutcomeFromBytes
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,8 +40,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koin.android.ext.android.inject
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Foreground service that owns every in-flight recording.
@@ -65,6 +65,7 @@ import java.util.concurrent.ConcurrentHashMap
 @UnstableApi
 class RecordingService : Service() {
     private val recordings: RecordingsRepository by inject()
+
     // MB-212 — schedule repo lookup happens in handleStop so the schedule
     // transitions to its terminal state from the same coroutine that
     // finalises the recording row's bytes. Avoids the receiver-side
@@ -74,6 +75,7 @@ class RecordingService : Service() {
     private val http: HttpClient by inject()
     private val prefs: com.yancotv.android.prefs.AppPreferences by inject()
     private val logger: com.yancotv.shared.logger.Logger by inject()
+
     // MK.14.8 — PlaybackController and RecordingDataSink expose Media3
     // types (DataSink, ExoPlayer config), so this service is annotated
     // @UnstableApi at the class level. Callers (UI / WorkManager) reach
@@ -137,11 +139,7 @@ class RecordingService : Service() {
         ensureNotificationChannel()
     }
 
-    override fun onStartCommand(
-        intent: Intent?,
-        flags: Int,
-        startId: Int,
-    ): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
                 val input = intent.toRecordInput() ?: run {
@@ -494,10 +492,7 @@ class RecordingService : Service() {
         activeJobs.keys.toList().forEach { handleStop(it) }
     }
 
-    private fun onRecorderResult(
-        recordId: String,
-        result: RecordResult,
-    ) {
+    private fun onRecorderResult(recordId: String, result: RecordResult) {
         try {
             when (result) {
                 is RecordResult.Success ->
@@ -652,10 +647,7 @@ class RecordingService : Service() {
          * with later `recordings` table reads. Generates a UUID when
          * one isn't supplied.
          */
-        fun start(
-            context: Context,
-            input: RecordInput,
-        ): String {
+        fun start(context: Context, input: RecordInput): String {
             val effectiveId =
                 input.recordId.ifBlank { UUID.randomUUID().toString() }
             val intent =
@@ -680,10 +672,7 @@ class RecordingService : Service() {
             return effectiveId
         }
 
-        fun stop(
-            context: Context,
-            recordId: String,
-        ) {
+        fun stop(context: Context, recordId: String) {
             val intent =
                 Intent(context, RecordingService::class.java)
                     .setAction(ACTION_STOP)
@@ -698,18 +687,16 @@ class RecordingService : Service() {
             context.startService(intent)
         }
 
-        internal fun formatToString(format: RecordingFormat): String =
-            when (format) {
-                RecordingFormat.HLS -> "hls"
-                RecordingFormat.MPEG_TS -> "mpeg_ts"
-            }
+        internal fun formatToString(format: RecordingFormat): String = when (format) {
+            RecordingFormat.HLS -> "hls"
+            RecordingFormat.MPEG_TS -> "mpeg_ts"
+        }
 
-        internal fun formatFromString(value: String?): RecordingFormat? =
-            when (value?.lowercase()) {
-                "hls" -> RecordingFormat.HLS
-                "mpeg_ts", "ts" -> RecordingFormat.MPEG_TS
-                else -> null
-            }
+        internal fun formatFromString(value: String?): RecordingFormat? = when (value?.lowercase()) {
+            "hls" -> RecordingFormat.HLS
+            "mpeg_ts", "ts" -> RecordingFormat.MPEG_TS
+            else -> null
+        }
     }
 }
 

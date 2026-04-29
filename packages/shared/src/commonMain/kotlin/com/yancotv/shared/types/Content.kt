@@ -92,20 +92,10 @@ data class Episode(
 )
 
 @Serializable
-data class SubtitleTrack(
-    val language: String,
-    val url: String,
-)
+data class SubtitleTrack(val language: String, val url: String)
 
 @Serializable
-data class EpisodeInfo(
-    val id: String,
-    val seasonNumber: Int,
-    val episodeNumber: Int,
-    val title: String,
-    val streamUrl: String,
-    val duration: String? = null,
-)
+data class EpisodeInfo(val id: String, val seasonNumber: Int, val episodeNumber: Int, val title: String, val streamUrl: String, val duration: String? = null)
 
 /** Parsed metadata from the metadata_json column */
 @Serializable
@@ -140,19 +130,11 @@ data class ContentMetadata(
 )
 
 @Serializable
-data class WatchPosition(
-    val positionSeconds: Double,
-    val durationSeconds: Double? = null,
-)
+data class WatchPosition(val positionSeconds: Double, val durationSeconds: Double? = null)
 
 /** Enriched content detail returned by content:getDetail */
 @Serializable
-data class ContentDetail(
-    val item: ContentItem,
-    val metadata: ContentMetadata,
-    val episodes: List<Episode>,
-    val watchPosition: WatchPosition? = null,
-)
+data class ContentDetail(val item: ContentItem, val metadata: ContentMetadata, val episodes: List<Episode>, val watchPosition: WatchPosition? = null)
 
 /** Watch history entry with joined content data */
 @Serializable
@@ -182,11 +164,4 @@ data class FavoriteEntry(
  *  be deleted (UI guards on [isDefault]); user-created lists carry
  *  user-supplied [name] and a [sortOrder] for display ordering. */
 @Serializable
-data class FavoriteList(
-    val id: String,
-    val name: String,
-    val sortOrder: Int,
-    val isDefault: Boolean,
-    val createdAt: Long,
-    val updatedAt: Long,
-)
+data class FavoriteList(val id: String, val name: String, val sortOrder: Int, val isDefault: Boolean, val createdAt: Long, val updatedAt: Long)

@@ -17,8 +17,7 @@ enum class ThemeId(val displayName: String) {
     ;
 
     companion object {
-        fun fromKey(key: String?): ThemeId =
-            values().firstOrNull { it.name == key } ?: FrostedEmerald
+        fun fromKey(key: String?): ThemeId = values().firstOrNull { it.name == key } ?: FrostedEmerald
     }
 }
 
@@ -36,8 +35,7 @@ enum class AccentId(val displayName: String) {
     ;
 
     companion object {
-        fun fromKey(key: String?): AccentId =
-            values().firstOrNull { it.name == key } ?: MATCH_THEME
+        fun fromKey(key: String?): AccentId = values().firstOrNull { it.name == key } ?: MATCH_THEME
     }
 }
 
@@ -61,13 +59,12 @@ class ThemeController {
         _accentId.value = id
     }
 
-    fun paletteFor(id: ThemeId): YancoPalette =
-        when (id) {
-            ThemeId.FrostedEmerald -> FrostedEmerald
-            ThemeId.MidnightSapphire -> MidnightSapphire
-            ThemeId.WarmAmber -> WarmAmber
-            ThemeId.Monochrome -> Monochrome
-        }
+    fun paletteFor(id: ThemeId): YancoPalette = when (id) {
+        ThemeId.FrostedEmerald -> FrostedEmerald
+        ThemeId.MidnightSapphire -> MidnightSapphire
+        ThemeId.WarmAmber -> WarmAmber
+        ThemeId.Monochrome -> Monochrome
+    }
 
     /** Resolves the base palette + accent overlay into the final palette
      *  every UI surface reads. */
@@ -77,12 +74,11 @@ class ThemeController {
         return base.applyAccent(bundle)
     }
 
-    private fun bundleFor(id: AccentId): AccentBundle? =
-        when (id) {
-            AccentId.MATCH_THEME -> null
-            AccentId.EMERALD -> EmeraldAccent
-            AccentId.SAPPHIRE -> SapphireAccent
-            AccentId.AMBER -> AmberAccent
-            AccentId.RED -> RedAccent
-        }
+    private fun bundleFor(id: AccentId): AccentBundle? = when (id) {
+        AccentId.MATCH_THEME -> null
+        AccentId.EMERALD -> EmeraldAccent
+        AccentId.SAPPHIRE -> SapphireAccent
+        AccentId.AMBER -> AmberAccent
+        AccentId.RED -> RedAccent
+    }
 }

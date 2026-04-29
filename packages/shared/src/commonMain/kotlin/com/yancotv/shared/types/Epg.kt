@@ -19,11 +19,7 @@ data class EpgProgramme(
 
 /** Now + Next pair for a single channel */
 @Serializable
-data class NowNext(
-    val channelTvgId: String,
-    val now: EpgProgramme? = null,
-    val next: EpgProgramme? = null,
-)
+data class NowNext(val channelTvgId: String, val now: EpgProgramme? = null, val next: EpgProgramme? = null)
 
 /** Map of tvgId -> NowNext for bulk queries */
 typealias NowNextMap = Map<String, NowNext>
@@ -48,20 +44,11 @@ data class EpgGuideChannel(
 
 /** EPG guide slice — programmes for a time range, grouped by channel */
 @Serializable
-data class EpgGuideData(
-    val channels: List<EpgGuideChannel>,
-    val startTime: Long,
-    val endTime: Long,
-)
+data class EpgGuideData(val channels: List<EpgGuideChannel>, val startTime: Long, val endTime: Long)
 
 /** Status returned after an EPG refresh */
 @Serializable
-data class EpgRefreshResult(
-    val ok: Boolean,
-    val programmeCount: Int? = null,
-    val channelCount: Int? = null,
-    val error: String? = null,
-)
+data class EpgRefreshResult(val ok: Boolean, val programmeCount: Int? = null, val channelCount: Int? = null, val error: String? = null)
 
 /** EPG settings stored in the settings table */
 @Serializable

@@ -74,17 +74,9 @@ class SourceSyncCoordinator(
 
     private var activeJob: Job? = null
 
-    data class Active(
-        val sourceId: String,
-        val sourceName: String,
-        val progress: SyncProgress,
-        val startedAtMs: Long,
-    )
+    data class Active(val sourceId: String, val sourceName: String, val progress: SyncProgress, val startedAtMs: Long)
 
-    fun start(
-        sourceId: String,
-        sourceName: String,
-    ) {
+    fun start(sourceId: String, sourceName: String) {
         if (_state.value != null) {
             logger.warn("syncCoordinator refusing start: another sync is active")
             return

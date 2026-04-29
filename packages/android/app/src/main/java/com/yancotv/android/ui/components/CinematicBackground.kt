@@ -18,27 +18,27 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
 fun CinematicBackground(modifier: Modifier = Modifier) {
     Box(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .background(
-                    Brush.radialGradient(
-                        colors =
-                            listOf(
-                                LocalYancoPalette.current.Accent.copy(alpha = 0.05f),
-                                LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0f),
-                            ),
-                        center = Offset(260f, 220f),
-                        radius = 1400f,
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .background(
+                Brush.radialGradient(
+                    colors =
+                    listOf(
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.05f),
+                        LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0f),
                     ),
-                ).background(
-                    Brush.verticalGradient(
-                        colors =
-                            listOf(
-                                LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0f),
-                                LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.35f),
-                            ),
+                    center = Offset(260f, 220f),
+                    radius = 1400f,
+                ),
+            ).background(
+                Brush.verticalGradient(
+                    colors =
+                    listOf(
+                        LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0f),
+                        LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.35f),
                     ),
                 ),
+            ),
     )
 }

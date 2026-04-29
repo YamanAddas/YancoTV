@@ -10,10 +10,7 @@ import app.cash.sqldelight.db.SqlDriver
  * and bulk FTS repopulation statements that SQLDelight's generated query
  * API can't express. Normal read/write goes through [db] as usual.
  */
-data class YancoDatabase(
-    val db: YancoDb,
-    val driver: SqlDriver,
-)
+data class YancoDatabase(val db: YancoDb, val driver: SqlDriver)
 
 /**
  * Platform-specific builder for the SQLDelight database.

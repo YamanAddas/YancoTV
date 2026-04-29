@@ -10,9 +10,9 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.yancotv.shared.history.WatchHistoryRepository
+import java.util.concurrent.TimeUnit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.util.concurrent.TimeUnit
 
 /**
  * MK.10.1 — periodic refresh of the launcher Recommendations channel.
@@ -26,23 +26,19 @@ import java.util.concurrent.TimeUnit
  * so the channel exists on first launch without waiting for the
  * periodic window.
  */
-class RecommendationsWorker(
-    context: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(context, params),
+class RecommendationsWorker(context: Context, params: WorkerParameters) :
+    CoroutineWorker(context, params),
     KoinComponent {
     private val history: WatchHistoryRepository by inject()
 
-    override suspend fun doWork(): Result {
-        return runCatching {
-            val sync = RecommendationsSync(applicationContext, history)
-            val result = sync.sync()
-            Log.i(TAG, "result=$result")
-            Result.success()
-        }.getOrElse { t ->
-            Log.w(TAG, "sync failed", t)
-            Result.retry()
-        }
+    override suspend fun doWork(): Result = runCatching {
+        val sync = RecommendationsSync(applicationContext, history)
+        val result = sync.sync()
+        Log.i(TAG, "result=$result")
+        Result.success()
+    }.getOrElse { t ->
+        Log.w(TAG, "sync failed", t)
+        Result.retry()
     }
 
     companion object {

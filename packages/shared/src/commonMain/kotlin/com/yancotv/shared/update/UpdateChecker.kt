@@ -141,13 +141,7 @@ class UpdateChecker(
  * Public result type — UI consumes this to render a "new version
  * available" prompt.
  */
-data class UpdateInfo(
-    val versionCode: Int,
-    val versionName: String,
-    val downloadUrl: String,
-    val releaseNotes: String?,
-    val minOsApi: Int?,
-)
+data class UpdateInfo(val versionCode: Int, val versionName: String, val downloadUrl: String, val releaseNotes: String?, val minOsApi: Int?)
 
 /**
  * On-the-wire shape of `update.json`. Internal — callers consume the

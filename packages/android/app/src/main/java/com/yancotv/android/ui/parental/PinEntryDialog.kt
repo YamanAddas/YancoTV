@@ -43,13 +43,7 @@ import kotlinx.coroutines.launch
  * desktop UX and makes the brute-force deterrent visible.
  */
 @Composable
-fun PinEntryDialog(
-    title: String,
-    body: String? = null,
-    repo: ParentalRepository,
-    onSuccess: () -> Unit,
-    onDismiss: () -> Unit,
-) {
+fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository, onSuccess: () -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -93,19 +87,19 @@ fun PinEntryDialog(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     textStyle =
-                        TextStyle(
-                            color = LocalYancoPalette.current.TextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
+                    TextStyle(
+                        color = LocalYancoPalette.current.TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
                     colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = LocalYancoPalette.current.TextPrimary,
-                            unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
-                            focusedBorderColor = LocalYancoPalette.current.Accent,
-                            unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
-                            cursorColor = LocalYancoPalette.current.Accent,
-                        ),
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                        unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                        focusedBorderColor = LocalYancoPalette.current.Accent,
+                        unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                        cursorColor = LocalYancoPalette.current.Accent,
+                    ),
                 )
                 if (lockoutSec > 0) {
                     Text(

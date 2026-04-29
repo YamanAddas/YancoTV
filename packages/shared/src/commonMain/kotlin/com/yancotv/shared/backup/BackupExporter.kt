@@ -30,11 +30,7 @@ import kotlinx.serialization.encodeToString
  *  - `downloads` (ephemeral, v1 deferred)
  *  - PIN hash (lives in Keystore, not DB)
  */
-class BackupExporter(
-    private val db: YancoDb,
-    private val credentialStore: CredentialStore,
-    private val cipher: BackupCipher = BackupCipher(),
-) {
+class BackupExporter(private val db: YancoDb, private val credentialStore: CredentialStore, private val cipher: BackupCipher = BackupCipher()) {
     /**
      * Build a [BackupFileV1] from current DB state.
      *
@@ -43,12 +39,7 @@ class BackupExporter(
      * @param nowMs `Clock`-injected timestamp for `createdAt`
      * @param password non-null enables AES/GCM credential encryption
      */
-    fun export(
-        appVersion: String,
-        dbSchemaVersion: Int,
-        nowMs: Long,
-        password: String? = null,
-    ): BackupFileV1 {
+    fun export(appVersion: String, dbSchemaVersion: Int, nowMs: Long, password: String? = null): BackupFileV1 {
         val encryption = password?.let {
             BackupEncryptionInfo(
                 kdf = "pbkdf2-sha256",
@@ -109,66 +100,62 @@ class BackupExporter(
         )
     }
 
-    private fun exportSources(key: ByteArray?): List<SourceRecord> =
-        db.sourcesQueries.selectAll().executeAsList().map { row ->
-            // Decrypt Keystore-bound blobs first; the resulting plaintext
-            // either lands as-is (no password) or is re-encrypted under
-            // the user's password-derived key.
-            val username = row.username_encrypted?.let { credentialStore.decrypt(it) }
-            val password = row.password_encrypted?.let { credentialStore.decrypt(it) }
-            val mac = row.mac_address_encrypted?.let { credentialStore.decrypt(it) }
-            SourceRecord(
-                id = row.id,
-                name = row.name,
-                type = row.type,
-                url = row.url,
-                filePath = row.file_path,
-                username = username?.let { wrap(it, key) },
-                password = password?.let { wrap(it, key) },
-                macAddress = mac?.let { wrap(it, key) },
-                epgUrl = row.epg_url,
-                userAgent = row.user_agent,
-                referer = row.referer,
-                isActive = row.is_active,
-                priority = row.priority,
-                epgPriority = row.epg_priority,
-                autoSyncInterval = row.auto_sync_interval,
-                autoSyncOnStart = row.auto_sync_on_start,
-                createdAt = row.created_at,
-                updatedAt = row.updated_at,
-            )
-        }
+    private fun exportSources(key: ByteArray?): List<SourceRecord> = db.sourcesQueries.selectAll().executeAsList().map { row ->
+        // Decrypt Keystore-bound blobs first; the resulting plaintext
+        // either lands as-is (no password) or is re-encrypted under
+        // the user's password-derived key.
+        val username = row.username_encrypted?.let { credentialStore.decrypt(it) }
+        val password = row.password_encrypted?.let { credentialStore.decrypt(it) }
+        val mac = row.mac_address_encrypted?.let { credentialStore.decrypt(it) }
+        SourceRecord(
+            id = row.id,
+            name = row.name,
+            type = row.type,
+            url = row.url,
+            filePath = row.file_path,
+            username = username?.let { wrap(it, key) },
+            password = password?.let { wrap(it, key) },
+            macAddress = mac?.let { wrap(it, key) },
+            epgUrl = row.epg_url,
+            userAgent = row.user_agent,
+            referer = row.referer,
+            isActive = row.is_active,
+            priority = row.priority,
+            epgPriority = row.epg_priority,
+            autoSyncInterval = row.auto_sync_interval,
+            autoSyncOnStart = row.auto_sync_on_start,
+            createdAt = row.created_at,
+            updatedAt = row.updated_at,
+        )
+    }
 
     /** When [key] is null the value passes through plaintext; otherwise hex-encrypted. */
-    private fun wrap(plaintext: String, key: ByteArray?): String =
-        if (key == null) plaintext else cipher.encryptHex(plaintext.encodeToByteArray(), key)
+    private fun wrap(plaintext: String, key: ByteArray?): String = if (key == null) plaintext else cipher.encryptHex(plaintext.encodeToByteArray(), key)
 
-    private fun exportFavoriteLists(): List<FavoriteListRecord> =
-        db.favoriteListsQueries.selectAll().executeAsList().map {
-            FavoriteListRecord(
-                id = it.id,
-                name = it.name,
-                sortOrder = it.sort_order,
-                isDefault = it.is_default,
-                createdAt = it.created_at,
-                updatedAt = it.updated_at,
-            )
-        }
+    private fun exportFavoriteLists(): List<FavoriteListRecord> = db.favoriteListsQueries.selectAll().executeAsList().map {
+        FavoriteListRecord(
+            id = it.id,
+            name = it.name,
+            sortOrder = it.sort_order,
+            isDefault = it.is_default,
+            createdAt = it.created_at,
+            updatedAt = it.updated_at,
+        )
+    }
 
-    private fun exportFavorites(): List<FavoriteRecord> =
-        db.favoritesQueries.selectAll().executeAsList().mapNotNull { row ->
-            // selectAll JOINs content already; row exposes content's
-            // source_id, stream_url, title, tvg_id directly.
-            FavoriteRecord(
-                favoriteId = row.favorite_id,
-                sourceId = row.source_id,
-                streamUrl = row.stream_url,
-                title = row.title,
-                tvgId = row.tvg_id,
-                listId = row.list_id,
-                addedAt = row.added_at,
-            )
-        }
+    private fun exportFavorites(): List<FavoriteRecord> = db.favoritesQueries.selectAll().executeAsList().mapNotNull { row ->
+        // selectAll JOINs content already; row exposes content's
+        // source_id, stream_url, title, tvg_id directly.
+        FavoriteRecord(
+            favoriteId = row.favorite_id,
+            sourceId = row.source_id,
+            streamUrl = row.stream_url,
+            title = row.title,
+            tvgId = row.tvg_id,
+            listId = row.list_id,
+            addedAt = row.added_at,
+        )
+    }
 
     private fun exportWatchHistory(): List<WatchHistoryRecord> {
         val rows = db.watchHistoryQueries.selectRecent(Long.MAX_VALUE).executeAsList()
@@ -190,109 +177,100 @@ class BackupExporter(
         }
     }
 
-    private fun exportRecordingSchedules(): List<RecordingScheduleRecord> =
-        db.recordingSchedulesQueries.selectAll().executeAsList().map { row ->
-            val content = row.content_id?.let { db.contentQueries.selectById(it).executeAsOneOrNull() }
-            RecordingScheduleRecord(
+    private fun exportRecordingSchedules(): List<RecordingScheduleRecord> = db.recordingSchedulesQueries.selectAll().executeAsList().map { row ->
+        val content = row.content_id?.let { db.contentQueries.selectById(it).executeAsOneOrNull() }
+        RecordingScheduleRecord(
+            id = row.id,
+            sourceId = content?.source_id,
+            streamUrl = row.stream_url,
+            programmeStreamUrl = null, // programme_id is local-only; importer re-resolves via title + start
+            title = row.title,
+            scheduledStart = row.scheduled_start,
+            scheduledEnd = row.scheduled_end,
+            state = row.state,
+            recordingId = row.recording_id,
+            seriesKey = row.series_key,
+            createdAt = row.created_at,
+            updatedAt = row.updated_at,
+        )
+    }
+
+    private fun exportRecordings(): List<RecordingRecord> = db.recordingsQueries.selectAll().executeAsList().map {
+        RecordingRecord(
+            id = it.id,
+            streamUrl = it.stream_url,
+            title = it.title,
+            fileUri = it.file_path,
+            status = it.status,
+            format = it.format,
+            startedAt = it.started_at,
+            endedAt = it.ended_at,
+            durationSeconds = it.duration_seconds,
+            fileSizeBytes = it.file_size_bytes,
+        )
+    }
+
+    private fun exportContentOverrides(): List<ContentOverrideRecord> = db.contentQueries.selectOverridesForBackup().executeAsList().map {
+        ContentOverrideRecord(
+            sourceId = it.source_id,
+            streamUrl = it.stream_url,
+            nameOverride = it.name_override,
+            logoOverride = it.logo_override,
+        )
+    }
+
+    private fun exportChannelOverrides(): List<ChannelOverrideRecord> = db.parentalQueries.selectAllOverrides().executeAsList().mapNotNull { row ->
+        val content = db.contentQueries.selectById(row.content_id).executeAsOneOrNull() ?: return@mapNotNull null
+        ChannelOverrideRecord(
+            sourceId = content.source_id,
+            streamUrl = content.stream_url,
+            customName = row.custom_name,
+            customLogoUrl = row.custom_logo_url,
+            customNumber = row.custom_number,
+            customGroup = row.custom_group,
+            updatedAt = row.updated_at,
+        )
+    }
+
+    private fun exportLockedChannels(): List<ChannelRef> = db.parentalQueries.selectLocked().executeAsList().mapNotNull { id ->
+        val c = db.contentQueries.selectById(id).executeAsOneOrNull() ?: return@mapNotNull null
+        ChannelRef(sourceId = c.source_id, streamUrl = c.stream_url, ts = 0L)
+    }
+
+    private fun exportHiddenChannels(): List<ChannelRef> = db.parentalQueries.selectHidden().executeAsList().mapNotNull { id ->
+        val c = db.contentQueries.selectById(id).executeAsOneOrNull() ?: return@mapNotNull null
+        ChannelRef(sourceId = c.source_id, streamUrl = c.stream_url, ts = 0L)
+    }
+
+    private fun exportGroupPreferences(): List<GroupPreferenceRecord> = listOf("live", "movie", "series").flatMap { type ->
+        db.groupPreferencesQueries.selectByType(type).executeAsList().map { row ->
+            GroupPreferenceRecord(
                 id = row.id,
-                sourceId = content?.source_id,
-                streamUrl = row.stream_url,
-                programmeStreamUrl = null, // programme_id is local-only; importer re-resolves via title + start
-                title = row.title,
-                scheduledStart = row.scheduled_start,
-                scheduledEnd = row.scheduled_end,
-                state = row.state,
-                recordingId = row.recording_id,
-                seriesKey = row.series_key,
-                createdAt = row.created_at,
-                updatedAt = row.updated_at,
-            )
-        }
-
-    private fun exportRecordings(): List<RecordingRecord> =
-        db.recordingsQueries.selectAll().executeAsList().map {
-            RecordingRecord(
-                id = it.id,
-                streamUrl = it.stream_url,
-                title = it.title,
-                fileUri = it.file_path,
-                status = it.status,
-                format = it.format,
-                startedAt = it.started_at,
-                endedAt = it.ended_at,
-                durationSeconds = it.duration_seconds,
-                fileSizeBytes = it.file_size_bytes,
-            )
-        }
-
-    private fun exportContentOverrides(): List<ContentOverrideRecord> =
-        db.contentQueries.selectOverridesForBackup().executeAsList().map {
-            ContentOverrideRecord(
-                sourceId = it.source_id,
-                streamUrl = it.stream_url,
-                nameOverride = it.name_override,
-                logoOverride = it.logo_override,
-            )
-        }
-
-    private fun exportChannelOverrides(): List<ChannelOverrideRecord> =
-        db.parentalQueries.selectAllOverrides().executeAsList().mapNotNull { row ->
-            val content = db.contentQueries.selectById(row.content_id).executeAsOneOrNull() ?: return@mapNotNull null
-            ChannelOverrideRecord(
-                sourceId = content.source_id,
-                streamUrl = content.stream_url,
+                contentType = row.content_type,
+                groupKey = row.group_key,
+                sortOrder = row.sort_order,
+                isHidden = row.is_hidden,
+                isPinned = row.is_pinned,
                 customName = row.custom_name,
-                customLogoUrl = row.custom_logo_url,
-                customNumber = row.custom_number,
-                customGroup = row.custom_group,
-                updatedAt = row.updated_at,
+                createdAt = row.created_at,
             )
         }
+    }
 
-    private fun exportLockedChannels(): List<ChannelRef> =
-        db.parentalQueries.selectLocked().executeAsList().mapNotNull { id ->
-            val c = db.contentQueries.selectById(id).executeAsOneOrNull() ?: return@mapNotNull null
-            ChannelRef(sourceId = c.source_id, streamUrl = c.stream_url, ts = 0L)
-        }
+    private fun exportSettings(): List<SettingsKv> = db.settingsQueries.selectAll().executeAsList().map { SettingsKv(it.key, it.value_) }
 
-    private fun exportHiddenChannels(): List<ChannelRef> =
-        db.parentalQueries.selectHidden().executeAsList().mapNotNull { id ->
-            val c = db.contentQueries.selectById(id).executeAsOneOrNull() ?: return@mapNotNull null
-            ChannelRef(sourceId = c.source_id, streamUrl = c.stream_url, ts = 0L)
-        }
-
-    private fun exportGroupPreferences(): List<GroupPreferenceRecord> =
-        listOf("live", "movie", "series").flatMap { type ->
-            db.groupPreferencesQueries.selectByType(type).executeAsList().map { row ->
-                GroupPreferenceRecord(
-                    id = row.id,
-                    contentType = row.content_type,
-                    groupKey = row.group_key,
-                    sortOrder = row.sort_order,
-                    isHidden = row.is_hidden,
-                    isPinned = row.is_pinned,
-                    customName = row.custom_name,
-                    createdAt = row.created_at,
-                )
-            }
-        }
-
-    private fun exportSettings(): List<SettingsKv> =
-        db.settingsQueries.selectAll().executeAsList().map { SettingsKv(it.key, it.value_) }
-
-    private fun exportReminders(): List<ReminderRecord> =
-        db.remindersQueries.selectAll().executeAsList().map {
-            ReminderRecord(
-                id = it.id,
-                programmeId = it.programme_id,
-                channelTvgId = it.channel_tvg_id,
-                title = it.title,
-                startTime = it.start_time,
-                endTime = it.end_time,
-                leadSeconds = it.lead_seconds,
-                fireAt = it.fire_at,
-                fired = it.fired,
-                createdAt = it.created_at,
-            )
-        }
+    private fun exportReminders(): List<ReminderRecord> = db.remindersQueries.selectAll().executeAsList().map {
+        ReminderRecord(
+            id = it.id,
+            programmeId = it.programme_id,
+            channelTvgId = it.channel_tvg_id,
+            title = it.title,
+            startTime = it.start_time,
+            endTime = it.end_time,
+            leadSeconds = it.lead_seconds,
+            fireAt = it.fire_at,
+            fired = it.fired,
+            createdAt = it.created_at,
+        )
+    }
 }

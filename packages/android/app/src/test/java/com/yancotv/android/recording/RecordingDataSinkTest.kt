@@ -272,11 +272,7 @@ class RecordingDataSinkTest {
     }
 
     /** Build a 188-byte TS packet for [pid] with optional [payload]. */
-    private fun tsPacket(
-        pid: Int,
-        pusi: Boolean = false,
-        payload: ByteArray = ByteArray(184),
-    ): ByteArray {
+    private fun tsPacket(pid: Int, pusi: Boolean = false, payload: ByteArray = ByteArray(184)): ByteArray {
         require(pid in 0..0x1FFF) { "pid out of range: $pid" }
         require(payload.size <= 184)
         val packet = ByteArray(188)
@@ -292,10 +288,7 @@ class RecordingDataSinkTest {
     }
 
     /** PAT (PID=0) advertising one program → [pmtPid]. */
-    private fun patPacket(
-        programNumber: Int,
-        pmtPid: Int,
-    ): ByteArray {
+    private fun patPacket(programNumber: Int, pmtPid: Int): ByteArray {
         val payload = ByteArray(184)
         payload[0] = 0x00 // pointer_field
         // section header (table_id, length, tsid, flags, section nums)
@@ -316,6 +309,5 @@ class RecordingDataSinkTest {
     }
 
     /** Minimal PMT packet — content doesn't matter, only PID match. */
-    private fun pmtPacket(pmtPid: Int): ByteArray =
-        tsPacket(pid = pmtPid, pusi = true)
+    private fun pmtPacket(pmtPid: Int): ByteArray = tsPacket(pid = pmtPid, pusi = true)
 }

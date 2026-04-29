@@ -96,10 +96,7 @@ data class VodDockData(
  * weight: PREMIUM uses the accent for emphasis (rating badge), MUTED is
  * the default secondary treatment.
  */
-data class VodDockChip(
-    val label: String,
-    val tone: VodDockChipTone = VodDockChipTone.MUTED,
-)
+data class VodDockChip(val label: String, val tone: VodDockChipTone = VodDockChipTone.MUTED)
 
 enum class VodDockChipTone {
     MUTED,
@@ -111,11 +108,7 @@ enum class VodDockChipTone {
  * lightweight timer while the dock is visible. Caller coerces to the
  * actual media window — this composable just renders what it's given.
  */
-data class VodDockProgress(
-    val playedMs: Long = 0L,
-    val bufferedMs: Long = 0L,
-    val durationMs: Long = 0L,
-)
+data class VodDockProgress(val playedMs: Long = 0L, val bufferedMs: Long = 0L, val durationMs: Long = 0L)
 
 /**
  * Top-level dispatcher. Stage-1 skeleton: renders nothing when visibility
@@ -301,11 +294,7 @@ private fun MetadataChip(chip: VodDockChip) {
 // ---------------------------------------------------------------------
 
 @Composable
-private fun VodDockProgressRow(
-    progress: VodDockProgress,
-    onSeekTo: (Long) -> Unit,
-    onUserInteraction: () -> Unit,
-) {
+private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Unit, onUserInteraction: () -> Unit) {
     val palette = LocalYancoPalette.current
     val duration = progress.durationMs.coerceAtLeast(1L)
     val playedPct = (progress.playedMs.toFloat() / duration).coerceIn(0f, 1f)
@@ -471,17 +460,35 @@ private fun VodDockTransportRow(
         // because the enum name is SUBS but the user-facing vocab is CC on
         // remotes. MENU opens on AUDIO as the default landing, matching
         // the MENU key behaviour elsewhere.
-        SecondaryChip(label = "CC", onClick = { onUserInteraction(); onOpenSheet(SheetMode.SUBS) })
+        SecondaryChip(label = "CC", onClick = {
+            onUserInteraction()
+            onOpenSheet(SheetMode.SUBS)
+        })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "AUDIO", onClick = { onUserInteraction(); onOpenSheet(SheetMode.AUDIO) })
+        SecondaryChip(label = "AUDIO", onClick = {
+            onUserInteraction()
+            onOpenSheet(SheetMode.AUDIO)
+        })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "SPEED", onClick = { onUserInteraction(); onOpenSheet(SheetMode.SPEED) })
+        SecondaryChip(label = "SPEED", onClick = {
+            onUserInteraction()
+            onOpenSheet(SheetMode.SPEED)
+        })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "FIT", onClick = { onUserInteraction(); onOpenSheet(SheetMode.ASPECT) })
+        SecondaryChip(label = "FIT", onClick = {
+            onUserInteraction()
+            onOpenSheet(SheetMode.ASPECT)
+        })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "FAV", onClick = { onUserInteraction(); onOpenSheet(SheetMode.FAV) })
+        SecondaryChip(label = "FAV", onClick = {
+            onUserInteraction()
+            onOpenSheet(SheetMode.FAV)
+        })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "MENU", onClick = { onUserInteraction(); onOpenSheet(SheetMode.AUDIO) })
+        SecondaryChip(label = "MENU", onClick = {
+            onUserInteraction()
+            onOpenSheet(SheetMode.AUDIO)
+        })
     }
 }
 
@@ -597,10 +604,7 @@ private fun TransportButton(
  * accent border + accent glow. No "primary" state — these are all peers.
  */
 @Composable
-private fun SecondaryChip(
-    label: String,
-    onClick: () -> Unit,
-) {
+private fun SecondaryChip(label: String, onClick: () -> Unit) {
     val palette = LocalYancoPalette.current
     val shape = YancoShapes.HexCapsule
     val interaction = remember { MutableInteractionSource() }
@@ -720,6 +724,7 @@ enum class SheetMode {
     RECORD,
     FAV,
     EXT,
+
     /** No matching V2 panel; activity falls through to the popup root. */
     CAST,
 

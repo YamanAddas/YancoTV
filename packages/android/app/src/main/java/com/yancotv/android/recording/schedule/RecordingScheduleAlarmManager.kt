@@ -35,9 +35,7 @@ import com.yancotv.shared.recording.RecordingScheduleEntry
  * the schedule-create flow.
  */
 @UnstableApi
-class RecordingScheduleAlarmManager(
-    private val context: Context,
-) {
+class RecordingScheduleAlarmManager(private val context: Context) {
     private val alarms: AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -50,11 +48,7 @@ class RecordingScheduleAlarmManager(
      * "schedule for a programme starting in 30 seconds with 60-second
      * pre-padding" case by firing immediately.
      */
-    fun arm(
-        schedule: RecordingScheduleEntry,
-        prePaddingMs: Long,
-        postPaddingMs: Long,
-    ) {
+    fun arm(schedule: RecordingScheduleEntry, prePaddingMs: Long, postPaddingMs: Long) {
         val now = System.currentTimeMillis()
         val preFireAt = (schedule.scheduledStart - prePaddingMs).coerceAtLeast(now)
         val endFireAt = schedule.scheduledEnd + postPaddingMs
@@ -73,11 +67,7 @@ class RecordingScheduleAlarmManager(
         alarms.cancel(pendingIntentFor(scheduleId, ACTION_END))
     }
 
-    private fun scheduleAlarm(
-        scheduleId: String,
-        action: String,
-        triggerMs: Long,
-    ) {
+    private fun scheduleAlarm(scheduleId: String, action: String, triggerMs: Long) {
         val pi = pendingIntentFor(scheduleId, action)
         val canExact =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -103,10 +93,7 @@ class RecordingScheduleAlarmManager(
         }
     }
 
-    private fun pendingIntentFor(
-        scheduleId: String,
-        action: String,
-    ): PendingIntent {
+    private fun pendingIntentFor(scheduleId: String, action: String): PendingIntent {
         val intent =
             Intent(context, RecordingScheduleReceiver::class.java).apply {
                 this.action = action

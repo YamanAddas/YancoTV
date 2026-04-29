@@ -30,10 +30,7 @@ fun HelloScreen(isTv: Boolean) {
 }
 
 @Composable
-private fun PhoneHello(
-    platformName: String,
-    mode: String,
-) {
+private fun PhoneHello(platformName: String, mode: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -50,10 +47,7 @@ private fun PhoneHello(
 }
 
 @Composable
-private fun TvHello(
-    platformName: String,
-    mode: String,
-) {
+private fun TvHello(platformName: String, mode: String) {
     Box(modifier = Modifier.fillMaxSize().padding(48.dp), contentAlignment = Alignment.Center) {
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),

@@ -22,12 +22,7 @@ sealed interface CategoryNode {
 
     data class Leaf(override val groupName: String) : CategoryNode
 
-    data class Parent(
-        val label: String,
-        val kind: PrefixCatalog.Kind,
-        val prefixCode: String,
-        val children: List<Leaf>,
-    ) : CategoryNode {
+    data class Parent(val label: String, val kind: PrefixCatalog.Kind, val prefixCode: String, val children: List<Leaf>) : CategoryNode {
         // Parents are addressed by the parent label, not a single group_name.
         // Consumers that need a key for a Parent should use [label] (or the
         // resolved kind+code pair). `groupName` is exposed for symmetry and
@@ -37,12 +32,7 @@ sealed interface CategoryNode {
 }
 
 object CategoryTreeBuilder {
-    private data class Bucket(
-        val label: String,
-        val kind: PrefixCatalog.Kind,
-        val code: String,
-        val children: MutableList<CategoryNode.Leaf>,
-    )
+    private data class Bucket(val label: String, val kind: PrefixCatalog.Kind, val code: String, val children: MutableList<CategoryNode.Leaf>)
 
     /**
      * Build a one-level tree out of the provider-ordered flat list returned
@@ -73,10 +63,7 @@ object CategoryTreeBuilder {
      * displayName form is supported for backup-restore symmetry across
      * future code-renames.
      */
-    fun build(
-        flatGroups: List<String>,
-        pinnedParentCodes: List<String> = emptyList(),
-    ): List<CategoryNode> {
+    fun build(flatGroups: List<String>, pinnedParentCodes: List<String> = emptyList()): List<CategoryNode> {
         if (flatGroups.isEmpty()) return emptyList()
 
         // Two-pass: first pass collects buckets in first-seen order and

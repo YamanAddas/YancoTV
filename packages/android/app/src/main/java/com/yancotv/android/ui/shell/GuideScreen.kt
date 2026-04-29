@@ -1,23 +1,15 @@
 package com.yancotv.android.ui.shell
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusable
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.focusGroup
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -54,7 +46,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -76,14 +76,13 @@ import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.recording.RecordingScheduleRepository
-import com.yancotv.shared.recording.RecordingScheduleState
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.EpgGuideChannel
 import com.yancotv.shared.types.EpgGuideData
 import com.yancotv.shared.types.EpgProgramme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -104,8 +103,7 @@ private val NOW_LEAD_IN = 16.dp
 private val MIN_PROG_WIDTH = 48.dp
 private const val ASSUMED_TIMELINE_DP = 1080
 
-private fun pxPerMinFor(timelineMinutes: Int): Int =
-    (ASSUMED_TIMELINE_DP / timelineMinutes.coerceAtLeast(1)).coerceIn(2, 24)
+private fun pxPerMinFor(timelineMinutes: Int): Int = (ASSUMED_TIMELINE_DP / timelineMinutes.coerceAtLeast(1)).coerceIn(2, 24)
 
 // Recompute the red "now" line every minute. Programme blocks only redraw
 // when the window slides — which happens on a coarser 30-min grain.
@@ -472,23 +470,23 @@ fun GuideScreen(
         }
         Column(
             modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .focusRequester(gridFocus)
-                    .focusGroup()
-                    .onFocusChanged { state ->
-                        gridHasFocus = state.hasFocus
-                        // Hole-cover: RIGHT-arrow from rail uses Compose
-                        // natural traversal, no callback fires.
-                        // Syncing panelFocus → Content here keeps the
-                        // state machine in step so BACK from grid
-                        // produces a Content → Categories transition
-                        // (LaunchedEffect re-fires, pill refocuses).
-                        if (state.hasFocus && panelFocus != PanelFocus.Content) {
-                            onPanelFocusChanged(PanelFocus.Content)
-                        }
-                    },
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .focusRequester(gridFocus)
+                .focusGroup()
+                .onFocusChanged { state ->
+                    gridHasFocus = state.hasFocus
+                    // Hole-cover: RIGHT-arrow from rail uses Compose
+                    // natural traversal, no callback fires.
+                    // Syncing panelFocus → Content here keeps the
+                    // state machine in step so BACK from grid
+                    // produces a Content → Categories transition
+                    // (LaunchedEffect re-fires, pill refocuses).
+                    if (state.hasFocus && panelFocus != PanelFocus.Content) {
+                        onPanelFocusChanged(PanelFocus.Content)
+                    }
+                },
         ) {
             if (guideEmpty) {
                 if (loading) {
@@ -671,9 +669,9 @@ fun GuideScreen(
                                 title = programme.title,
                                 streamUrl = streamUrl,
                                 programmes =
-                                    matches.map { p ->
-                                        Triple(p.id, p.startTime * 1000L, p.endTime * 1000L)
-                                    },
+                                matches.map { p ->
+                                    Triple(p.id, p.startTime * 1000L, p.endTime * 1000L)
+                                },
                             )
                         }.onFailure {
                             Log.e("Yanco", "scheduleSeries failed for ${programme.title}", it)
@@ -698,11 +696,7 @@ fun GuideScreen(
     }
 }
 
-private data class ProgrammeAction(
-    val channel: EpgGuideChannel,
-    val programme: EpgProgramme,
-)
-
+private data class ProgrammeAction(val channel: EpgGuideChannel, val programme: EpgProgramme)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -754,9 +748,9 @@ private fun GuideGrid(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep),
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep),
     ) {
         TimeHeader(
             startTime = guide.startTime,
@@ -770,18 +764,18 @@ private fun GuideGrid(
         if (totalCount > guide.channels.size) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(LocalYancoPalette.current.BackgroundRaised)
-                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .background(LocalYancoPalette.current.BackgroundRaised)
+                    .padding(horizontal = 24.dp, vertical = 4.dp),
             ) {
                 androidx.compose.material3.Text(
                     text =
-                        if (loadingMore) {
-                            "Showing ${guide.channels.size} of $totalCount channels · loading more…"
-                        } else {
-                            "Showing ${guide.channels.size} of $totalCount channels"
-                        },
+                    if (loadingMore) {
+                        "Showing ${guide.channels.size} of $totalCount channels · loading more…"
+                    } else {
+                        "Showing ${guide.channels.size} of $totalCount channels"
+                    },
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
                 )
@@ -848,17 +842,17 @@ private fun GuideGrid(
             if (nowOffsetMin in 0..totalMinutes) {
                 Box(
                     modifier =
-                        Modifier
-                            .offset {
-                                val leftPx =
-                                    CHANNEL_COL_WIDTH.toPx() +
-                                        (nowOffsetMin * pxPerMin).dp.toPx() -
-                                        hScroll.value
-                                IntOffset(leftPx.toInt(), 0)
-                            }
-                            .width(2.dp)
-                            .fillMaxHeight()
-                            .background(Color(0xFFE25555)),
+                    Modifier
+                        .offset {
+                            val leftPx =
+                                CHANNEL_COL_WIDTH.toPx() +
+                                    (nowOffsetMin * pxPerMin).dp.toPx() -
+                                    hScroll.value
+                            IntOffset(leftPx.toInt(), 0)
+                        }
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(Color(0xFFE25555)),
                 )
             }
 
@@ -889,18 +883,18 @@ private fun JumpToNowButton(onClick: () -> Unit) {
     val fg = if (focused) palette.BackgroundDeep else palette.Accent
     Box(
         modifier =
-            Modifier
-                .clip(shape)
-                .background(bg)
-                .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier
+            .clip(shape)
+            .background(bg)
+            .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
             text = "Now",
@@ -922,10 +916,10 @@ private fun TimeHeader(
 ) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(HEADER_HEIGHT)
-                .background(LocalYancoPalette.current.BackgroundRaised),
+        Modifier
+            .fillMaxWidth()
+            .height(HEADER_HEIGHT)
+            .background(LocalYancoPalette.current.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 2026-04-27 — "Now" jump button lives in the channel-column
@@ -941,10 +935,10 @@ private fun TimeHeader(
         }
         Row(
             modifier =
-                Modifier
-                    .horizontalScroll(hScroll)
-                    .width(timelineWidth)
-                    .fillMaxHeight(),
+            Modifier
+                .horizontalScroll(hScroll)
+                .width(timelineWidth)
+                .fillMaxHeight(),
         ) {
             // Ticks every 30 min. Each tick owns its 30-min slice width so
             // the label stays left-aligned with the tick line.
@@ -954,10 +948,10 @@ private fun TimeHeader(
                 val label = formatHourMinute(startTime + minute * 60L)
                 Box(
                     modifier =
-                        Modifier
-                            .width((slice * pxPerMin).dp)
-                            .fillMaxHeight()
-                            .border(0.5.dp, LocalYancoPalette.current.BorderSubtle),
+                    Modifier
+                        .width((slice * pxPerMin).dp)
+                        .fillMaxHeight()
+                        .border(0.5.dp, LocalYancoPalette.current.BorderSubtle),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
@@ -1036,10 +1030,10 @@ private fun ChannelRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(ROW_HEIGHT)
-                .background(LocalYancoPalette.current.BackgroundRaised),
+        Modifier
+            .fillMaxWidth()
+            .height(ROW_HEIGHT)
+            .background(LocalYancoPalette.current.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Sticky channel cell — stays visible even as the timeline scrolls.
@@ -1067,10 +1061,10 @@ private fun ChannelRow(
         // Row's content is much smaller than before.
         Row(
             modifier =
-                Modifier
-                    .horizontalScroll(hScroll)
-                    .width(timelineWidth)
-                    .fillMaxHeight(),
+            Modifier
+                .horizontalScroll(hScroll)
+                .width(timelineWidth)
+                .fillMaxHeight(),
         ) {
             var cursor = windowStart
             var firstEmitted = true
@@ -1098,12 +1092,7 @@ private fun ChannelRow(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelCell(
-    channel: EpgGuideChannel,
-    onClick: () -> Unit,
-    onLongPress: () -> Unit,
-    onExitLeft: () -> Unit = {},
-) {
+private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPress: () -> Unit, onExitLeft: () -> Unit = {}) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
@@ -1122,41 +1111,41 @@ private fun ChannelCell(
 
     Row(
         modifier =
-            Modifier
-                .width(CHANNEL_COL_WIDTH)
-                .fillMaxHeight()
-                .background(bg)
-                .border(0.5.dp, border)
-                // Hole-cover: LEFT from the leftmost cell exits to the
-                // category rail. Programmes inside the timeline use
-                // their own LEFT/RIGHT for navigation between blocks;
-                // only the channel column is the "leftmost edge"
-                // where LEFT must escape the panel.
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                        onExitLeft()
-                        true
-                    } else {
-                        false
-                    }
+        Modifier
+            .width(CHANNEL_COL_WIDTH)
+            .fillMaxHeight()
+            .background(bg)
+            .border(0.5.dp, border)
+            // Hole-cover: LEFT from the leftmost cell exits to the
+            // category rail. Programmes inside the timeline use
+            // their own LEFT/RIGHT for navigation between blocks;
+            // only the channel column is the "leftmost edge"
+            // where LEFT must escape the panel.
+            .onPreviewKeyEvent { ev ->
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                    onExitLeft()
+                    true
+                } else {
+                    false
                 }
-                .focusable(interactionSource = interaction)
-                .combinedClickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                    onLongClick = onLongPress,
-                ).padding(horizontal = 8.dp),
+            }
+            .focusable(interactionSource = interaction)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = onLongPress,
+            ).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(LocalYancoPalette.current.BackgroundDeep),
+            Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!channel.logoUrl.isNullOrBlank()) {
@@ -1187,11 +1176,7 @@ private fun ChannelCell(
 }
 
 @Composable
-private fun ProgrammeBlock(
-    programme: EpgProgramme,
-    widthDp: androidx.compose.ui.unit.Dp,
-    onActivate: () -> Unit,
-) {
+private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui.unit.Dp, onActivate: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundDeep
@@ -1199,21 +1184,21 @@ private fun ProgrammeBlock(
 
     Column(
         modifier =
-            Modifier
-                .width(widthDp)
-                .fillMaxHeight()
-                .padding(1.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(bg)
-                .border(0.5.dp, border, RoundedCornerShape(4.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onActivate,
-                )
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+        Modifier
+            .width(widthDp)
+            .fillMaxHeight()
+            .padding(1.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(bg)
+            .border(0.5.dp, border, RoundedCornerShape(4.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onActivate,
+            )
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
@@ -1234,10 +1219,7 @@ private fun ProgrammeBlock(
 }
 
 @Composable
-private fun GuideEmptyState(
-    text: String,
-    modifier: Modifier,
-) {
+private fun GuideEmptyState(text: String, modifier: Modifier) {
     Box(
         modifier = modifier.fillMaxSize().background(LocalYancoPalette.current.BackgroundDeep),
         contentAlignment = Alignment.Center,

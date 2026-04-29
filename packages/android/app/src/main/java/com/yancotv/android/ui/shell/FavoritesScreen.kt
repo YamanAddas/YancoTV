@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -134,9 +134,9 @@ fun FavoritesScreen(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep),
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep),
     ) {
         FavoriteListsTabBar(
             lists = lists,
@@ -243,9 +243,9 @@ private fun FavoritesListBody(
     LazyColumn(
         state = listState,
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Keep sections in a stable order (Live first — fastest to consume).
@@ -302,12 +302,7 @@ private fun FavoritesListBody(
     }
 }
 
-private fun removeFavorite(
-    row: ContentItem,
-    scope: kotlinx.coroutines.CoroutineScope,
-    favorites: FavoritesRepository,
-    listId: String,
-) {
+private fun removeFavorite(row: ContentItem, scope: kotlinx.coroutines.CoroutineScope, favorites: FavoritesRepository, listId: String) {
     // MK.13.4 — scope removal to the visible list only. Removing from
     // `default` should not orphan a copy that exists in another list.
     // SQLDelight is blocking and a main-thread write would jank focus.
@@ -321,20 +316,14 @@ private fun removeFavorite(
  * rename / delete sub-dialog.
  */
 @Composable
-private fun FavoriteListsTabBar(
-    lists: List<FavoriteList>,
-    selectedId: String,
-    onSelect: (String) -> Unit,
-    onCreate: () -> Unit,
-    onManage: (String) -> Unit,
-) {
+private fun FavoriteListsTabBar(lists: List<FavoriteList>, selectedId: String, onSelect: (String) -> Unit, onCreate: () -> Unit, onManage: (String) -> Unit) {
     if (lists.isEmpty()) return
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -356,12 +345,7 @@ private fun FavoriteListsTabBar(
 }
 
 @Composable
-private fun ListTabChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onLongPress: (() -> Unit)?,
-) {
+private fun ListTabChip(label: String, selected: Boolean, onClick: () -> Unit, onLongPress: (() -> Unit)?) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -374,23 +358,23 @@ private fun ListTabChip(
     val bg = if (selected) palette.AccentMuted.copy(alpha = 0.25f) else palette.BackgroundRaised
     Box(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .border(if (focused || selected) 2.dp else 1.dp, border, RoundedCornerShape(6.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
-                    // Tap a non-selected tab → switch to it. Tap an
-                    // already-selected non-default tab → open manage
-                    // (rename / delete). Default list never opens
-                    // manage; the SQL guard ignores delete on it anyway.
-                    if (selected && onLongPress != null) {
-                        onLongPress()
-                    } else {
-                        onClick()
-                    }
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(if (focused || selected) 2.dp else 1.dp, border, RoundedCornerShape(6.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+                // Tap a non-selected tab → switch to it. Tap an
+                // already-selected non-default tab → open manage
+                // (rename / delete). Default list never opens
+                // manage; the SQL guard ignores delete on it anyway.
+                if (selected && onLongPress != null) {
+                    onLongPress()
+                } else {
+                    onClick()
                 }
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+            }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -401,12 +385,7 @@ private fun ListTabChip(
 }
 
 @Composable
-private fun ListManageDialog(
-    list: FavoriteList,
-    onRename: (String) -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun ListManageDialog(list: FavoriteList, onRename: (String) -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
     var mode by remember { mutableStateOf("menu") } // "menu" | "rename" | "confirm-delete"
     when (mode) {
         "rename" ->
@@ -471,14 +450,7 @@ private fun ListManageDialog(
  * kept local here to avoid a cross-package dependency on a TV-focus dialog).
  */
 @Composable
-private fun TextEntryDialog(
-    title: String,
-    body: String,
-    initial: String,
-    confirmLabel: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun TextEntryDialog(title: String, body: String, initial: String, confirmLabel: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
     var text by rememberSaveable { mutableStateOf(initial) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
@@ -526,11 +498,7 @@ private fun SectionHeader(text: String) {
  * on focus); two explicit buttons is unambiguous.
  */
 @Composable
-private fun FavoriteRow(
-    item: ContentItem,
-    onActivate: () -> Unit,
-    onRemove: () -> Unit,
-) {
+private fun FavoriteRow(item: ContentItem, onActivate: () -> Unit, onRemove: () -> Unit) {
     val badges = remember(item.id) { QualityBadge.parse(item.title) }
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
@@ -539,24 +507,24 @@ private fun FavoriteRow(
         focused = false,
         bevelInset = 2.dp,
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(72.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(72.dp),
     ) {
         Row(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 28.dp, vertical = 8.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
                 modifier =
-                    Modifier
-                        .size(52.dp)
-                        .clip(YancoShapes.HexCapsule)
-                        .background(LocalYancoPalette.current.BackgroundDeep),
+                Modifier
+                    .size(52.dp)
+                    .clip(YancoShapes.HexCapsule)
+                    .background(LocalYancoPalette.current.BackgroundDeep),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!item.logoUrl.isNullOrBlank()) {
@@ -597,11 +565,7 @@ private fun FavoriteRow(
  * up on Fire TV.
  */
 @Composable
-private fun FavoriteActionButton(
-    label: String,
-    primary: Boolean,
-    onClick: () -> Unit,
-) {
+private fun FavoriteActionButton(label: String, primary: Boolean, onClick: () -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -626,13 +590,13 @@ private fun FavoriteActionButton(
         }
     Box(
         modifier =
-            Modifier
-                .clip(shape)
-                .background(bg)
-                .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier
+            .clip(shape)
+            .background(bg)
+            .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -658,12 +622,12 @@ private fun UnstarButton_unused_(onClick: () -> Unit) {
         text = "\u2606 Remove",
         color = LocalYancoPalette.current.Accent,
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(6.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }

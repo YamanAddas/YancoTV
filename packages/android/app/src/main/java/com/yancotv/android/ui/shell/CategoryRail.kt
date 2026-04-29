@@ -34,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
@@ -47,16 +46,17 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -151,47 +151,47 @@ fun CategoryRail(
 
     Column(
         modifier =
-            modifier
-                .fillMaxHeight()
-                .width(ShellDim.categoriesPanelWidth)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            LocalYancoPalette.current.BackgroundElevated.copy(alpha = 0.78f),
-                            LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.70f),
-                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.82f),
-                        ),
+        modifier
+            .fillMaxHeight()
+            .width(ShellDim.categoriesPanelWidth)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        LocalYancoPalette.current.BackgroundElevated.copy(alpha = 0.78f),
+                        LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.70f),
+                        LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.82f),
                     ),
-                ).border(
-                    width = 1.dp,
-                    color = LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(0.dp),
-                ).padding(top = Space.md)
-                // Track whether ANY descendant pill has focus. Drives both
-                // [BackHandler] (BACK on a pill pops to sidebar — without
-                // this, hasFocus stayed false forever and BACK fell through
-                // to the system handler, exiting the app) and the
-                // onPanelFocusChanged callback that lets HomeScreen mark
-                // panelFocus=Categories when focus enters by routes other
-                // than the explicit RIGHT-from-sidebar path.
-                .onFocusChanged { hasFocus = it.hasFocus }
-                // D-pad LEFT pops to the sidebar from anywhere in the rail.
-                // RIGHT is intentionally NOT handled here — it's owned by each
-                // HexPillRow so the pill's `group` is captured in the click
-                // closure and onSelect(group) commits atomically with
-                // onEnterContent(). Handling RIGHT at the Column level lost the
-                // pill identity, so onSelect relied on the LaunchedEffect-driven
-                // onFocused having already fired — which it hadn't, after a
-                // section switch (Live → Movies), so the previous section's
-                // selectedGroup leaked into the new section's content panel.
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                        onExitToSidebar()
-                        true
-                    } else {
-                        false
-                    }
-                }.focusGroup(),
+                ),
+            ).border(
+                width = 1.dp,
+                color = LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(0.dp),
+            ).padding(top = Space.md)
+            // Track whether ANY descendant pill has focus. Drives both
+            // [BackHandler] (BACK on a pill pops to sidebar — without
+            // this, hasFocus stayed false forever and BACK fell through
+            // to the system handler, exiting the app) and the
+            // onPanelFocusChanged callback that lets HomeScreen mark
+            // panelFocus=Categories when focus enters by routes other
+            // than the explicit RIGHT-from-sidebar path.
+            .onFocusChanged { hasFocus = it.hasFocus }
+            // D-pad LEFT pops to the sidebar from anywhere in the rail.
+            // RIGHT is intentionally NOT handled here — it's owned by each
+            // HexPillRow so the pill's `group` is captured in the click
+            // closure and onSelect(group) commits atomically with
+            // onEnterContent(). Handling RIGHT at the Column level lost the
+            // pill identity, so onSelect relied on the LaunchedEffect-driven
+            // onFocused having already fired — which it hadn't, after a
+            // section switch (Live → Movies), so the previous section's
+            // selectedGroup leaked into the new section's content panel.
+            .onPreviewKeyEvent { ev ->
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                    onExitToSidebar()
+                    true
+                } else {
+                    false
+                }
+            }.focusGroup(),
     ) {
         // Header label — gives the rail a "you are here" anchor; collapses
         // out of focus traversal because it isn't focusable.
@@ -205,12 +205,12 @@ fun CategoryRail(
             state = listState,
             modifier = Modifier.fillMaxHeight(),
             contentPadding =
-                PaddingValues(
-                    start = Space.md,
-                    end = Space.md,
-                    top = Space.xs,
-                    bottom = Space.section,
-                ),
+            PaddingValues(
+                start = Space.md,
+                end = Space.md,
+                top = Space.xs,
+                bottom = Space.section,
+            ),
             verticalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
             if (showFavorites) {
@@ -376,56 +376,56 @@ private fun HexPillRow(
         }
     val fg by animateColorAsState(
         targetValue =
-            when {
-                focused -> Color.Black
-                selected -> LocalYancoPalette.current.Accent
-                else -> LocalYancoPalette.current.TextSecondary
-            },
+        when {
+            focused -> Color.Black
+            selected -> LocalYancoPalette.current.Accent
+            else -> LocalYancoPalette.current.TextSecondary
+        },
         label = "rail-pill-fg",
     )
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .shadow(
-                    elevation = if (focused) 16.dp else 0.dp,
-                    shape = YancoShapes.HexPill,
-                    ambientColor = LocalYancoPalette.current.Accent,
-                    spotColor = LocalYancoPalette.current.Accent,
-                ).clip(YancoShapes.HexPill)
-                .background(bg)
-                .border(if (focused) 2.dp else 1.dp, border, YancoShapes.HexPill)
-                // PlacedFocusAnchor (per native-android-mk skill rule): waits for
-                // the pill's onPlaced callback before requestFocus(). Plain
-                // FocusRequester races a freshly-mounted rail and silently fails
-                // — exactly the bug the user hit when LEFT from the CTA opened
-                // the rail visually but left focus stuck on the CTA, so DOWN
-                // walked into the coverflow instead of the next pill.
-                .then(anchor?.let { Modifier.placedFocus(it) } ?: Modifier)
-                // RIGHT on a pill commits THIS pill's group + enters content.
-                // Owning RIGHT here (not on the rail's outer Column) ensures the
-                // pill identity is captured in scope — relying on the focused
-                // pill's onFocused → onSelect having already fired loses the
-                // race after a section switch (Live → Movies), where the rail
-                // re-mounts with the previous section's selectedGroup until the
-                // user navigates pills. Now RIGHT and CENTER share one path.
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
-                        onCommitAndEnter()
-                        true
-                    } else {
-                        false
-                    }
-                }.focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
-                .semantics(mergeDescendants = true) { contentDescription = "Category: $label" }
-                .padding(
-                    start = if (indented) Space.section else Space.lg,
-                    end = Space.lg,
-                    top = Space.xs,
-                    bottom = Space.xs,
-                ),
+        Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .shadow(
+                elevation = if (focused) 16.dp else 0.dp,
+                shape = YancoShapes.HexPill,
+                ambientColor = LocalYancoPalette.current.Accent,
+                spotColor = LocalYancoPalette.current.Accent,
+            ).clip(YancoShapes.HexPill)
+            .background(bg)
+            .border(if (focused) 2.dp else 1.dp, border, YancoShapes.HexPill)
+            // PlacedFocusAnchor (per native-android-mk skill rule): waits for
+            // the pill's onPlaced callback before requestFocus(). Plain
+            // FocusRequester races a freshly-mounted rail and silently fails
+            // — exactly the bug the user hit when LEFT from the CTA opened
+            // the rail visually but left focus stuck on the CTA, so DOWN
+            // walked into the coverflow instead of the next pill.
+            .then(anchor?.let { Modifier.placedFocus(it) } ?: Modifier)
+            // RIGHT on a pill commits THIS pill's group + enters content.
+            // Owning RIGHT here (not on the rail's outer Column) ensures the
+            // pill identity is captured in scope — relying on the focused
+            // pill's onFocused → onSelect having already fired loses the
+            // race after a section switch (Live → Movies), where the rail
+            // re-mounts with the previous section's selectedGroup until the
+            // user navigates pills. Now RIGHT and CENTER share one path.
+            .onPreviewKeyEvent { ev ->
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
+                    onCommitAndEnter()
+                    true
+                } else {
+                    false
+                }
+            }.focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = "Category: $label" }
+            .padding(
+                start = if (indented) Space.section else Space.lg,
+                end = Space.lg,
+                top = Space.xs,
+                bottom = Space.xs,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -439,10 +439,10 @@ private fun HexPillRow(
         } else if (selected) {
             Box(
                 modifier =
-                    Modifier
-                        .size(6.dp)
-                        .clip(RoundedCornerShape(Radius.pill))
-                        .background(if (focused) Color.Black else LocalYancoPalette.current.Accent),
+                Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(if (focused) Color.Black else LocalYancoPalette.current.Accent),
             )
         }
         Text(

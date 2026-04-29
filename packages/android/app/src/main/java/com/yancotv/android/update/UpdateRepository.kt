@@ -32,11 +32,7 @@ import kotlinx.coroutines.sync.withLock
  * user has already updated. Re-fetching on next tick costs ~1 KB of
  * network and keeps the prompt source-of-truth = the live endpoint.
  */
-class UpdateRepository(
-    private val checker: UpdateChecker,
-    private val prefs: AppPreferences,
-    private val now: () -> Long = { System.currentTimeMillis() },
-) {
+class UpdateRepository(private val checker: UpdateChecker, private val prefs: AppPreferences, private val now: () -> Long = { System.currentTimeMillis() }) {
     private val _info = MutableStateFlow<UpdateInfo?>(null)
     val info: StateFlow<UpdateInfo?> = _info.asStateFlow()
 
@@ -65,16 +61,15 @@ class UpdateRepository(
      * Returns the resolved [UpdateInfo] (or null) for callers that want
      * to act immediately rather than collecting from [info].
      */
-    suspend fun triggerCheck(): UpdateInfo? =
-        checkMutex.withLock {
-            if (!checker.isConfigured) {
-                return@withLock null
-            }
-            val result = checker.check()
-            _info.value = result
-            prefs.setLastUpdateCheckAt(now())
-            result
+    suspend fun triggerCheck(): UpdateInfo? = checkMutex.withLock {
+        if (!checker.isConfigured) {
+            return@withLock null
         }
+        val result = checker.check()
+        _info.value = result
+        prefs.setLastUpdateCheckAt(now())
+        result
+    }
 
     /**
      * Used by [com.yancotv.android.ui.settings.SettingsAboutTab]'s

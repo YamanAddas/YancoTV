@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,8 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.focus.dpadVerticalScroll
-import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -34,24 +33,19 @@ import com.yancotv.android.ui.theme.YancoType
  * the short justification of what the tab will host.
  */
 @Composable
-fun SettingsPlaceholder(
-    kicker: String,
-    title: String,
-    body: String,
-    modifier: Modifier = Modifier,
-) {
+fun SettingsPlaceholder(kicker: String, title: String, body: String, modifier: Modifier = Modifier) {
     val scroll = rememberScrollState()
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                // MB-116: focusable + D-pad scroll for placeholder tabs
-                // (Storage / Notifications / Recordings / EPG /
-                // Subtitles / Appearance) — read-only bodies still need
-                // to be scrollable on TV.
-                .dpadVerticalScroll(scroll)
-                .padding(horizontal = Space.xxl, vertical = Space.xl),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(scroll)
+            // MB-116: focusable + D-pad scroll for placeholder tabs
+            // (Storage / Notifications / Recordings / EPG /
+            // Subtitles / Appearance) — read-only bodies still need
+            // to be scrollable on TV.
+            .dpadVerticalScroll(scroll)
+            .padding(horizontal = Space.xxl, vertical = Space.xl),
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
         // MB-109 fallback focusable lives at SettingsScreen.ContentPane
@@ -73,25 +67,25 @@ fun SettingsPlaceholder(
         // pages/settings-tabs.jsx so the body reads as "this section starts here".
         Spacer(
             modifier =
-                Modifier
-                    .width(72.dp)
-                    .height(2.dp)
-                    .clip(YancoShapes.ChipBevel)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
-                        ),
+            Modifier
+                .width(72.dp)
+                .height(2.dp)
+                .clip(YancoShapes.ChipBevel)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(LocalYancoPalette.current.Accent, LocalYancoPalette.current.AccentDeep),
                     ),
+                ),
         )
         Spacer(modifier = Modifier.height(Space.sm))
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(YancoShapes.CutCornerCardSmall)
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .border(1.dp, LocalYancoPalette.current.BorderSubtle, YancoShapes.CutCornerCardSmall)
-                    .padding(horizontal = Space.xxl, vertical = Space.lg),
+            Modifier
+                .fillMaxWidth()
+                .clip(YancoShapes.CutCornerCardSmall)
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(1.dp, LocalYancoPalette.current.BorderSubtle, YancoShapes.CutCornerCardSmall)
+                .padding(horizontal = Space.xxl, vertical = Space.lg),
         ) {
             Text(
                 text = "Pending implementation",

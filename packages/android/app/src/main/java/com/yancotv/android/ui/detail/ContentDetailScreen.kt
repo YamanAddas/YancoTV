@@ -52,11 +52,11 @@ import com.yancotv.android.ui.components.focusStyle
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.favorites.FavoritesRepository
@@ -65,7 +65,6 @@ import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpisodeInfo
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -141,10 +140,10 @@ fun ContentDetailScreen(
     // anchor are no-ops — they never intercept episode-row activations.
     Box(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .focusGroup(),
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .focusGroup(),
     ) {
         Spacer(Modifier.size(0.dp).focusRequester(trapFocus).focusable())
         LazyColumn(
@@ -194,9 +193,9 @@ fun ContentDetailScreen(
                     item(key = "season_chips") {
                         Row(
                             modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Space.page, vertical = Space.xs),
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Space.page, vertical = Space.xs),
                             horizontalArrangement = Arrangement.spacedBy(Space.sm),
                         ) {
                             seasons.keys.forEach { season ->
@@ -214,9 +213,9 @@ fun ContentDetailScreen(
                     item(key = "no_episodes") {
                         Box(
                             modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Space.page, vertical = Space.md),
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Space.page, vertical = Space.md),
                         ) {
                             Text(
                                 text = "No episodes available.",
@@ -295,9 +294,9 @@ private fun HeroBlock(
         BackdropHero(url = backdropUrlOf(item, metadata))
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Space.page, vertical = Space.xxxl),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Space.page, vertical = Space.xxxl),
             verticalArrangement = Arrangement.spacedBy(Space.lg),
         ) {
             // Push the content block below the backdrop gradient so the
@@ -340,15 +339,15 @@ private fun HeroBlock(
                     }
                     ActionRow(
                         primaryLabel =
-                            when (item.type) {
-                                ContentType.SERIES ->
-                                    if (episodes.isNotEmpty()) {
-                                        "Play S${episodes.first().seasonNumber}E${episodes.first().episodeNumber}"
-                                    } else {
-                                        "Play"
-                                    }
-                                else -> "Play"
-                            },
+                        when (item.type) {
+                            ContentType.SERIES ->
+                                if (episodes.isNotEmpty()) {
+                                    "Play S${episodes.first().seasonNumber}E${episodes.first().episodeNumber}"
+                                } else {
+                                    "Play"
+                                }
+                            else -> "Play"
+                        },
                         isFavorite = isFavorite,
                         onPlay = onPlay,
                         onFavoriteToggle = onFavoriteToggle,
@@ -369,22 +368,18 @@ private fun HeroBlock(
     }
 }
 
-private fun backdropUrlOf(
-    item: ContentItem,
-    meta: ContentMetadata,
-): String? =
-    meta.backdropUrl?.takeIf { it.isNotBlank() }
-        ?: meta.tmdbBackdropUrl?.takeIf { it.isNotBlank() }
-        ?: item.logoUrl?.takeIf { it.isNotBlank() }
+private fun backdropUrlOf(item: ContentItem, meta: ContentMetadata): String? = meta.backdropUrl?.takeIf { it.isNotBlank() }
+    ?: meta.tmdbBackdropUrl?.takeIf { it.isNotBlank() }
+    ?: item.logoUrl?.takeIf { it.isNotBlank() }
 
 @Composable
 private fun BackdropHero(url: String?) {
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(ShellDim.heroHeight)
-                .background(LocalYancoPalette.current.BackgroundRaised),
+        Modifier
+            .fillMaxWidth()
+            .height(ShellDim.heroHeight)
+            .background(LocalYancoPalette.current.BackgroundRaised),
     ) {
         if (!url.isNullOrBlank()) {
             AsyncImage(
@@ -399,33 +394,33 @@ private fun BackdropHero(url: String?) {
         // into the page background for a seamless hand-off.
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors =
-                                listOf(
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f),
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.3f),
-                                    Color.Transparent,
-                                ),
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors =
+                        listOf(
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f),
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.3f),
+                            Color.Transparent,
                         ),
                     ),
+                ),
         )
         Box(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    Color.Transparent,
-                                    LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f),
-                                    LocalYancoPalette.current.BackgroundDeep,
-                                ),
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors =
+                        listOf(
+                            Color.Transparent,
+                            LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f),
+                            LocalYancoPalette.current.BackgroundDeep,
                         ),
                     ),
+                ),
         )
     }
 }
@@ -434,12 +429,12 @@ private fun BackdropHero(url: String?) {
 private fun Poster(url: String?) {
     Box(
         modifier =
-            Modifier
-                .width(ShellDim.detailPosterWidth)
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(Radius.panel))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, LocalYancoPalette.current.PanelBorder, RoundedCornerShape(Radius.panel)),
+        Modifier
+            .width(ShellDim.detailPosterWidth)
+            .aspectRatio(2f / 3f)
+            .clip(RoundedCornerShape(Radius.panel))
+            .background(LocalYancoPalette.current.BackgroundRaised)
+            .border(1.dp, LocalYancoPalette.current.PanelBorder, RoundedCornerShape(Radius.panel)),
         contentAlignment = Alignment.Center,
     ) {
         if (!url.isNullOrBlank()) {
@@ -460,11 +455,7 @@ private fun Poster(url: String?) {
 }
 
 @Composable
-private fun MetaLine(
-    meta: ContentMetadata,
-    type: ContentType,
-    episodeCount: Int,
-) {
+private fun MetaLine(meta: ContentMetadata, type: ContentType, episodeCount: Int) {
     val bits =
         buildList {
             meta.releaseDate?.takeIf { it.isNotBlank() }?.let { add(it.take(4)) }
@@ -482,10 +473,10 @@ private fun MetaLine(
             if (i > 0) {
                 Box(
                     modifier =
-                        Modifier
-                            .size(3.dp)
-                            .clip(RoundedCornerShape(Radius.pill))
-                            .background(LocalYancoPalette.current.TextFaint),
+                    Modifier
+                        .size(3.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(LocalYancoPalette.current.TextFaint),
                 )
             }
             Text(
@@ -498,10 +489,7 @@ private fun MetaLine(
 }
 
 @Composable
-private fun CreditRow(
-    label: String,
-    value: String,
-) {
+private fun CreditRow(label: String, value: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
         Text(
             text = label.uppercase(),
@@ -551,23 +539,19 @@ private fun ActionRow(
 }
 
 @Composable
-private fun PrimaryButton(
-    label: String,
-    onClick: () -> Unit,
-    playAnchor: PlacedFocusAnchor,
-) {
+private fun PrimaryButton(label: String, onClick: () -> Unit, playAnchor: PlacedFocusAnchor) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.AccentGlow else LocalYancoPalette.current.Accent
     Row(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radius.control))
-                .background(bg)
-                .placedFocus(playAnchor)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = Space.xxl, vertical = Space.md),
+        Modifier
+            .clip(RoundedCornerShape(Radius.control))
+            .background(bg)
+            .placedFocus(playAnchor)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.xxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -586,12 +570,7 @@ private fun PrimaryButton(
 }
 
 @Composable
-private fun SecondaryButton(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector?,
-    onClick: () -> Unit,
-    accent: Boolean,
-) {
+private fun SecondaryButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, onClick: () -> Unit, accent: Boolean) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg =
@@ -614,13 +593,13 @@ private fun SecondaryButton(
         }
     Row(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radius.control))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(Radius.control))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = Space.lg, vertical = Space.md),
+        Modifier
+            .clip(RoundedCornerShape(Radius.control))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(Radius.control))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -641,15 +620,12 @@ private fun SecondaryButton(
 }
 
 @Composable
-private fun EpisodesSectionHeader(
-    loading: Boolean,
-    episodeCount: Int,
-) {
+private fun EpisodesSectionHeader(loading: Boolean, episodeCount: Int) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Space.page, vertical = Space.md),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.page, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -675,12 +651,7 @@ private fun EpisodesSectionHeader(
 }
 
 @Composable
-private fun SeasonChip(
-    label: String,
-    selected: Boolean,
-    count: Int,
-    onClick: () -> Unit,
-) {
+private fun SeasonChip(label: String, selected: Boolean, count: Int, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg =
@@ -697,13 +668,13 @@ private fun SeasonChip(
         }
     Row(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(Radius.pill))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = Space.lg, vertical = Space.sm),
+        Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(Radius.pill))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.lg, vertical = Space.sm),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -714,10 +685,10 @@ private fun SeasonChip(
         )
         Box(
             modifier =
-                Modifier
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.5f))
-                    .padding(horizontal = Space.sm, vertical = 2.dp),
+            Modifier
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.5f))
+                .padding(horizontal = Space.sm, vertical = 2.dp),
         ) {
             Text(
                 text = count.toString(),
@@ -729,35 +700,32 @@ private fun SeasonChip(
 }
 
 @Composable
-private fun EpisodeRow(
-    ep: EpisodeInfo,
-    onClick: () -> Unit,
-) {
+private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .focusStyle(focused = focused, radius = Radius.card, liftScale = 1.015f)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = Space.lg, vertical = Space.md),
+        Modifier
+            .fillMaxWidth()
+            .focusStyle(focused = focused, radius = Radius.card, liftScale = 1.015f)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(Radius.chip))
-                    .background(
-                        if (focused) {
-                            LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
-                        } else {
-                            LocalYancoPalette.current.BackgroundElevated
-                        },
-                    ),
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(Radius.chip))
+                .background(
+                    if (focused) {
+                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+                    } else {
+                        LocalYancoPalette.current.BackgroundElevated
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Text(

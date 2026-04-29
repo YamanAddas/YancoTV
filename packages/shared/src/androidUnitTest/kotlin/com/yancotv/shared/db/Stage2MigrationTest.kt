@@ -187,9 +187,8 @@ class Stage2MigrationTest {
          * Stage 2 doesn't touch (epg_programmes children, episodes,
          * downloads, etc.) aren't included unless they're FK targets.
          */
-        fun v3Schema(): List<String> =
-            listOf(
-                """
+        fun v3Schema(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -210,8 +209,8 @@ class Stage2MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE content (
                     id TEXT PRIMARY KEY NOT NULL,
                     source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -228,8 +227,8 @@ class Stage2MigrationTest {
                     name_override TEXT,
                     logo_override TEXT
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE epg_programmes (
                     id TEXT PRIMARY KEY NOT NULL,
                     source_id TEXT REFERENCES sources(id) ON DELETE CASCADE,
@@ -241,8 +240,8 @@ class Stage2MigrationTest {
                     category TEXT,
                     icon_url TEXT
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE recordings (
                     id TEXT PRIMARY KEY NOT NULL,
                     content_id TEXT,
@@ -256,19 +255,18 @@ class Stage2MigrationTest {
                     file_size_bytes INTEGER,
                     error TEXT
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE favorites (
                     id TEXT PRIMARY KEY NOT NULL,
                     content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
                     added_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
-        fun v3SeedRows(): List<String> =
-            listOf(
-                """
+        fun v3SeedRows(): List<String> = listOf(
+            """
                 INSERT INTO sources (
                     id, name, type, url, file_path,
                     username_encrypted, password_encrypted, mac_address_encrypted,
@@ -282,8 +280,8 @@ class Stage2MigrationTest {
                     1, 0, 1, 0,
                     1700000000000, 1700000000000
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 INSERT INTO content (
                     id, source_id, type, title, clean_title, group_name,
                     stream_url, logo_url, tvg_id, metadata_json,
@@ -293,12 +291,12 @@ class Stage2MigrationTest {
                     'https://example.com/stream.ts', NULL, 'test.tvg', NULL,
                     0, 1700000000000, NULL, NULL
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 INSERT INTO favorites (id, content_id, added_at)
                 VALUES ('fav-v3', 'ch-1', 1700000000000);
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 INSERT INTO recordings (
                     id, content_id, title, stream_url, file_path, status,
                     started_at, ended_at, duration_seconds, file_size_bytes, error
@@ -309,7 +307,7 @@ class Stage2MigrationTest {
                     'completed',
                     1700000000000, 1700003600000, 3600, 524288000, NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
     }
 }

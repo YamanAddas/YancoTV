@@ -7,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -53,10 +52,7 @@ import com.yancotv.shared.recording.RecordingsRepository
  * notification (and the future RecordingsScreen) carries that info.
  */
 @Composable
-fun RecordingIndicator(
-    controller: PlaybackController,
-    recordings: RecordingsRepository,
-) {
+fun RecordingIndicator(controller: PlaybackController, recordings: RecordingsRepository) {
     val currentItem by controller.currentItem.collectAsState()
     val rows by remember { recordings.allFlow() }.collectAsState(initial = emptyList())
 
@@ -74,29 +70,29 @@ fun RecordingIndicator(
         initialValue = 0.45f,
         targetValue = 1f,
         animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 700, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
+        infiniteRepeatable(
+            animation = tween(durationMillis = 700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
         label = "recording-pulse-alpha",
     )
 
     Row(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(percent = 50))
-                .background(Color(0xCC000000))
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .semantics { contentDescription = "Recording in progress" },
+        Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color(0xCC000000))
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .semantics { contentDescription = "Recording in progress" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(
             modifier =
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE53935))
-                    .alpha(pulse),
+            Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFE53935))
+                .alpha(pulse),
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -108,4 +104,3 @@ fun RecordingIndicator(
         )
     }
 }
-

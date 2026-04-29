@@ -38,10 +38,7 @@ import org.koin.compose.koinInject
  * overlays lands with MK.16.2 when runtime theme switching ships.
  */
 @Composable
-fun YancoTheme(
-    isTv: Boolean,
-    content: @Composable () -> Unit,
-) {
+fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
     val themeController: ThemeController = koinInject()
     val themeId by themeController.themeId.collectAsState()
     val accentId by themeController.accentId.collectAsState()
@@ -88,36 +85,34 @@ fun YancoTheme(
  * pick up our palette automatically; untouched slots fall back to the
  * Material dark defaults and that's fine.
  */
-private fun phoneColorScheme(p: YancoPalette) =
-    darkColorScheme(
-        primary = p.Accent,
-        onPrimary = Color.Black,
-        secondary = p.AccentDeep,
-        background = p.BackgroundDeep,
-        surface = p.BackgroundRaised,
-        surfaceVariant = p.BackgroundHover,
-        onBackground = p.TextPrimary,
-        onSurface = p.TextPrimary,
-        onSurfaceVariant = p.TextSecondary,
-        outline = p.BorderSubtle,
-        error = p.Error,
-    )
+private fun phoneColorScheme(p: YancoPalette) = darkColorScheme(
+    primary = p.Accent,
+    onPrimary = Color.Black,
+    secondary = p.AccentDeep,
+    background = p.BackgroundDeep,
+    surface = p.BackgroundRaised,
+    surfaceVariant = p.BackgroundHover,
+    onBackground = p.TextPrimary,
+    onSurface = p.TextPrimary,
+    onSurfaceVariant = p.TextSecondary,
+    outline = p.BorderSubtle,
+    error = p.Error,
+)
 
 /**
  * androidx.tv.material3 `colorScheme` — same mapping as [phoneColorScheme]
  * but with the TV-specific `border` slot instead of Material3's `outline`.
  */
-private fun tvColorScheme(p: YancoPalette) =
-    androidx.tv.material3.darkColorScheme(
-        primary = p.Accent,
-        onPrimary = Color.Black,
-        secondary = p.AccentDeep,
-        background = p.BackgroundDeep,
-        surface = p.BackgroundRaised,
-        surfaceVariant = p.BackgroundHover,
-        onBackground = p.TextPrimary,
-        onSurface = p.TextPrimary,
-        onSurfaceVariant = p.TextSecondary,
-        border = p.BorderSubtle,
-        error = p.Error,
-    )
+private fun tvColorScheme(p: YancoPalette) = androidx.tv.material3.darkColorScheme(
+    primary = p.Accent,
+    onPrimary = Color.Black,
+    secondary = p.AccentDeep,
+    background = p.BackgroundDeep,
+    surface = p.BackgroundRaised,
+    surfaceVariant = p.BackgroundHover,
+    onBackground = p.TextPrimary,
+    onSurface = p.TextPrimary,
+    onSurfaceVariant = p.TextSecondary,
+    border = p.BorderSubtle,
+    error = p.Error,
+)

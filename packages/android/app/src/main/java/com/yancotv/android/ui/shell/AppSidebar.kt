@@ -1,12 +1,10 @@
 package com.yancotv.android.ui.shell
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -25,7 +23,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,11 +55,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.R
 import com.yancotv.android.ui.nav.AppSection
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoType
 
 /**
@@ -131,45 +131,45 @@ fun AppSidebar(
         remember(pal) {
             Brush.verticalGradient(
                 colors =
-                    listOf(
-                        pal.BackgroundElevated.copy(alpha = 0.86f),
-                        pal.BackgroundRaised.copy(alpha = 0.78f),
-                        pal.BackgroundDeep.copy(alpha = 0.88f),
-                    ),
+                listOf(
+                    pal.BackgroundElevated.copy(alpha = 0.86f),
+                    pal.BackgroundRaised.copy(alpha = 0.78f),
+                    pal.BackgroundDeep.copy(alpha = 0.88f),
+                ),
             )
         }
     Column(
         modifier =
-            modifier
-                .fillMaxHeight()
-                .width(width)
-                .background(brush)
-                .border(1.dp, LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
-                .padding(horizontal = Space.md, vertical = Space.md)
-                // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
-                // routes this into the categories rail; for non-browse sections
-                // it lands inside the section's content. The rail is vertical
-                // so RIGHT has no in-rail meaning.
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
-                        onMoveRight()
-                        true
-                    } else {
-                        false
-                    }
+        modifier
+            .fillMaxHeight()
+            .width(width)
+            .background(brush)
+            .border(1.dp, LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
+            .padding(horizontal = Space.md, vertical = Space.md)
+            // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
+            // routes this into the categories rail; for non-browse sections
+            // it lands inside the section's content. The rail is vertical
+            // so RIGHT has no in-rail meaning.
+            .onPreviewKeyEvent { ev ->
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
+                    onMoveRight()
+                    true
+                } else {
+                    false
                 }
-                // MB-113: focusRestorer() removed. It races with the
-                // explicit `activeRowFocus` binding (MB-106): on BACK / LEFT
-                // from a section, the restorer fires first to land focus on
-                // the *last-focused* descendant, then activeRowFocus fires
-                // to target the *current-section* row. Usually they agree,
-                // but during the COLLAPSED→EXPANDED width animation the
-                // layout is in flux and the two requests can land out of
-                // order — leaving the row focused but the interactionSource
-                // lagging until the user nudges the D-pad ("detector won't
-                // show until OK"). With explicit activeRowFocus we always
-                // know which row to focus; the restorer is dead weight.
-                .focusGroup(),
+            }
+            // MB-113: focusRestorer() removed. It races with the
+            // explicit `activeRowFocus` binding (MB-106): on BACK / LEFT
+            // from a section, the restorer fires first to land focus on
+            // the *last-focused* descendant, then activeRowFocus fires
+            // to target the *current-section* row. Usually they agree,
+            // but during the COLLAPSED→EXPANDED width animation the
+            // layout is in flux and the two requests can land out of
+            // order — leaving the row focused but the interactionSource
+            // lagging until the user nudges the D-pad ("detector won't
+            // show until OK"). With explicit activeRowFocus we always
+            // know which row to focus; the restorer is dead weight.
+            .focusGroup(),
     ) {
         BrandMark(showWordmark = expanded)
         Spacer(Modifier.height(Space.md))
@@ -182,9 +182,9 @@ fun AppSidebar(
         Column(
             verticalArrangement = Arrangement.spacedBy(Space.xxs),
             modifier =
-                Modifier
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
         ) {
             AppSection.entries.forEach { section ->
                 // MB-106: pass activeRowFocus *only* to the row matching
@@ -237,24 +237,20 @@ internal fun accentInsetFraction(springProgress: Float): Float = (1f - springPro
  * Pulled out of the composable so the binding contract is unit-testable
  * without spinning up the Compose runtime.
  */
-internal fun bindActiveRowFocus(
-    section: AppSection,
-    current: AppSection,
-    activeRowFocus: FocusRequester?,
-): FocusRequester? = if (section == current) activeRowFocus else null
+internal fun bindActiveRowFocus(section: AppSection, current: AppSection, activeRowFocus: FocusRequester?): FocusRequester? =
+    if (section == current) activeRowFocus else null
 
-private fun iconFor(section: AppSection): ImageVector =
-    when (section) {
-        AppSection.Home -> YancoIcons.Home
-        AppSection.LiveTv -> YancoIcons.Live
-        AppSection.Guide -> YancoIcons.Guide
-        AppSection.Movies -> YancoIcons.Movies
-        AppSection.Series -> YancoIcons.Series
-        AppSection.Favorites -> YancoIcons.Favorites
-        AppSection.Recordings -> YancoIcons.Recordings
-        AppSection.Search -> YancoIcons.Search
-        AppSection.Settings -> YancoIcons.Settings
-    }
+private fun iconFor(section: AppSection): ImageVector = when (section) {
+    AppSection.Home -> YancoIcons.Home
+    AppSection.LiveTv -> YancoIcons.Live
+    AppSection.Guide -> YancoIcons.Guide
+    AppSection.Movies -> YancoIcons.Movies
+    AppSection.Series -> YancoIcons.Series
+    AppSection.Favorites -> YancoIcons.Favorites
+    AppSection.Recordings -> YancoIcons.Recordings
+    AppSection.Search -> YancoIcons.Search
+    AppSection.Settings -> YancoIcons.Settings
+}
 
 @Composable
 private fun BrandMark(showWordmark: Boolean) {
@@ -271,11 +267,11 @@ private fun BrandMark(showWordmark: Boolean) {
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(if (showWordmark) 96.dp else 56.dp)
-                .padding(horizontal = Space.xs, vertical = Space.xs)
-                .semantics { contentDescription = "YancoTV" },
+        Modifier
+            .fillMaxWidth()
+            .height(if (showWordmark) 96.dp else 56.dp)
+            .padding(horizontal = Space.xs, vertical = Space.xs)
+            .semantics { contentDescription = "YancoTV" },
     )
 }
 
@@ -320,11 +316,11 @@ private fun SidebarRow(
             focused || selected ->
                 Brush.horizontalGradient(
                     colors =
-                        listOf(
-                            palette.Accent.copy(alpha = 0.28f),
-                            palette.Accent.copy(alpha = 0.10f),
-                            Color.Transparent,
-                        ),
+                    listOf(
+                        palette.Accent.copy(alpha = 0.28f),
+                        palette.Accent.copy(alpha = 0.10f),
+                        Color.Transparent,
+                    ),
                 )
             else ->
                 Brush.horizontalGradient(
@@ -361,34 +357,34 @@ private fun SidebarRow(
 
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(52.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(52.dp),
     ) {
         // Accent rail on the left edge marks the selected section even
         // when focus is elsewhere. Glow shadow makes the bar read as a
         // lit edge, not a flat stripe (Concept A's "you are here" cue).
         Box(
             modifier =
-                Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .padding(vertical = Space.sm * accentInsetFraction)
-                    .shadow(
-                        elevation = if (selected || focused) 12.dp else 0.dp,
-                        shape = RoundedCornerShape(Radius.pill),
-                        ambientColor = palette.Accent,
-                        spotColor = palette.Accent,
-                    ).clip(RoundedCornerShape(Radius.pill))
-                    .background(
-                        if (selected || focused) {
-                            Brush.verticalGradient(
-                                listOf(palette.AccentSoft, palette.Accent, palette.AccentDeep),
-                            )
-                        } else {
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
-                        },
-                    ),
+            Modifier
+                .width(4.dp)
+                .fillMaxHeight()
+                .padding(vertical = Space.sm * accentInsetFraction)
+                .shadow(
+                    elevation = if (selected || focused) 12.dp else 0.dp,
+                    shape = RoundedCornerShape(Radius.pill),
+                    ambientColor = palette.Accent,
+                    spotColor = palette.Accent,
+                ).clip(RoundedCornerShape(Radius.pill))
+                .background(
+                    if (selected || focused) {
+                        Brush.verticalGradient(
+                            listOf(palette.AccentSoft, palette.Accent, palette.AccentDeep),
+                        )
+                    } else {
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                    },
+                ),
         )
         // MB-113: shape stable across the sidebar's two width states.
         // CutCornerCardSmall uses an ABSOLUTE 16dp cut, which is 23 % of
@@ -404,28 +400,28 @@ private fun SidebarRow(
         val rowShape = remember { RoundedCornerShape(10.dp) }
         Row(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(start = Space.sm)
-                    .clip(rowShape)
-                    .background(rowBrush)
-                    .border(borderWidth, border, rowShape)
-                    .let { base ->
-                        // Requester binds to the SAME node that's focusable,
-                        // not a wrapper. requestFocus then lands on this
-                        // node directly → interactionSource flips → focused
-                        // gradient + ring render immediately (MB-106 v2).
-                        if (focusRequester != null) base.focusRequester(focusRequester) else base
-                    }
-                    .focusable(interactionSource = interaction)
-                    .clickable(
-                        interactionSource = interaction,
-                        indication = null,
-                        role = Role.Tab,
-                        onClick = onClick,
-                    )
-                    .semantics { contentDescription = section.label }
-                    .padding(horizontal = Space.md, vertical = Space.sm),
+            Modifier
+                .fillMaxSize()
+                .padding(start = Space.sm)
+                .clip(rowShape)
+                .background(rowBrush)
+                .border(borderWidth, border, rowShape)
+                .let { base ->
+                    // Requester binds to the SAME node that's focusable,
+                    // not a wrapper. requestFocus then lands on this
+                    // node directly → interactionSource flips → focused
+                    // gradient + ring render immediately (MB-106 v2).
+                    if (focusRequester != null) base.focusRequester(focusRequester) else base
+                }
+                .focusable(interactionSource = interaction)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Tab,
+                    onClick = onClick,
+                )
+                .semantics { contentDescription = section.label }
+                .padding(horizontal = Space.md, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.md),
         ) {

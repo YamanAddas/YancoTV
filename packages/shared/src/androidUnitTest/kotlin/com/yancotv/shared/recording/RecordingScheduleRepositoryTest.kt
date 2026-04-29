@@ -2,14 +2,14 @@ package com.yancotv.shared.recording
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.yancotv.shared.db.YancoDb
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 
 /**
  * Tests for [RecordingScheduleRepository] — covers the seven-state
@@ -36,10 +36,8 @@ class RecordingScheduleRepositoryTest {
         return YancoDb(driver)
     }
 
-    private fun makeRepo(
-        db: YancoDb = makeDb(),
-        clock: () -> Long = { 1_700_000_000_000L },
-    ): RecordingScheduleRepository = RecordingScheduleRepository(db, clock)
+    private fun makeRepo(db: YancoDb = makeDb(), clock: () -> Long = { 1_700_000_000_000L }): RecordingScheduleRepository =
+        RecordingScheduleRepository(db, clock)
 
     // ── insert + getById + getAll ─────────────────────────────────
 

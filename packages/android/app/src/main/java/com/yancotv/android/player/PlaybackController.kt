@@ -8,24 +8,24 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
-import com.yancotv.android.BuildConfig
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.yancotv.android.BuildConfig
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.recording.RecordingDataSink
 import com.yancotv.android.recording.TeeingDataSourceFactory
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.playback.Playable
-import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.playback.toPlayable
+import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,7 +41,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
 
 /**
  * Sleep-timer presets (MK.12b.1). Fixed durations are stored in
@@ -57,10 +56,7 @@ import java.util.concurrent.TimeUnit
  * (Xtream typical) or a Referer with the global UA (Akamai-style hosts
  * that gate on Referer only).
  */
-internal data class SourceNetworkOverride(
-    val userAgent: String?,
-    val referer: String?,
-)
+internal data class SourceNetworkOverride(val userAgent: String?, val referer: String?)
 
 enum class SleepTimerOption(val durationMs: Long?) {
     MIN_15(15L * 60_000L),
@@ -117,21 +113,14 @@ internal sealed interface PlayLaunchDecision {
     data object NewTarget : PlayLaunchDecision
 }
 
-internal fun playLaunchDecision(
-    list: List<ContentItem>,
-    startIndex: Int,
-    currentId: String?,
-): PlayLaunchDecision {
+internal fun playLaunchDecision(list: List<ContentItem>, startIndex: Int, currentId: String?): PlayLaunchDecision {
     if (startIndex !in list.indices) return PlayLaunchDecision.Reject
     val target = list[startIndex]
     if (target.toPlayable() == null) return PlayLaunchDecision.Reject
     return if (currentId == target.id) PlayLaunchDecision.SameTarget else PlayLaunchDecision.NewTarget
 }
 
-internal fun episodeLaunchDecision(
-    episode: Playable.Episode,
-    currentId: String?,
-): PlayLaunchDecision {
+internal fun episodeLaunchDecision(episode: Playable.Episode, currentId: String?): PlayLaunchDecision {
     if (episode.streamUrl.isBlank()) return PlayLaunchDecision.Reject
     return if (currentId == episode.id) PlayLaunchDecision.SameTarget else PlayLaunchDecision.NewTarget
 }
@@ -185,6 +174,7 @@ class PlaybackController(
      */
     @Volatile
     private var currentSourceNet: SourceNetworkOverride? = null
+
     /**
      * The shared ExoPlayer. Mutable to support MK.9.4's FFmpeg crash
      * watchdog: on a confirmed FFmpeg-renderer crash the controller
@@ -327,7 +317,8 @@ class PlaybackController(
                     profile.rebufferMs,
                 ).setBackBuffer(
                     profile.backBufferMs,
-                    /* retainBackBufferFromKeyframe = */ true,
+                    /* retainBackBufferFromKeyframe = */
+                    true,
                 ).build()
         // MK.9 — vendor the FFmpeg AUDIO extension to fix MB-14
         // (Fire TV ships without licensed AC3/EAC3/DTS/TrueHD decoders, so
@@ -506,10 +497,7 @@ class PlaybackController(
      *     point so VOD mid-seeks aren't lost when the user zaps between titles
      *     without hitting a lifecycle hook.
      */
-    fun play(
-        list: List<ContentItem>,
-        startIndex: Int,
-    ) {
+    fun play(list: List<ContentItem>, startIndex: Int) {
         when (playLaunchDecision(list, startIndex, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
             PlayLaunchDecision.SameTarget -> {
@@ -574,21 +562,20 @@ class PlaybackController(
      * VOD file, resume-point logic behaves correctly, and
      * `type == ContentType.LIVE` checks around the app correctly read false.
      */
-    private fun Playable.Episode.toContentItemView(): ContentItem =
-        ContentItem(
-            id = id,
-            sourceId = sourceId,
-            type = ContentType.MOVIE,
-            title = title,
-            cleanTitle = title,
-            groupName = null,
-            streamUrl = streamUrl,
-            logoUrl = artworkUrl,
-            tvgId = null,
-            metadataJson = null,
-            sortOrder = 0,
-            createdAt = 0L,
-        )
+    private fun Playable.Episode.toContentItemView(): ContentItem = ContentItem(
+        id = id,
+        sourceId = sourceId,
+        type = ContentType.MOVIE,
+        title = title,
+        cleanTitle = title,
+        groupName = null,
+        streamUrl = streamUrl,
+        logoUrl = artworkUrl,
+        tvgId = null,
+        metadataJson = null,
+        sortOrder = 0,
+        createdAt = 0L,
+    )
 
     fun next(): Boolean = step(+1)
 
@@ -633,10 +620,7 @@ class PlaybackController(
      * resume point intact lets the user hit play again without re-loading
      * the title). Sleep state resets to [SleepTimerState.Off].
      */
-    fun setSleepTimer(
-        option: SleepTimerOption,
-        endOfProgramMs: Long? = null,
-    ) {
+    fun setSleepTimer(option: SleepTimerOption, endOfProgramMs: Long? = null) {
         val durationMs = option.durationMs ?: endOfProgramMs ?: return
         if (durationMs <= 0L) return
         sleepJob?.cancel()
@@ -710,10 +694,7 @@ class PlaybackController(
      * swapping, and seek back to [Player.getCurrentPosition] after so the
      * user sees the same frame they were on.
      */
-    fun applyExternalSubtitle(
-        uri: Uri,
-        mime: String?,
-    ) {
+    fun applyExternalSubtitle(uri: Uri, mime: String?) {
         val item = _currentItem.value ?: return
         if (item.type == ContentType.LIVE) return
         val pos = player.currentPosition.coerceAtLeast(0L)
@@ -896,6 +877,7 @@ class PlaybackController(
          *  so we can identify local-file recordings inside the controller
          *  and skip resume-point persistence (they have no `content` row). */
         const val LOCAL_RECORDING_ID_PREFIX = "_rec_"
+
         // Fallbacks for when AppPreferences returns 0/blank — kept here so
         // the controller has a safe floor independent of the prefs defaults.
         private const val DEFAULT_CONNECT_TIMEOUT_SEC = 15
@@ -975,12 +957,7 @@ private const val FFMPEG_PACKAGE_PREFIX = "androidx.media3.decoder.ffmpeg."
  * `app/src/test/.../ResumePointDecisionTest.kt` can exercise the full
  * matrix without instantiating the controller.
  */
-internal fun resumePointDecision(
-    item: ContentItem?,
-    episode: Playable.Episode?,
-    positionSeconds: Long,
-    durationSeconds: Long?,
-): ResumePointWrite? {
+internal fun resumePointDecision(item: ContentItem?, episode: Playable.Episode?, positionSeconds: Long, durationSeconds: Long?): ResumePointWrite? {
     if (item == null) return null
     if (item.type == ContentType.LIVE) return null
     if (item.id.startsWith(PlaybackController.LOCAL_RECORDING_ID_PREFIX)) return null
@@ -1002,9 +979,4 @@ internal fun resumePointDecision(
     }
 }
 
-internal data class ResumePointWrite(
-    val contentId: String,
-    val episodeId: String?,
-    val positionSeconds: Long,
-    val durationSeconds: Long?,
-)
+internal data class ResumePointWrite(val contentId: String, val episodeId: String?, val positionSeconds: Long, val durationSeconds: Long?)

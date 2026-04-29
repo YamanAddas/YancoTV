@@ -1,11 +1,13 @@
 package com.yancotv.android.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,11 +17,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.material3.Text
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.UserAgentPreset
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -52,10 +51,10 @@ fun SettingsNetworkTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "User-Agent",
@@ -140,11 +139,7 @@ fun SettingsNetworkTab(
 }
 
 @Composable
-private fun TestConnectionRow(
-    scope: kotlinx.coroutines.CoroutineScope,
-    sources: SourceRepository,
-    http: HttpClient,
-) {
+private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources: SourceRepository, http: HttpClient) {
     var status by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
     val palette = LocalYancoPalette.current
@@ -170,48 +165,44 @@ private fun TestConnectionRow(
             }
         },
         content =
-            status?.let { result ->
-                {
-                    val statusColor =
-                        when {
-                            result.startsWith("OK") -> palette.Accent
-                            result.startsWith("Failed") -> palette.Error
-                            else -> palette.TextSecondary
-                        }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettingsKicker(text = "STATUS")
-                        Text(
-                            text = result,
-                            color = statusColor,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+        status?.let { result ->
+            {
+                val statusColor =
+                    when {
+                        result.startsWith("OK") -> palette.Accent
+                        result.startsWith("Failed") -> palette.Error
+                        else -> palette.TextSecondary
                     }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingsKicker(text = "STATUS")
+                    Text(
+                        text = result,
+                        color = statusColor,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
-            },
+            }
+        },
     )
 }
 
-private suspend fun probeFirstActiveSource(
-    sources: SourceRepository,
-    http: HttpClient,
-): String =
-    withContext(Dispatchers.IO) {
-        runCatching {
-            val target =
-                sources
-                    .getAll()
-                    .firstOrNull { it.isActive && !it.url.isNullOrBlank() }
-                    ?: return@runCatching "No active source with a URL configured."
-            val url = target.url!!
-            val started = System.currentTimeMillis()
-            http.getBytes(
-                url = url,
-                options = HttpRequestOptions(timeoutMs = 10_000L, maxResponseBytes = 1_024L),
-            )
-            val elapsed = System.currentTimeMillis() - started
-            "OK · ${target.name} · ${elapsed} ms"
-        }.getOrElse { t ->
-            "Failed · ${t.message ?: t::class.simpleName}"
-        }
+private suspend fun probeFirstActiveSource(sources: SourceRepository, http: HttpClient): String = withContext(Dispatchers.IO) {
+    runCatching {
+        val target =
+            sources
+                .getAll()
+                .firstOrNull { it.isActive && !it.url.isNullOrBlank() }
+                ?: return@runCatching "No active source with a URL configured."
+        val url = target.url!!
+        val started = System.currentTimeMillis()
+        http.getBytes(
+            url = url,
+            options = HttpRequestOptions(timeoutMs = 10_000L, maxResponseBytes = 1_024L),
+        )
+        val elapsed = System.currentTimeMillis() - started
+        "OK · ${target.name} · $elapsed ms"
+    }.getOrElse { t ->
+        "Failed · ${t.message ?: t::class.simpleName}"
     }
+}

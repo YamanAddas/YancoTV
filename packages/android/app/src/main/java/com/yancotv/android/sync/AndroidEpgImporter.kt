@@ -9,6 +9,12 @@ import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.parsers.XmltvProgramme
 import com.yancotv.shared.parsers.parseXmltvTimestamp
 import com.yancotv.shared.types.EpgRefreshResult
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.InputStream
+import java.util.UUID
+import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -16,12 +22,6 @@ import okhttp3.Request
 import okio.buffer
 import okio.sink
 import org.xmlpull.v1.XmlPullParser
-import java.io.BufferedInputStream
-import java.io.File
-import java.io.InputStream
-import java.util.UUID
-import java.util.concurrent.TimeUnit
-import java.util.zip.GZIPInputStream
 
 /**
  * Android-native EPG refresh pipeline. **Streams end to end** so peak memory
@@ -168,10 +168,7 @@ class AndroidEpgImporter(
 
     // ───── download ─────
 
-    private fun downloadToFile(
-        url: String,
-        dest: File,
-    ): Long {
+    private fun downloadToFile(url: String, dest: File): Long {
         val client =
             http.newCall(
                 Request
@@ -353,10 +350,7 @@ class AndroidEpgImporter(
     }
 
     /** Advance past the matching END_TAG for a [tagName] the caller just entered. */
-    private fun skipToEnd(
-        parser: XmlPullParser,
-        tagName: String,
-    ) {
+    private fun skipToEnd(parser: XmlPullParser, tagName: String) {
         var depth = 1
         while (depth > 0) {
             when (parser.next()) {
@@ -399,11 +393,10 @@ class AndroidEpgImporter(
         return out
     }
 
-    private fun loadKnownTvgIds(): Set<String> =
-        db.contentQueries
-            .distinctLiveTvgIds()
-            .executeAsList()
-            .toHashSet()
+    private fun loadKnownTvgIds(): Set<String> = db.contentQueries
+        .distinctLiveTvgIds()
+        .executeAsList()
+        .toHashSet()
 
     private fun recordError(msg: String?) {
         if (msg.isNullOrBlank()) {
@@ -413,10 +406,7 @@ class AndroidEpgImporter(
         }
     }
 
-    private data class EpgTarget(
-        val url: String,
-        val sourceKey: String,
-    )
+    private data class EpgTarget(val url: String, val sourceKey: String)
 
     companion object {
         private const val GLOBAL = EpgRepository.GLOBAL_SOURCE_KEY

@@ -22,12 +22,7 @@ import kotlin.test.assertTrue
  *    content row is inserted.
  */
 class BackupRoundTripTest {
-    private fun seedSource(
-        db: YancoDb,
-        id: String = "src-A",
-        username: String = "user@host",
-        password: String = "p@ssw0rd",
-    ) {
+    private fun seedSource(db: YancoDb, id: String = "src-A", username: String = "user@host", password: String = "p@ssw0rd") {
         val store = PlaintextCredentialStore()
         db.sourcesQueries.insert(
             id = id,
@@ -54,13 +49,7 @@ class BackupRoundTripTest {
         )
     }
 
-    private fun seedContent(
-        db: YancoDb,
-        id: String,
-        sourceId: String = "src-A",
-        streamUrl: String = "http://stream/$id",
-        title: String = "Channel $id",
-    ) {
+    private fun seedContent(db: YancoDb, id: String, sourceId: String = "src-A", streamUrl: String = "http://stream/$id", title: String = "Channel $id") {
         db.contentQueries.insert(
             id = id,
             source_id = sourceId,

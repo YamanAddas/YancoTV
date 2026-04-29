@@ -36,7 +36,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -45,6 +44,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,24 +55,24 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.player.PlaybackController
-import com.yancotv.android.ui.focus.PlacedFocusAnchor
-import com.yancotv.android.ui.focus.placedFocus
-import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.player.SleepTimerOption
 import com.yancotv.android.player.SleepTimerState
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.recording.RecordingService
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.recording.RecordInput
 import com.yancotv.shared.recording.RecordingFormat
 import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /**
  * MK.options.redesign — host for the per-category floating panels.
@@ -104,14 +104,14 @@ fun PlayerOptionsPanelHost(
 
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .pointerInput(active) {
-                    // Outside-tap (touch only) closes everything — popup
-                    // and panel both. Distinct from BACK / option-pick,
-                    // which only pop one level.
-                    if (active != null) detectTapGestures { onDismiss() }
-                },
+        Modifier
+            .fillMaxSize()
+            .pointerInput(active) {
+                // Outside-tap (touch only) closes everything — popup
+                // and panel both. Distinct from BACK / option-pick,
+                // which only pop one level.
+                if (active != null) detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.BottomEnd,
     ) {
         AnimatedVisibility(
@@ -122,22 +122,22 @@ fun PlayerOptionsPanelHost(
             val current = active
             Column(
                 modifier =
-                    Modifier
-                        .padding(end = 32.dp, bottom = 96.dp)
-                        .width(PANEL_WIDTH.dp)
-                        .heightIn(max = PANEL_MAX_HEIGHT.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xEE0A1410))
-                        .border(1.dp, palette.Accent, RoundedCornerShape(12.dp)),
+                Modifier
+                    .padding(end = 32.dp, bottom = 96.dp)
+                    .width(PANEL_WIDTH.dp)
+                    .heightIn(max = PANEL_MAX_HEIGHT.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xEE0A1410))
+                    .border(1.dp, palette.Accent, RoundedCornerShape(12.dp)),
             ) {
                 if (current != null) {
                     PanelHeader(label = labelFor(current))
                     Column(
                         modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         when (current) {
@@ -178,27 +178,22 @@ private fun PanelHeader(label: String) {
     )
 }
 
-private fun labelFor(c: PlayerOptionCategory): String =
-    when (c) {
-        PlayerOptionCategory.AUDIO -> "Audio"
-        PlayerOptionCategory.SUBTITLES -> "Subtitles"
-        PlayerOptionCategory.ASPECT -> "Aspect"
-        PlayerOptionCategory.SPEED -> "Speed"
-        PlayerOptionCategory.SLEEP -> "Sleep"
-        PlayerOptionCategory.RECORD -> "Record"
-        PlayerOptionCategory.FAVORITES -> "Favorites"
-        PlayerOptionCategory.EXTERNAL -> "External player"
-    }
+private fun labelFor(c: PlayerOptionCategory): String = when (c) {
+    PlayerOptionCategory.AUDIO -> "Audio"
+    PlayerOptionCategory.SUBTITLES -> "Subtitles"
+    PlayerOptionCategory.ASPECT -> "Aspect"
+    PlayerOptionCategory.SPEED -> "Speed"
+    PlayerOptionCategory.SLEEP -> "Sleep"
+    PlayerOptionCategory.RECORD -> "Record"
+    PlayerOptionCategory.FAVORITES -> "Favorites"
+    PlayerOptionCategory.EXTERNAL -> "External player"
+}
 
 // ───── Audio ─────
 
 @UnstableApi
 @Composable
-private fun AudioPanelContent(
-    controller: PlaybackController,
-    prefs: AppPreferences,
-    onPickOption: () -> Unit,
-) {
+private fun AudioPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickOption: () -> Unit) {
     val tracks = rememberAudioTracks(controller.player)
     val scope = rememberCoroutineScope()
     val firstRowAnchor = rememberPlacedFocusAnchor()
@@ -225,13 +220,7 @@ private fun AudioPanelContent(
     }
 }
 
-private data class AudioTrack(
-    val group: Tracks.Group,
-    val trackIndex: Int,
-    val language: String?,
-    val displayName: String,
-    val selected: Boolean,
-)
+private data class AudioTrack(val group: Tracks.Group, val trackIndex: Int, val language: String?, val displayName: String, val selected: Boolean)
 
 @UnstableApi
 @Composable
@@ -279,10 +268,7 @@ private fun readAudioTracks(player: Player): List<AudioTrack> {
 }
 
 @UnstableApi
-private fun applyAudioTrack(
-    player: Player,
-    track: AudioTrack,
-) {
+private fun applyAudioTrack(player: Player, track: AudioTrack) {
     val params = player.trackSelectionParameters.buildUpon()
     track.language?.takeIf { it.isNotBlank() }?.let { lang ->
         params.setPreferredAudioLanguage(lang)
@@ -298,12 +284,7 @@ private fun applyAudioTrack(
 
 @UnstableApi
 @Composable
-private fun SubtitlesPanelContent(
-    controller: PlaybackController,
-    prefs: AppPreferences,
-    onPickExternal: () -> Unit,
-    onPickOption: () -> Unit,
-) {
+private fun SubtitlesPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickExternal: () -> Unit, onPickOption: () -> Unit) {
     val tracks = rememberTextTracks(controller.player)
     val disabled = rememberTextDisabled(controller.player)
     val scope = rememberCoroutineScope()
@@ -350,13 +331,7 @@ private fun SubtitlesPanelContent(
     )
 }
 
-private data class TextTrack(
-    val group: Tracks.Group,
-    val trackIndex: Int,
-    val language: String?,
-    val displayName: String,
-    val selected: Boolean,
-)
+private data class TextTrack(val group: Tracks.Group, val trackIndex: Int, val language: String?, val displayName: String, val selected: Boolean)
 
 @UnstableApi
 @Composable
@@ -419,10 +394,7 @@ private fun readTextTracks(player: Player): List<TextTrack> {
 }
 
 @UnstableApi
-private fun applyTextTrack(
-    player: Player,
-    track: TextTrack,
-) {
+private fun applyTextTrack(player: Player, track: TextTrack) {
     val params = player.trackSelectionParameters.buildUpon()
     params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
     track.language?.takeIf { it.isNotBlank() }?.let { lang ->
@@ -438,10 +410,7 @@ private fun applyTextTrack(
 // ───── Aspect ─────
 
 @Composable
-private fun AspectPanelContent(
-    prefs: AppPreferences,
-    onPickOption: () -> Unit,
-) {
+private fun AspectPanelContent(prefs: AppPreferences, onPickOption: () -> Unit) {
     val state by prefs.playbackFlow.collectAsState()
     val scope = rememberCoroutineScope()
     val firstRowAnchor = rememberPlacedFocusAnchor()
@@ -461,10 +430,7 @@ private fun AspectPanelContent(
 }
 
 /** Cycle helper exposed for the popup-row LEFT/RIGHT gesture. */
-suspend fun cycleAspect(
-    prefs: AppPreferences,
-    forward: Boolean,
-) {
+suspend fun cycleAspect(prefs: AppPreferences, forward: Boolean) {
     val current = prefs.playbackFlow.value.resizeMode
     val all = ResizeMode.values()
     val idx = all.indexOf(current).coerceAtLeast(0)
@@ -478,11 +444,7 @@ private val SPEED_PRESETS = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
 
 @UnstableApi
 @Composable
-private fun SpeedPanelContent(
-    controller: PlaybackController,
-    prefs: AppPreferences,
-    onPickOption: () -> Unit,
-) {
+private fun SpeedPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickOption: () -> Unit) {
     val state by prefs.playbackFlow.collectAsState()
     val scope = rememberCoroutineScope()
     val firstRowAnchor = rememberPlacedFocusAnchor()
@@ -502,34 +464,27 @@ private fun SpeedPanelContent(
     }
 }
 
-private fun formatSpeed(speed: Float): String =
-    if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "${speed}×"
+private fun formatSpeed(speed: Float): String = if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "$speed×"
 
 @UnstableApi
-private fun applySpeed(
-    controller: PlaybackController,
-    prefs: AppPreferences,
-    speed: Float,
-    scope: kotlinx.coroutines.CoroutineScope,
-) {
+private fun applySpeed(controller: PlaybackController, prefs: AppPreferences, speed: Float, scope: kotlinx.coroutines.CoroutineScope) {
     controller.player.setPlaybackSpeed(speed)
     scope.launch { prefs.setSpeed(speed) }
 }
 
 /** Cycle helper for the popup-row LEFT/RIGHT gesture on Speed. */
 @UnstableApi
-suspend fun cycleSpeed(
-    controller: PlaybackController,
-    prefs: AppPreferences,
-    forward: Boolean,
-) {
+suspend fun cycleSpeed(controller: PlaybackController, prefs: AppPreferences, forward: Boolean) {
     val current = prefs.playbackFlow.value.speed
     val idx =
         SPEED_PRESETS.indexOfFirst { kotlin.math.abs(it - current) < 0.01f }
             .takeIf { it >= 0 } ?: SPEED_PRESETS.indexOf(1.0f)
     val next =
-        if (forward) (idx + 1) % SPEED_PRESETS.size
-        else (idx - 1 + SPEED_PRESETS.size) % SPEED_PRESETS.size
+        if (forward) {
+            (idx + 1) % SPEED_PRESETS.size
+        } else {
+            (idx - 1 + SPEED_PRESETS.size) % SPEED_PRESETS.size
+        }
     val target = SPEED_PRESETS[next]
     controller.player.setPlaybackSpeed(target)
     prefs.setSpeed(target)
@@ -539,10 +494,7 @@ suspend fun cycleSpeed(
 
 @UnstableApi
 @Composable
-private fun SleepPanelContent(
-    controller: PlaybackController,
-    onPickOption: () -> Unit,
-) {
+private fun SleepPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val sleep by controller.sleepTimer.collectAsState()
     val firstRowAnchor = rememberPlacedFocusAnchor()
     LaunchedEffect(Unit) { firstRowAnchor.awaitAndRequest() }
@@ -572,14 +524,13 @@ private fun SleepPanelContent(
     }
 }
 
-private fun sleepLabel(opt: SleepTimerOption): String =
-    when (opt) {
-        SleepTimerOption.MIN_15 -> "15 minutes"
-        SleepTimerOption.MIN_30 -> "30 minutes"
-        SleepTimerOption.MIN_45 -> "45 minutes"
-        SleepTimerOption.MIN_60 -> "60 minutes"
-        SleepTimerOption.END_OF_PROGRAM -> "End of programme"
-    }
+private fun sleepLabel(opt: SleepTimerOption): String = when (opt) {
+    SleepTimerOption.MIN_15 -> "15 minutes"
+    SleepTimerOption.MIN_30 -> "30 minutes"
+    SleepTimerOption.MIN_45 -> "45 minutes"
+    SleepTimerOption.MIN_60 -> "60 minutes"
+    SleepTimerOption.END_OF_PROGRAM -> "End of programme"
+}
 
 // ───── Audio / Subs cycle helpers ─────
 
@@ -594,18 +545,16 @@ private fun sleepLabel(opt: SleepTimerOption): String =
  * label still showed the old language code until the next reopen.
  */
 @UnstableApi
-fun cycleAudioTrack(
-    controller: PlaybackController,
-    forward: Boolean,
-    scope: kotlinx.coroutines.CoroutineScope? = null,
-    prefs: AppPreferences? = null,
-) {
+fun cycleAudioTrack(controller: PlaybackController, forward: Boolean, scope: kotlinx.coroutines.CoroutineScope? = null, prefs: AppPreferences? = null) {
     val tracks = readAudioTracks(controller.player)
     if (tracks.isEmpty()) return
     val currentIdx = tracks.indexOfFirst { it.selected }.coerceAtLeast(0)
     val nextIdx =
-        if (forward) (currentIdx + 1) % tracks.size
-        else (currentIdx - 1 + tracks.size) % tracks.size
+        if (forward) {
+            (currentIdx + 1) % tracks.size
+        } else {
+            (currentIdx - 1 + tracks.size) % tracks.size
+        }
     val nextTrack = tracks[nextIdx]
     applyAudioTrack(controller.player, nextTrack)
     if (scope != null && prefs != null) {
@@ -623,12 +572,7 @@ fun cycleAudioTrack(
  * `currentValue` reflects the cycle without reopening.
  */
 @UnstableApi
-fun cycleTextTrack(
-    controller: PlaybackController,
-    forward: Boolean,
-    scope: kotlinx.coroutines.CoroutineScope? = null,
-    prefs: AppPreferences? = null,
-) {
+fun cycleTextTrack(controller: PlaybackController, forward: Boolean, scope: kotlinx.coroutines.CoroutineScope? = null, prefs: AppPreferences? = null) {
     val player = controller.player
     val tracks = readTextTracks(player)
     if (tracks.isEmpty()) {
@@ -643,8 +587,11 @@ fun cycleTextTrack(
             else -> tracks.indexOfFirst { it.selected }.coerceAtLeast(0)
         }
     val nextIdx =
-        if (forward) (currentIdx + 1) % states
-        else (currentIdx - 1 + states) % states
+        if (forward) {
+            (currentIdx + 1) % states
+        } else {
+            (currentIdx - 1 + states) % states
+        }
     val newLang: String
     if (nextIdx == tracks.size) {
         // Off
@@ -668,12 +615,7 @@ fun cycleTextTrack(
 // ───── Shared ─────
 
 @Composable
-private fun OptionRow(
-    label: String,
-    selected: Boolean,
-    onPick: () -> Unit,
-    focusAnchor: PlacedFocusAnchor? = null,
-) {
+private fun OptionRow(label: String, selected: Boolean, onPick: () -> Unit, focusAnchor: PlacedFocusAnchor? = null) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -686,29 +628,29 @@ private fun OptionRow(
     val border = if (focused) palette.Accent else Color.Transparent
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(6.dp))
-                .let { m -> if (focusAnchor != null) m.placedFocus(focusAnchor) else m }
-                .onPreviewKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
-                    when (e.key) {
-                        Key.DirectionCenter,
-                        Key.Enter,
-                        Key.NumPadEnter,
-                        Key.Spacebar,
-                        -> {
-                            onPick()
-                            true
-                        }
-                        else -> false
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .let { m -> if (focusAnchor != null) m.placedFocus(focusAnchor) else m }
+            .onPreviewKeyEvent { e ->
+                if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                when (e.key) {
+                    Key.DirectionCenter,
+                    Key.Enter,
+                    Key.NumPadEnter,
+                    Key.Spacebar,
+                    -> {
+                        onPick()
+                        true
                     }
+                    else -> false
                 }
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button) { onPick() }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+            }
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button) { onPick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -743,10 +685,7 @@ private fun EmptyLine(text: String) {
 
 @UnstableApi
 @Composable
-private fun RecordPanelContent(
-    controller: PlaybackController,
-    onPickOption: () -> Unit,
-) {
+private fun RecordPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val recordings: RecordingsRepository =
         org.koin.compose.koinInject()
@@ -771,8 +710,11 @@ private fun RecordPanelContent(
     val stopAnchor = rememberPlacedFocusAnchor()
     LaunchedEffect(currentItem?.id, active != null) {
         if (currentItem == null) return@LaunchedEffect
-        if (active != null) stopAnchor.awaitAndRequest()
-        else recordAnchor.awaitAndRequest()
+        if (active != null) {
+            stopAnchor.awaitAndRequest()
+        } else {
+            recordAnchor.awaitAndRequest()
+        }
     }
     val item = currentItem
     if (item == null) {
@@ -809,13 +751,13 @@ private fun RecordPanelContent(
             RecordingService.start(
                 context = context,
                 input =
-                    RecordInput(
-                        recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
-                        sourceUrl = item.streamUrl,
-                        title = displayTitle,
-                        format = format,
-                        contentId = item.id,
-                    ),
+                RecordInput(
+                    recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
+                    sourceUrl = item.streamUrl,
+                    title = displayTitle,
+                    format = format,
+                    contentId = item.id,
+                ),
             )
             android.widget.Toast.makeText(
                 context,
@@ -840,10 +782,7 @@ private fun detectRecordingFormat(streamUrl: String): RecordingFormat {
 
 @UnstableApi
 @Composable
-private fun FavoritesPanelContent(
-    controller: PlaybackController,
-    onPickOption: () -> Unit,
-) {
+private fun FavoritesPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val favorites: FavoritesRepository = org.koin.compose.koinInject()
     val scope = rememberCoroutineScope()
     val currentItem by controller.currentItem.collectAsState()
@@ -882,10 +821,7 @@ private fun FavoritesPanelContent(
 
 @UnstableApi
 @Composable
-private fun ExternalPanelContent(
-    controller: PlaybackController,
-    onPickOption: () -> Unit,
-) {
+private fun ExternalPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val currentItem by controller.currentItem.collectAsState()
     val installed = remember { ExternalPlayer.installed(context) }

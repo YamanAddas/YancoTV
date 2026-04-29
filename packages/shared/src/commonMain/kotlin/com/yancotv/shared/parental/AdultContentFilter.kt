@@ -66,10 +66,7 @@ object AdultContentFilter {
      * channel literally named "Adult Swim" being hidden when the user
      * toggles the filter).
      */
-    private fun looksAdult(
-        text: String,
-        includeCategoryOnly: Boolean,
-    ): Boolean {
+    private fun looksAdult(text: String, includeCategoryOnly: Boolean): Boolean {
         val tokens = text.split(' ').filter { it.isNotEmpty() }
         for (tok in tokens) {
             if (tok in STRONG_MARKERS) return true

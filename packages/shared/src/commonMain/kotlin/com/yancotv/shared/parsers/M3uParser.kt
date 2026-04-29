@@ -34,10 +34,7 @@ data class M3uParseResult(
  * Handles: BOM markers, Windows/Unix/old-Mac line endings, empty lines,
  * malformed entries, duplicate URL collapse, and common provider quirks.
  */
-fun parseM3u(
-    content: String,
-    logger: Logger = NOOP_LOGGER,
-): M3uParseResult {
+fun parseM3u(content: String, logger: Logger = NOOP_LOGGER): M3uParseResult {
     val entries = mutableListOf<M3uEntry>()
     // streamUrl -> index; titled entries replace bare URL entries on collision.
     val urlIndex = mutableMapOf<String, Int>()
@@ -49,10 +46,7 @@ fun parseM3u(
 
     var currentEntry: PartialEntry? = null
 
-    fun addOrReplace(
-        entry: M3uEntry,
-        hasTitle: Boolean,
-    ) {
+    fun addOrReplace(entry: M3uEntry, hasTitle: Boolean) {
         val existingIdx = urlIndex[entry.streamUrl]
         if (existingIdx == null) {
             urlIndex[entry.streamUrl] = entries.size
@@ -168,10 +162,7 @@ private fun parseExtinfLine(line: String): PartialEntry {
     return entry
 }
 
-private fun extractAttribute(
-    line: String,
-    attr: String,
-): String {
+private fun extractAttribute(line: String, attr: String): String {
     val escaped = Regex.escape(attr)
     val dbl = Regex("$escaped=\"([^\"]*)\"", RegexOption.IGNORE_CASE).find(line)
     if (dbl != null) return dbl.groupValues[1]

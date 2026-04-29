@@ -17,8 +17,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -176,10 +174,10 @@ fun GuideSyncPanel(
     if (compact) {
         Row(
             modifier =
-                modifier
-                    .fillMaxWidth()
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
+            modifier
+                .fillMaxWidth()
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .padding(horizontal = 24.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -216,18 +214,18 @@ fun GuideSyncPanel(
 
     Box(
         modifier =
-            modifier
-                .fillMaxWidth()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .padding(32.dp),
+        modifier
+            .fillMaxWidth()
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .padding(32.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier =
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(24.dp),
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -265,11 +263,11 @@ fun GuideSyncPanel(
                         val err = src.lastSyncError
                         Text(
                             text =
-                                buildString {
-                                    append("• ${src.name}  ·  ${src.channelCount} channels  ·  ")
-                                    append(if (hasEpg) "EPG URL set" else "no EPG URL")
-                                    if (!err.isNullOrBlank()) append("  ·  err: $err")
-                                },
+                            buildString {
+                                append("• ${src.name}  ·  ${src.channelCount} channels  ·  ")
+                                append(if (hasEpg) "EPG URL set" else "no EPG URL")
+                                if (!err.isNullOrBlank()) append("  ·  err: $err")
+                            },
                             color = if (!err.isNullOrBlank() || !hasEpg) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                             fontSize = 12.sp,
                         )
@@ -309,7 +307,9 @@ fun GuideSyncPanel(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Paste an XMLTV URL to load EPG from. Used in addition to per-source URLs — useful when a provider's feed is broken or you want a better schedule.",
+                text =
+                "Paste an XMLTV URL to load EPG from. Used in addition to per-source URLs — " +
+                    "useful when a provider's feed is broken or you want a better schedule.",
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 11.sp,
             )
@@ -369,19 +369,9 @@ fun GuideSyncPanel(
     }
 }
 
-private data class Snapshot(
-    val stats: EpgStats?,
-    val sources: List<Source>,
-    val globalUrl: String?,
-    val lastError: String?,
-)
+private data class Snapshot(val stats: EpgStats?, val sources: List<Source>, val globalUrl: String?, val lastError: String?)
 
-private fun subtitleFor(
-    lastRefreshedMs: Long?,
-    totalSources: Int,
-    withEpg: Int,
-    lastError: String?,
-): String {
+private fun subtitleFor(lastRefreshedMs: Long?, totalSources: Int, withEpg: Int, lastError: String?): String {
     val refreshed =
         when (lastRefreshedMs) {
             null -> "never refreshed"
@@ -410,7 +400,6 @@ private fun formatRelative(epochMs: Long): String {
 }
 
 @Composable
-private fun rememberEpgWorkFlow(context: android.content.Context): Flow<List<WorkInfo>> =
-    remember {
-        WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("epg-sync-oneshot")
-    }
+private fun rememberEpgWorkFlow(context: android.content.Context): Flow<List<WorkInfo>> = remember {
+    WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("epg-sync-oneshot")
+}

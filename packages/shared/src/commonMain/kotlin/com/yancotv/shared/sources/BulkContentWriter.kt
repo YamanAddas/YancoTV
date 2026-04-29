@@ -49,10 +49,7 @@ import kotlinx.serialization.json.Json
  * leaving the schema stable on a crash is more important than the small
  * theoretical speedup.
  */
-class BulkContentWriter(
-    private val driver: SqlDriver,
-    private val logger: Logger = NOOP_LOGGER,
-) {
+class BulkContentWriter(private val driver: SqlDriver, private val logger: Logger = NOOP_LOGGER) {
     private val json =
         Json {
             encodeDefaults = false
@@ -339,13 +336,7 @@ class BulkContentWriter(
         }
     }
 
-    fun writeSeriesChunk(
-        sourceId: String,
-        items: List<XtreamSeriesInfo>,
-        categoryNames: Map<String, String>,
-        now: Long,
-        sortOrderStart: Long,
-    ): Int {
+    fun writeSeriesChunk(sourceId: String, items: List<XtreamSeriesInfo>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
@@ -406,12 +397,7 @@ class BulkContentWriter(
      * no separate live/VOD/series endpoints, so sort order is a single
      * monotonic counter across the whole playlist.
      */
-    fun writeM3uChunk(
-        sourceId: String,
-        items: List<M3uEntry>,
-        now: Long,
-        sortOrderStart: Long,
-    ): Int {
+    fun writeM3uChunk(sourceId: String, items: List<M3uEntry>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
@@ -457,13 +443,7 @@ class BulkContentWriter(
         }
     }
 
-    fun writeStalkerLiveChunk(
-        sourceId: String,
-        items: List<StalkerChannel>,
-        categoryNames: Map<String, String>,
-        now: Long,
-        sortOrderStart: Long,
-    ): Int {
+    fun writeStalkerLiveChunk(sourceId: String, items: List<StalkerChannel>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
@@ -509,13 +489,7 @@ class BulkContentWriter(
         }
     }
 
-    fun writeStalkerVodChunk(
-        sourceId: String,
-        items: List<StalkerVodItem>,
-        categoryNames: Map<String, String>,
-        now: Long,
-        sortOrderStart: Long,
-    ): Int {
+    fun writeStalkerVodChunk(sourceId: String, items: List<StalkerVodItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
@@ -560,13 +534,7 @@ class BulkContentWriter(
         }
     }
 
-    fun writeStalkerSeriesChunk(
-        sourceId: String,
-        items: List<StalkerSeriesItem>,
-        categoryNames: Map<String, String>,
-        now: Long,
-        sortOrderStart: Long,
-    ): Int {
+    fun writeStalkerSeriesChunk(sourceId: String, items: List<StalkerSeriesItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
@@ -612,12 +580,11 @@ class BulkContentWriter(
         }
     }
 
-    private fun serializeType(type: ContentType): String =
-        when (type) {
-            ContentType.LIVE -> "live"
-            ContentType.MOVIE -> "movie"
-            ContentType.SERIES -> "series"
-        }
+    private fun serializeType(type: ContentType): String = when (type) {
+        ContentType.LIVE -> "live"
+        ContentType.MOVIE -> "movie"
+        ContentType.SERIES -> "series"
+    }
 
     companion object {
         /**

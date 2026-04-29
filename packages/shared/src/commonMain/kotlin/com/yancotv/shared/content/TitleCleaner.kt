@@ -51,10 +51,7 @@ fun cleanTitle(rawTitle: String): String {
  * `currentYear` defaults to a generous upper bound so callers can omit it;
  * pass the real current year when stricter rejection of future years matters.
  */
-fun extractYear(
-    title: String,
-    currentYear: Int = 9999,
-): Int? {
+fun extractYear(title: String, currentYear: Int = 9999): Int? {
     val parenMatch = Regex("""\((\d{4})\)""").find(title)
     if (parenMatch != null) {
         val year = parenMatch.groupValues[1].toInt()
@@ -70,10 +67,7 @@ fun extractYear(
     return null
 }
 
-data class SeasonEpisode(
-    val season: Int,
-    val episode: Int,
-)
+data class SeasonEpisode(val season: Int, val episode: Int)
 
 /** Extract season and episode numbers from a title. */
 fun extractSeasonEpisode(title: String): SeasonEpisode? {

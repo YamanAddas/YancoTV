@@ -173,14 +173,7 @@ val WarmAmber =
  * any base palette so the user can mix-and-match (e.g. Sapphire base
  * canvases + Amber accent).
  */
-data class AccentBundle(
-    val accent: Color,
-    val soft: Color,
-    val deep: Color,
-    val glow: Color,
-    val muted: Color,
-    val focusRing: Color,
-)
+data class AccentBundle(val accent: Color, val soft: Color, val deep: Color, val glow: Color, val muted: Color, val focusRing: Color)
 
 val EmeraldAccent =
     AccentBundle(
@@ -222,15 +215,14 @@ val RedAccent =
         focusRing = Color(0xFFFF8FA3),
     )
 
-fun YancoPalette.applyAccent(bundle: AccentBundle): YancoPalette =
-    copy(
-        Accent = bundle.accent,
-        AccentSoft = bundle.soft,
-        AccentDeep = bundle.deep,
-        AccentGlow = bundle.glow,
-        AccentMuted = bundle.muted,
-        FocusRing = bundle.focusRing,
-    )
+fun YancoPalette.applyAccent(bundle: AccentBundle): YancoPalette = copy(
+    Accent = bundle.accent,
+    AccentSoft = bundle.soft,
+    AccentDeep = bundle.deep,
+    AccentGlow = bundle.glow,
+    AccentMuted = bundle.muted,
+    FocusRing = bundle.focusRing,
+)
 
 val Monochrome =
     YancoPalette(

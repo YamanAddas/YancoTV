@@ -46,10 +46,7 @@ class MpegTsRecorder(
     private val _state = MutableStateFlow<RecorderState>(RecorderState.Idle)
     val state: StateFlow<RecorderState> = _state.asStateFlow()
 
-    suspend fun record(
-        input: RecordInput,
-        sink: Sink,
-    ): RecordResult {
+    suspend fun record(input: RecordInput, sink: Sink): RecordResult {
         val startedAt = clock.nowMs()
         val deadlineMs = input.maxDurationMs?.let { startedAt + it }
         var bytesWritten = 0L
@@ -121,10 +118,7 @@ class MpegTsRecorder(
         }
     }
 
-    private fun options(
-        userAgent: String?,
-        referer: String?,
-    ): HttpRequestOptions {
+    private fun options(userAgent: String?, referer: String?): HttpRequestOptions {
         val headers = buildMap {
             if (!userAgent.isNullOrBlank()) put("User-Agent", userAgent)
             if (!referer.isNullOrBlank()) put("Referer", referer)
@@ -155,11 +149,7 @@ class MpegTsRecorder(
         )
     }
 
-    private fun finishCompleted(
-        recordId: String,
-        startedAtMs: Long,
-        bytesWritten: Long,
-    ): RecordResult {
+    private fun finishCompleted(recordId: String, startedAtMs: Long, bytesWritten: Long): RecordResult {
         val secs = (clock.nowMs() - startedAtMs) / 1000L
         _state.value =
             RecorderState.Completed(
@@ -170,12 +160,7 @@ class MpegTsRecorder(
         return RecordResult.Success(recordId, bytesWritten, secs)
     }
 
-    private fun failWithReason(
-        recordId: String,
-        reason: String,
-        cause: Throwable?,
-        bytesWritten: Long,
-    ): RecordResult {
+    private fun failWithReason(recordId: String, reason: String, cause: Throwable?, bytesWritten: Long): RecordResult {
         _state.value =
             RecorderState.Failed(
                 recordId = recordId,

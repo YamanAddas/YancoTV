@@ -142,11 +142,7 @@ class RecordingScheduleScheduler(
         return targets.size
     }
 
-    data class SeriesBindResult(
-        val seriesKey: String,
-        val created: Int,
-        val skipped: Int,
-    )
+    data class SeriesBindResult(val seriesKey: String, val created: Int, val skipped: Int)
 
     /**
      * Cancel a schedule. Behavior depends on current state:
@@ -205,10 +201,7 @@ class RecordingScheduleScheduler(
      * MISSED — we'd otherwise be re-arming alarms for already-passed
      * windows.
      */
-    fun rescheduleAll(
-        prePaddingSeconds: Long = DEFAULT_PRE_PADDING_S,
-        postPaddingSeconds: Long = DEFAULT_POST_PADDING_S,
-    ) {
+    fun rescheduleAll(prePaddingSeconds: Long = DEFAULT_PRE_PADDING_S, postPaddingSeconds: Long = DEFAULT_POST_PADDING_S) {
         val now = System.currentTimeMillis()
         val armed = repo.getByState(RecordingScheduleState.ARMED)
         for (schedule in armed) {
@@ -275,16 +268,14 @@ class RecordingScheduleScheduler(
          * surface to a minimum. The naming convention is the source of
          * truth; pinned by `ScheduleIdFromRecordIdTest`.
          */
-        fun scheduleIdFromRecordId(recordId: String): String? =
-            if (recordId.startsWith("sched-rec-")) {
-                recordId.removePrefix("sched-rec-")
-            } else {
-                null
-            }
+        fun scheduleIdFromRecordId(recordId: String): String? = if (recordId.startsWith("sched-rec-")) {
+            recordId.removePrefix("sched-rec-")
+        } else {
+            null
+        }
 
         /** Canonical series-binding key. Snapshot at bind time; cancel
          *  uses the same key regardless of later EPG title drift. */
-        fun seriesKeyFor(channelTvgId: String, title: String): String =
-            "$channelTvgId::$title"
+        fun seriesKeyFor(channelTvgId: String, title: String): String = "$channelTvgId::$title"
     }
 }

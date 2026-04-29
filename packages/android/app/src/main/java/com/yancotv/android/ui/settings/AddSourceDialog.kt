@@ -26,9 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -53,12 +53,7 @@ import com.yancotv.shared.types.SourceType
  * OK to type, Back to exit edit mode.
  */
 @Composable
-fun AddSourceDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (AddSourceInput) -> Unit,
-    saving: Boolean = false,
-    saveError: String? = null,
-) {
+fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, saving: Boolean = false, saveError: String? = null) {
     var type by remember { mutableStateOf(SourceType.XTREAM) }
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
@@ -110,27 +105,27 @@ fun AddSourceDialog(
     Dialog(
         onDismissRequest = { if (!saving) onDismiss() },
         properties =
-            DialogProperties(
-                dismissOnClickOutside = !saving,
-                dismissOnBackPress = !saving,
-                usePlatformDefaultWidth = false,
-            ),
+        DialogProperties(
+            dismissOnClickOutside = !saving,
+            dismissOnBackPress = !saving,
+            usePlatformDefaultWidth = false,
+        ),
     ) {
         Column(
             modifier =
-                Modifier
-                    .widthIn(min = 560.dp, max = 720.dp)
-                    .heightIn(max = 640.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .border(1.dp, LocalYancoPalette.current.BorderSubtle, RoundedCornerShape(16.dp)),
+            Modifier
+                .widthIn(min = 560.dp, max = 720.dp)
+                .heightIn(max = 640.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(1.dp, LocalYancoPalette.current.BorderSubtle, RoundedCornerShape(16.dp)),
         ) {
             // Header
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp, vertical = 22.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
@@ -150,11 +145,11 @@ fun AddSourceDialog(
 
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 28.dp, vertical = 20.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 SectionLabel("Source type")
@@ -248,9 +243,9 @@ fun AddSourceDialog(
 
             Row(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -271,10 +266,10 @@ fun AddSourceDialog(
 private fun Divider() {
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(LocalYancoPalette.current.BorderSubtle),
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(LocalYancoPalette.current.BorderSubtle),
     )
 }
 
@@ -293,12 +288,12 @@ private fun SectionLabel(text: String) {
 private fun ErrorBanner(text: String) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.Error.copy(alpha = 0.12f))
-                .border(1.dp, LocalYancoPalette.current.Error.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(LocalYancoPalette.current.Error.copy(alpha = 0.12f))
+            .border(1.dp, LocalYancoPalette.current.Error.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = text, color = LocalYancoPalette.current.Error, fontSize = 12.sp)
@@ -306,12 +301,7 @@ private fun ErrorBanner(text: String) {
 }
 
 @Composable
-private fun TypeChip(
-    label: String,
-    description: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
+private fun TypeChip(label: String, description: String, selected: Boolean, onSelect: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg =
@@ -328,14 +318,14 @@ private fun TypeChip(
         }
     Column(
         modifier =
-            Modifier
-                .widthIn(min = 180.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(bg)
-                .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onSelect)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier
+            .widthIn(min = 180.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onSelect)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
@@ -353,11 +343,7 @@ private fun TypeChip(
 }
 
 @Composable
-private fun PrimaryButton(
-    label: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-) {
+private fun PrimaryButton(label: String, onClick: () -> Unit, enabled: Boolean) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg =
@@ -369,21 +355,21 @@ private fun PrimaryButton(
     val borderColor = if (focused) LocalYancoPalette.current.TextPrimary else bg
     Box(
         modifier =
-            Modifier
-                .height(42.dp)
-                .widthIn(min = 120.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                .focusable(enabled = enabled, interactionSource = interaction)
-                .clickable(
-                    enabled = enabled,
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                ).alpha(if (enabled) 1f else 0.7f)
-                .padding(horizontal = 22.dp),
+        Modifier
+            .height(42.dp)
+            .widthIn(min = 120.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .focusable(enabled = enabled, interactionSource = interaction)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ).alpha(if (enabled) 1f else 0.7f)
+            .padding(horizontal = 22.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -396,32 +382,28 @@ private fun PrimaryButton(
 }
 
 @Composable
-private fun GhostButton(
-    label: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-) {
+private fun GhostButton(label: String, onClick: () -> Unit, enabled: Boolean) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val borderColor = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
     Box(
         modifier =
-            Modifier
-                .height(42.dp)
-                .widthIn(min = 104.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                .focusable(enabled = enabled, interactionSource = interaction)
-                .clickable(
-                    enabled = enabled,
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                ).alpha(if (enabled) 1f else 0.5f)
-                .padding(horizontal = 18.dp),
+        Modifier
+            .height(42.dp)
+            .widthIn(min = 104.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .focusable(enabled = enabled, interactionSource = interaction)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ).alpha(if (enabled) 1f else 0.5f)
+            .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(

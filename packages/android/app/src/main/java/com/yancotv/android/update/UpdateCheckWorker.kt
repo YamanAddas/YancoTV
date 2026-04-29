@@ -11,9 +11,9 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.yancotv.android.prefs.AppPreferences
+import java.util.concurrent.TimeUnit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.util.concurrent.TimeUnit
 
 /**
  * Stage 5.2.2 — periodic update-check worker. Runs once every
@@ -36,10 +36,8 @@ import java.util.concurrent.TimeUnit
  * one-shot path bypasses this gate so a manual "Check now" works
  * even when periodic checks are disabled.
  */
-class UpdateCheckWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params),
+class UpdateCheckWorker(appContext: Context, params: WorkerParameters) :
+    CoroutineWorker(appContext, params),
     KoinComponent {
     private val repo: UpdateRepository by inject()
     private val prefs: AppPreferences by inject()

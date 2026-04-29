@@ -50,16 +50,10 @@ internal fun civilFromEpochSeconds(epochSecs: Long): Civil {
 
 internal fun utcYearFromEpochSeconds(epochSecs: Long): Int = civilFromEpochSeconds(epochSecs).year
 
-private fun floorDivLong(
-    a: Long,
-    b: Long,
-): Long {
+private fun floorDivLong(a: Long, b: Long): Long {
     var q = a / b
     if ((a xor b) < 0 && q * b != a) q--
     return q
 }
 
-private fun floorModLong(
-    a: Long,
-    b: Long,
-): Long = a - floorDivLong(a, b) * b
+private fun floorModLong(a: Long, b: Long): Long = a - floorDivLong(a, b) * b

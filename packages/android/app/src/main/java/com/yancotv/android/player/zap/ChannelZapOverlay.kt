@@ -49,14 +49,14 @@ fun ChannelZapOverlay(state: ChannelZapNumericState) {
     ) {
         Column(
             modifier =
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(palette.BackgroundElevated)
-                    .border(
-                        width = 1.dp,
-                        color = palette.Accent,
-                        shape = RoundedCornerShape(12.dp),
-                    ).padding(horizontal = 24.dp, vertical = 14.dp),
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(palette.BackgroundElevated)
+                .border(
+                    width = 1.dp,
+                    color = palette.Accent,
+                    shape = RoundedCornerShape(12.dp),
+                ).padding(horizontal = 24.dp, vertical = 14.dp),
         ) {
             Text(
                 text = "CHANNEL",

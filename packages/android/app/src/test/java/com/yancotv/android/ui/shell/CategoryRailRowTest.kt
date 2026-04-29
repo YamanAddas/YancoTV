@@ -3,8 +3,8 @@ package com.yancotv.android.ui.shell
 import com.yancotv.shared.content.CategoryNode
 import com.yancotv.shared.content.CategoryTreeBuilder
 import com.yancotv.shared.content.PrefixCatalog
-import org.junit.Test
 import kotlin.test.assertEquals
+import org.junit.Test
 
 /**
  * MK.20.3.5 — Pure-function tests for the rail flatten helpers. Pinned by

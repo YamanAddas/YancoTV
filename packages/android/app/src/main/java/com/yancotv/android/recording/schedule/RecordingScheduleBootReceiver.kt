@@ -44,10 +44,7 @@ class RecordingScheduleBootReceiver :
     private val repo: RecordingScheduleRepository by inject()
     private val scheduler: RecordingScheduleScheduler by inject()
 
-    override fun onReceive(
-        context: Context,
-        intent: Intent,
-    ) {
+    override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
             intent.action != "android.intent.action.QUICKBOOT_POWERON"
         ) {

@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -39,11 +38,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 
@@ -103,13 +103,13 @@ fun CategoryChipBar(
     LazyRow(
         state = listState,
         modifier =
-            modifier
-                .focusGroup(),
+        modifier
+            .focusGroup(),
         contentPadding =
-            PaddingValues(
-                horizontal = Space.page,
-                vertical = Space.xs,
-            ),
+        PaddingValues(
+            horizontal = Space.page,
+            vertical = Space.xs,
+        ),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -138,10 +138,10 @@ fun CategoryChipBar(
         item(key = "__sep__") {
             Spacer(
                 modifier =
-                    Modifier
-                        .width(1.dp)
-                        .size(width = 1.dp, height = 20.dp)
-                        .background(LocalYancoPalette.current.BorderSubtle),
+                Modifier
+                    .width(1.dp)
+                    .size(width = 1.dp, height = 20.dp)
+                    .background(LocalYancoPalette.current.BorderSubtle),
             )
         }
         items(groups, key = { it }) { group ->
@@ -157,11 +157,7 @@ fun CategoryChipBar(
     }
 }
 
-internal fun selectedChipIndex(
-    groups: List<String>,
-    selected: String,
-    showFavorites: Boolean,
-): Int {
+internal fun selectedChipIndex(groups: List<String>, selected: String, showFavorites: Boolean): Int {
     val favoriteCount = if (showFavorites) 1 else 0
     return when (selected) {
         FAVORITES_GROUP -> if (showFavorites) 0 else -1
@@ -222,11 +218,11 @@ private fun Chip(
         }
     val fg by animateColorAsState(
         targetValue =
-            when {
-                focused -> Color.Black
-                selected -> LocalYancoPalette.current.Accent
-                else -> LocalYancoPalette.current.TextSecondary
-            },
+        when {
+            focused -> Color.Black
+            selected -> LocalYancoPalette.current.Accent
+            else -> LocalYancoPalette.current.TextSecondary
+        },
         label = "chip-fg",
     )
     // Hex-inspired chip — leading angular bevel + rounded trailing cap so
@@ -234,20 +230,20 @@ private fun Chip(
     // pick up an emerald drop-shadow so the lift reads at 10 ft.
     Row(
         modifier =
-            Modifier
-                .height(38.dp)
-                .shadow(
-                    elevation = if (focused) 14.dp else 0.dp,
-                    shape = YancoShapes.ChipBevel,
-                    ambientColor = LocalYancoPalette.current.Accent,
-                    spotColor = LocalYancoPalette.current.Accent,
-                ).clip(YancoShapes.ChipBevel)
-                .background(bg)
-                .border(if (focused) 2.dp else 0.dp, border, YancoShapes.ChipBevel)
-                .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
-                .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
+        Modifier
+            .height(38.dp)
+            .shadow(
+                elevation = if (focused) 14.dp else 0.dp,
+                shape = YancoShapes.ChipBevel,
+                ambientColor = LocalYancoPalette.current.Accent,
+                spotColor = LocalYancoPalette.current.Accent,
+            ).clip(YancoShapes.ChipBevel)
+            .background(bg)
+            .border(if (focused) 2.dp else 0.dp, border, YancoShapes.ChipBevel)
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
+            .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -263,10 +259,10 @@ private fun Chip(
             // a touch of colour without a generic leading glyph.
             Box(
                 modifier =
-                    Modifier
-                        .size(6.dp)
-                        .clip(RoundedCornerShape(Radius.pill))
-                        .background(LocalYancoPalette.current.Accent),
+                Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(LocalYancoPalette.current.Accent),
             )
         }
         Text(

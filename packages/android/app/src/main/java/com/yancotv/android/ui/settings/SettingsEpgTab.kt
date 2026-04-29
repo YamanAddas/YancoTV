@@ -113,16 +113,18 @@ fun SettingsEpgTab(
     // "Last refreshed" / "Programmes" rows update without leaving the tab.
     val epgWasRunning = remember { mutableStateOf(false) }
     LaunchedEffect(running) {
-        if (running) epgWasRunning.value = true
-        else if (epgWasRunning.value) {
+        if (running) {
+            epgWasRunning.value = true
+        } else if (epgWasRunning.value) {
             epgWasRunning.value = false
             reloadTick++
         }
     }
     val syncWasRunning = remember { mutableStateOf(false) }
     LaunchedEffect(coordinatorState?.sourceId) {
-        if (coordinatorState != null) syncWasRunning.value = true
-        else if (syncWasRunning.value) {
+        if (coordinatorState != null) {
+            syncWasRunning.value = true
+        } else if (syncWasRunning.value) {
             syncWasRunning.value = false
             reloadTick++
         }
@@ -130,10 +132,10 @@ fun SettingsEpgTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Guide diagnostics",
@@ -177,12 +179,12 @@ fun SettingsEpgTab(
             SettingsRow(
                 label = "Refresh actions",
                 hint =
-                    when {
-                        running -> "Refreshing EPG…"
-                        syncing -> "Re-syncing ${coordinatorState?.sourceName ?: "source"}…"
-                        activeSources.isEmpty() -> "Add a source first — Settings → Sources."
-                        else -> "REFRESH pulls a fresh EPG payload. RE-SYNC re-walks every active source so a rotated EPG URL is auto-adopted."
-                    },
+                when {
+                    running -> "Refreshing EPG…"
+                    syncing -> "Re-syncing ${coordinatorState?.sourceName ?: "source"}…"
+                    activeSources.isEmpty() -> "Add a source first — Settings → Sources."
+                    else -> "REFRESH pulls a fresh EPG payload. RE-SYNC re-walks every active source so a rotated EPG URL is auto-adopted."
+                },
                 content = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -270,11 +272,11 @@ fun SettingsEpgTab(
                         ) {
                             Text(
                                 text =
-                                    if (globalUrlDraft.isBlank() && savedGlobalUrl != null) {
-                                        "CLEAR"
-                                    } else {
-                                        "SAVE"
-                                    },
+                                if (globalUrlDraft.isBlank() && savedGlobalUrl != null) {
+                                    "CLEAR"
+                                } else {
+                                    "SAVE"
+                                },
                                 maxLines = 1,
                                 softWrap = false,
                             )
@@ -387,13 +389,7 @@ private fun ValueText(value: String) {
 }
 
 @Composable
-private fun EpgPriorityRow(
-    source: Source,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-) {
+private fun EpgPriorityRow(source: Source, canMoveUp: Boolean, canMoveDown: Boolean, onMoveUp: () -> Unit, onMoveDown: () -> Unit) {
     SettingsRow(
         label = source.name,
         kicker = "PRIORITY ${source.epgPriority}",
@@ -432,15 +428,13 @@ private fun formatLastRefreshed(epochMs: Long?): String {
     }
 }
 
-private fun formatCount(n: Long): String =
-    when {
-        n < 1_000L -> n.toString()
-        n < 10_000L -> String.format(java.util.Locale.US, "%.1fk", n / 1000.0)
-        else -> "${n / 1000L}k"
-    }
+private fun formatCount(n: Long): String = when {
+    n < 1_000L -> n.toString()
+    n < 10_000L -> String.format(java.util.Locale.US, "%.1fk", n / 1000.0)
+    else -> "${n / 1000L}k"
+}
 
 @Composable
-private fun rememberEpgWorkFlow(context: android.content.Context): Flow<List<WorkInfo>> =
-    remember {
-        WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("epg-sync-oneshot")
-    }
+private fun rememberEpgWorkFlow(context: android.content.Context): Flow<List<WorkInfo>> = remember {
+    WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("epg-sync-oneshot")
+}

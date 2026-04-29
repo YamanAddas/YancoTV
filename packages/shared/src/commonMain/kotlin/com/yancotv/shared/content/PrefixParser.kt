@@ -19,12 +19,7 @@ package com.yancotv.shared.content
  * code or full-word match, the catalog [PrefixCatalog.Entry] when resolvable,
  * and the trimmed remainder. Pure / no I/O so iOS shares it.
  */
-data class ParsedGroup(
-    val originalName: String,
-    val prefix: String?,
-    val resolved: PrefixCatalog.Entry?,
-    val remainder: String,
-)
+data class ParsedGroup(val originalName: String, val prefix: String?, val resolved: PrefixCatalog.Entry?, val remainder: String)
 
 object PrefixParser {
     // 2–3 letter code at start, optionally wrapped by a leading pipe/bracket,

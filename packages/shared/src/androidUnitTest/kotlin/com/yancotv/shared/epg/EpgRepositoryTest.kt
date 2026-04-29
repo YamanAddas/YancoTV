@@ -2,30 +2,21 @@ package com.yancotv.shared.epg
 
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class EpgRepositoryTest {
-    private class FakeHttpClient(
-        private val textResponses: Map<String, String> = emptyMap(),
-        private val errors: Set<String> = emptySet(),
-    ) : HttpClient {
+    private class FakeHttpClient(private val textResponses: Map<String, String> = emptyMap(), private val errors: Set<String> = emptySet()) : HttpClient {
         val calls = mutableListOf<String>()
 
-        override suspend fun getJson(
-            url: String,
-            options: HttpRequestOptions,
-        ): Any? = error("getJson not used")
+        override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = error("getJson not used")
 
-        override suspend fun getText(
-            url: String,
-            options: HttpRequestOptions,
-        ): String {
+        override suspend fun getText(url: String, options: HttpRequestOptions): String {
             calls.add(url)
             if (url in errors) throw RuntimeException("simulated network failure for $url")
             return textResponses[url] ?: error("unmocked URL: $url")
@@ -51,12 +42,7 @@ class EpgRepositoryTest {
 </tv>"""
     }
 
-    private data class Quadruple(
-        val channelId: String,
-        val title: String,
-        val startUnix: Long,
-        val endUnix: Long,
-    )
+    private data class Quadruple(val channelId: String, val title: String, val startUnix: Long, val endUnix: Long)
 
     private fun fmtUtc(unix: Long): String {
         // Howard-Hinnant inverse: unix seconds -> civil date UTC.
@@ -90,12 +76,7 @@ class EpgRepositoryTest {
         return Triple(yy, m, d)
     }
 
-    private fun insertSource(
-        db: com.yancotv.shared.db.YancoDb,
-        id: String,
-        epgUrl: String?,
-        epgPriority: Long = 0L,
-    ) {
+    private fun insertSource(db: com.yancotv.shared.db.YancoDb, id: String, epgUrl: String?, epgPriority: Long = 0L) {
         db.sourcesQueries.insert(
             id = id,
             name = id,
@@ -122,253 +103,238 @@ class EpgRepositoryTest {
     }
 
     @Test
-    fun `refresh with no sources returns ok with zero counts`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 10_000L })
-            val result = repo.refresh()
-            assertTrue(result.ok)
-            assertEquals(0, result.programmeCount)
-        }
+    fun `refresh with no sources returns ok with zero counts`() = runTest {
+        val (db, driver) = newDbPair()
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 10_000L })
+        val result = repo.refresh()
+        assertTrue(result.ok)
+        assertEquals(0, result.programmeCount)
+    }
 
     @Test
-    fun `refresh ingests programmes into the DB`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-A", "http://host/epg-a.xml")
+    fun `refresh ingests programmes into the DB`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", "http://host/epg-a.xml")
 
-            val now = 1_700_000_000L
-            val xml =
-                xmltv(
-                    listOf(
-                        Quadruple("c1", "Morning Show", now - 1800, now + 1800),
-                        Quadruple("c1", "Lunch Hour", now + 1800, now + 5400),
-                    ),
-                )
-            val http = FakeHttpClient(mapOf("http://host/epg-a.xml" to xml))
-            val repo = EpgRepository(db, driver, http, clock = { now * 1000L })
+        val now = 1_700_000_000L
+        val xml =
+            xmltv(
+                listOf(
+                    Quadruple("c1", "Morning Show", now - 1800, now + 1800),
+                    Quadruple("c1", "Lunch Hour", now + 1800, now + 5400),
+                ),
+            )
+        val http = FakeHttpClient(mapOf("http://host/epg-a.xml" to xml))
+        val repo = EpgRepository(db, driver, http, clock = { now * 1000L })
 
-            val result = repo.refresh()
-            assertTrue(result.ok, "error: ${result.error}")
-            assertEquals(2, result.programmeCount)
-            assertEquals(1, result.channelCount)
+        val result = repo.refresh()
+        assertTrue(result.ok, "error: ${result.error}")
+        assertEquals(2, result.programmeCount)
+        assertEquals(1, result.channelCount)
 
-            val nn = repo.getNowNext("c1")
-            assertNotNull(nn.now)
-            assertEquals("Morning Show", nn.now!!.title)
-            assertNotNull(nn.next)
-            assertEquals("Lunch Hour", nn.next!!.title)
-        }
-
-    @Test
-    fun `refresh keeps existing rows when all sources fail`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-A", "http://host/epg-a.xml")
-
-            val now = 1_700_000_000L
-            // First refresh: success.
-            val xml = xmltv(listOf(Quadruple("c1", "Baseline", now - 100, now + 100)))
-            var repo =
-                EpgRepository(
-                    db,
-                    driver,
-                    FakeHttpClient(mapOf("http://host/epg-a.xml" to xml)),
-                    clock = { now * 1000L },
-                )
-            assertTrue(repo.refresh().ok)
-            assertEquals(1L, repo.getStats().programmeCount)
-
-            // Second refresh: network failure — existing row must survive.
-            repo =
-                EpgRepository(
-                    db,
-                    driver,
-                    FakeHttpClient(errors = setOf("http://host/epg-a.xml")),
-                    clock = { now * 1000L },
-                )
-            val failed = repo.refresh()
-            assertFalse(failed.ok)
-            assertEquals(1L, repo.getStats().programmeCount, "existing rows must not be dropped on failure")
-        }
+        val nn = repo.getNowNext("c1")
+        assertNotNull(nn.now)
+        assertEquals("Morning Show", nn.now!!.title)
+        assertNotNull(nn.next)
+        assertEquals("Lunch Hour", nn.next!!.title)
+    }
 
     @Test
-    fun `getNowNext returns next-only when nothing is airing right now`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-A", "http://host/epg-a.xml")
-            val now = 1_700_000_000L
-            val xml = xmltv(listOf(Quadruple("c1", "Upcoming", now + 600, now + 1200)))
-            val repo =
-                EpgRepository(
-                    db,
-                    driver,
-                    FakeHttpClient(mapOf("http://host/epg-a.xml" to xml)),
-                    clock = { now * 1000L },
-                )
-            assertTrue(repo.refresh().ok)
+    fun `refresh keeps existing rows when all sources fail`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", "http://host/epg-a.xml")
 
-            val nn = repo.getNowNext("c1")
-            assertNull(nn.now)
-            assertNotNull(nn.next)
-            assertEquals("Upcoming", nn.next!!.title)
-        }
+        val now = 1_700_000_000L
+        // First refresh: success.
+        val xml = xmltv(listOf(Quadruple("c1", "Baseline", now - 100, now + 100)))
+        var repo =
+            EpgRepository(
+                db,
+                driver,
+                FakeHttpClient(mapOf("http://host/epg-a.xml" to xml)),
+                clock = { now * 1000L },
+            )
+        assertTrue(repo.refresh().ok)
+        assertEquals(1L, repo.getStats().programmeCount)
+
+        // Second refresh: network failure — existing row must survive.
+        repo =
+            EpgRepository(
+                db,
+                driver,
+                FakeHttpClient(errors = setOf("http://host/epg-a.xml")),
+                clock = { now * 1000L },
+            )
+        val failed = repo.refresh()
+        assertFalse(failed.ok)
+        assertEquals(1L, repo.getStats().programmeCount, "existing rows must not be dropped on failure")
+    }
 
     @Test
-    fun `global EPG URL is included as the 'global' source key`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            val now = 1_700_000_000L
-            val xml = xmltv(listOf(Quadruple("c1", "Global Show", now - 100, now + 100)))
-            val repo =
-                EpgRepository(
-                    db,
-                    driver,
-                    FakeHttpClient(mapOf("http://host/global.xml" to xml)),
-                    clock = { now * 1000L },
-                )
-            repo.setGlobalEpgUrl("http://host/global.xml")
-            val result = repo.refresh()
-            assertTrue(result.ok)
-            assertEquals(1, result.programmeCount)
-            val nn = repo.getNowNext("c1")
-            assertEquals("Global Show", nn.now?.title)
-        }
+    fun `getNowNext returns next-only when nothing is airing right now`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", "http://host/epg-a.xml")
+        val now = 1_700_000_000L
+        val xml = xmltv(listOf(Quadruple("c1", "Upcoming", now + 600, now + 1200)))
+        val repo =
+            EpgRepository(
+                db,
+                driver,
+                FakeHttpClient(mapOf("http://host/epg-a.xml" to xml)),
+                clock = { now * 1000L },
+            )
+        assertTrue(repo.refresh().ok)
+
+        val nn = repo.getNowNext("c1")
+        assertNull(nn.now)
+        assertNotNull(nn.next)
+        assertEquals("Upcoming", nn.next!!.title)
+    }
+
+    @Test
+    fun `global EPG URL is included as the 'global' source key`() = runTest {
+        val (db, driver) = newDbPair()
+        val now = 1_700_000_000L
+        val xml = xmltv(listOf(Quadruple("c1", "Global Show", now - 100, now + 100)))
+        val repo =
+            EpgRepository(
+                db,
+                driver,
+                FakeHttpClient(mapOf("http://host/global.xml" to xml)),
+                clock = { now * 1000L },
+            )
+        repo.setGlobalEpgUrl("http://host/global.xml")
+        val result = repo.refresh()
+        assertTrue(result.ok)
+        assertEquals(1, result.programmeCount)
+        val nn = repo.getNowNext("c1")
+        assertEquals("Global Show", nn.now?.title)
+    }
 
     // ───── Paginated guide + stats + last-error (MK.7.5 + MK.8.6) ─────
 
-    @Test fun `getGuideData paginates cleanly over N channels`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            val now = 1_700_000_000L
-            // 120 distinct tvg_ids, all with an in-window programme.
-            seedGuideChannelsAndEpg(db, count = 120, windowCenter = now)
+    @Test fun `getGuideData paginates cleanly over N channels`() = runTest {
+        val (db, driver) = newDbPair()
+        val now = 1_700_000_000L
+        // 120 distinct tvg_ids, all with an in-window programme.
+        seedGuideChannelsAndEpg(db, count = 120, windowCenter = now)
 
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
-            val windowStart = now - 3600L
-            val windowEnd = now + 3600L
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val windowStart = now - 3600L
+        val windowEnd = now + 3600L
 
-            val page0 = repo.getGuideData(windowStart, windowEnd, limit = 50L, offset = 0L)
-            val page1 = repo.getGuideData(windowStart, windowEnd, limit = 50L, offset = 50L)
-            val page2 = repo.getGuideData(windowStart, windowEnd, limit = 50L, offset = 100L)
+        val page0 = repo.getGuideData(windowStart, windowEnd, limit = 50L, offset = 0L)
+        val page1 = repo.getGuideData(windowStart, windowEnd, limit = 50L, offset = 50L)
+        val page2 = repo.getGuideData(windowStart, windowEnd, limit = 50L, offset = 100L)
 
-            assertEquals(50, page0.channels.size)
-            assertEquals(50, page1.channels.size)
-            assertEquals(20, page2.channels.size, "final page must carry the remainder")
+        assertEquals(50, page0.channels.size)
+        assertEquals(50, page1.channels.size)
+        assertEquals(20, page2.channels.size, "final page must carry the remainder")
 
-            // Pages must not overlap. This would have caught the
-            // DISTINCT-on-full-row bug that shipped LazyColumn duplicate-key
-            // crashes for 250k-channel users.
-            val allIds = (page0.channels + page1.channels + page2.channels).map { it.tvgId }
-            assertEquals(allIds.size, allIds.toSet().size, "pagination must yield unique tvg_ids")
-            assertEquals(120, allIds.toSet().size)
-        }
+        // Pages must not overlap. This would have caught the
+        // DISTINCT-on-full-row bug that shipped LazyColumn duplicate-key
+        // crashes for 250k-channel users.
+        val allIds = (page0.channels + page1.channels + page2.channels).map { it.tvgId }
+        assertEquals(allIds.size, allIds.toSet().size, "pagination must yield unique tvg_ids")
+        assertEquals(120, allIds.toSet().size)
+    }
 
-    @Test fun `countGuideChannels matches number of distinct tvg_ids in window`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            val now = 1_700_000_000L
-            seedGuideChannelsAndEpg(db, count = 37, windowCenter = now)
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+    @Test fun `countGuideChannels matches number of distinct tvg_ids in window`() = runTest {
+        val (db, driver) = newDbPair()
+        val now = 1_700_000_000L
+        seedGuideChannelsAndEpg(db, count = 37, windowCenter = now)
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
 
-            assertEquals(
-                37L,
-                repo.countGuideChannels(startTime = now - 3600L, endTime = now + 3600L),
+        assertEquals(
+            37L,
+            repo.countGuideChannels(startTime = now - 3600L, endTime = now + 3600L),
+        )
+    }
+
+    @Test fun `getGuideData offset past end returns empty`() = runTest {
+        val (db, driver) = newDbPair()
+        val now = 1_700_000_000L
+        seedGuideChannelsAndEpg(db, count = 5, windowCenter = now)
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+
+        val page =
+            repo.getGuideData(
+                startTime = now - 3600L,
+                endTime = now + 3600L,
+                limit = 100L,
+                offset = 1000L,
             )
-        }
+        assertTrue(page.channels.isEmpty())
+    }
 
-    @Test fun `getGuideData offset past end returns empty`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            val now = 1_700_000_000L
-            seedGuideChannelsAndEpg(db, count = 5, windowCenter = now)
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+    @Test fun `getGuideData dedupes channels with multiple content variants sharing tvg_id`() = runTest {
+        val (db, driver) = newDbPair()
+        val now = 1_700_000_000L
+        // Two content rows carry the same tvg_id — typical for providers that
+        // ship 1080p + 720p variants. The paged query's GROUP BY c.tvg_id
+        // must collapse them to one guide row.
+        insertSource(db, "src-A", "http://a")
+        insertContent(db, "ch-1080p", "src-A", "cnn.us", "CNN 1080p")
+        insertContent(db, "ch-720p", "src-A", "cnn.us", "CNN 720p")
+        insertProgramme(db, tvgId = "cnn.us", start = now - 100, end = now + 100, sourceKey = "src-A")
 
-            val page =
-                repo.getGuideData(
-                    startTime = now - 3600L,
-                    endTime = now + 3600L,
-                    limit = 100L,
-                    offset = 1000L,
-                )
-            assertTrue(page.channels.isEmpty())
-        }
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page =
+            repo.getGuideData(
+                startTime = now - 3600L,
+                endTime = now + 3600L,
+                limit = 100L,
+                offset = 0L,
+            )
+        assertEquals(1, page.channels.size, "two variants of cnn.us must collapse to one guide row")
+        assertEquals("cnn.us", page.channels.single().tvgId)
+    }
 
-    @Test fun `getGuideData dedupes channels with multiple content variants sharing tvg_id`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            val now = 1_700_000_000L
-            // Two content rows carry the same tvg_id — typical for providers that
-            // ship 1080p + 720p variants. The paged query's GROUP BY c.tvg_id
-            // must collapse them to one guide row.
-            insertSource(db, "src-A", "http://a")
-            insertContent(db, "ch-1080p", "src-A", "cnn.us", "CNN 1080p")
-            insertContent(db, "ch-720p", "src-A", "cnn.us", "CNN 720p")
-            insertProgramme(db, tvgId = "cnn.us", start = now - 100, end = now + 100, sourceKey = "src-A")
+    @Test fun `refresh error surfaces per-source failure messages`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", "http://a.xml")
+        insertSource(db, "src-B", "http://b.xml")
+        val now = 1_700_000_000L
+        val repo =
+            EpgRepository(
+                db,
+                driver,
+                // Both fail.
+                FakeHttpClient(errors = setOf("http://a.xml", "http://b.xml")),
+                clock = { now * 1000L },
+            )
 
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
-            val page =
-                repo.getGuideData(
-                    startTime = now - 3600L,
-                    endTime = now + 3600L,
-                    limit = 100L,
-                    offset = 0L,
-                )
-            assertEquals(1, page.channels.size, "two variants of cnn.us must collapse to one guide row")
-            assertEquals("cnn.us", page.channels.single().tvgId)
-        }
+        val result = repo.refresh()
+        assertFalse(result.ok)
+        val err = result.error ?: ""
+        // Joined per-source messages, not just "All EPG sources failed".
+        assertTrue(err.contains("src-A"), "error must name src-A: $err")
+        assertTrue(err.contains("src-B"), "error must name src-B: $err")
+        // Persisted for diagnostics panel.
+        assertEquals(err, repo.getLastError())
+    }
 
-    @Test fun `refresh error surfaces per-source failure messages`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-A", "http://a.xml")
-            insertSource(db, "src-B", "http://b.xml")
-            val now = 1_700_000_000L
-            val repo =
-                EpgRepository(
-                    db,
-                    driver,
-                    // Both fail.
-                    FakeHttpClient(errors = setOf("http://a.xml", "http://b.xml")),
-                    clock = { now * 1000L },
-                )
+    @Test fun `refresh success clears prior last-error`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", "http://a.xml")
+        val now = 1_700_000_000L
+        val xml = xmltv(listOf(Quadruple("c1", "Show", now - 100, now + 100)))
 
-            val result = repo.refresh()
-            assertFalse(result.ok)
-            val err = result.error ?: ""
-            // Joined per-source messages, not just "All EPG sources failed".
-            assertTrue(err.contains("src-A"), "error must name src-A: $err")
-            assertTrue(err.contains("src-B"), "error must name src-B: $err")
-            // Persisted for diagnostics panel.
-            assertEquals(err, repo.getLastError())
-        }
+        // First refresh: fail.
+        EpgRepository(db, driver, FakeHttpClient(errors = setOf("http://a.xml")), clock = { now * 1000L })
+            .refresh()
+        val repo = EpgRepository(db, driver, FakeHttpClient(mapOf("http://a.xml" to xml)), clock = { now * 1000L })
+        assertTrue(repo.getLastError() != null, "sanity: first refresh should have stamped an error")
 
-    @Test fun `refresh success clears prior last-error`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-A", "http://a.xml")
-            val now = 1_700_000_000L
-            val xml = xmltv(listOf(Quadruple("c1", "Show", now - 100, now + 100)))
-
-            // First refresh: fail.
-            EpgRepository(db, driver, FakeHttpClient(errors = setOf("http://a.xml")), clock = { now * 1000L })
-                .refresh()
-            val repo = EpgRepository(db, driver, FakeHttpClient(mapOf("http://a.xml" to xml)), clock = { now * 1000L })
-            assertTrue(repo.getLastError() != null, "sanity: first refresh should have stamped an error")
-
-            // Second refresh: success.
-            val ok = repo.refresh()
-            assertTrue(ok.ok)
-            assertNull(repo.getLastError(), "success must clear the stored last-error")
-        }
+        // Second refresh: success.
+        val ok = repo.refresh()
+        assertTrue(ok.ok)
+        assertNull(repo.getLastError(), "success must clear the stored last-error")
+    }
 
     // ───── seeding helpers ─────
 
-    private fun seedGuideChannelsAndEpg(
-        db: com.yancotv.shared.db.YancoDb,
-        count: Int,
-        windowCenter: Long,
-    ) {
+    private fun seedGuideChannelsAndEpg(db: com.yancotv.shared.db.YancoDb, count: Int, windowCenter: Long) {
         insertSource(db, "src-A", null)
         for (i in 0 until count) {
             val tvg = "c$i"
@@ -386,109 +352,100 @@ class EpgRepositoryTest {
      * These tests pin that contract so a future refactor that drops
      * the JOIN can't silently regress.
      */
-    @Test fun `getNowProgramme picks higher epg_priority source`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-low", null, epgPriority = 0L)
-            insertSource(db, "src-high", null, epgPriority = 5L)
+    @Test fun `getNowProgramme picks higher epg_priority source`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-low", null, epgPriority = 0L)
+        insertSource(db, "src-high", null, epgPriority = 5L)
 
-            // Both sources publish a programme covering "now".
-            val nowSec = 1_000L
-            db.epgProgrammesQueries.upsert(
-                id = "low-prog",
-                source_id = "src-low",
-                channel_tvg_id = "cnn.us",
-                title = "Low source show",
-                description = null,
-                start_time = nowSec - 500L,
-                end_time = nowSec + 500L,
-                category = null,
-                icon_url = null,
-            )
-            db.epgProgrammesQueries.upsert(
-                id = "high-prog",
-                source_id = "src-high",
-                channel_tvg_id = "cnn.us",
-                title = "High source show",
-                description = null,
-                start_time = nowSec - 500L,
-                end_time = nowSec + 500L,
-                category = null,
-                icon_url = null,
-            )
+        // Both sources publish a programme covering "now".
+        val nowSec = 1_000L
+        db.epgProgrammesQueries.upsert(
+            id = "low-prog",
+            source_id = "src-low",
+            channel_tvg_id = "cnn.us",
+            title = "Low source show",
+            description = null,
+            start_time = nowSec - 500L,
+            end_time = nowSec + 500L,
+            category = null,
+            icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "high-prog",
+            source_id = "src-high",
+            channel_tvg_id = "cnn.us",
+            title = "High source show",
+            description = null,
+            start_time = nowSec - 500L,
+            end_time = nowSec + 500L,
+            category = null,
+            icon_url = null,
+        )
 
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { nowSec * 1_000L })
-            val now = repo.getNowProgramme("cnn.us")
-            assertNotNull(now)
-            assertEquals("High source show", now.title)
-        }
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { nowSec * 1_000L })
+        val now = repo.getNowProgramme("cnn.us")
+        assertNotNull(now)
+        assertEquals("High source show", now.title)
+    }
 
-    @Test fun `single-source case unchanged by priority JOIN`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-A", null, epgPriority = 0L)
-            val nowSec = 1_000L
-            db.epgProgrammesQueries.upsert(
-                id = "p1",
-                source_id = "src-A",
-                channel_tvg_id = "cnn.us",
-                title = "Solo show",
-                description = null,
-                start_time = nowSec - 500L,
-                end_time = nowSec + 500L,
-                category = null,
-                icon_url = null,
-            )
+    @Test fun `single-source case unchanged by priority JOIN`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null, epgPriority = 0L)
+        val nowSec = 1_000L
+        db.epgProgrammesQueries.upsert(
+            id = "p1",
+            source_id = "src-A",
+            channel_tvg_id = "cnn.us",
+            title = "Solo show",
+            description = null,
+            start_time = nowSec - 500L,
+            end_time = nowSec + 500L,
+            category = null,
+            icon_url = null,
+        )
 
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { nowSec * 1_000L })
-            assertEquals("Solo show", repo.getNowProgramme("cnn.us")?.title)
-        }
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { nowSec * 1_000L })
+        assertEquals("Solo show", repo.getNowProgramme("cnn.us")?.title)
+    }
 
-    @Test fun `getProgrammesForChannel orders priority then start_time`() =
-        runTest {
-            val (db, driver) = newDbPair()
-            insertSource(db, "src-low", null, epgPriority = 0L)
-            insertSource(db, "src-high", null, epgPriority = 10L)
+    @Test fun `getProgrammesForChannel orders priority then start_time`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-low", null, epgPriority = 0L)
+        insertSource(db, "src-high", null, epgPriority = 10L)
 
-            // Same channel, two sources, programmes interleaved in time.
-            // forChannelRange's ORDER BY priority DESC, start_time means
-            // ALL high-priority rows come before any low-priority rows
-            // even when their start_time is later.
-            val low1 = 1000L
-            val low2 = 2000L
-            val high1 = 1500L
-            db.epgProgrammesQueries.upsert(
-                id = "low-1", source_id = "src-low", channel_tvg_id = "cnn.us",
-                title = "Low 1", description = null, start_time = low1, end_time = low1 + 100,
-                category = null, icon_url = null,
-            )
-            db.epgProgrammesQueries.upsert(
-                id = "low-2", source_id = "src-low", channel_tvg_id = "cnn.us",
-                title = "Low 2", description = null, start_time = low2, end_time = low2 + 100,
-                category = null, icon_url = null,
-            )
-            db.epgProgrammesQueries.upsert(
-                id = "high-1", source_id = "src-high", channel_tvg_id = "cnn.us",
-                title = "High 1", description = null, start_time = high1, end_time = high1 + 100,
-                category = null, icon_url = null,
-            )
+        // Same channel, two sources, programmes interleaved in time.
+        // forChannelRange's ORDER BY priority DESC, start_time means
+        // ALL high-priority rows come before any low-priority rows
+        // even when their start_time is later.
+        val low1 = 1000L
+        val low2 = 2000L
+        val high1 = 1500L
+        db.epgProgrammesQueries.upsert(
+            id = "low-1", source_id = "src-low", channel_tvg_id = "cnn.us",
+            title = "Low 1", description = null, start_time = low1, end_time = low1 + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "low-2", source_id = "src-low", channel_tvg_id = "cnn.us",
+            title = "Low 2", description = null, start_time = low2, end_time = low2 + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "high-1", source_id = "src-high", channel_tvg_id = "cnn.us",
+            title = "High 1", description = null, start_time = high1, end_time = high1 + 100,
+            category = null, icon_url = null,
+        )
 
-            val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 0L })
-            val rows = repo.getProgrammesForChannel("cnn.us", startTime = 0L, endTime = 10_000L)
-            assertEquals(3, rows.size)
-            // High-priority row first, then low-priority by start_time.
-            assertEquals("High 1", rows[0].title)
-            assertEquals("Low 1", rows[1].title)
-            assertEquals("Low 2", rows[2].title)
-        }
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 0L })
+        val rows = repo.getProgrammesForChannel("cnn.us", startTime = 0L, endTime = 10_000L)
+        assertEquals(3, rows.size)
+        // High-priority row first, then low-priority by start_time.
+        assertEquals("High 1", rows[0].title)
+        assertEquals("Low 1", rows[1].title)
+        assertEquals("Low 2", rows[2].title)
+    }
 
-    private fun insertContent(
-        db: com.yancotv.shared.db.YancoDb,
-        id: String,
-        sourceId: String,
-        tvgId: String,
-        title: String,
-    ) {
+    private fun insertContent(db: com.yancotv.shared.db.YancoDb, id: String, sourceId: String, tvgId: String, title: String) {
         db.contentQueries.insert(
             id = id,
             source_id = sourceId,
@@ -505,13 +462,7 @@ class EpgRepositoryTest {
         )
     }
 
-    private fun insertProgramme(
-        db: com.yancotv.shared.db.YancoDb,
-        tvgId: String,
-        start: Long,
-        end: Long,
-        sourceKey: String,
-    ) {
+    private fun insertProgramme(db: com.yancotv.shared.db.YancoDb, tvgId: String, start: Long, end: Long, sourceKey: String) {
         db.epgProgrammesQueries.upsert(
             id = "$tvgId|$start|$sourceKey",
             source_id = sourceKey,

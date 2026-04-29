@@ -28,11 +28,7 @@ sealed interface RecordingPath {
 }
 
 object RecordingRouting {
-    fun decide(
-        playingUrl: String?,
-        requestedUrl: String,
-    ): RecordingPath =
-        // Both sides must be non-blank AND identical. Production
+    fun decide(playingUrl: String?, requestedUrl: String): RecordingPath = // Both sides must be non-blank AND identical. Production
         // RecordInput contract forbids blank requestedUrl already, but
         // pinning the boundary here keeps the function safe to call
         // from any context (UI debug, future caller, or a fuzz input).

@@ -1,19 +1,19 @@
 package com.yancotv.shared.http
 
+import io.ktor.client.HttpClient as KtorClient
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.jvm.javaio.copyTo
 import io.ktor.utils.io.jvm.javaio.toInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.io.Source
 import kotlinx.io.asSource
 import kotlinx.io.buffered
-import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
-import io.ktor.client.HttpClient as KtorClient
 
 /**
  * Android variant of [KtorHttpClient] that streams large response bodies
@@ -40,74 +40,61 @@ import io.ktor.client.HttpClient as KtorClient
  * A 60MB response writes in ~150ms to internal storage and reads in ~50ms
  * — negligible vs the multi-second network download + SQLite insert cost.
  */
-class AndroidKtorHttpClient(
-    ktor: KtorClient,
-    userAgentProvider: () -> String,
-    perRequestReadTimeoutMs: () -> Long?,
-    private val cacheDir: File,
-) : KtorHttpClient(ktor, userAgentProvider, perRequestReadTimeoutMs) {
-    override suspend fun <T> getSource(
-        url: String,
-        options: HttpRequestOptions,
-        block: suspend (Source) -> T,
-    ): T =
-        withContext(Dispatchers.IO) {
-            val response = performGet(url, options)
+class AndroidKtorHttpClient(ktor: KtorClient, userAgentProvider: () -> String, perRequestReadTimeoutMs: () -> Long?, private val cacheDir: File) :
+    KtorHttpClient(ktor, userAgentProvider, perRequestReadTimeoutMs) {
+    override suspend fun <T> getSource(url: String, options: HttpRequestOptions, block: suspend (Source) -> T): T = withContext(Dispatchers.IO) {
+        val response = performGet(url, options)
 
-            // Streaming-live path: hand the caller a Source backed directly
-            // by the network channel. Required for [MpegTsRecorder] where the
-            // body is a multi-hour MPEG-TS that never ends until the caller
-            // cancels — the default temp-file path below would call
-            // `streamToFile` and loop forever, never reaching `block(source)`,
-            // so the recorder's sink would receive zero bytes (regression
-            // observed when stopping a recording produced 0-byte files).
-            if (options.streamLive) {
-                val channel: ByteReadChannel = response.bodyAsChannel()
-                return@withContext channel.toInputStream().use { input ->
-                    val source: Source = input.asSource().buffered()
-                    source.use { block(it) }
-                }
-            }
-
-            options.maxResponseBytes?.let { cap ->
-                response.headers["Content-Length"]?.toLongOrNull()?.let { declared ->
-                    if (declared > cap) {
-                        throw HttpResponseError(
-                            status = HttpStatusCode.PayloadTooLarge.value,
-                            statusText = "Payload too large",
-                            message = "Response declared $declared bytes exceeds cap $cap bytes ($url)",
-                        )
-                    }
-                }
-            }
-
-            val tempFile = File(cacheDir, "ktor-stream-${UUID.randomUUID()}.bin")
-            try {
-                val bytesWritten = streamToFile(response.bodyAsChannel(), tempFile, options.maxResponseBytes)
-                // Extra post-download guard in case the server omitted Content-Length.
-                options.maxResponseBytes?.let { cap ->
-                    if (bytesWritten > cap) {
-                        throw HttpResponseError(
-                            status = HttpStatusCode.PayloadTooLarge.value,
-                            statusText = "Payload too large",
-                            message = "Response $bytesWritten bytes exceeds cap $cap bytes ($url)",
-                        )
-                    }
-                }
-                tempFile.inputStream().use { fis ->
-                    val source: Source = fis.asSource().buffered()
-                    source.use { block(it) }
-                }
-            } finally {
-                runCatching { tempFile.delete() }
+        // Streaming-live path: hand the caller a Source backed directly
+        // by the network channel. Required for [MpegTsRecorder] where the
+        // body is a multi-hour MPEG-TS that never ends until the caller
+        // cancels — the default temp-file path below would call
+        // `streamToFile` and loop forever, never reaching `block(source)`,
+        // so the recorder's sink would receive zero bytes (regression
+        // observed when stopping a recording produced 0-byte files).
+        if (options.streamLive) {
+            val channel: ByteReadChannel = response.bodyAsChannel()
+            return@withContext channel.toInputStream().use { input ->
+                val source: Source = input.asSource().buffered()
+                source.use { block(it) }
             }
         }
 
-    private suspend fun streamToFile(
-        channel: ByteReadChannel,
-        dest: File,
-        maxBytes: Long?,
-    ): Long {
+        options.maxResponseBytes?.let { cap ->
+            response.headers["Content-Length"]?.toLongOrNull()?.let { declared ->
+                if (declared > cap) {
+                    throw HttpResponseError(
+                        status = HttpStatusCode.PayloadTooLarge.value,
+                        statusText = "Payload too large",
+                        message = "Response declared $declared bytes exceeds cap $cap bytes ($url)",
+                    )
+                }
+            }
+        }
+
+        val tempFile = File(cacheDir, "ktor-stream-${UUID.randomUUID()}.bin")
+        try {
+            val bytesWritten = streamToFile(response.bodyAsChannel(), tempFile, options.maxResponseBytes)
+            // Extra post-download guard in case the server omitted Content-Length.
+            options.maxResponseBytes?.let { cap ->
+                if (bytesWritten > cap) {
+                    throw HttpResponseError(
+                        status = HttpStatusCode.PayloadTooLarge.value,
+                        statusText = "Payload too large",
+                        message = "Response $bytesWritten bytes exceeds cap $cap bytes ($url)",
+                    )
+                }
+            }
+            tempFile.inputStream().use { fis ->
+                val source: Source = fis.asSource().buffered()
+                source.use { block(it) }
+            }
+        } finally {
+            runCatching { tempFile.delete() }
+        }
+    }
+
+    private suspend fun streamToFile(channel: ByteReadChannel, dest: File, maxBytes: Long?): Long {
         FileOutputStream(dest).use { fos ->
             // Ktor's copyTo streams the channel into an OutputStream with a
             // bounded internal buffer (default 4KB). We cap it here so a

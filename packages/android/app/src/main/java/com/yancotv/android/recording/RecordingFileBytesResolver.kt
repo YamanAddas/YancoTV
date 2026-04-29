@@ -35,25 +35,21 @@ import java.io.File
  * etc.); the caller treats every `null` as "no recovery possible →
  * mark `FAILED("orphaned_by_app_kill")`".
  */
-fun recordingFileBytesResolver(context: Context): (String) -> Long? =
-    { fileUri ->
-        runCatching {
-            when {
-                fileUri.isBlank() -> null
-                fileUri.startsWith("content://") -> contentResolverFileSize(context, fileUri)
-                fileUri.startsWith("file://") -> {
-                    val path = Uri.parse(fileUri).path
-                    if (path == null) null else filesystemFileSize(File(path))
-                }
-                else -> filesystemFileSize(File(fileUri))
+fun recordingFileBytesResolver(context: Context): (String) -> Long? = { fileUri ->
+    runCatching {
+        when {
+            fileUri.isBlank() -> null
+            fileUri.startsWith("content://") -> contentResolverFileSize(context, fileUri)
+            fileUri.startsWith("file://") -> {
+                val path = Uri.parse(fileUri).path
+                if (path == null) null else filesystemFileSize(File(path))
             }
-        }.getOrNull()
-    }
+            else -> filesystemFileSize(File(fileUri))
+        }
+    }.getOrNull()
+}
 
-private fun contentResolverFileSize(
-    context: Context,
-    uri: String,
-): Long? {
+private fun contentResolverFileSize(context: Context, uri: String): Long? {
     val parsed = Uri.parse(uri) ?: return null
     return context.contentResolver
         .query(parsed, arrayOf(OpenableColumns.SIZE), null, null, null)

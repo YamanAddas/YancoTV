@@ -33,10 +33,7 @@ import com.yancotv.shared.types.ContentType
  * sync so removed history items disappear from the launcher row
  * within one period (default 6 hours).
  */
-class RecommendationsSync(
-    private val context: Context,
-    private val history: WatchHistoryRepository,
-) {
+class RecommendationsSync(private val context: Context, private val history: WatchHistoryRepository) {
     fun sync(): SyncResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             // TvContractCompat preview-program APIs require API 26+.
@@ -164,18 +161,13 @@ class RecommendationsSync(
         return Uri.parse(intent.toUri(0))
     }
 
-    private fun typeFor(t: ContentType): Int =
-        when (t) {
-            ContentType.LIVE -> TvContractCompat.PreviewPrograms.TYPE_CHANNEL
-            ContentType.MOVIE -> TvContractCompat.PreviewPrograms.TYPE_MOVIE
-            ContentType.SERIES -> TvContractCompat.PreviewPrograms.TYPE_TV_SERIES
-        }
+    private fun typeFor(t: ContentType): Int = when (t) {
+        ContentType.LIVE -> TvContractCompat.PreviewPrograms.TYPE_CHANNEL
+        ContentType.MOVIE -> TvContractCompat.PreviewPrograms.TYPE_MOVIE
+        ContentType.SERIES -> TvContractCompat.PreviewPrograms.TYPE_TV_SERIES
+    }
 
-    data class SyncResult(
-        val channelId: Long,
-        val programs: Int,
-        val skipped: Boolean,
-    )
+    data class SyncResult(val channelId: Long, val programs: Int, val skipped: Boolean)
 
     companion object {
         private const val TAG = "YancoRecs"

@@ -20,11 +20,7 @@ import kotlinx.coroutines.sync.withLock
  * Clock is injected so tests can fast-forward the lockout window without
  * sleeping 30 s.
  */
-class ParentalRepository(
-    private val db: YancoDb,
-    private val hasher: PinHasher,
-    private val clock: () -> Long,
-) {
+class ParentalRepository(private val db: YancoDb, private val hasher: PinHasher, private val clock: () -> Long) {
     // In-memory lockout state. Matches desktop — survives across verify
     // calls within one process but resets on app restart (acceptable: an
     // attacker with app kill access has bigger problems). Protected by a
@@ -48,10 +44,9 @@ class ParentalRepository(
     // ───── PIN ─────
 
     /** Returns ms remaining on the current brute-force cooldown, or 0 if not locked. */
-    suspend fun lockoutRemainingMs(): Long =
-        lockoutMutex.withLock {
-            (lockoutUntilMs - clock()).coerceAtLeast(0L)
-        }
+    suspend fun lockoutRemainingMs(): Long = lockoutMutex.withLock {
+        (lockoutUntilMs - clock()).coerceAtLeast(0L)
+    }
 
     suspend fun setPin(pin: String) {
         val encoded = hasher.hash(pin)
@@ -154,25 +149,22 @@ class ParentalRepository(
 
     // ───── internals ─────
 
-    private fun readSettings(): ParentalSettings =
-        ParentalSettings(
-            pinSet = db.settingsQueries.get(KEY_PIN_HASH).executeAsOneOrNull() != null,
-            pinEnabled = db.settingsQueries.get(KEY_PIN_ENABLED).executeAsOneOrNull() == "1",
-            hideAdultContent = db.settingsQueries.get(KEY_HIDE_ADULT).executeAsOneOrNull() == "1",
-            requirePinForSettings = db.settingsQueries.get(KEY_REQUIRE_PIN_SETTINGS).executeAsOneOrNull() == "1",
-        )
+    private fun readSettings(): ParentalSettings = ParentalSettings(
+        pinSet = db.settingsQueries.get(KEY_PIN_HASH).executeAsOneOrNull() != null,
+        pinEnabled = db.settingsQueries.get(KEY_PIN_ENABLED).executeAsOneOrNull() == "1",
+        hideAdultContent = db.settingsQueries.get(KEY_HIDE_ADULT).executeAsOneOrNull() == "1",
+        requirePinForSettings = db.settingsQueries.get(KEY_REQUIRE_PIN_SETTINGS).executeAsOneOrNull() == "1",
+    )
 
-    private fun loadLockedIds(): Set<String> =
-        db.parentalQueries
-            .selectLocked()
-            .executeAsList()
-            .toHashSet()
+    private fun loadLockedIds(): Set<String> = db.parentalQueries
+        .selectLocked()
+        .executeAsList()
+        .toHashSet()
 
-    private fun loadHiddenIds(): Set<String> =
-        db.parentalQueries
-            .selectHidden()
-            .executeAsList()
-            .toHashSet()
+    private fun loadHiddenIds(): Set<String> = db.parentalQueries
+        .selectHidden()
+        .executeAsList()
+        .toHashSet()
 
     companion object {
         const val KEY_PIN_HASH = "parental_pin_hash"
@@ -188,9 +180,4 @@ class ParentalRepository(
     }
 }
 
-data class ParentalSettings(
-    val pinSet: Boolean,
-    val pinEnabled: Boolean,
-    val hideAdultContent: Boolean,
-    val requirePinForSettings: Boolean,
-)
+data class ParentalSettings(val pinSet: Boolean, val pinEnabled: Boolean, val hideAdultContent: Boolean, val requirePinForSettings: Boolean)

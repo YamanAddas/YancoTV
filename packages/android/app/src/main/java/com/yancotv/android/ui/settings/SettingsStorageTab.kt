@@ -16,8 +16,8 @@ fun SettingsStorageTab(modifier: Modifier = Modifier) {
         kicker = "Later milestone",
         title = "Storage",
         body =
-            "Image cache size, EPG cache size, SQLite DB footprint, and one-tap " +
-                "clear actions. Waiting on a size-aggregator in the shared cache layer " +
-                "so the read is cheap enough to refresh on tab entry.",
+        "Image cache size, EPG cache size, SQLite DB footprint, and one-tap " +
+            "clear actions. Waiting on a size-aggregator in the shared cache layer " +
+            "so the read is cheap enough to refresh on tab entry.",
     )
 }

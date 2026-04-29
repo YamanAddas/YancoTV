@@ -28,9 +28,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,11 +54,7 @@ import org.koin.compose.koinInject
  * pinned at the top (same pattern as [SourcesScreen]).
  */
 @Composable
-fun SettingsGroupsTab(
-    modifier: Modifier = Modifier,
-    prefs: AppPreferences = koinInject(),
-    repo: ContentRepository = koinInject(),
-) {
+fun SettingsGroupsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koinInject(), repo: ContentRepository = koinInject()) {
     val hidden by prefs.hiddenGroupsFlow.collectAsState()
     val pinnedParentsByType by prefs.pinnedParentsFlow.collectAsState()
     val general by prefs.generalFlow.collectAsState()
@@ -93,9 +89,9 @@ fun SettingsGroupsTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Groups",
@@ -150,15 +146,15 @@ fun SettingsGroupsTab(
                 val palette = LocalYancoPalette.current
                 Column(
                     modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(palette.BackgroundRaised.copy(alpha = 0.5f))
-                            .border(
-                                width = 1.dp,
-                                color = palette.BorderSubtle,
-                                shape = RoundedCornerShape(12.dp),
-                            ),
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.BackgroundRaised.copy(alpha = 0.5f))
+                        .border(
+                            width = 1.dp,
+                            color = palette.BorderSubtle,
+                            shape = RoundedCornerShape(12.dp),
+                        ),
                 ) {
                     availableParents.forEach { parent ->
                         val isPinned =
@@ -205,16 +201,16 @@ fun SettingsGroupsTab(
             val palette = LocalYancoPalette.current
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(palette.BackgroundRaised.copy(alpha = 0.5f))
-                        .border(
-                            width = 1.dp,
-                            color = palette.BorderSubtle,
-                            shape = RoundedCornerShape(12.dp),
-                        ),
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(palette.BackgroundRaised.copy(alpha = 0.5f))
+                    .border(
+                        width = 1.dp,
+                        color = palette.BorderSubtle,
+                        shape = RoundedCornerShape(12.dp),
+                    ),
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -230,11 +226,11 @@ fun SettingsGroupsTab(
                         // Hairline between rows.
                         Box(
                             modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 18.dp)
-                                    .background(palette.BorderSubtle)
-                                    .padding(top = 0.dp, bottom = 0.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp)
+                                .background(palette.BorderSubtle)
+                                .padding(top = 0.dp, bottom = 0.dp),
                         ) {
                             // Empty 1dp divider via height; keeps the modifier
                             // tower simple compared to building Divider().
@@ -248,11 +244,7 @@ fun SettingsGroupsTab(
 }
 
 @Composable
-private fun GroupRow(
-    name: String,
-    hidden: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
+private fun GroupRow(name: String, hidden: Boolean, onToggle: (Boolean) -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -260,21 +252,21 @@ private fun GroupRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(rowBg)
-                .border(
-                    width = if (focused) 1.5.dp else 0.dp,
-                    color = if (focused) palette.FocusRing else Color.Transparent,
-                    shape = RoundedCornerShape(0.dp),
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = { onToggle(!hidden) },
-                )
-                .padding(horizontal = 22.dp, vertical = 14.dp),
+        Modifier
+            .fillMaxWidth()
+            .background(rowBg)
+            .border(
+                width = if (focused) 1.5.dp else 0.dp,
+                color = if (focused) palette.FocusRing else Color.Transparent,
+                shape = RoundedCornerShape(0.dp),
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = { onToggle(!hidden) },
+            )
+            .padding(horizontal = 22.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -297,14 +289,7 @@ private fun GroupRow(
 }
 
 @Composable
-private fun ParentPinRow(
-    label: String,
-    prefixCode: String,
-    kind: PrefixCatalog.Kind,
-    childCount: Int,
-    pinned: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
+private fun ParentPinRow(label: String, prefixCode: String, kind: PrefixCatalog.Kind, childCount: Int, pinned: Boolean, onToggle: (Boolean) -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -316,21 +301,21 @@ private fun ParentPinRow(
         }
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(rowBg)
-                .border(
-                    width = if (focused) 1.5.dp else 0.dp,
-                    color = if (focused) palette.FocusRing else Color.Transparent,
-                    shape = RoundedCornerShape(0.dp),
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = { onToggle(!pinned) },
-                )
-                .padding(horizontal = 22.dp, vertical = 14.dp),
+        Modifier
+            .fillMaxWidth()
+            .background(rowBg)
+            .border(
+                width = if (focused) 1.5.dp else 0.dp,
+                color = if (focused) palette.FocusRing else Color.Transparent,
+                shape = RoundedCornerShape(0.dp),
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = { onToggle(!pinned) },
+            )
+            .padding(horizontal = 22.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -352,9 +337,8 @@ private fun ParentPinRow(
     }
 }
 
-private fun typeChipLabel(type: ContentType): String =
-    when (type) {
-        ContentType.LIVE -> "Live TV"
-        ContentType.MOVIE -> "Movies"
-        ContentType.SERIES -> "Series"
-    }
+private fun typeChipLabel(type: ContentType): String = when (type) {
+    ContentType.LIVE -> "Live TV"
+    ContentType.MOVIE -> "Movies"
+    ContentType.SERIES -> "Series"
+}

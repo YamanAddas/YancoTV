@@ -163,9 +163,9 @@ object YancoIcons {
                 // Outer cog silhouette.
                 addPath(
                     pathData =
-                        androidx.compose.ui.graphics.vector.addPathNodes(
-                            "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
-                        ),
+                    androidx.compose.ui.graphics.vector.addPathNodes(
+                        "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+                    ),
                     stroke = SolidColor(Color.White),
                     strokeLineWidth = 1.6f,
                     strokeLineCap = StrokeCap.Round,
@@ -174,9 +174,9 @@ object YancoIcons {
                 // Inner hub (radius 3 at center).
                 addPath(
                     pathData =
-                        androidx.compose.ui.graphics.vector.addPathNodes(
-                            "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
-                        ),
+                    androidx.compose.ui.graphics.vector.addPathNodes(
+                        "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
+                    ),
                     stroke = SolidColor(Color.White),
                     strokeLineWidth = 1.6f,
                     strokeLineCap = StrokeCap.Round,
@@ -257,17 +257,34 @@ object YancoIcons {
     /** Grid of four squares — Groups tab. */
     val Grid: ImageVector =
         buildLine("grid") {
-            moveTo(3f, 3f); lineTo(10f, 3f); lineTo(10f, 10f); lineTo(3f, 10f); close()
-            moveTo(14f, 3f); lineTo(21f, 3f); lineTo(21f, 10f); lineTo(14f, 10f); close()
-            moveTo(3f, 14f); lineTo(10f, 14f); lineTo(10f, 21f); lineTo(3f, 21f); close()
-            moveTo(14f, 14f); lineTo(21f, 14f); lineTo(21f, 21f); lineTo(14f, 21f); close()
+            moveTo(3f, 3f)
+            lineTo(10f, 3f)
+            lineTo(10f, 10f)
+            lineTo(3f, 10f)
+            close()
+            moveTo(14f, 3f)
+            lineTo(21f, 3f)
+            lineTo(21f, 10f)
+            lineTo(14f, 10f)
+            close()
+            moveTo(3f, 14f)
+            lineTo(10f, 14f)
+            lineTo(10f, 21f)
+            lineTo(3f, 21f)
+            close()
+            moveTo(14f, 14f)
+            lineTo(21f, 14f)
+            lineTo(21f, 21f)
+            lineTo(14f, 21f)
+            close()
         }
 
     /** CC / subtitles badge — Subtitles tab. */
     val Subtitles: ImageVector =
         buildLine("subtitles") {
             // Rounded rect frame (2,5) → (22,19) with 1dp corner radius.
-            moveTo(4f, 5f); lineTo(20f, 5f)
+            moveTo(4f, 5f)
+            lineTo(20f, 5f)
             arcToRelative(1f, 1f, 0f, false, true, 1f, 1f)
             lineTo(21f, 18f)
             arcToRelative(1f, 1f, 0f, false, true, -1f, 1f)
@@ -277,20 +294,40 @@ object YancoIcons {
             arcToRelative(1f, 1f, 0f, false, true, 1f, -1f)
             close()
             // Upper-row narrow dashes (CC underscores).
-            moveTo(7f, 11f); lineTo(6.5f, 11f)
-            moveTo(14.5f, 11f); lineTo(14f, 11f)
+            moveTo(7f, 11f)
+            lineTo(6.5f, 11f)
+            moveTo(14.5f, 11f)
+            lineTo(14f, 11f)
             // Lower-row wide dashes (caption lines).
-            moveTo(7f, 15f); lineTo(10f, 15f)
-            moveTo(15f, 15f); lineTo(18f, 15f)
+            moveTo(7f, 15f)
+            lineTo(10f, 15f)
+            moveTo(15f, 15f)
+            lineTo(18f, 15f)
         }
 
     /** Ascending bars — Network tab. */
     val Signal: ImageVector =
         buildFilled("signal") {
-            moveTo(3f, 13f); lineTo(5f, 13f); lineTo(5f, 18f); lineTo(3f, 18f); close()
-            moveTo(8f, 9f); lineTo(10f, 9f); lineTo(10f, 18f); lineTo(8f, 18f); close()
-            moveTo(13f, 5f); lineTo(15f, 5f); lineTo(15f, 18f); lineTo(13f, 18f); close()
-            moveTo(18f, 1f); lineTo(20f, 1f); lineTo(20f, 18f); lineTo(18f, 18f); close()
+            moveTo(3f, 13f)
+            lineTo(5f, 13f)
+            lineTo(5f, 18f)
+            lineTo(3f, 18f)
+            close()
+            moveTo(8f, 9f)
+            lineTo(10f, 9f)
+            lineTo(10f, 18f)
+            lineTo(8f, 18f)
+            close()
+            moveTo(13f, 5f)
+            lineTo(15f, 5f)
+            lineTo(15f, 18f)
+            lineTo(13f, 18f)
+            close()
+            moveTo(18f, 1f)
+            lineTo(20f, 1f)
+            lineTo(20f, 18f)
+            lineTo(18f, 18f)
+            close()
         }
 
     /** Two interlocking chain links — Sources tab. */
@@ -357,8 +394,10 @@ object YancoIcons {
             lineTo(2f, 7f)
             arcToRelative(1f, 1f, 0f, false, true, 1f, -1f)
             close()
-            moveTo(6f, 12f); lineTo(18f, 12f)
-            moveTo(6f, 15f); lineTo(10f, 15f)
+            moveTo(6f, 12f)
+            lineTo(18f, 12f)
+            moveTo(6f, 15f)
+            lineTo(10f, 15f)
         }
 
     /** Angled key — Shortcuts tab. */
@@ -369,9 +408,12 @@ object YancoIcons {
             arcToRelative(4f, 4f, 0f, true, true, 0f, 8f)
             arcToRelative(4f, 4f, 0f, true, true, 0f, -8f)
             // Shaft + two notches.
-            moveTo(11f, 12f); lineTo(22f, 1f)
-            moveTo(19f, 4f); lineTo(22f, 7f)
-            moveTo(16f, 7f); lineTo(19f, 10f)
+            moveTo(11f, 12f)
+            lineTo(22f, 1f)
+            moveTo(19f, 4f)
+            lineTo(22f, 7f)
+            moveTo(16f, 7f)
+            lineTo(19f, 10f)
         }
 
     /** Encircled lowercase "i" — About tab. */
@@ -382,16 +424,31 @@ object YancoIcons {
             arcToRelative(9f, 9f, 0f, true, true, 0f, -18f)
             // Dot of the "i" — drawn as a zero-length stroke so the rounded cap
             // paints a solid mark. Kept distinct from the stem for hinting.
-            moveTo(12f, 8f); lineTo(12f, 8.01f)
-            moveTo(12f, 12f); lineTo(12f, 16f)
+            moveTo(12f, 8f)
+            lineTo(12f, 8.01f)
+            moveTo(12f, 12f)
+            lineTo(12f, 16f)
         }
 
     /** Floppy-disk silhouette — Backup tab (export/import). */
     val Save: ImageVector =
         buildLine("save") {
-            moveTo(5f, 4f); lineTo(17f, 4f); lineTo(20f, 7f); lineTo(20f, 20f); lineTo(4f, 20f); lineTo(4f, 5f); close()
-            moveTo(8f, 4f); lineTo(8f, 9f); lineTo(15f, 9f); lineTo(15f, 4f)
-            moveTo(7f, 13f); lineTo(17f, 13f); lineTo(17f, 19f); lineTo(7f, 19f); close()
+            moveTo(5f, 4f)
+            lineTo(17f, 4f)
+            lineTo(20f, 7f)
+            lineTo(20f, 20f)
+            lineTo(4f, 20f)
+            lineTo(4f, 5f)
+            close()
+            moveTo(8f, 4f)
+            lineTo(8f, 9f)
+            lineTo(15f, 9f)
+            lineTo(15f, 4f)
+            moveTo(7f, 13f)
+            lineTo(17f, 13f)
+            lineTo(17f, 19f)
+            lineTo(7f, 19f)
+            close()
         }
 
     /** Soft cloud silhouette — sidebar "SYNCED" footer chip. */
@@ -422,60 +479,50 @@ object YancoIcons {
             }
         }
 
-    private fun buildLine(
-        name: String,
-        block: PathBuilder.() -> Unit,
-    ): ImageVector =
-        ImageVector
-            .Builder(
-                name = name,
-                defaultWidth = 24.dp,
-                defaultHeight = 24.dp,
-                viewportWidth = 24f,
-                viewportHeight = 24f,
-            ).apply {
-                addPath(
-                    pathData =
-                        androidx.compose.ui.graphics.vector
-                            .PathData(block),
-                    stroke = SolidColor(Color.White),
-                    strokeLineWidth = 1.6f,
-                    strokeLineCap = StrokeCap.Round,
-                    strokeLineJoin = StrokeJoin.Round,
-                )
-            }.build()
+    private fun buildLine(name: String, block: PathBuilder.() -> Unit): ImageVector = ImageVector
+        .Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            addPath(
+                pathData =
+                androidx.compose.ui.graphics.vector
+                    .PathData(block),
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 1.6f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            )
+        }.build()
 
-    private fun buildFilled(
-        name: String,
-        block: PathBuilder.() -> Unit,
-    ): ImageVector =
-        ImageVector
-            .Builder(
-                name = name,
-                defaultWidth = 24.dp,
-                defaultHeight = 24.dp,
-                viewportWidth = 24f,
-                viewportHeight = 24f,
-            ).apply {
-                addPath(
-                    pathData =
-                        androidx.compose.ui.graphics.vector
-                            .PathData(block),
-                    fill = SolidColor(Color.White),
-                )
-            }.build()
+    private fun buildFilled(name: String, block: PathBuilder.() -> Unit): ImageVector = ImageVector
+        .Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            addPath(
+                pathData =
+                androidx.compose.ui.graphics.vector
+                    .PathData(block),
+                fill = SolidColor(Color.White),
+            )
+        }.build()
 
     // Multi-path helper: lets an icon mix line-style and solid-fill sub-paths
     // (used by [Theme]). Keeps the single-path [buildLine]/[buildFilled] pair
     // as the common case and reserves this one for genuinely layered glyphs.
-    private class LayeredIconScope(
-        private val builder: ImageVector.Builder,
-    ) {
+    private class LayeredIconScope(private val builder: ImageVector.Builder) {
         fun stroke(block: PathBuilder.() -> Unit) {
             builder.addPath(
                 pathData =
-                    androidx.compose.ui.graphics.vector
-                        .PathData(block),
+                androidx.compose.ui.graphics.vector
+                    .PathData(block),
                 stroke = SolidColor(Color.White),
                 strokeLineWidth = 1.6f,
                 strokeLineCap = StrokeCap.Round,
@@ -486,25 +533,21 @@ object YancoIcons {
         fun fill(block: PathBuilder.() -> Unit) {
             builder.addPath(
                 pathData =
-                    androidx.compose.ui.graphics.vector
-                        .PathData(block),
+                androidx.compose.ui.graphics.vector
+                    .PathData(block),
                 fill = SolidColor(Color.White),
             )
         }
     }
 
-    private fun iconLayered(
-        name: String,
-        block: LayeredIconScope.() -> Unit,
-    ): ImageVector =
-        ImageVector
-            .Builder(
-                name = name,
-                defaultWidth = 24.dp,
-                defaultHeight = 24.dp,
-                viewportWidth = 24f,
-                viewportHeight = 24f,
-            ).apply {
-                LayeredIconScope(this).block()
-            }.build()
+    private fun iconLayered(name: String, block: LayeredIconScope.() -> Unit): ImageVector = ImageVector
+        .Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            LayeredIconScope(this).block()
+        }.build()
 }

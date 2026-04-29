@@ -21,10 +21,7 @@ import com.yancotv.shared.content.QualityBadge
  * [QualityBadge.parse] so we never render the same chip twice.
  */
 @Composable
-fun QualityChips(
-    badges: List<QualityBadge>,
-    modifier: Modifier = Modifier,
-) {
+fun QualityChips(badges: List<QualityBadge>, modifier: Modifier = Modifier) {
     if (badges.isEmpty()) return
     Row(
         modifier = modifier,
@@ -42,10 +39,10 @@ private fun Chip(badge: QualityBadge) {
         color = fg,
         fontSize = 10.sp,
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(3.dp))
-                .background(bg)
-                .padding(horizontal = 5.dp, vertical = 1.dp),
+        Modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(bg)
+            .padding(horizontal = 5.dp, vertical = 1.dp),
     )
 }
 

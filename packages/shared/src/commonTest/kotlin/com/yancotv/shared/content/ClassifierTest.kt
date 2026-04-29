@@ -10,17 +10,16 @@ private fun makeEntry(
     title: String = "Test Channel",
     groupTitle: String = "",
     streamUrl: String = "http://example.com/stream",
-): M3uEntry =
-    M3uEntry(
-        duration = duration,
-        title = title,
-        groupTitle = groupTitle,
-        tvgId = "",
-        tvgName = "",
-        tvgLogo = "",
-        streamUrl = streamUrl,
-        rawAttributes = "",
-    )
+): M3uEntry = M3uEntry(
+    duration = duration,
+    title = title,
+    groupTitle = groupTitle,
+    tvgId = "",
+    tvgName = "",
+    tvgLogo = "",
+    streamUrl = streamUrl,
+    rawAttributes = "",
+)
 
 class ClassifierTest {
     // --- classifyEntry — base suite (mirrors content-classifier.test.ts) ---

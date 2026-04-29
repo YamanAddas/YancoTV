@@ -26,11 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -153,16 +153,16 @@ fun SettingsClickToEditField(
     } else {
         Column(
             modifier =
-                modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    // LEFT from the inner field escapes to the active inner-
-                    // sidebar tab — same boundary contract every Settings row
-                    // owns. Bare mode is used inside dialogs, so it doesn't
-                    // need this — the dialog owns its own focus boundary.
-                    .leftExitsTo(activeTabFocus)
-                    .padding(16.dp),
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                // LEFT from the inner field escapes to the active inner-
+                // sidebar tab — same boundary contract every Settings row
+                // owns. Bare mode is used inside dialogs, so it doesn't
+                // need this — the dialog owns its own focus boundary.
+                .leftExitsTo(activeTabFocus)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             labelText()
@@ -173,27 +173,22 @@ fun SettingsClickToEditField(
 }
 
 @Composable
-private fun ReadOnlyFieldBody(
-    display: String,
-    placeholder: String,
-    empty: Boolean,
-    onClick: () -> Unit,
-) {
+private fun ReadOnlyFieldBody(display: String, placeholder: String, empty: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundDeep
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(8.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = 14.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(8.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         // Single-line clamp + ellipsis — long URLs like
@@ -225,13 +220,13 @@ private fun EditableFieldBody(
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.BackgroundHover)
-                .border(2.dp, LocalYancoPalette.current.FocusRing, RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(LocalYancoPalette.current.BackgroundHover)
+            .border(2.dp, LocalYancoPalette.current.FocusRing, RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         BasicTextField(
@@ -243,23 +238,20 @@ private fun EditableFieldBody(
             cursorBrush = SolidColor(LocalYancoPalette.current.FocusRing),
             visualTransformation = transformation,
             keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = keyboardType,
-                    imeAction = ImeAction.Done,
-                ),
+            KeyboardOptions(
+                keyboardType = keyboardType,
+                imeAction = ImeAction.Done,
+            ),
             keyboardActions = KeyboardActions(onDone = { onDone() }),
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
+            Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
         )
     }
 }
 
-private fun transformForDisplay(
-    value: String,
-    transformation: VisualTransformation,
-): String {
+private fun transformForDisplay(value: String, transformation: VisualTransformation): String {
     if (value.isEmpty()) return ""
     if (transformation is PasswordVisualTransformation) return "•".repeat(value.length)
     return value

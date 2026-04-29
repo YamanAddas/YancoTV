@@ -35,16 +35,9 @@ data class XmltvProgramme(
     val iconUrl: String? = null,
 )
 
-data class XmltvChannel(
-    val id: String,
-    val displayName: String? = null,
-    val iconUrl: String? = null,
-)
+data class XmltvChannel(val id: String, val displayName: String? = null, val iconUrl: String? = null)
 
-data class XmltvResult(
-    val channels: List<XmltvChannel>,
-    val programmes: List<XmltvProgramme>,
-)
+data class XmltvResult(val channels: List<XmltvChannel>, val programmes: List<XmltvProgramme>)
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -60,10 +53,7 @@ private const val CLOSE_CHAN = "</channel>"
 // -----------------------------------------------------------------------------
 
 /** Parse an XMLTV string into channels + programmes. */
-fun parseXmltvString(
-    xml: String,
-    logger: Logger = NOOP_LOGGER,
-): XmltvResult {
+fun parseXmltvString(xml: String, logger: Logger = NOOP_LOGGER): XmltvResult {
     val channels = parseChannels(xml)
     val programmes = parseProgrammes(xml)
     logger.info("XMLTV parsed: ${channels.size} channels, ${programmes.size} programmes")
@@ -71,19 +61,13 @@ fun parseXmltvString(
 }
 
 /** Entry point accepting a plain XML string. Convenience. */
-fun parseXmltv(
-    input: String,
-    logger: Logger = NOOP_LOGGER,
-): XmltvResult = parseXmltvString(input, logger)
+fun parseXmltv(input: String, logger: Logger = NOOP_LOGGER): XmltvResult = parseXmltvString(input, logger)
 
 /**
  * Entry point accepting a UTF-8 byte array. Gzip/zlib NOT supported —
  * caller must decompress first. See deviations note at top of file.
  */
-fun parseXmltv(
-    input: ByteArray,
-    logger: Logger = NOOP_LOGGER,
-): XmltvResult = parseXmltvString(input.decodeToString(), logger)
+fun parseXmltv(input: ByteArray, logger: Logger = NOOP_LOGGER): XmltvResult = parseXmltvString(input.decodeToString(), logger)
 
 // -----------------------------------------------------------------------------
 // XMLTV timestamp parsing — pure string math, no java.time/kotlinx.datetime.
@@ -133,26 +117,18 @@ fun parseXmltvTimestamp(ts: String): Long {
 
 private fun isLeap(y: Int): Boolean = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
 
-private fun daysInMonth(
-    year: Int,
-    month: Int,
-): Int =
-    when (month) {
-        1, 3, 5, 7, 8, 10, 12 -> 31
-        4, 6, 9, 11 -> 30
-        2 -> if (isLeap(year)) 29 else 28
-        else -> 0
-    }
+private fun daysInMonth(year: Int, month: Int): Int = when (month) {
+    1, 3, 5, 7, 8, 10, 12 -> 31
+    4, 6, 9, 11 -> 30
+    2 -> if (isLeap(year)) 29 else 28
+    else -> 0
+}
 
 /**
  * Civil date -> days since 1970-01-01 (Howard Hinnant, public domain).
  * Works for any proleptic Gregorian date.
  */
-private fun civilToDays(
-    y: Int,
-    m: Int,
-    d: Int,
-): Long {
+private fun civilToDays(y: Int, m: Int, d: Int): Long {
     val year = if (m <= 2) y - 1 else y
     val era = (if (year >= 0) year else year - 399) / 400
     val yoe = (year - era * 400).toLong() // [0, 399]
@@ -258,10 +234,7 @@ private fun parseProgrammes(xml: String): List<XmltvProgramme> {
 // -----------------------------------------------------------------------------
 
 /** Extract an attribute value from an attribute-string slice. */
-private fun extractAttrFast(
-    attrs: String,
-    name: String,
-): String? {
+private fun extractAttrFast(attrs: String, name: String): String? {
     val search = "$name=\""
     val idx = attrs.indexOf(search)
     if (idx == -1) return null
@@ -272,10 +245,7 @@ private fun extractAttrFast(
 }
 
 /** Extract the text content of the first matching element. */
-private fun extractTagFast(
-    body: String,
-    tagName: String,
-): String? {
+private fun extractTagFast(body: String, tagName: String): String? {
     val open = "<$tagName"
     val close = "</$tagName>"
 
@@ -294,11 +264,7 @@ private fun extractTagFast(
 }
 
 /** Extract an attribute from a child tag within a body string. */
-private fun extractAttrFromTag(
-    body: String,
-    tagName: String,
-    attrName: String,
-): String? {
+private fun extractAttrFromTag(body: String, tagName: String, attrName: String): String? {
     val open = "<$tagName"
     val idx = body.indexOf(open)
     if (idx == -1) return null

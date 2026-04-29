@@ -31,10 +31,7 @@ import org.koin.compose.koinInject
  * own section since the option set varies with the installed apps.
  */
 @Composable
-fun SettingsPlaybackTab(
-    modifier: Modifier = Modifier,
-    prefs: AppPreferences = koinInject(),
-) {
+fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = koinInject()) {
     val scope = rememberCoroutineScope()
     val snapshot by prefs.playbackFlow.collectAsState()
     val externalSnap by prefs.externalPlayerFlow.collectAsState()
@@ -43,10 +40,10 @@ fun SettingsPlaybackTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Video",
@@ -80,7 +77,9 @@ fun SettingsPlaybackTab(
             SettingsRowSpacer()
             SettingsToggleRow(
                 label = "Enable decoder fallback",
-                description = "If a hardware decoder fails to start, retry on the software decoder. Turn off to surface decoder errors directly (debugging only).",
+                description =
+                "If a hardware decoder fails to start, retry on the software decoder. " +
+                    "Turn off to surface decoder errors directly (debugging only).",
                 checked = snapshot.enableDecoderFallback,
                 onCheckedChange = { scope.launch { prefs.setDecoderFallback(it) } },
             )
@@ -166,16 +165,14 @@ fun SettingsPlaybackTab(
     }
 }
 
-private fun bucketLabel(bucket: ExternalPlayerBucket): String =
-    when (bucket) {
-        ExternalPlayerBucket.LIVE -> "Live TV"
-        ExternalPlayerBucket.MOVIE -> "Movies"
-        ExternalPlayerBucket.SERIES -> "Series &amp; episodes"
-    }
+private fun bucketLabel(bucket: ExternalPlayerBucket): String = when (bucket) {
+    ExternalPlayerBucket.LIVE -> "Live TV"
+    ExternalPlayerBucket.MOVIE -> "Movies"
+    ExternalPlayerBucket.SERIES -> "Series &amp; episodes"
+}
 
-private fun bucketKicker(bucket: ExternalPlayerBucket): String =
-    when (bucket) {
-        ExternalPlayerBucket.LIVE -> "LIVE"
-        ExternalPlayerBucket.MOVIE -> "VOD"
-        ExternalPlayerBucket.SERIES -> "EPISODES"
-    }
+private fun bucketKicker(bucket: ExternalPlayerBucket): String = when (bucket) {
+    ExternalPlayerBucket.LIVE -> "LIVE"
+    ExternalPlayerBucket.MOVIE -> "VOD"
+    ExternalPlayerBucket.SERIES -> "EPISODES"
+}

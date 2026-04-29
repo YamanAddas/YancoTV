@@ -10,13 +10,8 @@ import com.yancotv.shared.types.EpisodeInfo
  * go through `ContentWriter`; this class is deliberately query-only so
  * the shell never touches `YancoDb` directly.
  */
-class ContentRepository(
-    private val db: YancoDb,
-) {
-    fun count(
-        type: ContentType,
-        group: String? = null,
-    ): Long {
+class ContentRepository(private val db: YancoDb) {
+    fun count(type: ContentType, group: String? = null): Long {
         val t = type.dbValue
         return if (group == null) {
             db.contentQueries.countByType(t).executeAsOne()
@@ -38,12 +33,7 @@ class ContentRepository(
      */
     fun groupsHierarchical(type: ContentType): List<CategoryNode> = CategoryTreeBuilder.build(groups(type))
 
-    fun page(
-        type: ContentType,
-        group: String? = null,
-        offset: Long,
-        limit: Long,
-    ): List<ContentItem> {
+    fun page(type: ContentType, group: String? = null, offset: Long, limit: Long): List<ContentItem> {
         val t = type.dbValue
         val rows =
             if (group == null) {
@@ -60,11 +50,10 @@ class ContentRepository(
      * client-side and sorting in Kotlin, which was both slow on first catalog
      * load and incorrect past the 200-per-type cap. Pushed down to SQLDelight.
      */
-    fun recentlyAddedVod(limit: Long): List<ContentItem> =
-        db.contentQueries
-            .recentlyAddedVod(limit)
-            .executeAsList()
-            .map { it.toDomain() }
+    fun recentlyAddedVod(limit: Long): List<ContentItem> = db.contentQueries
+        .recentlyAddedVod(limit)
+        .executeAsList()
+        .map { it.toDomain() }
 
     /**
      * FTS4-backed search across `title`, `clean_title`, and `group_name`.
@@ -76,10 +65,7 @@ class ContentRepository(
      * FTS4 operators (`*` prefix wildcards, quoted phrases). We strip
      * leading/trailing whitespace only.
      */
-    fun search(
-        query: String,
-        limit: Long = 100,
-    ): List<ContentItem> {
+    fun search(query: String, limit: Long = 100): List<ContentItem> {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return emptyList()
         // Prefix wildcard so typing "mar" matches "Marvel". Users typing
@@ -107,11 +93,7 @@ class ContentRepository(
      * search-rails UI calls this once per [ContentType] so each rail
      * gets its own slice.
      */
-    fun searchByType(
-        query: String,
-        type: ContentType,
-        limit: Long = 100,
-    ): List<ContentItem> {
+    fun searchByType(query: String, type: ContentType, limit: Long = 100): List<ContentItem> {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return emptyList()
         val ftsQuery =
@@ -135,11 +117,10 @@ class ContentRepository(
             .map { it.toDomain() }
     }
 
-    fun findById(id: String): ContentItem? =
-        db.contentQueries
-            .selectById(id)
-            .executeAsOneOrNull()
-            ?.toDomain()
+    fun findById(id: String): ContentItem? = db.contentQueries
+        .selectById(id)
+        .executeAsOneOrNull()
+        ?.toDomain()
 
     /**
      * Pick the highest-priority live channel that carries [tvgId]. Used by
@@ -167,11 +148,7 @@ class ContentRepository(
      * wrap in `Dispatchers.Default` per the threading rule (`Dispatchers.IO`
      * only exists on JVM/Android — `commonMain` has to use the KMP-safe one).
      */
-    fun setOverrides(
-        contentId: String,
-        nameOverride: String?,
-        logoOverride: String?,
-    ) {
+    fun setOverrides(contentId: String, nameOverride: String?, logoOverride: String?) {
         db.contentQueries.setOverrides(
             nameOverride = nameOverride?.takeIf { it.isNotBlank() },
             logoOverride = logoOverride?.takeIf { it.isNotBlank() },
@@ -187,36 +164,34 @@ class ContentRepository(
      * resume offset is honoured. Returns null when the episode row
      * isn't cached locally — caller falls back to opening detail.
      */
-    fun episodeById(id: String): EpisodeInfo? =
-        db.episodesQueries.selectById(id).executeAsOneOrNull()?.let { row ->
-            EpisodeInfo(
-                id = row.id,
-                seasonNumber = row.season_number?.toInt() ?: 0,
-                episodeNumber = row.episode_number?.toInt() ?: 0,
-                title = row.title.orEmpty(),
-                streamUrl = row.stream_url,
-                duration = row.duration?.toString(),
-            )
-        }
+    fun episodeById(id: String): EpisodeInfo? = db.episodesQueries.selectById(id).executeAsOneOrNull()?.let { row ->
+        EpisodeInfo(
+            id = row.id,
+            seasonNumber = row.season_number?.toInt() ?: 0,
+            episodeNumber = row.episode_number?.toInt() ?: 0,
+            title = row.title.orEmpty(),
+            streamUrl = row.stream_url,
+            duration = row.duration?.toString(),
+        )
+    }
 }
 
-private fun com.yancotv.shared.db.Content.toDomain(): ContentItem =
-    ContentItem(
-        id = id,
-        sourceId = source_id,
-        type = contentTypeFromDb(type),
-        title = title,
-        cleanTitle = clean_title,
-        groupName = group_name,
-        streamUrl = stream_url,
-        logoUrl = logo_url,
-        tvgId = tvg_id,
-        metadataJson = metadata_json,
-        sortOrder = sort_order.toInt(),
-        createdAt = created_at,
-        nameOverride = name_override,
-        logoOverride = logo_override,
-    )
+private fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(
+    id = id,
+    sourceId = source_id,
+    type = contentTypeFromDb(type),
+    title = title,
+    cleanTitle = clean_title,
+    groupName = group_name,
+    streamUrl = stream_url,
+    logoUrl = logo_url,
+    tvgId = tvg_id,
+    metadataJson = metadata_json,
+    sortOrder = sort_order.toInt(),
+    createdAt = created_at,
+    nameOverride = name_override,
+    logoOverride = logo_override,
+)
 
 private val ContentType.dbValue: String
     get() =
@@ -226,10 +201,9 @@ private val ContentType.dbValue: String
             ContentType.SERIES -> "series"
         }
 
-private fun contentTypeFromDb(value: String): ContentType =
-    when (value) {
-        "live" -> ContentType.LIVE
-        "movie" -> ContentType.MOVIE
-        "series" -> ContentType.SERIES
-        else -> error("Unknown content type: $value")
-    }
+private fun contentTypeFromDb(value: String): ContentType = when (value) {
+    "live" -> ContentType.LIVE
+    "movie" -> ContentType.MOVIE
+    "series" -> ContentType.SERIES
+    else -> error("Unknown content type: $value")
+}

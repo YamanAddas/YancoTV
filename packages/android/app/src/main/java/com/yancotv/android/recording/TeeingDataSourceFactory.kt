@@ -23,9 +23,6 @@ import androidx.media3.datasource.TeeDataSource
  * lives in [RecordingDataSink], not here.
  */
 @UnstableApi
-class TeeingDataSourceFactory(
-    private val upstreamFactory: DataSource.Factory,
-    private val sink: RecordingDataSink,
-) : DataSource.Factory {
+class TeeingDataSourceFactory(private val upstreamFactory: DataSource.Factory, private val sink: RecordingDataSink) : DataSource.Factory {
     override fun createDataSource(): DataSource = TeeDataSource(upstreamFactory.createDataSource(), sink)
 }

@@ -88,10 +88,7 @@ class AdultContentFilterTest {
         )
     }
 
-    private fun item(
-        title: String = "Channel",
-        group: String? = null,
-    ) = ContentItem(
+    private fun item(title: String = "Channel", group: String? = null) = ContentItem(
         id = "c1",
         sourceId = "s1",
         type = ContentType.LIVE,

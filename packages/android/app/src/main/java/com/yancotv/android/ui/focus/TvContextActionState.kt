@@ -24,10 +24,7 @@ object TvContextActionState {
     private var action: (() -> Unit)? = null
 
     /** Card-gained-focus: bind this token's action as the active one. */
-    fun set(
-        owner: Any,
-        handler: () -> Unit,
-    ) {
+    fun set(owner: Any, handler: () -> Unit) {
         token = owner
         action = handler
     }

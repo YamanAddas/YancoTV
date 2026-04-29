@@ -29,11 +29,7 @@ import kotlinx.serialization.json.Json
  * consistent across platforms — same provider compatibility rules, same
  * URL shapes.
  */
-class CatchupService(
-    private val contentRepo: ContentRepository,
-    private val sourceRepo: SourceRepository,
-    private val clock: () -> Long,
-) {
+class CatchupService(private val contentRepo: ContentRepository, private val sourceRepo: SourceRepository, private val clock: () -> Long) {
     /** Lightweight reason codes so the caller can show a specific error toast. */
     enum class UnavailableReason {
         FUTURE_PROGRAMME,
@@ -45,13 +41,9 @@ class CatchupService(
     }
 
     sealed class Resolution {
-        data class Playable(
-            val item: ContentItem,
-        ) : Resolution()
+        data class Playable(val item: ContentItem) : Resolution()
 
-        data class Unavailable(
-            val reason: UnavailableReason,
-        ) : Resolution()
+        data class Unavailable(val reason: UnavailableReason) : Resolution()
     }
 
     /**
@@ -59,10 +51,7 @@ class CatchupService(
      * rather than pulled off [programme] so callers that already looked up
      * the programme can reuse the id string without a second field access.
      */
-    fun resolve(
-        programme: EpgProgramme,
-        channelTvgId: String = programme.channelTvgId,
-    ): Resolution {
+    fun resolve(programme: EpgProgramme, channelTvgId: String = programme.channelTvgId): Resolution {
         val nowSec = clock() / 1000L
         if (programme.startTime > nowSec) {
             return Resolution.Unavailable(UnavailableReason.FUTURE_PROGRAMME)
@@ -96,10 +85,7 @@ class CatchupService(
         }
     }
 
-    private fun resolveXtream(
-        channel: ContentItem,
-        programme: EpgProgramme,
-    ): Resolution {
+    private fun resolveXtream(channel: ContentItem, programme: EpgProgramme): Resolution {
         val creds =
             sourceRepo.xtreamCredentials(channel.sourceId)
                 ?: return Resolution.Unavailable(UnavailableReason.MISSING_CREDENTIALS)
@@ -116,12 +102,7 @@ class CatchupService(
         return Resolution.Playable(channel.withCatchupUrl(url, programme))
     }
 
-    private fun resolveM3u(
-        channel: ContentItem,
-        programme: EpgProgramme,
-        metadata: ContentMetadata?,
-        nowSec: Long,
-    ): Resolution {
+    private fun resolveM3u(channel: ContentItem, programme: EpgProgramme, metadata: ContentMetadata?, nowSec: Long): Resolution {
         val mdMap = HashMap<String, Any?>(4)
         metadata?.catchupSource?.let { mdMap["catchupSource"] = it }
         metadata?.catchupType?.let { mdMap["catchupType"] = it }
@@ -140,26 +121,21 @@ class CatchupService(
         return Resolution.Playable(channel.withCatchupUrl(url, programme))
     }
 
-    private fun parseMetadata(json: String): ContentMetadata? =
-        runCatching { METADATA_JSON.decodeFromString(ContentMetadata.serializer(), json) }
-            .getOrElse { err ->
-                if (err is SerializationException) null else throw err
-            }
+    private fun parseMetadata(json: String): ContentMetadata? = runCatching { METADATA_JSON.decodeFromString(ContentMetadata.serializer(), json) }
+        .getOrElse { err ->
+            if (err is SerializationException) null else throw err
+        }
 
     /**
      * Return a copy of [this] with [url] swapped in and an id suffix that
      * encodes the programme. Needed so two back-to-back catchup plays on the
      * same channel don't collide with each other in history/resume lookups.
      */
-    private fun ContentItem.withCatchupUrl(
-        url: String,
-        programme: EpgProgramme,
-    ): ContentItem =
-        copy(
-            id = "catchup:$id:${programme.startTime}",
-            streamUrl = url,
-            cleanTitle = programme.title,
-        )
+    private fun ContentItem.withCatchupUrl(url: String, programme: EpgProgramme): ContentItem = copy(
+        id = "catchup:$id:${programme.startTime}",
+        streamUrl = url,
+        cleanTitle = programme.title,
+    )
 
     private companion object {
         private val METADATA_JSON = Json { ignoreUnknownKeys = true }

@@ -57,11 +57,7 @@ class BackupImporter(
      * @param password required when [BackupFileV1.encryption] is non-null
      * @param currentSchemaVersion `YancoDb.Schema.version` at import time
      */
-    fun import(
-        file: BackupFileV1,
-        password: String? = null,
-        currentSchemaVersion: Int,
-    ): RestoreReport {
+    fun import(file: BackupFileV1, password: String? = null, currentSchemaVersion: Int): RestoreReport {
         require(file.schemaVersion == 1) {
             "unsupported backup schemaVersion ${file.schemaVersion}"
         }
@@ -168,12 +164,7 @@ class BackupImporter(
 
     // ─── Phase 1 importers ────────────────────────────────────────────────
 
-    private fun importSources(
-        records: List<SourceRecord>,
-        key: ByteArray?,
-        warnings: MutableList<String>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importSources(records: List<SourceRecord>, key: ByteArray?, warnings: MutableList<String>, skipped: MutableMap<String, Int>): Int {
         var inserted = 0
         for (r in records) {
             val existing = db.sourcesQueries.selectById(r.id).executeAsOneOrNull()
@@ -215,11 +206,7 @@ class BackupImporter(
         return inserted
     }
 
-    private fun decryptIfNeeded(
-        value: String,
-        key: ByteArray?,
-        warnings: MutableList<String>,
-    ): String {
+    private fun decryptIfNeeded(value: String, key: ByteArray?, warnings: MutableList<String>): String {
         if (key == null) return value // plaintext mode
         return runCatching { cipher.decryptBytes(value, key).decodeToString() }
             .getOrElse {
@@ -228,10 +215,7 @@ class BackupImporter(
             }
     }
 
-    private fun importFavoriteLists(
-        records: List<FavoriteListRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importFavoriteLists(records: List<FavoriteListRecord>, skipped: MutableMap<String, Int>): Int {
         var inserted = 0
         for (r in records) {
             // 'default' list is seeded by FavoriteLists.sq INSERT OR IGNORE;
@@ -254,10 +238,7 @@ class BackupImporter(
         return inserted
     }
 
-    private fun importSettings(
-        records: List<SettingsKv>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importSettings(records: List<SettingsKv>, skipped: MutableMap<String, Int>): Int {
         // Settings is upsert by primary key so "merge mode" overwrites
         // existing keys with backup values.
         //
@@ -286,10 +267,7 @@ class BackupImporter(
         val DEVICE_BOUND_SETTING_KEYS: Set<String> = emptySet()
     }
 
-    private fun importGroupPreferences(
-        records: List<GroupPreferenceRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importGroupPreferences(records: List<GroupPreferenceRecord>, skipped: MutableMap<String, Int>): Int {
         for (r in records) {
             db.groupPreferencesQueries.upsert(
                 id = r.id,
@@ -305,10 +283,7 @@ class BackupImporter(
         return records.size
     }
 
-    private fun importReminders(
-        records: List<ReminderRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importReminders(records: List<ReminderRecord>, skipped: MutableMap<String, Int>): Int {
         var inserted = 0
         for (r in records) {
             val existing = db.remindersQueries.selectById(r.id).executeAsOneOrNull()
@@ -333,10 +308,7 @@ class BackupImporter(
         return inserted
     }
 
-    private fun importRecordings(
-        records: List<RecordingRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importRecordings(records: List<RecordingRecord>, skipped: MutableMap<String, Int>): Int {
         var inserted = 0
         for (r in records) {
             val existing = db.recordingsQueries.selectById(r.id).executeAsOneOrNull()
@@ -388,10 +360,7 @@ class BackupImporter(
         return inserted
     }
 
-    private fun importRecordingSchedules(
-        records: List<RecordingScheduleRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importRecordingSchedules(records: List<RecordingScheduleRecord>, skipped: MutableMap<String, Int>): Int {
         var inserted = 0
         for (r in records) {
             val existing = db.recordingSchedulesQueries.selectById(r.id).executeAsOneOrNull()
@@ -428,11 +397,7 @@ class BackupImporter(
 
     // ─── Phase 2 importers (re-link or buffer) ────────────────────────────
 
-    private fun importFavorites(
-        records: List<FavoriteRecord>,
-        bufferIfUnresolved: MutableList<FavoriteRecord>,
-        skipped: MutableMap<String, Int>,
-    ): Int {
+    private fun importFavorites(records: List<FavoriteRecord>, bufferIfUnresolved: MutableList<FavoriteRecord>, skipped: MutableMap<String, Int>): Int {
         var inserted = 0
         for (r in records) {
             val cid = db.contentQueries.findIdBySourceAndStreamUrl(r.sourceId, r.streamUrl).executeAsOneOrNull()
@@ -544,11 +509,7 @@ class BackupImporter(
         return inserted
     }
 
-    private fun importChannelRefs(
-        records: List<ChannelRef>,
-        bufferIfUnresolved: MutableList<ChannelRef>,
-        upsert: (contentId: String, ts: Long) -> Unit,
-    ): Int {
+    private fun importChannelRefs(records: List<ChannelRef>, bufferIfUnresolved: MutableList<ChannelRef>, upsert: (contentId: String, ts: Long) -> Unit): Int {
         var inserted = 0
         for (r in records) {
             val cid = db.contentQueries.findIdBySourceAndStreamUrl(r.sourceId, r.streamUrl).executeAsOneOrNull()
@@ -575,29 +536,30 @@ data class PendingLinkState(
     val lockedChannels: List<ChannelRef>,
     val hiddenChannels: List<ChannelRef>,
 ) {
-    fun isEmpty(): Boolean =
-        favorites.isEmpty() && watchHistory.isEmpty() && contentOverrides.isEmpty() &&
-            channelOverrides.isEmpty() && lockedChannels.isEmpty() && hiddenChannels.isEmpty()
+    fun isEmpty(): Boolean = favorites.isEmpty() &&
+        watchHistory.isEmpty() &&
+        contentOverrides.isEmpty() &&
+        channelOverrides.isEmpty() &&
+        lockedChannels.isEmpty() &&
+        hiddenChannels.isEmpty()
 
-    fun counts(): Map<String, Int> =
-        mapOf(
-            "favorites" to favorites.size,
-            "watchHistory" to watchHistory.size,
-            "contentOverrides" to contentOverrides.size,
-            "channelOverrides" to channelOverrides.size,
-            "lockedChannels" to lockedChannels.size,
-            "hiddenChannels" to hiddenChannels.size,
-        ).filterValues { it > 0 }
+    fun counts(): Map<String, Int> = mapOf(
+        "favorites" to favorites.size,
+        "watchHistory" to watchHistory.size,
+        "contentOverrides" to contentOverrides.size,
+        "channelOverrides" to channelOverrides.size,
+        "lockedChannels" to lockedChannels.size,
+        "hiddenChannels" to hiddenChannels.size,
+    ).filterValues { it > 0 }
 
-    internal fun toMutable() =
-        MutablePendingLinkState(
-            favorites.toMutableList(),
-            watchHistory.toMutableList(),
-            contentOverrides.toMutableList(),
-            channelOverrides.toMutableList(),
-            lockedChannels.toMutableList(),
-            hiddenChannels.toMutableList(),
-        )
+    internal fun toMutable() = MutablePendingLinkState(
+        favorites.toMutableList(),
+        watchHistory.toMutableList(),
+        contentOverrides.toMutableList(),
+        channelOverrides.toMutableList(),
+        lockedChannels.toMutableList(),
+        hiddenChannels.toMutableList(),
+    )
 
     companion object {
         fun empty() = PendingLinkState(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
@@ -612,15 +574,14 @@ internal data class MutablePendingLinkState(
     val lockedChannels: MutableList<ChannelRef>,
     val hiddenChannels: MutableList<ChannelRef>,
 ) {
-    fun toImmutable() =
-        PendingLinkState(
-            favorites.toList(),
-            watchHistory.toList(),
-            contentOverrides.toList(),
-            channelOverrides.toList(),
-            lockedChannels.toList(),
-            hiddenChannels.toList(),
-        )
+    fun toImmutable() = PendingLinkState(
+        favorites.toList(),
+        watchHistory.toList(),
+        contentOverrides.toList(),
+        channelOverrides.toList(),
+        lockedChannels.toList(),
+        hiddenChannels.toList(),
+    )
 }
 
 /**
@@ -628,12 +589,7 @@ internal data class MutablePendingLinkState(
  * [BackupImporter.retryPendingLinks]. UI consumes these counts to show
  * the user what landed and what didn't.
  */
-data class RestoreReport(
-    val restored: Map<String, Int>,
-    val skipped: Map<String, Int>,
-    val unlinked: Map<String, Int>,
-    val warnings: List<String>,
-) {
+data class RestoreReport(val restored: Map<String, Int>, val skipped: Map<String, Int>, val unlinked: Map<String, Int>, val warnings: List<String>) {
     val totalRestored: Int get() = restored.values.sum()
     val totalSkipped: Int get() = skipped.values.sum()
     val totalUnlinked: Int get() = unlinked.values.sum()
@@ -643,16 +599,12 @@ data class RestoreReport(
     }
 }
 
-class BackupSchemaTooNewException(
-    val backupVersion: Int,
-    val currentVersion: Int,
-) : RuntimeException(
+class BackupSchemaTooNewException(val backupVersion: Int, val currentVersion: Int) :
+    RuntimeException(
         "backup is for db schema $backupVersion but binary is at $currentVersion; upgrade the app first",
     )
 
-class BackupChecksumMismatchException(
-    val expected: String,
-    val actual: String,
-) : RuntimeException("backup checksum mismatch (expected=$expected actual=$actual)")
+class BackupChecksumMismatchException(val expected: String, val actual: String) :
+    RuntimeException("backup checksum mismatch (expected=$expected actual=$actual)")
 
 class BackupDecryptException(message: String) : RuntimeException(message)

@@ -26,9 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,11 +50,7 @@ import org.koin.compose.koinInject
  * MB-110 audit-pass-5 fix stays in place).
  */
 @Composable
-fun SettingsAppearanceTab(
-    modifier: Modifier = Modifier,
-    themeController: ThemeController = koinInject(),
-    prefs: AppPreferences = koinInject(),
-) {
+fun SettingsAppearanceTab(modifier: Modifier = Modifier, themeController: ThemeController = koinInject(), prefs: AppPreferences = koinInject()) {
     val active by themeController.themeId.collectAsState()
     val activeAccent by themeController.accentId.collectAsState()
     val appearance by prefs.appearanceFlow.collectAsState()
@@ -62,10 +58,10 @@ fun SettingsAppearanceTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Theme",
@@ -136,12 +132,7 @@ fun SettingsAppearanceTab(
 }
 
 @Composable
-private fun ThemeRow(
-    id: ThemeId,
-    selected: Boolean,
-    palette: YancoPalette,
-    onClick: () -> Unit,
-) {
+private fun ThemeRow(id: ThemeId, selected: Boolean, palette: YancoPalette, onClick: () -> Unit) {
     // Audit-pass-5: focus + selected as separate visual states. Without
     // a shared interactionSource the border only updated on `selected`,
     // so D-pad navigation across rows had no visible cursor — user had
@@ -158,22 +149,22 @@ private fun ThemeRow(
     val borderWidth = if (focused || selected) 1.5.dp else 1.dp
     Row(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(pal.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
-                .border(
-                    width = borderWidth,
-                    color = borderColour,
-                    shape = RoundedCornerShape(12.dp),
-                )
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 22.dp, vertical = 16.dp),
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(pal.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
+            .border(
+                width = borderWidth,
+                color = borderColour,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -210,12 +201,7 @@ private fun SwatchTriple(palette: YancoPalette) {
 }
 
 @Composable
-private fun AccentChip(
-    id: AccentId,
-    selected: Boolean,
-    swatch: Color,
-    onClick: () -> Unit,
-) {
+private fun AccentChip(id: AccentId, selected: Boolean, swatch: Color, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val pal = LocalYancoPalette.current
@@ -228,22 +214,22 @@ private fun AccentChip(
     val borderWidth = if (focused || selected) 1.5.dp else 1.dp
     Row(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (selected) pal.Accent.copy(alpha = 0.18f) else pal.BackgroundRaised)
-                .border(
-                    width = borderWidth,
-                    color = borderColour,
-                    shape = RoundedCornerShape(8.dp),
-                )
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) pal.Accent.copy(alpha = 0.18f) else pal.BackgroundRaised)
+            .border(
+                width = borderWidth,
+                color = borderColour,
+                shape = RoundedCornerShape(8.dp),
+            )
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -257,23 +243,16 @@ private fun AccentChip(
     }
 }
 
-private fun swatchColourFor(
-    id: AccentId,
-    controller: ThemeController,
-    activeTheme: ThemeId,
-): Color = controller.resolved(activeTheme, id).Accent
+private fun swatchColourFor(id: AccentId, controller: ThemeController, activeTheme: ThemeId): Color = controller.resolved(activeTheme, id).Accent
 
 @Composable
-private fun Swatch(
-    colour: Color,
-    size: androidx.compose.ui.unit.Dp = 28.dp,
-) {
+private fun Swatch(colour: Color, size: androidx.compose.ui.unit.Dp = 28.dp) {
     Box(
         modifier =
-            Modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(colour)
-                .border(1.dp, LocalYancoPalette.current.BorderSubtle, CircleShape),
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(colour)
+            .border(1.dp, LocalYancoPalette.current.BorderSubtle, CircleShape),
     )
 }

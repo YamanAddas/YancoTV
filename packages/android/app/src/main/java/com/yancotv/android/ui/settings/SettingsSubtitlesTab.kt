@@ -16,8 +16,8 @@ fun SettingsSubtitlesTab(modifier: Modifier = Modifier) {
         kicker = "Milestone MK.12a.3+",
         title = "Subtitles",
         body =
-            "Default caption language, font size, font color, background opacity, " +
-                "and vertical position. Player-overlay picker already ships (MK.12a.3); " +
-                "these are the defaults persisted across restarts.",
+        "Default caption language, font size, font color, background opacity, " +
+            "and vertical position. Player-overlay picker already ships (MK.12a.3); " +
+            "these are the defaults persisted across restarts.",
     )
 }

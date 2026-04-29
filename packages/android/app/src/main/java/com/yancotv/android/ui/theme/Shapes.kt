@@ -80,15 +80,8 @@ object YancoShapes {
  * the left/right side bevels take (0.28 = ~15°). [pointRoundDp] softens
  * the two side tips so the shape doesn't read as razor-sharp at any size.
  */
-internal class HexCapsuleShape(
-    private val cutFraction: Float,
-    private val pointRoundDp: Dp,
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
+internal class HexCapsuleShape(private val cutFraction: Float, private val pointRoundDp: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val h = size.height
         val w = size.width
         val cut = (h * cutFraction).coerceIn(10f, 36f)
@@ -135,15 +128,8 @@ internal class HexCapsuleShape(
  *
  *   `0 0, calc(100% - cut) 0, 100% cut, 100% 100%, cut 100%, 0 calc(100% - cut)`
  */
-internal class CutCornerCardShape(
-    private val cut: Dp,
-    private val round: Dp,
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
+internal class CutCornerCardShape(private val cut: Dp, private val round: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val cap = minOf(size.width, size.height) * 0.4f
         val c = with(density) { cut.toPx() }.coerceAtMost(cap)
         val r = with(density) { round.toPx() }.coerceAtMost(c * 0.5f)
@@ -188,11 +174,7 @@ internal class CutCornerCardShape(
  * a full hexagon (which would crowd short labels).
  */
 internal class ChipBevelShape : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val h = size.height
         val cut = (h * 0.42f).coerceIn(8f, 16f)
         val r = h / 2f
@@ -202,12 +184,12 @@ internal class ChipBevelShape : Shape {
                 lineTo(size.width - r, 0f)
                 arcTo(
                     rect =
-                        Rect(
-                            left = size.width - h,
-                            top = 0f,
-                            right = size.width,
-                            bottom = h,
-                        ),
+                    Rect(
+                        left = size.width - h,
+                        top = 0f,
+                        right = size.width,
+                        bottom = h,
+                    ),
                     startAngleDegrees = -90f,
                     sweepAngleDegrees = 180f,
                     forceMoveTo = false,
@@ -225,11 +207,7 @@ internal class ChipBevelShape : Shape {
  * slightly steeper than the tile so buttons feel more pointed.
  */
 internal class ButtonBevelShape : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val h = size.height
         val cut = (h * 0.42f).coerceIn(10f, 22f)
         val mid = h / 2f
@@ -264,11 +242,7 @@ internal class ButtonBevelShape : Shape {
  * transport buttons that need to slot under a progress bar.
  */
 internal class PointyHexShape : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val w = size.width
         val h = size.height
         val path =

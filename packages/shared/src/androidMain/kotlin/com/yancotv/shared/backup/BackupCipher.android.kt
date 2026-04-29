@@ -10,20 +10,13 @@ import javax.crypto.spec.SecretKeySpec
 actual class BackupCipher {
     private val random = SecureRandom()
 
-    actual fun deriveKey(
-        password: String,
-        saltHex: String,
-        iterations: Int,
-    ): ByteArray {
+    actual fun deriveKey(password: String, saltHex: String, iterations: Int): ByteArray {
         val salt = decodeHex(saltHex)
         val spec = PBEKeySpec(password.toCharArray(), salt, iterations, 256)
         return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
     }
 
-    actual fun encryptHex(
-        plaintext: ByteArray,
-        key: ByteArray,
-    ): String {
+    actual fun encryptHex(plaintext: ByteArray, key: ByteArray): String {
         val iv = ByteArray(12).also { random.nextBytes(it) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
@@ -31,10 +24,7 @@ actual class BackupCipher {
         return encodeHex(iv) + encodeHex(ct)
     }
 
-    actual fun decryptBytes(
-        hex: String,
-        key: ByteArray,
-    ): ByteArray {
+    actual fun decryptBytes(hex: String, key: ByteArray): ByteArray {
         val all = decodeHex(hex)
         require(all.size > 12) { "ciphertext shorter than IV" }
         val iv = all.copyOfRange(0, 12)
@@ -70,13 +60,12 @@ actual class BackupCipher {
         return out
     }
 
-    private fun hexValue(c: Char): Int =
-        when (c) {
-            in '0'..'9' -> c - '0'
-            in 'a'..'f' -> c - 'a' + 10
-            in 'A'..'F' -> c - 'A' + 10
-            else -> error("invalid hex char $c")
-        }
+    private fun hexValue(c: Char): Int = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> c - 'a' + 10
+        in 'A'..'F' -> c - 'A' + 10
+        else -> error("invalid hex char $c")
+    }
 
     private companion object {
         val HEX = "0123456789abcdef".toCharArray()

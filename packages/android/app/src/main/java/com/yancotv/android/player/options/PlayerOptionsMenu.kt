@@ -21,8 +21,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -44,6 +43,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,11 +70,7 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
  */
 @UnstableApi
 @Composable
-fun PlayerOptionsMenu(
-    state: PlayerOptionsState,
-    rows: List<PlayerOptionsRow>,
-    onDismiss: () -> Unit,
-) {
+fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, onDismiss: () -> Unit) {
     val visible by state.menuVisible.collectAsState()
     val activePanel by state.activePanel.collectAsState()
     val palette = LocalYancoPalette.current
@@ -112,13 +108,13 @@ fun PlayerOptionsMenu(
 
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // Touch-only outside dismiss. Don't add a clickable scrim;
-                // it would steal CENTER from the rows on TV.
-                .pointerInput(visible) {
-                    if (visible) detectTapGestures { onDismiss() }
-                },
+        Modifier
+            .fillMaxSize()
+            // Touch-only outside dismiss. Don't add a clickable scrim;
+            // it would steal CENTER from the rows on TV.
+            .pointerInput(visible) {
+                if (visible) detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.BottomEnd,
     ) {
         // Hide the popup while a panel is active. RCA: when both the
@@ -140,21 +136,21 @@ fun PlayerOptionsMenu(
         ) {
             Column(
                 modifier =
-                    Modifier
-                        // Reduced bottom inset (96 → 24) so the menu has
-                        // room to fully render all 8 rows without
-                        // clipping the last one ("External player").
-                        // heightIn cap + verticalScroll handles short
-                        // viewports gracefully — rows scroll instead of
-                        // being silently cut off the screen.
-                        .padding(end = 32.dp, bottom = 24.dp)
-                        .width(MENU_WIDTH.dp)
-                        .heightIn(max = MENU_MAX_HEIGHT.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xEE0A1410))
-                        .border(1.dp, palette.BorderSubtle, RoundedCornerShape(12.dp))
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
+                Modifier
+                    // Reduced bottom inset (96 → 24) so the menu has
+                    // room to fully render all 8 rows without
+                    // clipping the last one ("External player").
+                    // heightIn cap + verticalScroll handles short
+                    // viewports gracefully — rows scroll instead of
+                    // being silently cut off the screen.
+                    .padding(end = 32.dp, bottom = 24.dp)
+                    .width(MENU_WIDTH.dp)
+                    .heightIn(max = MENU_MAX_HEIGHT.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xEE0A1410))
+                    .border(1.dp, palette.BorderSubtle, RoundedCornerShape(12.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
@@ -177,10 +173,7 @@ fun PlayerOptionsMenu(
 }
 
 @Composable
-private fun PlayerOptionsRowItem(
-    row: PlayerOptionsRow,
-    focusRequester: FocusRequester?,
-) {
+private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusRequester?) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -191,38 +184,38 @@ private fun PlayerOptionsRowItem(
 
     Row(
         modifier =
-            Modifier
-                .padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(6.dp))
-                .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
-                // onPreviewKeyEvent must wrap focusable so it sees the
-                // event before the focusable's default arrow-key focus
-                // search runs. Earlier order (after focusable + clickable)
-                // didn't fire because Compose had already moved focus or
-                // the modifier chain didn't expose preview events on the
-                // focusable's children-side. Returns true on a successful
-                // cycle so the activity's swallow guard doesn't double-
-                // handle the key.
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.DirectionLeft -> {
-                            val handler = row.onCyclePrev ?: return@onPreviewKeyEvent false
-                            handler()
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            val handler = row.onCycleNext ?: return@onPreviewKeyEvent false
-                            handler()
-                            true
-                        }
-                        else -> false
+        Modifier
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
+            // onPreviewKeyEvent must wrap focusable so it sees the
+            // event before the focusable's default arrow-key focus
+            // search runs. Earlier order (after focusable + clickable)
+            // didn't fire because Compose had already moved focus or
+            // the modifier chain didn't expose preview events on the
+            // focusable's children-side. Returns true on a successful
+            // cycle so the activity's swallow guard doesn't double-
+            // handle the key.
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionLeft -> {
+                        val handler = row.onCyclePrev ?: return@onPreviewKeyEvent false
+                        handler()
+                        true
                     }
-                }.focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button) { row.onPick() }
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                    Key.DirectionRight -> {
+                        val handler = row.onCycleNext ?: return@onPreviewKeyEvent false
+                        handler()
+                        true
+                    }
+                    else -> false
+                }
+            }.focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button) { row.onPick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

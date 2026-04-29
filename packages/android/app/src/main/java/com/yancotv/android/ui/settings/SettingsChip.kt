@@ -52,12 +52,7 @@ import com.yancotv.android.ui.theme.YancoPalette
  * Compose runtime — see `SettingsChipColorsTest` (MB-110).
  */
 @Composable
-internal fun SettingsChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun SettingsChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -66,21 +61,21 @@ internal fun SettingsChip(
 
     Row(
         modifier =
-            modifier
-                .clip(shape)
-                .background(colors.background)
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = colors.border,
-                    shape = shape,
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Tab,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier
+            .clip(shape)
+            .background(colors.background)
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = colors.border,
+                shape = shape,
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -110,17 +105,9 @@ internal fun SettingsChip(
  *   this" cue while moving focus away).
  * - Foreground stays primary for `selected || focused`, muted otherwise.
  */
-internal data class SettingsChipColors(
-    val background: Color,
-    val border: Color,
-    val foreground: Color,
-)
+internal data class SettingsChipColors(val background: Color, val border: Color, val foreground: Color)
 
-internal fun chipColors(
-    palette: YancoPalette,
-    selected: Boolean,
-    focused: Boolean,
-): SettingsChipColors {
+internal fun chipColors(palette: YancoPalette, selected: Boolean, focused: Boolean): SettingsChipColors {
     val background =
         if (selected) palette.Accent.copy(alpha = 0.22f) else palette.BackgroundDeep
     val border = if (focused) palette.FocusRing else Color.Transparent

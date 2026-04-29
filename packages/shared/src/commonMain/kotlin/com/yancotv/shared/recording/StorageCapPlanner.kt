@@ -29,12 +29,7 @@ class StorageCapPlanner {
      *         first; their `fileSizeBytes` sum + current free will fit the new recording);
      *         [Plan.NoSpace] (even after evicting every evictable row, can't fit).
      */
-    fun planForNewRecording(
-        capBytes: Long,
-        existingRecordings: List<StoredRecording>,
-        newRecordingExpectedBytes: Long,
-        freeDiskBytes: Long,
-    ): Plan {
+    fun planForNewRecording(capBytes: Long, existingRecordings: List<StoredRecording>, newRecordingExpectedBytes: Long, freeDiskBytes: Long): Plan {
         val totalCurrent = existingRecordings.sumOf { it.bytesOnDisk }
         val capRemaining = (capBytes - totalCurrent).coerceAtLeast(0)
         val effectiveBudget = minOf(capRemaining, freeDiskBytes)
@@ -76,10 +71,8 @@ class StorageCapPlanner {
      * before a scheduled recording. Per design spec §2 Q13: warn if
      * available capacity is < 2 × estimated_size.
      */
-    fun shouldWarnBeforeScheduledFire(
-        availableBytesAfterEviction: Long,
-        estimatedRecordingBytes: Long,
-    ): Boolean = availableBytesAfterEviction < estimatedRecordingBytes * 2
+    fun shouldWarnBeforeScheduledFire(availableBytesAfterEviction: Long, estimatedRecordingBytes: Long): Boolean =
+        availableBytesAfterEviction < estimatedRecordingBytes * 2
 
     /**
      * Snapshot of one stored recording row, projected to the fields
@@ -102,30 +95,20 @@ class StorageCapPlanner {
 
     sealed interface Plan {
         /** Cap allows the new recording without evicting anything. */
-        data class Proceed(
-            val remainingBudgetBytes: Long,
-        ) : Plan
+        data class Proceed(val remainingBudgetBytes: Long) : Plan
 
         /**
          * Need to delete [evictionTargets] (in order) before starting
          * the new recording; resulting budget will be enough.
          */
-        data class EvictThenProceed(
-            val evictionTargets: List<String>,
-            val bytesFreed: Long,
-            val remainingBudgetAfterEvictionBytes: Long,
-        ) : Plan
+        data class EvictThenProceed(val evictionTargets: List<String>, val bytesFreed: Long, val remainingBudgetAfterEvictionBytes: Long) : Plan
 
         /**
          * Even with every evictable row gone, [shortfallBytes] still
          * can't be freed. Caller surfaces a "free space" prompt and
          * refuses the recording.
          */
-        data class NoSpace(
-            val shortfallBytes: Long,
-            val evictableBytes: Long,
-            val totalRequiredBytes: Long,
-        ) : Plan
+        data class NoSpace(val shortfallBytes: Long, val evictableBytes: Long, val totalRequiredBytes: Long) : Plan
     }
 
     companion object {

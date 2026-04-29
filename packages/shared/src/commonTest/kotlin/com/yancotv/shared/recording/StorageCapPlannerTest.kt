@@ -4,9 +4,9 @@ import com.yancotv.shared.recording.StorageCapPlanner.Plan
 import com.yancotv.shared.recording.StorageCapPlanner.StoredRecording
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 
 /**
  * Tests for [StorageCapPlanner]. Pure logic; no Android deps. Covers
@@ -49,11 +49,11 @@ class StorageCapPlannerTest {
             planner.planForNewRecording(
                 capBytes = 10 * gb,
                 existingRecordings =
-                    listOf(
-                        rec("oldest", 4 * gb, startedAt = 100),
-                        rec("middle", 3 * gb, startedAt = 200),
-                        rec("newest", 3 * gb, startedAt = 300),
-                    ),
+                listOf(
+                    rec("oldest", 4 * gb, startedAt = 100),
+                    rec("middle", 3 * gb, startedAt = 200),
+                    rec("newest", 3 * gb, startedAt = 300),
+                ),
                 newRecordingExpectedBytes = 5 * gb,
                 freeDiskBytes = 100 * gb, // disk has plenty; cap is the constraint
             )
@@ -69,11 +69,11 @@ class StorageCapPlannerTest {
             planner.planForNewRecording(
                 capBytes = 10 * gb,
                 existingRecordings =
-                    listOf(
-                        rec("a", 1 * gb, startedAt = 100),
-                        rec("b", 1 * gb, startedAt = 200),
-                        rec("c", 8 * gb, startedAt = 300),
-                    ),
+                listOf(
+                    rec("a", 1 * gb, startedAt = 100),
+                    rec("b", 1 * gb, startedAt = 200),
+                    rec("c", 8 * gb, startedAt = 300),
+                ),
                 newRecordingExpectedBytes = 2 * gb,
                 freeDiskBytes = 100 * gb,
             )
@@ -89,10 +89,10 @@ class StorageCapPlannerTest {
             planner.planForNewRecording(
                 capBytes = 10 * gb,
                 existingRecordings =
-                    listOf(
-                        rec("inflight", 8 * gb, startedAt = 100, evictable = false),
-                        rec("done", 2 * gb, startedAt = 200, evictable = true),
-                    ),
+                listOf(
+                    rec("inflight", 8 * gb, startedAt = 100, evictable = false),
+                    rec("done", 2 * gb, startedAt = 200, evictable = true),
+                ),
                 newRecordingExpectedBytes = 5 * gb,
                 freeDiskBytes = 100 * gb,
             )
@@ -138,16 +138,10 @@ class StorageCapPlannerTest {
         assertEquals(16 * gb, proceed.remainingBudgetBytes)
     }
 
-    private fun rec(
-        id: String,
-        bytesOnDisk: Long,
-        startedAt: Long,
-        evictable: Boolean = true,
-    ): StoredRecording =
-        StoredRecording(
-            id = id,
-            bytesOnDisk = bytesOnDisk,
-            startedAt = startedAt,
-            evictable = evictable,
-        )
+    private fun rec(id: String, bytesOnDisk: Long, startedAt: Long, evictable: Boolean = true): StoredRecording = StoredRecording(
+        id = id,
+        bytesOnDisk = bytesOnDisk,
+        startedAt = startedAt,
+        evictable = evictable,
+    )
 }

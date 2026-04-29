@@ -1,0 +1,65 @@
+# Repo-level EditorConfig + ktlint rule overrides.
+#
+# MB-202 (2026-04-28) — flipped `ignoreFailures = false` on ktlint;
+# this file pins the rule overrides we deliberately disable for the
+# Kotlin codebase so the lint pass agrees with the conventions we
+# already follow.
+#
+# Disabled rules (with reasons):
+#
+#   ktlint_standard_function-naming
+#     Compose @Composable functions use PascalCase by community
+#     convention (Google's Compose docs + Android Studio templates).
+#     ktlint's stock rule enforces lowerCamelCase. Disabling globally
+#     because the codebase mixes Composable functions with regular
+#     ones in the same files; per-file or per-function suppress
+#     would litter every UI file with annotations.
+#
+#   ktlint_standard_backing-property-naming
+#     StateFlow exposure pattern uses `_foo: MutableStateFlow` +
+#     public `val foo: StateFlow = _foo.asStateFlow()` — the
+#     leading-underscore private + matching public is canonical
+#     Kotlin (kotlinx.coroutines docs use it). ktlint's rule wants
+#     no underscore prefix.
+#
+#   ktlint_standard_filename
+#     A handful of Kotlin source files declare multiple top-level
+#     entities (e.g. AppModules.kt holds both the appModule DSL and
+#     several helper functions). Their filenames are intentionally
+#     not PascalCase'd to a single class name. The rule would fire
+#     on every multi-decl file; disabled so we don't have to choose
+#     between renaming files we like or scattering @file:Suppress
+#     across the codebase.
+#
+# Standard formatting (the parts we keep):
+#   - 4-space indent, LF line endings, UTF-8, trailing newline,
+#     trim-trailing-whitespace.
+#   - max_line_length = 160 (matches PRODUCTION_PLAN_NATIVE.md
+#     comment style + the ktlint default for Android Studio code-style).
+#   - Trailing commas allowed (Kotlin style guide; ij_kotlin_*
+#     properties).
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+continuation_indent_size = 4
+max_line_length = 160
+ktlint_code_style = android_studio
+ktlint_standard = enabled
+ktlint_standard_function-naming = disabled
+ktlint_standard_backing-property-naming = disabled
+ktlint_standard_filename = disabled
+ij_kotlin_allow_trailing_comma_on_call_site = true
+ij_kotlin_allow_trailing_comma = true
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+max_line_length = off

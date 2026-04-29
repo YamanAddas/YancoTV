@@ -8,16 +8,16 @@ import kotlin.test.assertTrue
 
 class UrlBuilderTest {
     // 2026-04-15T14:30:00Z in Unix seconds
-    private val apr15_1430 = 1776263400L
+    private val apr15At1430 = 1776263400L
 
     // 2026-01-01T00:00:00Z
-    private val jan1_0000 = 1767225600L
+    private val jan1At0000 = 1767225600L
 
     // 2026-06-01T10:00:00Z
-    private val jun1_1000 = 1780308000L
+    private val jun1At1000 = 1780308000L
 
     // 2026-04-15T14:30:45Z
-    private val apr15_143045 = 1776263445L
+    private val apr15At143045 = 1776263445L
 
     @Test fun buildsStandardXtreamTimeshiftUrl() {
         val url =
@@ -26,7 +26,7 @@ class UrlBuilderTest {
                 "user1",
                 "pass1",
                 "http://provider.com/live/user1/pass1/12345.ts",
-                apr15_1430,
+                apr15At1430,
                 3600,
             )
         assertEquals(
@@ -42,7 +42,7 @@ class UrlBuilderTest {
                 "u",
                 "p",
                 "http://host.com/live/u/p/99999.ts",
-                jan1_0000,
+                jan1At0000,
                 1800,
             )
         assertTrue(url.contains("/99999.ts"))
@@ -56,7 +56,7 @@ class UrlBuilderTest {
                 "u",
                 "p",
                 "http://host.com/stream",
-                jan1_0000,
+                jan1At0000,
                 600,
             )
         assertTrue(url.contains("/0.ts"))
@@ -69,7 +69,7 @@ class UrlBuilderTest {
                 "u",
                 "p",
                 "http://host.com/live/u/p/1.ts",
-                jun1_1000,
+                jun1At1000,
                 120,
             )
         assertTrue(Regex("""^http://host\.com////timeshift/""").containsMatchIn(url))
@@ -82,7 +82,7 @@ class UrlBuilderTest {
                 "u",
                 "p",
                 "http://host.com/live/u/p/1.ts",
-                jan1_0000,
+                jan1At0000,
                 61,
             )
         assertTrue(url.contains("/2/"))
@@ -147,7 +147,7 @@ class UrlBuilderTest {
             buildM3uCatchupUrl(
                 "http://stream.com/live/1.ts",
                 mapOf("catchupSource" to "http://archive.com/{Y}-{m}-{d}/{H}:{M}:{S}"),
-                apr15_143045,
+                apr15At143045,
                 3600,
                 now,
             )

@@ -56,11 +56,7 @@ import org.koin.compose.koinInject
  * suspend-wrapped launches.
  */
 @Composable
-fun SettingsParentalTab(
-    modifier: Modifier = Modifier,
-    repo: ParentalRepository = koinInject(),
-    contentRepo: ContentRepository = koinInject(),
-) {
+fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository = koinInject(), contentRepo: ContentRepository = koinInject()) {
     val scope = rememberCoroutineScope()
     val settings = repo.settings.collectAsState().value
     val hiddenIds = repo.hiddenIds.collectAsState().value
@@ -94,10 +90,10 @@ fun SettingsParentalTab(
     // measures fine inside the verticalScroll.
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -115,11 +111,11 @@ fun SettingsParentalTab(
         // ───── PIN section ─────
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -222,11 +218,11 @@ fun SettingsParentalTab(
         // without this panel there's no way to unhide except reinstalling.
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -251,11 +247,11 @@ fun SettingsParentalTab(
             }
             Text(
                 text =
-                    if (hiddenIds.isEmpty()) {
-                        "No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it."
-                    } else {
-                        "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back."
-                    },
+                if (hiddenIds.isEmpty()) {
+                    "No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it."
+                } else {
+                    "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back."
+                },
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
             )
@@ -280,15 +276,15 @@ fun SettingsParentalTab(
     showGate?.let { action ->
         PinEntryDialog(
             title =
-                when (action) {
-                    GateAction.CHANGE -> "Enter current PIN"
-                    GateAction.REMOVE -> "Confirm with current PIN"
-                },
+            when (action) {
+                GateAction.CHANGE -> "Enter current PIN"
+                GateAction.REMOVE -> "Confirm with current PIN"
+            },
             body =
-                when (action) {
-                    GateAction.CHANGE -> "To change your PIN, confirm the current one first."
-                    GateAction.REMOVE -> "Removing the PIN will disable parental controls."
-                },
+            when (action) {
+                GateAction.CHANGE -> "To change your PIN, confirm the current one first."
+                GateAction.REMOVE -> "Removing the PIN will disable parental controls."
+            },
             repo = repo,
             onSuccess = {
                 when (action) {
@@ -313,11 +309,7 @@ fun SettingsParentalTab(
 private enum class GateAction { CHANGE, REMOVE }
 
 @Composable
-private fun PinField(
-    value: String,
-    onChange: (String) -> Unit,
-    label: String,
-) {
+private fun PinField(value: String, onChange: (String) -> Unit, label: String) {
     // MB-117: click-to-edit so the IME never auto-pops on D-pad focus.
     // Bare mode keeps the field flush inside the dialog body that hosts it.
     SettingsClickToEditField(
@@ -331,17 +323,14 @@ private fun PinField(
 }
 
 @Composable
-private fun HiddenRow(
-    item: ContentItem,
-    onUnhide: () -> Unit,
-) {
+private fun HiddenRow(item: ContentItem, onUnhide: () -> Unit) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

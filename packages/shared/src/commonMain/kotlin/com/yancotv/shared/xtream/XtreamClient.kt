@@ -30,14 +30,7 @@ import kotlinx.serialization.json.io.decodeSourceToSequence
  * defensive `String(x ?? '')` / `Number(x) || 0` semantics of the TS source.
  */
 
-data class XtreamUserInfo(
-    val username: String,
-    val status: String,
-    val expDate: String?,
-    val isTrial: Boolean,
-    val activeCons: Int,
-    val maxConnections: Int,
-)
+data class XtreamUserInfo(val username: String, val status: String, val expDate: String?, val isTrial: Boolean, val activeCons: Int, val maxConnections: Int)
 
 data class XtreamServerInfo(
     val url: String,
@@ -49,16 +42,9 @@ data class XtreamServerInfo(
     val timezone: String,
 )
 
-data class XtreamAuthInfo(
-    val userInfo: XtreamUserInfo,
-    val serverInfo: XtreamServerInfo,
-)
+data class XtreamAuthInfo(val userInfo: XtreamUserInfo, val serverInfo: XtreamServerInfo)
 
-data class XtreamCategory(
-    val categoryId: String,
-    val categoryName: String,
-    val parentId: Int,
-)
+data class XtreamCategory(val categoryId: String, val categoryName: String, val parentId: Int)
 
 data class XtreamLiveStream(
     val num: Int,
@@ -104,23 +90,11 @@ data class XtreamSeriesInfo(
     val lastModified: String,
 )
 
-data class XtreamEpisodeInfo(
-    val duration: String? = null,
-    val season: Int? = null,
-)
+data class XtreamEpisodeInfo(val duration: String? = null, val season: Int? = null)
 
-data class XtreamSeriesEpisode(
-    val id: String,
-    val episodeNum: Int,
-    val title: String,
-    val containerExtension: String,
-    val info: XtreamEpisodeInfo,
-)
+data class XtreamSeriesEpisode(val id: String, val episodeNum: Int, val title: String, val containerExtension: String, val info: XtreamEpisodeInfo)
 
-data class XtreamSeasonRef(
-    val seasonNumber: Int,
-    val name: String,
-)
+data class XtreamSeasonRef(val seasonNumber: Int, val name: String)
 
 data class XtreamSeriesDetailInfo(
     val name: String,
@@ -133,16 +107,9 @@ data class XtreamSeriesDetailInfo(
     val rating: String,
 )
 
-data class XtreamSeriesDetail(
-    val seasons: List<XtreamSeasonRef>,
-    val episodes: Map<String, List<XtreamSeriesEpisode>>,
-    val info: XtreamSeriesDetailInfo,
-)
+data class XtreamSeriesDetail(val seasons: List<XtreamSeasonRef>, val episodes: Map<String, List<XtreamSeriesEpisode>>, val info: XtreamSeriesDetailInfo)
 
-data class XtreamSubtitle(
-    val language: String,
-    val url: String,
-)
+data class XtreamSubtitle(val language: String, val url: String)
 
 data class XtreamVodDetail(
     val name: String,
@@ -161,9 +128,7 @@ data class XtreamVodDetail(
     val tmdbId: Int?,
 )
 
-enum class XtreamStreamType(
-    val path: String,
-) {
+enum class XtreamStreamType(val path: String) {
     LIVE("live"),
     MOVIE("movie"),
     SERIES("series"),
@@ -225,20 +190,14 @@ private fun JsonElement?.obj(): JsonObject? = this as? JsonObject
 private fun JsonElement?.arr(): JsonArray? = this as? JsonArray
 
 /** Mirrors TS `String(x ?? '')`. */
-private fun strOf(
-    v: JsonElement?,
-    default: String = "",
-): String {
+private fun strOf(v: JsonElement?, default: String = ""): String {
     if (v == null || v is JsonNull) return default
     if (v is JsonPrimitive) return v.content
     return v.toString()
 }
 
 /** Mirrors TS `Number(x) || 0` for integer fields. */
-private fun numOf(
-    v: JsonElement?,
-    default: Int = 0,
-): Int {
+private fun numOf(v: JsonElement?, default: Int = 0): Int {
     if (v == null || v is JsonNull) return default
     val prim = v as? JsonPrimitive ?: return default
     return prim.content.toDoubleOrNull()?.toInt() ?: default
@@ -293,12 +252,7 @@ data class XtreamClientOptions(
     val authTimeoutMs: Long = 25_000,
 )
 
-class XtreamClient(
-    url: String,
-    private val username: String,
-    private val password: String,
-    options: XtreamClientOptions,
-) {
+class XtreamClient(url: String, private val username: String, private val password: String, options: XtreamClientOptions) {
     private val baseUrl: String =
         url
             .replace(Regex("/+$"), "")
@@ -336,24 +290,24 @@ class XtreamClient(
         return Result.Ok(
             XtreamAuthInfo(
                 userInfo =
-                    XtreamUserInfo(
-                        username = strOf(userInfo["username"]),
-                        status = strOf(userInfo["status"], "Unknown"),
-                        expDate = userInfo["exp_date"]?.let { if (it is JsonNull) null else strOf(it) },
-                        isTrial = strOf(userInfo["is_trial"]) == "1",
-                        activeCons = numOf(userInfo["active_cons"]),
-                        maxConnections = numOf(userInfo["max_connections"]),
-                    ),
+                XtreamUserInfo(
+                    username = strOf(userInfo["username"]),
+                    status = strOf(userInfo["status"], "Unknown"),
+                    expDate = userInfo["exp_date"]?.let { if (it is JsonNull) null else strOf(it) },
+                    isTrial = strOf(userInfo["is_trial"]) == "1",
+                    activeCons = numOf(userInfo["active_cons"]),
+                    maxConnections = numOf(userInfo["max_connections"]),
+                ),
                 serverInfo =
-                    XtreamServerInfo(
-                        url = strOf(serverInfo["url"]),
-                        port = strOf(serverInfo["port"]),
-                        httpsPort = serverInfo["https_port"]?.let { if (it is JsonNull) null else strOf(it) },
-                        rtmpPort = serverInfo["rtmp_port"]?.let { if (it is JsonNull) null else strOf(it) },
-                        serverProtocol = strOf(serverInfo["server_protocol"], "http"),
-                        timeNow = strOf(serverInfo["time_now"]),
-                        timezone = strOf(serverInfo["timezone"]),
-                    ),
+                XtreamServerInfo(
+                    url = strOf(serverInfo["url"]),
+                    port = strOf(serverInfo["port"]),
+                    httpsPort = serverInfo["https_port"]?.let { if (it is JsonNull) null else strOf(it) },
+                    rtmpPort = serverInfo["rtmp_port"]?.let { if (it is JsonNull) null else strOf(it) },
+                    serverProtocol = strOf(serverInfo["server_protocol"], "http"),
+                    timeNow = strOf(serverInfo["time_now"]),
+                    timezone = strOf(serverInfo["timezone"]),
+                ),
             ),
         )
     }
@@ -390,16 +344,12 @@ class XtreamClient(
      * not by the raw payload. This is how a 150MB VOD catalog survives the
      * Fire TV 400MB heap budget.
      */
-    suspend fun streamLiveStreams(
-        chunkSize: Int = 500,
-        onChunk: suspend (List<XtreamLiveStream>) -> Unit,
-    ): Result<Int, Throwable> =
-        streamArray(
-            action = "get_live_streams",
-            chunkSize = chunkSize,
-            onChunk = onChunk,
-            parse = ::parseLiveStream,
-        )
+    suspend fun streamLiveStreams(chunkSize: Int = 500, onChunk: suspend (List<XtreamLiveStream>) -> Unit): Result<Int, Throwable> = streamArray(
+        action = "get_live_streams",
+        chunkSize = chunkSize,
+        onChunk = onChunk,
+        parse = ::parseLiveStream,
+    )
 
     private fun parseLiveStream(s: JsonObject): XtreamLiveStream {
         val catIds = s["category_ids"].arr()?.map { numOf(it) } ?: emptyList()
@@ -434,30 +384,25 @@ class XtreamClient(
         return Result.Ok(streams)
     }
 
-    suspend fun streamVodStreams(
-        chunkSize: Int = 500,
-        onChunk: suspend (List<XtreamVodStream>) -> Unit,
-    ): Result<Int, Throwable> =
-        streamArray(
-            action = "get_vod_streams",
-            chunkSize = chunkSize,
-            onChunk = onChunk,
-            parse = ::parseVodStream,
-        )
+    suspend fun streamVodStreams(chunkSize: Int = 500, onChunk: suspend (List<XtreamVodStream>) -> Unit): Result<Int, Throwable> = streamArray(
+        action = "get_vod_streams",
+        chunkSize = chunkSize,
+        onChunk = onChunk,
+        parse = ::parseVodStream,
+    )
 
-    private fun parseVodStream(s: JsonObject): XtreamVodStream =
-        XtreamVodStream(
-            num = numOf(s["num"]),
-            name = strOf(s["name"]),
-            streamType = strOf(s["stream_type"], "movie"),
-            streamId = numOf(s["stream_id"]),
-            streamIcon = strOf(s["stream_icon"]),
-            rating = strOf(s["rating"]),
-            added = strOf(s["added"]),
-            categoryId = strOf(s["category_id"]),
-            containerExtension = strOf(s["container_extension"], "mp4"),
-            directSource = strOf(s["direct_source"]),
-        )
+    private fun parseVodStream(s: JsonObject): XtreamVodStream = XtreamVodStream(
+        num = numOf(s["num"]),
+        name = strOf(s["name"]),
+        streamType = strOf(s["stream_type"], "movie"),
+        streamId = numOf(s["stream_id"]),
+        streamIcon = strOf(s["stream_icon"]),
+        rating = strOf(s["rating"]),
+        added = strOf(s["added"]),
+        categoryId = strOf(s["category_id"]),
+        containerExtension = strOf(s["container_extension"], "mp4"),
+        directSource = strOf(s["direct_source"]),
+    )
 
     suspend fun getSeriesList(categoryId: String? = null): Result<List<XtreamSeriesInfo>, Throwable> {
         val extra = if (categoryId != null) "&category_id=$categoryId" else ""
@@ -473,16 +418,12 @@ class XtreamClient(
         return Result.Ok(series)
     }
 
-    suspend fun streamSeriesList(
-        chunkSize: Int = 500,
-        onChunk: suspend (List<XtreamSeriesInfo>) -> Unit,
-    ): Result<Int, Throwable> =
-        streamArray(
-            action = "get_series",
-            chunkSize = chunkSize,
-            onChunk = onChunk,
-            parse = ::parseSeriesInfo,
-        )
+    suspend fun streamSeriesList(chunkSize: Int = 500, onChunk: suspend (List<XtreamSeriesInfo>) -> Unit): Result<Int, Throwable> = streamArray(
+        action = "get_series",
+        chunkSize = chunkSize,
+        onChunk = onChunk,
+        parse = ::parseSeriesInfo,
+    )
 
     /**
      * Shared streaming array walker. Decodes a JSON array element-by-element
@@ -569,21 +510,20 @@ class XtreamClient(
         return Result.Err(Exception("Max retries exceeded"))
     }
 
-    private fun parseSeriesInfo(s: JsonObject): XtreamSeriesInfo =
-        XtreamSeriesInfo(
-            num = numOf(s["num"]),
-            name = strOf(s["name"]),
-            seriesId = numOf(s["series_id"]),
-            cover = strOf(s["cover"]),
-            plot = strOf(s["plot"]),
-            cast = strOf(s["cast"]),
-            director = strOf(s["director"]),
-            genre = strOf(s["genre"]),
-            releaseDate = strOf(s["releaseDate"] ?: s["release_date"]),
-            rating = strOf(s["rating"]),
-            categoryId = strOf(s["category_id"]),
-            lastModified = strOf(s["last_modified"]),
-        )
+    private fun parseSeriesInfo(s: JsonObject): XtreamSeriesInfo = XtreamSeriesInfo(
+        num = numOf(s["num"]),
+        name = strOf(s["name"]),
+        seriesId = numOf(s["series_id"]),
+        cover = strOf(s["cover"]),
+        plot = strOf(s["plot"]),
+        cast = strOf(s["cast"]),
+        director = strOf(s["director"]),
+        genre = strOf(s["genre"]),
+        releaseDate = strOf(s["releaseDate"] ?: s["release_date"]),
+        rating = strOf(s["rating"]),
+        categoryId = strOf(s["category_id"]),
+        lastModified = strOf(s["last_modified"]),
+    )
 
     suspend fun getSeriesInfo(seriesId: Int): Result<XtreamSeriesDetail, Throwable> {
         val data = request("get_series_info&series_id=$seriesId")
@@ -616,10 +556,10 @@ class XtreamClient(
                             title = strOf(e["title"]),
                             containerExtension = strOf(e["container_extension"], "mp4"),
                             info =
-                                XtreamEpisodeInfo(
-                                    duration = epInfo?.get("duration")?.let { if (truthyOf(it)) strOf(it) else null },
-                                    season = epInfo?.get("season")?.let { if (truthyOf(it)) numOf(it) else null },
-                                ),
+                            XtreamEpisodeInfo(
+                                duration = epInfo?.get("duration")?.let { if (truthyOf(it)) strOf(it) else null },
+                                season = epInfo?.get("season")?.let { if (truthyOf(it)) numOf(it) else null },
+                            ),
                         )
                     }
             }
@@ -630,16 +570,16 @@ class XtreamClient(
                 seasons = seasons,
                 episodes = episodes,
                 info =
-                    XtreamSeriesDetailInfo(
-                        name = strOf(info["name"]),
-                        cover = strOf(info["cover"]),
-                        plot = strOf(info["plot"]),
-                        cast = strOf(info["cast"]),
-                        director = strOf(info["director"]),
-                        genre = strOf(info["genre"]),
-                        releaseDate = strOf(info["releaseDate"] ?: info["release_date"]),
-                        rating = strOf(info["rating"]),
-                    ),
+                XtreamSeriesDetailInfo(
+                    name = strOf(info["name"]),
+                    cover = strOf(info["cover"]),
+                    plot = strOf(info["plot"]),
+                    cast = strOf(info["cast"]),
+                    director = strOf(info["director"]),
+                    genre = strOf(info["genre"]),
+                    releaseDate = strOf(info["releaseDate"] ?: info["release_date"]),
+                    rating = strOf(info["rating"]),
+                ),
             ),
         )
     }
@@ -715,21 +655,14 @@ class XtreamClient(
 
     fun buildEpgUrl(): String = "$baseUrl/xmltv.php?username=${enc(username)}&password=${enc(password)}"
 
-    fun buildStreamUrl(
-        streamId: Int,
-        type: XtreamStreamType,
-        extension: String? = null,
-    ): String {
+    fun buildStreamUrl(streamId: Int, type: XtreamStreamType, extension: String? = null): String {
         val defaultExt = if (type == XtreamStreamType.LIVE) "ts" else "mp4"
         val trimmed = extension?.trim().orEmpty()
         val ext = if (trimmed.isNotEmpty()) trimmed else defaultExt
         return "$baseUrl/${type.path}/$username/$password/$streamId.$ext"
     }
 
-    private suspend fun request(
-        action: String,
-        perRequestTimeoutMs: Long = timeoutMs,
-    ): Result<JsonElement, Throwable> {
+    private suspend fun request(action: String, perRequestTimeoutMs: Long = timeoutMs): Result<JsonElement, Throwable> {
         val url =
             "$baseUrl/player_api.php?username=${enc(username)}&password=${enc(password)}&action=$action"
 

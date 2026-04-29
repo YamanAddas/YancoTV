@@ -12,9 +12,9 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.yancotv.shared.epg.EpgRepository
+import java.util.concurrent.TimeUnit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.util.concurrent.TimeUnit
 
 /**
  * Periodic + one-shot EPG refresh. Fetches every configured source's XMLTV,
@@ -33,40 +33,37 @@ import java.util.concurrent.TimeUnit
  * intervals waste battery + bandwidth; longer ones mean the "now playing"
  * band on the guide can be hours stale after a full day uptime.
  */
-class EpgSyncWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params),
+class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
+    CoroutineWorker(appContext, params),
     KoinComponent {
     private val epg: EpgRepository by inject()
     private val importer: AndroidEpgImporter by inject()
 
-    override suspend fun doWork(): Result =
-        try {
-            // Stream-based importer keeps peak memory bounded — the shared
-            // [EpgRepository.refresh] path materialises the whole XML as a
-            // String and OOMs on Fire TV when the provider's feed is large.
-            // The importer uses XmlPullParser + incremental batched writes.
-            val result =
-                importer.refresh { msg ->
-                    setProgress(workDataOf(KEY_PROGRESS to msg))
-                }
-            if (result.ok) {
-                val cutoff = (System.currentTimeMillis() / 1000L) - STALE_WINDOW_SECONDS
-                runCatching { epg.deleteStale(cutoff) }
-                Result.success()
-            } else if (runAttemptCount < MAX_RETRIES) {
-                Result.retry()
-            } else {
-                Result.failure(workDataOf(KEY_ERROR to (result.error ?: "EPG refresh failed")))
+    override suspend fun doWork(): Result = try {
+        // Stream-based importer keeps peak memory bounded — the shared
+        // [EpgRepository.refresh] path materialises the whole XML as a
+        // String and OOMs on Fire TV when the provider's feed is large.
+        // The importer uses XmlPullParser + incremental batched writes.
+        val result =
+            importer.refresh { msg ->
+                setProgress(workDataOf(KEY_PROGRESS to msg))
             }
-        } catch (t: Throwable) {
-            if (runAttemptCount < MAX_RETRIES) {
-                Result.retry()
-            } else {
-                Result.failure(workDataOf(KEY_ERROR to (t.message ?: t::class.simpleName ?: "unknown")))
-            }
+        if (result.ok) {
+            val cutoff = (System.currentTimeMillis() / 1000L) - STALE_WINDOW_SECONDS
+            runCatching { epg.deleteStale(cutoff) }
+            Result.success()
+        } else if (runAttemptCount < MAX_RETRIES) {
+            Result.retry()
+        } else {
+            Result.failure(workDataOf(KEY_ERROR to (result.error ?: "EPG refresh failed")))
         }
+    } catch (t: Throwable) {
+        if (runAttemptCount < MAX_RETRIES) {
+            Result.retry()
+        } else {
+            Result.failure(workDataOf(KEY_ERROR to (t.message ?: t::class.simpleName ?: "unknown")))
+        }
+    }
 
     companion object {
         const val KEY_ERROR = "error"

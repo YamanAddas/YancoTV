@@ -49,11 +49,7 @@ class ContentDetailService(
      * sync-time value was empty). [metadata] is fully populated with
      * whatever we could load. [episodes] is only non-empty for series.
      */
-    data class Loaded(
-        val item: ContentItem,
-        val metadata: ContentMetadata,
-        val episodes: List<EpisodeInfo>,
-    )
+    data class Loaded(val item: ContentItem, val metadata: ContentMetadata, val episodes: List<EpisodeInfo>)
 
     suspend fun load(item: ContentItem): Loaded {
         val cached = item.metadataJson?.let { parseMetadata(it) } ?: ContentMetadata()
@@ -131,10 +127,7 @@ class ContentDetailService(
      * persistence is best-effort and a missing row only costs the user a
      * resume point on that one episode.
      */
-    private fun persistEpisodes(
-        seriesId: String,
-        episodes: List<EpisodeInfo>,
-    ) {
+    private fun persistEpisodes(seriesId: String, episodes: List<EpisodeInfo>) {
         if (episodes.isEmpty()) return
         episodes.forEach { ep ->
             runCatching {
@@ -153,11 +146,7 @@ class ContentDetailService(
         }
     }
 
-    private suspend fun loadMovieDetail(
-        item: ContentItem,
-        cached: ContentMetadata,
-        client: XtreamClient,
-    ): ContentMetadata {
+    private suspend fun loadMovieDetail(item: ContentItem, cached: ContentMetadata, client: XtreamClient): ContentMetadata {
         val streamId = cached.streamId?.toInt() ?: return cached
         return when (val res = client.getVodInfo(streamId)) {
             is Result.Ok -> {
@@ -174,9 +163,9 @@ class ContentDetailService(
                     tagline = v.tagline.ifBlank { cached.tagline },
                     youtubeTrailer = v.youtubeTrailer.ifBlank { cached.youtubeTrailer },
                     subtitles =
-                        v.subtitles
-                            .map { SubtitleTrack(language = it.language, url = it.url) }
-                            .takeIf { it.isNotEmpty() } ?: cached.subtitles,
+                    v.subtitles
+                        .map { SubtitleTrack(language = it.language, url = it.url) }
+                        .takeIf { it.isNotEmpty() } ?: cached.subtitles,
                     tmdbId = v.tmdbId?.toLong() ?: cached.tmdbId,
                     tmdbType = cached.tmdbType ?: v.tmdbId?.let { TmdbType.MOVIE },
                     detailFetchedAt = nowMs(),
@@ -189,11 +178,7 @@ class ContentDetailService(
         }
     }
 
-    private suspend fun loadSeriesDetail(
-        item: ContentItem,
-        cached: ContentMetadata,
-        client: XtreamClient,
-    ): ContentMetadata {
+    private suspend fun loadSeriesDetail(item: ContentItem, cached: ContentMetadata, client: XtreamClient): ContentMetadata {
         val seriesId = cached.seriesId?.toInt() ?: return cached
         return when (val res = client.getSeriesInfo(seriesId)) {
             is Result.Ok -> {
@@ -214,11 +199,11 @@ class ContentDetailService(
                                     episodeNumber = e.episodeNum,
                                     title = e.title.ifBlank { "Episode ${e.episodeNum}" },
                                     streamUrl =
-                                        client.buildStreamUrl(
-                                            e.id.toIntOrNull() ?: 0,
-                                            XtreamStreamType.SERIES,
-                                            e.containerExtension,
-                                        ),
+                                    client.buildStreamUrl(
+                                        e.id.toIntOrNull() ?: 0,
+                                        XtreamStreamType.SERIES,
+                                        e.containerExtension,
+                                    ),
                                     duration = e.info.duration?.takeIf { it.isNotBlank() },
                                 ),
                             )
@@ -242,10 +227,9 @@ class ContentDetailService(
         }
     }
 
-    private fun parseMetadata(raw: String): ContentMetadata? =
-        runCatching {
-            json.decodeFromString(ContentMetadata.serializer(), raw)
-        }.getOrNull()
+    private fun parseMetadata(raw: String): ContentMetadata? = runCatching {
+        json.decodeFromString(ContentMetadata.serializer(), raw)
+    }.getOrNull()
 
     private fun encodeMetadata(meta: ContentMetadata): String = json.encodeToString(ContentMetadata.serializer(), meta)
 

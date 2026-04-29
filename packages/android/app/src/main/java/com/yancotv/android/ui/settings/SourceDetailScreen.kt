@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -68,12 +66,7 @@ import kotlinx.coroutines.withContext
  * a view + edit form.
  */
 @Composable
-fun SourceDetailScreen(
-    sourceId: String,
-    repo: SourceRepository,
-    coordinator: SourceSyncCoordinator,
-    onBack: () -> Unit,
-) {
+fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: SourceSyncCoordinator, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var source by remember { mutableStateOf<Source?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -145,9 +138,9 @@ fun SourceDetailScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
     ) {
         DetailHero(
             source = current,
@@ -218,7 +211,7 @@ fun SourceDetailScreen(
             SettingsToggleRow(
                 label = "Auto-sync on app start",
                 description =
-                    "When on, this source kicks off a background refresh every time you open YancoTV. Off keeps catalog reads fast on launch and only syncs when you press Sync manually or the auto-sync interval elapses.",
+                "When on, this source kicks off a background refresh every time you open YancoTV. Off keeps catalog reads fast on launch and only syncs when you press Sync manually or the auto-sync interval elapses.",
                 checked = current.autoSyncOnStart,
                 onCheckedChange = { enabled ->
                     scope.launch {
@@ -367,13 +360,13 @@ fun SourceDetailScreen(
                                     name = nameField.takeIf { it.isNotBlank() && it != current.name },
                                     url = urlField.takeIf { it != current.url.orEmpty() },
                                     username =
-                                        usernameField.takeIf {
-                                            current.type == SourceType.XTREAM && it.isNotBlank()
-                                        },
+                                    usernameField.takeIf {
+                                        current.type == SourceType.XTREAM && it.isNotBlank()
+                                    },
                                     password =
-                                        passwordField.takeIf {
-                                            current.type == SourceType.XTREAM && it.isNotBlank()
-                                        },
+                                    passwordField.takeIf {
+                                        current.type == SourceType.XTREAM && it.isNotBlank()
+                                    },
                                     epgUrl = epgUrlField.takeIf { it != current.epgUrl.orEmpty() },
                                     userAgent = userAgentField.takeIf { it != current.userAgent.orEmpty() },
                                     referer = referrerField.takeIf { it != current.referer.orEmpty() },
@@ -454,30 +447,25 @@ fun SourceDetailScreen(
  *  Reuses the Sources-list dot vocabulary so the user sees the same
  *  "alive" indicator across the list and detail surfaces. */
 @Composable
-private fun DetailHero(
-    source: Source,
-    palette: YancoPalette,
-    onBack: () -> Unit,
-    backAnchorModifier: Modifier,
-) {
+private fun DetailHero(source: Source, palette: YancoPalette, onBack: () -> Unit, backAnchorModifier: Modifier) {
     val status = remember(source) { computeRowStatus(source, isSyncing = false) }
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(palette.BackgroundElevated.copy(alpha = 0.55f))
-                .border(1.dp, palette.PanelBorder, RoundedCornerShape(16.dp))
-                .padding(horizontal = 22.dp, vertical = 18.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(palette.BackgroundElevated.copy(alpha = 0.55f))
+            .border(1.dp, palette.PanelBorder, RoundedCornerShape(16.dp))
+            .padding(horizontal = 22.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .background(status.dotColor(palette)),
+            Modifier
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(status.dotColor(palette)),
         )
         Column(modifier = Modifier.weight(1f)) {
             SettingsKicker(text = "${typeLabel(source.type).uppercase()} · SOURCE", accent = true)
@@ -534,23 +522,21 @@ private fun ErrorPane(message: String, onBack: () -> Unit) {
     }
 }
 
-private fun statusKicker(status: RowStatus): String =
-    when (status) {
-        RowStatus.Syncing -> "SYNCING"
-        RowStatus.Ready -> "READY"
-        RowStatus.Stale -> "STALE"
-        RowStatus.NeverSynced -> "NEW"
-        RowStatus.Error -> "ERROR"
-    }
+private fun statusKicker(status: RowStatus): String = when (status) {
+    RowStatus.Syncing -> "SYNCING"
+    RowStatus.Ready -> "READY"
+    RowStatus.Stale -> "STALE"
+    RowStatus.NeverSynced -> "NEW"
+    RowStatus.Error -> "ERROR"
+}
 
-private fun healthSummary(status: RowStatus): String =
-    when (status) {
-        RowStatus.Syncing -> "Syncing now"
-        RowStatus.Ready -> "Healthy"
-        RowStatus.Stale -> "Stale — sync to refresh"
-        RowStatus.NeverSynced -> "Never synced"
-        RowStatus.Error -> "Last sync failed"
-    }
+private fun healthSummary(status: RowStatus): String = when (status) {
+    RowStatus.Syncing -> "Syncing now"
+    RowStatus.Ready -> "Healthy"
+    RowStatus.Stale -> "Stale — sync to refresh"
+    RowStatus.NeverSynced -> "Never synced"
+    RowStatus.Error -> "Last sync failed"
+}
 
 private fun formatRefreshIn(source: Source): String {
     if (source.lastSyncError != null) return "—"
@@ -574,13 +560,12 @@ private fun formatRefreshIn(source: Source): String {
     }
 }
 
-private fun serverFieldLabel(type: SourceType): String =
-    when (type) {
-        SourceType.XTREAM -> "Server URL"
-        SourceType.M3U_URL -> "Playlist URL"
-        SourceType.STALKER -> "Portal URL"
-        SourceType.M3U_FILE -> "File path"
-    }
+private fun serverFieldLabel(type: SourceType): String = when (type) {
+    SourceType.XTREAM -> "Server URL"
+    SourceType.M3U_URL -> "Playlist URL"
+    SourceType.STALKER -> "Portal URL"
+    SourceType.M3U_FILE -> "File path"
+}
 
 private fun formatLastSynced(ms: Long?): String {
     if (ms == null) return "Never"

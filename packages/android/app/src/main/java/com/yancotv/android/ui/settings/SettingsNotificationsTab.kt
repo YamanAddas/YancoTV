@@ -15,8 +15,8 @@ fun SettingsNotificationsTab(modifier: Modifier = Modifier) {
         kicker = "Later milestone",
         title = "Notifications",
         body =
-            "Per-event toggles for EPG reminders, source-sync completion, recording-ready " +
-                "alerts, and update prompts. Routes through WorkManager — unblocked once " +
-                "MK.14 adds the DVR event producer.",
+        "Per-event toggles for EPG reminders, source-sync completion, recording-ready " +
+            "alerts, and update prompts. Routes through WorkManager — unblocked once " +
+            "MK.14 adds the DVR event producer.",
     )
 }

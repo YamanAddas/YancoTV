@@ -2,16 +2,14 @@ package com.yancotv.shared.recording
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.yancotv.shared.db.YancoDb
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
 
 /**
  * Tests for [RecordingsRepository] — covers state-transition validation
@@ -26,10 +24,7 @@ class RecordingsRepositoryTest {
         return YancoDb(driver)
     }
 
-    private fun makeRepo(
-        db: YancoDb = makeDb(),
-        clock: () -> Long = { 1_700_000_000_000L },
-    ): RecordingsRepository = RecordingsRepository(db, clock)
+    private fun makeRepo(db: YancoDb = makeDb(), clock: () -> Long = { 1_700_000_000_000L }): RecordingsRepository = RecordingsRepository(db, clock)
 
     @Test fun markStartedInsertsRecordingRowInRecordingState() {
         val repo = makeRepo()
@@ -263,15 +258,14 @@ class RecordingsRepositoryTest {
         assertEquals(RecordingFormat.MPEG_TS, repo.getById("t")?.format)
     }
 
-    @Test fun allFlowReflectsLiveWrites() =
-        runTest {
-            val repo = makeRepo()
-            // First snapshot before any rows: empty.
-            assertTrue(repo.allFlow().first().isEmpty())
+    @Test fun allFlowReflectsLiveWrites() = runTest {
+        val repo = makeRepo()
+        // First snapshot before any rows: empty.
+        assertTrue(repo.allFlow().first().isEmpty())
 
-            repo.markStarted("a", null, "A", "u", "/p", RecordingFormat.HLS)
-            val after = repo.allFlow().first()
-            assertEquals(1, after.size)
-            assertEquals("a", after[0].id)
-        }
+        repo.markStarted("a", null, "A", "u", "/p", RecordingFormat.HLS)
+        val after = repo.allFlow().first()
+        assertEquals(1, after.size)
+        assertEquals("a", after[0].id)
+    }
 }

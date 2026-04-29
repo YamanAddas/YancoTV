@@ -2,12 +2,12 @@ package com.yancotv.android.ui.settings
 
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +30,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -39,10 +38,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.update.UpdateCheckWorker
 import com.yancotv.android.update.UpdateInstaller
@@ -83,10 +80,10 @@ fun SettingsAboutTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(scroll)
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         // dpadVerticalScroll deliberately NOT applied here — once the
         // tab has focusable rows (Updates toggle + Check-now button +
         // future control rows), Compose's natural focus traversal
@@ -101,11 +98,11 @@ fun SettingsAboutTab(
             contentDescription = "YancoTV logo",
             contentScale = ContentScale.Fit,
             modifier =
-                Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .size(140.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .padding(bottom = 12.dp),
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(140.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .padding(bottom = 12.dp),
         )
 
         // ───── Version row + tagline ─────
@@ -222,7 +219,9 @@ fun SettingsAboutTab(
         // sentence about what the app does + who it's for.
         SettingsSection(
             title = "About YancoTV",
-            sub = "An IPTV client for Android TV, Fire TV, and phones. Bring your M3U or Xtream playlist; we handle the EPG, recordings, favourites, multi-list, and smart category grouping.",
+            sub =
+            "An IPTV client for Android TV, Fire TV, and phones. Bring your M3U or Xtream playlist; " +
+                "we handle the EPG, recordings, favourites, multi-list, and smart category grouping.",
         ) {}
 
         // ───── Diagnostics ─────
@@ -261,28 +260,24 @@ fun SettingsAboutTab(
  * scroll the same way every other read-only-focusable row does.
  */
 @Composable
-private fun VersionRow(
-    text: String,
-    kicker: String? = null,
-    arabesque: FontFamily,
-) {
+private fun VersionRow(text: String, kicker: String? = null, arabesque: FontFamily) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = RoundedCornerShape(12.dp)
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(palette.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
-                .border(
-                    width = if (focused) 1.5.dp else 1.dp,
-                    color = if (focused) palette.FocusRing else palette.BorderSubtle,
-                    shape = shape,
-                )
-                .focusable(interactionSource = interaction)
-                .padding(horizontal = 22.dp, vertical = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.BackgroundRaised.copy(alpha = if (focused) 0.65f else 0.5f))
+            .border(
+                width = if (focused) 1.5.dp else 1.dp,
+                color = if (focused) palette.FocusRing else palette.BorderSubtle,
+                shape = shape,
+            )
+            .focusable(interactionSource = interaction)
+            .padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -341,12 +336,12 @@ private fun UpdateAvailableBanner(
     val palette = LocalYancoPalette.current
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(palette.Accent.copy(alpha = 0.12f))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.Accent.copy(alpha = 0.12f))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Column {
             Text(
@@ -462,19 +457,19 @@ private fun LinearProgressBar(percent: Int) {
     val pct = percent.coerceIn(0, 100)
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(palette.BorderSubtle.copy(alpha = 0.6f)),
+        Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(palette.BorderSubtle.copy(alpha = 0.6f)),
     ) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth(fraction = pct / 100f)
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(palette.Accent),
+            Modifier
+                .fillMaxWidth(fraction = pct / 100f)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(palette.Accent),
         )
     }
 }
@@ -492,11 +487,7 @@ private fun formatLastChecked(millis: Long?): String {
     }
 }
 
-private data class BuildInfo(
-    val version: String,
-    val versionCode: Long,
-    val packageName: String,
-)
+private data class BuildInfo(val version: String, val versionCode: Long, val packageName: String)
 
 private fun buildInfo(ctx: Context): BuildInfo {
     val pm = ctx.packageManager

@@ -12,24 +12,16 @@ import kotlin.test.assertTrue
  */
 
 private class DummyHttpClient : HttpClient {
-    override suspend fun getJson(
-        url: String,
-        options: HttpRequestOptions,
-    ): Any? = null
+    override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = null
 
-    override suspend fun getText(
-        url: String,
-        options: HttpRequestOptions,
-    ): String = ""
+    override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
 }
 
 class StalkerClientTest {
     private val http: HttpClient = DummyHttpClient()
 
-    private fun makeClient(
-        portal: String = "http://portal.example.com/stalker_portal",
-        mac: String = "00:1A:79:AA:BB:CC",
-    ): StalkerClient = StalkerClient(portal, mac, StalkerClientOptions(http = http))
+    private fun makeClient(portal: String = "http://portal.example.com/stalker_portal", mac: String = "00:1A:79:AA:BB:CC"): StalkerClient =
+        StalkerClient(portal, mac, StalkerClientOptions(http = http))
 
     // --- constructor ---
 

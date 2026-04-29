@@ -59,10 +59,7 @@ class HlsRecorder(
      * (Android side flushes + closes after this function returns,
      * regardless of outcome, before transitioning the DB row).
      */
-    suspend fun record(
-        input: RecordInput,
-        sink: Sink,
-    ): RecordResult {
+    suspend fun record(input: RecordInput, sink: Sink): RecordResult {
         val startedAt = clock.nowMs()
         val deadlineMs = input.maxDurationMs?.let { startedAt + it }
 
@@ -189,11 +186,7 @@ class HlsRecorder(
      * the freshly-parsed media playlist so the main loop can skip a
      * redundant fetch on iteration 0.
      */
-    private suspend fun resolveStartingPlaylist(
-        sourceUrl: String,
-        userAgent: String?,
-        referer: String?,
-    ): Pair<String, HlsPlaylist> {
+    private suspend fun resolveStartingPlaylist(sourceUrl: String, userAgent: String?, referer: String?): Pair<String, HlsPlaylist> {
         val text = fetchManifest(sourceUrl, userAgent, referer)
         val parsed = HlsManifestParser.parse(text, sourceUrl)
         if (!parsed.isMaster) return sourceUrl to parsed
@@ -207,23 +200,14 @@ class HlsRecorder(
         return variantUrl to variantPlaylist
     }
 
-    private suspend fun fetchManifest(
-        url: String,
-        userAgent: String?,
-        referer: String?,
-    ): String =
-        http.getText(url, options(userAgent, referer))
+    private suspend fun fetchManifest(url: String, userAgent: String?, referer: String?): String = http.getText(url, options(userAgent, referer))
 
     /**
      * Fetch a segment's bytes with retry. Distinct from
      * [fetchManifest] because segments are binary and we want to use
      * `getBytes`, but the retry shape is the same.
      */
-    private suspend fun fetchSegmentWithRetry(
-        url: String,
-        userAgent: String?,
-        referer: String?,
-    ): ByteArray {
+    private suspend fun fetchSegmentWithRetry(url: String, userAgent: String?, referer: String?): ByteArray {
         var attempt = 0
         var lastError: Throwable? = null
         while (attempt <= strategy.maxRetriesPerRequest) {
@@ -248,10 +232,7 @@ class HlsRecorder(
         throw lastError ?: IllegalStateException("segment fetch retry loop exited without error")
     }
 
-    private fun options(
-        userAgent: String?,
-        referer: String?,
-    ): HttpRequestOptions {
+    private fun options(userAgent: String?, referer: String?): HttpRequestOptions {
         val headers = buildMap {
             if (!userAgent.isNullOrBlank()) put("User-Agent", userAgent)
             if (!referer.isNullOrBlank()) put("Referer", referer)
@@ -271,11 +252,7 @@ class HlsRecorder(
         )
     }
 
-    private fun finishCompleted(
-        recordId: String,
-        startedAtMs: Long,
-        bytesWritten: Long,
-    ): RecordResult {
+    private fun finishCompleted(recordId: String, startedAtMs: Long, bytesWritten: Long): RecordResult {
         val secs = (clock.nowMs() - startedAtMs) / 1000L
         val terminal =
             RecorderState.Completed(
@@ -287,12 +264,7 @@ class HlsRecorder(
         return RecordResult.Success(recordId, bytesWritten, secs)
     }
 
-    private fun failManifest(
-        recordId: String,
-        reason: String,
-        cause: Throwable,
-        bytesWritten: Long,
-    ): RecordResult {
+    private fun failManifest(recordId: String, reason: String, cause: Throwable, bytesWritten: Long): RecordResult {
         _state.value =
             RecorderState.Failed(
                 recordId = recordId,
@@ -302,10 +274,7 @@ class HlsRecorder(
         return RecordResult.Failure(recordId, bytesWritten, reason, cause)
     }
 
-    private fun failHeartbeat(
-        recordId: String,
-        bytesWritten: Long,
-    ): RecordResult {
+    private fun failHeartbeat(recordId: String, bytesWritten: Long): RecordResult {
         val reason = "heartbeat_timeout"
         _state.value =
             RecorderState.Failed(

@@ -6,8 +6,4 @@ package com.yancotv.shared.sources
  * field is deliberately a raw [String] rather than a char array because
  * [String] is what the URL builder + HTTP stack both need.
  */
-data class XtreamCredentials(
-    val baseUrl: String,
-    val username: String,
-    val password: String,
-)
+data class XtreamCredentials(val baseUrl: String, val username: String, val password: String)

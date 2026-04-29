@@ -5,9 +5,7 @@ package com.yancotv.shared.content
  * `group-parser.ts` `normalizeQuality` mapping so badges rendered on
  * Android match what the Electron app shows for the same title.
  */
-enum class QualityBadge(
-    val label: String,
-) {
+enum class QualityBadge(val label: String) {
     UHD_8K("8K"),
     UHD_4K("4K"),
     FHD("FHD"),

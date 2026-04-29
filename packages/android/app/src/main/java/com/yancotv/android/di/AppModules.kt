@@ -35,7 +35,6 @@ import com.yancotv.shared.sources.SourceRepository
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
-import java.util.concurrent.TimeUnit
 
 /**
  * MK.4 DI wiring. Everything the shell needs (db, http, sources) is bound

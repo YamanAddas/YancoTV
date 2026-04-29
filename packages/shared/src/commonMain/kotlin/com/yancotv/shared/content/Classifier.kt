@@ -41,10 +41,7 @@ private val MOVIE_GROUP_PATTERNS =
         "ondemand",
     )
 
-private fun matchesAny(
-    group: String,
-    patterns: List<String>,
-): Boolean {
+private fun matchesAny(group: String, patterns: List<String>): Boolean {
     for (p in patterns) {
         if (group.contains(p)) return true
     }

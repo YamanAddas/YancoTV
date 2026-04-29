@@ -9,7 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +35,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import com.yancotv.android.ui.focus.placedFocus
-import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +46,8 @@ import com.yancotv.android.backup.BackupCoordinator
 import com.yancotv.android.backup.ExportResult
 import com.yancotv.android.backup.ImportResult
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.db.YancoDb
 import kotlinx.coroutines.Dispatchers
@@ -256,15 +255,15 @@ fun SettingsBackupTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                // Same outer padding as the SettingsSection-based tabs:
-                // 32dp horizontal aligns with the breadcrumb's optical
-                // edge; 24dp top + 80dp bottom give safety margin so the
-                // last row doesn't hug the panel edge when scrolled.
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp)
-                .semantics { contentDescription = "Backup settings" },
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            // Same outer padding as the SettingsSection-based tabs:
+            // 32dp horizontal aligns with the breadcrumb's optical
+            // edge; 24dp top + 80dp bottom give safety margin so the
+            // last row doesn't hug the panel edge when scrolled.
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp)
+            .semantics { contentDescription = "Backup settings" },
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -283,11 +282,11 @@ fun SettingsBackupTab(
         // ───── Export ─────
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -321,11 +320,11 @@ fun SettingsBackupTab(
             SettingsToggleRow(
                 label = "Encrypt with password",
                 description =
-                    if (encryptToggle) {
-                        "Source credentials will be re-encrypted under your password (PBKDF2 + AES/GCM). You'll need this password to restore."
-                    } else {
-                        "Source credentials will be in PLAINTEXT in the file. Don't share or upload this file."
-                    },
+                if (encryptToggle) {
+                    "Source credentials will be re-encrypted under your password (PBKDF2 + AES/GCM). You'll need this password to restore."
+                } else {
+                    "Source credentials will be in PLAINTEXT in the file. Don't share or upload this file."
+                },
                 checked = encryptToggle,
                 onCheckedChange = { encryptToggle = it },
             )
@@ -403,11 +402,11 @@ fun SettingsBackupTab(
                 Text(
                     status,
                     color =
-                        if (status.startsWith("Export failed")) {
-                            LocalYancoPalette.current.Error
-                        } else {
-                            LocalYancoPalette.current.TextMuted
-                        },
+                    if (status.startsWith("Export failed")) {
+                        LocalYancoPalette.current.Error
+                    } else {
+                        LocalYancoPalette.current.TextMuted
+                    },
                     fontSize = 11.sp,
                 )
             }
@@ -416,11 +415,11 @@ fun SettingsBackupTab(
         // ───── Import ─────
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LocalYancoPalette.current.BackgroundRaised)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -486,11 +485,11 @@ fun SettingsBackupTab(
                 Text(
                     status,
                     color =
-                        if (status.startsWith("Restore failed") || status.startsWith("Couldn't") || status.startsWith("Wrong")) {
-                            LocalYancoPalette.current.Error
-                        } else {
-                            LocalYancoPalette.current.TextMuted
-                        },
+                    if (status.startsWith("Restore failed") || status.startsWith("Couldn't") || status.startsWith("Wrong")) {
+                        LocalYancoPalette.current.Error
+                    } else {
+                        LocalYancoPalette.current.TextMuted
+                    },
                     fontSize = 11.sp,
                 )
             }
@@ -523,11 +522,11 @@ fun SettingsBackupTab(
         if (recent.isNotEmpty()) {
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(LocalYancoPalette.current.BackgroundRaised)
-                        .padding(16.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(LocalYancoPalette.current.BackgroundRaised)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
@@ -579,30 +578,26 @@ fun SettingsBackupTab(
  *  row pattern so the navigation feels identical across the two
  *  Settings list surfaces. */
 @Composable
-private fun RecentExportRow(
-    row: RecentBackup,
-    onUse: () -> Unit,
-    onDelete: () -> Unit,
-) {
+private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -> Unit) {
     val palette = LocalYancoPalette.current
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(palette.BackgroundElevated.copy(alpha = 0.6f))
-                .border(1.dp, palette.BorderSubtle, RoundedCornerShape(10.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.BackgroundElevated.copy(alpha = 0.6f))
+            .border(1.dp, palette.BorderSubtle, RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Tiny dot for visual anchor — same vocabulary as the Sources rows.
         Box(
             modifier =
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(if (row.fileUri != null) palette.Accent else palette.TextMuted),
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(if (row.fileUri != null) palette.Accent else palette.TextMuted),
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -613,15 +608,15 @@ private fun RecentExportRow(
             )
             Text(
                 text =
-                    buildString {
-                        append(formatBytes(row.sizeBytes))
-                        append(" · schema v")
-                        append(row.schemaVersion)
-                        append(" · sha256 ")
-                        append(row.checksum.take(8))
-                        append('…')
-                        if (row.fileUri == null) append(" · file location lost")
-                    },
+                buildString {
+                    append(formatBytes(row.sizeBytes))
+                    append(" · schema v")
+                    append(row.schemaVersion)
+                    append(" · sha256 ")
+                    append(row.checksum.take(8))
+                    append('…')
+                    if (row.fileUri == null) append(" · file location lost")
+                },
                 color = palette.TextMuted,
                 fontSize = 10.sp,
             )
@@ -650,13 +645,8 @@ private fun RecentExportRow(
  * EXTRA_INITIAL_URI was added in API 26. Older devices ignore the
  * extra harmlessly — picker opens to default and the user navigates.
  */
-private class OpenDocumentWithInitialUri(
-    private val initialUri: Uri?,
-) : ActivityResultContracts.OpenDocument() {
-    override fun createIntent(
-        context: Context,
-        input: Array<String>,
-    ): Intent {
+private class OpenDocumentWithInitialUri(private val initialUri: Uri?) : ActivityResultContracts.OpenDocument() {
+    override fun createIntent(context: Context, input: Array<String>): Intent {
         val intent = super.createIntent(context, input)
         if (initialUri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
@@ -675,46 +665,43 @@ private data class RecentBackup(
     val fileUri: String?,
 )
 
-private fun formatBytes(b: Long): String =
-    when {
-        b < 1024 -> "$b B"
-        b < 1024 * 1024 -> "%.1f KB".format(b / 1024.0)
-        else -> "%.1f MB".format(b / (1024.0 * 1024.0))
-    }
+private fun formatBytes(b: Long): String = when {
+    b < 1024 -> "$b B"
+    b < 1024 * 1024 -> "%.1f KB".format(b / 1024.0)
+    else -> "%.1f MB".format(b / (1024.0 * 1024.0))
+}
 
-private fun formatExportResult(r: ExportResult, filename: String): String =
-    when (r) {
-        is ExportResult.Success ->
-            "Exported $filename · ${formatBytes(r.bytesWritten)} · schema v${r.file.dbSchemaVersion} · " +
-                "${r.file.recordCounts.values.sum()} records · checksum ${r.file.checksum.take(8)}…"
-        is ExportResult.Failed -> "Export failed: ${r.message}"
-    }
+private fun formatExportResult(r: ExportResult, filename: String): String = when (r) {
+    is ExportResult.Success ->
+        "Exported $filename · ${formatBytes(r.bytesWritten)} · schema v${r.file.dbSchemaVersion} · " +
+            "${r.file.recordCounts.values.sum()} records · checksum ${r.file.checksum.take(8)}…"
+    is ExportResult.Failed -> "Export failed: ${r.message}"
+}
 
-private fun formatImportResult(r: ImportResult): String =
-    when (r) {
-        is ImportResult.Success -> {
-            val report = r.report
-            buildString {
-                append("Restored ")
-                append(report.totalRestored)
-                append(" rows")
-                if (report.totalUnlinked > 0) {
-                    append(" · ")
-                    append(report.totalUnlinked)
-                    append(" pending source resync")
-                }
-                if (report.totalSkipped > 0) {
-                    append(" · ")
-                    append(report.totalSkipped)
-                    append(" already present (skipped)")
-                }
-                report.warnings.forEach { append(" · ").append(it) }
+private fun formatImportResult(r: ImportResult): String = when (r) {
+    is ImportResult.Success -> {
+        val report = r.report
+        buildString {
+            append("Restored ")
+            append(report.totalRestored)
+            append(" rows")
+            if (report.totalUnlinked > 0) {
+                append(" · ")
+                append(report.totalUnlinked)
+                append(" pending source resync")
             }
+            if (report.totalSkipped > 0) {
+                append(" · ")
+                append(report.totalSkipped)
+                append(" already present (skipped)")
+            }
+            report.warnings.forEach { append(" · ").append(it) }
         }
-        is ImportResult.ChecksumMismatch -> "Restore failed: file is corrupted (checksum mismatch)."
-        is ImportResult.SchemaTooNew -> "Restore failed: backup is for schema v${r.backupVersion} but app is at v${r.currentVersion}. Update the app first."
-        is ImportResult.DecryptFailed -> "Wrong password (or file is corrupted): ${r.message}"
-        is ImportResult.MalformedJson -> "Couldn't read the file: ${r.message}"
-        is ImportResult.IoError -> "Couldn't open the file: ${r.message}"
-        is ImportResult.UnexpectedError -> "Restore failed: ${r.message}"
     }
+    is ImportResult.ChecksumMismatch -> "Restore failed: file is corrupted (checksum mismatch)."
+    is ImportResult.SchemaTooNew -> "Restore failed: backup is for schema v${r.backupVersion} but app is at v${r.currentVersion}. Update the app first."
+    is ImportResult.DecryptFailed -> "Wrong password (or file is corrupted): ${r.message}"
+    is ImportResult.MalformedJson -> "Couldn't read the file: ${r.message}"
+    is ImportResult.IoError -> "Couldn't open the file: ${r.message}"
+    is ImportResult.UnexpectedError -> "Restore failed: ${r.message}"
+}

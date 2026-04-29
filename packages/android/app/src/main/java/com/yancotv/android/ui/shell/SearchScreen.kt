@@ -38,15 +38,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.font.FontWeight
-import com.yancotv.android.ui.theme.YancoShapes
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +57,7 @@ import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.types.ContentItem
@@ -162,10 +162,10 @@ fun SearchScreen(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SearchField(value = query, onValueChange = { query = it })
@@ -255,10 +255,7 @@ fun SearchScreen(
 }
 
 @Composable
-private fun SearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-) {
+private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
@@ -273,12 +270,12 @@ private fun SearchField(
 
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, border, RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(LocalYancoPalette.current.BackgroundRaised)
+            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         BasicTextField(
             value = value,
@@ -293,10 +290,10 @@ private fun SearchField(
             // debounce, so there's nothing extra to fire here.
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .placedFocus(fieldAnchor)
-                    .semantics { contentDescription = "Search channels, movies, and series" },
+            Modifier
+                .fillMaxWidth()
+                .placedFocus(fieldAnchor)
+                .semantics { contentDescription = "Search channels, movies, and series" },
             decorationBox = { inner ->
                 if (value.isEmpty()) {
                     Text(
@@ -311,15 +308,12 @@ private fun SearchField(
 }
 
 @Composable
-private fun EmptyState(
-    title: String,
-    subtitle: String,
-) {
+private fun EmptyState(title: String, subtitle: String) {
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -330,10 +324,7 @@ private fun EmptyState(
 }
 
 @Composable
-private fun SearchRow(
-    item: ContentItem,
-    onActivate: () -> Unit,
-) {
+private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
@@ -343,24 +334,24 @@ private fun SearchRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(8.dp))
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(LocalYancoPalette.current.BackgroundDeep),
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
@@ -401,12 +392,11 @@ private fun SearchRow(
     }
 }
 
-private fun typeLabel(type: ContentType): String =
-    when (type) {
-        ContentType.LIVE -> "LIVE"
-        ContentType.MOVIE -> "MOVIE"
-        ContentType.SERIES -> "SERIES"
-    }
+private fun typeLabel(type: ContentType): String = when (type) {
+    ContentType.LIVE -> "LIVE"
+    ContentType.MOVIE -> "MOVIE"
+    ContentType.SERIES -> "SERIES"
+}
 
 /**
  * MK.search.rails — per-type horizontal orb rail. Header above, LazyRow
@@ -415,11 +405,7 @@ private fun typeLabel(type: ContentType): String =
  * the parent LazyColumn's focus search.
  */
 @Composable
-private fun SearchRail(
-    title: String,
-    items: List<ContentItem>,
-    onActivate: (ContentItem) -> Unit,
-) {
+private fun SearchRail(title: String, items: List<ContentItem>, onActivate: (ContentItem) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = title.uppercase(),
@@ -447,10 +433,7 @@ private fun SearchRail(
  * shared interactionSource per the native-android-mk skill.
  */
 @Composable
-private fun SearchOrb(
-    item: ContentItem,
-    onActivate: () -> Unit,
-) {
+private fun SearchOrb(item: ContentItem, onActivate: () -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -463,21 +446,21 @@ private fun SearchOrb(
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(144.dp)
-                    .clip(YancoShapes.HexCapsule)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(palette.BackgroundElevated, palette.BackgroundDeep),
-                        ),
-                    )
-                    .border(
-                        width = if (focused) 2.dp else 1.dp,
-                        color = if (focused) palette.FocusRing else palette.PanelBorder,
-                        shape = YancoShapes.HexCapsule,
-                    )
-                    .focusable(interactionSource = interaction)
-                    .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate),
+            Modifier
+                .size(144.dp)
+                .clip(YancoShapes.HexCapsule)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(palette.BackgroundElevated, palette.BackgroundDeep),
+                    ),
+                )
+                .border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) palette.FocusRing else palette.PanelBorder,
+                    shape = YancoShapes.HexCapsule,
+                )
+                .focusable(interactionSource = interaction)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {

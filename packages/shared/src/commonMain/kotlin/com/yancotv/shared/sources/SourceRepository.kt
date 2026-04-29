@@ -22,6 +22,7 @@ import com.yancotv.shared.types.SourceType
 import com.yancotv.shared.types.UpdateSourceInput
 import com.yancotv.shared.xtream.XtreamClient
 import com.yancotv.shared.xtream.XtreamClientOptions
+import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -33,7 +34,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.random.Random
 
 /**
  * CRUD + sync orchestrator for sources. Mirrors desktop `source-manager.ts` +
@@ -140,17 +140,15 @@ class SourceRepository(
         return saved
     }
 
-    fun getAll(): List<Source> =
-        db.sourcesQueries
-            .selectAll()
-            .executeAsList()
-            .map { it.toDomain() }
+    fun getAll(): List<Source> = db.sourcesQueries
+        .selectAll()
+        .executeAsList()
+        .map { it.toDomain() }
 
-    fun getById(id: String): Source? =
-        db.sourcesQueries
-            .selectById(id)
-            .executeAsOneOrNull()
-            ?.toDomain()
+    fun getById(id: String): Source? = db.sourcesQueries
+        .selectById(id)
+        .executeAsOneOrNull()
+        ?.toDomain()
 
     fun updateSource(input: UpdateSourceInput): Source {
         val existing =
@@ -215,29 +213,20 @@ class SourceRepository(
         }
     }
 
-    fun setActive(
-        id: String,
-        active: Boolean,
-    ) {
+    fun setActive(id: String, active: Boolean) {
         db.sourcesQueries.setActive(active, clock(), id)
     }
 
     /** MK.15.7 — set the EPG merge priority for a source. Higher values
      *  win when two sources cover the same `tvg_id`. Independent of
      *  `priority` (which orders sources in the shell rail). */
-    fun setEpgPriority(
-        id: String,
-        priority: Int,
-    ) {
+    fun setEpgPriority(id: String, priority: Int) {
         db.sourcesQueries.setEpgPriority(priority.toLong(), clock(), id)
     }
 
     /** v9 → v10 — toggle whether [id] auto-syncs every time the app
      *  starts. Read by [autoSyncOnStartList] from the Android shell. */
-    fun setAutoSyncOnStart(
-        id: String,
-        enabled: Boolean,
-    ) {
+    fun setAutoSyncOnStart(id: String, enabled: Boolean) {
         db.sourcesQueries.setAutoSyncOnStart(enabled, clock(), id)
     }
 
@@ -246,21 +235,19 @@ class SourceRepository(
      *  source they later deactivated; respect the deactivation). The
      *  Android shell calls this once per MainActivity creation and
      *  enqueues a sync via SourceSyncCoordinator for each row. */
-    fun autoSyncOnStartList(): List<Source> =
-        db.sourcesQueries
-            .selectAutoSyncOnStart()
-            .executeAsList()
-            .map { it.toDomain() }
+    fun autoSyncOnStartList(): List<Source> = db.sourcesQueries
+        .selectAutoSyncOnStart()
+        .executeAsList()
+        .map { it.toDomain() }
 
     /** Reactive source list for Settings UIs that need to repaint after a
      *  setEpgPriority / setActive write. SQLDelight emits on any sources-
      *  table change, so writes from any other path light this up too. */
-    fun allFlow(): Flow<List<Source>> =
-        db.sourcesQueries
-            .selectAll()
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { rows -> rows.map { it.toDomain() } }
+    fun allFlow(): Flow<List<Source>> = db.sourcesQueries
+        .selectAll()
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows -> rows.map { it.toDomain() } }
 
     fun removeSource(id: String) {
         // Content rows cascade via the FK.
@@ -278,74 +265,73 @@ class SourceRepository(
      * Uses [channelFlow] so parallel fetchers can emit progress concurrently
      * without racing a shared flow collector.
      */
-    fun syncSource(id: String): Flow<SyncProgress> =
-        channelFlow {
-            val source =
-                getById(id) ?: run {
-                    logger.warn("syncSource[$id] not found")
-                    send(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
-                    return@channelFlow
+    fun syncSource(id: String): Flow<SyncProgress> = channelFlow {
+        val source =
+            getById(id) ?: run {
+                logger.warn("syncSource[$id] not found")
+                send(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
+                return@channelFlow
+            }
+
+        logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
+        try {
+            send(SyncProgress(SyncProgress.Phase.FETCHING, message = "Connecting"))
+            val writer = ContentWriter(db)
+            val now = clock()
+            val inserted =
+                when (source.type) {
+                    SourceType.M3U_URL ->
+                        syncM3uUrl(source, writer, now) { cur, total ->
+                            send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
+                        }
+                    SourceType.M3U_FILE ->
+                        syncM3uFile(source, writer, now) { cur, total ->
+                            send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
+                        }
+                    SourceType.XTREAM ->
+                        syncXtream(source, writer, now) { phase, cur, total, msg ->
+                            send(SyncProgress(phase, cur, total, msg))
+                        }
+                    SourceType.STALKER ->
+                        syncStalker(source, writer, now) { phase, cur, total, msg ->
+                            send(SyncProgress(phase, cur, total, msg))
+                        }
                 }
 
-            logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
-            try {
-                send(SyncProgress(SyncProgress.Phase.FETCHING, message = "Connecting"))
-                val writer = ContentWriter(db)
-                val now = clock()
-                val inserted =
-                    when (source.type) {
-                        SourceType.M3U_URL ->
-                            syncM3uUrl(source, writer, now) { cur, total ->
-                                send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
-                            }
-                        SourceType.M3U_FILE ->
-                            syncM3uFile(source, writer, now) { cur, total ->
-                                send(SyncProgress(SyncProgress.Phase.WRITING, cur, total))
-                            }
-                        SourceType.XTREAM ->
-                            syncXtream(source, writer, now) { phase, cur, total, msg ->
-                                send(SyncProgress(phase, cur, total, msg))
-                            }
-                        SourceType.STALKER ->
-                            syncStalker(source, writer, now) { phase, cur, total, msg ->
-                                send(SyncProgress(phase, cur, total, msg))
-                            }
-                    }
-
-                db.sourcesQueries.updateSyncResult(
-                    last_synced = now,
-                    last_sync_error = null,
-                    channel_count = inserted.toLong(),
-                    updated_at = now,
-                    id = id,
-                )
-                logger.info("syncSource[$id] done inserted=$inserted")
-                send(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
-            } catch (ce: CancellationException) {
-                // User pressed Cancel (or scope was torn down). Leave the source's
-                // last-sync-error alone — cancellation isn't a "failure" the user
-                // needs to be told about on next open. Must rethrow so the Flow
-                // shuts down instead of being treated as a normal error emission.
-                logger.info("syncSource[$id] cancelled")
-                throw ce
-            } catch (t: Throwable) {
-                // Redact credentials before this string lands in three
-                // PII-leak-prone surfaces: Android logcat (visible to adb /
-                // bug reports), `sources.last_sync_error` (persisted), and
-                // the Sources screen's failure-text rendering. Xtream
-                // 401/404 URLs include `?username=…&password=…` verbatim.
-                val msg = redactErrorMessage(t)
-                logger.error("sync failed for ${source.id}: $msg")
-                db.sourcesQueries.updateSyncResult(
-                    last_synced = source.lastSynced,
-                    last_sync_error = msg,
-                    channel_count = source.channelCount.toLong(),
-                    updated_at = clock(),
-                    id = id,
-                )
-                send(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
-            }
+            db.sourcesQueries.updateSyncResult(
+                last_synced = now,
+                last_sync_error = null,
+                channel_count = inserted.toLong(),
+                updated_at = now,
+                id = id,
+            )
+            logger.info("syncSource[$id] done inserted=$inserted")
+            send(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
+        } catch (ce: CancellationException) {
+            // User pressed Cancel (or scope was torn down). Leave the source's
+            // last-sync-error alone — cancellation isn't a "failure" the user
+            // needs to be told about on next open. Must rethrow so the Flow
+            // shuts down instead of being treated as a normal error emission.
+            logger.info("syncSource[$id] cancelled")
+            throw ce
+        } catch (t: Throwable) {
+            // Redact credentials before this string lands in three
+            // PII-leak-prone surfaces: Android logcat (visible to adb /
+            // bug reports), `sources.last_sync_error` (persisted), and
+            // the Sources screen's failure-text rendering. Xtream
+            // 401/404 URLs include `?username=…&password=…` verbatim.
+            val msg = redactErrorMessage(t)
+            logger.error("sync failed for ${source.id}: $msg")
+            db.sourcesQueries.updateSyncResult(
+                last_synced = source.lastSynced,
+                last_sync_error = msg,
+                channel_count = source.channelCount.toLong(),
+                updated_at = clock(),
+                id = id,
+            )
+            send(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
         }
+    }
 
     // ───── sync helpers ─────
 
@@ -390,12 +376,7 @@ class SourceRepository(
      * transaction and is committed before the next one starts, so the Guide
      * and Home screens can keep querying while sync is in flight.
      */
-    private suspend fun writeM3uBulk(
-        sourceId: String,
-        entries: List<M3uEntry>,
-        now: Long,
-        onProgress: suspend (Int, Int) -> Unit,
-    ): Int {
+    private suspend fun writeM3uBulk(sourceId: String, entries: List<M3uEntry>, now: Long, onProgress: suspend (Int, Int) -> Unit): Int {
         val bulk = BulkContentWriter(driver, logger)
         val total = entries.size
         onProgress(0, total)
@@ -430,11 +411,7 @@ class SourceRepository(
      * automatically. Many providers ship the right XMLTV URL in the header —
      * not using it means the user has to paste it by hand or live without EPG.
      */
-    private fun adoptDiscoveredEpgUrl(
-        source: Source,
-        discovered: String?,
-        now: Long,
-    ) {
+    private fun adoptDiscoveredEpgUrl(source: Source, discovered: String?, now: Long) {
         val d = discovered?.takeIf { it.isNotBlank() } ?: return
         if (!source.epgUrl.isNullOrBlank()) return
         // Redact in case the M3U header EPG URL itself carries credentials —
@@ -713,27 +690,26 @@ class SourceRepository(
         return credentialStore.decrypt(blob)
     }
 
-    private fun Sources.toDomain(): Source =
-        Source(
-            id = id,
-            name = name,
-            type = deserializeType(type),
-            url = url,
-            filePath = file_path,
-            epgUrl = epg_url,
-            userAgent = user_agent,
-            referer = referer,
-            lastSynced = last_synced,
-            isActive = is_active,
-            priority = priority.toInt(),
-            channelCount = channel_count.toInt(),
-            lastSyncError = last_sync_error,
-            autoSyncInterval = auto_sync_interval.toInt(),
-            epgPriority = epg_priority.toInt(),
-            autoSyncOnStart = auto_sync_on_start,
-            createdAt = created_at,
-            updatedAt = updated_at,
-        )
+    private fun Sources.toDomain(): Source = Source(
+        id = id,
+        name = name,
+        type = deserializeType(type),
+        url = url,
+        filePath = file_path,
+        epgUrl = epg_url,
+        userAgent = user_agent,
+        referer = referer,
+        lastSynced = last_synced,
+        isActive = is_active,
+        priority = priority.toInt(),
+        channelCount = channel_count.toInt(),
+        lastSyncError = last_sync_error,
+        autoSyncInterval = auto_sync_interval.toInt(),
+        epgPriority = epg_priority.toInt(),
+        autoSyncOnStart = auto_sync_on_start,
+        createdAt = created_at,
+        updatedAt = updated_at,
+    )
 
     private fun validate(input: AddSourceInput) {
         require(input.name.isNotBlank()) { "name is required" }
@@ -753,22 +729,20 @@ class SourceRepository(
     }
 
     companion object {
-        internal fun serializeType(t: SourceType): String =
-            when (t) {
-                SourceType.M3U_URL -> "m3u_url"
-                SourceType.M3U_FILE -> "m3u_file"
-                SourceType.XTREAM -> "xtream"
-                SourceType.STALKER -> "stalker"
-            }
+        internal fun serializeType(t: SourceType): String = when (t) {
+            SourceType.M3U_URL -> "m3u_url"
+            SourceType.M3U_FILE -> "m3u_file"
+            SourceType.XTREAM -> "xtream"
+            SourceType.STALKER -> "stalker"
+        }
 
-        internal fun deserializeType(s: String): SourceType =
-            when (s) {
-                "m3u_url" -> SourceType.M3U_URL
-                "m3u_file" -> SourceType.M3U_FILE
-                "xtream" -> SourceType.XTREAM
-                "stalker" -> SourceType.STALKER
-                else -> error("unknown source type: $s")
-            }
+        internal fun deserializeType(s: String): SourceType = when (s) {
+            "m3u_url" -> SourceType.M3U_URL
+            "m3u_file" -> SourceType.M3U_FILE
+            "xtream" -> SourceType.XTREAM
+            "stalker" -> SourceType.STALKER
+            else -> error("unknown source type: $s")
+        }
 
         private fun defaultId(clock: () -> Long): String {
             val ts = clock().toString(16)
@@ -786,8 +760,7 @@ class SourceRepository(
     }
 }
 
-private fun <T, E : Throwable> Result<T, E>.unwrap(): T =
-    when (this) {
-        is Result.Ok -> value
-        is Result.Err -> throw error
-    }
+private fun <T, E : Throwable> Result<T, E>.unwrap(): T = when (this) {
+    is Result.Ok -> value
+    is Result.Err -> throw error
+}

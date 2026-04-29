@@ -54,19 +54,15 @@ internal sealed interface RecoveryAction {
  * @param currentSchemaVersion the schema version the running binary's
  *   `YancoDb.Schema.version.toInt()` reports.
  */
-internal fun decideRecoveryAction(
-    saved: SourcesBackupFile?,
-    currentSchemaVersion: Int,
-): RecoveryAction =
-    when {
-        saved == null -> RecoveryAction.FreshOnly
-        saved.schemaVersion > currentSchemaVersion ->
-            RecoveryAction.RefuseRestore(
-                "Sources backup schemaVersion=${saved.schemaVersion} is newer than " +
-                    "current schema $currentSchemaVersion; refusing to restore.",
-            )
-        else -> RecoveryAction.Restore(saved.sources)
-    }
+internal fun decideRecoveryAction(saved: SourcesBackupFile?, currentSchemaVersion: Int): RecoveryAction = when {
+    saved == null -> RecoveryAction.FreshOnly
+    saved.schemaVersion > currentSchemaVersion ->
+        RecoveryAction.RefuseRestore(
+            "Sources backup schemaVersion=${saved.schemaVersion} is newer than " +
+                "current schema $currentSchemaVersion; refusing to restore.",
+        )
+    else -> RecoveryAction.Restore(saved.sources)
+}
 
 /**
  * Enumerate every file SQLite might leave behind for a given main DB
@@ -87,10 +83,9 @@ internal fun decideRecoveryAction(
  * (main, journal, wal, shm) order to mirror the existing production
  * code's order; SQLite's own recovery is robust to either ordering.
  */
-internal fun dbArtifactPaths(dbFile: File): List<File> =
-    listOf(
-        dbFile,
-        File("${dbFile.path}-journal"),
-        File("${dbFile.path}-wal"),
-        File("${dbFile.path}-shm"),
-    )
+internal fun dbArtifactPaths(dbFile: File): List<File> = listOf(
+    dbFile,
+    File("${dbFile.path}-journal"),
+    File("${dbFile.path}-wal"),
+    File("${dbFile.path}-shm"),
+)

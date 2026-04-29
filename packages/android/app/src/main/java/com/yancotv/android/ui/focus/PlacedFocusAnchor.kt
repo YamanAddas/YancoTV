@@ -78,10 +78,9 @@ fun rememberPlacedFocusAnchor(): PlacedFocusAnchor = remember { PlacedFocusAncho
  * make the node focusable on its own — combine with [Modifier.focusable]
  * or a clickable/focusable child.
  */
-fun Modifier.placedFocus(anchor: PlacedFocusAnchor): Modifier =
-    this
-        .onPlaced { anchor.markPlaced() }
-        .focusRequester(anchor.requester)
+fun Modifier.placedFocus(anchor: PlacedFocusAnchor): Modifier = this
+    .onPlaced { anchor.markPlaced() }
+    .focusRequester(anchor.requester)
 
 /**
  * Invisible 0-dp focus trap. Drop this as the first child of an overlay
@@ -98,10 +97,10 @@ fun Modifier.placedFocus(anchor: PlacedFocusAnchor): Modifier =
 fun FocusTrap(anchor: PlacedFocusAnchor) {
     Spacer(
         modifier =
-            Modifier
-                .size(0.dp)
-                .placedFocus(anchor)
-                .focusable(),
+        Modifier
+            .size(0.dp)
+            .placedFocus(anchor)
+            .focusable(),
     )
 }
 
@@ -121,8 +120,8 @@ fun FocusTrap(anchor: PlacedFocusAnchor) {
 fun FocusableSpacer() {
     Spacer(
         modifier =
-            Modifier
-                .size(0.dp)
-                .focusable(),
+        Modifier
+            .size(0.dp)
+            .focusable(),
     )
 }

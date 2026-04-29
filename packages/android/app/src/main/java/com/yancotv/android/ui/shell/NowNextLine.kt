@@ -27,11 +27,7 @@ import com.yancotv.shared.types.NowNext
  *  - Renders nothing if the channel has no EPG data (caller should skip it).
  */
 @Composable
-fun NowNextLine(
-    nowNext: NowNext?,
-    nowSeconds: Long,
-    modifier: Modifier = Modifier,
-) {
+fun NowNextLine(nowNext: NowNext?, nowSeconds: Long, modifier: Modifier = Modifier) {
     if (nowNext == null) return
     val now = nowNext.now
     val next = nowNext.next
@@ -59,19 +55,19 @@ fun NowNextLine(
         if (now != null) {
             Box(
                 modifier =
-                    Modifier
-                        .padding(top = 3.dp)
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(LocalYancoPalette.current.BorderSubtle),
+                Modifier
+                    .padding(top = 3.dp)
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(LocalYancoPalette.current.BorderSubtle),
             ) {
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(progress)
-                            .background(LocalYancoPalette.current.Accent),
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(LocalYancoPalette.current.Accent),
                 )
             }
         }

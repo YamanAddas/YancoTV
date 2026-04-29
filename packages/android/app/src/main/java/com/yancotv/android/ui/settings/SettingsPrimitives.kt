@@ -9,7 +9,6 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,14 +74,13 @@ internal val LocalActiveSettingsTabFocus = compositionLocalOf { FocusRequester.D
  * '5s' in Connect-timeout presets — same content pane, different row).
  */
 @OptIn(ExperimentalComposeUiApi::class)
-internal fun Modifier.leftExitsTo(target: FocusRequester): Modifier =
-    this
-        .focusGroup()
-        .focusProperties {
-            exit = { direction ->
-                if (direction == FocusDirection.Left) target else FocusRequester.Default
-            }
+internal fun Modifier.leftExitsTo(target: FocusRequester): Modifier = this
+    .focusGroup()
+    .focusProperties {
+        exit = { direction ->
+            if (direction == FocusDirection.Left) target else FocusRequester.Default
         }
+    }
 
 /**
  * Shared submenu primitives. Maps the Claude-Design "Frosted Emerald"
@@ -130,18 +129,18 @@ internal fun SettingsSection(
             // §`Section` in the HTML mock.
             Box(
                 modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(1.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                colors =
-                                    listOf(
-                                        palette.Accent.copy(alpha = 0.20f),
-                                        Color.Transparent,
-                                    ),
+                Modifier
+                    .weight(1f)
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors =
+                            listOf(
+                                palette.Accent.copy(alpha = 0.20f),
+                                Color.Transparent,
                             ),
                         ),
+                    ),
             )
             right?.invoke()
         }
@@ -278,11 +277,7 @@ internal fun SettingsRow(
  * accent or muted color depending on context.
  */
 @Composable
-internal fun SettingsKicker(
-    text: String,
-    modifier: Modifier = Modifier,
-    accent: Boolean = false,
-) {
+internal fun SettingsKicker(text: String, modifier: Modifier = Modifier, accent: Boolean = false) {
     val palette = LocalYancoPalette.current
     Text(
         text = text.uppercase(),
@@ -342,49 +337,49 @@ internal fun SettingsSlider(
         ) {
             BoxWithConstraints(
                 modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(barHeight)
-                        .focusable(interactionSource = interaction)
-                        .onPreviewKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                            when (event.key) {
-                                Key.DirectionLeft -> {
-                                    val next = (clampedValue - step).coerceAtLeast(range.first)
-                                    if (next != clampedValue) onValueChange(next)
-                                    true
-                                }
-                                Key.DirectionRight -> {
-                                    val next = (clampedValue + step).coerceAtMost(range.last)
-                                    if (next != clampedValue) onValueChange(next)
-                                    true
-                                }
-                                else -> false
+                Modifier
+                    .weight(1f)
+                    .height(barHeight)
+                    .focusable(interactionSource = interaction)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionLeft -> {
+                                val next = (clampedValue - step).coerceAtLeast(range.first)
+                                if (next != clampedValue) onValueChange(next)
+                                true
                             }
-                        },
+                            Key.DirectionRight -> {
+                                val next = (clampedValue + step).coerceAtMost(range.last)
+                                if (next != clampedValue) onValueChange(next)
+                                true
+                            }
+                            else -> false
+                        }
+                    },
                 contentAlignment = Alignment.CenterStart,
             ) {
                 // Empty track
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(shape)
-                            .background(Color.White.copy(alpha = 0.08f)),
+                    Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(shape)
+                        .background(Color.White.copy(alpha = 0.08f)),
                 )
                 // Accent fill
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxWidth(progress.coerceAtLeast(0.001f))
-                            .height(4.dp)
-                            .clip(shape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(palette.AccentDeep, palette.Accent),
-                                ),
+                    Modifier
+                        .fillMaxWidth(progress.coerceAtLeast(0.001f))
+                        .height(4.dp)
+                        .clip(shape)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(palette.AccentDeep, palette.Accent),
                             ),
+                        ),
                 )
                 // Knob — translated to the progress point. The .offset() variant
                 // would clip on the right edge; using an absolute-position Box
@@ -398,16 +393,16 @@ internal fun SettingsSlider(
                     if (focused) palette.FocusRing else palette.Accent
                 Box(
                     modifier =
-                        Modifier
-                            .padding(start = knobX)
-                            .size(knobSize)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(palette.Accent)
-                            .border(
-                                width = if (focused) 2.dp else 1.dp,
-                                color = ringColor,
-                                shape = RoundedCornerShape(11.dp),
-                            ),
+                    Modifier
+                        .padding(start = knobX)
+                        .size(knobSize)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(palette.Accent)
+                        .border(
+                            width = if (focused) 2.dp else 1.dp,
+                            color = ringColor,
+                            shape = RoundedCornerShape(11.dp),
+                        ),
                 )
             }
             Text(
@@ -444,11 +439,7 @@ internal fun SettingsSlider(
  * focus — RIGHT past the trigger lands somewhere unrelated.
  */
 @Composable
-internal fun SettingsSelect(
-    value: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun SettingsSelect(value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -462,27 +453,27 @@ internal fun SettingsSelect(
 
     Row(
         modifier =
-            modifier
-                .height(40.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .clip(shape)
-                .background(palette.BackgroundElevated)
-                .border(
-                    width = if (focused) 1.5.dp else 1.dp,
-                    color = if (focused) palette.FocusRing else palette.BorderSubtle,
-                    shape = shape,
-                )
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.DropdownList,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 18.dp),
+        modifier
+            .height(40.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .background(palette.BackgroundElevated)
+            .border(
+                width = if (focused) 1.5.dp else 1.dp,
+                color = if (focused) palette.FocusRing else palette.BorderSubtle,
+                shape = shape,
+            )
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.DropdownList,
+                onClick = onClick,
+            )
+            .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -497,13 +488,13 @@ internal fun SettingsSelect(
         // 6×4 down-arrow Box instead.
         Box(
             modifier =
-                Modifier
-                    .size(width = 8.dp, height = 5.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(palette.TextSecondary, palette.TextMuted),
-                        ),
+            Modifier
+                .size(width = 8.dp, height = 5.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(palette.TextSecondary, palette.TextMuted),
                     ),
+                ),
         )
     }
 }
@@ -514,16 +505,11 @@ internal fun SettingsSelect(
  * `ChipRow` shows N options on one line.
  */
 @Composable
-internal fun SettingsChipRow(
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun SettingsChipRow(options: List<String>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier =
-            modifier
-                .horizontalScroll(rememberScrollState()),
+        modifier
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { option ->
@@ -539,17 +525,11 @@ internal fun SettingsChipRow(
 /** Convenience overload — caller passes any enum-like list whose stringification
  *  matches what should display. */
 @Composable
-internal fun <T> SettingsChipRow(
-    options: List<T>,
-    selected: T,
-    label: (T) -> String,
-    onSelect: (T) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun <T> SettingsChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier =
-            modifier
-                .horizontalScroll(rememberScrollState()),
+        modifier
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { option ->
@@ -566,16 +546,13 @@ internal fun <T> SettingsChipRow(
  *  body can drop the boilerplate Column.fillMaxSize().verticalScroll().padding(24).
  *  Provides Section spacing internally; nest [SettingsSection]s inside. */
 @Composable
-internal fun SettingsTabBody(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
+internal fun SettingsTabBody(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier =
-            modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+        modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .padding(horizontal = 6.dp, vertical = 4.dp),
     ) {
         content()
     }
@@ -584,12 +561,7 @@ internal fun SettingsTabBody(
 /** Helper: render a single settings text label outside a Row — used when
  *  a tab needs a freeform paragraph between sections (e.g. About hero). */
 @Composable
-internal fun SettingsBodyText(
-    text: String,
-    modifier: Modifier = Modifier,
-    fontSize: TextUnit = 12.sp,
-    @Suppress("UNUSED_PARAMETER") accent: Boolean = false,
-) {
+internal fun SettingsBodyText(text: String, modifier: Modifier = Modifier, fontSize: TextUnit = 12.sp, @Suppress("UNUSED_PARAMETER") accent: Boolean = false) {
     val palette = LocalYancoPalette.current
     Text(
         text = text,
@@ -638,24 +610,24 @@ internal fun SettingsInlineSwitch(checked: Boolean) {
 
     Row(
         modifier =
-            Modifier
-                .size(width = 44.dp, height = 24.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(trackBrush)
-                .border(1.dp, borderColor, RoundedCornerShape(12.dp)),
+        Modifier
+            .size(width = 44.dp, height = 24.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(trackBrush)
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(modifier = Modifier.width(knobOffset.dp))
         Box(
             modifier =
-                Modifier
-                    .size(18.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(palette.TextPrimary, palette.TextSecondary),
-                        ),
+            Modifier
+                .size(18.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(palette.TextPrimary, palette.TextSecondary),
                     ),
+                ),
         )
     }
 }

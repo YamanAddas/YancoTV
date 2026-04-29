@@ -55,13 +55,7 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
  * same everywhere.
  */
 @Composable
-internal fun SettingsToggleRow(
-    label: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true,
-) {
+internal fun SettingsToggleRow(label: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -97,34 +91,34 @@ internal fun SettingsToggleRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .shadow(
-                    elevation = if (focused && enabled) 14.dp else 0.dp,
-                    shape = shape,
-                    ambientColor = palette.AccentGlow,
-                    spotColor = palette.AccentGlow,
-                )
-                .clip(shape)
-                .background(rowBg)
-                .border(
-                    width = if (focused && enabled) 1.5.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .leftExitsTo(activeTabFocus)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                    role = Role.Switch,
-                    onClick = { onCheckedChange(!checked) },
-                )
-                .padding(horizontal = 22.dp, vertical = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = if (focused && enabled) 14.dp else 0.dp,
+                shape = shape,
+                ambientColor = palette.AccentGlow,
+                spotColor = palette.AccentGlow,
+            )
+            .clip(shape)
+            .background(rowBg)
+            .border(
+                width = if (focused && enabled) 1.5.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            .leftExitsTo(activeTabFocus)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Switch,
+                onClick = { onCheckedChange(!checked) },
+            )
+            .padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -165,10 +159,7 @@ internal fun SettingsToggleRow(
  * upgraded.)
  */
 @Composable
-private fun VerdantSwitch(
-    checked: Boolean,
-    enabled: Boolean,
-) {
+private fun VerdantSwitch(checked: Boolean, enabled: Boolean) {
     val palette = LocalYancoPalette.current
     val knobOffset by animateDpAsState(
         targetValue = if (checked) 27.dp else 3.dp,
@@ -193,12 +184,12 @@ private fun VerdantSwitch(
 
     Row(
         modifier =
-            Modifier
-                .size(width = 54.dp, height = 30.dp)
-                .graphicsLayer { alpha = if (enabled) 1f else 0.42f }
-                .clip(RoundedCornerShape(15.dp))
-                .background(trackBrush)
-                .border(1.dp, trackBorder, RoundedCornerShape(15.dp)),
+        Modifier
+            .size(width = 54.dp, height = 30.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.42f }
+            .clip(RoundedCornerShape(15.dp))
+            .background(trackBrush)
+            .border(1.dp, trackBorder, RoundedCornerShape(15.dp)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Spacer pushes the knob from the left; width animates 3dp → 27dp
@@ -207,14 +198,14 @@ private fun VerdantSwitch(
         Spacer(modifier = Modifier.width(knobOffset))
         Box(
             modifier =
-                Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(palette.TextPrimary, palette.TextSecondary),
-                        ),
+            Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(palette.TextPrimary, palette.TextSecondary),
                     ),
+                ),
         )
     }
 }

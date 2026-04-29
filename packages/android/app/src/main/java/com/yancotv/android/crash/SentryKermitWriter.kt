@@ -28,12 +28,7 @@ import io.sentry.SentryLevel
  * a clean checkout with an empty DSN won't post anything.
  */
 class SentryKermitWriter : LogWriter() {
-    override fun log(
-        severity: Severity,
-        message: String,
-        tag: String,
-        throwable: Throwable?,
-    ) {
+    override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
         if (!Sentry.isEnabled()) return
 
         val sentryLevel =

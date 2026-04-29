@@ -62,8 +62,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -75,10 +75,10 @@ import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.focus.tvLongClickable
 import com.yancotv.android.ui.parental.ChannelActionsMenu
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
@@ -390,9 +390,9 @@ fun CoverflowSectionScreen(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .onFocusChanged { coverflowHasFocus = it.hasFocus },
+        modifier
+            .fillMaxSize()
+            .onFocusChanged { coverflowHasFocus = it.hasFocus },
     ) {
         // Compose key dispatch order is preview (top-down) → onKeyEvent
         // (bottom-up) → default focus navigation. An .onKeyEvent on the outer
@@ -436,31 +436,31 @@ fun CoverflowSectionScreen(
                 }
             },
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .weight(0.62f),
+            Modifier
+                .fillMaxWidth()
+                .weight(0.62f),
         )
 
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .weight(0.38f)
-                    // D-pad LEFT at the leftmost orb pops back to the categories
-                    // rail. Inter-orb LEFT/RIGHT presses flow through to
-                    // LazyRow's natural focus traversal — we only intercept
-                    // when there's nowhere left to scroll inside the wheel.
-                    .onPreviewKeyEvent { ev ->
-                        if (ev.type == KeyEventType.KeyDown &&
-                            ev.key == Key.DirectionLeft &&
-                            shouldExitCoverflowOnLeft(focusedIndex)
-                        ) {
-                            onExitToCategories()
-                            true
-                        } else {
-                            false
-                        }
-                    }.focusGroup(),
+            Modifier
+                .fillMaxWidth()
+                .weight(0.38f)
+                // D-pad LEFT at the leftmost orb pops back to the categories
+                // rail. Inter-orb LEFT/RIGHT presses flow through to
+                // LazyRow's natural focus traversal — we only intercept
+                // when there's nowhere left to scroll inside the wheel.
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown &&
+                        ev.key == Key.DirectionLeft &&
+                        shouldExitCoverflowOnLeft(focusedIndex)
+                    ) {
+                        onExitToCategories()
+                        true
+                    } else {
+                        false
+                    }
+                }.focusGroup(),
         ) {
             when {
                 visible.isNotEmpty() ->
@@ -470,10 +470,10 @@ fun CoverflowSectionScreen(
                         nowNextMap = nowNextMap,
                         lockedIds = lockedIds,
                         focusedIndex =
-                            focusedIndex.coerceIn(
-                                0,
-                                (visible.size - 1).coerceAtLeast(0),
-                            ),
+                        focusedIndex.coerceIn(
+                            0,
+                            (visible.size - 1).coerceAtLeast(0),
+                        ),
                         firstItemAnchor = firstItemAnchor,
                         entryFocus = entryFocus,
                         onFocus = { idx, item ->
@@ -542,33 +542,33 @@ private fun PreviewPane(
 ) {
     Row(
         modifier =
-            modifier.padding(
-                start = Space.page,
-                end = Space.page,
-                top = Space.lg,
-                bottom = Space.lg,
-            ),
+        modifier.padding(
+            start = Space.page,
+            end = Space.page,
+            top = Space.lg,
+            bottom = Space.lg,
+        ),
         horizontalArrangement = Arrangement.spacedBy(Space.xxxl),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier =
-                Modifier
-                    .weight(0.6f)
-                    .fillMaxHeight()
-                    .clip(YancoShapes.CutCornerCardLarge)
-                    .background(LocalYancoPalette.current.BackgroundDeep)
-                    .border(
-                        width = 1.dp,
-                        brush =
-                            Brush.verticalGradient(
-                                listOf(
-                                    LocalYancoPalette.current.Accent.copy(alpha = 0.45f),
-                                    LocalYancoPalette.current.PanelBorder,
-                                ),
-                            ),
-                        shape = YancoShapes.CutCornerCardLarge,
+            Modifier
+                .weight(0.6f)
+                .fillMaxHeight()
+                .clip(YancoShapes.CutCornerCardLarge)
+                .background(LocalYancoPalette.current.BackgroundDeep)
+                .border(
+                    width = 1.dp,
+                    brush =
+                    Brush.verticalGradient(
+                        listOf(
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.45f),
+                            LocalYancoPalette.current.PanelBorder,
+                        ),
                     ),
+                    shape = YancoShapes.CutCornerCardLarge,
+                ),
         ) {
             when {
                 // LIVE preview — share the running ExoPlayer surface.
@@ -584,23 +584,23 @@ private fun PreviewPane(
                         contentDescription = focused.cleanTitle?.ifBlank { null } ?: focused.title,
                         contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
                         modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(if (type == ContentType.LIVE) Space.section else 0.dp),
+                        Modifier
+                            .fillMaxSize()
+                            .padding(if (type == ContentType.LIVE) Space.section else 0.dp),
                     )
                 else -> PreviewIdleArtwork(type = type)
             }
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                0.85f to Color.Transparent,
-                                1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f),
-                            ),
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.85f to Color.Transparent,
+                            1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f),
                         ),
+                    ),
             )
         }
 
@@ -616,9 +616,9 @@ private fun PreviewPane(
             onPlay = onPlay,
             onToggleFavorite = onToggleFavorite,
             modifier =
-                Modifier
-                    .weight(0.4f)
-                    .fillMaxHeight(),
+            Modifier
+                .weight(0.4f)
+                .fillMaxHeight(),
         )
     }
 }
@@ -633,16 +633,16 @@ private fun PreviewIdleArtwork(type: ContentType) {
         }
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            LocalYancoPalette.current.BackgroundElevated,
-                            LocalYancoPalette.current.BackgroundDeep,
-                        ),
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        LocalYancoPalette.current.BackgroundElevated,
+                        LocalYancoPalette.current.BackgroundDeep,
                     ),
                 ),
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -748,14 +748,14 @@ private fun MetaColumn(
             // only reachable when Watch itself owns focus.
             Box(
                 modifier =
-                    Modifier.onPreviewKeyEvent { ev ->
-                        if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                            onExitLeft()
-                            true
-                        } else {
-                            false
-                        }
-                    },
+                Modifier.onPreviewKeyEvent { ev ->
+                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
+                        onExitLeft()
+                        true
+                    } else {
+                        false
+                    }
+                },
             ) {
                 HexCta(
                     label = watchLabel,
@@ -776,10 +776,7 @@ private fun MetaColumn(
 }
 
 @Composable
-private fun EmptyMetaPrompt(
-    type: ContentType,
-    modifier: Modifier,
-) {
+private fun EmptyMetaPrompt(type: ContentType, modifier: Modifier) {
     val (overline, title, body) =
         when (type) {
             ContentType.LIVE ->
@@ -821,37 +818,33 @@ private fun EmptyMetaPrompt(
 }
 
 @Composable
-private fun ProgressLine(
-    start: Long,
-    end: Long,
-    now: Long,
-) {
+private fun ProgressLine(start: Long, end: Long, now: Long) {
     val span = remember(start, end) { (end - start).coerceAtLeast(1) }
     val pct = ((now - start).toFloat() / span).coerceIn(0f, 1f)
     val remainingMin = ((end - now).coerceAtLeast(0) / 60).toInt()
     Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(LocalYancoPalette.current.BorderSubtle),
+            Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(LocalYancoPalette.current.BorderSubtle),
         ) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxWidth(pct)
-                        .fillMaxHeight()
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(
-                                    LocalYancoPalette.current.AccentDeep,
-                                    LocalYancoPalette.current.Accent,
-                                    LocalYancoPalette.current.AccentGlow,
-                                ),
+                Modifier
+                    .fillMaxWidth(pct)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                LocalYancoPalette.current.AccentDeep,
+                                LocalYancoPalette.current.Accent,
+                                LocalYancoPalette.current.AccentGlow,
                             ),
                         ),
+                    ),
             )
         }
         Text(
@@ -863,25 +856,19 @@ private fun ProgressLine(
 }
 
 @Composable
-private fun HexCta(
-    label: String,
-    icon: ImageVector,
-    primary: Boolean,
-    highlighted: Boolean = false,
-    onClick: () -> Unit,
-) {
+private fun HexCta(label: String, icon: ImageVector, primary: Boolean, highlighted: Boolean = false, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = YancoShapes.ButtonBevel
     val bg by animateColorAsState(
         targetValue =
-            when {
-                primary && focused -> LocalYancoPalette.current.AccentGlow
-                primary -> LocalYancoPalette.current.Accent
-                focused -> LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
-                highlighted -> LocalYancoPalette.current.Accent.copy(alpha = 0.14f)
-                else -> LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f)
-            },
+        when {
+            primary && focused -> LocalYancoPalette.current.AccentGlow
+            primary -> LocalYancoPalette.current.Accent
+            focused -> LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+            highlighted -> LocalYancoPalette.current.Accent.copy(alpha = 0.14f)
+            else -> LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.6f)
+        },
         label = "hexCtaBg",
     )
     val border =
@@ -899,23 +886,23 @@ private fun HexCta(
         }
     Row(
         modifier =
-            Modifier
-                .shadow(
-                    elevation = if (focused) 14.dp else 0.dp,
-                    shape = shape,
-                    ambientColor = LocalYancoPalette.current.Accent,
-                    spotColor = LocalYancoPalette.current.Accent,
-                ).clip(shape)
-                .background(bg)
-                .border(if (focused) 2.dp else 1.dp, border, shape)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .semantics(mergeDescendants = true) { contentDescription = label }
-                // xl horizontal padding (was xxxl) so two CTAs side-by-side
-                // always fit when the categories rail is mounted. Buttons stay
-                // generous-looking because the hex bevel + emerald glow do most
-                // of the visual lifting; the chrome doesn't need 32dp gutters.
-                .padding(horizontal = Space.xl, vertical = Space.md),
+        Modifier
+            .shadow(
+                elevation = if (focused) 14.dp else 0.dp,
+                shape = shape,
+                ambientColor = LocalYancoPalette.current.Accent,
+                spotColor = LocalYancoPalette.current.Accent,
+            ).clip(shape)
+            .background(bg)
+            .border(if (focused) 2.dp else 1.dp, border, shape)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = label }
+            // xl horizontal padding (was xxxl) so two CTAs side-by-side
+            // always fit when the categories rail is mounted. Buttons stay
+            // generous-looking because the hex bevel + emerald glow do most
+            // of the visual lifting; the chrome doesn't need 32dp gutters.
+            .padding(horizontal = Space.xl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
@@ -934,19 +921,19 @@ private fun HexCta(
 private fun MetaLivePill() {
     Row(
         modifier =
-            Modifier
-                .clip(YancoShapes.ChipBevel)
-                .background(LocalYancoPalette.current.Live)
-                .padding(horizontal = Space.md, vertical = 4.dp),
+        Modifier
+            .clip(YancoShapes.ChipBevel)
+            .background(LocalYancoPalette.current.Live)
+            .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(6.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(Color.White),
+            Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(Color.White),
         )
         Text(text = "LIVE", color = Color.White, style = YancoType.Overline)
     }
@@ -956,11 +943,11 @@ private fun MetaLivePill() {
 private fun MetaLockChip() {
     Row(
         modifier =
-            Modifier
-                .clip(YancoShapes.ChipBevel)
-                .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
-                .border(1.dp, LocalYancoPalette.current.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
-                .padding(horizontal = Space.md, vertical = 4.dp),
+        Modifier
+            .clip(YancoShapes.ChipBevel)
+            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
+            .border(1.dp, LocalYancoPalette.current.Accent.copy(alpha = 0.45f), YancoShapes.ChipBevel)
+            .padding(horizontal = Space.md, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
@@ -1013,12 +1000,12 @@ private fun ContentCoverflow(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding =
-                PaddingValues(
-                    start = sidePaddingDp,
-                    end = sidePaddingDp,
-                    top = Space.lg,
-                    bottom = Space.lg,
-                ),
+            PaddingValues(
+                start = sidePaddingDp,
+                end = sidePaddingDp,
+                top = Space.lg,
+                bottom = Space.lg,
+            ),
             horizontalArrangement = Arrangement.spacedBy(OrbSpacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1071,56 +1058,56 @@ private fun ContentOrb(
 
     Column(
         modifier =
-            Modifier
-                .width(OrbWidth)
-                .height(OrbHeight)
-                .graphicsLayer {
-                    this.rotationY = rotationY
-                    scaleX = scale
-                    scaleY = scale
-                    this.alpha = alpha
-                    this.translationX = translationX
-                    this.cameraDistance = cameraDist
-                },
+        Modifier
+            .width(OrbWidth)
+            .height(OrbHeight)
+            .graphicsLayer {
+                this.rotationY = rotationY
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+                this.translationX = translationX
+                this.cameraDistance = cameraDist
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(OrbWidth)
-                    .shadow(
-                        elevation = if (focused) 28.dp else 6.dp,
-                        shape = YancoShapes.HexCapsule,
-                        ambientColor = LocalYancoPalette.current.Accent,
-                        spotColor = LocalYancoPalette.current.Accent,
-                    ).clip(YancoShapes.HexCapsule)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                LocalYancoPalette.current.BackgroundElevated,
-                                LocalYancoPalette.current.BackgroundDeep,
-                            ),
+            Modifier
+                .size(OrbWidth)
+                .shadow(
+                    elevation = if (focused) 28.dp else 6.dp,
+                    shape = YancoShapes.HexCapsule,
+                    ambientColor = LocalYancoPalette.current.Accent,
+                    spotColor = LocalYancoPalette.current.Accent,
+                ).clip(YancoShapes.HexCapsule)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            LocalYancoPalette.current.BackgroundElevated,
+                            LocalYancoPalette.current.BackgroundDeep,
                         ),
-                    ).border(
-                        width = if (focused) 2.dp else 1.dp,
-                        color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
-                        shape = YancoShapes.HexCapsule,
-                    ).then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
-                    .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
-                    // MB-98 — registers `onLongPress` as the active context-menu
-                    // action while this orb holds focus. The actual long-press
-                    // timer + KEYCODE_MENU dispatch live in MainActivity (see
-                    // TvContextActionState). Touch long-press is unsupported on
-                    // the coverflow path — TV-only surface.
-                    .tvLongClickable(onLongPress)
-                    .focusable(interactionSource = interaction)
-                    .clickable(
-                        interactionSource = interaction,
-                        indication = null,
-                        role = Role.Button,
-                        onClick = onActivate,
-                    ).semantics(mergeDescendants = true) { contentDescription = title },
+                    ),
+                ).border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
+                    shape = YancoShapes.HexCapsule,
+                ).then(placedAnchor?.let { Modifier.placedFocus(it) } ?: Modifier)
+                .then(entryFocus?.let { Modifier.focusRequester(it) } ?: Modifier)
+                // MB-98 — registers `onLongPress` as the active context-menu
+                // action while this orb holds focus. The actual long-press
+                // timer + KEYCODE_MENU dispatch live in MainActivity (see
+                // TvContextActionState). Touch long-press is unsupported on
+                // the coverflow path — TV-only surface.
+                .tvLongClickable(onLongPress)
+                .focusable(interactionSource = interaction)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onActivate,
+                ).semantics(mergeDescendants = true) { contentDescription = title },
             contentAlignment = Alignment.Center,
         ) {
             if (item.logoUrl?.isNotBlank() == true) {
@@ -1129,9 +1116,9 @@ private fun ContentOrb(
                     contentDescription = null,
                     contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
                     modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(if (type == ContentType.LIVE) Space.lg else 0.dp),
+                    Modifier
+                        .fillMaxSize()
+                        .padding(if (type == ContentType.LIVE) Space.lg else 0.dp),
                 )
             } else {
                 Text(
@@ -1143,17 +1130,17 @@ private fun ContentOrb(
             if (isLocked) {
                 Box(
                     modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(Space.xs)
-                            .size(22.dp)
-                            .clip(RoundedCornerShape(Radius.pill))
-                            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
-                            .border(
-                                1.dp,
-                                LocalYancoPalette.current.Accent.copy(alpha = 0.55f),
-                                RoundedCornerShape(Radius.pill),
-                            ),
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(Space.xs)
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.85f))
+                        .border(
+                            1.dp,
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.55f),
+                            RoundedCornerShape(Radius.pill),
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1191,10 +1178,7 @@ private fun ContentOrb(
 }
 
 @Composable
-private fun CoverflowEmptyState(
-    type: ContentType,
-    favoritesFilter: Boolean,
-) {
+private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean) {
     val title =
         when {
             favoritesFilter ->
@@ -1217,9 +1201,9 @@ private fun CoverflowEmptyState(
         }
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(Space.page),
+        Modifier
+            .fillMaxSize()
+            .padding(Space.page),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.Start,
     ) {

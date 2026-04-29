@@ -33,10 +33,7 @@ class SentrySmokeTestReceiver : BroadcastReceiver() {
         private const val TAG = "YancoSentrySmoke"
     }
 
-    override fun onReceive(
-        context: Context,
-        intent: Intent,
-    ) {
+    override fun onReceive(context: Context, intent: Intent) {
         if (!Sentry.isEnabled()) {
             Log.w(TAG, "Sentry is not enabled — DSN missing in local.properties?")
             return

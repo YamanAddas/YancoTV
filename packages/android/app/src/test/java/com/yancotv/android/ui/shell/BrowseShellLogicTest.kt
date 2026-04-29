@@ -402,25 +402,21 @@ class BrowseShellLogicTest {
 
     // ---- helpers ----
 
-    private fun sampleItems(): List<ContentItem> =
-        listOf(
-            movie(id = "m1", title = "The Matrix"),
-            movie(id = "m2", title = "Inception"),
-            ContentItem(
-                id = "s1",
-                sourceId = "src",
-                type = ContentType.SERIES,
-                title = "Stranger Things",
-                streamUrl = "http://x/s1",
-                sortOrder = 0,
-                createdAt = 0L,
-            ),
-        )
+    private fun sampleItems(): List<ContentItem> = listOf(
+        movie(id = "m1", title = "The Matrix"),
+        movie(id = "m2", title = "Inception"),
+        ContentItem(
+            id = "s1",
+            sourceId = "src",
+            type = ContentType.SERIES,
+            title = "Stranger Things",
+            streamUrl = "http://x/s1",
+            sortOrder = 0,
+            createdAt = 0L,
+        ),
+    )
 
-    private fun movie(
-        id: String,
-        title: String,
-    ) = ContentItem(
+    private fun movie(id: String, title: String) = ContentItem(
         id = id,
         sourceId = "src",
         type = ContentType.MOVIE,
@@ -430,21 +426,19 @@ class BrowseShellLogicTest {
         createdAt = 0L,
     )
 
-    private fun liveChannels(): List<ContentItem> =
-        listOf(
-            liveChannel("c1"),
-            liveChannel("c2"),
-            liveChannel("c3"),
-        )
+    private fun liveChannels(): List<ContentItem> = listOf(
+        liveChannel("c1"),
+        liveChannel("c2"),
+        liveChannel("c3"),
+    )
 
-    private fun liveChannel(id: String) =
-        ContentItem(
-            id = id,
-            sourceId = "src",
-            type = ContentType.LIVE,
-            title = "Channel $id",
-            streamUrl = "http://x/$id",
-            sortOrder = 0,
-            createdAt = 0L,
-        )
+    private fun liveChannel(id: String) = ContentItem(
+        id = id,
+        sourceId = "src",
+        type = ContentType.LIVE,
+        title = "Channel $id",
+        streamUrl = "http://x/$id",
+        sortOrder = 0,
+        createdAt = 0L,
+    )
 }

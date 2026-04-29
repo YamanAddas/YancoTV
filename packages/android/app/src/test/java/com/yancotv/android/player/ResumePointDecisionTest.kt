@@ -3,9 +3,9 @@ package com.yancotv.android.player
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
-import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import org.junit.Test
 
 /**
  * MK.23.C.1 — pin [resumePointDecision]'s contract. The function gates
@@ -179,10 +179,7 @@ class ResumePointDecisionTest {
 
     // ───── Helpers ─────
 
-    private fun movie(
-        id: String = "movie-1",
-        type: ContentType = ContentType.MOVIE,
-    ) = ContentItem(
+    private fun movie(id: String = "movie-1", type: ContentType = ContentType.MOVIE) = ContentItem(
         id = id,
         sourceId = "src-1",
         type = type,
@@ -192,21 +189,17 @@ class ResumePointDecisionTest {
         createdAt = 0L,
     )
 
-    private fun liveChannel(id: String = "ch-1") =
-        ContentItem(
-            id = id,
-            sourceId = "src-1",
-            type = ContentType.LIVE,
-            title = "Test channel",
-            streamUrl = "http://example.test/$id.ts",
-            sortOrder = 0,
-            createdAt = 0L,
-        )
+    private fun liveChannel(id: String = "ch-1") = ContentItem(
+        id = id,
+        sourceId = "src-1",
+        type = ContentType.LIVE,
+        title = "Test channel",
+        streamUrl = "http://example.test/$id.ts",
+        sortOrder = 0,
+        createdAt = 0L,
+    )
 
-    private fun episode(
-        id: String = "ep-1",
-        seriesId: String = "series-1",
-    ) = Playable.Episode(
+    private fun episode(id: String = "ep-1", seriesId: String = "series-1") = Playable.Episode(
         id = id,
         seriesId = seriesId,
         title = "Test episode",

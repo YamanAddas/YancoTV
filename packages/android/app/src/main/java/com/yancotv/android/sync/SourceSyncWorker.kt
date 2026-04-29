@@ -11,10 +11,10 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.sources.SyncProgress
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.lastOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.util.concurrent.TimeUnit
 
 /**
  * Background sync for a single source. Scheduled per-source when the user
@@ -28,10 +28,8 @@ import java.util.concurrent.TimeUnit
  * SQLDelight row's `last_synced` / `last_sync_error` directly. We only need
  * the terminal state (success or retry) from WorkManager's perspective.
  */
-class SourceSyncWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params),
+class SourceSyncWorker(appContext: Context, params: WorkerParameters) :
+    CoroutineWorker(appContext, params),
     KoinComponent {
     private val repo: SourceRepository by inject()
 
@@ -62,11 +60,7 @@ class SourceSyncWorker(
         private const val MAX_RETRIES = 3
         private const val UNIQUE_PREFIX = "source-sync-"
 
-        fun enqueuePeriodic(
-            context: Context,
-            sourceId: String,
-            intervalMinutes: Long,
-        ) {
+        fun enqueuePeriodic(context: Context, sourceId: String, intervalMinutes: Long) {
             val constraints =
                 Constraints
                     .Builder()
@@ -88,10 +82,7 @@ class SourceSyncWorker(
             )
         }
 
-        fun cancel(
-            context: Context,
-            sourceId: String,
-        ) {
+        fun cancel(context: Context, sourceId: String) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_PREFIX + sourceId)
         }
     }

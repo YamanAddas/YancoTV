@@ -6,11 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class ContentWriterTest {
-    private fun entry(
-        title: String,
-        url: String,
-        group: String = "News",
-    ) = M3uEntry(
+    private fun entry(title: String, url: String, group: String = "News") = M3uEntry(
         duration = -1.0,
         title = title,
         groupTitle = group,

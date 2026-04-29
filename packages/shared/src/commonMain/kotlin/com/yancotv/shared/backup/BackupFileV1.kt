@@ -40,11 +40,7 @@ data class BackupFileV1(
 )
 
 @Serializable
-data class BackupEncryptionInfo(
-    val kdf: String = "pbkdf2-sha256",
-    val iterations: Int,
-    val saltHex: String,
-)
+data class BackupEncryptionInfo(val kdf: String = "pbkdf2-sha256", val iterations: Int, val saltHex: String)
 
 /**
  * Per-table record buckets. The table → field mapping mirrors
@@ -99,14 +95,7 @@ data class SourceRecord(
 )
 
 @Serializable
-data class FavoriteListRecord(
-    val id: String,
-    val name: String,
-    val sortOrder: Long,
-    val isDefault: Long,
-    val createdAt: Long,
-    val updatedAt: Long,
-)
+data class FavoriteListRecord(val id: String, val name: String, val sortOrder: Long, val isDefault: Long, val createdAt: Long, val updatedAt: Long)
 
 /**
  * Re-link tuple: `(sourceId, streamUrl)` resolves to a local `content_id`
@@ -171,12 +160,7 @@ data class RecordingRecord(
 )
 
 @Serializable
-data class ContentOverrideRecord(
-    val sourceId: String,
-    val streamUrl: String,
-    val nameOverride: String?,
-    val logoOverride: String?,
-)
+data class ContentOverrideRecord(val sourceId: String, val streamUrl: String, val nameOverride: String?, val logoOverride: String?)
 
 @Serializable
 data class ChannelOverrideRecord(
@@ -190,11 +174,7 @@ data class ChannelOverrideRecord(
 )
 
 @Serializable
-data class ChannelRef(
-    val sourceId: String,
-    val streamUrl: String,
-    val ts: Long,
-)
+data class ChannelRef(val sourceId: String, val streamUrl: String, val ts: Long)
 
 @Serializable
 data class GroupPreferenceRecord(

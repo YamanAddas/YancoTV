@@ -86,17 +86,9 @@ data class RecorderStrategy(
 sealed interface RecorderState {
     data object Idle : RecorderState
 
-    data class Recording(
-        val recordId: String,
-        val bytesWritten: Long,
-        val secondsElapsed: Long,
-    ) : RecorderState
+    data class Recording(val recordId: String, val bytesWritten: Long, val secondsElapsed: Long) : RecorderState
 
-    data class Completed(
-        val recordId: String,
-        val bytesWritten: Long,
-        val secondsElapsed: Long,
-    ) : RecorderState
+    data class Completed(val recordId: String, val bytesWritten: Long, val secondsElapsed: Long) : RecorderState
 
     data class Failed(
         val recordId: String,
@@ -115,18 +107,9 @@ sealed interface RecordResult {
     val recordId: String
     val bytesWritten: Long
 
-    data class Success(
-        override val recordId: String,
-        override val bytesWritten: Long,
-        val secondsElapsed: Long,
-    ) : RecordResult
+    data class Success(override val recordId: String, override val bytesWritten: Long, val secondsElapsed: Long) : RecordResult
 
-    data class Failure(
-        override val recordId: String,
-        override val bytesWritten: Long,
-        val reason: String,
-        val cause: Throwable? = null,
-    ) : RecordResult
+    data class Failure(override val recordId: String, override val bytesWritten: Long, val reason: String, val cause: Throwable? = null) : RecordResult
 }
 
 /**

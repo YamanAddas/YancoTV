@@ -11,7 +11,9 @@ plugins {
 ktlint {
     version.set(libs.versions.ktlintCli.get())
     android.set(false) // KMP module — Android-specific rules don't apply
-    ignoreFailures.set(true)
+    // MB-202 — burn-down landed; flipped to false. See app/build.gradle.kts
+    // for the .editorconfig disable list rationale.
+    ignoreFailures.set(false)
     filter {
         // Match on both `/` (POSIX) and `\` (Windows) — `it.file.path` on
         // Windows uses backslashes, so a literal `/build/generated/` check
@@ -160,7 +162,7 @@ if (isWindowsHost) {
         // verified at build time.
         doFirst {
             logger.lifecycle(
-                "Skipping ${name} on Windows — sqlite-jdbc + JBR native-link " +
+                "Skipping $name on Windows — sqlite-jdbc + JBR native-link " +
                     "incompatibility (see :shared:build.gradle.kts comment). " +
                     "Migration coverage runs via :shared:testDebugUnitTest -> MigrationTest.kt.",
             )

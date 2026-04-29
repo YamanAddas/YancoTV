@@ -1,9 +1,9 @@
 package com.yancotv.android.recording.schedule
 
-import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.Test
 
 /**
  * MB-215 — pin the FGS-start-failure → schedule-FAILED contract. The

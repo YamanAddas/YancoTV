@@ -16,16 +16,9 @@ import kotlinx.coroutines.delay
  * Number, Boolean, or null. All field access is defensive.
  */
 
-data class StalkerAuthInfo(
-    val token: String,
-    val portalUrl: String,
-    val macAddress: String,
-)
+data class StalkerAuthInfo(val token: String, val portalUrl: String, val macAddress: String)
 
-data class StalkerCategory(
-    val id: String,
-    val title: String,
-)
+data class StalkerCategory(val id: String, val title: String)
 
 data class StalkerChannel(
     val id: Int,
@@ -39,23 +32,9 @@ data class StalkerChannel(
     val tvArchiveDuration: Int,
 )
 
-data class StalkerVodItem(
-    val id: Int,
-    val name: String,
-    val cmd: String,
-    val categoryId: String,
-    val logo: String,
-    val description: String,
-)
+data class StalkerVodItem(val id: Int, val name: String, val cmd: String, val categoryId: String, val logo: String, val description: String)
 
-data class StalkerSeriesItem(
-    val id: Int,
-    val name: String,
-    val categoryId: String,
-    val cover: String,
-    val plot: String,
-    val genre: String,
-)
+data class StalkerSeriesItem(val id: Int, val name: String, val categoryId: String, val cover: String, val plot: String, val genre: String)
 
 private const val MAX_RESPONSE_BYTES: Long = 150L * 1024 * 1024
 private const val MAX_RETRIES = 3
@@ -67,27 +46,20 @@ private const val STALKER_X_USER_AGENT = "Model: MAG254; Link: Ethernet"
 
 private val STREAM_CMD_PREFIX = Regex("""^(?:ffrt|ffmpeg|auto)\s+""", RegexOption.IGNORE_CASE)
 
-private fun isRetryableError(message: String): Boolean =
-    message.contains("timed out") ||
-        message.contains("ECONNRESET") ||
-        message.contains("ECONNREFUSED") ||
-        message.contains("ETIMEDOUT") ||
-        message.contains("ENOTFOUND") ||
-        message.contains("socket hang up") ||
-        message.contains("HTTP 429") ||
-        message.contains("HTTP 502") ||
-        message.contains("HTTP 503") ||
-        message.contains("HTTP 504")
+private fun isRetryableError(message: String): Boolean = message.contains("timed out") ||
+    message.contains("ECONNRESET") ||
+    message.contains("ECONNREFUSED") ||
+    message.contains("ETIMEDOUT") ||
+    message.contains("ENOTFOUND") ||
+    message.contains("socket hang up") ||
+    message.contains("HTTP 429") ||
+    message.contains("HTTP 502") ||
+    message.contains("HTTP 503") ||
+    message.contains("HTTP 504")
 
-private fun str(
-    v: Any?,
-    default: String = "",
-): String = if (v == null) default else v.toString()
+private fun str(v: Any?, default: String = ""): String = if (v == null) default else v.toString()
 
-private fun num(
-    v: Any?,
-    default: Int = 0,
-): Int {
+private fun num(v: Any?, default: Int = 0): Int {
     if (v == null) return default
     return when (v) {
         is Number -> v.toInt()
@@ -132,17 +104,9 @@ private fun enc(s: String): String {
 /** Build `application/x-www-form-urlencoded`-style query string from a LinkedHashMap, mirroring TS `URLSearchParams.toString()`. */
 private fun buildQuery(params: LinkedHashMap<String, String>): String = params.entries.joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
 
-data class StalkerClientOptions(
-    val http: HttpClient,
-    val logger: Logger = NOOP_LOGGER,
-    val timeoutMs: Long = 60_000,
-)
+data class StalkerClientOptions(val http: HttpClient, val logger: Logger = NOOP_LOGGER, val timeoutMs: Long = 60_000)
 
-class StalkerClient(
-    portalUrl: String,
-    private val macAddress: String,
-    options: StalkerClientOptions,
-) {
+class StalkerClient(portalUrl: String, private val macAddress: String, options: StalkerClientOptions) {
     private val portalUrl: String = portalUrl.replace(Regex("/+$"), "")
     private val http: HttpClient = options.http
     private val logger: Logger = options.logger
@@ -358,11 +322,7 @@ class StalkerClient(
     /** Strip Stalker "cmd" playback prefixes ("ffrt", "ffmpeg", "auto") and return the URL. */
     fun buildStreamUrl(cmd: String): String = cmd.replace(STREAM_CMD_PREFIX, "").trim()
 
-    private suspend fun request(
-        type: String,
-        action: String,
-        extraParams: Map<String, String> = emptyMap(),
-    ): Result<Any?, Throwable> {
+    private suspend fun request(type: String, action: String, extraParams: Map<String, String> = emptyMap()): Result<Any?, Throwable> {
         val params = LinkedHashMap<String, String>()
         params["type"] = type
         params["action"] = action

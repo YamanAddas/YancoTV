@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,14 +49,14 @@ import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 
 /**
  * Stage 3.1 / MK.14.5 — sidebar Recordings catalog.
@@ -120,9 +119,9 @@ fun RecordingsScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 12.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -212,11 +211,11 @@ fun RecordingsScreen(
                             entry = schedule,
                             linkedRecording = linked,
                             onPlay =
-                                if (playable != null) {
-                                    { playRecording(controller, context, playable) }
-                                } else {
-                                    null
-                                },
+                            if (playable != null) {
+                                { playRecording(controller, context, playable) }
+                            } else {
+                                null
+                            },
                             onDelete = {
                                 // Delete the schedule row; if a linked
                                 // recording exists, delete it too (file +
@@ -240,10 +239,7 @@ fun RecordingsScreen(
 }
 
 @Composable
-private fun SectionHeader(
-    text: String,
-    palette: com.yancotv.android.ui.theme.YancoPalette,
-) {
+private fun SectionHeader(text: String, palette: com.yancotv.android.ui.theme.YancoPalette) {
     Text(
         text = text.uppercase(Locale.getDefault()),
         color = palette.TextMuted,
@@ -258,9 +254,9 @@ private fun SectionHeader(
 private fun EmptyRecordingsState(palette: com.yancotv.android.ui.theme.YancoPalette) {
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(top = 40.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(top = 40.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -273,8 +269,8 @@ private fun EmptyRecordingsState(palette: com.yancotv.android.ui.theme.YancoPale
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text =
-                    "Open any live channel, press MENU, and pick \"Record this channel\" " +
-                        "to start. Recordings appear here as soon as they begin.",
+                "Open any live channel, press MENU, and pick \"Record this channel\" " +
+                    "to start. Recordings appear here as soon as they begin.",
                 color = palette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -297,23 +293,18 @@ private fun EmptyRecordingsState(palette: com.yancotv.android.ui.theme.YancoPale
  * with their own focus targets is unambiguous.
  */
 @Composable
-private fun RecordingRow(
-    entry: RecordingEntry,
-    onPlay: () -> Unit,
-    onStop: () -> Unit,
-    onDelete: () -> Unit,
-) {
+private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -> Unit, onDelete: () -> Unit) {
     val palette = LocalYancoPalette.current
     val shape = RoundedCornerShape(10.dp)
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(palette.BackgroundRaised)
-                .border(width = 1.dp, color = palette.PanelBorder, shape = shape)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.BackgroundRaised)
+            .border(width = 1.dp, color = palette.PanelBorder, shape = shape)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -370,10 +361,7 @@ private fun RecordingRow(
 }
 
 @Composable
-private fun StatusBadge(
-    status: RecordingStatus,
-    palette: com.yancotv.android.ui.theme.YancoPalette,
-) {
+private fun StatusBadge(status: RecordingStatus, palette: com.yancotv.android.ui.theme.YancoPalette) {
     val (label, fg, bg) =
         when (status) {
             RecordingStatus.RECORDING -> Triple("REC", palette.BackgroundDeep, palette.Live)
@@ -383,10 +371,10 @@ private fun StatusBadge(
         }
     Box(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(50))
-                .background(bg)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(
             text = label,
@@ -407,21 +395,18 @@ private fun StatusBadge(
  * not just unscheduling something pending.
  */
 @Composable
-private fun UpcomingScheduleRow(
-    entry: RecordingScheduleEntry,
-    onCancel: () -> Unit,
-) {
+private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> Unit) {
     val palette = LocalYancoPalette.current
     val shape = RoundedCornerShape(10.dp)
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(palette.BackgroundRaised)
-                .border(width = 1.dp, color = palette.PanelBorder, shape = shape)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.BackgroundRaised)
+            .border(width = 1.dp, color = palette.PanelBorder, shape = shape)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -445,7 +430,7 @@ private fun UpcomingScheduleRow(
         Spacer(modifier = Modifier.width(12.dp))
         FocusableInlineButton(
             label =
-                if (entry.state == RecordingScheduleState.FIRING) "Stop" else "Cancel",
+            if (entry.state == RecordingScheduleState.FIRING) "Stop" else "Cancel",
             primary = false,
             onClick = onCancel,
         )
@@ -467,11 +452,11 @@ private fun HistoryScheduleRow(
     val palette = LocalYancoPalette.current
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(palette.BackgroundDeep.copy(alpha = 0.4f))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(palette.BackgroundDeep.copy(alpha = 0.4f))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -524,23 +509,19 @@ private enum class ScheduleStateBadgeKind {
     ;
 
     companion object {
-        fun fromState(state: RecordingScheduleState): ScheduleStateBadgeKind =
-            when (state) {
-                RecordingScheduleState.SCHEDULED, RecordingScheduleState.ARMED -> SCHEDULED
-                RecordingScheduleState.FIRING -> FIRING
-                RecordingScheduleState.COMPLETED -> COMPLETED
-                RecordingScheduleState.FAILED -> FAILED
-                RecordingScheduleState.CANCELLED -> CANCELLED
-                RecordingScheduleState.MISSED -> MISSED
-            }
+        fun fromState(state: RecordingScheduleState): ScheduleStateBadgeKind = when (state) {
+            RecordingScheduleState.SCHEDULED, RecordingScheduleState.ARMED -> SCHEDULED
+            RecordingScheduleState.FIRING -> FIRING
+            RecordingScheduleState.COMPLETED -> COMPLETED
+            RecordingScheduleState.FAILED -> FAILED
+            RecordingScheduleState.CANCELLED -> CANCELLED
+            RecordingScheduleState.MISSED -> MISSED
+        }
     }
 }
 
 @Composable
-private fun ScheduleStateBadge(
-    kind: ScheduleStateBadgeKind,
-    palette: com.yancotv.android.ui.theme.YancoPalette,
-) {
+private fun ScheduleStateBadge(kind: ScheduleStateBadgeKind, palette: com.yancotv.android.ui.theme.YancoPalette) {
     val (label, fg, bg) =
         when (kind) {
             ScheduleStateBadgeKind.SCHEDULED ->
@@ -560,10 +541,10 @@ private fun ScheduleStateBadge(
         }
     Box(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(50))
-                .background(bg)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(
             text = label,
@@ -576,11 +557,7 @@ private fun ScheduleStateBadge(
 }
 
 @Composable
-private fun FocusableInlineButton(
-    label: String,
-    primary: Boolean = false,
-    onClick: () -> Unit,
-) {
+private fun FocusableInlineButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -605,25 +582,25 @@ private fun FocusableInlineButton(
         }
     Box(
         modifier =
-            Modifier
-                .clip(shape)
-                .background(bg)
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                // TV D-pad needs explicit `.focusable` paired with the
-                // clickable's MutableInteractionSource — same lesson as
-                // FavoritesScreen rows. Without this, Modifier.clickable
-                // alone is unreliable for D-pad focus on Fire TV.
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier
+            .clip(shape)
+            .background(bg)
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            // TV D-pad needs explicit `.focusable` paired with the
+            // clickable's MutableInteractionSource — same lesson as
+            // FavoritesScreen rows. Without this, Modifier.clickable
+            // alone is unreliable for D-pad focus on Fire TV.
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
             text = label,
@@ -661,11 +638,7 @@ private fun RecordingEntry.metaLine(): String {
  * to FK against — see PlaybackController.persistResumePoint).
  */
 @UnstableApi
-private fun playRecording(
-    controller: PlaybackController,
-    context: Context,
-    entry: RecordingEntry,
-) {
+private fun playRecording(controller: PlaybackController, context: Context, entry: RecordingEntry) {
     val streamUrl =
         // Both absolute file paths and content:// URIs are supported.
         // For File paths we prepend file:// so ExoPlayer's data-source
@@ -702,11 +675,7 @@ private fun playRecording(
  * java.io.File. Best effort — a missing file isn't a fatal error
  * (the row still goes away).
  */
-private suspend fun deleteRecording(
-    context: Context,
-    recordings: RecordingsRepository,
-    entry: RecordingEntry,
-) {
+private suspend fun deleteRecording(context: Context, recordings: RecordingsRepository, entry: RecordingEntry) {
     withContext(Dispatchers.IO) {
         runCatching {
             if (entry.filePath.startsWith("content://")) {
@@ -759,11 +728,10 @@ private fun RecordingScheduleEntry.historyMetaLine(): String {
     return if (reason != null) "$startStr · $reason" else startStr
 }
 
-private fun friendlyReason(rawReason: String): String =
-    when (rawReason) {
-        "device_offline" -> "device was off"
-        "concurrent_recording_active" -> "another recording was running"
-        "orphaned_by_app_kill" -> "interrupted by reboot"
-        "channel_deleted" -> "channel removed"
-        else -> rawReason.replace('_', ' ')
-    }
+private fun friendlyReason(rawReason: String): String = when (rawReason) {
+    "device_offline" -> "device was off"
+    "concurrent_recording_active" -> "another recording was running"
+    "orphaned_by_app_kill" -> "interrupted by reboot"
+    "channel_deleted" -> "channel removed"
+    else -> rawReason.replace('_', ' ')
+}

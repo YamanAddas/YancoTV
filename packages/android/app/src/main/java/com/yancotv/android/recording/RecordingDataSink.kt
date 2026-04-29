@@ -54,9 +54,7 @@ import java.io.OutputStream
  * don't touch this sink.
  */
 @UnstableApi
-class RecordingDataSink(
-    @Suppress("unused") private val logger: Logger = NOOP_LOGGER,
-) : DataSink {
+class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LOGGER) : DataSink {
     private val lock = Any()
     private var output: OutputStream? = null
     private var bytesWritten: Long = 0L

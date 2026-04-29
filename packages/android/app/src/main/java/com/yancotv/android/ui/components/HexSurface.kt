@@ -55,18 +55,18 @@ fun HexSurface(
     shellGradient: Brush =
         Brush.verticalGradient(
             colors =
-                listOf(
-                    LocalYancoPalette.current.BackgroundElevated.copy(alpha = 0.78f),
-                    LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.72f),
-                ),
+            listOf(
+                LocalYancoPalette.current.BackgroundElevated.copy(alpha = 0.78f),
+                LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.72f),
+            ),
         ),
     focusedShellGradient: Brush =
         Brush.verticalGradient(
             colors =
-                listOf(
-                    LocalYancoPalette.current.Accent,
-                    LocalYancoPalette.current.AccentDeep,
-                ),
+            listOf(
+                LocalYancoPalette.current.Accent,
+                LocalYancoPalette.current.AccentDeep,
+            ),
         ),
     innerFill: Color = LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.78f),
     focusedInnerFill: Color = LocalYancoPalette.current.Accent.copy(alpha = 0.14f),
@@ -96,59 +96,59 @@ fun HexSurface(
 
     Box(
         modifier =
-            modifier
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationY = translate
-                }.shadow(
-                    elevation = elevation,
-                    shape = shape,
-                    ambientColor = if (focused) LocalYancoPalette.current.Accent else Color.Black,
-                    spotColor = if (focused) LocalYancoPalette.current.Accent else Color.Black,
-                )
-                // Outer shell — the "frame". On focus it becomes a saturated
-                // emerald gradient ring; idle it's a subtle elevated surface.
-                .clip(shape)
-                .background(if (focused) focusedShellGradient else shellGradient)
-                .border(
-                    width = shellBorder,
-                    color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
-                    shape = shape,
-                ).padding(bevelInset),
+        modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = translate
+            }.shadow(
+                elevation = elevation,
+                shape = shape,
+                ambientColor = if (focused) LocalYancoPalette.current.Accent else Color.Black,
+                spotColor = if (focused) LocalYancoPalette.current.Accent else Color.Black,
+            )
+            // Outer shell — the "frame". On focus it becomes a saturated
+            // emerald gradient ring; idle it's a subtle elevated surface.
+            .clip(shape)
+            .background(if (focused) focusedShellGradient else shellGradient)
+            .border(
+                width = shellBorder,
+                color = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder,
+                shape = shape,
+            ).padding(bevelInset),
     ) {
         // Inner content panel — the "recessed" surface. Clipped to the same
         // shape so the bevelled edge is preserved inside the frame.
         Box(
             modifier =
-                Modifier
-                    .clip(shape)
-                    .background(if (focused) focusedInnerFill else innerFill)
-                    .border(
-                        width = 1.dp,
-                        color = if (focused) LocalYancoPalette.current.Accent.copy(alpha = 0.55f) else Color.Transparent,
-                        shape = shape,
-                    ),
+            Modifier
+                .clip(shape)
+                .background(if (focused) focusedInnerFill else innerFill)
+                .border(
+                    width = 1.dp,
+                    color = if (focused) LocalYancoPalette.current.Accent.copy(alpha = 0.55f) else Color.Transparent,
+                    shape = shape,
+                ),
         ) {
             content()
             // Specular top facet — single hairline of warm white that traces
             // the top edge to make the hex read as machined metal under light.
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .align(Alignment.TopCenter)
-                        .background(
-                            Brush.horizontalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Transparent,
-                                        Color.White.copy(alpha = if (focused) 0.55f else 0.18f),
-                                        Color.Transparent,
-                                    ),
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors =
+                            listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = if (focused) 0.55f else 0.18f),
+                                Color.Transparent,
                             ),
                         ),
+                    ),
             )
         }
     }

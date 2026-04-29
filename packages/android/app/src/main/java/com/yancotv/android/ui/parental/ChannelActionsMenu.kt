@@ -61,11 +61,7 @@ import org.koin.compose.koinInject
  * cache override values inside this composable.
  */
 @Composable
-fun ChannelActionsMenu(
-    item: ContentItem,
-    repo: ParentalRepository,
-    onDismiss: () -> Unit,
-) {
+fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val content: ContentRepository = koinInject()
@@ -284,11 +280,7 @@ fun ChannelActionsMenu(
 }
 
 @Composable
-private fun ActionRow(
-    label: String,
-    accent: Boolean = false,
-    onClick: () -> Unit,
-) {
+private fun ActionRow(label: String, accent: Boolean = false, onClick: () -> Unit) {
     val palette = LocalYancoPalette.current
     TextButton(
         onClick = onClick,
@@ -299,9 +291,9 @@ private fun ActionRow(
             color = if (accent) palette.Accent else palette.TextPrimary,
             fontSize = 14.sp,
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         )
     }
 }
@@ -312,14 +304,7 @@ private fun ActionRow(
  * process death without re-snapshotting from the (potentially stale) caller.
  */
 @Composable
-private fun TextEntryDialog(
-    title: String,
-    body: String,
-    initial: String,
-    confirmLabel: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun TextEntryDialog(title: String, body: String, initial: String, confirmLabel: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
     var text by rememberSaveable { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -333,22 +318,22 @@ private fun TextEntryDialog(
                     onValueChange = { text = it },
                     singleLine = true,
                     keyboardOptions =
-                        KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                        ),
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                    ),
                     textStyle =
-                        TextStyle(
-                            color = LocalYancoPalette.current.TextPrimary,
-                            fontSize = 14.sp,
-                        ),
+                    TextStyle(
+                        color = LocalYancoPalette.current.TextPrimary,
+                        fontSize = 14.sp,
+                    ),
                     colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = LocalYancoPalette.current.TextPrimary,
-                            unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
-                            focusedBorderColor = LocalYancoPalette.current.Accent,
-                            unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
-                            cursorColor = LocalYancoPalette.current.Accent,
-                        ),
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = LocalYancoPalette.current.TextPrimary,
+                        unfocusedTextColor = LocalYancoPalette.current.TextPrimary,
+                        focusedBorderColor = LocalYancoPalette.current.Accent,
+                        unfocusedBorderColor = LocalYancoPalette.current.BackgroundHover,
+                        cursorColor = LocalYancoPalette.current.Accent,
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

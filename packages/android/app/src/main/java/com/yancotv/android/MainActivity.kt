@@ -245,15 +245,11 @@ class MainActivity : ComponentActivity() {
     private var longPressJob: Job? = null
     private var longPressFired = false
 
-    private fun isCenterKey(keyCode: Int): Boolean =
-        keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-            keyCode == KeyEvent.KEYCODE_ENTER ||
-            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+    private fun isCenterKey(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+        keyCode == KeyEvent.KEYCODE_ENTER ||
+        keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
 
-    override fun onKeyDown(
-        keyCode: Int,
-        event: KeyEvent?,
-    ): Boolean {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // Global search hotkeys — work from anywhere in the shell without
         // first navigating to the Search sidebar destination. TV remotes
         // send KEYCODE_SEARCH; phone / bluetooth keyboards send Ctrl-K.
@@ -294,10 +290,7 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    override fun onKeyUp(
-        keyCode: Int,
-        event: KeyEvent?,
-    ): Boolean {
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         // MB-98 — short-press path: cancel pending timer, let combinedClickable
         // see UP and fire onClick normally.
         // Long-press path: timer already fired and opened the menu, so swallow

@@ -4,18 +4,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.recording.RecordingService
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.recording.RecordInput
+import com.yancotv.shared.recording.RecordingFormat
 import com.yancotv.shared.recording.RecordingScheduleEntry
 import com.yancotv.shared.recording.RecordingScheduleRepository
 import com.yancotv.shared.recording.RecordingScheduleState
 import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
-import com.yancotv.shared.recording.RecordingFormat
-import com.yancotv.shared.recording.RecordInput
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import org.koin.core.component.KoinComponent
@@ -72,12 +71,7 @@ import org.koin.core.component.inject
  * `service_start_failed:` reason — no Context, no Receiver, no Service
  * required. Production call site lives in [RecordingScheduleReceiver.startRecording].
  */
-internal fun tryStartOrFailSchedule(
-    scheduleId: String,
-    tag: String,
-    startService: () -> Unit,
-    transitionFailed: (reason: String) -> Unit,
-) {
+internal fun tryStartOrFailSchedule(scheduleId: String, tag: String, startService: () -> Unit, transitionFailed: (reason: String) -> Unit) {
     runCatching { startService() }
         .onFailure { t ->
             Log.e(tag, "RecordingService.start failed for $scheduleId", t)
@@ -94,10 +88,7 @@ class RecordingScheduleReceiver :
     private val content: ContentRepository by inject()
     private val playbackController: PlaybackController by inject()
 
-    override fun onReceive(
-        context: Context,
-        intent: Intent,
-    ) {
+    override fun onReceive(context: Context, intent: Intent) {
         val scheduleId =
             intent.getStringExtra(RecordingScheduleAlarmManager.EXTRA_SCHEDULE_ID) ?: run {
                 Log.w(TAG, "received ${intent.action} with no schedule_id — ignoring")
@@ -110,10 +101,7 @@ class RecordingScheduleReceiver :
         }
     }
 
-    private fun handlePreFire(
-        context: Context,
-        scheduleId: String,
-    ) {
+    private fun handlePreFire(context: Context, scheduleId: String) {
         val schedule =
             schedules.getById(scheduleId) ?: run {
                 Log.w(TAG, "pre-fire for missing schedule $scheduleId — ignoring")
@@ -216,10 +204,7 @@ class RecordingScheduleReceiver :
         }
     }
 
-    private fun handleEnd(
-        context: Context,
-        scheduleId: String,
-    ) {
+    private fun handleEnd(context: Context, scheduleId: String) {
         val schedule =
             schedules.getById(scheduleId) ?: run {
                 Log.w(TAG, "end for missing schedule $scheduleId — ignoring")
@@ -286,10 +271,7 @@ class RecordingScheduleReceiver :
         }
     }
 
-    private fun startRecording(
-        context: Context,
-        schedule: RecordingScheduleEntry,
-    ) {
+    private fun startRecording(context: Context, schedule: RecordingScheduleEntry) {
         // **MK.14.3 fix (2026-04-26 hands-on bug)**. The original receiver
         // called `schedules.linkRecording(scheduleId, recordId)` BEFORE
         // `RecordingService.start` inserted the recordings row. The
@@ -333,13 +315,13 @@ class RecordingScheduleReceiver :
                 RecordingService.start(
                     context = context,
                     input =
-                        RecordInput(
-                            recordId = recordId,
-                            sourceUrl = schedule.streamUrl,
-                            title = schedule.title,
-                            format = detectRecordingFormat(schedule.streamUrl),
-                            contentId = schedule.contentId,
-                        ),
+                    RecordInput(
+                        recordId = recordId,
+                        sourceUrl = schedule.streamUrl,
+                        title = schedule.title,
+                        format = detectRecordingFormat(schedule.streamUrl),
+                        contentId = schedule.contentId,
+                    ),
                 )
             },
             transitionFailed = { reason ->
@@ -353,7 +335,6 @@ class RecordingScheduleReceiver :
             },
         )
     }
-
 
     /**
      * Resolve the [ContentItem] to hand to [PlaybackController.play] when

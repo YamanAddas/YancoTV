@@ -102,12 +102,11 @@ class WatchdogClassifierTest {
         assertFalse(isFfmpegRelatedError(exception))
     }
 
-    private fun decodingFailedWithCause(cause: Throwable?): TestPlaybackException =
-        TestPlaybackException(
-            message = "decoding failed",
-            cause = cause,
-            errorCode = PlaybackException.ERROR_CODE_DECODING_FAILED,
-        )
+    private fun decodingFailedWithCause(cause: Throwable?): TestPlaybackException = TestPlaybackException(
+        message = "decoding failed",
+        cause = cause,
+        errorCode = PlaybackException.ERROR_CODE_DECODING_FAILED,
+    )
 
     /**
      * PlaybackException's primary public constructor delegates to a
@@ -115,11 +114,7 @@ class WatchdogClassifierTest {
      * Realtime()`. Subclassing here is the simplest way to fixture the
      * type without standing up Robolectric.
      */
-    private class TestPlaybackException(
-        message: String,
-        cause: Throwable?,
-        errorCode: Int,
-    ) : PlaybackException(message, cause, errorCode)
+    private class TestPlaybackException(message: String, cause: Throwable?, errorCode: Int) : PlaybackException(message, cause, errorCode)
 
     /**
      * Lives in the test class's package (`com.yancotv.android.player`),

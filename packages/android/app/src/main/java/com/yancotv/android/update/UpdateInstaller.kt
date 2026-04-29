@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.update.UpdateInfo
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,7 +23,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
 
 /**
  * Stage 5.2.3 — sideload auto-update download + install controller.
@@ -55,28 +55,15 @@ import java.io.File
  * MB-230 consolidation) so we don't open another connection pool /
  * dispatcher for what's effectively a one-shot fetch.
  */
-class UpdateInstaller(
-    private val appContext: Context,
-    private val sharedHttp: OkHttpClient,
-    private val logger: Logger,
-) {
+class UpdateInstaller(private val appContext: Context, private val sharedHttp: OkHttpClient, private val logger: Logger) {
     sealed interface State {
         data object Idle : State
 
-        data class Downloading(
-            val percent: Int,
-            val versionName: String,
-        ) : State
+        data class Downloading(val percent: Int, val versionName: String) : State
 
-        data class ReadyToInstall(
-            val apkFile: File,
-            val versionName: String,
-        ) : State
+        data class ReadyToInstall(val apkFile: File, val versionName: String) : State
 
-        data class Failed(
-            val reason: String,
-            val versionName: String,
-        ) : State
+        data class Failed(val reason: String, val versionName: String) : State
     }
 
     private val _state = MutableStateFlow<State>(State.Idle)

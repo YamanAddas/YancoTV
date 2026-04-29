@@ -37,9 +37,7 @@ import kotlinx.serialization.json.Json
  * ([LIVE_BASE] / [VOD_BASE] / [SERIES_BASE] + running index), matching the
  * server-returned order of the single-endpoint response.
  */
-class ContentWriter(
-    private val db: YancoDb,
-) {
+class ContentWriter(private val db: YancoDb) {
     private val json =
         Json {
             encodeDefaults = false
@@ -57,12 +55,7 @@ class ContentWriter(
     }
 
     /** Writes M3U entries for [sourceId]. Returns number of rows inserted. */
-    fun writeM3u(
-        sourceId: String,
-        entries: List<M3uEntry>,
-        now: Long,
-        onProgress: (current: Int, total: Int) -> Unit = { _, _ -> },
-    ): Int {
+    fun writeM3u(sourceId: String, entries: List<M3uEntry>, now: Long, onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }): Int {
         val total = entries.size
         var written = 0
         db.transaction {
@@ -201,11 +194,11 @@ class ContentWriter(
                     clean_title = cleaned,
                     group_name = groupName,
                     stream_url =
-                        client.buildStreamUrl(
-                            v.streamId,
-                            XtreamStreamType.MOVIE,
-                            v.containerExtension,
-                        ),
+                    client.buildStreamUrl(
+                        v.streamId,
+                        XtreamStreamType.MOVIE,
+                        v.containerExtension,
+                    ),
                     logo_url = v.streamIcon.ifBlank { null },
                     tvg_id = null,
                     metadata_json = encodeMeta(meta),
@@ -217,13 +210,7 @@ class ContentWriter(
         return items.size
     }
 
-    fun appendXtreamSeries(
-        sourceId: String,
-        items: List<XtreamSeriesInfo>,
-        categoryNames: Map<String, String>,
-        sortOrderStart: Long,
-        now: Long,
-    ): Int {
+    fun appendXtreamSeries(sourceId: String, items: List<XtreamSeriesInfo>, categoryNames: Map<String, String>, sortOrderStart: Long, now: Long): Int {
         if (items.isEmpty()) return 0
         db.transaction {
             for ((i, sr) in items.withIndex()) {
@@ -371,12 +358,11 @@ class ContentWriter(
         return written
     }
 
-    private fun serializeType(type: ContentType): String =
-        when (type) {
-            ContentType.LIVE -> "live"
-            ContentType.MOVIE -> "movie"
-            ContentType.SERIES -> "series"
-        }
+    private fun serializeType(type: ContentType): String = when (type) {
+        ContentType.LIVE -> "live"
+        ContentType.MOVIE -> "movie"
+        ContentType.SERIES -> "series"
+    }
 
     companion object {
         const val LIVE_BASE = 0L
@@ -385,7 +371,4 @@ class ContentWriter(
     }
 }
 
-data class StalkerBundle<T>(
-    val items: List<T>,
-    val categories: Map<String, String>,
-)
+data class StalkerBundle<T>(val items: List<T>, val categories: Map<String, String>)

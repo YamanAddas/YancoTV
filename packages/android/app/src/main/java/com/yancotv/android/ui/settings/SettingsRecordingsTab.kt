@@ -45,14 +45,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.android.prefs.RecordingPrefs
 import com.yancotv.android.prefs.RecordingStorageMode
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.io.File
 
 /**
  * Stage 3.1 / MK.14.2-storage (audit-revised) — recording-storage tab.
@@ -78,10 +77,7 @@ import java.io.File
  * under the newly-selected mode.
  */
 @Composable
-fun SettingsRecordingsTab(
-    modifier: Modifier = Modifier,
-    prefs: AppPreferences = koinInject(),
-) {
+fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koinInject()) {
     val palette = LocalYancoPalette.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -141,10 +137,10 @@ fun SettingsRecordingsTab(
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -157,11 +153,11 @@ fun SettingsRecordingsTab(
         // ── Storage mode picker card ─────────────────────────────
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(palette.BackgroundRaised)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(palette.BackgroundRaised)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -172,8 +168,8 @@ fun SettingsRecordingsTab(
             )
             Text(
                 text =
-                    "Pick where new recordings save. You can change this " +
-                        "any time — past recordings keep playing from wherever they were saved.",
+                "Pick where new recordings save. You can change this " +
+                    "any time — past recordings keep playing from wherever they were saved.",
                 color = palette.TextMuted,
                 fontSize = 11.sp,
             )
@@ -184,13 +180,13 @@ fun SettingsRecordingsTab(
                 badge = "RECOMMENDED",
                 subtitle = "Movies/${PUBLIC_DIR_NAME}/ — survives uninstall",
                 detail =
-                    if (needsLegacyPermission && recordingPrefs.storageMode != RecordingStorageMode.PUBLIC_MEDIA_STORE) {
-                        "Tap to grant storage permission and switch."
-                    } else if (needsLegacyPermission) {
-                        "Storage permission needed — tap to grant."
-                    } else {
-                        publicFolderResolvedPath()
-                    },
+                if (needsLegacyPermission && recordingPrefs.storageMode != RecordingStorageMode.PUBLIC_MEDIA_STORE) {
+                    "Tap to grant storage permission and switch."
+                } else if (needsLegacyPermission) {
+                    "Storage permission needed — tap to grant."
+                } else {
+                    publicFolderResolvedPath()
+                },
                 selected = recordingPrefs.storageMode == RecordingStorageMode.PUBLIC_MEDIA_STORE,
                 onSelect = {
                     if (needsLegacyPermission) {
@@ -226,18 +222,18 @@ fun SettingsRecordingsTab(
                 title = "Custom folder",
                 badge = "ADVANCED",
                 subtitle =
-                    if (recordingPrefs.folderUri != null) {
-                        "Pick a different folder anytime"
-                    } else {
-                        "Pick any folder using your TV's system picker"
-                    },
+                if (recordingPrefs.folderUri != null) {
+                    "Pick a different folder anytime"
+                } else {
+                    "Pick any folder using your TV's system picker"
+                },
                 detail =
-                    recordingPrefs.folderUri?.let { uriString ->
-                        runCatching { Uri.parse(uriString) }
-                            .getOrNull()
-                            ?.let { friendlyTreeUriPath(it) }
-                            ?: uriString
-                    } ?: "No folder picked yet — tap to choose.",
+                recordingPrefs.folderUri?.let { uriString ->
+                    runCatching { Uri.parse(uriString) }
+                        .getOrNull()
+                        ?.let { friendlyTreeUriPath(it) }
+                        ?: uriString
+                } ?: "No folder picked yet — tap to choose.",
                 selected = recordingPrefs.storageMode == RecordingStorageMode.CUSTOM_SAF,
                 onSelect = {
                     // Selecting Custom always launches the system picker —
@@ -285,11 +281,11 @@ fun SettingsRecordingsTab(
         // ── Browse-your-recordings tip ──────────────────────────
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(palette.BackgroundRaised)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(palette.BackgroundRaised)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
@@ -300,9 +296,9 @@ fun SettingsRecordingsTab(
             )
             Text(
                 text =
-                    "Open the Recordings tab in the sidebar to play, delete, and inspect " +
-                        "any recording you've made. New recordings show up there immediately " +
-                        "as they start.",
+                "Open the Recordings tab in the sidebar to play, delete, and inspect " +
+                    "any recording you've made. New recordings show up there immediately " +
+                    "as they start.",
                 color = palette.TextMuted,
                 fontSize = 11.sp,
             )
@@ -315,11 +311,11 @@ fun SettingsRecordingsTab(
         if (recordingPrefs.storageMode == RecordingStorageMode.CUSTOM_SAF) {
             Column(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(palette.BackgroundRaised)
-                        .padding(16.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(palette.BackgroundRaised)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
@@ -330,11 +326,11 @@ fun SettingsRecordingsTab(
                 )
                 Text(
                     text =
-                        "Stock Fire TV's folder picker has known D-pad bugs (the Select / " +
-                            "hamburger / tab buttons can be unreachable from the remote). It's a " +
-                            "Fire OS limitation, not a YancoTV bug. Fix: install Files by Google — " +
-                            "Fire TV will route the picker through it. Or switch to Public folder " +
-                            "above; recordings save without ever using the system picker.",
+                    "Stock Fire TV's folder picker has known D-pad bugs (the Select / " +
+                        "hamburger / tab buttons can be unreachable from the remote). It's a " +
+                        "Fire OS limitation, not a YancoTV bug. Fix: install Files by Google — " +
+                        "Fire TV will route the picker through it. Or switch to Public folder " +
+                        "above; recordings save without ever using the system picker.",
                     color = palette.TextMuted,
                     fontSize = 11.sp,
                 )
@@ -349,14 +345,7 @@ fun SettingsRecordingsTab(
  * permission grant launcher or a SAF picker).
  */
 @Composable
-private fun ModeRow(
-    title: String,
-    badge: String?,
-    subtitle: String,
-    detail: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
+private fun ModeRow(title: String, badge: String?, subtitle: String, detail: String, selected: Boolean, onSelect: () -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -377,23 +366,23 @@ private fun ModeRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(bg)
-                .border(
-                    width = if (focused || selected) 2.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onSelect,
-                )
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(bg)
+            .border(
+                width = if (focused || selected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onSelect,
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -404,23 +393,23 @@ private fun ModeRow(
         ) {
             Box(
                 modifier =
-                    Modifier
-                        .size(16.dp)
-                        .clip(CircleShape)
-                        .border(
-                            width = 2.dp,
-                            color = if (selected) palette.Accent else palette.PanelBorder,
-                            shape = CircleShape,
-                        ),
+                Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .border(
+                        width = 2.dp,
+                        color = if (selected) palette.Accent else palette.PanelBorder,
+                        shape = CircleShape,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 if (selected) {
                     Box(
                         modifier =
-                            Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(palette.Accent),
+                        Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(palette.Accent),
                     )
                 }
             }
@@ -444,10 +433,10 @@ private fun ModeRow(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.6.sp,
                         modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(palette.Accent.copy(alpha = 0.15f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(palette.Accent.copy(alpha = 0.15f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
             }
@@ -467,11 +456,7 @@ private fun ModeRow(
 }
 
 @Composable
-private fun FocusableSettingsButton(
-    label: String,
-    primary: Boolean,
-    onClick: () -> Unit,
-) {
+private fun FocusableSettingsButton(label: String, primary: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -496,22 +481,22 @@ private fun FocusableSettingsButton(
         }
     Row(
         modifier =
-            Modifier
-                .clip(shape)
-                .background(bg)
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+        Modifier
+            .clip(shape)
+            .background(bg)
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -581,11 +566,10 @@ private fun appPrivateResolvedPath(context: android.content.Context): String {
     return dir.absolutePath.replaceFirst(Regex("^/storage/emulated/\\d+"), "")
 }
 
-private fun hasLegacyStoragePermission(context: android.content.Context): Boolean =
-    ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-    ) == PackageManager.PERMISSION_GRANTED
+private fun hasLegacyStoragePermission(context: android.content.Context): Boolean = ContextCompat.checkSelfPermission(
+    context,
+    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+) == PackageManager.PERMISSION_GRANTED
 
 /** Mirrors `RecordingStorageResolver.PUBLIC_DIR_NAME`; kept in sync by code review. */
 private const val PUBLIC_DIR_NAME = "YancoTV"

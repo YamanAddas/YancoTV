@@ -2,6 +2,9 @@ package com.yancotv.android.ui.settings
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,9 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -49,17 +49,17 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -69,9 +69,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.focus.FocusableSpacer
+import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
-import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import kotlinx.coroutines.launch
 
@@ -89,10 +89,7 @@ import kotlinx.coroutines.launch
  * only the breadcrumb + content scroll re-render. Prevents tab swaps from
  * resetting scroll state in sibling panes.
  */
-enum class SettingsTab(
-    val label: String,
-    val icon: ImageVector,
-) {
+enum class SettingsTab(val label: String, val icon: ImageVector) {
     // Subtitles, Notifications, Storage tabs are removed from the
     // sidebar (2026-04-27) — they were never more than placeholder
     // bodies. Their `Settings*Tab.kt` files stay in tree so post-v1
@@ -126,11 +123,7 @@ private val OnAccentInk: Color = Color(0xFF04130C)
 @OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
-fun SettingsScreen(
-    modifier: Modifier = Modifier,
-    initialTab: SettingsTab = SettingsTab.General,
-    onExitToMainSidebar: () -> Unit = {},
-) {
+fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val scope = rememberCoroutineScope()
     // Two layers, two keys, one rule per layer:
@@ -167,15 +160,15 @@ fun SettingsScreen(
 
     Row(
         modifier =
-            modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .padding(
-                    start = Space.page,
-                    top = Space.section,
-                    end = Space.page,
-                    bottom = Space.section,
-                ),
+        modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep)
+            .padding(
+                start = Space.page,
+                top = Space.section,
+                end = Space.page,
+                bottom = Space.section,
+            ),
         horizontalArrangement = Arrangement.spacedBy(Space.xxl),
     ) {
         Sidebar(
@@ -223,9 +216,9 @@ fun SettingsScreen(
             onExit = onExitToMainSidebar,
             activeTabFocus = activeTabFocus,
             modifier =
-                Modifier
-                    .width(380.dp)
-                    .fillMaxHeight(),
+            Modifier
+                .width(380.dp)
+                .fillMaxHeight(),
         )
         // Provide the active-tab requester to every Settings row primitive
         // beneath this point so each row's focusGroup boundary can redirect
@@ -236,9 +229,9 @@ fun SettingsScreen(
                 current = tab,
                 activeTabFocus = activeTabFocus,
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .onFocusChanged { contentHasFocus = it.hasFocus },
+                Modifier
+                    .fillMaxSize()
+                    .onFocusChanged { contentHasFocus = it.hasFocus },
             )
         }
     }
@@ -246,13 +239,7 @@ fun SettingsScreen(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun Sidebar(
-    current: SettingsTab,
-    onSelect: (SettingsTab) -> Unit,
-    onExit: () -> Unit,
-    activeTabFocus: FocusRequester,
-    modifier: Modifier = Modifier,
-) {
+private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExit: () -> Unit, activeTabFocus: FocusRequester, modifier: Modifier = Modifier) {
     // Verdant Frost — clean rounded panel (28dp `--r-xl`) replaces the
     // hex-cut shell so the Settings screen reads as the design's
     // "polished island" within the wider hex-cut app. The cut-corner
@@ -269,37 +256,37 @@ private fun Sidebar(
 
     Column(
         modifier =
-            modifier
-                .clip(panelShape)
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
-                .onFocusChanged { sidebarHasFocus = it.hasFocus }
-                // D-pad LEFT inside the inner sidebar exits Settings.
-                // The sidebar is a vertical list with no horizontal
-                // siblings, so blanket-consuming LEFT is safe — there's
-                // no in-rail meaning for it. Same shape as CategoryRail's
-                // LEFT handler. Consume always so Compose's default focus
-                // search doesn't try to find an off-screen target.
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
-                        onExit()
-                        true
-                    } else {
-                        false
-                    }
+        modifier
+            .clip(panelShape)
+            .background(LocalYancoPalette.current.BackgroundRaised)
+            .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
+            .onFocusChanged { sidebarHasFocus = it.hasFocus }
+            // D-pad LEFT inside the inner sidebar exits Settings.
+            // The sidebar is a vertical list with no horizontal
+            // siblings, so blanket-consuming LEFT is safe — there's
+            // no in-rail meaning for it. Same shape as CategoryRail's
+            // LEFT handler. Consume always so Compose's default focus
+            // search doesn't try to find an off-screen target.
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                    onExit()
+                    true
+                } else {
+                    false
                 }
-                .focusGroup()
-                .focusRestorer(),
+            }
+            .focusGroup()
+            .focusRestorer(),
     ) {
         SidebarHeader()
         HairlineDivider()
         Column(
             modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 14.dp),
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for (entry in SettingsTab.entries) {
@@ -330,9 +317,9 @@ private fun SidebarHeader() {
     // at 3 m on Fire TV without crowding the divider.
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -355,12 +342,7 @@ private fun SidebarHeader() {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun TabItem(
-    entry: SettingsTab,
-    selected: Boolean,
-    onClick: () -> Unit,
-    focusRequester: FocusRequester? = null,
-) {
+private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, focusRequester: FocusRequester? = null) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -447,47 +429,47 @@ private fun TabItem(
 
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                // Soft accent halo on focus — colored shadow gives the
-                // design's "1.5dp ring + 28px halo" feel without a manual
-                // glow layer. Spot/ambient colors render colored on
-                // API 28+; on older builds it falls back to a neutral
-                // shadow which is still a useful focus cue.
-                .shadow(
-                    elevation = shadowElevation,
-                    shape = shape,
-                    ambientColor = palette.AccentGlow,
-                    spotColor = palette.AccentGlow,
-                )
-                .clip(shape)
-                .background(rowBrush)
-                .border(
-                    width = if (focused) 1.5.dp else 0.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .then(onTabKey)
-                .let { base ->
-                    // Bind the requester to the SAME node as `.focusable`
-                    // (Modifier order matters in Compose 1.7) — putting it on a
-                    // wrapper Box made requestFocus unreliable, see MB-106 v2.
-                    if (focusRequester != null) base.focusRequester(focusRequester) else base
-                }
-                .focusable(interactionSource = interaction)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    onClick = onClick,
-                ).semantics {
-                    role = Role.Tab
-                    contentDescription = "${entry.label} settings tab"
-                },
+        Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            // Soft accent halo on focus — colored shadow gives the
+            // design's "1.5dp ring + 28px halo" feel without a manual
+            // glow layer. Spot/ambient colors render colored on
+            // API 28+; on older builds it falls back to a neutral
+            // shadow which is still a useful focus cue.
+            .shadow(
+                elevation = shadowElevation,
+                shape = shape,
+                ambientColor = palette.AccentGlow,
+                spotColor = palette.AccentGlow,
+            )
+            .clip(shape)
+            .background(rowBrush)
+            .border(
+                width = if (focused) 1.5.dp else 0.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            .then(onTabKey)
+            .let { base ->
+                // Bind the requester to the SAME node as `.focusable`
+                // (Modifier order matters in Compose 1.7) — putting it on a
+                // wrapper Box made requestFocus unreliable, see MB-106 v2.
+                if (focusRequester != null) base.focusRequester(focusRequester) else base
+            }
+            .focusable(interactionSource = interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            ).semantics {
+                role = Role.Tab
+                contentDescription = "${entry.label} settings tab"
+            },
     ) {
         if (selected) {
             // Selected accent rail — design spec: 3dp wide × 44dp tall,
@@ -495,23 +477,23 @@ private fun TabItem(
             // distinct from the focus ring around the whole row.
             Box(
                 modifier =
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .width(3.dp)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(palette.Accent, palette.AccentDeep),
-                            ),
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .width(3.dp)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(palette.Accent, palette.AccentDeep),
                         ),
+                    ),
             )
         }
         Row(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(start = 22.dp, end = 18.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(start = 22.dp, end = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -522,10 +504,10 @@ private fun TabItem(
             // pass collapsed them away.
             Box(
                 modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(iconBgColor),
+                Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(iconBgColor),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -551,36 +533,35 @@ private fun TabItem(
 @OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
-private fun ContentPane(
-    current: SettingsTab,
-    activeTabFocus: FocusRequester,
-    modifier: Modifier = Modifier,
-) {
+private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, modifier: Modifier = Modifier) {
     val panelShape = RoundedCornerShape(28.dp)
     Column(
         modifier =
-            modifier
-                .clip(panelShape)
-                .background(LocalYancoPalette.current.BackgroundRaised)
-                .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
-                // Define the content pane as a focus group so we can
-                // redirect focus exits from it. `focusProperties.exit`
-                // runs inside Compose's focus traversal — it fires only
-                // when there is NO in-group target in the requested
-                // direction, so chip rows / sliders / button rows with
-                // horizontal LEFT siblings keep their natural navigation
-                // (e.g. "VLC chip" → "System chip" stays in-row). At the
-                // leftmost edge, the exit lambda redirects to the active
-                // tab in the inner sidebar instead of letting Compose's
-                // spatial search find an unrelated focusable above or
-                // below in the same column.
-                .focusGroup()
-                .focusProperties {
-                    exit = { direction ->
-                        if (direction == FocusDirection.Left) activeTabFocus
-                        else FocusRequester.Default
+        modifier
+            .clip(panelShape)
+            .background(LocalYancoPalette.current.BackgroundRaised)
+            .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
+            // Define the content pane as a focus group so we can
+            // redirect focus exits from it. `focusProperties.exit`
+            // runs inside Compose's focus traversal — it fires only
+            // when there is NO in-group target in the requested
+            // direction, so chip rows / sliders / button rows with
+            // horizontal LEFT siblings keep their natural navigation
+            // (e.g. "VLC chip" → "System chip" stays in-row). At the
+            // leftmost edge, the exit lambda redirects to the active
+            // tab in the inner sidebar instead of letting Compose's
+            // spatial search find an unrelated focusable above or
+            // below in the same column.
+            .focusGroup()
+            .focusProperties {
+                exit = { direction ->
+                    if (direction == FocusDirection.Left) {
+                        activeTabFocus
+                    } else {
+                        FocusRequester.Default
                     }
-                },
+                }
+            },
     ) {
         Breadcrumb(current = current)
         HairlineDivider()
@@ -607,39 +588,39 @@ private fun ContentPane(
             androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides
                 bringIntoViewSpec,
         ) {
-        Box(
-            modifier =
+            Box(
+                modifier =
                 Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-        ) {
-            androidx.compose.runtime.key(current) {
-                TabContent(tab = current)
+            ) {
+                androidx.compose.runtime.key(current) {
+                    TabContent(tab = current)
+                }
+                // MB-109 (hoisted): single focus fallback for the entire
+                // ContentPane. moveFocus(Right) from the sub-sidebar lands
+                // on the first focusable child of the active tab body if it
+                // has any (General/Playback/Groups/Network/Parental do); if
+                // the tab is read-only (About/Shortcuts) or a placeholder,
+                // focus falls through to this 0-dp trap so the request never
+                // silently fails and the user always exits the sub-sidebar.
+                //
+                // Lives at ContentPane scope (not per-tab) so:
+                //   1. Tab swap doesn't unmount it — focus traversal sees a
+                //      stable target across the `key(current)` re-mount.
+                //   2. No per-tab Column.spacedBy gap pushes the visible
+                //      content down by 12-16dp (the regression from the
+                //      first attempt — see MB-112 commit).
+                //   3. One source of truth: future placeholder tabs inherit
+                //      the trap automatically; no per-tab boilerplate.
+                //
+                // Sibling of the keyed TabContent inside the same Box, so
+                // it's last in the focus traversal order — real tab
+                // focusables come first, the trap is only used when a tab
+                // body has no other focus targets.
+                FocusableSpacer()
             }
-            // MB-109 (hoisted): single focus fallback for the entire
-            // ContentPane. moveFocus(Right) from the sub-sidebar lands
-            // on the first focusable child of the active tab body if it
-            // has any (General/Playback/Groups/Network/Parental do); if
-            // the tab is read-only (About/Shortcuts) or a placeholder,
-            // focus falls through to this 0-dp trap so the request never
-            // silently fails and the user always exits the sub-sidebar.
-            //
-            // Lives at ContentPane scope (not per-tab) so:
-            //   1. Tab swap doesn't unmount it — focus traversal sees a
-            //      stable target across the `key(current)` re-mount.
-            //   2. No per-tab Column.spacedBy gap pushes the visible
-            //      content down by 12-16dp (the regression from the
-            //      first attempt — see MB-112 commit).
-            //   3. One source of truth: future placeholder tabs inherit
-            //      the trap automatically; no per-tab boilerplate.
-            //
-            // Sibling of the keyed TabContent inside the same Box, so
-            // it's last in the focus traversal order — real tab
-            // focusables come first, the trap is only used when a tab
-            // body has no other focus targets.
-            FocusableSpacer()
-        }
-        }  // end CompositionLocalProvider
+        } // end CompositionLocalProvider
     }
 }
 
@@ -683,11 +664,7 @@ private fun rememberSafeMarginBringIntoViewSpec(): androidx.compose.foundation.g
     return remember(density) {
         val safetyPx = with(density) { SAFETY_MARGIN_DP.dp.toPx() }
         object : androidx.compose.foundation.gestures.BringIntoViewSpec {
-            override fun calculateScrollDistance(
-                offset: Float,
-                size: Float,
-                containerSize: Float,
-            ): Float {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
                 // Element bigger than viewport — leave alone (About body case).
                 if (size >= containerSize) return 0f
                 val trailingEdge = offset + size
@@ -715,9 +692,9 @@ private fun rememberSafeMarginBringIntoViewSpec(): androidx.compose.foundation.g
 private fun Breadcrumb(current: SettingsTab) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 40.dp, end = 40.dp, top = 24.dp, bottom = 20.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 40.dp, end = 40.dp, top = 24.dp, bottom = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -757,11 +734,7 @@ private fun TabContent(tab: SettingsTab) {
 }
 
 @Composable
-private fun HexChip(
-    text: String,
-    active: Boolean,
-    icon: ImageVector? = null,
-) {
+private fun HexChip(text: String, active: Boolean, icon: ImageVector? = null) {
     // Symmetric horizontal hex with slightly rounded points. The previous
     // `ChipBevel` was asymmetric — a sharp angular cut on the left and a
     // half-pill rounded right — which read as 'half circle on a side and
@@ -786,15 +759,15 @@ private fun HexChip(
     val fg = if (active) OnAccentInk else LocalYancoPalette.current.TextMuted
     Row(
         modifier =
-            Modifier
-                .height(30.dp)
-                .clip(shape)
-                .background(bg)
-                .border(
-                    1.dp,
-                    if (active) Color.Transparent else LocalYancoPalette.current.BorderSubtle,
-                    shape,
-                ).padding(horizontal = 22.dp),
+        Modifier
+            .height(30.dp)
+            .clip(shape)
+            .background(bg)
+            .border(
+                1.dp,
+                if (active) Color.Transparent else LocalYancoPalette.current.BorderSubtle,
+                shape,
+            ).padding(horizontal = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -820,10 +793,9 @@ private fun HexChip(
 private fun HairlineDivider() {
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(LocalYancoPalette.current.BorderSubtle),
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(LocalYancoPalette.current.BorderSubtle),
     )
 }
-

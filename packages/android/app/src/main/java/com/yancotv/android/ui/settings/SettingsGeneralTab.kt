@@ -31,19 +31,16 @@ import org.koin.compose.koinInject
  * last row room to scroll past the panel edge without feeling clipped.
  */
 @Composable
-fun SettingsGeneralTab(
-    modifier: Modifier = Modifier,
-    prefs: AppPreferences = koinInject(),
-) {
+fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = koinInject()) {
     val scope = rememberCoroutineScope()
     val state by prefs.generalFlow.collectAsState()
 
     Column(
         modifier =
-            modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
             title = "Startup",
@@ -96,7 +93,9 @@ fun SettingsGeneralTab(
         ) {
             SettingsToggleRow(
                 label = "Smart category grouping",
-                description = "Bucket categories by detected language / region prefix into collapsible Arabic / English / USA parents. Off shows the provider's flat list as-is.",
+                description =
+                "Bucket categories by detected language / region prefix into collapsible Arabic / English / USA parents. " +
+                    "Off shows the provider's flat list as-is.",
                 checked = state.smartGrouping,
                 onCheckedChange = { scope.launch { prefs.setSmartGrouping(it) } },
             )

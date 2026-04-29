@@ -35,9 +35,8 @@ enum class RecordingStatus(val sql: String) {
     fun isTerminal(): Boolean = this != RECORDING
 
     companion object {
-        fun fromSql(value: String): RecordingStatus =
-            values().firstOrNull { it.sql == value }
-                ?: error("Unknown recording status: $value")
+        fun fromSql(value: String): RecordingStatus = values().firstOrNull { it.sql == value }
+            ?: error("Unknown recording status: $value")
     }
 }
 
@@ -102,14 +101,7 @@ class RecordingsRepository(
 ) {
     /** Insert a fresh `RECORDING` row. Caller supplies an id (typically
      *  a UUID); throws if the id collides. */
-    fun markStarted(
-        id: String,
-        contentId: String?,
-        title: String,
-        streamUrl: String,
-        filePath: String,
-        format: RecordingFormat,
-    ): RecordingEntry {
+    fun markStarted(id: String, contentId: String?, title: String, streamUrl: String, filePath: String, format: RecordingFormat): RecordingEntry {
         val now = clock()
         db.recordingsQueries.insert(
             id = id,
@@ -131,66 +123,50 @@ class RecordingsRepository(
         return getById(id) ?: error("insert succeeded but row missing: $id")
     }
 
-    fun markCompleted(
-        id: String,
-        bytesWritten: Long,
-        durationSeconds: Long,
-    ): RecordingEntry = transitionTerminal(id, RecordingStatus.COMPLETED, bytesWritten, durationSeconds, error = null)
+    fun markCompleted(id: String, bytesWritten: Long, durationSeconds: Long): RecordingEntry =
+        transitionTerminal(id, RecordingStatus.COMPLETED, bytesWritten, durationSeconds, error = null)
 
-    fun markFailed(
-        id: String,
-        reason: String,
-        bytesWritten: Long,
-    ): RecordingEntry =
-        transitionTerminal(
-            id,
-            RecordingStatus.FAILED,
-            bytesWritten,
-            durationSeconds = null,
-            error = reason,
-        )
+    fun markFailed(id: String, reason: String, bytesWritten: Long): RecordingEntry = transitionTerminal(
+        id,
+        RecordingStatus.FAILED,
+        bytesWritten,
+        durationSeconds = null,
+        error = reason,
+    )
 
-    fun markCancelled(
-        id: String,
-        bytesWritten: Long,
-    ): RecordingEntry =
-        transitionTerminal(
-            id,
-            RecordingStatus.CANCELLED,
-            bytesWritten,
-            durationSeconds = null,
-            error = null,
-        )
+    fun markCancelled(id: String, bytesWritten: Long): RecordingEntry = transitionTerminal(
+        id,
+        RecordingStatus.CANCELLED,
+        bytesWritten,
+        durationSeconds = null,
+        error = null,
+    )
 
-    fun getById(id: String): RecordingEntry? =
-        db.recordingsQueries
-            .selectById(id)
-            .executeAsOneOrNull()
-            ?.toEntry()
+    fun getById(id: String): RecordingEntry? = db.recordingsQueries
+        .selectById(id)
+        .executeAsOneOrNull()
+        ?.toEntry()
 
-    fun getAll(): List<RecordingEntry> =
-        db.recordingsQueries
-            .selectAll()
-            .executeAsList()
-            .map { it.toEntry() }
+    fun getAll(): List<RecordingEntry> = db.recordingsQueries
+        .selectAll()
+        .executeAsList()
+        .map { it.toEntry() }
 
-    fun getByStatus(status: RecordingStatus): List<RecordingEntry> =
-        db.recordingsQueries
-            .selectByStatus(status.sql)
-            .executeAsList()
-            .map { it.toEntry() }
+    fun getByStatus(status: RecordingStatus): List<RecordingEntry> = db.recordingsQueries
+        .selectByStatus(status.sql)
+        .executeAsList()
+        .map { it.toEntry() }
 
     /** Reactive list — backs the RecordingsScreen. Inserts /
      *  transitions / deletes anywhere in the app refresh subscribers
      *  without manual reload. Terminal query dispatches off main on
      *  `Dispatchers.Default` (KMP-safe — `Dispatchers.IO` only exists
      *  on JVM/Android). */
-    fun allFlow(): Flow<List<RecordingEntry>> =
-        db.recordingsQueries
-            .selectAll()
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { rows -> rows.map { it.toEntry() } }
+    fun allFlow(): Flow<List<RecordingEntry>> = db.recordingsQueries
+        .selectAll()
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows -> rows.map { it.toEntry() } }
 
     fun deleteById(id: String) {
         db.recordingsQueries.deleteById(id)
@@ -260,13 +236,7 @@ class RecordingsRepository(
 
     // ── internal ──────────────────────────────────────────────────
 
-    private fun transitionTerminal(
-        id: String,
-        target: RecordingStatus,
-        bytesWritten: Long,
-        durationSeconds: Long?,
-        error: String?,
-    ): RecordingEntry {
+    private fun transitionTerminal(id: String, target: RecordingStatus, bytesWritten: Long, durationSeconds: Long?, error: String?): RecordingEntry {
         require(target.isTerminal()) {
             "transitionTerminal must move to a terminal state, got $target"
         }
@@ -288,35 +258,32 @@ class RecordingsRepository(
         return getById(id) ?: error("update succeeded but row missing: $id")
     }
 
-    private fun Recordings.toEntry(): RecordingEntry =
-        RecordingEntry(
-            id = id,
-            contentId = content_id,
-            title = title,
-            streamUrl = stream_url,
-            filePath = file_path,
-            status = RecordingStatus.fromSql(status),
-            startedAt = started_at,
-            endedAt = ended_at,
-            durationSeconds = duration_seconds,
-            fileSizeBytes = file_size_bytes,
-            error = error,
-            format = formatFromSql(format),
-        )
+    private fun Recordings.toEntry(): RecordingEntry = RecordingEntry(
+        id = id,
+        contentId = content_id,
+        title = title,
+        streamUrl = stream_url,
+        filePath = file_path,
+        status = RecordingStatus.fromSql(status),
+        startedAt = started_at,
+        endedAt = ended_at,
+        durationSeconds = duration_seconds,
+        fileSizeBytes = file_size_bytes,
+        error = error,
+        format = formatFromSql(format),
+    )
 
-    private fun formatToSql(format: RecordingFormat): String =
-        when (format) {
-            RecordingFormat.HLS -> "hls"
-            RecordingFormat.MPEG_TS -> "mpeg_ts"
-        }
+    private fun formatToSql(format: RecordingFormat): String = when (format) {
+        RecordingFormat.HLS -> "hls"
+        RecordingFormat.MPEG_TS -> "mpeg_ts"
+    }
 
-    private fun formatFromSql(value: String?): RecordingFormat? =
-        when (value) {
-            "hls" -> RecordingFormat.HLS
-            "mpeg_ts" -> RecordingFormat.MPEG_TS
-            null -> null
-            else -> null // unrecognised tag from a future build; treat as unknown
-        }
+    private fun formatFromSql(value: String?): RecordingFormat? = when (value) {
+        "hls" -> RecordingFormat.HLS
+        "mpeg_ts" -> RecordingFormat.MPEG_TS
+        null -> null
+        else -> null // unrecognised tag from a future build; treat as unknown
+    }
 
     companion object {
         // 10 minutes — matches design spec §2 Q10. Rows with

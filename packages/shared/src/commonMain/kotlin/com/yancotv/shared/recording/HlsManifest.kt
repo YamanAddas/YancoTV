@@ -37,10 +37,7 @@ internal data class HlsSegment(
 )
 
 internal object HlsManifestParser {
-    fun parse(
-        manifestText: String,
-        manifestUrl: String,
-    ): HlsPlaylist {
+    fun parse(manifestText: String, manifestUrl: String): HlsPlaylist {
         val lines = manifestText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
         // Master playlists carry STREAM-INF entries; media playlists
         // carry EXTINF + segment URIs. A playlist can't legally be
@@ -127,10 +124,7 @@ internal object HlsManifestParser {
      * A full RFC 3986 implementation isn't necessary — HLS manifests
      * never use the unusual cases (query merge, dotless paths, etc.).
      */
-    internal fun resolveUrl(
-        baseUrl: String,
-        ref: String,
-    ): String {
+    internal fun resolveUrl(baseUrl: String, ref: String): String {
         if (ref.startsWith("http://") || ref.startsWith("https://")) return ref
         val schemeEnd = baseUrl.indexOf("://")
         if (schemeEnd < 0) return ref // can't resolve; let the fetcher fail with a useful error

@@ -21,9 +21,7 @@ import kotlinx.coroutines.withContext
  * through an IO dispatcher so the Settings toggles don't block the
  * main thread while the Switch animates.
  */
-class AppPreferences(
-    private val db: YancoDb,
-) {
+class AppPreferences(private val db: YancoDb) {
     private val _playback = MutableStateFlow(readPlayback())
     val playbackFlow: StateFlow<PlaybackPrefs> = _playback.asStateFlow()
 
@@ -86,55 +84,45 @@ class AppPreferences(
 
     // ───── Playback ─────
 
-    suspend fun setResizeMode(mode: ResizeMode) =
-        write(KEY_RESIZE, mode.key) {
-            _playback.value = _playback.value.copy(resizeMode = mode)
-        }
+    suspend fun setResizeMode(mode: ResizeMode) = write(KEY_RESIZE, mode.key) {
+        _playback.value = _playback.value.copy(resizeMode = mode)
+    }
 
-    suspend fun setAutoPlayNext(enabled: Boolean) =
-        write(KEY_AUTOPLAY, if (enabled) "1" else "0") {
-            _playback.value = _playback.value.copy(autoPlayNext = enabled)
-        }
+    suspend fun setAutoPlayNext(enabled: Boolean) = write(KEY_AUTOPLAY, if (enabled) "1" else "0") {
+        _playback.value = _playback.value.copy(autoPlayNext = enabled)
+    }
 
-    suspend fun setAudioLanguage(lang: String) =
-        write(KEY_AUDIO_LANG, lang) {
-            _playback.value = _playback.value.copy(audioLanguage = lang)
-        }
+    suspend fun setAudioLanguage(lang: String) = write(KEY_AUDIO_LANG, lang) {
+        _playback.value = _playback.value.copy(audioLanguage = lang)
+    }
 
-    suspend fun setSubtitleLanguage(lang: String) =
-        write(KEY_SUBTITLE_LANG, lang) {
-            _playback.value = _playback.value.copy(subtitleLanguage = lang)
-        }
+    suspend fun setSubtitleLanguage(lang: String) = write(KEY_SUBTITLE_LANG, lang) {
+        _playback.value = _playback.value.copy(subtitleLanguage = lang)
+    }
 
     // MK.12a.4 — Playback speed. Persisted as a plain float ("1.25") so a
     // future schema audit can read it in place. Only applied automatically
     // to VOD; live channels always reset to 1.0× at loadCurrent() time (the
     // user can still bump speed live, but zapping channels clears it).
-    suspend fun setSpeed(speed: Float) =
-        write(KEY_SPEED, speed.toString()) {
-            _playback.value = _playback.value.copy(speed = speed)
-        }
+    suspend fun setSpeed(speed: Float) = write(KEY_SPEED, speed.toString()) {
+        _playback.value = _playback.value.copy(speed = speed)
+    }
 
     // MK.17.3 — decoder fallback toggle. Stored as "1" / "0".
-    suspend fun setDecoderFallback(enabled: Boolean) =
-        write(KEY_DECODER_FALLBACK, if (enabled) "1" else "0") {
-            _playback.value = _playback.value.copy(enableDecoderFallback = enabled)
-        }
+    suspend fun setDecoderFallback(enabled: Boolean) = write(KEY_DECODER_FALLBACK, if (enabled) "1" else "0") {
+        _playback.value = _playback.value.copy(enableDecoderFallback = enabled)
+    }
 
     // MK.17.4 — buffer profile preset.
-    suspend fun setBufferProfile(profile: BufferProfile) =
-        write(KEY_BUFFER_PROFILE, profile.key) {
-            _playback.value = _playback.value.copy(bufferProfile = profile)
-        }
+    suspend fun setBufferProfile(profile: BufferProfile) = write(KEY_BUFFER_PROFILE, profile.key) {
+        _playback.value = _playback.value.copy(bufferProfile = profile)
+    }
 
     // MK.18.2 — default external player per content bucket. Series and
     // episodes share the SERIES bucket (the user's intent is "the kind of
     // long-form content I watch" — distinguishing the wrapper from its
     // episodes adds knobs without value).
-    suspend fun setDefaultExternalPlayer(
-        bucket: ExternalPlayerBucket,
-        choice: DefaultExternalPlayer,
-    ) {
+    suspend fun setDefaultExternalPlayer(bucket: ExternalPlayerBucket, choice: DefaultExternalPlayer) {
         val key =
             when (bucket) {
                 ExternalPlayerBucket.LIVE -> KEY_EXT_PLAYER_LIVE
@@ -153,44 +141,37 @@ class AppPreferences(
 
     // ───── Network ─────
 
-    suspend fun setUserAgent(ua: String) =
-        write(KEY_USER_AGENT, ua) {
-            _network.value = _network.value.copy(userAgentOverride = ua.takeIf { it.isNotBlank() })
-        }
+    suspend fun setUserAgent(ua: String) = write(KEY_USER_AGENT, ua) {
+        _network.value = _network.value.copy(userAgentOverride = ua.takeIf { it.isNotBlank() })
+    }
 
-    suspend fun setConnectTimeout(sec: Int) =
-        write(KEY_CONNECT_TIMEOUT, sec.toString()) {
-            _network.value = _network.value.copy(connectTimeoutSec = sec)
-        }
+    suspend fun setConnectTimeout(sec: Int) = write(KEY_CONNECT_TIMEOUT, sec.toString()) {
+        _network.value = _network.value.copy(connectTimeoutSec = sec)
+    }
 
-    suspend fun setReadTimeout(sec: Int) =
-        write(KEY_READ_TIMEOUT, sec.toString()) {
-            _network.value = _network.value.copy(readTimeoutSec = sec)
-        }
+    suspend fun setReadTimeout(sec: Int) = write(KEY_READ_TIMEOUT, sec.toString()) {
+        _network.value = _network.value.copy(readTimeoutSec = sec)
+    }
 
     // ───── General ─────
 
-    suspend fun setOpenOn(section: OpenOn) =
-        write(KEY_OPEN_ON, section.key) {
-            _general.value = _general.value.copy(openOn = section)
-        }
+    suspend fun setOpenOn(section: OpenOn) = write(KEY_OPEN_ON, section.key) {
+        _general.value = _general.value.copy(openOn = section)
+    }
 
-    suspend fun setShowChannelNumbers(enabled: Boolean) =
-        write(KEY_SHOW_NUMBERS, if (enabled) "1" else "0") {
-            _general.value = _general.value.copy(showChannelNumbers = enabled)
-        }
+    suspend fun setShowChannelNumbers(enabled: Boolean) = write(KEY_SHOW_NUMBERS, if (enabled) "1" else "0") {
+        _general.value = _general.value.copy(showChannelNumbers = enabled)
+    }
 
     // MK.16.5 — channel-number padding format. Only meaningful when
     // [GeneralPrefs.showChannelNumbers] is true.
-    suspend fun setChannelNumberFormat(format: ChannelNumberFormat) =
-        write(KEY_CHANNEL_NUMBER_FORMAT, format.key) {
-            _general.value = _general.value.copy(channelNumberFormat = format)
-        }
+    suspend fun setChannelNumberFormat(format: ChannelNumberFormat) = write(KEY_CHANNEL_NUMBER_FORMAT, format.key) {
+        _general.value = _general.value.copy(channelNumberFormat = format)
+    }
 
-    suspend fun setSmartGrouping(enabled: Boolean) =
-        write(KEY_SMART_GROUPING, if (enabled) "1" else "0") {
-            _general.value = _general.value.copy(smartGrouping = enabled)
-        }
+    suspend fun setSmartGrouping(enabled: Boolean) = write(KEY_SMART_GROUPING, if (enabled) "1" else "0") {
+        _general.value = _general.value.copy(smartGrouping = enabled)
+    }
 
     // MK.16.2 — theme picker. Persisted as the enum name; cold launch
     // reads it back via [readThemeId] and primes [ThemeController].
@@ -216,17 +197,15 @@ class AppPreferences(
     private val _appearance = MutableStateFlow(readAppearance())
     val appearanceFlow: StateFlow<AppearancePrefs> = _appearance.asStateFlow()
 
-    suspend fun setFontScalePercent(percent: Int) =
-        write(KEY_FONT_SCALE_PCT, percent.toString()) {
-            _appearance.value = _appearance.value.copy(fontScalePercent = percent)
-        }
+    suspend fun setFontScalePercent(percent: Int) = write(KEY_FONT_SCALE_PCT, percent.toString()) {
+        _appearance.value = _appearance.value.copy(fontScalePercent = percent)
+    }
 
-    private fun readAppearance(): AppearancePrefs =
-        AppearancePrefs(
-            fontScalePercent =
-                readString(KEY_FONT_SCALE_PCT)?.toIntOrNull()?.takeIf { it in 50..200 }
-                    ?: AppearancePrefs.DEFAULT_FONT_SCALE_PCT,
-        )
+    private fun readAppearance(): AppearancePrefs = AppearancePrefs(
+        fontScalePercent =
+        readString(KEY_FONT_SCALE_PCT)?.toIntOrNull()?.takeIf { it in 50..200 }
+            ?: AppearancePrefs.DEFAULT_FONT_SCALE_PCT,
+    )
 
     // ───── Recording (Stage 3.1 / MK.14.2-storage, MK.14.X audit revision) ─────
     //
@@ -245,33 +224,28 @@ class AppPreferences(
     // present, we infer `storageMode = CUSTOM_SAF`. Absent → default
     // mode wins on first read. See [readRecording].
 
-    suspend fun setRecordingStorageMode(mode: RecordingStorageMode) =
-        write(KEY_RECORDING_STORAGE_MODE, mode.key) {
-            _recording.value = _recording.value.copy(storageMode = mode)
-        }
+    suspend fun setRecordingStorageMode(mode: RecordingStorageMode) = write(KEY_RECORDING_STORAGE_MODE, mode.key) {
+        _recording.value = _recording.value.copy(storageMode = mode)
+    }
 
     // ───── EPG (MK.15.1 / 15.2) ─────
 
-    suspend fun setEpgDaysBack(days: Int) =
-        write(KEY_EPG_DAYS_BACK, days.coerceIn(0, 14).toString()) {
-            _epg.value = _epg.value.copy(daysBack = days.coerceIn(0, 14))
-        }
+    suspend fun setEpgDaysBack(days: Int) = write(KEY_EPG_DAYS_BACK, days.coerceIn(0, 14).toString()) {
+        _epg.value = _epg.value.copy(daysBack = days.coerceIn(0, 14))
+    }
 
-    suspend fun setEpgDaysForward(days: Int) =
-        write(KEY_EPG_DAYS_FORWARD, days.coerceIn(1, 14).toString()) {
-            _epg.value = _epg.value.copy(daysForward = days.coerceIn(1, 14))
-        }
+    suspend fun setEpgDaysForward(days: Int) = write(KEY_EPG_DAYS_FORWARD, days.coerceIn(1, 14).toString()) {
+        _epg.value = _epg.value.copy(daysForward = days.coerceIn(1, 14))
+    }
 
-    suspend fun setEpgTimelineMinutes(minutes: Int) =
-        write(KEY_EPG_TIMELINE_MIN, minutes.toString()) {
-            _epg.value = _epg.value.copy(timelineMinutes = minutes)
-        }
+    suspend fun setEpgTimelineMinutes(minutes: Int) = write(KEY_EPG_TIMELINE_MIN, minutes.toString()) {
+        _epg.value = _epg.value.copy(timelineMinutes = minutes)
+    }
 
-    suspend fun setRecordingFolderUri(uri: String?) =
-        write(KEY_RECORDING_FOLDER_URI, uri.orEmpty()) {
-            _recording.value =
-                _recording.value.copy(folderUri = uri?.takeIf { it.isNotBlank() })
-        }
+    suspend fun setRecordingFolderUri(uri: String?) = write(KEY_RECORDING_FOLDER_URI, uri.orEmpty()) {
+        _recording.value =
+            _recording.value.copy(folderUri = uri?.takeIf { it.isNotBlank() })
+    }
 
     /**
      * MK.19.8.3 — persisted SAF tree URI for backup exports. Null /
@@ -279,8 +253,7 @@ class AppPreferences(
      * API 29+, or the public Downloads dir on API ≤28. The Settings
      * → Backup tab's "Change folder…" button writes here.
      */
-    suspend fun setBackupFolderUri(uri: String?) =
-        write(KEY_BACKUP_FOLDER_URI, uri.orEmpty()) { /* no flow surface yet — read on demand */ }
+    suspend fun setBackupFolderUri(uri: String?) = write(KEY_BACKUP_FOLDER_URI, uri.orEmpty()) { /* no flow surface yet — read on demand */ }
 
     fun readBackupFolderUri(): String? = readString(KEY_BACKUP_FOLDER_URI)?.takeIf { it.isNotBlank() }
 
@@ -293,10 +266,7 @@ class AppPreferences(
     // Persisted as newline-joined names because category names can contain
     // commas/pipes but practically never newlines.
 
-    suspend fun setGroupHidden(
-        name: String,
-        hidden: Boolean,
-    ) {
+    suspend fun setGroupHidden(name: String, hidden: Boolean) {
         val next =
             _hiddenGroups.value.toMutableSet().apply {
                 if (hidden) add(name) else remove(name)
@@ -314,11 +284,7 @@ class AppPreferences(
      * isn't pinned is also a no-op. Order is preserved so the user's
      * pin sequence drives the rail's top-of-list ordering.
      */
-    suspend fun setParentPinned(
-        type: ContentType,
-        code: String,
-        pinned: Boolean,
-    ) {
+    suspend fun setParentPinned(type: ContentType, code: String, pinned: Boolean) {
         val codeNorm = code.lowercase()
         val current = _pinnedParents.value[type] ?: emptyList()
         val next =
@@ -349,10 +315,7 @@ class AppPreferences(
         writePinnedParents(type, emptyList())
     }
 
-    private suspend fun writePinnedParents(
-        type: ContentType,
-        next: List<String>,
-    ) {
+    private suspend fun writePinnedParents(type: ContentType, next: List<String>) {
         val key = pinnedParentsKey(type)
         val value = next.joinToString("\n")
         withContext(Dispatchers.IO) {
@@ -365,12 +328,11 @@ class AppPreferences(
         _pinnedParents.value = _pinnedParents.value.toMutableMap().apply { put(type, next) }
     }
 
-    private fun pinnedParentsKey(type: ContentType): String =
-        when (type) {
-            ContentType.LIVE -> KEY_PINNED_PARENTS_LIVE
-            ContentType.MOVIE -> KEY_PINNED_PARENTS_MOVIE
-            ContentType.SERIES -> KEY_PINNED_PARENTS_SERIES
-        }
+    private fun pinnedParentsKey(type: ContentType): String = when (type) {
+        ContentType.LIVE -> KEY_PINNED_PARENTS_LIVE
+        ContentType.MOVIE -> KEY_PINNED_PARENTS_MOVIE
+        ContentType.SERIES -> KEY_PINNED_PARENTS_SERIES
+    }
 
     private suspend fun writeHiddenGroups(next: Set<String>) {
         val value = next.joinToString("\n")
@@ -386,51 +348,46 @@ class AppPreferences(
 
     // ───── internals ─────
 
-    private fun readPlayback(): PlaybackPrefs =
-        PlaybackPrefs(
-            resizeMode = ResizeMode.fromKey(readString(KEY_RESIZE)),
-            autoPlayNext = readString(KEY_AUTOPLAY) == "1",
-            audioLanguage = readString(KEY_AUDIO_LANG).orEmpty(),
-            subtitleLanguage = readString(KEY_SUBTITLE_LANG).orEmpty(),
-            speed = readString(KEY_SPEED)?.toFloatOrNull() ?: 1.0f,
-            enableDecoderFallback = readString(KEY_DECODER_FALLBACK) != "0",
-            bufferProfile = BufferProfile.fromKey(readString(KEY_BUFFER_PROFILE)),
-        )
+    private fun readPlayback(): PlaybackPrefs = PlaybackPrefs(
+        resizeMode = ResizeMode.fromKey(readString(KEY_RESIZE)),
+        autoPlayNext = readString(KEY_AUTOPLAY) == "1",
+        audioLanguage = readString(KEY_AUDIO_LANG).orEmpty(),
+        subtitleLanguage = readString(KEY_SUBTITLE_LANG).orEmpty(),
+        speed = readString(KEY_SPEED)?.toFloatOrNull() ?: 1.0f,
+        enableDecoderFallback = readString(KEY_DECODER_FALLBACK) != "0",
+        bufferProfile = BufferProfile.fromKey(readString(KEY_BUFFER_PROFILE)),
+    )
 
-    private fun readNetwork(): NetworkPrefs =
-        NetworkPrefs(
-            userAgentOverride = readString(KEY_USER_AGENT)?.takeIf { it.isNotBlank() },
-            connectTimeoutSec = readString(KEY_CONNECT_TIMEOUT)?.toIntOrNull() ?: DEFAULT_CONNECT_TIMEOUT,
-            readTimeoutSec = readString(KEY_READ_TIMEOUT)?.toIntOrNull() ?: DEFAULT_READ_TIMEOUT,
-        )
+    private fun readNetwork(): NetworkPrefs = NetworkPrefs(
+        userAgentOverride = readString(KEY_USER_AGENT)?.takeIf { it.isNotBlank() },
+        connectTimeoutSec = readString(KEY_CONNECT_TIMEOUT)?.toIntOrNull() ?: DEFAULT_CONNECT_TIMEOUT,
+        readTimeoutSec = readString(KEY_READ_TIMEOUT)?.toIntOrNull() ?: DEFAULT_READ_TIMEOUT,
+    )
 
-    private fun readGeneral(): GeneralPrefs =
-        GeneralPrefs(
-            openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
-            showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
-            smartGrouping = readString(KEY_SMART_GROUPING) == "1",
-            channelNumberFormat = ChannelNumberFormat.fromKey(readString(KEY_CHANNEL_NUMBER_FORMAT)),
-        )
+    private fun readGeneral(): GeneralPrefs = GeneralPrefs(
+        openOn = OpenOn.fromKey(readString(KEY_OPEN_ON)),
+        showChannelNumbers = readString(KEY_SHOW_NUMBERS) == "1",
+        smartGrouping = readString(KEY_SMART_GROUPING) == "1",
+        channelNumberFormat = ChannelNumberFormat.fromKey(readString(KEY_CHANNEL_NUMBER_FORMAT)),
+    )
 
-    private fun readExternalPlayer(): ExternalPlayerPrefs =
-        ExternalPlayerPrefs(
-            live = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_LIVE)),
-            movie = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_MOVIE)),
-            series = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_SERIES)),
-        )
+    private fun readExternalPlayer(): ExternalPlayerPrefs = ExternalPlayerPrefs(
+        live = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_LIVE)),
+        movie = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_MOVIE)),
+        series = DefaultExternalPlayer.fromKey(readString(KEY_EXT_PLAYER_SERIES)),
+    )
 
-    private fun readEpg(): EpgPrefs =
-        EpgPrefs(
-            daysBack =
-                readString(KEY_EPG_DAYS_BACK)?.toIntOrNull()?.coerceIn(0, 14)
-                    ?: EpgPrefs.DEFAULT_DAYS_BACK,
-            daysForward =
-                readString(KEY_EPG_DAYS_FORWARD)?.toIntOrNull()?.coerceIn(1, 14)
-                    ?: EpgPrefs.DEFAULT_DAYS_FORWARD,
-            timelineMinutes =
-                readString(KEY_EPG_TIMELINE_MIN)?.toIntOrNull()
-                    ?: EpgPrefs.DEFAULT_TIMELINE_MIN,
-        )
+    private fun readEpg(): EpgPrefs = EpgPrefs(
+        daysBack =
+        readString(KEY_EPG_DAYS_BACK)?.toIntOrNull()?.coerceIn(0, 14)
+            ?: EpgPrefs.DEFAULT_DAYS_BACK,
+        daysForward =
+        readString(KEY_EPG_DAYS_FORWARD)?.toIntOrNull()?.coerceIn(1, 14)
+            ?: EpgPrefs.DEFAULT_DAYS_FORWARD,
+        timelineMinutes =
+        readString(KEY_EPG_TIMELINE_MIN)?.toIntOrNull()
+            ?: EpgPrefs.DEFAULT_TIMELINE_MIN,
+    )
 
     private fun readRecording(): RecordingPrefs {
         val folderUri = readString(KEY_RECORDING_FOLDER_URI)?.takeIf { it.isNotBlank() }
@@ -446,35 +403,28 @@ class AppPreferences(
         return RecordingPrefs(storageMode = mode, folderUri = folderUri)
     }
 
-    private fun readHiddenGroups(): Set<String> =
-        readString(KEY_HIDDEN_GROUPS)
-            ?.split('\n')
-            ?.mapNotNull { it.takeIf(String::isNotBlank) }
-            ?.toSet()
-            ?: emptySet()
+    private fun readHiddenGroups(): Set<String> = readString(KEY_HIDDEN_GROUPS)
+        ?.split('\n')
+        ?.mapNotNull { it.takeIf(String::isNotBlank) }
+        ?.toSet()
+        ?: emptySet()
 
-    private fun readPinnedParents(key: String): List<String> =
-        readString(key)
-            ?.split('\n')
-            ?.mapNotNull { it.takeIf(String::isNotBlank)?.lowercase() }
-            ?: emptyList()
+    private fun readPinnedParents(key: String): List<String> = readString(key)
+        ?.split('\n')
+        ?.mapNotNull { it.takeIf(String::isNotBlank)?.lowercase() }
+        ?: emptyList()
 
-    private fun readUpdatePrefs(): UpdatePrefs =
-        UpdatePrefs(
-            // Default ON — we want users to know about new versions; the
-            // toggle is opt-out rather than opt-in. Empty string (= unset
-            // in DB) maps to enabled.
-            autoCheckEnabled = readString(KEY_AUTO_UPDATE_CHECK) != "0",
-            lastCheckedAt = readString(KEY_LAST_UPDATE_CHECK_AT)?.toLongOrNull(),
-        )
+    private fun readUpdatePrefs(): UpdatePrefs = UpdatePrefs(
+        // Default ON — we want users to know about new versions; the
+        // toggle is opt-out rather than opt-in. Empty string (= unset
+        // in DB) maps to enabled.
+        autoCheckEnabled = readString(KEY_AUTO_UPDATE_CHECK) != "0",
+        lastCheckedAt = readString(KEY_LAST_UPDATE_CHECK_AT)?.toLongOrNull(),
+    )
 
     private fun readString(key: String): String? = db.settingsQueries.get(key).executeAsOneOrNull()
 
-    private suspend inline fun write(
-        key: String,
-        value: String,
-        crossinline refresh: () -> Unit,
-    ) {
+    private suspend inline fun write(key: String, value: String, crossinline refresh: () -> Unit) {
         withContext(Dispatchers.IO) {
             if (value.isBlank()) {
                 db.settingsQueries.delete(key)
@@ -537,11 +487,7 @@ enum class ExternalPlayerBucket { LIVE, MOVIE, SERIES }
  * launcher falls through to INTERNAL — picking a player you uninstalled
  * later shouldn't strand playback.
  */
-enum class DefaultExternalPlayer(
-    val key: String,
-    val displayName: String,
-    val app: com.yancotv.android.player.ExternalPlayerApp?,
-) {
+enum class DefaultExternalPlayer(val key: String, val displayName: String, val app: com.yancotv.android.player.ExternalPlayerApp?) {
     INTERNAL("internal", "Internal", null),
     VLC("vlc", "VLC", com.yancotv.android.player.ExternalPlayerApp.VLC),
     MX_PRO("mx_pro", "MX Player Pro", com.yancotv.android.player.ExternalPlayerApp.MX_PRO),
@@ -550,8 +496,7 @@ enum class DefaultExternalPlayer(
     ;
 
     companion object {
-        fun fromKey(key: String?): DefaultExternalPlayer =
-            values().firstOrNull { it.key == key } ?: INTERNAL
+        fun fromKey(key: String?): DefaultExternalPlayer = values().firstOrNull { it.key == key } ?: INTERNAL
     }
 }
 
@@ -560,12 +505,11 @@ data class ExternalPlayerPrefs(
     val movie: DefaultExternalPlayer = DefaultExternalPlayer.INTERNAL,
     val series: DefaultExternalPlayer = DefaultExternalPlayer.INTERNAL,
 ) {
-    fun forContentType(type: com.yancotv.shared.types.ContentType): DefaultExternalPlayer =
-        when (type) {
-            com.yancotv.shared.types.ContentType.LIVE -> live
-            com.yancotv.shared.types.ContentType.MOVIE -> movie
-            com.yancotv.shared.types.ContentType.SERIES -> series
-        }
+    fun forContentType(type: com.yancotv.shared.types.ContentType): DefaultExternalPlayer = when (type) {
+        com.yancotv.shared.types.ContentType.LIVE -> live
+        com.yancotv.shared.types.ContentType.MOVIE -> movie
+        com.yancotv.shared.types.ContentType.SERIES -> series
+    }
 }
 
 /**
@@ -577,11 +521,7 @@ data class ExternalPlayerPrefs(
  *    a longer span shows more programmes per screen at smaller width.
  *    Allowed: 30 / 60 / 90 / 120 / 180.
  */
-data class EpgPrefs(
-    val daysBack: Int = DEFAULT_DAYS_BACK,
-    val daysForward: Int = DEFAULT_DAYS_FORWARD,
-    val timelineMinutes: Int = DEFAULT_TIMELINE_MIN,
-) {
+data class EpgPrefs(val daysBack: Int = DEFAULT_DAYS_BACK, val daysForward: Int = DEFAULT_DAYS_FORWARD, val timelineMinutes: Int = DEFAULT_TIMELINE_MIN) {
     companion object {
         // 2026-04-27: cut from 1 day to 0. The hard-coded 2-hour
         // catch-up baseline added in GuideScreen's window math gives a
@@ -591,6 +531,7 @@ data class EpgPrefs(
         // hours of past programmes, which the user reported was hard
         // to navigate.
         const val DEFAULT_DAYS_BACK = 0
+
         // 2026-04-27: cut from 2 days to 1. 24 h of upcoming guide is
         // typically all the user needs; multi-day reminder browsing is
         // a power-user case the slider still covers (1–14).
@@ -643,16 +584,12 @@ enum class RecordingStorageMode(val key: String) {
     ;
 
     companion object {
-        fun fromKey(key: String?): RecordingStorageMode =
-            values().firstOrNull { it.key == key } ?: PUBLIC_MEDIA_STORE
+        fun fromKey(key: String?): RecordingStorageMode = values().firstOrNull { it.key == key } ?: PUBLIC_MEDIA_STORE
     }
 }
 
 /** Default section to land on when the app opens. TiviMate defaults to last-used. */
-enum class OpenOn(
-    val key: String,
-    val displayName: String,
-) {
+enum class OpenOn(val key: String, val displayName: String) {
     HOME("home", "Home"),
     LIVE_TV("live_tv", "Live TV"),
     LAST_USED("last_used", "Last used"),
@@ -681,11 +618,7 @@ data class GeneralPrefs(
  * MK.16.5 — channel-number padding presets. Applied only when the
  * "Show channel numbers" toggle is on; ignored otherwise.
  */
-enum class ChannelNumberFormat(
-    val key: String,
-    val displayName: String,
-    private val pad: Int,
-) {
+enum class ChannelNumberFormat(val key: String, val displayName: String, private val pad: Int) {
     NONE("none", "No padding", 0),
     PAD3("pad3", "001", 3),
     PAD4("pad4", "0001", 4),
@@ -700,18 +633,15 @@ enum class ChannelNumberFormat(
     }
 
     companion object {
-        fun fromKey(key: String?): ChannelNumberFormat =
-            values().firstOrNull { it.key == key } ?: NONE
+        fun fromKey(key: String?): ChannelNumberFormat = values().firstOrNull { it.key == key } ?: NONE
     }
 }
 
-enum class ResizeMode(
-    val key: String,
-    val displayName: String,
-) {
+enum class ResizeMode(val key: String, val displayName: String) {
     FIT("fit", "Fit"),
     FILL("fill", "Fill"),
     ZOOM("zoom", "Zoom"),
+
     // MK.12a.5 — forced aspect ratios. These override the stream's reported
     // aspect; useful when a provider tags the stream incorrectly (SD 4:3
     // content served in a 16:9 container, letterboxed 16:9 in a 4:3 frame).
@@ -760,19 +690,14 @@ enum class BufferProfile(
     ;
 
     companion object {
-        fun fromKey(key: String?): BufferProfile =
-            values().firstOrNull { it.key == key } ?: BALANCED
+        fun fromKey(key: String?): BufferProfile = values().firstOrNull { it.key == key } ?: BALANCED
     }
 }
 
 /** MK.17.1a — known-good IPTV User-Agent strings. The default
  *  ("system") leaves the network layer to pick its own; everything
  *  else writes a verbatim UA into [NetworkPrefs.userAgentOverride]. */
-enum class UserAgentPreset(
-    val key: String,
-    val displayName: String,
-    val value: String?,
-) {
+enum class UserAgentPreset(val key: String, val displayName: String, val value: String?) {
     SYSTEM("system", "System default", null),
     VLC("vlc", "VLC", "VLC/3.0.20 LibVLC/3.0.20"),
     EXOPLAYER("exoplayer", "ExoPlayer", "ExoPlayerLib/2.19.1"),
@@ -806,9 +731,7 @@ data class NetworkPrefs(
  * just font scale; future home for other dimension-driven knobs (row
  * density, etc.).
  */
-data class AppearancePrefs(
-    val fontScalePercent: Int = DEFAULT_FONT_SCALE_PCT,
-) {
+data class AppearancePrefs(val fontScalePercent: Int = DEFAULT_FONT_SCALE_PCT) {
     val fontScale: Float get() = fontScalePercent / 100f
 
     companion object {
@@ -826,7 +749,4 @@ data class AppearancePrefs(
  * StateFlow + is re-fetched on next worker tick rather than persisted
  * through this class.
  */
-data class UpdatePrefs(
-    val autoCheckEnabled: Boolean = true,
-    val lastCheckedAt: Long? = null,
-)
+data class UpdatePrefs(val autoCheckEnabled: Boolean = true, val lastCheckedAt: Long? = null)

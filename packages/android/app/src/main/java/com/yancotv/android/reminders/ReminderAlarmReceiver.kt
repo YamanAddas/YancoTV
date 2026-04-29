@@ -28,10 +28,7 @@ class ReminderAlarmReceiver :
     KoinComponent {
     private val repo: ReminderRepository by inject()
 
-    override fun onReceive(
-        context: Context,
-        intent: Intent,
-    ) {
+    override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ReminderScheduler.ACTION_FIRE) return
         val reminderId = intent.getStringExtra(ReminderScheduler.EXTRA_REMINDER_ID) ?: return
         val programmeId = intent.getStringExtra(ReminderScheduler.EXTRA_PROGRAMME_ID)
@@ -41,12 +38,7 @@ class ReminderAlarmReceiver :
         postNotification(context, reminderId, programmeId, title)
     }
 
-    private fun postNotification(
-        context: Context,
-        reminderId: String,
-        programmeId: String?,
-        title: String,
-    ) {
+    private fun postNotification(context: Context, reminderId: String, programmeId: String?, title: String) {
         val tapIntent =
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

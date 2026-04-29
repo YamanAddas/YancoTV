@@ -1,8 +1,8 @@
 package com.yancotv.shared.http
 
+import io.ktor.client.HttpClient as KtorClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.HttpClient as KtorClient
 
 actual fun createHttpClient(defaultUserAgent: String): HttpClient {
     val ktor =

@@ -2,10 +2,8 @@ package com.yancotv.android.ui.shell
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -29,6 +27,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.player.PlaybackController
@@ -241,18 +240,15 @@ fun HomeScreen(
     // the sidebar, and a further BACK on the sidebar exits.
     BackHandler(
         enabled =
-            !sidebarHasFocus &&
-                detailItem == null &&
-                !searchOverlayVisible &&
-                contentType == null,
+        !sidebarHasFocus &&
+            detailItem == null &&
+            !searchOverlayVisible &&
+            contentType == null,
     ) {
         runCatching { sidebarFocus.requestFocus() }
     }
 
-    val onBrowseActivate = fun(
-        list: List<ContentItem>,
-        idx: Int,
-    ) {
+    val onBrowseActivate = fun(list: List<ContentItem>, idx: Int) {
         val target = list.getOrNull(idx) ?: return
         gatedPlay(target.id) {
             when (target.type) {
@@ -372,7 +368,7 @@ fun HomeScreen(
                         onActivate = onBrowseActivate,
                         onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
                         restoreFocusOnWindowRegain =
-                            detailItem == null && !searchOverlayVisible && pendingPlay == null,
+                        detailItem == null && !searchOverlayVisible && pendingPlay == null,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
@@ -504,25 +500,25 @@ fun HomeScreen(
         if (searchOverlayVisible) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.72f))
-                        .pointerInput(Unit) {
-                            detectTapGestures { SearchOverlayState.hide() }
-                        },
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .pointerInput(Unit) {
+                        detectTapGestures { SearchOverlayState.hide() }
+                    },
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxWidth(if (isTv) 0.6f else 1f)
-                            .fillMaxHeight()
-                            .background(LocalYancoPalette.current.BackgroundDeep)
-                            // Eat tap so the outer scrim's dismiss
-                            // doesn't fire when the user taps inside the
-                            // search panel itself. Empty handler is
-                            // enough — touch consumed by pointerInput.
-                            .pointerInput(Unit) { detectTapGestures { } },
+                    Modifier
+                        .fillMaxWidth(if (isTv) 0.6f else 1f)
+                        .fillMaxHeight()
+                        .background(LocalYancoPalette.current.BackgroundDeep)
+                        // Eat tap so the outer scrim's dismiss
+                        // doesn't fire when the user taps inside the
+                        // search panel itself. Empty handler is
+                        // enough — touch consumed by pointerInput.
+                        .pointerInput(Unit) { detectTapGestures { } },
                 ) {
                     SearchScreen(isTv = isTv)
                 }
@@ -600,9 +596,9 @@ fun HomeScreen(
 private fun SettingsLockedPlaceholder() {
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep),
+        Modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -640,9 +636,9 @@ private fun guideChannelToContentItem(channel: EpgGuideChannel): ContentItem? {
 private fun PlaceholderArea(section: AppSection) {
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .background(LocalYancoPalette.current.BackgroundDeep),
+        Modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep),
         contentAlignment = Alignment.Center,
     ) {
         Text(

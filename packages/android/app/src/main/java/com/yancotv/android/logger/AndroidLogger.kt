@@ -9,9 +9,7 @@ import com.yancotv.shared.logger.Logger
  * while chasing the Save-hang on MK.6: without this wire-up every `logger.*`
  * call in shared/ was a no-op, making Keystore and SQL steps invisible.
  */
-class AndroidLogger(
-    private val tag: String = "Yanco",
-) : Logger {
+class AndroidLogger(private val tag: String = "Yanco") : Logger {
     override fun info(msg: String) {
         Log.i(tag, msg)
     }

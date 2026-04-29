@@ -285,28 +285,27 @@ class DatabaseRecoveryTest {
 
     // ─────── Helpers ───────
 
-    private fun sourceRow(id: String): BackedUpSource =
-        BackedUpSource(
-            id = id,
-            name = "Source $id",
-            type = "m3u_url",
-            url = "https://example.com/$id.m3u",
-            filePath = null,
-            usernameEncrypted = null,
-            passwordEncrypted = null,
-            macAddressEncrypted = null,
-            epgUrl = null,
-            userAgent = null,
-            referer = null,
-            lastSynced = null,
-            lastSyncError = null,
-            isActive = true,
-            priority = 0L,
-            channelCount = 0L,
-            autoSyncInterval = 0L,
-            epgPriority = 0L,
-            autoSyncOnStart = false,
-            createdAt = 1_700_000_000_000L,
-            updatedAt = 1_700_000_000_000L,
-        )
+    private fun sourceRow(id: String): BackedUpSource = BackedUpSource(
+        id = id,
+        name = "Source $id",
+        type = "m3u_url",
+        url = "https://example.com/$id.m3u",
+        filePath = null,
+        usernameEncrypted = null,
+        passwordEncrypted = null,
+        macAddressEncrypted = null,
+        epgUrl = null,
+        userAgent = null,
+        referer = null,
+        lastSynced = null,
+        lastSyncError = null,
+        isActive = true,
+        priority = 0L,
+        channelCount = 0L,
+        autoSyncInterval = 0L,
+        epgPriority = 0L,
+        autoSyncOnStart = false,
+        createdAt = 1_700_000_000_000L,
+        updatedAt = 1_700_000_000_000L,
+    )
 }

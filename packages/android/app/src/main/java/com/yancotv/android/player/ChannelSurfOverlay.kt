@@ -30,21 +30,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.android.prefs.ChannelNumberFormat
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
@@ -53,6 +51,7 @@ import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -125,10 +124,10 @@ fun ChannelSurfOverlay(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxHeight()
-                .background(Color.Black.copy(alpha = 0.78f))
-                .padding(vertical = 16.dp),
+        Modifier
+            .fillMaxHeight()
+            .background(Color.Black.copy(alpha = 0.78f))
+            .padding(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
@@ -152,8 +151,8 @@ fun ChannelSurfOverlay(
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding =
-                androidx.compose.foundation.layout
-                    .PaddingValues(horizontal = 12.dp),
+            androidx.compose.foundation.layout
+                .PaddingValues(horizontal = 12.dp),
         ) {
             itemsIndexed(items, key = { _, it -> it.id }) { idx, item ->
                 val nn = item.tvgId?.let { nowNext[it] }
@@ -163,12 +162,12 @@ fun ChannelSurfOverlay(
                     nowStartSec = nn?.now?.startTime,
                     nowEndSec = nn?.now?.endTime,
                     channelNumberPrefix =
-                        if (general.showChannelNumbers) {
-                            general.channelNumberFormat.format(item.sortOrder.takeIf { it > 0 })
-                                .takeIf { it.isNotBlank() }
-                        } else {
-                            null
-                        },
+                    if (general.showChannelNumbers) {
+                        general.channelNumberFormat.format(item.sortOrder.takeIf { it > 0 })
+                            .takeIf { it.isNotBlank() }
+                    } else {
+                        null
+                    },
                     playing = item.id == currentContentId,
                     autoFocus = idx == initialIndex,
                     onClick = { onPick(items, idx) },
@@ -216,25 +215,25 @@ private fun SurfRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(6.dp))
-                .focusRequester(focusRequester)
-                .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-                .padding(horizontal = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .focusRequester(focusRequester)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(LocalYancoPalette.current.BackgroundDeep),
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
@@ -294,17 +293,17 @@ private fun SurfRow(
                 Spacer(modifier = Modifier.height(3.dp))
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(LocalYancoPalette.current.BorderSubtle, RoundedCornerShape(1.dp)),
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(LocalYancoPalette.current.BorderSubtle, RoundedCornerShape(1.dp)),
                 ) {
                     Box(
                         modifier =
-                            Modifier
-                                .fillMaxWidth(progress)
-                                .fillMaxHeight()
-                                .background(LocalYancoPalette.current.Accent, RoundedCornerShape(1.dp)),
+                        Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .background(LocalYancoPalette.current.Accent, RoundedCornerShape(1.dp)),
                     )
                 }
             }
@@ -313,10 +312,10 @@ private fun SurfRow(
             Spacer(modifier = Modifier.width(2.dp))
             Box(
                 modifier =
-                    Modifier
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(LocalYancoPalette.current.Accent, RoundedCornerShape(2.dp)),
+                Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(LocalYancoPalette.current.Accent, RoundedCornerShape(2.dp)),
             )
         }
     }

@@ -23,9 +23,7 @@ import javax.crypto.spec.GCMParameterSpec
  * later, do it via a new [keyAlias] and fall back to the old alias when
  * decrypting — same pattern Android uses for its own keyset rotation.
  */
-class AndroidKeystoreCredentialStore(
-    private val keyAlias: String = DEFAULT_ALIAS,
-) : CredentialStore {
+class AndroidKeystoreCredentialStore(private val keyAlias: String = DEFAULT_ALIAS) : CredentialStore {
     override fun encrypt(plaintext: String): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())

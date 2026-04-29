@@ -3,10 +3,12 @@ package com.yancotv.android.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,12 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -161,12 +159,7 @@ private fun hexRowShape(corner: Dp): Shape {
  * wired to the overlay's action callbacks.
  */
 @Composable
-private fun HexBtn(
-    label: String,
-    primary: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun HexBtn(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     val shape = hexRowShape(10.dp)
     // Audit-pass-7 (Bug D): focus chrome via shared interactionSource.
@@ -217,11 +210,7 @@ private fun HexBtn(
  * muted. Background is always the deep raised surface.
  */
 @Composable
-private fun HexChip(
-    label: String,
-    tone: Color,
-    modifier: Modifier = Modifier,
-) {
+private fun HexChip(label: String, tone: Color, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     val shape = hexRowShape(6.dp)
     Box(
@@ -249,12 +238,7 @@ private fun HexChip(
  * true (used for the live bitrate tile).
  */
 @Composable
-private fun DiagnosticTile(
-    label: String,
-    value: String,
-    accent: Boolean,
-    modifier: Modifier = Modifier,
-) {
+private fun DiagnosticTile(label: String, value: String, accent: Boolean, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     val shape = hexRowShape(10.dp)
     Column(
@@ -291,13 +275,7 @@ private fun DiagnosticTile(
 // ----------------------------------------------------------------------
 
 @Composable
-private fun BufferingOverlay(
-    data: VodChromeBuffering,
-    onRetry: () -> Unit,
-    onPlaybackOptions: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun BufferingOverlay(data: VodChromeBuffering, onRetry: () -> Unit, onPlaybackOptions: () -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     Box(
         modifier = modifier

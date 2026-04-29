@@ -23,20 +23,13 @@ import com.yancotv.shared.types.EpgProgramme
  *     reminder on the same programme replaces its alarm instead of stacking.
  */
 @UnstableApi
-class ReminderScheduler(
-    private val context: Context,
-    private val repo: ReminderRepository,
-) {
+class ReminderScheduler(private val context: Context, private val repo: ReminderRepository) {
     private val alarms: AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun isSet(programmeId: String): Boolean = repo.forProgramme(programmeId) != null
 
-    fun set(
-        channelTvgId: String,
-        programme: EpgProgramme,
-        leadSeconds: Long = 0L,
-    ): Reminder {
+    fun set(channelTvgId: String, programme: EpgProgramme, leadSeconds: Long = 0L): Reminder {
         val reminder = repo.upsert(channelTvgId, programme, leadSeconds)
         scheduleAlarm(reminder)
         return reminder
@@ -91,11 +84,7 @@ class ReminderScheduler(
         alarms.cancel(pendingIntentFor(reminderId, programmeId = null, title = null))
     }
 
-    private fun pendingIntentFor(
-        reminderId: String,
-        programmeId: String?,
-        title: String?,
-    ): PendingIntent {
+    private fun pendingIntentFor(reminderId: String, programmeId: String?, title: String?): PendingIntent {
         val intent =
             Intent(context, ReminderAlarmReceiver::class.java).apply {
                 action = ACTION_FIRE

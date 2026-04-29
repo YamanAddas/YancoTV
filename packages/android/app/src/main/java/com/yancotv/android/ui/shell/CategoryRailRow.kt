@@ -24,19 +24,9 @@ sealed interface CategoryRailRow {
     val key: String
     val label: String
 
-    data class Leaf(
-        override val key: String,
-        override val label: String,
-        val groupName: String,
-        val indented: Boolean = false,
-    ) : CategoryRailRow
+    data class Leaf(override val key: String, override val label: String, val groupName: String, val indented: Boolean = false) : CategoryRailRow
 
-    data class Parent(
-        override val key: String,
-        override val label: String,
-        val expanded: Boolean,
-        val childCount: Int,
-    ) : CategoryRailRow
+    data class Parent(override val key: String, override val label: String, val expanded: Boolean, val childCount: Int) : CategoryRailRow
 }
 
 /**
@@ -52,10 +42,7 @@ sealed interface CategoryRailRow {
  * No re-sorting — input order (provider order from MK.20.1, bucketed in
  * MK.20.2) is preserved at every level.
  */
-fun flattenCategoryTree(
-    tree: List<CategoryNode>,
-    expandedParents: Set<String>,
-): List<CategoryRailRow> {
+fun flattenCategoryTree(tree: List<CategoryNode>, expandedParents: Set<String>): List<CategoryRailRow> {
     if (tree.isEmpty()) return emptyList()
     val out = mutableListOf<CategoryRailRow>()
     for (node in tree) {
@@ -104,7 +91,5 @@ fun flattenCategoryTree(
  * a side effect of upstream filtering: an empty bucket isn't created in
  * the first place. Pinning (MK.20 follow-up) plugs in here when wired.
  */
-fun applySmartGroupingHidden(
-    flatGroups: List<String>,
-    hidden: Set<String>,
-): List<String> = if (hidden.isEmpty()) flatGroups else flatGroups.filter { it !in hidden }
+fun applySmartGroupingHidden(flatGroups: List<String>, hidden: Set<String>): List<String> =
+    if (hidden.isEmpty()) flatGroups else flatGroups.filter { it !in hidden }

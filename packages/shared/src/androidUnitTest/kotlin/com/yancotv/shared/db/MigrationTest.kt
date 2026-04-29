@@ -540,9 +540,8 @@ class MigrationTest {
          * touches what `2.sqm` says, so missing tables don't fail the
          * migration step.
          */
-        fun v2Schema(): List<String> =
-            listOf(
-                """
+        fun v2Schema(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -563,8 +562,8 @@ class MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE content (
                     id TEXT PRIMARY KEY NOT NULL,
                     source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -579,8 +578,8 @@ class MigrationTest {
                     sort_order INTEGER NOT NULL DEFAULT 0,
                     created_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
         const val SEED_SOURCE_V2 = """
             INSERT INTO sources (
@@ -626,9 +625,8 @@ class MigrationTest {
          *   - 8.sqm: no sources column change (recording_schedules.series_key)
          *   - 9.sqm: + auto_sync_on_start  ← what this test verifies
          */
-        fun v9SourcesSchema(): List<String> =
-            listOf(
-                """
+        fun v9SourcesSchema(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -651,8 +649,8 @@ class MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
         const val SEED_SOURCE_V9 = """
             INSERT INTO sources (
@@ -679,9 +677,8 @@ class MigrationTest {
          * touch (`favorites` etc). Override columns added in 2.sqm are
          * present here because we're starting at v3.
          */
-        fun v3SchemaForRecordingsHop(): List<String> =
-            listOf(
-                """
+        fun v3SchemaForRecordingsHop(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -702,8 +699,8 @@ class MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE content (
                     id TEXT PRIMARY KEY NOT NULL,
                     source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -720,8 +717,8 @@ class MigrationTest {
                     name_override TEXT,
                     logo_override TEXT
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE epg_programmes (
                     id TEXT PRIMARY KEY NOT NULL,
                     source_id TEXT REFERENCES sources(id) ON DELETE CASCADE,
@@ -733,8 +730,8 @@ class MigrationTest {
                     category TEXT,
                     icon_url TEXT
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE recordings (
                     id TEXT PRIMARY KEY NOT NULL,
                     content_id TEXT,
@@ -748,8 +745,8 @@ class MigrationTest {
                     file_size_bytes INTEGER,
                     error TEXT
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
         const val SEED_RECORDING_V3 = """
             INSERT INTO recordings (
@@ -773,9 +770,8 @@ class MigrationTest {
          * `favorites` here has the v3 shape (no list_id) — that's the
          * column 4.sqm ALTERs onto it.
          */
-        fun v4SchemaForFavoritesHop(): List<String> =
-            listOf(
-                """
+        fun v4SchemaForFavoritesHop(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -796,8 +792,8 @@ class MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE content (
                     id TEXT PRIMARY KEY NOT NULL,
                     source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -814,15 +810,15 @@ class MigrationTest {
                     name_override TEXT,
                     logo_override TEXT
                 );
-                """.trimIndent(),
-                """
+            """.trimIndent(),
+            """
                 CREATE TABLE favorites (
                     id TEXT PRIMARY KEY NOT NULL,
                     content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
                     added_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
         const val SEED_SOURCE_V3_4 = """
             INSERT INTO sources (
@@ -881,9 +877,8 @@ class MigrationTest {
          * v5 sources columns: genesis (18 columns) — 5.sqm adds `referer`
          * (the 19th).
          */
-        fun v5SourcesSchema(): List<String> =
-            listOf(
-                """
+        fun v5SourcesSchema(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -904,8 +899,8 @@ class MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
         const val SEED_SOURCE_V5 = """
             INSERT INTO sources (
@@ -928,9 +923,8 @@ class MigrationTest {
          * has `referer` (added in 5.sqm) but not yet `epg_priority`
          * (added in 6.sqm).
          */
-        fun v6SourcesSchema(): List<String> =
-            listOf(
-                """
+        fun v6SourcesSchema(): List<String> = listOf(
+            """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,
                     name TEXT NOT NULL,
@@ -952,8 +946,8 @@ class MigrationTest {
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """.trimIndent(),
-            )
+            """.trimIndent(),
+        )
 
         const val SEED_SOURCE_V6 = """
             INSERT INTO sources (

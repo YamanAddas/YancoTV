@@ -36,11 +36,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -97,10 +97,7 @@ import org.koin.compose.koinInject
  *   as supporting context, not competing widgets.
  */
 @Composable
-fun SourcesScreen(
-    repo: SourceRepository = koinInject(),
-    coordinator: SourceSyncCoordinator = koinInject(),
-) {
+fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSyncCoordinator = koinInject()) {
     val sources = remember { mutableStateListOf<Source>() }
     var showAdd by remember { mutableStateOf(false) }
     var addSaving by remember { mutableStateOf(false) }
@@ -155,9 +152,9 @@ fun SourcesScreen(
         }
         Column(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+            Modifier
+                .fillMaxSize()
+                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         ) {
             SourceDetailScreen(
                 sourceId = openDetailId,
@@ -174,9 +171,9 @@ fun SourcesScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         active?.let { state ->
@@ -198,12 +195,12 @@ fun SourcesScreen(
         // strip on Fire TV; the detail pane has the room for them).
         Column(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(palette.BackgroundRaised.copy(alpha = 0.55f))
-                    .border(1.dp, palette.PanelBorder, RoundedCornerShape(20.dp)),
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(palette.BackgroundRaised.copy(alpha = 0.55f))
+                .border(1.dp, palette.PanelBorder, RoundedCornerShape(20.dp)),
         ) {
             ListHeader(
                 count = sources.size,
@@ -287,16 +284,13 @@ fun SourcesScreen(
  * one identity" instead of stacking multiple framed sections.
  */
 @Composable
-private fun ListHeader(
-    count: Int,
-    onAddClick: () -> Unit,
-) {
+private fun ListHeader(count: Int, onAddClick: () -> Unit) {
     val palette = LocalYancoPalette.current
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 24.dp, end = 16.dp, top = 18.dp, bottom = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 16.dp, top = 18.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -343,31 +337,26 @@ private fun ListHeader(
  * action lives here, not on the per-row card — single source of truth.
  */
 @Composable
-private fun SyncBanner(
-    sourceName: String,
-    progress: SyncProgress,
-    elapsedSec: Long,
-    onCancel: () -> Unit,
-) {
+private fun SyncBanner(sourceName: String, progress: SyncProgress, elapsedSec: Long, onCancel: () -> Unit) {
     val palette = LocalYancoPalette.current
     val message = phaseLabel(sourceName, progress, elapsedSec)
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(palette.Accent.copy(alpha = 0.10f))
-                .border(1.dp, palette.Accent.copy(alpha = 0.32f), RoundedCornerShape(14.dp))
-                .padding(start = 18.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.Accent.copy(alpha = 0.10f))
+            .border(1.dp, palette.Accent.copy(alpha = 0.32f), RoundedCornerShape(14.dp))
+            .padding(start = 18.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(palette.Accent),
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(palette.Accent),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -394,10 +383,7 @@ private fun SyncBanner(
 }
 
 @Composable
-private fun EmptyState(
-    onAddClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun EmptyState(onAddClick: () -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     Column(
         modifier = modifier.padding(48.dp),
@@ -406,11 +392,11 @@ private fun EmptyState(
     ) {
         Box(
             modifier =
-                Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(palette.Accent.copy(alpha = 0.12f))
-                    .border(1.dp, palette.Accent.copy(alpha = 0.32f), RoundedCornerShape(16.dp)),
+            Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(palette.Accent.copy(alpha = 0.12f))
+                .border(1.dp, palette.Accent.copy(alpha = 0.32f), RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -455,12 +441,7 @@ private fun EmptyState(
  *   the detail surface.
  */
 @Composable
-private fun SourceListRow(
-    source: Source,
-    isSyncing: Boolean,
-    palette: YancoPalette,
-    onClick: () -> Unit,
-) {
+private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPalette, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val activeTabFocus = LocalActiveSettingsTabFocus.current
@@ -488,31 +469,31 @@ private fun SourceListRow(
 
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .shadow(
-                    elevation = if (focused) 14.dp else 0.dp,
-                    shape = RoundedCornerShape(0.dp),
-                    ambientColor = palette.AccentGlow,
-                    spotColor = palette.AccentGlow,
-                )
-                .background(rowBg)
-                .border(
-                    width = if (focused) 1.5.dp else 0.dp,
-                    color = rowBorder,
-                )
-                .leftExitsTo(activeTabFocus)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = if (focused) 14.dp else 0.dp,
+                shape = RoundedCornerShape(0.dp),
+                ambientColor = palette.AccentGlow,
+                spotColor = palette.AccentGlow,
+            )
+            .background(rowBg)
+            .border(
+                width = if (focused) 1.5.dp else 0.dp,
+                color = rowBorder,
+            )
+            .leftExitsTo(activeTabFocus)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -567,18 +548,16 @@ private fun SourceListRow(
  *  across the list and detail surfaces. */
 internal enum class RowStatus { Syncing, Ready, Stale, NeverSynced, Error }
 
-internal fun RowStatus.dotColor(palette: YancoPalette): Color =
-    when (this) {
-        RowStatus.Syncing, RowStatus.Ready -> palette.Accent
-        RowStatus.Stale, RowStatus.NeverSynced -> palette.Premium
-        RowStatus.Error -> palette.Error
-    }
+internal fun RowStatus.dotColor(palette: YancoPalette): Color = when (this) {
+    RowStatus.Syncing, RowStatus.Ready -> palette.Accent
+    RowStatus.Stale, RowStatus.NeverSynced -> palette.Premium
+    RowStatus.Error -> palette.Error
+}
 
-internal fun RowStatus.subColor(palette: YancoPalette): Color =
-    when (this) {
-        RowStatus.Error -> palette.Error.copy(alpha = 0.85f)
-        else -> palette.TextMuted
-    }
+internal fun RowStatus.subColor(palette: YancoPalette): Color = when (this) {
+    RowStatus.Error -> palette.Error.copy(alpha = 0.85f)
+    else -> palette.TextMuted
+}
 
 internal fun RowStatus.subLine(source: Source): String {
     val type = typeLabel(source.type)
@@ -629,10 +608,7 @@ private fun nextSyncSuffix(source: Source): String {
  *  far left of every row — the single "is this alive?" indicator that
  *  replaces the previous 44dp type icon + READY chip combo. */
 @Composable
-private fun LiveDot(
-    color: Color,
-    pulsing: Boolean,
-) {
+private fun LiveDot(color: Color, pulsing: Boolean) {
     val alpha by animateFloatAsState(
         targetValue = if (pulsing) 0.55f else 1.0f,
         animationSpec = tween(durationMillis = 600),
@@ -640,32 +616,28 @@ private fun LiveDot(
     )
     Box(
         modifier =
-            Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(color)
-                .shadow(
-                    elevation = 6.dp,
-                    shape = CircleShape,
-                    ambientColor = color,
-                    spotColor = color,
-                )
-                .graphicsLayer { this.alpha = alpha },
+        Modifier
+            .size(12.dp)
+            .clip(CircleShape)
+            .background(color)
+            .shadow(
+                elevation = 6.dp,
+                shape = CircleShape,
+                ambientColor = color,
+                spotColor = color,
+            )
+            .graphicsLayer { this.alpha = alpha },
     )
 }
 
 @Composable
-private fun StatusChip(
-    text: String,
-    accent: Color,
-    bg: Color,
-) {
+private fun StatusChip(text: String, accent: Color, bg: Color) {
     Box(
         modifier =
-            Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(bg)
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
         Text(
             text = text,
@@ -678,42 +650,33 @@ private fun StatusChip(
 }
 
 @Composable
-private fun HairLine(
-    palette: YancoPalette,
-    indent: androidx.compose.ui.unit.Dp = 0.dp,
-) {
+private fun HairLine(palette: YancoPalette, indent: androidx.compose.ui.unit.Dp = 0.dp) {
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = indent)
-                .height(1.dp)
-                .background(palette.BorderSubtle),
+        Modifier
+            .fillMaxWidth()
+            .padding(start = indent)
+            .height(1.dp)
+            .background(palette.BorderSubtle),
     )
 }
 
-internal fun typeLabel(type: SourceType): String =
-    when (type) {
-        SourceType.XTREAM -> "Xtream"
-        SourceType.M3U_URL -> "M3U URL"
-        SourceType.M3U_FILE -> "M3U File"
-        SourceType.STALKER -> "Stalker"
-    }
+internal fun typeLabel(type: SourceType): String = when (type) {
+    SourceType.XTREAM -> "Xtream"
+    SourceType.M3U_URL -> "M3U URL"
+    SourceType.M3U_FILE -> "M3U File"
+    SourceType.STALKER -> "Stalker"
+}
 
-private fun formatItemCount(n: Int): String =
-    when {
-        n == 0 -> "no items yet"
-        n == 1 -> "1 item"
-        n < 1_000 -> "$n items"
-        n < 1_000_000 -> "%.1fk items".format(n / 1000.0)
-        else -> "%.1fM items".format(n / 1_000_000.0)
-    }
+private fun formatItemCount(n: Int): String = when {
+    n == 0 -> "no items yet"
+    n == 1 -> "1 item"
+    n < 1_000 -> "$n items"
+    n < 1_000_000 -> "%.1fk items".format(n / 1000.0)
+    else -> "%.1fM items".format(n / 1_000_000.0)
+}
 
-private fun phaseLabel(
-    name: String,
-    p: SyncProgress,
-    elapsedSec: Long = 0,
-): String {
+private fun phaseLabel(name: String, p: SyncProgress, elapsedSec: Long = 0): String {
     val suffix = p.message?.takeIf { it.isNotBlank() }
     val elapsed = if (elapsedSec > 0) " (${elapsedSec}s)" else ""
     return when (p.phase) {

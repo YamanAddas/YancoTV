@@ -64,11 +64,7 @@ object CrashReporter {
         file.delete()
     }
 
-    private fun writeCrashLog(
-        context: Context,
-        thread: Thread,
-        throwable: Throwable,
-    ) {
+    private fun writeCrashLog(context: Context, thread: Thread, throwable: Throwable) {
         val timestamp =
             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
                 .format(Date())

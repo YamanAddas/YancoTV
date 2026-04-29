@@ -76,19 +76,12 @@ private val OnAccentInk: Color = Color(0xFF04130C)
  */
 internal enum class ButtonSize { Standard, Compact }
 
-private data class ButtonMetrics(
-    val height: Int,
-    val horizontalPadding: Int,
-    val fontSize: Int,
-    val minWidth: Int,
-    val cornerRadius: Int,
-)
+private data class ButtonMetrics(val height: Int, val horizontalPadding: Int, val fontSize: Int, val minWidth: Int, val cornerRadius: Int)
 
-private fun metricsFor(size: ButtonSize): ButtonMetrics =
-    when (size) {
-        ButtonSize.Standard -> ButtonMetrics(48, 22, 13, 88, 14)
-        ButtonSize.Compact -> ButtonMetrics(36, 14, 11, 64, 10)
-    }
+private fun metricsFor(size: ButtonSize): ButtonMetrics = when (size) {
+    ButtonSize.Standard -> ButtonMetrics(48, 22, 13, 88, 14)
+    ButtonSize.Compact -> ButtonMetrics(36, 14, 11, 64, 10)
+}
 
 /**
  * Primary accent button.
@@ -159,34 +152,40 @@ internal fun SettingsAccentButton(
 
     Row(
         modifier =
-            modifier
-                .height(m.height.dp)
-                .defaultMinSize(minWidth = m.minWidth.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .shadow(
-                    elevation = if (focused && enabled) 16.dp else if (translucent) 0.dp else 6.dp,
-                    shape = shape,
-                    ambientColor = palette.AccentGlow,
-                    spotColor = palette.AccentGlow,
-                )
-                .clip(shape)
-                .background(fill)
-                .border(
-                    width = borderWidth,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = m.horizontalPadding.dp),
+        modifier
+            .height(m.height.dp)
+            .defaultMinSize(minWidth = m.minWidth.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = if (focused && enabled) {
+                    16.dp
+                } else if (translucent) {
+                    0.dp
+                } else {
+                    6.dp
+                },
+                shape = shape,
+                ambientColor = palette.AccentGlow,
+                spotColor = palette.AccentGlow,
+            )
+            .clip(shape)
+            .background(fill)
+            .border(
+                width = borderWidth,
+                color = borderColor,
+                shape = shape,
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = m.horizontalPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
@@ -246,34 +245,34 @@ internal fun SettingsOutlinedButton(
 
     Row(
         modifier =
-            modifier
-                .height(m.height.dp)
-                .defaultMinSize(minWidth = m.minWidth.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .shadow(
-                    elevation = if (focused && enabled) 14.dp else 0.dp,
-                    shape = shape,
-                    ambientColor = palette.AccentGlow,
-                    spotColor = palette.AccentGlow,
-                )
-                .clip(shape)
-                .background(bgColor)
-                .border(
-                    width = if (focused && enabled) 1.5.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = m.horizontalPadding.dp),
+        modifier
+            .height(m.height.dp)
+            .defaultMinSize(minWidth = m.minWidth.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = if (focused && enabled) 14.dp else 0.dp,
+                shape = shape,
+                ambientColor = palette.AccentGlow,
+                spotColor = palette.AccentGlow,
+            )
+            .clip(shape)
+            .background(bgColor)
+            .border(
+                width = if (focused && enabled) 1.5.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = m.horizontalPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
@@ -334,34 +333,34 @@ internal fun SettingsDangerButton(
 
     Row(
         modifier =
-            modifier
-                .height(m.height.dp)
-                .defaultMinSize(minWidth = m.minWidth.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .shadow(
-                    elevation = if (focused && enabled) 16.dp else 0.dp,
-                    shape = shape,
-                    ambientColor = palette.Error,
-                    spotColor = palette.Error,
-                )
-                .clip(shape)
-                .background(bgColor)
-                .border(
-                    width = if (focused && enabled) 1.5.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .padding(horizontal = m.horizontalPadding.dp),
+        modifier
+            .height(m.height.dp)
+            .defaultMinSize(minWidth = m.minWidth.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = if (focused && enabled) 16.dp else 0.dp,
+                shape = shape,
+                ambientColor = palette.Error,
+                spotColor = palette.Error,
+            )
+            .clip(shape)
+            .background(bgColor)
+            .border(
+                width = if (focused && enabled) 1.5.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = m.horizontalPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
@@ -379,19 +378,18 @@ internal fun SettingsDangerButton(
     }
 }
 
-private fun primaryFillBrush(palette: YancoPalette, enabled: Boolean): Brush =
-    if (enabled) {
-        Brush.verticalGradient(
-            listOf(palette.Accent, palette.AccentDeep),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                palette.AccentMuted.copy(alpha = 0.6f),
-                palette.AccentMuted.copy(alpha = 0.4f),
-            ),
-        )
-    }
+private fun primaryFillBrush(palette: YancoPalette, enabled: Boolean): Brush = if (enabled) {
+    Brush.verticalGradient(
+        listOf(palette.Accent, palette.AccentDeep),
+    )
+} else {
+    Brush.verticalGradient(
+        listOf(
+            palette.AccentMuted.copy(alpha = 0.6f),
+            palette.AccentMuted.copy(alpha = 0.4f),
+        ),
+    )
+}
 
 /**
  * Internal sentinel used by tests to verify the button never falls back

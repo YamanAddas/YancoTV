@@ -75,9 +75,8 @@ enum class RecordingScheduleState(val sql: String) {
     companion object {
         private val TERMINAL = setOf(COMPLETED, FAILED, CANCELLED, MISSED)
 
-        fun fromSql(value: String): RecordingScheduleState =
-            values().firstOrNull { it.sql == value }
-                ?: error("Unknown recording_schedules.state: $value")
+        fun fromSql(value: String): RecordingScheduleState = values().firstOrNull { it.sql == value }
+            ?: error("Unknown recording_schedules.state: $value")
     }
 }
 
@@ -115,10 +114,7 @@ data class RecordingScheduleEntry(
  * Tests (commonTest mirror in androidUnitTest) assert the transitions;
  * the alarm/receiver layer trusts the repo to reject illegal moves.
  */
-class RecordingScheduleRepository(
-    private val db: YancoDb,
-    private val clock: () -> Long,
-) {
+class RecordingScheduleRepository(private val db: YancoDb, private val clock: () -> Long) {
     /** Insert a new SCHEDULED row. The Android scheduler arms the
      *  alarm immediately and transitions to ARMED via [transitionTo]. */
     fun insert(
@@ -153,30 +149,26 @@ class RecordingScheduleRepository(
         return getById(id) ?: error("insert succeeded but row missing: $id")
     }
 
-    fun getById(id: String): RecordingScheduleEntry? =
-        db.recordingSchedulesQueries
-            .selectById(id)
-            .executeAsOneOrNull()
-            ?.toEntry()
+    fun getById(id: String): RecordingScheduleEntry? = db.recordingSchedulesQueries
+        .selectById(id)
+        .executeAsOneOrNull()
+        ?.toEntry()
 
-    fun getAll(): List<RecordingScheduleEntry> =
-        db.recordingSchedulesQueries
-            .selectAll()
-            .executeAsList()
-            .map { it.toEntry() }
+    fun getAll(): List<RecordingScheduleEntry> = db.recordingSchedulesQueries
+        .selectAll()
+        .executeAsList()
+        .map { it.toEntry() }
 
-    fun getByState(state: RecordingScheduleState): List<RecordingScheduleEntry> =
-        db.recordingSchedulesQueries
-            .selectByState(state.sql)
-            .executeAsList()
-            .map { it.toEntry() }
+    fun getByState(state: RecordingScheduleState): List<RecordingScheduleEntry> = db.recordingSchedulesQueries
+        .selectByState(state.sql)
+        .executeAsList()
+        .map { it.toEntry() }
 
     /** MK.14.6 — fetch every schedule (any state) tagged with [seriesKey]. */
-    fun getBySeriesKey(seriesKey: String): List<RecordingScheduleEntry> =
-        db.recordingSchedulesQueries
-            .selectBySeriesKey(seriesKey)
-            .executeAsList()
-            .map { it.toEntry() }
+    fun getBySeriesKey(seriesKey: String): List<RecordingScheduleEntry> = db.recordingSchedulesQueries
+        .selectBySeriesKey(seriesKey)
+        .executeAsList()
+        .map { it.toEntry() }
 
     /**
      * Reactive list — backs the RecordingsScreen's "Upcoming" section.
@@ -185,12 +177,11 @@ class RecordingScheduleRepository(
      * main on `Dispatchers.Default` (KMP-safe — `Dispatchers.IO` only
      * exists on JVM/Android).
      */
-    fun allFlow(): Flow<List<RecordingScheduleEntry>> =
-        db.recordingSchedulesQueries
-            .selectAll()
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { rows -> rows.map { it.toEntry() } }
+    fun allFlow(): Flow<List<RecordingScheduleEntry>> = db.recordingSchedulesQueries
+        .selectAll()
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows -> rows.map { it.toEntry() } }
 
     /**
      * Transition to a new state. Validates legal moves:
@@ -203,11 +194,7 @@ class RecordingScheduleRepository(
      * `concurrent_recording_active`, etc.); it's stored in the `error`
      * column and surfaced in the UI's failure tooltip.
      */
-    fun transitionTo(
-        id: String,
-        target: RecordingScheduleState,
-        errorReason: String? = null,
-    ): RecordingScheduleEntry {
+    fun transitionTo(id: String, target: RecordingScheduleState, errorReason: String? = null): RecordingScheduleEntry {
         val current = getById(id) ?: error("schedule $id missing — cannot transition to $target")
         require(!current.state.isTerminal()) {
             "schedule $id is already ${current.state.name}; cannot move to $target"
@@ -230,10 +217,7 @@ class RecordingScheduleRepository(
      * Caller is the broadcast receiver after RecordingService has
      * inserted the recording row.
      */
-    fun linkRecording(
-        id: String,
-        recordingId: String,
-    ): RecordingScheduleEntry {
+    fun linkRecording(id: String, recordingId: String): RecordingScheduleEntry {
         val current = getById(id) ?: error("schedule $id missing — cannot link recording")
         require(current.state == RecordingScheduleState.ARMED) {
             "schedule $id is ${current.state.name}; can only link from ARMED"
@@ -331,50 +315,42 @@ class RecordingScheduleRepository(
 
     // ── internals ─────────────────────────────────────────────────
 
-    private fun isLegalTransition(
-        from: RecordingScheduleState,
-        to: RecordingScheduleState,
-    ): Boolean =
-        when (from) {
-            RecordingScheduleState.SCHEDULED ->
-                to == RecordingScheduleState.ARMED ||
-                    to == RecordingScheduleState.CANCELLED ||
-                    to == RecordingScheduleState.MISSED
-            RecordingScheduleState.ARMED ->
-                to == RecordingScheduleState.FIRING ||
-                    to == RecordingScheduleState.CANCELLED ||
-                    to == RecordingScheduleState.MISSED
-            RecordingScheduleState.FIRING ->
-                to == RecordingScheduleState.COMPLETED ||
-                    to == RecordingScheduleState.FAILED ||
-                    to == RecordingScheduleState.CANCELLED
-            else -> false
-        }
+    private fun isLegalTransition(from: RecordingScheduleState, to: RecordingScheduleState): Boolean = when (from) {
+        RecordingScheduleState.SCHEDULED ->
+            to == RecordingScheduleState.ARMED ||
+                to == RecordingScheduleState.CANCELLED ||
+                to == RecordingScheduleState.MISSED
+        RecordingScheduleState.ARMED ->
+            to == RecordingScheduleState.FIRING ||
+                to == RecordingScheduleState.CANCELLED ||
+                to == RecordingScheduleState.MISSED
+        RecordingScheduleState.FIRING ->
+            to == RecordingScheduleState.COMPLETED ||
+                to == RecordingScheduleState.FAILED ||
+                to == RecordingScheduleState.CANCELLED
+        else -> false
+    }
 
-    private fun Recording_schedules.toEntry(): RecordingScheduleEntry =
-        RecordingScheduleEntry(
-            id = id,
-            contentId = content_id,
-            programmeId = programme_id,
-            title = title,
-            streamUrl = stream_url,
-            scheduledStart = scheduled_start,
-            scheduledEnd = scheduled_end,
-            state = RecordingScheduleState.fromSql(state),
-            recordingId = recording_id,
-            error = error,
-            createdAt = created_at,
-            updatedAt = updated_at,
-            seriesKey = series_key,
-        )
+    private fun Recording_schedules.toEntry(): RecordingScheduleEntry = RecordingScheduleEntry(
+        id = id,
+        contentId = content_id,
+        programmeId = programme_id,
+        title = title,
+        streamUrl = stream_url,
+        scheduledStart = scheduled_start,
+        scheduledEnd = scheduled_end,
+        state = RecordingScheduleState.fromSql(state),
+        recordingId = recording_id,
+        error = error,
+        createdAt = created_at,
+        updatedAt = updated_at,
+        seriesKey = series_key,
+    )
 
     /** Result counts from [reconcileAfterBoot] — surfaces to the
      *  caller for "we missed N recordings while the TV was off"
      *  toasts / notifications. */
-    data class MissedSweepResult(
-        val markedMissed: Int,
-        val markedFailedFromOrphan: Int,
-    ) {
+    data class MissedSweepResult(val markedMissed: Int, val markedFailedFromOrphan: Int) {
         val total: Int get() = markedMissed + markedFailedFromOrphan
     }
 
@@ -425,20 +401,16 @@ class RecordingScheduleRepository(
  * Bytes <= 0 → FAILED + `REASON_NO_RESPONSE_FROM_SERVER`.
  * Bytes  > 0 → COMPLETED, no error reason.
  */
-data class ScheduleOutcomeFromBytes(
-    val state: RecordingScheduleState,
-    val reason: String?,
-)
+data class ScheduleOutcomeFromBytes(val state: RecordingScheduleState, val reason: String?)
 
-fun scheduleOutcomeFromBytes(bytesWritten: Long): ScheduleOutcomeFromBytes =
-    if (bytesWritten <= 0L) {
-        ScheduleOutcomeFromBytes(
-            RecordingScheduleState.FAILED,
-            RecordingScheduleRepository.REASON_NO_RESPONSE_FROM_SERVER,
-        )
-    } else {
-        ScheduleOutcomeFromBytes(
-            RecordingScheduleState.COMPLETED,
-            null,
-        )
-    }
+fun scheduleOutcomeFromBytes(bytesWritten: Long): ScheduleOutcomeFromBytes = if (bytesWritten <= 0L) {
+    ScheduleOutcomeFromBytes(
+        RecordingScheduleState.FAILED,
+        RecordingScheduleRepository.REASON_NO_RESPONSE_FROM_SERVER,
+    )
+} else {
+    ScheduleOutcomeFromBytes(
+        RecordingScheduleState.COMPLETED,
+        null,
+    )
+}

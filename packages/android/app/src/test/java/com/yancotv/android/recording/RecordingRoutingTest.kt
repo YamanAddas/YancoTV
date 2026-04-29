@@ -1,7 +1,7 @@
 package com.yancotv.android.recording
 
-import org.junit.Test
 import kotlin.test.assertEquals
+import org.junit.Test
 
 /**
  * MB-213 — pin the live-tee vs fresh-GET decision table. Real

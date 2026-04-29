@@ -32,21 +32,12 @@ import kotlin.test.assertTrue
 class BulkContentWriterTest {
     private val noopHttp =
         object : HttpClient {
-            override suspend fun getJson(
-                url: String,
-                options: HttpRequestOptions,
-            ): Any? = null
+            override suspend fun getJson(url: String, options: HttpRequestOptions): Any? = null
 
-            override suspend fun getText(
-                url: String,
-                options: HttpRequestOptions,
-            ): String = ""
+            override suspend fun getText(url: String, options: HttpRequestOptions): String = ""
         }
 
-    private fun insertSource(
-        db: com.yancotv.shared.db.YancoDb,
-        id: String = "s1",
-    ) {
+    private fun insertSource(db: com.yancotv.shared.db.YancoDb, id: String = "s1") {
         db.sourcesQueries.insert(
             id = id,
             name = "Test",
@@ -72,11 +63,7 @@ class BulkContentWriterTest {
         )
     }
 
-    private fun m3uEntry(
-        title: String,
-        url: String,
-        group: String = "News",
-    ) = M3uEntry(
+    private fun m3uEntry(title: String, url: String, group: String = "News") = M3uEntry(
         duration = -1.0,
         title = title,
         groupTitle = group,
@@ -87,10 +74,7 @@ class BulkContentWriterTest {
         rawAttributes = "",
     )
 
-    private fun liveStream(
-        id: Int,
-        name: String,
-    ) = XtreamLiveStream(
+    private fun liveStream(id: Int, name: String) = XtreamLiveStream(
         num = id,
         name = name,
         streamType = "live",
@@ -106,10 +90,7 @@ class BulkContentWriterTest {
         tvArchiveDuration = 0,
     )
 
-    private fun vodStream(
-        id: Int,
-        name: String,
-    ) = XtreamVodStream(
+    private fun vodStream(id: Int, name: String) = XtreamVodStream(
         num = id,
         name = name,
         streamType = "movie",
@@ -122,10 +103,7 @@ class BulkContentWriterTest {
         directSource = "",
     )
 
-    private fun seriesInfo(
-        id: Int,
-        name: String,
-    ) = XtreamSeriesInfo(
+    private fun seriesInfo(id: Int, name: String) = XtreamSeriesInfo(
         num = id,
         name = name,
         seriesId = id,
@@ -140,10 +118,7 @@ class BulkContentWriterTest {
         lastModified = "",
     )
 
-    private fun stalkerChannel(
-        id: Int,
-        name: String,
-    ) = StalkerChannel(
+    private fun stalkerChannel(id: Int, name: String) = StalkerChannel(
         id = id,
         name = name,
         cmd = "http://s/$id",
@@ -155,10 +130,7 @@ class BulkContentWriterTest {
         tvArchiveDuration = 0,
     )
 
-    private fun stalkerVod(
-        id: Int,
-        name: String,
-    ) = StalkerVodItem(
+    private fun stalkerVod(id: Int, name: String) = StalkerVodItem(
         id = id,
         name = name,
         cmd = "http://v/$id",
@@ -167,10 +139,7 @@ class BulkContentWriterTest {
         description = "",
     )
 
-    private fun stalkerSeries(
-        id: Int,
-        name: String,
-    ) = StalkerSeriesItem(
+    private fun stalkerSeries(id: Int, name: String) = StalkerSeriesItem(
         id = id,
         name = name,
         categoryId = "1",
@@ -179,13 +148,12 @@ class BulkContentWriterTest {
         genre = "",
     )
 
-    private fun xtreamClient(sourceId: String = "s1") =
-        XtreamClient(
-            url = "http://example.test",
-            username = "u",
-            password = "p",
-            options = XtreamClientOptions(http = noopHttp),
-        ).also { _ -> sourceId } // pin sourceId for symmetry with sut calls
+    private fun xtreamClient(sourceId: String = "s1") = XtreamClient(
+        url = "http://example.test",
+        username = "u",
+        password = "p",
+        options = XtreamClientOptions(http = noopHttp),
+    ).also { _ -> sourceId } // pin sourceId for symmetry with sut calls
 
     // ───── M3U ─────
 
@@ -489,8 +457,11 @@ class BulkContentWriterTest {
         // The two favorites + the history row must survive.
         assertTrue(db.favoritesQueries.isFavorite(ch1Id).executeAsOne(), "ch1 favorite must survive resync")
         assertTrue(db.favoritesQueries.isFavorite(ch2Id).executeAsOne(), "ch2 favorite must survive resync")
-        assertEquals(1, db.watchHistoryQueries.selectByContent(ch1Id).executeAsList().size,
-            "watch_history row for ch1 must survive resync")
+        assertEquals(
+            1,
+            db.watchHistoryQueries.selectByContent(ch1Id).executeAsList().size,
+            "watch_history row for ch1 must survive resync",
+        )
     }
 
     /**
@@ -551,8 +522,11 @@ class BulkContentWriterTest {
         assertTrue(db.favoritesQueries.isFavorite(ch1Id).executeAsOne(), "ch1 favorite must survive")
         // ch2 was dropped — finishSource's orphan sweep removes its favorite + history.
         assertTrue(!db.favoritesQueries.isFavorite(ch2Id).executeAsOne(), "ch2 favorite must be swept as orphan")
-        assertEquals(0, db.watchHistoryQueries.selectByContent(ch2Id).executeAsList().size,
-            "ch2 watch_history must be swept as orphan")
+        assertEquals(
+            0,
+            db.watchHistoryQueries.selectByContent(ch2Id).executeAsList().size,
+            "ch2 watch_history must be swept as orphan",
+        )
     }
 
     /**

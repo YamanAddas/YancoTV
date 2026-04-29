@@ -11,10 +11,7 @@ import com.yancotv.shared.types.ContentType
  * Recordings landed back in 2026-04-26 (Stage 3.1 / MK.14.5) as the catalog
  * surface for the recording engine. Downloads stays dropped — no roadmap.
  */
-enum class AppSection(
-    val label: String,
-    val contentType: ContentType? = null,
-) {
+enum class AppSection(val label: String, val contentType: ContentType? = null) {
     Home("Home"),
     LiveTv("Live TV", ContentType.LIVE),
     Guide("Guide"),

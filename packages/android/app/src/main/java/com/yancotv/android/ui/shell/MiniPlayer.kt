@@ -41,10 +41,7 @@ import org.koin.compose.koinInject
  */
 @UnstableApi
 @Composable
-fun MiniPlayer(
-    modifier: Modifier = Modifier,
-    controller: PlaybackController = koinInject(),
-) {
+fun MiniPlayer(modifier: Modifier = Modifier, controller: PlaybackController = koinInject()) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     // Cache the live Surface so the lifecycle observer + watchdog effect
     // can re-bind without waiting for the next onSurface emission. Null

@@ -107,26 +107,15 @@ class EpgRepository(
      * EPG-canonical title — caller has the snapshot from the long-pressed
      * row.
      */
-    fun findFutureByChannelAndTitle(
-        tvgId: String,
-        title: String,
-        now: Long,
-        windowMs: Long,
-    ): List<EpgProgramme> =
-        db.epgProgrammesQueries
-            .futureByChannelAndTitle(tvgId, title, now, now + windowMs)
-            .executeAsList()
-            .map { it.toDomain() }
+    fun findFutureByChannelAndTitle(tvgId: String, title: String, now: Long, windowMs: Long): List<EpgProgramme> = db.epgProgrammesQueries
+        .futureByChannelAndTitle(tvgId, title, now, now + windowMs)
+        .executeAsList()
+        .map { it.toDomain() }
 
-    fun getProgrammesForChannel(
-        tvgId: String,
-        startTime: Long,
-        endTime: Long,
-    ): List<EpgProgramme> =
-        db.epgProgrammesQueries
-            .forChannelRange(tvgId, startTime, endTime)
-            .executeAsList()
-            .map { it.toDomain() }
+    fun getProgrammesForChannel(tvgId: String, startTime: Long, endTime: Long): List<EpgProgramme> = db.epgProgrammesQueries
+        .forChannelRange(tvgId, startTime, endTime)
+        .executeAsList()
+        .map { it.toDomain() }
 
     /**
      * Guide grid data: the [startTime, endTime) window projected across
@@ -197,25 +186,16 @@ class EpgRepository(
     }
 
     /** Total distinct live channels with guide data in the window. Used by the guide's "X of Y" header. */
-    fun countGuideChannels(
-        startTime: Long,
-        endTime: Long,
-        sourceId: String? = null,
-        groupName: String? = null,
-    ): Long =
-        when {
-            groupName != null -> db.contentQueries.countGuideChannelsByGroup(groupName, startTime, endTime).executeAsOne()
-            sourceId != null -> db.contentQueries.countGuideChannelsBySource(sourceId, startTime, endTime).executeAsOne()
-            else -> db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
-        }
+    fun countGuideChannels(startTime: Long, endTime: Long, sourceId: String? = null, groupName: String? = null): Long = when {
+        groupName != null -> db.contentQueries.countGuideChannelsByGroup(groupName, startTime, endTime).executeAsOne()
+        sourceId != null -> db.contentQueries.countGuideChannelsBySource(sourceId, startTime, endTime).executeAsOne()
+        else -> db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
+    }
 
     /** MK.guide.groups — distinct live group names with guide-covered
      *  channels in the window. Drives GuideScreen's group filter chip
      *  strip; only groups the user can actually filter by appear. */
-    fun getGuideGroups(
-        startTime: Long,
-        endTime: Long,
-    ): List<String> =
+    fun getGuideGroups(startTime: Long, endTime: Long): List<String> =
         db.contentQueries.distinctGuideGroups(startTime, endTime).executeAsList().mapNotNull { it }
 
     fun getStats(): EpgStats {
@@ -229,11 +209,10 @@ class EpgRepository(
         return EpgStats(programmeCount = programmes, channelCount = channels, lastRefreshedAt = lastRefreshed)
     }
 
-    fun getGlobalEpgUrl(): String? =
-        db.settingsQueries
-            .get(GLOBAL_URL_KEY)
-            .executeAsOneOrNull()
-            ?.takeIf { it.isNotBlank() }
+    fun getGlobalEpgUrl(): String? = db.settingsQueries
+        .get(GLOBAL_URL_KEY)
+        .executeAsOneOrNull()
+        ?.takeIf { it.isNotBlank() }
 
     fun setGlobalEpgUrl(url: String?) {
         if (url.isNullOrBlank()) {
@@ -332,11 +311,10 @@ class EpgRepository(
         )
     }
 
-    fun getLastError(): String? =
-        db.settingsQueries
-            .get(LAST_ERROR_KEY)
-            .executeAsOneOrNull()
-            ?.takeIf { it.isNotBlank() }
+    fun getLastError(): String? = db.settingsQueries
+        .get(LAST_ERROR_KEY)
+        .executeAsOneOrNull()
+        ?.takeIf { it.isNotBlank() }
 
     private fun setLastError(msg: String) {
         db.settingsQueries.upsert(LAST_ERROR_KEY, msg)
@@ -390,11 +368,7 @@ class EpgRepository(
         return out
     }
 
-    private fun buildNowNext(
-        tvgId: String,
-        rows: List<Epg_programmes>,
-        now: Long,
-    ): NowNext {
+    private fun buildNowNext(tvgId: String, rows: List<Epg_programmes>, now: Long): NowNext {
         if (rows.isEmpty()) return NowNext(channelTvgId = tvgId)
         val first = rows[0]
         return if (first.start_time <= now) {
@@ -410,22 +384,18 @@ class EpgRepository(
 
     private fun nowSeconds(): Long = clock() / 1000L
 
-    private fun Epg_programmes.toDomain(): EpgProgramme =
-        EpgProgramme(
-            id = id,
-            channelTvgId = channel_tvg_id,
-            title = title,
-            description = description,
-            startTime = start_time,
-            endTime = end_time,
-            category = category,
-            iconUrl = icon_url,
-        )
-
-    private data class EpgTarget(
-        val url: String,
-        val sourceKey: String,
+    private fun Epg_programmes.toDomain(): EpgProgramme = EpgProgramme(
+        id = id,
+        channelTvgId = channel_tvg_id,
+        title = title,
+        description = description,
+        startTime = start_time,
+        endTime = end_time,
+        category = category,
+        iconUrl = icon_url,
     )
+
+    private data class EpgTarget(val url: String, val sourceKey: String)
 
     private data class GuideChannelRow(
         val tvgId: String?,

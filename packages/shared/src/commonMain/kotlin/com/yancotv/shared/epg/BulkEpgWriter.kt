@@ -20,10 +20,7 @@ import com.yancotv.shared.parsers.XmltvProgramme
  * and we do a single `BEGIN IMMEDIATE ... DELETE ... INSERT ... COMMIT`
  * so the table is always either fully stale or fully fresh, never mid-swap.
  */
-class BulkEpgWriter(
-    private val driver: SqlDriver,
-    private val logger: Logger = NOOP_LOGGER,
-) {
+class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = NOOP_LOGGER) {
     data class ProgrammeBatch(
         /** Key used in the composite primary key `channelId|startTime|sourceKey`. */
         val sourceKey: String,
@@ -32,10 +29,7 @@ class BulkEpgWriter(
         val programmes: List<XmltvProgramme>,
     )
 
-    data class Result(
-        val rowsWritten: Int,
-        val channels: Int,
-    )
+    data class Result(val rowsWritten: Int, val channels: Int)
 
     /**
      * Atomically swap the whole `epg_programmes` table with the concatenated
@@ -43,11 +37,7 @@ class BulkEpgWriter(
      * INSERT so the UI can show "written X/total". Progress is in rows, not
      * batches, to make the tick readable.
      */
-    fun replaceAll(
-        batches: List<ProgrammeBatch>,
-        onBatch: suspend (written: Int, total: Int) -> Unit = { _, _ -> },
-        lastRefreshedMs: Long? = null,
-    ): Result {
+    fun replaceAll(batches: List<ProgrammeBatch>, onBatch: suspend (written: Int, total: Int) -> Unit = { _, _ -> }, lastRefreshedMs: Long? = null): Result {
         val total = batches.sumOf { it.programmes.size }
         if (total == 0) {
             driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
@@ -164,11 +154,7 @@ class BulkEpgWriter(
             }
         }
 
-        fun writeBatch(
-            sourceKey: String,
-            sourceIdForDb: String?,
-            programmes: List<XmltvProgramme>,
-        ) {
+        fun writeBatch(sourceKey: String, sourceIdForDb: String?, programmes: List<XmltvProgramme>) {
             if (!open) error("Session not open")
             if (programmes.isEmpty()) return
             var i = 0

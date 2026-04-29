@@ -2,9 +2,9 @@ package com.yancotv.shared.db
 
 import android.content.Context
 import android.util.Log
+import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.io.File
 
 /**
  * Stage 1.5 — proactive sources backup for DB corruption recovery.
@@ -32,9 +32,7 @@ import java.io.File
  * back functioning sources because the encrypted blob restored to the
  * fresh DB matches the still-living Keystore entry.
  */
-internal class SourcesBackup(
-    private val backupFile: File,
-) {
+internal class SourcesBackup(private val backupFile: File) {
     /**
      * Production constructor: writes to `<filesDir>/sources-backup.json`,
      * the standard location for app-private state on Android.
@@ -104,21 +102,17 @@ internal class SourcesBackup(
      * parse (corrupted backup; better to lose sources than to crash on
      * launch).
      */
-    fun read(): SourcesBackupFile? =
-        runCatching {
-            if (!backupFile.exists()) return@runCatching null
-            JSON.decodeFromString(SourcesBackupFile.serializer(), backupFile.readText())
-        }.getOrNull()
+    fun read(): SourcesBackupFile? = runCatching {
+        if (!backupFile.exists()) return@runCatching null
+        JSON.decodeFromString(SourcesBackupFile.serializer(), backupFile.readText())
+    }.getOrNull()
 
     /**
      * Re-insert the backed-up sources into a freshly-created DB. Called
      * by [DatabaseFactory] only after a corruption recovery has stood up
      * a new (empty) DB. Safe to call with an empty list.
      */
-    fun restoreInto(
-        db: YancoDb,
-        sources: List<BackedUpSource>,
-    ) {
+    fun restoreInto(db: YancoDb, sources: List<BackedUpSource>) {
         if (sources.isEmpty()) return
         db.sourcesQueries.transaction {
             sources.forEach { src ->
@@ -153,7 +147,10 @@ internal class SourcesBackup(
     private companion object {
         const val BACKUP_FILE_NAME = "sources-backup.json"
         const val TAG = "YancoSourcesBackup"
-        val JSON = Json { prettyPrint = false; encodeDefaults = true }
+        val JSON = Json {
+            prettyPrint = false
+            encodeDefaults = true
+        }
     }
 }
 
@@ -225,12 +222,11 @@ internal data class BackedUpSource(
 
     override fun hashCode(): Int = id.hashCode() * 31 + updatedAt.hashCode()
 
-    private fun ByteArray?.contentEqualsOrBothNull(other: ByteArray?): Boolean =
-        when {
-            this == null && other == null -> true
-            this == null || other == null -> false
-            else -> this.contentEquals(other)
-        }
+    private fun ByteArray?.contentEqualsOrBothNull(other: ByteArray?): Boolean = when {
+        this == null && other == null -> true
+        this == null || other == null -> false
+        else -> this.contentEquals(other)
+    }
 }
 
 /**
@@ -240,8 +236,4 @@ internal data class BackedUpSource(
  * stale columns into a different schema).
  */
 @Serializable
-internal data class SourcesBackupFile(
-    val schemaVersion: Int,
-    val backupTime: Long,
-    val sources: List<BackedUpSource>,
-)
+internal data class SourcesBackupFile(val schemaVersion: Int, val backupTime: Long, val sources: List<BackedUpSource>)

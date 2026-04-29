@@ -4,9 +4,7 @@ import android.content.Context
 import android.util.Log
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 
-actual class DatabaseFactory(
-    private val context: Context,
-) {
+actual class DatabaseFactory(private val context: Context) {
     /**
      * Open the YancoTV SQLDelight database.
      *
@@ -106,8 +104,7 @@ actual class DatabaseFactory(
      * PRAGMA configuration callback. Same as before — extracted so the
      * normal-open and recovery paths share one source of truth.
      */
-    private inner class SchemaCallback :
-        AndroidSqliteDriver.Callback(YancoDb.Schema) {
+    private inner class SchemaCallback : AndroidSqliteDriver.Callback(YancoDb.Schema) {
         override fun onConfigure(db: androidx.sqlite.db.SupportSQLiteDatabase) {
             super.onConfigure(db)
             // WAL lets readers and writers coexist. Without this, a

@@ -20,35 +20,31 @@ import kotlinx.coroutines.flow.map
  * The UI pins a synthetic "Favorites" category at the top of the rail; this
  * repo feeds that category. Order is newest-added first, matching desktop.
  */
-class FavoritesRepository(
-    private val db: YancoDb,
-    private val clock: () -> Long,
-) {
-    fun all(): List<FavoriteEntry> =
-        db.favoritesQueries.selectAll().executeAsList().map { row ->
-            FavoriteEntry(
-                favoriteId = row.favorite_id,
-                addedAt = row.added_at,
-                listId = row.list_id,
-                content =
-                    ContentItem(
-                        id = row.id,
-                        sourceId = row.source_id,
-                        type = contentTypeFromDb(row.type),
-                        title = row.title,
-                        cleanTitle = row.clean_title,
-                        groupName = row.group_name,
-                        streamUrl = row.stream_url,
-                        logoUrl = row.logo_url,
-                        tvgId = row.tvg_id,
-                        metadataJson = row.metadata_json,
-                        sortOrder = row.sort_order.toInt(),
-                        createdAt = row.created_at,
-                        nameOverride = row.name_override,
-                        logoOverride = row.logo_override,
-                    ),
-            )
-        }
+class FavoritesRepository(private val db: YancoDb, private val clock: () -> Long) {
+    fun all(): List<FavoriteEntry> = db.favoritesQueries.selectAll().executeAsList().map { row ->
+        FavoriteEntry(
+            favoriteId = row.favorite_id,
+            addedAt = row.added_at,
+            listId = row.list_id,
+            content =
+            ContentItem(
+                id = row.id,
+                sourceId = row.source_id,
+                type = contentTypeFromDb(row.type),
+                title = row.title,
+                cleanTitle = row.clean_title,
+                groupName = row.group_name,
+                streamUrl = row.stream_url,
+                logoUrl = row.logo_url,
+                tvgId = row.tvg_id,
+                metadataJson = row.metadata_json,
+                sortOrder = row.sort_order.toInt(),
+                createdAt = row.created_at,
+                nameOverride = row.name_override,
+                logoOverride = row.logo_override,
+            ),
+        )
+    }
 
     fun allForType(type: ContentType): List<FavoriteEntry> = all().filter { it.content.type == type }
 
@@ -63,43 +59,41 @@ class FavoritesRepository(
      * (`Dispatchers.IO` only exists on JVM/Android and would fail the iOS
      * metadata compile).
      */
-    fun allFlow(): Flow<List<FavoriteEntry>> =
-        db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows ->
-            rows.map { row ->
-                FavoriteEntry(
-                    favoriteId = row.favorite_id,
-                    addedAt = row.added_at,
-                    listId = row.list_id,
-                    content =
-                        ContentItem(
-                            id = row.id,
-                            sourceId = row.source_id,
-                            type = contentTypeFromDb(row.type),
-                            title = row.title,
-                            cleanTitle = row.clean_title,
-                            groupName = row.group_name,
-                            streamUrl = row.stream_url,
-                            logoUrl = row.logo_url,
-                            tvgId = row.tvg_id,
-                            metadataJson = row.metadata_json,
-                            sortOrder = row.sort_order.toInt(),
-                            createdAt = row.created_at,
-                            nameOverride = row.name_override,
-                            logoOverride = row.logo_override,
-                        ),
-                )
-            }
+    fun allFlow(): Flow<List<FavoriteEntry>> = db.favoritesQueries.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows ->
+        rows.map { row ->
+            FavoriteEntry(
+                favoriteId = row.favorite_id,
+                addedAt = row.added_at,
+                listId = row.list_id,
+                content =
+                ContentItem(
+                    id = row.id,
+                    sourceId = row.source_id,
+                    type = contentTypeFromDb(row.type),
+                    title = row.title,
+                    cleanTitle = row.clean_title,
+                    groupName = row.group_name,
+                    streamUrl = row.stream_url,
+                    logoUrl = row.logo_url,
+                    tvgId = row.tvg_id,
+                    metadataJson = row.metadata_json,
+                    sortOrder = row.sort_order.toInt(),
+                    createdAt = row.created_at,
+                    nameOverride = row.name_override,
+                    logoOverride = row.logo_override,
+                ),
+            )
         }
+    }
 
     /**
      * Reactive [isFavorite] for a single content id. Lets a star button
      * reflect state changes made from other screens without a focus round-trip.
      */
-    fun isFavoriteFlow(contentId: String): Flow<Boolean> =
-        db.favoritesQueries
-            .isFavorite(contentId)
-            .asFlow()
-            .mapToOne(Dispatchers.Default)
+    fun isFavoriteFlow(contentId: String): Flow<Boolean> = db.favoritesQueries
+        .isFavorite(contentId)
+        .asFlow()
+        .mapToOne(Dispatchers.Default)
 
     fun toggle(contentId: String): Boolean {
         // Returns the new state — caller can flip a UI star without re-querying.
@@ -128,34 +122,31 @@ class FavoritesRepository(
     // ───── MK.13.4 — multi-list ─────
 
     /** Snapshot of every list, sorted by [FavoriteList.sortOrder]. */
-    fun lists(): List<FavoriteList> =
-        db.favoriteListsQueries.selectAll().executeAsList().map { it.toEntity() }
+    fun lists(): List<FavoriteList> = db.favoriteListsQueries.selectAll().executeAsList().map { it.toEntity() }
 
     /** Reactive [lists] for a tab bar that re-renders when the user creates,
      *  renames, or deletes a list. Default list is always present. */
-    fun listsFlow(): Flow<List<FavoriteList>> =
-        db.favoriteListsQueries
-            .selectAll()
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { rows -> rows.map { it.toEntity() } }
+    fun listsFlow(): Flow<List<FavoriteList>> = db.favoriteListsQueries
+        .selectAll()
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows -> rows.map { it.toEntity() } }
 
     /** Reactive list of entries for [listId]. Empty when the list has no
      *  members (or doesn't exist — caller should still validate against
      *  [listsFlow]). */
-    fun byListFlow(listId: String): Flow<List<FavoriteEntry>> =
-        db.favoritesQueries
-            .selectByList(listId)
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { rows -> rows.map { it.toFavoriteEntry() } }
+    fun byListFlow(listId: String): Flow<List<FavoriteEntry>> = db.favoritesQueries
+        .selectByList(listId)
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows -> rows.map { it.toFavoriteEntry() } }
 
     /** Create a new list with [name] at the end of the order. Returns its id. */
     fun createList(name: String): String {
         val trimmed = name.trim().ifEmpty { "Untitled list" }
         val now = clock()
         val nextOrder = (lists().maxOfOrNull { it.sortOrder } ?: 0) + 1
-        val id = "list:${now}:${trimmed.hashCode().toUInt().toString(16)}"
+        val id = "list:$now:${trimmed.hashCode().toUInt().toString(16)}"
         db.favoriteListsQueries.insert(
             id = id,
             name = trimmed,
@@ -167,10 +158,7 @@ class FavoritesRepository(
         return id
     }
 
-    fun renameList(
-        id: String,
-        name: String,
-    ) {
+    fun renameList(id: String, name: String) {
         val trimmed = name.trim().ifEmpty { return }
         db.favoriteListsQueries.rename(name = trimmed, updated_at = clock(), id = id)
     }
@@ -182,10 +170,7 @@ class FavoritesRepository(
         db.favoriteListsQueries.deleteById(id)
     }
 
-    fun setListSortOrder(
-        id: String,
-        sortOrder: Int,
-    ) {
+    fun setListSortOrder(id: String, sortOrder: Int) {
         db.favoriteListsQueries.setSortOrder(
             sort_order = sortOrder.toLong(),
             updated_at = clock(),
@@ -200,10 +185,7 @@ class FavoritesRepository(
      * `fav:<content>` for legacy parity; the per-list id lets the same
      * content live in multiple lists simultaneously.
      */
-    fun addToList(
-        contentId: String,
-        listId: String,
-    ) {
+    fun addToList(contentId: String, listId: String) {
         val favoriteId = "fav:$listId:$contentId"
         runCatching {
             db.favoritesQueries.insert(
@@ -215,46 +197,41 @@ class FavoritesRepository(
         }
     }
 
-    fun removeFromList(
-        contentId: String,
-        listId: String,
-    ) {
+    fun removeFromList(contentId: String, listId: String) {
         db.favoritesQueries.deleteByContentInList(content_id = contentId, list_id = listId)
     }
 
-    private fun com.yancotv.shared.db.Favorite_lists.toEntity(): FavoriteList =
-        FavoriteList(
-            id = id,
-            name = name,
-            sortOrder = sort_order.toInt(),
-            isDefault = is_default == 1L,
-            createdAt = created_at,
-            updatedAt = updated_at,
-        )
+    private fun com.yancotv.shared.db.Favorite_lists.toEntity(): FavoriteList = FavoriteList(
+        id = id,
+        name = name,
+        sortOrder = sort_order.toInt(),
+        isDefault = is_default == 1L,
+        createdAt = created_at,
+        updatedAt = updated_at,
+    )
 
-    private fun com.yancotv.shared.db.SelectByList.toFavoriteEntry(): FavoriteEntry =
-        FavoriteEntry(
-            favoriteId = favorite_id,
-            addedAt = added_at,
-            listId = list_id,
-            content =
-                ContentItem(
-                    id = id,
-                    sourceId = source_id,
-                    type = contentTypeFromDb(type),
-                    title = title,
-                    cleanTitle = clean_title,
-                    groupName = group_name,
-                    streamUrl = stream_url,
-                    logoUrl = logo_url,
-                    tvgId = tvg_id,
-                    metadataJson = metadata_json,
-                    sortOrder = sort_order.toInt(),
-                    createdAt = created_at,
-                    nameOverride = name_override,
-                    logoOverride = logo_override,
-                ),
-        )
+    private fun com.yancotv.shared.db.SelectByList.toFavoriteEntry(): FavoriteEntry = FavoriteEntry(
+        favoriteId = favorite_id,
+        addedAt = added_at,
+        listId = list_id,
+        content =
+        ContentItem(
+            id = id,
+            sourceId = source_id,
+            type = contentTypeFromDb(type),
+            title = title,
+            cleanTitle = clean_title,
+            groupName = group_name,
+            streamUrl = stream_url,
+            logoUrl = logo_url,
+            tvgId = tvg_id,
+            metadataJson = metadata_json,
+            sortOrder = sort_order.toInt(),
+            createdAt = created_at,
+            nameOverride = name_override,
+            logoOverride = logo_override,
+        ),
+    )
 
     private companion object {
         // Stage 2.2 — id of the seeded "default" list. Created by the v4 → v5
@@ -264,10 +241,9 @@ class FavoritesRepository(
     }
 }
 
-private fun contentTypeFromDb(value: String): ContentType =
-    when (value) {
-        "live" -> ContentType.LIVE
-        "movie" -> ContentType.MOVIE
-        "series" -> ContentType.SERIES
-        else -> error("Unknown content type: $value")
-    }
+private fun contentTypeFromDb(value: String): ContentType = when (value) {
+    "live" -> ContentType.LIVE
+    "movie" -> ContentType.MOVIE
+    "series" -> ContentType.SERIES
+    else -> error("Unknown content type: $value")
+}

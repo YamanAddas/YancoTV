@@ -29,24 +29,20 @@ import okhttp3.OkHttpClient
  *    which clears or trims this cache on `RUNNING_LOW`/`RUNNING_CRITICAL`/
  *    `BACKGROUND`/`COMPLETE` levels.
  */
-fun buildYancoImageLoader(
-    context: Context,
-    sharedHttp: OkHttpClient,
-): ImageLoader =
-    ImageLoader
-        .Builder(context)
-        .memoryCache {
-            MemoryCache
-                .Builder()
-                .maxSizeBytes(32L * 1024 * 1024)
-                .build()
-        }.diskCache {
-            DiskCache
-                .Builder()
-                .directory(context.cacheDir.resolve("yanco-images"))
-                .maxSizeBytes(250L * 1024 * 1024)
-                .build()
-        }.components {
-            add(OkHttpNetworkFetcherFactory(sharedHttp))
-        }.crossfade(120)
-        .build()
+fun buildYancoImageLoader(context: Context, sharedHttp: OkHttpClient): ImageLoader = ImageLoader
+    .Builder(context)
+    .memoryCache {
+        MemoryCache
+            .Builder()
+            .maxSizeBytes(32L * 1024 * 1024)
+            .build()
+    }.diskCache {
+        DiskCache
+            .Builder()
+            .directory(context.cacheDir.resolve("yanco-images"))
+            .maxSizeBytes(250L * 1024 * 1024)
+            .build()
+    }.components {
+        add(OkHttpNetworkFetcherFactory(sharedHttp))
+    }.crossfade(120)
+    .build()

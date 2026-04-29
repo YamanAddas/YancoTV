@@ -2,6 +2,10 @@ package com.yancotv.android.sources
 
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.sources.SyncProgress
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -12,10 +16,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 
 /**
  * MK.23.D.2 — single-slot re-entrancy guard. The coordinator's first
@@ -36,54 +36,53 @@ import kotlin.test.assertNull
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SourceSyncCoordinatorTest {
-    @Test fun `second start while first in-flight is no-op and does not invoke syncSource again`() =
-        runTest {
-            val invocations = AtomicInteger(0)
-            // Flow stays open — never emits DONE — so the first start()
-            // remains "active". Without re-entrancy guard the second
-            // start would see an empty `_state` and fire syncSource
-            // again.
-            val openFlow = MutableSharedFlow<SyncProgress>(replay = 1)
-            openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, message = "go"))
+    @Test fun `second start while first in-flight is no-op and does not invoke syncSource again`() = runTest {
+        val invocations = AtomicInteger(0)
+        // Flow stays open — never emits DONE — so the first start()
+        // remains "active". Without re-entrancy guard the second
+        // start would see an empty `_state` and fire syncSource
+        // again.
+        val openFlow = MutableSharedFlow<SyncProgress>(replay = 1)
+        openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, message = "go"))
 
-            val coordinator =
-                SourceSyncCoordinator(
-                    syncSource = { _ ->
-                        invocations.incrementAndGet()
-                        openFlow as Flow<SyncProgress>
-                    },
-                    logger = NoopLogger,
-                    kickEpgRefresh = {},
-                    dispatcher = UnconfinedTestDispatcher(testScheduler),
-                    scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
-                )
-
-            coordinator.start(sourceId = "src-A", sourceName = "A")
-            // First start must observe Active state.
-            assertNotNull(coordinator.state.value, "first start must populate state")
-            assertEquals("src-A", coordinator.state.value?.sourceId)
-            assertEquals(1, invocations.get(), "first start invokes syncSource once")
-
-            // Second start while first still in flight — must early-return.
-            coordinator.start(sourceId = "src-A", sourceName = "A")
-            assertEquals(
-                1,
-                invocations.get(),
-                "second start MUST be a silent no-op — the existing _state.value != null guard is the contract",
+        val coordinator =
+            SourceSyncCoordinator(
+                syncSource = { _ ->
+                    invocations.incrementAndGet()
+                    openFlow as Flow<SyncProgress>
+                },
+                logger = NoopLogger,
+                kickEpgRefresh = {},
+                dispatcher = UnconfinedTestDispatcher(testScheduler),
+                scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
             )
 
-            // Different source same window — also rejected. The coordinator
-            // is single-slot regardless of source identity.
-            coordinator.start(sourceId = "src-B", sourceName = "B")
-            assertEquals(
-                1,
-                invocations.get(),
-                "single-slot: even a different source can't sneak in while another is active",
-            )
+        coordinator.start(sourceId = "src-A", sourceName = "A")
+        // First start must observe Active state.
+        assertNotNull(coordinator.state.value, "first start must populate state")
+        assertEquals("src-A", coordinator.state.value?.sourceId)
+        assertEquals(1, invocations.get(), "first start invokes syncSource once")
 
-            // State still reflects the original source.
-            assertEquals("src-A", coordinator.state.value?.sourceId)
-        }
+        // Second start while first still in flight — must early-return.
+        coordinator.start(sourceId = "src-A", sourceName = "A")
+        assertEquals(
+            1,
+            invocations.get(),
+            "second start MUST be a silent no-op — the existing _state.value != null guard is the contract",
+        )
+
+        // Different source same window — also rejected. The coordinator
+        // is single-slot regardless of source identity.
+        coordinator.start(sourceId = "src-B", sourceName = "B")
+        assertEquals(
+            1,
+            invocations.get(),
+            "single-slot: even a different source can't sneak in while another is active",
+        )
+
+        // State still reflects the original source.
+        assertEquals("src-A", coordinator.state.value?.sourceId)
+    }
 
     /**
      * MK.24.E.2 — full lifecycle teardown: after the first run's flow
@@ -95,43 +94,42 @@ class SourceSyncCoordinatorTest {
      * fires on the success path AND that a follow-up start() is observed
      * by the fake repo (one repo invocation per call, total of 2 here).
      */
-    @Test fun `start completed then restarted observes second invocation and clears state between runs`() =
-        runTest {
-            val invocations = AtomicInteger(0)
-            val coordinator =
-                SourceSyncCoordinator(
-                    syncSource = { _ ->
-                        invocations.incrementAndGet()
-                        // Finite flow that terminates after DONE so the
-                        // launch's collect returns and finally fires.
-                        flowOf(SyncProgress(SyncProgress.Phase.DONE, message = "ok"))
-                    },
-                    logger = NoopLogger,
-                    kickEpgRefresh = {},
-                    dispatcher = UnconfinedTestDispatcher(testScheduler),
-                    scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
-                )
-
-            coordinator.start("src-A", "A")
-            testScheduler.advanceUntilIdle()
-            assertEquals(1, invocations.get(), "first start invokes syncSource")
-            assertNull(
-                coordinator.state.value,
-                "finally MUST clear _state after DONE so subsequent starts can run",
+    @Test fun `start completed then restarted observes second invocation and clears state between runs`() = runTest {
+        val invocations = AtomicInteger(0)
+        val coordinator =
+            SourceSyncCoordinator(
+                syncSource = { _ ->
+                    invocations.incrementAndGet()
+                    // Finite flow that terminates after DONE so the
+                    // launch's collect returns and finally fires.
+                    flowOf(SyncProgress(SyncProgress.Phase.DONE, message = "ok"))
+                },
+                logger = NoopLogger,
+                kickEpgRefresh = {},
+                dispatcher = UnconfinedTestDispatcher(testScheduler),
+                scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
             )
 
-            // Fresh start after teardown — the re-entrancy guard sees
-            // _state.value == null and lets it through. A regression
-            // that left state non-null after DONE would fail right here.
-            coordinator.start("src-B", "B")
-            testScheduler.advanceUntilIdle()
-            assertEquals(
-                2,
-                invocations.get(),
-                "second start after first completes MUST invoke syncSource a second time",
-            )
-            assertNull(coordinator.state.value, "second run also tears down")
-        }
+        coordinator.start("src-A", "A")
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, invocations.get(), "first start invokes syncSource")
+        assertNull(
+            coordinator.state.value,
+            "finally MUST clear _state after DONE so subsequent starts can run",
+        )
+
+        // Fresh start after teardown — the re-entrancy guard sees
+        // _state.value == null and lets it through. A regression
+        // that left state non-null after DONE would fail right here.
+        coordinator.start("src-B", "B")
+        testScheduler.advanceUntilIdle()
+        assertEquals(
+            2,
+            invocations.get(),
+            "second start after first completes MUST invoke syncSource a second time",
+        )
+        assertNull(coordinator.state.value, "second run also tears down")
+    }
 
     /**
      * MK.24.E.2 — failure-path teardown. The launch's outer catch logs +
@@ -140,61 +138,59 @@ class SourceSyncCoordinatorTest {
      * for the user to retry. This is the recovery contract: a transient
      * failure must NOT lock the source out for the session.
      */
-    @Test fun `start failed then restarted clears state and allows second invocation`() =
-        runTest {
-            val invocations = AtomicInteger(0)
-            val coordinator =
-                SourceSyncCoordinator(
-                    syncSource = { _ ->
-                        invocations.incrementAndGet()
-                        flow<SyncProgress> { throw RuntimeException("network down") }
-                    },
-                    logger = NoopLogger,
-                    kickEpgRefresh = {},
-                    dispatcher = UnconfinedTestDispatcher(testScheduler),
-                    scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
-                )
-
-            coordinator.start("src-A", "A")
-            testScheduler.advanceUntilIdle()
-            assertEquals(1, invocations.get())
-            assertNull(
-                coordinator.state.value,
-                "finally MUST clear _state on the failure path too — user retry depends on it",
+    @Test fun `start failed then restarted clears state and allows second invocation`() = runTest {
+        val invocations = AtomicInteger(0)
+        val coordinator =
+            SourceSyncCoordinator(
+                syncSource = { _ ->
+                    invocations.incrementAndGet()
+                    flow<SyncProgress> { throw RuntimeException("network down") }
+                },
+                logger = NoopLogger,
+                kickEpgRefresh = {},
+                dispatcher = UnconfinedTestDispatcher(testScheduler),
+                scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
             )
 
-            coordinator.start("src-A", "A")
-            testScheduler.advanceUntilIdle()
-            assertEquals(
-                2,
-                invocations.get(),
-                "retry after failure MUST invoke syncSource a second time",
+        coordinator.start("src-A", "A")
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, invocations.get())
+        assertNull(
+            coordinator.state.value,
+            "finally MUST clear _state on the failure path too — user retry depends on it",
+        )
+
+        coordinator.start("src-A", "A")
+        testScheduler.advanceUntilIdle()
+        assertEquals(
+            2,
+            invocations.get(),
+            "retry after failure MUST invoke syncSource a second time",
+        )
+    }
+
+    @Test fun `cancel sets activeJob to null but state observable until launch finally fires`() = runTest {
+        val openFlow = MutableSharedFlow<SyncProgress>(replay = 1)
+        openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, message = "go"))
+
+        val coordinator =
+            SourceSyncCoordinator(
+                syncSource = { _ -> openFlow as Flow<SyncProgress> },
+                logger = NoopLogger,
+                kickEpgRefresh = {},
+                dispatcher = UnconfinedTestDispatcher(testScheduler),
+                scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
             )
-        }
 
-    @Test fun `cancel sets activeJob to null but state observable until launch finally fires`() =
-        runTest {
-            val openFlow = MutableSharedFlow<SyncProgress>(replay = 1)
-            openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, message = "go"))
+        coordinator.start("src-A", "A")
+        assertNotNull(coordinator.state.value)
 
-            val coordinator =
-                SourceSyncCoordinator(
-                    syncSource = { _ -> openFlow as Flow<SyncProgress> },
-                    logger = NoopLogger,
-                    kickEpgRefresh = {},
-                    dispatcher = UnconfinedTestDispatcher(testScheduler),
-                    scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler)),
-                )
-
-            coordinator.start("src-A", "A")
-            assertNotNull(coordinator.state.value)
-
-            coordinator.cancel()
-            testScheduler.advanceUntilIdle()
-            // After cancel + finally clears, state should be null again so
-            // a subsequent start() can succeed.
-            assertNull(coordinator.state.value, "finally clears _state on cancellation")
-        }
+        coordinator.cancel()
+        testScheduler.advanceUntilIdle()
+        // After cancel + finally clears, state should be null again so
+        // a subsequent start() can succeed.
+        assertNull(coordinator.state.value, "finally clears _state on cancellation")
+    }
 
     private object NoopLogger : Logger {
         override fun info(msg: String) {}

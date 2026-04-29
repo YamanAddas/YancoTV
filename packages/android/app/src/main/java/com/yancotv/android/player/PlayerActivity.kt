@@ -20,10 +20,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -48,6 +48,8 @@ import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgProgramme
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -55,8 +57,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
-import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
  * Fullscreen player. Attaches the shared [PlaybackController.player]
@@ -493,10 +493,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPictureInPictureModeChanged(
-        isInPictureInPictureMode: Boolean,
-        newConfig: Configuration,
-    ) {
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         inPip = isInPictureInPictureMode
         // While in PIP, the shrunken surface only needs the video — hide
@@ -733,19 +730,13 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatCodec(
-        v: Format?,
-        a: Format?,
-    ): String {
+    private fun formatCodec(v: Format?, a: Format?): String {
         val vc = v?.sampleMimeType?.substringAfter('/')?.uppercase()
         val ac = a?.sampleMimeType?.substringAfter('/')?.uppercase()
         return listOfNotNull(vc, ac).joinToString(" / ").ifEmpty { "—" }
     }
 
-    private fun formatBitrate(
-        v: Format?,
-        a: Format?,
-    ): String {
+    private fun formatBitrate(v: Format?, a: Format?): String {
         val total = listOfNotNull(v?.bitrate, a?.bitrate).filter { it > 0 }.sum()
         if (total <= 0) return "—"
         return if (total >= 1_000_000) {
@@ -866,9 +857,7 @@ class PlayerActivity : AppCompatActivity() {
 
     // ───── MK.options.redesign — new options popup + per-category panels ─────
 
-    private fun showOptionsV2(
-        initialCategory: com.yancotv.android.player.options.PlayerOptionCategory? = null,
-    ) {
+    private fun showOptionsV2(initialCategory: com.yancotv.android.player.options.PlayerOptionCategory? = null) {
         ensureOptionsV2()
         playerView.hideController()
         // Audit: same defense the legacy sheet uses. Block PlayerView's
@@ -950,8 +939,8 @@ class PlayerActivity : AppCompatActivity() {
                 category = com.yancotv.android.player.options.PlayerOptionCategory.AUDIO,
                 label = "Audio",
                 currentValue =
-                    playback.audioLanguage.takeIf { it.isNotBlank() }
-                        ?.uppercase(java.util.Locale.ROOT) ?: "Auto",
+                playback.audioLanguage.takeIf { it.isNotBlank() }
+                    ?.uppercase(java.util.Locale.ROOT) ?: "Auto",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.AUDIO) },
                 onCyclePrev = {
                     com.yancotv.android.player.options.cycleAudioTrack(
@@ -975,8 +964,8 @@ class PlayerActivity : AppCompatActivity() {
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES,
                 label = "Subtitles",
                 currentValue =
-                    playback.subtitleLanguage.takeIf { it.isNotBlank() }
-                        ?.uppercase(java.util.Locale.ROOT) ?: "Off",
+                playback.subtitleLanguage.takeIf { it.isNotBlank() }
+                    ?.uppercase(java.util.Locale.ROOT) ?: "Off",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES) },
                 onCyclePrev = {
                     com.yancotv.android.player.options.cycleTextTrack(
@@ -1036,11 +1025,11 @@ class PlayerActivity : AppCompatActivity() {
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SLEEP,
                 label = "Sleep",
                 currentValue =
-                    when (val s = sleepState) {
-                        is com.yancotv.android.player.SleepTimerState.Off -> "Off"
-                        is com.yancotv.android.player.SleepTimerState.Active ->
-                            sleepRowLabel(s.option)
-                    },
+                when (val s = sleepState) {
+                    is com.yancotv.android.player.SleepTimerState.Off -> "Off"
+                    is com.yancotv.android.player.SleepTimerState.Active ->
+                        sleepRowLabel(s.option)
+                },
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SLEEP) },
             )
         // Slice 2b — these rows open native floating panels matching the
@@ -1114,14 +1103,13 @@ class PlayerActivity : AppCompatActivity() {
         return raw >= LIVE_BEHIND_THRESHOLD_MS
     }
 
-    private fun sleepRowLabel(opt: SleepTimerOption): String =
-        when (opt) {
-            SleepTimerOption.MIN_15 -> "15 min"
-            SleepTimerOption.MIN_30 -> "30 min"
-            SleepTimerOption.MIN_45 -> "45 min"
-            SleepTimerOption.MIN_60 -> "60 min"
-            SleepTimerOption.END_OF_PROGRAM -> "End of programme"
-        }
+    private fun sleepRowLabel(opt: SleepTimerOption): String = when (opt) {
+        SleepTimerOption.MIN_15 -> "15 min"
+        SleepTimerOption.MIN_30 -> "30 min"
+        SleepTimerOption.MIN_45 -> "45 min"
+        SleepTimerOption.MIN_60 -> "60 min"
+        SleepTimerOption.END_OF_PROGRAM -> "End of programme"
+    }
 
     /**
      * Lazy-inflate the channel-zap ViewStub on the first digit. Avoids
@@ -1677,10 +1665,7 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    override fun onKeyDown(
-        keyCode: Int,
-        event: KeyEvent,
-    ): Boolean {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         // MK.options.redesign — popup/panel takes priority over every
         // other handler. Without this, the `if (!controllerVisible)`
         // branch below was matching DPAD_LEFT first and opening the

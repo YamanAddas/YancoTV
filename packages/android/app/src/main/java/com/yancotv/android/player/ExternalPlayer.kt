@@ -11,11 +11,7 @@ import android.net.Uri
  * Android 11+ visibility, otherwise [PackageManager.getPackageInfo]
  * always reports "not installed".
  */
-enum class ExternalPlayerApp(
-    val packageName: String,
-    val displayName: String,
-    val sub: String,
-) {
+enum class ExternalPlayerApp(val packageName: String, val displayName: String, val sub: String) {
     VLC("org.videolan.vlc", "VLC", "Open in VLC"),
     MX_PRO("com.mxtech.videoplayer.pro", "MX Player Pro", "Open in MX Player Pro"),
     MX_FREE("com.mxtech.videoplayer.ad", "MX Player", "Open in MX Player"),
@@ -60,11 +56,7 @@ object ExternalPlayer {
      * same convention. Live streams pass null because the offset is
      * meaningless for live.
      */
-    fun buildIntent(
-        streamUrl: String,
-        positionMs: Long?,
-        app: ExternalPlayerApp?,
-    ): Intent {
+    fun buildIntent(streamUrl: String, positionMs: Long?, app: ExternalPlayerApp?): Intent {
         val intent =
             Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(Uri.parse(streamUrl), "video/*")
@@ -85,37 +77,26 @@ object ExternalPlayer {
      * system chooser) and starts it. Returns false if the launch failed
      * (no resolver, or the user cancelled the chooser).
      */
-    fun launch(
-        context: Context,
-        streamUrl: String,
-        positionMs: Long?,
-        app: ExternalPlayerApp?,
-    ): Boolean {
-        return runCatching {
-            val intent = buildIntent(streamUrl, positionMs, app)
-            val toStart =
-                if (app == null) {
-                    Intent.createChooser(intent, "Open with").apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                } else {
-                    intent
+    fun launch(context: Context, streamUrl: String, positionMs: Long?, app: ExternalPlayerApp?): Boolean = runCatching {
+        val intent = buildIntent(streamUrl, positionMs, app)
+        val toStart =
+            if (app == null) {
+                Intent.createChooser(intent, "Open with").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-            context.startActivity(toStart)
-            true
-        }.getOrDefault(false)
-    }
+            } else {
+                intent
+            }
+        context.startActivity(toStart)
+        true
+    }.getOrDefault(false)
 
-    private fun isPackageInstalled(
-        pm: PackageManager,
-        pkg: String,
-    ): Boolean =
-        runCatching {
-            // GET_ACTIVITIES = 0 — we only need existence, not the
-            // package details. The query is cheap and returns null /
-            // throws NameNotFoundException when the package isn't
-            // installed; runCatching collapses both to false.
-            pm.getPackageInfo(pkg, 0)
-            true
-        }.getOrDefault(false)
+    private fun isPackageInstalled(pm: PackageManager, pkg: String): Boolean = runCatching {
+        // GET_ACTIVITIES = 0 — we only need existence, not the
+        // package details. The query is cheap and returns null /
+        // throws NameNotFoundException when the package isn't
+        // installed; runCatching collapses both to false.
+        pm.getPackageInfo(pkg, 0)
+        true
+    }.getOrDefault(false)
 }

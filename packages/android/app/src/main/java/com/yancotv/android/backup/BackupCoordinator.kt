@@ -1,6 +1,5 @@
 package com.yancotv.android.backup
 
-import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -9,9 +8,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
-import java.io.File
-import java.io.FileOutputStream
 import com.yancotv.android.BuildConfig
+import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.shared.backup.BackupCanonicalJson
 import com.yancotv.shared.backup.BackupChecksumMismatchException
 import com.yancotv.shared.backup.BackupDecryptException
@@ -22,13 +20,13 @@ import com.yancotv.shared.backup.BackupSchemaTooNewException
 import com.yancotv.shared.backup.RestoreReport
 import com.yancotv.shared.backup.sha256Hex
 import com.yancotv.shared.db.YancoDb
-import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.shared.sources.CredentialStore
 import com.yancotv.shared.sources.SyncProgress
+import java.io.File
+import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +35,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -85,6 +84,7 @@ class BackupCoordinator(
             .onEach { onSourceSyncComplete() }
             .launchIn(scope)
     }
+
     /**
      * Default export path — writes to the system's public Downloads
      * folder (`MediaStore.Downloads` on API 29+, direct file write to
@@ -94,29 +94,21 @@ class BackupCoordinator(
      * Used when the user hasn't explicitly picked a backup folder
      * via the Settings → Backup → "Change folder…" button.
      */
-    suspend fun exportToDefault(
-        filename: String,
-        password: String?,
-        label: String?,
-    ): ExportResult =
-        withContext(Dispatchers.IO) {
-            val (file, bytes) = buildBackupBytes(password)
-            val (storageUriString, sizeBytes) =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    writeToMediaStoreDownloads(filename, bytes)
-                        ?: return@withContext ExportResult.Failed("MediaStore.Downloads insert failed")
-                } else {
-                    writeToPublicDownloadsLegacy(filename, bytes)
-                        ?: return@withContext ExportResult.Failed("Could not write to /sdcard/Download")
-                }
-            persistMetadata(file, storageUriString, sizeBytes, label)
-            ExportResult.Success(file = file, bytesWritten = sizeBytes)
-        }
+    suspend fun exportToDefault(filename: String, password: String?, label: String?): ExportResult = withContext(Dispatchers.IO) {
+        val (file, bytes) = buildBackupBytes(password)
+        val (storageUriString, sizeBytes) =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                writeToMediaStoreDownloads(filename, bytes)
+                    ?: return@withContext ExportResult.Failed("MediaStore.Downloads insert failed")
+            } else {
+                writeToPublicDownloadsLegacy(filename, bytes)
+                    ?: return@withContext ExportResult.Failed("Could not write to /sdcard/Download")
+            }
+        persistMetadata(file, storageUriString, sizeBytes, label)
+        ExportResult.Success(file = file, bytesWritten = sizeBytes)
+    }
 
-    private fun writeToMediaStoreDownloads(
-        filename: String,
-        bytes: ByteArray,
-    ): Pair<String, Long>? {
+    private fun writeToMediaStoreDownloads(filename: String, bytes: ByteArray): Pair<String, Long>? {
         val values =
             ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, filename)
@@ -128,7 +120,10 @@ class BackupCoordinator(
             }
         val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
         return runCatching {
-            context.contentResolver.openOutputStream(uri, "w")?.use { it.write(bytes); it.flush() }
+            context.contentResolver.openOutputStream(uri, "w")?.use {
+                it.write(bytes)
+                it.flush()
+            }
                 ?: error("openOutputStream returned null")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 values.clear()
@@ -144,16 +139,16 @@ class BackupCoordinator(
         }
     }
 
-    private fun writeToPublicDownloadsLegacy(
-        filename: String,
-        bytes: ByteArray,
-    ): Pair<String, Long>? {
+    private fun writeToPublicDownloadsLegacy(filename: String, bytes: ByteArray): Pair<String, Long>? {
         @Suppress("DEPRECATION")
         val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val targetDir = File(downloads, "YancoTV").also { it.mkdirs() }
         val file = File(targetDir, filename)
         return runCatching {
-            FileOutputStream(file).use { it.write(bytes); it.flush() }
+            FileOutputStream(file).use {
+                it.write(bytes)
+                it.flush()
+            }
             Uri.fromFile(file).toString() to file.length()
         }.getOrElse {
             Log.e(TAG, "legacy Downloads write failed", it)
@@ -169,36 +164,30 @@ class BackupCoordinator(
      * button. We mirror the recording-folder pattern from
      * [com.yancotv.android.recording.RecordingStorageResolver].
      */
-    suspend fun export(
-        folderUri: Uri,
-        filename: String,
-        password: String?,
-        label: String?,
-    ): ExportResult =
-        withContext(Dispatchers.IO) {
-            val (file, bytes) = buildBackupBytes(password)
+    suspend fun export(folderUri: Uri, filename: String, password: String?, label: String?): ExportResult = withContext(Dispatchers.IO) {
+        val (file, bytes) = buildBackupBytes(password)
 
-            // Resolve the tree URI to a writable DocumentFile, create
-            // (or replace) the named file inside, write bytes.
-            val tree =
-                DocumentFile.fromTreeUri(context, folderUri)
-                    ?: return@withContext ExportResult.Failed("Could not open folder")
-            // If a file with the same name already exists, delete it
-            // first — SAF createFile silently appends "(1)" suffixes
-            // otherwise, which fragments the user's backup folder.
-            tree.findFile(filename)?.delete()
-            val doc =
-                tree.createFile("application/json", filename)
-                    ?: return@withContext ExportResult.Failed("Could not create file '$filename' in folder")
+        // Resolve the tree URI to a writable DocumentFile, create
+        // (or replace) the named file inside, write bytes.
+        val tree =
+            DocumentFile.fromTreeUri(context, folderUri)
+                ?: return@withContext ExportResult.Failed("Could not open folder")
+        // If a file with the same name already exists, delete it
+        // first — SAF createFile silently appends "(1)" suffixes
+        // otherwise, which fragments the user's backup folder.
+        tree.findFile(filename)?.delete()
+        val doc =
+            tree.createFile("application/json", filename)
+                ?: return@withContext ExportResult.Failed("Could not create file '$filename' in folder")
 
-            context.contentResolver.openOutputStream(doc.uri, "w")?.use { out ->
-                out.write(bytes)
-                out.flush()
-            } ?: return@withContext ExportResult.Failed("Could not open file for writing")
+        context.contentResolver.openOutputStream(doc.uri, "w")?.use { out ->
+            out.write(bytes)
+            out.flush()
+        } ?: return@withContext ExportResult.Failed("Could not open file for writing")
 
-            persistMetadata(file, doc.uri.toString(), bytes.size.toLong(), label)
-            ExportResult.Success(file = file, bytesWritten = bytes.size.toLong())
-        }
+        persistMetadata(file, doc.uri.toString(), bytes.size.toLong(), label)
+        ExportResult.Success(file = file, bytesWritten = bytes.size.toLong())
+    }
 
     /** Build the BackupFileV1 + canonical-pretty-JSON bytes once, share across export paths. */
     private fun buildBackupBytes(password: String?): Pair<BackupFileV1, ByteArray> {
@@ -215,12 +204,7 @@ class BackupCoordinator(
     }
 
     /** Insert a BackupMetadata row tracking the just-written export. */
-    private fun persistMetadata(
-        file: BackupFileV1,
-        fileUri: String,
-        sizeBytes: Long,
-        label: String?,
-    ) {
+    private fun persistMetadata(file: BackupFileV1, fileUri: String, sizeBytes: Long, label: String?) {
         // SHA-256 over the on-disk bytes — distinct from file.checksum
         // (which is over the `records` block only). The on-disk
         // checksum lets a future "verify integrity" feature catch
@@ -246,64 +230,60 @@ class BackupCoordinator(
      * `ContentResolver.openInputStream` probe so MB-217 catches missing
      * files at import time.
      */
-    suspend fun import(
-        source: Uri,
-        password: String?,
-    ): ImportResult =
-        withContext(Dispatchers.IO) {
-            val text =
-                runCatching {
-                    context.contentResolver.openInputStream(source)?.use { it.readBytes().decodeToString() }
-                }.getOrElse { return@withContext ImportResult.IoError("could not open $source: ${it.message}") }
-                    ?: return@withContext ImportResult.IoError("ContentResolver returned null InputStream for $source")
+    suspend fun import(source: Uri, password: String?): ImportResult = withContext(Dispatchers.IO) {
+        val text =
+            runCatching {
+                context.contentResolver.openInputStream(source)?.use { it.readBytes().decodeToString() }
+            }.getOrElse { return@withContext ImportResult.IoError("could not open $source: ${it.message}") }
+                ?: return@withContext ImportResult.IoError("ContentResolver returned null InputStream for $source")
 
-            val file =
-                runCatching { BackupCanonicalJson.decodeBackupFile(text) }
-                    .getOrElse { return@withContext ImportResult.MalformedJson(it.message ?: "JSON parse failed") }
+        val file =
+            runCatching { BackupCanonicalJson.decodeBackupFile(text) }
+                .getOrElse { return@withContext ImportResult.MalformedJson(it.message ?: "JSON parse failed") }
 
-            val importer =
-                BackupImporter(
-                    db = db,
-                    credentialStore = credentialStore,
-                    recordingFileExists = { uri ->
-                        runCatching {
-                            context.contentResolver
-                                .openInputStream(Uri.parse(uri))
-                                ?.use { /* close immediately */ }
-                            true
-                        }.getOrElse { false }
-                    },
-                )
-            try {
-                val report = importer.import(file, password = password, currentSchemaVersion = YancoDb.Schema.version.toInt())
-                // MK.19.8.4 — register importer for source-sync-driven
-                // retry IF anything actually buffered. No buffer →
-                // nothing to retry → don't keep a reference around.
-                val unlinked = report.unlinked.values.sum()
-                if (unlinked > 0) {
-                    pendingImporter = importer
-                    retriesRemaining = MAX_RETRY_PASSES
-                    _pendingCount.value = unlinked
-                } else {
-                    pendingImporter = null
-                    retriesRemaining = 0
-                    _pendingCount.value = 0
-                }
-                ImportResult.Success(report = report, importer = importer, file = file)
-            } catch (e: BackupChecksumMismatchException) {
-                Log.w(TAG, "checksum mismatch on $source", e)
-                ImportResult.ChecksumMismatch
-            } catch (e: BackupSchemaTooNewException) {
-                Log.w(TAG, "schema too new", e)
-                ImportResult.SchemaTooNew(backupVersion = e.backupVersion, currentVersion = e.currentVersion)
-            } catch (e: BackupDecryptException) {
-                Log.w(TAG, "decrypt failed", e)
-                ImportResult.DecryptFailed(e.message ?: "credential decryption failed")
-            } catch (e: Throwable) {
-                Log.e(TAG, "unexpected import failure", e)
-                ImportResult.UnexpectedError(e.message ?: e::class.simpleName ?: "unknown")
+        val importer =
+            BackupImporter(
+                db = db,
+                credentialStore = credentialStore,
+                recordingFileExists = { uri ->
+                    runCatching {
+                        context.contentResolver
+                            .openInputStream(Uri.parse(uri))
+                            ?.use { /* close immediately */ }
+                        true
+                    }.getOrElse { false }
+                },
+            )
+        try {
+            val report = importer.import(file, password = password, currentSchemaVersion = YancoDb.Schema.version.toInt())
+            // MK.19.8.4 — register importer for source-sync-driven
+            // retry IF anything actually buffered. No buffer →
+            // nothing to retry → don't keep a reference around.
+            val unlinked = report.unlinked.values.sum()
+            if (unlinked > 0) {
+                pendingImporter = importer
+                retriesRemaining = MAX_RETRY_PASSES
+                _pendingCount.value = unlinked
+            } else {
+                pendingImporter = null
+                retriesRemaining = 0
+                _pendingCount.value = 0
             }
+            ImportResult.Success(report = report, importer = importer, file = file)
+        } catch (e: BackupChecksumMismatchException) {
+            Log.w(TAG, "checksum mismatch on $source", e)
+            ImportResult.ChecksumMismatch
+        } catch (e: BackupSchemaTooNewException) {
+            Log.w(TAG, "schema too new", e)
+            ImportResult.SchemaTooNew(backupVersion = e.backupVersion, currentVersion = e.currentVersion)
+        } catch (e: BackupDecryptException) {
+            Log.w(TAG, "decrypt failed", e)
+            ImportResult.DecryptFailed(e.message ?: "credential decryption failed")
+        } catch (e: Throwable) {
+            Log.e(TAG, "unexpected import failure", e)
+            ImportResult.UnexpectedError(e.message ?: e::class.simpleName ?: "unknown")
         }
+    }
 
     /**
      * Called by the sync-coordinator subscription when a source
@@ -346,11 +326,7 @@ sealed interface ExportResult {
 }
 
 sealed interface ImportResult {
-    data class Success(
-        val report: RestoreReport,
-        val importer: BackupImporter,
-        val file: BackupFileV1,
-    ) : ImportResult
+    data class Success(val report: RestoreReport, val importer: BackupImporter, val file: BackupFileV1) : ImportResult
 
     data object ChecksumMismatch : ImportResult
 
