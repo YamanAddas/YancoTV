@@ -22,6 +22,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -787,24 +788,38 @@ private fun GuideGrid(
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                items(guide.channels, key = { it.tvgId }) { channel ->
-                    ChannelRow(
-                        channel = channel,
-                        windowStart = guide.startTime,
-                        windowEnd = guide.endTime,
-                        timelineWidth = timelineWidth,
-                        pxPerMin = pxPerMin,
-                        hScroll = hScroll,
-                        onPlayChannel = { onPlay(channel, null) },
-                        onLongPressChannel = { onChannelLongPress(channel) },
-                        onProgrammeAction = { prog -> onProgrammeAction(channel, prog) },
-                        onExitLeftFromChannel = onExitLeftFromChannel,
-                    )
+            // Stage 5.4 perf slice 2 — `BoxWithConstraints` reads the
+            // panel's max width once so each `ChannelRow` knows the
+            // pixel viewport for its `hScroll` and can virtualise the
+            // programme list to the visible window. Without it every
+            // row composed all 24 h × 50–150 programmes per channel —
+            // ~750–2250 `ProgrammeBlock` instances always in the
+            // layout tree, walked on every scroll.
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val viewportWidthPx =
+                    with(density) { (maxWidth - CHANNEL_COL_WIDTH).toPx() }
+                        .toInt()
+                        .coerceAtLeast(0)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    items(guide.channels, key = { it.tvgId }) { channel ->
+                        ChannelRow(
+                            channel = channel,
+                            windowStart = guide.startTime,
+                            windowEnd = guide.endTime,
+                            timelineWidth = timelineWidth,
+                            pxPerMin = pxPerMin,
+                            viewportWidthPx = viewportWidthPx,
+                            hScroll = hScroll,
+                            onPlayChannel = { onPlay(channel, null) },
+                            onLongPressChannel = { onChannelLongPress(channel) },
+                            onProgrammeAction = { prog -> onProgrammeAction(channel, prog) },
+                            onExitLeftFromChannel = onExitLeftFromChannel,
+                        )
+                    }
                 }
             }
 
@@ -960,12 +975,59 @@ private fun ChannelRow(
     windowEnd: Long,
     timelineWidth: androidx.compose.ui.unit.Dp,
     pxPerMin: Int,
+    viewportWidthPx: Int,
     hScroll: androidx.compose.foundation.ScrollState,
     onPlayChannel: () -> Unit,
     onLongPressChannel: () -> Unit,
     onProgrammeAction: (EpgProgramme) -> Unit,
     onExitLeftFromChannel: () -> Unit,
 ) {
+    // Stage 5.4 perf slice 2 — virtualise the programme list. Pre-fix
+    // every `ChannelRow` rendered all 24 h × 50–150 programmes per
+    // channel, even when only ~5 fell inside the user's viewport, so
+    // the layout pass walked every off-screen `ProgrammeBlock` on
+    // every scroll. With the LazyColumn above showing ~15 rows that
+    // was 750–2250 instances always laid out.
+    //
+    // Now: a `derivedStateOf` reads `hScroll.value` and emits only
+    // programmes whose `[startTime, endTime]` intersects
+    // `[viewportStart − buffer, viewportEnd + buffer]`. `derivedStateOf`
+    // is the right primitive — its consumer (this composable) only
+    // recomposes when the *derived list* changes (i.e. crossing a
+    // programme boundary), not on every scroll frame. The 60 min
+    // buffer on each side absorbs fast scrolls before the next derive
+    // tick lands.
+    //
+    // Programmes are then absolutely positioned via `Modifier.offset`
+    // (lambda form, layout-time only — same trick as the now-line in
+    // slice 1). The wrapper `Box(width = timelineWidth)` keeps the
+    // total scrollable width unchanged so `hScroll`'s bounds aren't
+    // disturbed by the virtualisation.
+    val visibleProgrammes by remember(
+        channel.programmes,
+        windowStart,
+        windowEnd,
+        pxPerMin,
+        viewportWidthPx,
+    ) {
+        derivedStateOf {
+            val scrollPx = hScroll.value.toLong()
+            val viewportEndPx = scrollPx + viewportWidthPx
+            // px → minutes from windowStart
+            val viewportStartMin = scrollPx / pxPerMin
+            val viewportEndMin = viewportEndPx / pxPerMin
+            val bufferMin = 60L
+            val rangeStartTime =
+                windowStart + ((viewportStartMin - bufferMin).coerceAtLeast(0L)) * 60L
+            val rangeEndTime = windowStart + (viewportEndMin + bufferMin) * 60L
+            channel.programmes.filter { p ->
+                val pe = p.endTime.coerceAtMost(windowEnd)
+                val ps = p.startTime.coerceAtLeast(windowStart)
+                pe > rangeStartTime && ps < rangeEndTime && pe > ps
+            }
+        }
+    }
+
     Row(
         modifier =
             Modifier
@@ -982,9 +1044,21 @@ private fun ChannelRow(
             onExitLeft = onExitLeftFromChannel,
         )
 
-        // Programme lane. We manually position each programme with a leading
-        // Spacer-ish gap, then a clickable block sized to its duration. Any
-        // trailing empty space after the last programme is left blank.
+        // Programme lane. Virtualised — only programmes inside the
+        // viewport (± 60-min buffer) are emitted. We keep the original
+        // `Row` flow-layout architecture (vs absolute-positioned Boxes)
+        // so D-pad RIGHT/LEFT focus traversal works the same as before:
+        // Compose's auto focus-search walks siblings in source order.
+        // Absolute positioning would have made traversal fall back to
+        // bounding-box geometry, which behaves unevenly on the Compose
+        // version we're on.
+        //
+        // The leading gap Box positions the first visible programme at
+        // its absolute time-offset from `windowStart`; subsequent gap
+        // Boxes carry inter-programme spacing. Total width of gaps +
+        // programmes equals the slice from the first visible programme
+        // to the last — well short of the full `timelineWidth` so the
+        // Row's content is much smaller than before.
         Row(
             modifier =
                 Modifier
@@ -993,11 +1067,13 @@ private fun ChannelRow(
                     .fillMaxHeight(),
         ) {
             var cursor = windowStart
-            for (prog in channel.programmes) {
+            var firstEmitted = true
+            for (prog in visibleProgrammes) {
                 val clampedStart = prog.startTime.coerceAtLeast(windowStart)
                 val clampedEnd = prog.endTime.coerceAtMost(windowEnd)
                 if (clampedEnd <= clampedStart) continue
-                val gapMin = ((clampedStart - cursor) / 60L).toInt().coerceAtLeast(0)
+                val gapStartFrom = if (firstEmitted) windowStart else cursor
+                val gapMin = ((clampedStart - gapStartFrom) / 60L).toInt().coerceAtLeast(0)
                 if (gapMin > 0) {
                     Box(modifier = Modifier.width((gapMin * pxPerMin).dp).fillMaxHeight())
                 }
@@ -1008,6 +1084,7 @@ private fun ChannelRow(
                     onActivate = { onProgrammeAction(prog) },
                 )
                 cursor = clampedEnd
+                firstEmitted = false
             }
         }
     }

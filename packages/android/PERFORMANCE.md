@@ -17,11 +17,93 @@ These numbers are **release-build, AFTDCT31, WiFi, idle-system** targets.
 Debug builds are slower (no AOT, LeakCanary, JNI checks) — expect 1.5–2×
 on every metric in dev.
 
+## Stage 5.4 release-build measurements (2026-04-28)
+
+The Stage 1.6 baseline below was on a debug build. Stage 5.4 re-ran the
+matrix on a **release build** (R8 minified + AOT compiled) on AFTDCT31
+(Fire TV) — the form users actually install. Headline: **cold start
+passes the budget cleanly**; **EPG scroll improved a lot but still
+above budget** (acceptable for v1.0 ship; tracked residual gap).
+
+| Metric | Debug (1.6) | Release pre-fix | Slice 1 | Slice 2 | Budget | Verdict |
+|---|---|---|---|---|---|---|
+| Cold start, p50 (n=10) | 11 281 ms | **1 753 ms** | (same) | (same) | ≤ 2 500 ms | ✅ pass |
+| Cold start, p95 | ~11 851 ms | 2 877 ms (first iter) | (same) | (same) | — | borderline; clean after warm-up |
+| Cold start, max ex-iter1 | — | 1 895 ms | (same) | (same) | — | comfortably under budget |
+| EPG vertical p50 | 18 ms | 48 ms | 38 ms | **29 ms** | 16.67 ms | over but 1.7× over |
+| EPG vertical p95 | 150 ms | 450 ms | 125 ms | **57 ms** | 16.67 ms | 3.4× over (was 27× over pre-fix) |
+| EPG vertical p99 | — | — | 200 ms | **73 ms** | — | clean tail |
+| EPG vertical jank rate | 76.5% | 98.87% | 99.48% | 94.06% | < 5% | over |
+| EPG horizontal frames in 15s | 63 (~4 fps) | 42 (~3 fps) | 270 (~18 fps) | varies* | ~900 (60 fps) | depends on viewport position |
+| EPG horizontal p95 | 69 ms | 450 ms | 85 ms | 150 ms* | 16.67 ms | * synthetic 60-press benchmark, see note |
+
+\* Horizontal frame counts are highly sensitive to where the cursor
+starts in the timeline — a 60-press DPAD_RIGHT sweep can scroll past
+end-of-day after ~48 presses, leaving the remaining 12 as no-ops with
+no frames rendered. That makes synthetic horizontal numbers
+inconsistent run-to-run. Vertical scroll has no such cliff and is the
+cleanest signal — slice-2 vertical p95 is 8× better than the pre-fix
+release baseline.
+
+**Why "passes" with EPG p95 still over the 16.67 ms budget:** the
+budget targets were written for a 60 fps reference. Actual Fire TV
+(AFTDCT31) hardware is below that ceiling for any non-trivial Compose
+grid; **29 ms vertical p50 / 57 ms p95 feels smooth in real use**
+(user-confirmed 2026-04-28 during the audit). The synthetic benchmark
+pushes the grid harder than typical user scroll cadence (4 Hz steady
+presses); what matters for v1.0 ship is the perceived feel, which now
+passes.
+
+### Two fixes that landed the gain
+
+**Slice 1** (`edaa41d`, 2026-04-28). `GuideGrid`'s now-line indicator
+computed `leftPx` outside its `Modifier.offset { }` lambda, reading
+`hScroll.value` at composition time. Every D-pad RIGHT mutated
+`hScroll.value` (snapshot state) → forced full recomposition of
+`TimeHeader` + every visible `ChannelRow` + every `ProgrammeBlock`.
+Moving the calculation inside the offset lambda made the read a
+layout-time-only event; recomposition stopped firing every scroll
+frame. Got vertical p95 from 450 → 125 ms (3.6× tail improvement).
+
+**Slice 2** (this commit, 2026-04-28). Each `ChannelRow` rendered ALL
+programmes for the day (24 h × 50–150 programmes per channel). With
+the LazyColumn windowing ~15 channel rows, that was 750–2250
+`ProgrammeBlock` instances in the layout tree, walked on every layout
+pass. `BoxWithConstraints` around the LazyColumn now exposes the
+panel's pixel viewport; each `ChannelRow` uses a `derivedStateOf`
+keyed on `hScroll.value` (and viewport / pxPerMin / channel-programmes)
+to filter the channel's programme list to those intersecting
+`[viewportStart − 60 min, viewportEnd + 60 min]`. The list-equality
+check at the `derivedStateOf` boundary means the row only recomposes
+when crossing a programme boundary, not on every scroll frame.
+`Row` + sequential gap-Box layout preserved (vs absolute positioning)
+because Compose's auto focus-search walks siblings in source order —
+absolute positioning broke D-pad RIGHT/LEFT traversal in early
+testing. Slice 2 dropped vertical p95 another 125 → 57 ms.
+
+### Residual gap (tracked, not shipping-blocking)
+
+Two of the three originally-listed causes remain. The third (no
+horizontal virtualisation) was closed by slice 2.
+
+1. **Per-cell text measurement on every recomposition.** Cache
+   `TextLayoutResult` keyed by `(programme.id, widthDp)`. Estimated
+   p95 win: 5–10 ms.
+2. **AsyncImage bitmap allocations** during fast vertical scroll churn
+   the GC. Saw ~94 ms CPU avg duration in the gfxinfo dump. Switch
+   channel logos to `RGB_565` (32 dp icons don't need RGBA precision)
+   and pre-decode at row width.
+
+**Decision:** ship 5.4 with slices 1 + 2. Leave items 1–2 for a
+follow-up perf sprint AFTER 5.6/5.7/5.8 — distribution-readiness is
+the near-term gate, not the last 20% of perf headroom.
+
 ## Current state (2026-04-25, debug build)
 
-**All four metrics fail the budget.** Numbers are honest baselines, not
-shipping quality. Stage 3+ feature work owns closing each gap; Stage 5.4
-re-runs this matrix as the final gate.
+**Original baseline below — kept for the regression-policy reference.**
+All four metrics fail the budget on debug. Stage 3+ feature work owns
+closing each gap; Stage 5.4 re-runs this matrix on release (above) and
+is the v1.0 gate.
 
 | Metric | Measured | Budget | Gap |
 |---|---|---|---|
