@@ -35,6 +35,20 @@ object SentryInit {
 
         SentryAndroid.init(context) { options ->
             options.dsn = dsn
+            // Stage 5.6 — privacy opt-out. The user can toggle off
+            // crash reports in Settings → About. We initialize Sentry
+            // unconditionally so the SDK is ready if the user later
+            // opts back in, but every event passes through this gate
+            // first; a `null` return drops the event before it leaves
+            // the device. Cheap synchronous SharedPreferences read on
+            // each event — no Koin dependency since SentryInit runs
+            // before `startKoin` in YancoApp.onCreate.
+            options.setBeforeSend { event, _ ->
+                if (CrashReportPrefs.isEnabled(context)) event else null
+            }
+            options.setBeforeBreadcrumb { breadcrumb, _ ->
+                if (CrashReportPrefs.isEnabled(context)) breadcrumb else null
+            }
             // Release tag groups events by app version in the Sentry UI.
             // Format matches Sentry's expectations: package@versionName+versionCode.
             options.release =

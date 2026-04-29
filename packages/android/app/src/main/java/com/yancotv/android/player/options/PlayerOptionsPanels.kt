@@ -689,6 +689,10 @@ private fun RecordPanelContent(controller: PlaybackController, onPickOption: () 
     val context = androidx.compose.ui.platform.LocalContext.current
     val recordings: RecordingsRepository =
         org.koin.compose.koinInject()
+    // Stage 5.6 — first-time recording disclaimer gate. Wraps the
+    // Record click so the user sees the legal acknowledgement once
+    // (then never again across the whole app, by SharedPreferences).
+    val disclaimerGate = com.yancotv.android.recording.rememberRecordingDisclaimerGate()
     val currentItem by controller.currentItem.collectAsState()
     val inflight by remember { recordings.allFlow() }.collectAsState(initial = emptyList())
     val active =
@@ -748,23 +752,25 @@ private fun RecordPanelContent(controller: PlaybackController, onPickOption: () 
         selected = false,
         focusAnchor = recordAnchor,
         onPick = {
-            RecordingService.start(
-                context = context,
-                input =
-                RecordInput(
-                    recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
-                    sourceUrl = item.streamUrl,
-                    title = displayTitle,
-                    format = format,
-                    contentId = item.id,
-                ),
-            )
-            android.widget.Toast.makeText(
-                context,
-                "Recording started — open Recordings to manage.",
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-            onPickOption()
+            disclaimerGate {
+                RecordingService.start(
+                    context = context,
+                    input =
+                    RecordInput(
+                        recordId = "rec-${System.currentTimeMillis()}-${item.id.take(8)}",
+                        sourceUrl = item.streamUrl,
+                        title = displayTitle,
+                        format = format,
+                        contentId = item.id,
+                    ),
+                )
+                android.widget.Toast.makeText(
+                    context,
+                    "Recording started — open Recordings to manage.",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+                onPickOption()
+            }
         },
     )
 }

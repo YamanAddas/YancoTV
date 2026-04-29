@@ -185,6 +185,12 @@ fun GuideScreen(
     var reloadTick by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    // Stage 5.6 — first-time recording disclaimer. Wraps both schedule
+    // entry points (single programme + series binding) so the user
+    // sees the legal acknowledgement once before their first scheduled
+    // recording. Persisted via SharedPreferences in [RecordingDisclaimerPrefs];
+    // future Schedule clicks pass through immediately.
+    val recordingDisclaimerGate = com.yancotv.android.recording.rememberRecordingDisclaimerGate()
 
     // MK.guide.groups — focus anchors for the cascade (mirrors
     // BrowseSection's pattern). Pill anchor uses the placed-focus
@@ -622,16 +628,18 @@ fun GuideScreen(
                     // can use the real content row.
                     val contentItem =
                         runCatching { contentRepo.findLiveByTvgId(channel.tvgId) }.getOrNull()
-                    runCatching {
-                        recordScheduler.schedule(
-                            contentId = contentItem?.id,
-                            programmeId = programme.id,
-                            title = programme.title,
-                            streamUrl = streamUrl,
-                            scheduledStart = programme.startTime * 1000L,
-                            scheduledEnd = programme.endTime * 1000L,
-                        )
-                    }.onFailure { Log.e("Yanco", "schedule failed for ${programme.id}", it) }
+                    recordingDisclaimerGate {
+                        runCatching {
+                            recordScheduler.schedule(
+                                contentId = contentItem?.id,
+                                programmeId = programme.id,
+                                title = programme.title,
+                                streamUrl = streamUrl,
+                                scheduledStart = programme.startTime * 1000L,
+                                scheduledEnd = programme.endTime * 1000L,
+                            )
+                        }.onFailure { Log.e("Yanco", "schedule failed for ${programme.id}", it) }
+                    }
                 }
                 actionTarget = null
             },
@@ -651,30 +659,32 @@ fun GuideScreen(
                 val programme = target.programme
                 val streamUrl = channel.streamUrl
                 if (!streamUrl.isNullOrBlank()) {
-                    coroutineScope.launch(Dispatchers.IO) {
-                        runCatching {
-                            val contentItem =
-                                contentRepo.findLiveByTvgId(channel.tvgId)
-                            val now = System.currentTimeMillis()
-                            val matches =
-                                epg.findFutureByChannelAndTitle(
-                                    tvgId = channel.tvgId,
+                    recordingDisclaimerGate {
+                        coroutineScope.launch(Dispatchers.IO) {
+                            runCatching {
+                                val contentItem =
+                                    contentRepo.findLiveByTvgId(channel.tvgId)
+                                val now = System.currentTimeMillis()
+                                val matches =
+                                    epg.findFutureByChannelAndTitle(
+                                        tvgId = channel.tvgId,
+                                        title = programme.title,
+                                        now = now,
+                                        windowMs = SERIES_LOOKAHEAD_MS,
+                                    )
+                                recordScheduler.scheduleSeries(
+                                    contentId = contentItem?.id,
+                                    channelTvgId = channel.tvgId,
                                     title = programme.title,
-                                    now = now,
-                                    windowMs = SERIES_LOOKAHEAD_MS,
+                                    streamUrl = streamUrl,
+                                    programmes =
+                                    matches.map { p ->
+                                        Triple(p.id, p.startTime * 1000L, p.endTime * 1000L)
+                                    },
                                 )
-                            recordScheduler.scheduleSeries(
-                                contentId = contentItem?.id,
-                                channelTvgId = channel.tvgId,
-                                title = programme.title,
-                                streamUrl = streamUrl,
-                                programmes =
-                                matches.map { p ->
-                                    Triple(p.id, p.startTime * 1000L, p.endTime * 1000L)
-                                },
-                            )
-                        }.onFailure {
-                            Log.e("Yanco", "scheduleSeries failed for ${programme.title}", it)
+                            }.onFailure {
+                                Log.e("Yanco", "scheduleSeries failed for ${programme.title}", it)
+                            }
                         }
                     }
                 }

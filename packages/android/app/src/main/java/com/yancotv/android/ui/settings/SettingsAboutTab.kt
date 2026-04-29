@@ -25,8 +25,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +49,22 @@ import com.yancotv.android.update.UpdateRepository
 import com.yancotv.shared.update.UpdateInfo
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+
+// Stage 5.6 — privacy + terms URLs. Shipped as constants so the v1
+// APK has the right hooks already; once the documents are hosted at
+// stable HTTPS URLs (likely the YancoTV GitHub Pages or a static
+// site), update these to the real values and bump versionCode. The
+// in-app links open the URL in the system's default link handler —
+// no in-app web view, deliberately, so users can read the policy in
+// a real browser they trust.
+//
+// Until then, both placeholders point at the local PRIVACY.md /
+// TERMS.md in the repo so the Open buttons don't 404 in dev. Friends
+// receiving the v1 APK: tap Open and they'll see a "Page not found"
+// in the browser — call out in the test invitation email that the
+// documents are in the repo for now.
+private const val PRIVACY_POLICY_URL = "https://example.invalid/yancotv/privacy"
+private const val TERMS_OF_SERVICE_URL = "https://example.invalid/yancotv/terms"
 
 /**
  * About tab — logo + version with an arabesque display face, then a
@@ -223,6 +241,76 @@ fun SettingsAboutTab(
             "An IPTV client for Android TV, Fire TV, and phones. Bring your M3U or Xtream playlist; " +
                 "we handle the EPG, recordings, favourites, multi-list, and smart category grouping.",
         ) {}
+
+        // ───── Privacy ─────
+        // Stage 5.6. The crash-reports toggle is the user-facing surface
+        // for the Sentry pipeline disclosed in the privacy policy — we
+        // can't credibly say "you can opt out" unless we ship a switch
+        // that actually does it. The switch flips a shared preference
+        // (`CrashReportPrefs`); Sentry's `beforeSend` callback consults
+        // it on every event, so future crashes / breadcrumbs are dropped
+        // at the SDK boundary the moment it's toggled off.
+        //
+        // Privacy + Terms links open the user-published HTTPS docs in a
+        // browser (or the system's default link handler). Until those
+        // are hosted, the URLs in PrivacyPolicyUrl / TermsOfServiceUrl
+        // point at placeholders — easy to swap to real URLs once the
+        // docs go up. Doing this now means the v1 APK already has the
+        // right hooks; we only have to host two HTML files later.
+        var crashReportsEnabled by remember {
+            mutableStateOf(
+                com.yancotv.android.crash.CrashReportPrefs.isEnabled(ctx),
+            )
+        }
+        SettingsSection(
+            title = "Privacy",
+            sub =
+            "What leaves your device, and how to opt out. Full policy linked below.",
+        ) {
+            SettingsToggleRow(
+                label = "Send crash reports",
+                description =
+                    "If something crashes, send a stack trace + device model + OS version " +
+                        "to our error tracker so we can fix it. No content, no playlist URLs, " +
+                        "no credentials. Off = nothing leaves the device.",
+                checked = crashReportsEnabled,
+                onCheckedChange = { enabled ->
+                    crashReportsEnabled = enabled
+                    com.yancotv.android.crash.CrashReportPrefs.setEnabled(ctx, enabled)
+                },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Privacy policy",
+                readOnlyFocusable = false,
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(PRIVACY_POLICY_URL),
+                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
+                right = { ValueText("Open") },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Terms of service",
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(TERMS_OF_SERVICE_URL),
+                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
+                right = { ValueText("Open") },
+            )
+        }
 
         // ───── Diagnostics ─────
         // Renamed from "Build" — these are debugging fields, not user
