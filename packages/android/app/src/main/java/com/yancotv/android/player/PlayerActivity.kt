@@ -82,6 +82,7 @@ class PlayerActivity : AppCompatActivity() {
         // 1.2 s is long enough to type "503" comfortably but short enough
         // that a single-press digit still feels responsive.
         private const val CHANNEL_ZAP_COMMIT_MS = 1200L
+        private const val LONG_PRESS_TIMEOUT_MS = 500L
         private const val QUICK_INFO_AUTO_HIDE_MS = 10_000L
         private const val PROGRESS_TICK_MS = 15_000L
 
@@ -203,6 +204,10 @@ class PlayerActivity : AppCompatActivity() {
     // the listener on the released instance.
     private var attachedPlayer: ExoPlayer? = null
     private var controllerVisible = false
+    // Long-press CENTER → options overlay (Google TV remotes lack MENU).
+    private var longPressJob: Job? = null
+    private var longPressFired = false
+    private var longPressTracking = false
     private var currentProgramme: EpgProgramme? = null
     private var progressTickerJob: Job? = null
     private var quickInfoHideJob: Job? = null
@@ -1601,32 +1606,66 @@ class PlayerActivity : AppCompatActivity() {
      * normal dispatch chain so the controller's own focus traversal keeps
      * working once the controller is visible.
      */
+    private fun isCenterKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            keyCode == KeyEvent.KEYCODE_ENTER ||
+            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // ── Long-press CENTER → options overlay (Google TV lacks MENU) ──
+        // UP while we own the gesture: either perform the short-press
+        // action (show controller / toggle dock) or swallow if the
+        // long-press already fired showOptionsV2().
+        if (event.action == KeyEvent.ACTION_UP && isCenterKey(event.keyCode) && longPressTracking) {
+            longPressJob?.cancel()
+            longPressJob = null
+            longPressTracking = false
+            if (longPressFired) {
+                longPressFired = false
+                return true
+            }
+            val isLive = controller.currentItem.value?.type == ContentType.LIVE
+            if (isLive) {
+                playerView.showController()
+            } else {
+                if (!dockVisible) showVodDock() else hideVodDock()
+            }
+            return true
+        }
+        // Repeats while held — consume so PlayerView doesn't act on them.
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 &&
+            isCenterKey(event.keyCode) && longPressTracking
+        ) {
+            return true
+        }
+
         if (event.action == KeyEvent.ACTION_DOWN) {
-            // While the controller is hidden, don't let PlayerView silently
-            // eat the press — run our own handler first. Dock / sheet /
-            // surf are their own controllers; we also bypass when one of
-            // them is visible so its Compose focus traversal sees the keys
-            // cleanly. Without the `!sheetVisible` guard we were racing
-            // Compose's pressed-state tracking on CENTER and the picks
-            // looked dead.
-            // MK.options.redesign — when the new options popup/panel is up,
-            // skip the bypass too so its ComposeView's focus traversal sees
-            // every key. Without this, UP/DOWN go straight to onKeyDown
-            // which zaps channels even though the popup is visible — the
-            // user could see the menu but not navigate it.
             val optionsV2Visible = optionsV2Inflated && optionsV2State.menuVisible.value
             val noOverlay = !surfVisible && !dockVisible && !optionsV2Visible
             val isLiveNow = controller.currentItem.value?.type == ContentType.LIVE
+
+            // Long-press timer: start on first CENTER DOWN when no overlay
+            // is up and the controller is hidden. Consumes the DOWN so the
+            // short-press action (show controller / toggle dock) is deferred
+            // to ACTION_UP. If the user holds ≥500 ms the timer fires
+            // showOptionsV2() instead.
+            if (event.repeatCount == 0 && isCenterKey(event.keyCode) &&
+                !controllerVisible && noOverlay && !channelZapState.visible.value
+            ) {
+                longPressJob?.cancel()
+                longPressFired = false
+                longPressTracking = true
+                longPressJob = lifecycleScope.launch {
+                    delay(LONG_PRESS_TIMEOUT_MS)
+                    showOptionsV2()
+                    longPressFired = true
+                }
+                return true
+            }
+
             // MK.10.4 fix — LIVE LEFT / RIGHT / TV_CONTENTS_MENU / CHANNEL_UP /
             // CHANNEL_DOWN always go through our handler, even when the
-            // Media3 controller is visible. Otherwise LEFT was ambiguous:
-            // controller hidden → surf, controller visible → Media3's
-            // internal controller-bar navigation (skip-prev / focus
-            // sibling button). Routing live channel-zap keys here
-            // regardless of controllerVisible eliminates that conflict.
-            // showSurf() / handleZap() etc. hide the controller as a
-            // side-effect so the visual is clean.
+            // Media3 controller is visible.
             if (isLiveNow && noOverlay) {
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_LEFT,
