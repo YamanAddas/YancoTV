@@ -5,3 +5,6 @@ local.properties
 *.iml
 captures/
 .cxx/
+
+# Stage 5.2.3 — locally staged auto-update test artifacts (APK + update.json)
+/auto-update-test/
