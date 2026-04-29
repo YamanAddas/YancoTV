@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Stage 5.2.3 — sideload auto-update. Downloaded APKs land in the
+         app-specific external files dir under "updates/" so we can
+         (a) write without WRITE_EXTERNAL_STORAGE and (b) hand the
+         android.os.PackageInstaller a content:// URI via FileProvider.
+         The system installer requires a content URI on Android 7+
+         (Nougat) — handing it a file:// crashes with FileUriExposedException.
+
+         Intentionally narrow: only "updates/" under external-files-path
+         is exposed. The rest of the app's external storage stays
+         private. -->
+    <external-files-path
+        name="updates"
+        path="updates/" />
+</paths>

@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -42,7 +45,9 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.update.UpdateCheckWorker
+import com.yancotv.android.update.UpdateInstaller
 import com.yancotv.android.update.UpdateRepository
+import com.yancotv.shared.update.UpdateInfo
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -63,6 +68,7 @@ fun SettingsAboutTab(
     modifier: Modifier = Modifier,
     prefs: AppPreferences = koinInject(),
     updateRepo: UpdateRepository = koinInject(),
+    installer: UpdateInstaller = koinInject(),
 ) {
     val ctx = LocalContext.current
     val info = remember { buildInfo(ctx) }
@@ -71,6 +77,7 @@ fun SettingsAboutTab(
 
     val updatePrefs by prefs.updatePrefsFlow.collectAsState()
     val updateInfo by updateRepo.info.collectAsState()
+    val installerState by installer.state.collectAsState()
     val scope = rememberCoroutineScope()
     val arabesque = remember { FontFamily(Font(R.font.arabesque_display, FontWeight.Bold)) }
 
@@ -151,54 +158,33 @@ fun SettingsAboutTab(
             )
             updateInfo?.let { uinfo ->
                 SettingsRowSpacer()
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(palette.Accent.copy(alpha = 0.12f))
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                ) {
-                    Column {
-                        Text(
-                            text = "New version available: ${uinfo.versionName}",
-                            color = palette.Accent,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        val notes = uinfo.releaseNotes
-                        if (!notes.isNullOrBlank()) {
-                            Text(
-                                text = notes,
-                                color = palette.TextSecondary,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(top = 4.dp),
+                UpdateAvailableBanner(
+                    info = uinfo,
+                    installerState = installerState,
+                    onDownload = { installer.download(uinfo) },
+                    onCancel = { installer.cancel() },
+                    onInstall = { apk ->
+                        // launchInstall returns false when the system "install
+                        // unknown apps" permission isn't granted yet — it
+                        // also routes the user to settings, so the UI can
+                        // surface a hint without opening anything itself.
+                        installer.launchInstall(apk)
+                    },
+                    onRetry = {
+                        installer.reset()
+                        installer.download(uinfo)
+                    },
+                    onOpenReleasePage = {
+                        runCatching {
+                            ctx.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(uinfo.downloadUrl),
+                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         }
-                        Text(
-                            text = "Open the release page to download and install.",
-                            color = palette.TextMuted,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
-                        )
-                        SettingsOutlinedButton(
-                            onClick = {
-                                runCatching {
-                                    ctx.startActivity(
-                                        android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(uinfo.downloadUrl),
-                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    )
-                                }
-                            },
-                            size = ButtonSize.Compact,
-                        ) {
-                            Text(text = "Open release page")
-                        }
-                    }
-                }
+                    },
+                )
             }
         }
 
@@ -299,6 +285,171 @@ private fun ValueText(value: String) {
         fontSize = 13.sp,
         fontWeight = FontWeight.SemiBold,
     )
+}
+
+/**
+ * Stage 5.2.3 — banner that surfaces whenever the [UpdateRepository]
+ * has a known new version. Drives off [UpdateInstaller.State] so the
+ * call-to-action morphs as the user steps through the flow:
+ *
+ *   - Idle               → "Download update" (+ "Open release page")
+ *   - Downloading(pct)   → progress bar + "Cancel"
+ *   - ReadyToInstall     → "Install now" (+ "Open release page")
+ *   - Failed(reason)     → reason text + "Retry" (+ "Open release page")
+ *
+ * The release-page button stays available in every state as a fallback
+ * — if our download host is down, or the user prefers their browser,
+ * they can sideload manually.
+ */
+@Composable
+private fun UpdateAvailableBanner(
+    info: UpdateInfo,
+    installerState: UpdateInstaller.State,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onInstall: (java.io.File) -> Unit,
+    onRetry: () -> Unit,
+    onOpenReleasePage: () -> Unit,
+) {
+    val palette = LocalYancoPalette.current
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(palette.Accent.copy(alpha = 0.12f))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Column {
+            Text(
+                text = "New version available: ${info.versionName}",
+                color = palette.Accent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            val notes = info.releaseNotes
+            if (!notes.isNullOrBlank()) {
+                Text(
+                    text = notes,
+                    color = palette.TextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            when (val s = installerState) {
+                UpdateInstaller.State.Idle -> {
+                    Text(
+                        text = "Download and install in place, or open the release page in a browser.",
+                        color = palette.TextMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+                    )
+                    Row {
+                        SettingsOutlinedButton(
+                            onClick = onDownload,
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Download update")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        SettingsOutlinedButton(
+                            onClick = onOpenReleasePage,
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Open release page")
+                        }
+                    }
+                }
+                is UpdateInstaller.State.Downloading -> {
+                    Text(
+                        text = "Downloading… ${s.percent}%",
+                        color = palette.TextSecondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
+                    )
+                    LinearProgressBar(percent = s.percent)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    SettingsOutlinedButton(
+                        onClick = onCancel,
+                        size = ButtonSize.Compact,
+                    ) {
+                        Text(text = "Cancel")
+                    }
+                }
+                is UpdateInstaller.State.ReadyToInstall -> {
+                    Text(
+                        text = "Download complete. Tap Install to apply the update — Android may ask you to allow installs from this app the first time.",
+                        color = palette.TextMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+                    )
+                    Row {
+                        SettingsOutlinedButton(
+                            onClick = { onInstall(s.apkFile) },
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Install now")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        SettingsOutlinedButton(
+                            onClick = onOpenReleasePage,
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Open release page")
+                        }
+                    }
+                }
+                is UpdateInstaller.State.Failed -> {
+                    Text(
+                        text = "Download failed: ${s.reason}",
+                        color = palette.TextSecondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+                    )
+                    Row {
+                        SettingsOutlinedButton(
+                            onClick = onRetry,
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Retry")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        SettingsOutlinedButton(
+                            onClick = onOpenReleasePage,
+                            size = ButtonSize.Compact,
+                        ) {
+                            Text(text = "Open release page")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinearProgressBar(percent: Int) {
+    val palette = LocalYancoPalette.current
+    val pct = percent.coerceIn(0, 100)
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(palette.BorderSubtle.copy(alpha = 0.6f)),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth(fraction = pct / 100f)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(palette.Accent),
+        )
+    }
 }
 
 private fun formatLastChecked(millis: Long?): String {

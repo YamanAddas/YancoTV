@@ -134,6 +134,19 @@ val appModule =
                 prefs = get(),
             )
         }
+        // Stage 5.2.3 — APK download + install controller. Owns its own
+        // CoroutineScope (SupervisorJob + IO); the Compose UI collects
+        // its StateFlow and dispatches actions. Singleton because
+        // download + install state must persist across composition
+        // (Settings tab can be left and re-entered while a download is
+        // still running).
+        single {
+            com.yancotv.android.update.UpdateInstaller(
+                appContext = androidContext(),
+                sharedHttp = get(),
+                logger = get(),
+            )
+        }
         single {
             PlaybackController(
                 context = androidContext(),

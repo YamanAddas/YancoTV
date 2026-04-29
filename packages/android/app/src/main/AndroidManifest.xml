@@ -36,6 +36,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- Stage 5.2.3 — sideload auto-update install flow. Lets the user
+         tap "Install" inside the app and have the system PackageInstaller
+         take over. On Android 8+ the user is also walked through the
+         "Install unknown apps" system screen the first time (we route
+         them there via Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES if
+         packageManager.canRequestPackageInstalls() is false). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- MK.14.X audit-revised storage path: legacy direct writes to
          /storage/emulated/0/Movies/YancoTV/ on Fire OS 7 / API 28 (where
          MediaStore RELATIVE_PATH isn't available yet). On API 29+ the
@@ -180,6 +188,21 @@
             android:name=".recording.RecordingService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Stage 5.2.3 — FileProvider exposes the downloaded APK to the
+             system PackageInstaller via a content:// URI (file:// is
+             rejected on Android 7+ with FileUriExposedException). Scoped
+             to "updates/" under getExternalFilesDir(null); see
+             res/xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 
