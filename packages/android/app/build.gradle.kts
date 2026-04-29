@@ -263,6 +263,105 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 }
 
+// Stage 5.2.3 — emit `update.json` for the sideload auto-update channel.
+//
+// The shape matches what `com.yancotv.shared.update.UpdateChecker` parses
+// (versionCode + versionName + downloadUrl, with optional releaseNotes /
+// minOsApi). Wired as a `finalizedBy` on `assembleRelease` so cutting a
+// release also drops the JSON next to the APK at
+// `app/build/outputs/update.json` — upload BOTH artifacts (or pin the JSON
+// to a gist / Pages site whose URL goes into `update.endpoint`) and the
+// running app's "Check now" picks up the new version.
+//
+// For testing the install flow on a dev box without first cutting a real
+// release: run with `-Pupdate.testBump=true` to emit a JSON whose
+// versionCode is the current build + 1. The running app then sees an
+// "update available", lets you exercise download → install, and lands
+// you on the same versionCode — no real bump in source needed.
+//
+// Properties (all optional):
+//   -Pupdate.testBump=true               bump emitted versionCode by 1
+//   -Pupdate.downloadUrl=https://...     override the APK URL (highest precedence)
+//   -Pupdate.releaseNotes="What's new…"  free-text notes
+// Or in `local.properties`:
+//   update.download.url=https://...      same as -Pupdate.downloadUrl, lower precedence
+val generateUpdateJson by tasks.registering {
+    group = "yancotv"
+    description = "Emit app/build/outputs/update.json for the sideload auto-update channel."
+
+    val outputFile = layout.buildDirectory.file("outputs/update.json")
+    outputs.file(outputFile)
+    // Re-run when any input changes — so a bump-only edit (no source diff)
+    // still rewrites the JSON.
+    inputs.property("versionCode", android.defaultConfig.versionCode ?: 1)
+    inputs.property("versionName", android.defaultConfig.versionName ?: "?")
+    inputs.property(
+        "testBump",
+        project.findProperty("update.testBump")?.toString() ?: "false",
+    )
+    inputs.property(
+        "downloadUrlOverride",
+        (project.findProperty("update.downloadUrl") as? String)
+            ?: sentryProps.getProperty("update.download.url", ""),
+    )
+    inputs.property(
+        "releaseNotes",
+        (project.findProperty("update.releaseNotes") as? String) ?: "",
+    )
+
+    doLast {
+        val testBump = project.findProperty("update.testBump")?.toString() == "true"
+        val baseVersionCode = android.defaultConfig.versionCode ?: 1
+        val baseVersionName = android.defaultConfig.versionName ?: "?"
+        val emittedVersionCode = if (testBump) baseVersionCode + 1 else baseVersionCode
+        val emittedVersionName =
+            if (testBump) "$baseVersionName-test" else baseVersionName
+        val downloadUrl =
+            (project.findProperty("update.downloadUrl") as? String)
+                ?: sentryProps
+                    .getProperty(
+                        "update.download.url",
+                        "https://example.invalid/yancotv-$emittedVersionCode.apk",
+                    )
+        val releaseNotes =
+            (project.findProperty("update.releaseNotes") as? String)
+                ?.takeIf { it.isNotBlank() }
+
+        val payload =
+            linkedMapOf<String, Any?>(
+                "versionCode" to emittedVersionCode,
+                "versionName" to emittedVersionName,
+                "downloadUrl" to downloadUrl,
+            )
+        if (releaseNotes != null) payload["releaseNotes"] = releaseNotes
+
+        val target = outputFile.get().asFile
+        target.parentFile.mkdirs()
+        target.writeText(
+            groovy.json.JsonOutput
+                .prettyPrint(groovy.json.JsonOutput.toJson(payload)),
+        )
+
+        logger.lifecycle("[generateUpdateJson] wrote $target")
+        logger.lifecycle("  versionCode = $emittedVersionCode")
+        logger.lifecycle("  versionName = $emittedVersionName")
+        logger.lifecycle("  downloadUrl = $downloadUrl")
+        if (testBump) {
+            logger.lifecycle(
+                "  (testBump=true: emitted versionCode is build+1 so the running app sees an update)",
+            )
+        }
+    }
+}
+
+// Cutting a release also drops the matching JSON. Debug intentionally
+// not wired — `assembleDebug` happens dozens of times a session and the
+// JSON would just be stale. Run `:app:generateUpdateJson` directly when
+// you want it for a debug build.
+afterEvaluate {
+    tasks.findByName("assembleRelease")?.finalizedBy(generateUpdateJson)
+}
+
 // Stage 1.4 follow-up — Sentry Gradle plugin. Uploads the R8 mapping file
 // to Sentry during release builds so obfuscated crash stack traces in the
 // dashboard get symbolicated back to readable Kotlin/Java source.
