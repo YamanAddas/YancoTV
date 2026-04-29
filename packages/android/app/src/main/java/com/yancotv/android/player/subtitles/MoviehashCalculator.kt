@@ -36,15 +36,24 @@ object MoviehashCalculator {
         }
         val first = rangeBytes(client, url, 0, CHUNK_BYTES - 1)
         val last = rangeBytes(client, url, size - CHUNK_BYTES, size - 1)
+        return Result(
+            hash = computeHash(size, first, last),
+            byteSize = size,
+        )
+    }
 
+    /**
+     * Pure-function form of the algorithm — exposed so unit tests can pin
+     * the byte arithmetic without spinning up a fake HTTP server. Inputs
+     * are the file size (already validated >= CHUNK_BYTES * 2) and the two
+     * 64 KiB chunks; output is the 16-char lowercase hex of the low 64
+     * bits of (size + LE-u64-sum(first) + LE-u64-sum(last)).
+     */
+    internal fun computeHash(size: Long, first: ByteArray, last: ByteArray): String {
         var sum: ULong = size.toULong()
         sum += sumLongsLE(first)
         sum += sumLongsLE(last)
-
-        return Result(
-            hash = sum.toString(16).padStart(16, '0'),
-            byteSize = size,
-        )
+        return sum.toString(16).padStart(16, '0')
     }
 
     private fun headContentLength(client: OkHttpClient, url: String): Long? {
