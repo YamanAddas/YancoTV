@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -191,7 +192,7 @@ private fun ReadOnlyFieldBody(
                 .background(bg)
                 .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(8.dp))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart,
     ) {

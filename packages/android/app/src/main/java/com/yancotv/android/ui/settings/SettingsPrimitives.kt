@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
@@ -222,6 +223,7 @@ internal fun SettingsRow(
                             .clickable(
                                 interactionSource = interaction,
                                 indication = null,
+                                role = Role.Button,
                                 onClick = onClick,
                             )
                     readOnlyFocusable ->
@@ -477,6 +479,7 @@ internal fun SettingsSelect(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.DropdownList,
                     onClick = onClick,
                 )
                 .padding(horizontal = 18.dp),

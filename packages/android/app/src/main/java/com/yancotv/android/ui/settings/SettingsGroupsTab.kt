@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -270,6 +271,7 @@ private fun GroupRow(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                     onClick = { onToggle(!hidden) },
                 )
                 .padding(horizontal = 22.dp, vertical = 14.dp),
@@ -325,6 +327,7 @@ private fun ParentPinRow(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                     onClick = { onToggle(!pinned) },
                 )
                 .padding(horizontal = 22.dp, vertical = 14.dp),

@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -460,7 +461,7 @@ private fun HomeHero(
                 .fillMaxWidth()
                 .height(320.dp)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = { onPlay(slide) }),
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = { onPlay(slide) }),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AnimatedContent(
@@ -841,7 +842,7 @@ private fun PosterTile(
             modifier
                 .width(ShellDim.posterTile)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -945,7 +946,7 @@ private fun OnNowTile(
             modifier
                 .width(ShellDim.posterTile)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -1029,7 +1030,7 @@ private fun UpNextTile(
             modifier
                 .width(ShellDim.posterTile)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(

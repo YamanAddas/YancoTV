@@ -33,6 +33,7 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -223,7 +224,7 @@ private fun SurfRow(
                 .border(1.dp, border, RoundedCornerShape(6.dp))
                 .focusRequester(focusRequester)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

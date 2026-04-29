@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -893,7 +894,12 @@ private fun JumpToNowButton(onClick: () -> Unit) {
                 .background(bg)
                 .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onClick,
+                )
                 .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
@@ -1138,6 +1144,7 @@ private fun ChannelCell(
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                     onClick = onClick,
                     onLongClick = onLongPress,
                 ).padding(horizontal = 8.dp),
@@ -1200,7 +1207,12 @@ private fun ProgrammeBlock(
                 .background(bg)
                 .border(0.5.dp, border, RoundedCornerShape(4.dp))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onActivate,
+                )
                 .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {

@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -508,6 +509,7 @@ private fun SourceListRow(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                     onClick = onClick,
                 )
                 .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 16.dp),

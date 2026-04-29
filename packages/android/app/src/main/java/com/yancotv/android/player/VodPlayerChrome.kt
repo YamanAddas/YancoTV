@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -194,6 +195,7 @@ private fun HexBtn(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
+                role = Role.Button,
                 onClick = onClick,
             )
             .padding(horizontal = 18.dp),

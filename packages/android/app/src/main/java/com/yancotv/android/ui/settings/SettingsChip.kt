@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,6 +77,7 @@ internal fun SettingsChip(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Tab,
                     onClick = onClick,
                 )
                 .padding(horizontal = 14.dp, vertical = 8.dp),

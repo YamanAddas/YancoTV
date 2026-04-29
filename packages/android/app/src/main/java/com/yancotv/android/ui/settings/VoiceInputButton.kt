@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -80,6 +81,7 @@ fun VoiceInputButton(
                     enabled = available,
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                 ) {
                     val intent =
                         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {

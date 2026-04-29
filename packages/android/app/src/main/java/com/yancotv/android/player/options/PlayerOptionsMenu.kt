@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -220,7 +221,7 @@ private fun PlayerOptionsRowItem(
                         else -> false
                     }
                 }.focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null) { row.onPick() }
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button) { row.onPick() }
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -417,7 +418,13 @@ private fun SidebarRow(
                         if (focusRequester != null) base.focusRequester(focusRequester) else base
                     }
                     .focusable(interactionSource = interaction)
-                    .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        role = Role.Tab,
+                        onClick = onClick,
+                    )
+                    .semantics { contentDescription = section.label }
                     .padding(horizontal = Space.md, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.md),

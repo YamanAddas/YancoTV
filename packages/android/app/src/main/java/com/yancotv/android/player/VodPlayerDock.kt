@@ -41,7 +41,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -572,7 +574,10 @@ private fun TransportButton(
                 indication = null,
                 onClick = onClick,
             )
-            .semantics { contentDescription = contentLabel },
+            .semantics {
+                contentDescription = contentLabel
+                role = Role.Button
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -631,7 +636,10 @@ private fun SecondaryChip(
                 indication = null,
                 onClick = onClick,
             )
-            .semantics { contentDescription = label }
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            }
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {

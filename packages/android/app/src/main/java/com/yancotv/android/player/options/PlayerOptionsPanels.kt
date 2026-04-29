@@ -36,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -706,7 +707,7 @@ private fun OptionRow(
                     }
                 }
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null) { onPick() }
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button) { onPick() }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

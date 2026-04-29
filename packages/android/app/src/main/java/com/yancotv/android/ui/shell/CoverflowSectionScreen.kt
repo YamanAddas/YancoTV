@@ -62,6 +62,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -908,7 +909,7 @@ private fun HexCta(
                 .background(bg)
                 .border(if (focused) 2.dp else 1.dp, border, shape)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .semantics(mergeDescendants = true) { contentDescription = label }
                 // xl horizontal padding (was xxxl) so two CTAs side-by-side
                 // always fit when the categories rail is mounted. Buttons stay
@@ -1117,6 +1118,7 @@ private fun ContentOrb(
                     .clickable(
                         interactionSource = interaction,
                         indication = null,
+                        role = Role.Button,
                         onClick = onActivate,
                     ).semantics(mergeDescendants = true) { contentDescription = title },
             contentAlignment = Alignment.Center,

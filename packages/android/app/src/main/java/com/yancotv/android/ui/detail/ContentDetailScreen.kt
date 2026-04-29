@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -565,7 +566,7 @@ private fun PrimaryButton(
                 .background(bg)
                 .placedFocus(playAnchor)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = Space.xxl, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
@@ -618,7 +619,7 @@ private fun SecondaryButton(
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(Radius.control))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
@@ -701,7 +702,7 @@ private fun SeasonChip(
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(Radius.pill))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = Space.lg, vertical = Space.sm),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -740,7 +741,7 @@ private fun EpisodeRow(
                 .fillMaxWidth()
                 .focusStyle(focused = focused, radius = Radius.card, liftScale = 1.015f)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.lg),

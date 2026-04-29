@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -245,7 +246,7 @@ private fun Chip(
                 .border(if (focused) 2.dp else 0.dp, border, YancoShapes.ChipBevel)
                 .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
                 .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),

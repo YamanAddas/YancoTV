@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -182,6 +183,7 @@ internal fun SettingsAccentButton(
                     interactionSource = interaction,
                     indication = null,
                     enabled = enabled,
+                    role = Role.Button,
                     onClick = onClick,
                 )
                 .padding(horizontal = m.horizontalPadding.dp),
@@ -268,6 +270,7 @@ internal fun SettingsOutlinedButton(
                     interactionSource = interaction,
                     indication = null,
                     enabled = enabled,
+                    role = Role.Button,
                     onClick = onClick,
                 )
                 .padding(horizontal = m.horizontalPadding.dp),
@@ -355,6 +358,7 @@ internal fun SettingsDangerButton(
                     interactionSource = interaction,
                     indication = null,
                     enabled = enabled,
+                    role = Role.Button,
                     onClick = onClick,
                 )
                 .padding(horizontal = m.horizontalPadding.dp),

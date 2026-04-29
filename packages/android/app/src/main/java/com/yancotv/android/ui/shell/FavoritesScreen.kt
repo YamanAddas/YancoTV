@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -378,7 +379,7 @@ private fun ListTabChip(
                 .background(bg)
                 .border(if (focused || selected) 2.dp else 1.dp, border, RoundedCornerShape(6.dp))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null) {
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
                     // Tap a non-selected tab → switch to it. Tap an
                     // already-selected non-default tab → open manage
                     // (rename / delete). Default list never opens
@@ -630,7 +631,7 @@ private fun FavoriteActionButton(
                 .background(bg)
                 .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(
@@ -662,7 +663,7 @@ private fun UnstarButton_unused_(onClick: () -> Unit) {
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(6.dp))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }

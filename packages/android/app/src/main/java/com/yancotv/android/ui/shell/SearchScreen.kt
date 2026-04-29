@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.yancotv.android.ui.theme.YancoShapes
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -349,7 +350,7 @@ private fun SearchRow(
                 .background(bg)
                 .border(1.dp, border, RoundedCornerShape(8.dp))
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onActivate)
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -476,7 +477,7 @@ private fun SearchOrb(
                         shape = YancoShapes.HexCapsule,
                     )
                     .focusable(interactionSource = interaction)
-                    .clickable(interactionSource = interaction, indication = null, onClick = onActivate),
+                    .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate),
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {

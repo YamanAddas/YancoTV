@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -169,6 +170,7 @@ private fun ThemeRow(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                     onClick = onClick,
                 )
                 .padding(horizontal = 22.dp, vertical = 16.dp),
@@ -238,6 +240,7 @@ private fun AccentChip(
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    role = Role.Button,
                     onClick = onClick,
                 )
                 .padding(horizontal = 12.dp, vertical = 8.dp),

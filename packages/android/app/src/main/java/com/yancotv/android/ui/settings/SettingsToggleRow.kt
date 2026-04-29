@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -120,6 +121,7 @@ internal fun SettingsToggleRow(
                     interactionSource = interaction,
                     indication = null,
                     enabled = enabled,
+                    role = Role.Switch,
                     onClick = { onCheckedChange(!checked) },
                 )
                 .padding(horizontal = 22.dp, vertical = 16.dp),
