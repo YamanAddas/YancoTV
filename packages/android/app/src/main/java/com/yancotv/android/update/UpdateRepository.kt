@@ -40,20 +40,36 @@ class UpdateRepository(
     private val _info = MutableStateFlow<UpdateInfo?>(null)
     val info: StateFlow<UpdateInfo?> = _info.asStateFlow()
 
+    /**
+     * Mirrors [UpdateChecker.isConfigured] so UI can read it via
+     * koinInject() without pulling the checker directly. Fixed at
+     * construction time (BuildConfig.UPDATE_ENDPOINT is baked in at
+     * build time), so a plain val is enough — no Flow needed.
+     */
+    val isConfigured: Boolean
+        get() = checker.isConfigured
+
     private val checkMutex = Mutex()
 
     /**
      * Run the underlying [UpdateChecker.check]. Idempotent on overlap —
      * a second concurrent caller waits for the first to finish and
-     * sees the same result via [info]. Always updates `lastCheckedAt`
-     * on completion (regardless of result), so the user gets accurate
-     * "last checked X ago" feedback.
+     * sees the same result via [info]. Updates `lastCheckedAt` only
+     * when [UpdateChecker.isConfigured] is true — otherwise the call
+     * is a no-op and we don't want a misleading "Just now" timestamp
+     * masking the fact that the build doesn't have an update endpoint
+     * wired (the original behavior, before 2026-04-28's fix, *did*
+     * write the timestamp on no-ops, which made dev builds look like
+     * they were checking when they weren't).
      *
      * Returns the resolved [UpdateInfo] (or null) for callers that want
      * to act immediately rather than collecting from [info].
      */
     suspend fun triggerCheck(): UpdateInfo? =
         checkMutex.withLock {
+            if (!checker.isConfigured) {
+                return@withLock null
+            }
             val result = checker.check()
             _info.value = result
             prefs.setLastUpdateCheckAt(now())

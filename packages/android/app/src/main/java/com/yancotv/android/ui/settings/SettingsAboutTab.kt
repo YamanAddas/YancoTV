@@ -123,19 +123,46 @@ fun SettingsAboutTab(
             modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
         )
 
-        // ───── Updates (Stage 5.2.2) ─────
+        // ───── Updates (Stage 5.2.2 + 5.2.3) ─────
+        // When BuildConfig.UPDATE_ENDPOINT is empty (no `update.endpoint`
+        // in local.properties — the default for dev builds) the checker
+        // is an unconditional no-op. Surface that explicitly instead of
+        // showing a "Check now" button that does nothing + a "Last
+        // checked: Just now" timestamp that lies. UpdateRepository
+        // mirrors this state from UpdateChecker.isConfigured.
+        val isConfigured = updateRepo.isConfigured
+        val updatesSub =
+            if (isConfigured) {
+                "YancoTV will tell you when a new version is ready."
+            } else {
+                "Update checks aren't wired for this build (no release endpoint configured)."
+            }
+        val updatesRight: (@Composable () -> Unit)? =
+            if (isConfigured) {
+                {
+                    SettingsOutlinedButton(
+                        onClick = { UpdateCheckWorker.enqueueOnce(ctx) },
+                        size = ButtonSize.Compact,
+                    ) {
+                        Text(text = "Check now")
+                    }
+                }
+            } else {
+                null
+            }
         SettingsSection(
             title = "Updates",
-            sub = "YancoTV will tell you when a new version is ready.",
-            right = {
-                SettingsOutlinedButton(
-                    onClick = { UpdateCheckWorker.enqueueOnce(ctx) },
-                    size = ButtonSize.Compact,
-                ) {
-                    Text(text = "Check now")
-                }
-            },
+            sub = updatesSub,
+            right = updatesRight,
         ) {
+            if (!isConfigured) {
+                // Nothing else makes sense here — the toggle would be a
+                // dead control, the timestamp would be permanently
+                // "Never" or stale. Leave the section visible so the
+                // user knows the feature exists; the sub copy explains
+                // why the controls are absent.
+                return@SettingsSection
+            }
             SettingsToggleRow(
                 label = "Check for updates automatically",
                 description = "Once a day, quietly in the background.",

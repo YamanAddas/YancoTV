@@ -63,6 +63,17 @@ class UpdateChecker(
     private val logger: Logger = NOOP_LOGGER,
 ) {
     /**
+     * True when [endpointUrl] is non-blank — i.e. the update mechanism
+     * is wired for this build. Dev builds without `update.endpoint` in
+     * `local.properties` ship with an empty endpoint and the check is
+     * an unconditional no-op; UI surfaces gate "Check now" / the
+     * lastCheckedAt timestamp on this so the user gets honest feedback
+     * instead of a "Just now" timestamp that masks a non-event.
+     */
+    val isConfigured: Boolean
+        get() = endpointUrl.isNotBlank()
+
+    /**
      * Single-shot poll. Returns an [UpdateInfo] when the remote
      * `versionCode` is strictly greater than [currentVersionCode]; null
      * for every non-applicable case:
@@ -73,6 +84,10 @@ class UpdateChecker(
      *     an "update available" prompt with no URL to install from),
      *   - remote `versionCode` is ≤ [currentVersionCode] (no update,
      *     downgrade, or equal).
+     *
+     * Callers that want to distinguish "endpoint not configured" from
+     * "endpoint configured but no update" should consult [isConfigured]
+     * before invoking — see [com.yancotv.android.update.UpdateRepository].
      *
      * Suspending — runs on the caller's coroutine context. WorkManager
      * worker dispatches off the main thread.
