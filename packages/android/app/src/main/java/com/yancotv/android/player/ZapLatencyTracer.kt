@@ -2,7 +2,6 @@ package com.yancotv.android.player
 
 import android.os.SystemClock
 import android.util.Log
-import com.yancotv.android.BuildConfig
 
 /**
  * Stage 1.6 — channel-zap latency probe.
@@ -18,8 +17,13 @@ import com.yancotv.android.BuildConfig
  * histogram captured cheaply over hundreds of samples on real Fire TV
  * hardware. Higher-resolution tracing is overkill for that bar.
  *
- * Production builds short-circuit to a no-op via [BuildConfig.DEBUG] so
- * R8 dead-code-eliminates the body — zero runtime cost on release.
+ * **Stage 5.4 update (2026-04-28):** the original `BuildConfig.DEBUG`
+ * gate was removed so release-build measurement runs can capture the
+ * histogram for the v1.0 perf-budget gate. Steady-state cost is one
+ * volatile read + one nanosecond diff + one `Log.i` per channel zap
+ * — well below the noise floor on Fire TV-class hardware. Logcat lines
+ * are tagged `ZapLatency` so the user can filter them out of any
+ * grep-based diagnostics.
  */
 object ZapLatencyTracer {
     private const val TAG = "ZapLatency"
@@ -29,13 +33,11 @@ object ZapLatencyTracer {
     @Volatile private var reason: String = ""
 
     fun markZapStart(why: String) {
-        if (!BuildConfig.DEBUG) return
         startElapsedMs = SystemClock.elapsedRealtime()
         reason = why
     }
 
     fun onFirstFrame() {
-        if (!BuildConfig.DEBUG) return
         val started = startElapsedMs
         if (started <= 0L) return
         val elapsed = SystemClock.elapsedRealtime() - started

@@ -808,21 +808,38 @@ private fun GuideGrid(
                 }
             }
 
-            // Vertical "now" indicator line. Rendered outside the lazy rows so
-            // it sits above the programme blocks, offset in sync with the
-            // shared horizontal scroll state. We use the lambda form of
-            // Modifier.offset so recomposition is cheap when hScroll.value
-            // ticks every frame during a swipe.
+            // Vertical "now" indicator line. Rendered outside the lazy rows
+            // so it sits above the programme blocks, offset in sync with
+            // the shared horizontal scroll state.
+            //
+            // **Stage 5.4 fix (2026-04-28).** The `leftPx` read of
+            // `hScroll.value` was computed OUTSIDE the `Modifier.offset { }`
+            // lambda — i.e. at composition time. Every horizontal scroll
+            // tick mutates `hScroll.value` (snapshot state); reading it in
+            // composition makes the enclosing `GuideGrid` re-compose every
+            // frame, which then re-evaluates `TimeHeader` + the LazyColumn's
+            // visible `ChannelRow`s + every `ProgrammeBlock` inside them.
+            // Pre-fix EPG horizontal scroll dropped to ~3 fps with 97-98 %
+            // janky frames on Fire TV (release build). The earlier comment
+            // claimed the offset-lambda made recomposition cheap, but the
+            // read sat outside the lambda — comment didn't match the code.
+            //
+            // Move the computation INSIDE the offset lambda so the
+            // `hScroll.value` read happens at LAYOUT time. Layout reruns
+            // are cheap (just the Box's position changes); recomposition
+            // of the grid no longer triggers on every scroll frame.
             val nowOffsetMin = ((nowSeconds - guide.startTime) / 60L).toInt()
             if (nowOffsetMin in 0..totalMinutes) {
-                val leftPx =
-                    with(density) {
-                        CHANNEL_COL_WIDTH.toPx() + (nowOffsetMin * pxPerMin).dp.toPx() - hScroll.value
-                    }
                 Box(
                     modifier =
                         Modifier
-                            .offset { IntOffset(leftPx.toInt(), 0) }
+                            .offset {
+                                val leftPx =
+                                    CHANNEL_COL_WIDTH.toPx() +
+                                        (nowOffsetMin * pxPerMin).dp.toPx() -
+                                        hScroll.value
+                                IntOffset(leftPx.toInt(), 0)
+                            }
                             .width(2.dp)
                             .fillMaxHeight()
                             .background(Color(0xFFE25555)),
