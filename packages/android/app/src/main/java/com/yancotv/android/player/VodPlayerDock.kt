@@ -467,10 +467,8 @@ private fun VodDockTransportRow(
         Spacer(Modifier.width(30.dp))
         // Each secondary chip routes to the matching sheet tab. CC → SUBS
         // because the enum name is SUBS but the user-facing vocab is CC on
-        // remotes. FAV opens the sheet's FAV tab even though it's a stub —
-        // the "COMING IN MK.XX" placeholder is more informative than a
-        // button that silently does nothing. MENU opens on AUDIO as the
-        // default landing, matching the MENU key behaviour elsewhere.
+        // remotes. MENU opens on AUDIO as the default landing, matching
+        // the MENU key behaviour elsewhere.
         SecondaryChip(label = "CC", onClick = { onUserInteraction(); onOpenSheet(SheetMode.SUBS) })
         Spacer(Modifier.width(8.dp))
         SecondaryChip(label = "AUDIO", onClick = { onUserInteraction(); onOpenSheet(SheetMode.AUDIO) })
