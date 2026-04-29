@@ -43,7 +43,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -997,6 +999,7 @@ private fun resumeButtonLabel(choice: NextEpisodeChoice): String {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SeasonPickerOverlay(
     seasons: java.util.SortedMap<Int, List<EpisodeInfo>>,
@@ -1009,16 +1012,19 @@ private fun SeasonPickerOverlay(
     LaunchedEffect(Unit) { selectedAnchor.awaitAndRequest() }
 
     // Outer scrim — fills the screen, dims everything behind, eats taps
-    // outside the panel for tap-to-dismiss. focusGroup() traps focus
-    // inside this overlay so D-pad can't escape into the page LazyColumn
-    // underneath.
+    // outside the panel for tap-to-dismiss. focusGroup() + focusProperties
+    // exit=Cancel traps focus inside this overlay so D-pad can't escape
+    // into the page LazyColumn underneath. focusGroup() alone only groups
+    // children — it doesn't prevent focus from leaving when the user
+    // presses UP at the top or DOWN at the bottom of the season list.
     Box(
         modifier =
         Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.72f))
             .pointerInput(Unit) { detectTapGestures { onDismiss() } }
-            .focusGroup(),
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } },
         contentAlignment = Alignment.Center,
     ) {
         Column(
