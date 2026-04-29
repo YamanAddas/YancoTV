@@ -1,3 +1,5 @@
+import java.io.File
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -431,6 +433,96 @@ val generateUpdateJson by tasks.registering {
 // you want it for a debug build.
 afterEvaluate {
     tasks.findByName("assembleRelease")?.finalizedBy(generateUpdateJson)
+}
+
+// Stage 5.7 — copy every artifact a real release needs into one
+// folder ready to upload. Runs after both `assembleRelease`
+// (signed APK + update.json finalizer) and `bundleRelease` (signed
+// AAB for Play). Output:
+//
+//   app/build/outputs/release-package/
+//     yancotv-<versionName>-<versionCode>.apk    ← Amazon, GitHub Releases, sideload
+//     yancotv-<versionName>-<versionCode>.aab    ← Play Console
+//     update.json                                ← endpoint payload (see Stage 5.2)
+//     SHA256SUMS                                 ← integrity sums for users who manually verify
+//
+// The user just zips this folder (or uploads the contents directly to
+// each store) — no more "where was that APK again" or "did I copy the
+// right update.json?". Run with:
+//
+//   ./gradlew :app:releasePackage
+//
+// (which auto-runs assembleRelease + bundleRelease + generateUpdateJson
+// because of `dependsOn`).
+val releasePackage by tasks.registering {
+    group = "yancotv"
+    description = "Bundle signed APK + AAB + update.json + SHA256SUMS for distribution."
+
+    // Resolve at config time so dependsOn / inputs / outputs are wired.
+    val apkFileProvider = layout.buildDirectory.file("outputs/apk/release/app-release.apk")
+    val aabFileProvider =
+        layout.buildDirectory.file(
+            "outputs/bundle/release/app-release.aab",
+        )
+    val updateJsonProvider = layout.buildDirectory.file("outputs/update.json")
+    val outDirProvider = layout.buildDirectory.dir("outputs/release-package")
+
+    inputs.file(apkFileProvider)
+    inputs.file(aabFileProvider)
+    inputs.file(updateJsonProvider)
+    outputs.dir(outDirProvider)
+
+    dependsOn("assembleRelease", "bundleRelease", generateUpdateJson)
+
+    doLast {
+        val versionName = android.defaultConfig.versionName ?: "unknown"
+        val versionCode = android.defaultConfig.versionCode ?: 0
+        val tag = "yancotv-$versionName-$versionCode"
+
+        val outDir = outDirProvider.get().asFile
+        outDir.deleteRecursively()
+        outDir.mkdirs()
+
+        val apk = apkFileProvider.get().asFile
+        val aab = aabFileProvider.get().asFile
+        val json = updateJsonProvider.get().asFile
+
+        val apkOut = File(outDir, "$tag.apk")
+        val aabOut = File(outDir, "$tag.aab")
+        val jsonOut = File(outDir, "update.json")
+
+        apk.copyTo(apkOut, overwrite = true)
+        aab.copyTo(aabOut, overwrite = true)
+        json.copyTo(jsonOut, overwrite = true)
+
+        // SHA256 sums for the two binaries — gives users (and us) a way
+        // to verify the file they're holding is the one we shipped, in
+        // case GitHub Releases / a CDN ever serves a corrupted blob.
+        val md = MessageDigest.getInstance("SHA-256")
+        fun sha256Of(f: File): String {
+            md.reset()
+            f.inputStream().use { input ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n == -1) break
+                    md.update(buf, 0, n)
+                }
+            }
+            return md.digest().joinToString("") { byte -> "%02x".format(byte) }
+        }
+        val sums = buildString {
+            appendLine("${sha256Of(apkOut)}  ${apkOut.name}")
+            appendLine("${sha256Of(aabOut)}  ${aabOut.name}")
+        }
+        File(outDir, "SHA256SUMS").writeText(sums)
+
+        logger.lifecycle("[releasePackage] wrote ${outDir.absolutePath}")
+        outDir.listFiles()?.sortedBy { it.name }?.forEach {
+            logger.lifecycle("  ${it.name}  (${it.length()} bytes)")
+        }
+        logger.lifecycle("[releasePackage] versionName=$versionName versionCode=$versionCode")
+    }
 }
 
 // Stage 1.4 follow-up — Sentry Gradle plugin. Uploads the R8 mapping file
