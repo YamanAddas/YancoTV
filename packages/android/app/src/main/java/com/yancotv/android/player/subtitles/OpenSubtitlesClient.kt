@@ -48,11 +48,15 @@ class OpenSubtitlesClient(
             .headers(baseHeaders())
             .get()
             .build()
-        val response = http.newCall(request).execute()
-        if (!response.isSuccessful) {
-            throw OpenSubtitlesException("Search failed: ${response.code}")
-        }
-        val body = response.body?.string() ?: return emptyList()
+        // .use {} closes the response body — without it the OkHttp connection
+        // pool fills up and eventually starves on TLS handshakes.
+        val body =
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw OpenSubtitlesException("Search failed: ${response.code}")
+                }
+                response.body?.string() ?: return emptyList()
+            }
         return parseSearchResponse(body)
     }
 
@@ -62,12 +66,14 @@ class OpenSubtitlesClient(
             .headers(baseHeaders())
             .post("""{"file_id":$fileId}""".toRequestBody("application/json".toMediaType()))
             .build()
-        val dlResponse = http.newCall(dlRequest).execute()
-        if (!dlResponse.isSuccessful) {
-            throw OpenSubtitlesException("Download request failed: ${dlResponse.code}")
-        }
-        val dlBody = dlResponse.body?.string()
-            ?: throw OpenSubtitlesException("Empty download response")
+        val dlBody =
+            http.newCall(dlRequest).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    throw OpenSubtitlesException("Download request failed: ${resp.code}")
+                }
+                resp.body?.string()
+                    ?: throw OpenSubtitlesException("Empty download response")
+            }
         val dlJson = JSONObject(dlBody)
         val link = dlJson.optString("link", "")
             .takeIf { it.isNotBlank() }
@@ -76,12 +82,14 @@ class OpenSubtitlesClient(
         val remaining = dlJson.optInt("remaining", -1)
 
         val fileRequest = Request.Builder().url(link).build()
-        val fileResponse = http.newCall(fileRequest).execute()
-        if (!fileResponse.isSuccessful) {
-            throw OpenSubtitlesException("File download failed: ${fileResponse.code}")
-        }
-        val bytes = fileResponse.body?.bytes()
-            ?: throw OpenSubtitlesException("Empty subtitle file")
+        val bytes =
+            http.newCall(fileRequest).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    throw OpenSubtitlesException("File download failed: ${resp.code}")
+                }
+                resp.body?.bytes()
+                    ?: throw OpenSubtitlesException("Empty subtitle file")
+            }
 
         val dir = File(cacheDir, "subtitles").also { it.mkdirs() }
         val safeName = fileName.replace(Regex("[^\\w.\\- ]+"), "_")
