@@ -84,6 +84,12 @@ val appModule =
                 cacheDir = androidContext().cacheDir,
             )
         }
+        single {
+            com.yancotv.android.player.subtitles.OpenSubtitlesClient(
+                http = get(),
+                cacheDir = androidContext().cacheDir,
+            )
+        }
         single<CredentialStore> { AndroidKeystoreCredentialStore() }
         single<FileContentReader> { AndroidFileContentReader(androidContext()) }
         single { ContentRepository(get()) }

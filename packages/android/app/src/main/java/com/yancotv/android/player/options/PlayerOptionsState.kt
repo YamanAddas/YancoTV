@@ -27,6 +27,7 @@ enum class PlayerOptionCategory {
     RECORD,
     FAVORITES,
     EXTERNAL,
+    SUBTITLE_SEARCH,
 }
 
 class PlayerOptionsState {

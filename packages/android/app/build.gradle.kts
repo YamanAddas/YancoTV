@@ -122,6 +122,8 @@ android {
         // Empty = updates disabled (the checker short-circuits before
         // any HTTP call).
         buildConfigField("String", "UPDATE_ENDPOINT", "\"$updateEndpoint\"")
+        buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"${sentryProps.getProperty("opensubtitles.apiKey", "")}\"")
+
     }
 
     // MB-201 — release signing config (only registered when local.properties
