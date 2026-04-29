@@ -700,15 +700,23 @@ class PlaybackController(
         val pos = player.currentPosition.coerceAtLeast(0L)
         persistResumePoint()
         _externalSubtitle = uri to mime
-        player.setMediaItem(buildMediaItem(item), pos)
-        player.prepare()
-        player.playWhenReady = true
-        // Ensure text tracks aren't still disabled from a previous "Off" pick.
+        // Enable text tracks BEFORE setMediaItem — the order matters because
+        // ExoPlayer's track selector evaluates the new tracks on prepare();
+        // doing the enable after prepare leaves a window where the external
+        // sub is loaded but the selector still treats text as disabled, so
+        // the track is present in `currentTracks` with isTrackSelected==false
+        // and the SUBTITLES panel mis-renders as "Off". Also clear any prior
+        // text-track override (e.g. user previously picked an embedded
+        // track) so the new external sub's SELECTION_FLAG_DEFAULT wins.
         player.trackSelectionParameters =
             player.trackSelectionParameters
                 .buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                 .build()
+        player.setMediaItem(buildMediaItem(item), pos)
+        player.prepare()
+        player.playWhenReady = true
     }
 
     /**

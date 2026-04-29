@@ -12,6 +12,9 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -295,6 +298,7 @@ private fun applyAudioTrack(player: Player, track: AudioTrack) {
 
 // ───── Subtitles ─────
 
+@OptIn(ExperimentalFoundationApi::class)
 @UnstableApi
 @Composable
 private fun SubtitlesPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickExternal: () -> Unit, state: PlayerOptionsState, onPickOption: () -> Unit) {
@@ -302,7 +306,34 @@ private fun SubtitlesPanelContent(controller: PlaybackController, prefs: AppPref
     val disabled = rememberTextDisabled(controller.player)
     val scope = rememberCoroutineScope()
     val firstRowAnchor = rememberPlacedFocusAnchor()
-    LaunchedEffect(Unit) { firstRowAnchor.awaitAndRequest() }
+    val searchRowAnchor = rememberPlacedFocusAnchor()
+    // bringIntoView lets us scroll the search row into view after focusing
+    // it. Without this the row gets focus but stays below the scroll
+    // viewport when there are many subtitle tracks above (BluRay rips
+    // routinely have 10+) — focus is technically there, but the user
+    // sees no selector because the focused row is offscreen.
+    val searchRowBringIntoView = remember { BringIntoViewRequester() }
+
+    // When the panel re-enters after a sub-panel closes, focus the row
+    // that opened the sub-panel — not the default first row. Currently
+    // SUBTITLE_SEARCH is the only sub-panel; structured this way so
+    // future sub-rows drop in with one extra branch.
+    //
+    // Snapshot the hint at first composition (NOT via collectAsState) so
+    // any subsequent recomposition — e.g. tracks flow emits after the
+    // ExoPlayer applyExternalSubtitle landed — can't observe a stale or
+    // already-consumed value mid-effect.
+    val initialReturning = remember { state.returningFromSubPanel.value }
+    LaunchedEffect(Unit) {
+        when (initialReturning) {
+            PlayerOptionCategory.SUBTITLE_SEARCH -> {
+                searchRowAnchor.awaitAndRequest()
+                runCatching { searchRowBringIntoView.bringIntoView() }
+            }
+            else -> firstRowAnchor.awaitAndRequest()
+        }
+        state.consumeSubPanelReturn()
+    }
 
     val offSelected = disabled || tracks.none { it.selected }
     OptionRow(
@@ -342,11 +373,14 @@ private fun SubtitlesPanelContent(controller: PlaybackController, prefs: AppPref
             onPickOption()
         },
     )
-    OptionRow(
-        label = "Search online…",
-        selected = false,
-        onPick = { state.openPanel(PlayerOptionCategory.SUBTITLE_SEARCH) },
-    )
+    Box(modifier = Modifier.bringIntoViewRequester(searchRowBringIntoView)) {
+        OptionRow(
+            label = "Search online…",
+            selected = false,
+            focusAnchor = searchRowAnchor,
+            onPick = { state.openPanel(PlayerOptionCategory.SUBTITLE_SEARCH) },
+        )
+    }
 }
 
 private data class TextTrack(val group: Tracks.Group, val trackIndex: Int, val language: String?, val displayName: String, val selected: Boolean)
@@ -496,16 +530,31 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
         searching = false
     }
 
-    LaunchedEffect(results) {
-        if (results.isNotEmpty()) firstRowAnchor.awaitAndRequest()
+    // Re-request focus whenever the visible row set changes — we move
+    // through three states (loading → error OR results), and each
+    // composes a different first row. Without this LaunchedEffect keying
+    // on all three, focus would only land once results arrive; during
+    // the loading window the panel would have no focused row at all.
+    LaunchedEffect(searching, error, results) {
+        firstRowAnchor.awaitAndRequest()
     }
 
     if (searching) {
-        OptionRow(label = "Searching \"${q?.query.orEmpty()}\"…", selected = false, onPick = {})
+        OptionRow(
+            label = "Searching \"${q?.query.orEmpty()}\"…",
+            selected = false,
+            focusAnchor = firstRowAnchor,
+            onPick = {},
+        )
         return
     }
     error?.let {
-        OptionRow(label = it, selected = false, onPick = {})
+        OptionRow(
+            label = it,
+            selected = false,
+            focusAnchor = firstRowAnchor,
+            onPick = {},
+        )
         return
     }
 
