@@ -92,20 +92,7 @@ class OpenSubtitlesClient(
             }
 
         val dir = File(cacheDir, "subtitles").also { it.mkdirs() }
-        // The character-class strip handles `../` etc. by replacing path
-        // separators with `_`, but two more belts: (1) if sanitization
-        // collapses everything (or the server sent a blank), fall back to
-        // a stable name based on file_id; (2) verify the resolved canonical
-        // path stays under our subtitles dir before writing. Defense in
-        // depth — opensubtitles.com is trusted but an upstream MITM or
-        // bad-state response shouldn't be able to write outside our cache.
-        val sanitized = fileName.replace(Regex("[^\\w.\\- ]+"), "_").trim()
-        val safeName = sanitized.ifBlank { "subtitle_$fileId.srt" }
-        val outFile = File(dir, "${fileId}-$safeName")
-        val dirCanonical = dir.canonicalPath + File.separator
-        if (!outFile.canonicalPath.startsWith(dirCanonical)) {
-            throw OpenSubtitlesException("Subtitle filename escaped cache dir")
-        }
+        val outFile = resolveSafeSubtitleFile(dir, fileId, fileName)
         outFile.writeBytes(bytes)
 
         return DownloadResult(file = outFile, remaining = remaining)
@@ -147,6 +134,34 @@ class OpenSubtitlesClient(
     companion object {
         private const val API_BASE = "https://api.opensubtitles.com/api/v1"
     }
+}
+
+/**
+ * Defense-in-depth file name resolution for downloaded subtitles.
+ *
+ * Three belts on a server-supplied [fileName]:
+ *   1. Strip everything but `\w.\- ` to neutralise `../` / `\` / null-byte
+ *      / control chars / Unicode separators that some filesystems treat
+ *      as path delimiters.
+ *   2. If the strip leaves a blank string (the server sent only symbols,
+ *      or nothing at all), fall back to a stable name keyed by file_id.
+ *   3. After resolving the final [File], verify its canonical path stays
+ *      under [dir]'s canonical path — throws [OpenSubtitlesException] if
+ *      a determined adversary somehow gets past (1) and (2). The cache
+ *      dir is the only legitimate write target.
+ *
+ * Top-level so unit tests can call it without instantiating the full
+ * [OpenSubtitlesClient] (which needs OkHttp + a real cacheDir).
+ */
+internal fun resolveSafeSubtitleFile(dir: File, fileId: Int, fileName: String): File {
+    val sanitized = fileName.replace(Regex("[^\\w.\\- ]+"), "_").trim()
+    val safeName = sanitized.ifBlank { "subtitle_$fileId.srt" }
+    val outFile = File(dir, "${fileId}-$safeName")
+    val dirCanonical = dir.canonicalPath + File.separator
+    if (!outFile.canonicalPath.startsWith(dirCanonical)) {
+        throw OpenSubtitlesException("Subtitle filename escaped cache dir")
+    }
+    return outFile
 }
 
 data class SubtitleResult(
