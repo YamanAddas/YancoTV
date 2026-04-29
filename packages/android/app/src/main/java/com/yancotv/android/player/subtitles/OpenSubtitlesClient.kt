@@ -92,8 +92,20 @@ class OpenSubtitlesClient(
             }
 
         val dir = File(cacheDir, "subtitles").also { it.mkdirs() }
-        val safeName = fileName.replace(Regex("[^\\w.\\- ]+"), "_")
+        // The character-class strip handles `../` etc. by replacing path
+        // separators with `_`, but two more belts: (1) if sanitization
+        // collapses everything (or the server sent a blank), fall back to
+        // a stable name based on file_id; (2) verify the resolved canonical
+        // path stays under our subtitles dir before writing. Defense in
+        // depth — opensubtitles.com is trusted but an upstream MITM or
+        // bad-state response shouldn't be able to write outside our cache.
+        val sanitized = fileName.replace(Regex("[^\\w.\\- ]+"), "_").trim()
+        val safeName = sanitized.ifBlank { "subtitle_$fileId.srt" }
         val outFile = File(dir, "${fileId}-$safeName")
+        val dirCanonical = dir.canonicalPath + File.separator
+        if (!outFile.canonicalPath.startsWith(dirCanonical)) {
+            throw OpenSubtitlesException("Subtitle filename escaped cache dir")
+        }
         outFile.writeBytes(bytes)
 
         return DownloadResult(file = outFile, remaining = remaining)
