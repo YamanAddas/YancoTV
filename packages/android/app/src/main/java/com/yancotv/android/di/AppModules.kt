@@ -32,6 +32,7 @@ import com.yancotv.shared.sources.AndroidKeystoreCredentialStore
 import com.yancotv.shared.sources.CredentialStore
 import com.yancotv.shared.sources.FileContentReader
 import com.yancotv.shared.sources.SourceRepository
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
@@ -62,8 +63,16 @@ val appModule =
         // the connection pool + dispatcher while letting them override
         // timeouts per request.
         single<OkHttpClient> {
+            // Explicit timeouts so a slow / dead IPTV server can't hang Coil
+            // image loads, the EPG importer, or the subtitle search panel
+            // forever. Defaults are 10s connect / no read timeout — fine
+            // for a typical CDN, fatal for a misbehaving provider host.
+            // 30s read covers EPG XMLTV downloads that stream slowly; the
+            // EPG importer overrides this per-request when it needs longer.
             OkHttpClient
                 .Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .build()
