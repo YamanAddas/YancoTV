@@ -257,10 +257,11 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
                         }
                     addSaving = false
                     result
-                        .onSuccess {
+                        .onSuccess { saved ->
                             showAdd = false
                             addError = null
                             refresh()
+                            coordinator.start(saved.id, saved.name)
                         }.onFailure { t ->
                             addError =
                                 when (t) {

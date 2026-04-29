@@ -15,7 +15,9 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderNotificationChannel
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.image.buildYancoImageLoader
+import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.recording.RecordingsRepository
+import com.yancotv.shared.types.ContentType
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryLevel
@@ -32,6 +34,7 @@ import org.koin.core.context.startKoin
 class YancoApp : Application() {
     private val playbackController: PlaybackController by inject()
     private val recordingsRepo: RecordingsRepository by inject()
+    private val contentRepo: ContentRepository by inject()
     private val sharedHttpClient: okhttp3.OkHttpClient by inject()
     private var startedActivities = 0
 
@@ -108,6 +111,19 @@ class YancoApp : Application() {
         // stuck row forever. IO-bound; off the main thread.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             runCatching { recordingsRepo.sweepOrphans() }
+        }
+        // Pre-warm the FTS index pages so the first search after launch
+        // doesn't pay flash-storage page-in latency. A 1-row query against
+        // each content type's slice is enough to walk the FTS B-tree
+        // headers and pull the hottest pages into the OS file cache.
+        // Off main thread, best-effort — failures are silent because an
+        // empty DB or missing FTS rows is normal on first install.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching {
+                contentRepo.searchByType("a", ContentType.LIVE, limit = 1)
+                contentRepo.searchByType("a", ContentType.MOVIE, limit = 1)
+                contentRepo.searchByType("a", ContentType.SERIES, limit = 1)
+            }
         }
         // Drop SUCCEEDED/FAILED WorkInfo records that survive across app
         // restarts. GuideSyncPanel observes the unique-work flow and the

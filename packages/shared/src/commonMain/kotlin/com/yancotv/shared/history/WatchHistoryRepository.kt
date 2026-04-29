@@ -109,12 +109,53 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
         return rows.firstOrNull { it.episode_id == null }?.position_seconds
     }
 
+    /**
+     * Most recently watched episode-level row for a series, or null if
+     * the user has never watched any episode of [contentId]. Used by the
+     * series detail page to label the Play button as "Resume SxEy"
+     * (mid-episode) or "Play SxEy" (next episode after a finished one).
+     *
+     * Returns the episode ID + offset; the caller resolves the actual
+     * EpisodeInfo against the loaded episode list. Series containers'
+     * own content-level rows are intentionally ignored — `positionFor`
+     * is the right primitive for those.
+     */
+    fun mostRecentEpisode(contentId: String): EpisodeResumeInfo? {
+        val rows = db.watchHistoryQueries.selectByContent(contentId).executeAsList()
+        val row = rows.firstOrNull { it.episode_id != null } ?: return null
+        return EpisodeResumeInfo(
+            episodeId = row.episode_id ?: return null,
+            positionSeconds = row.position_seconds,
+            durationSeconds = row.duration_seconds,
+            watchedAt = row.watched_at,
+        )
+    }
+
     fun removeForContent(contentId: String) {
         db.watchHistoryQueries.deleteByContent(contentId)
     }
 
     fun clearAll() {
         db.watchHistoryQueries.clearAll()
+    }
+}
+
+data class EpisodeResumeInfo(
+    val episodeId: String,
+    val positionSeconds: Long,
+    val durationSeconds: Long?,
+    val watchedAt: Long,
+) {
+    /**
+     * Treat ≥95% of duration as "finished". Anything less is mid-episode
+     * (Resume). Matches the rule of thumb used by mainstream streaming
+     * apps; tighter than 100% to handle credits sequences and trailing
+     * tail-end skips that don't represent real continuation intent.
+     */
+    fun isFinished(): Boolean {
+        val dur = durationSeconds ?: return false
+        if (dur <= 0L) return false
+        return positionSeconds.toDouble() / dur.toDouble() >= 0.95
     }
 }
 

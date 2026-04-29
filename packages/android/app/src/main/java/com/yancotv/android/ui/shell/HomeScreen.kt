@@ -432,7 +432,7 @@ fun HomeScreen(
                 }
             } else if (section == AppSection.Search) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    SearchScreen(isTv = isTv)
+                    SearchScreen(isTv = isTv, onShowDetail = { detailItem = it })
                 }
             } else if (section == AppSection.Home) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
@@ -520,7 +520,7 @@ fun HomeScreen(
                         // enough — touch consumed by pointerInput.
                         .pointerInput(Unit) { detectTapGestures { } },
                 ) {
-                    SearchScreen(isTv = isTv)
+                    SearchScreen(isTv = isTv, onShowDetail = { detailItem = it })
                 }
             }
         }

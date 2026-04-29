@@ -31,6 +31,14 @@ packages/mobile/android/.gradle/
 dont commit.txt
 /yancotv_logo.png
 .claude-scratch/
+# Keystore-backup helper: contains release.keystore + Sentry secrets in
+# plaintext. Generated on demand to transit the values into a password
+# manager, then deleted. Never commit.
+/RELEASE_BACKUP.txt
+# Scratch dir for the public yancotv-releases repo's starter files.
+# Lives inside this private repo for convenience; gets copied OUT into
+# the new public repo's clone when the user is ready to push.
+/_release_repo_scaffold/
 
 # adb logcat dumps + ad-hoc screenshots kept out of the tree — these
 # appear next to the repo root during debugging sessions and aren't

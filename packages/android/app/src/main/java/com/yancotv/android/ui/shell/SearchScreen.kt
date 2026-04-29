@@ -63,8 +63,13 @@ import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.koin.compose.koinInject
 
 /**
@@ -80,10 +85,12 @@ import org.koin.compose.koinInject
 @Composable
 fun SearchScreen(
     isTv: Boolean,
+    onShowDetail: ((ContentItem) -> Unit)? = null,
     modifier: Modifier = Modifier,
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
     parental: com.yancotv.shared.parental.ParentalRepository = koinInject(),
+    syncCoordinator: com.yancotv.android.sources.SourceSyncCoordinator = koinInject(),
 ) {
     // rememberSaveable so a rotation / process-death while the user has a
     // query typed doesn't wipe the term. Results are not saved — rerunning
@@ -99,7 +106,9 @@ fun SearchScreen(
     }
     val results = remember { mutableStateListOf<ContentItem>() }
     var searching by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val syncActive by syncCoordinator.state.collectAsState()
 
     // Parental gate — filter hidden IDs out of results, gate play on locked,
     // and apply the adult-content filter when enabled in Settings.
@@ -129,35 +138,59 @@ fun SearchScreen(
         if (trimmed.isEmpty()) {
             results.clear()
             searching = false
+            searchError = null
             return@LaunchedEffect
         }
         searching = true
+        searchError = null
         delay(220L)
-        // MK.search.rails — per-type fetch so each rail gets a fair slice
-        // (a large live catalog used to exhaust the unified 100-row
-        // limit within live alone, hiding all movies/series). Three
-        // sequential SQLite reads are still <10ms total on Fire TV;
-        // moving to parallel adds dispatcher complexity for no
-        // measurable win at this row count.
-        val matches =
-            withContext(Dispatchers.IO) {
-                val live =
-                    runCatching { repo.searchByType(trimmed, ContentType.LIVE, limit = 100) }
-                        .onFailure { Log.w("Yanco", "SearchScreen.searchByType(live) failed: ${it.message}", it) }
-                        .getOrElse { emptyList() }
-                val movies =
-                    runCatching { repo.searchByType(trimmed, ContentType.MOVIE, limit = 100) }
-                        .onFailure { Log.w("Yanco", "SearchScreen.searchByType(movie) failed: ${it.message}", it) }
-                        .getOrElse { emptyList() }
-                val series =
-                    runCatching { repo.searchByType(trimmed, ContentType.SERIES, limit = 100) }
-                        .onFailure { Log.w("Yanco", "SearchScreen.searchByType(series) failed: ${it.message}", it) }
-                        .getOrElse { emptyList() }
-                live + movies + series
+        // Parallel per-type fetch so the three rails finish in roughly
+        // max(t1, t2, t3) instead of sum. On a freshly-synced DB the
+        // FTS index pages aren't in the OS file cache yet and a sync
+        // can still hold the SQLite write lock, so any single query may
+        // take seconds. Per-query 8s timeout keeps the UI honest — if
+        // FTS stalls we surface an error instead of leaving the user
+        // staring at a frozen "Searching…" forever.
+        val outcome =
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        val jobs =
+                            listOf(ContentType.LIVE, ContentType.MOVIE, ContentType.SERIES).map { type ->
+                                async {
+                                    runCatching {
+                                        withTimeout(8_000L) {
+                                            repo.searchByType(trimmed, type, limit = 100)
+                                        }
+                                    }.onFailure { t ->
+                                        when (t) {
+                                            is TimeoutCancellationException ->
+                                                Log.w("Yanco", "SearchScreen.searchByType($type) timed out")
+                                            else ->
+                                                Log.w("Yanco", "SearchScreen.searchByType($type) failed: ${t.message}", t)
+                                        }
+                                    }.getOrElse { emptyList() }
+                                }
+                            }
+                        jobs.awaitAll().flatten()
+                    }
+                }
             }
-        results.clear()
-        results.addAll(matches)
         searching = false
+        outcome
+            .onSuccess { matches ->
+                results.clear()
+                results.addAll(matches)
+                searchError = if (matches.isEmpty() && syncActive != null) {
+                    "Sync still running — try again in a moment."
+                } else {
+                    null
+                }
+            }.onFailure { t ->
+                Log.w("Yanco", "SearchScreen search failed: ${t.message}", t)
+                results.clear()
+                searchError = "Search failed. Try again."
+            }
     }
 
     Column(
@@ -170,6 +203,14 @@ fun SearchScreen(
     ) {
         SearchField(value = query, onValueChange = { query = it })
 
+        // Sync-active warning — when a source is still syncing, FTS reads
+        // can stall behind the write lock and the index pages aren't yet
+        // in the OS file cache. Surface this so the user knows results
+        // may be incomplete or slow until sync finishes.
+        syncActive?.let { active ->
+            SyncBanner(sourceName = active.sourceName)
+        }
+
         when {
             query.isBlank() ->
                 EmptyState(
@@ -180,6 +221,11 @@ fun SearchScreen(
                 EmptyState(
                     title = "Searching…",
                     subtitle = "Searching for \"${query.trim()}\"…",
+                )
+            searchError != null && results.isEmpty() ->
+                EmptyState(
+                    title = "Search unavailable",
+                    subtitle = searchError ?: "",
                 )
             results.isEmpty() ->
                 EmptyState(
@@ -198,10 +244,17 @@ fun SearchScreen(
                 val series = remember(visible) { visible.filter { it.type == ContentType.SERIES } }
                 val onActivate: (ContentItem, List<ContentItem>) -> Unit = { item, bucket ->
                     gatedPlay(item.id) {
-                        val idx = bucket.indexOf(item).coerceAtLeast(0)
-                        val alreadyPlaying = controller.currentId == item.id
-                        if (!alreadyPlaying) controller.play(bucket, idx)
-                        if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                        when {
+                            (item.type == ContentType.MOVIE || item.type == ContentType.SERIES) && onShowDetail != null -> {
+                                onShowDetail.invoke(item)
+                            }
+                            else -> {
+                                val idx = bucket.indexOf(item).coerceAtLeast(0)
+                                val alreadyPlaying = controller.currentId == item.id
+                                if (!alreadyPlaying) controller.play(bucket, idx)
+                                if (!isTv || alreadyPlaying) PlayerLauncher.launch(context)
+                            }
+                        }
                     }
                 }
                 LazyColumn(
@@ -320,6 +373,25 @@ private fun EmptyState(title: String, subtitle: String) {
             Text(text = title, color = LocalYancoPalette.current.TextPrimary)
             Text(text = subtitle, color = LocalYancoPalette.current.TextMuted)
         }
+    }
+}
+
+@Composable
+private fun SyncBanner(sourceName: String) {
+    Box(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(LocalYancoPalette.current.Accent.copy(alpha = 0.12f))
+            .border(1.dp, LocalYancoPalette.current.Accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = "Syncing \"$sourceName\" — search results may be incomplete or slow until it finishes.",
+            color = LocalYancoPalette.current.Accent,
+            fontSize = 12.sp,
+        )
     }
 }
 

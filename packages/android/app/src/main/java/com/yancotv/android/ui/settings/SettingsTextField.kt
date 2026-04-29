@@ -87,13 +87,14 @@ fun SettingsClickToEditField(
 ) {
     var editing by remember { mutableStateOf(false) }
     val editFocus = remember { FocusRequester() }
+    val readOnlyFocus = remember { FocusRequester() }
 
-    // Push focus into the embedded text field the frame after `editing`
-    // flips true. The field is only composed while editing, so this
-    // effect can't race with its own recomposition: it fires once per
-    // edit-mode entry.
     LaunchedEffect(editing) {
-        if (editing) runCatching { editFocus.requestFocus() }
+        if (editing) {
+            runCatching { editFocus.requestFocus() }
+        } else {
+            runCatching { readOnlyFocus.requestFocus() }
+        }
     }
 
     val labelText: @Composable () -> Unit = {
@@ -131,6 +132,7 @@ fun SettingsClickToEditField(
                 placeholder = hint?.takeIf { value.isBlank() } ?: "",
                 empty = value.isBlank(),
                 onClick = { editing = true },
+                focusRequester = readOnlyFocus,
             )
         }
     }
@@ -173,7 +175,13 @@ fun SettingsClickToEditField(
 }
 
 @Composable
-private fun ReadOnlyFieldBody(display: String, placeholder: String, empty: Boolean, onClick: () -> Unit) {
+private fun ReadOnlyFieldBody(
+    display: String,
+    placeholder: String,
+    empty: Boolean,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester = FocusRequester.Default,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
@@ -186,6 +194,7 @@ private fun ReadOnlyFieldBody(display: String, placeholder: String, empty: Boole
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(8.dp))
+            .focusRequester(focusRequester)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),

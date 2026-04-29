@@ -1,10 +1,12 @@
 package com.yancotv.android.ui.detail
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -17,13 +19,16 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -42,6 +47,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
@@ -60,6 +66,8 @@ import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.history.EpisodeResumeInfo
+import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
@@ -91,6 +99,7 @@ fun ContentDetailScreen(
     modifier: Modifier = Modifier,
     detailService: ContentDetailService = koinInject(),
     favorites: FavoritesRepository = koinInject(),
+    watchHistory: WatchHistoryRepository = koinInject(),
 ) {
     var loaded by remember(item.id) { mutableStateOf<ContentDetailService.Loaded?>(null) }
     var loading by remember(item.id) { mutableStateOf(true) }
@@ -126,11 +135,53 @@ fun ContentDetailScreen(
         remember(seasons, selectedSeason) {
             seasons[selectedSeason].orEmpty()
         }
+    var seasonPickerOpen by remember(item.id) { mutableStateOf(false) }
+    // Anchor for the first visible episode of the active season. Re-keyed
+    // on selectedSeason so each season change spawns a *fresh* anchor —
+    // and thus a fresh FocusRequester. Reusing one across seasons hits a
+    // race: the old requester briefly loses its binding while the new
+    // first-episode node attaches, and a requestFocus() landing in that
+    // gap silently no-ops. With a per-season anchor, the new requester
+    // binds to the new node cleanly and isPlaced starts at false.
+    val firstEpisodeAnchor = remember(selectedSeason) { PlacedFocusAnchor() }
+    // Gate so the focus-shift LaunchedEffect doesn't fire on the initial
+    // season pick (the one auto-set when episodes first load) — that
+    // would steal focus from the Play button before the user has even
+    // looked at it.
+    var hasInitialFocus by remember(item.id) { mutableStateOf(false) }
+
+    // Resume info — async DB read once we know the content + episode list.
+    // Recomputed when episodes settle so the button label updates from
+    // "Play" → "Resume S2E4" / "Play S2E5" / "Watch again S1E1" without
+    // forcing the user to wait on initial render.
+    var resumeInfo by remember(item.id) { mutableStateOf<EpisodeResumeInfo?>(null) }
+    LaunchedEffect(item.id, episodes.size) {
+        if (rendered.type != ContentType.SERIES || episodes.isEmpty()) {
+            resumeInfo = null
+            return@LaunchedEffect
+        }
+        resumeInfo =
+            withContext(Dispatchers.IO) {
+                runCatching { watchHistory.mostRecentEpisode(rendered.id) }.getOrNull()
+            }
+    }
+    val playChoice =
+        remember(episodes, resumeInfo) {
+            computeNextEpisode(episodes, resumeInfo)
+        }
 
     // Single LazyColumn governs the whole page so d-pad focus never has
     // to cross a scroll-container boundary.
     val listState = rememberLazyListState()
     val trapFocus = remember { FocusRequester() }
+    // True once the open-time focus ladder has handed off to the Play
+    // button. While false the 0-dp Spacer below is focusable so we have
+    // a target for the initial trapFocus.requestFocus(). Once the
+    // playAnchor is wired and focused, we disable the Spacer's
+    // focusable so spatial UP from the action row doesn't dump focus
+    // onto an invisible 0-dp node (the "stuck focus on top" feeling).
+    // Reset per item.id so re-opening another series rearms the trap.
+    var initialFocusTransferred by remember(item.id) { mutableStateOf(false) }
 
     // Focus trap: focusGroup boundary + an invisible 0-dp Spacer anchor.
     // The Spacer is the first focusable node inside the group, so it
@@ -145,7 +196,12 @@ fun ContentDetailScreen(
             .background(LocalYancoPalette.current.BackgroundDeep)
             .focusGroup(),
     ) {
-        Spacer(Modifier.size(0.dp).focusRequester(trapFocus).focusable())
+        Spacer(
+            Modifier
+                .size(0.dp)
+                .focusRequester(trapFocus)
+                .focusable(enabled = !initialFocusTransferred),
+        )
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -156,13 +212,18 @@ fun ContentDetailScreen(
                     item = rendered,
                     metadata = metadata,
                     episodes = episodes,
+                    playChoice = playChoice,
                     isFavorite = isFav,
                     onPlay = {
                         when (rendered.type) {
-                            ContentType.SERIES ->
-                                episodes.firstOrNull()?.let {
-                                    onPlayEpisode(rendered, it)
-                                } ?: onPlayContent(rendered)
+                            ContentType.SERIES -> {
+                                val ep = playChoice?.episode
+                                if (ep != null) {
+                                    onPlayEpisode(rendered, ep)
+                                } else {
+                                    onPlayContent(rendered)
+                                }
+                            }
                             else -> onPlayContent(rendered)
                         }
                     },
@@ -190,23 +251,14 @@ fun ContentDetailScreen(
                     )
                 }
                 if (seasons.size > 1) {
-                    item(key = "season_chips") {
-                        Row(
-                            modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Space.page, vertical = Space.xs),
-                            horizontalArrangement = Arrangement.spacedBy(Space.sm),
-                        ) {
-                            seasons.keys.forEach { season ->
-                                SeasonChip(
-                                    label = if (season == 0) "Specials" else "Season $season",
-                                    selected = season == selectedSeason,
-                                    count = seasons[season]?.size ?: 0,
-                                    onClick = { selectedSeason = season },
-                                )
-                            }
-                        }
+                    item(key = "season_selector") {
+                        SeasonSelector(
+                            seasonCount = seasons.size,
+                            selectedSeason = selectedSeason,
+                            episodeCount = seasons[selectedSeason]?.size ?: 0,
+                            open = seasonPickerOpen,
+                            onTriggerClick = { seasonPickerOpen = true },
+                        )
                     }
                 }
                 if (visibleEpisodes.isEmpty() && !loading) {
@@ -225,14 +277,36 @@ fun ContentDetailScreen(
                         }
                     }
                 }
-                items(visibleEpisodes, key = { "ep:${it.id}" }) { ep ->
+                itemsIndexed(visibleEpisodes, key = { _, ep -> "ep:${ep.id}" }) { idx, ep ->
                     Box(
                         modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xxs),
                     ) {
-                        EpisodeRow(ep = ep, onClick = { onPlayEpisode(rendered, ep) })
+                        EpisodeRow(
+                            ep = ep,
+                            onClick = { onPlayEpisode(rendered, ep) },
+                            modifier = if (idx == 0) Modifier.placedFocus(firstEpisodeAnchor) else Modifier,
+                        )
                     }
                 }
             }
+        }
+
+        // Season picker — rendered as an overlay sibling of the LazyColumn
+        // (NOT a LazyColumn item) so navigating it doesn't drive the page
+        // scroll and focus stays trapped inside until the user picks a
+        // season or presses BACK. Inline expansion turned out to leak
+        // focus into the episode list and bounce the page scroll while
+        // the user was still scanning seasons.
+        if (seasonPickerOpen && rendered.type == ContentType.SERIES && seasons.size > 1) {
+            SeasonPickerOverlay(
+                seasons = seasons,
+                selectedSeason = selectedSeason,
+                onDismiss = { seasonPickerOpen = false },
+                onSeasonSelect = { season ->
+                    selectedSeason = season
+                    seasonPickerOpen = false
+                },
+            )
         }
     }
 
@@ -247,6 +321,23 @@ fun ContentDetailScreen(
     LaunchedEffect(loaded != null) {
         runCatching { trapFocus.requestFocus() } // immediate trap while Play button renders
         playAnchor.awaitAndRequest() // waits for onPlaced, then fires once
+        // Trap has done its job — disable so spatial UP from the action
+        // row can't land on an invisible 0-dp Spacer.
+        initialFocusTransferred = true
+        hasInitialFocus = true
+    }
+
+    // After the user picks a different season from the dropdown, hand
+    // focus to the first episode of the new season. We use a
+    // LaunchedEffect (not a scope.launch in the click handler) so the
+    // request runs after Compose has settled the recomposition and the
+    // new first-episode node is attached. Gated on hasInitialFocus so
+    // the initial composition's selectedSeason assignment doesn't steal
+    // focus from the Play button.
+    LaunchedEffect(selectedSeason) {
+        if (hasInitialFocus) {
+            firstEpisodeAnchor.awaitAndRequest()
+        }
     }
 
     // Return-from-player focus restore. PlayerActivity yanks window focus
@@ -284,6 +375,7 @@ private fun HeroBlock(
     item: ContentItem,
     metadata: ContentMetadata,
     episodes: List<EpisodeInfo>,
+    playChoice: NextEpisodeChoice?,
     isFavorite: Boolean,
     onPlay: () -> Unit,
     onFavoriteToggle: () -> Unit,
@@ -340,12 +432,7 @@ private fun HeroBlock(
                     ActionRow(
                         primaryLabel =
                         when (item.type) {
-                            ContentType.SERIES ->
-                                if (episodes.isNotEmpty()) {
-                                    "Play S${episodes.first().seasonNumber}E${episodes.first().episodeNumber}"
-                                } else {
-                                    "Play"
-                                }
+                            ContentType.SERIES -> playChoice?.let(::resumeButtonLabel) ?: "Play"
                             else -> "Play"
                         },
                         isFavorite = isFavorite,
@@ -651,37 +738,50 @@ private fun EpisodesSectionHeader(loading: Boolean, episodeCount: Int) {
 }
 
 @Composable
-private fun SeasonChip(label: String, selected: Boolean, count: Int, onClick: () -> Unit) {
+private fun SeasonSelector(
+    seasonCount: Int,
+    selectedSeason: Int,
+    episodeCount: Int,
+    open: Boolean,
+    onTriggerClick: () -> Unit,
+) {
+    Column(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.page, vertical = Space.xs),
+    ) {
+        SeasonTrigger(
+            label = if (selectedSeason == 0) "Specials" else "Season $selectedSeason",
+            count = episodeCount,
+            open = open,
+            onClick = onTriggerClick,
+        )
+    }
+}
+
+@Composable
+private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg =
-        when {
-            focused -> LocalYancoPalette.current.BackgroundHover
-            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
-            else -> LocalYancoPalette.current.BackgroundRaised
-        }
-    val border =
-        when {
-            focused -> LocalYancoPalette.current.FocusRing
-            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.5f)
-            else -> LocalYancoPalette.current.PanelBorder
-        }
+    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
+    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.PanelBorder
     Row(
         modifier =
         Modifier
             .clip(RoundedCornerShape(Radius.pill))
             .background(bg)
-            .border(1.dp, border, RoundedCornerShape(Radius.pill))
+            .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(Radius.pill))
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null, role = Role.DropdownList, onClick = onClick)
             .padding(horizontal = Space.lg, vertical = Space.sm),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            color = if (selected || focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextPrimary,
-            style = YancoType.Label,
+            color = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextPrimary,
+            style = YancoType.LabelStrong,
         )
         Box(
             modifier =
@@ -691,21 +791,80 @@ private fun SeasonChip(label: String, selected: Boolean, count: Int, onClick: ()
                 .padding(horizontal = Space.sm, vertical = 2.dp),
         ) {
             Text(
-                text = count.toString(),
+                text = "$count episodes",
                 color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.Caption,
+            )
+        }
+        // Chevron — flips orientation when expanded.
+        Text(
+            text = if (open) "▲" else "▼",
+            color = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextSecondary,
+            style = YancoType.Caption,
+        )
+    }
+}
+
+@Composable
+private fun SeasonOption(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val bg =
+        when {
+            focused -> LocalYancoPalette.current.BackgroundHover
+            selected -> LocalYancoPalette.current.Accent.copy(alpha = 0.12f)
+            else -> Color.Transparent
+        }
+    Row(
+        modifier =
+        modifier
+            .fillMaxWidth()
+            .background(bg)
+            .focusable(interactionSource = interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Space.lg, vertical = Space.md),
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color =
+            when {
+                focused -> LocalYancoPalette.current.Accent
+                selected -> LocalYancoPalette.current.Accent
+                else -> LocalYancoPalette.current.TextPrimary
+            },
+            style = YancoType.Label,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "$count episodes",
+            color = LocalYancoPalette.current.TextMuted,
+            style = YancoType.Caption,
+        )
+        if (selected) {
+            Text(
+                text = "✓",
+                color = LocalYancoPalette.current.Accent,
+                style = YancoType.Label,
             )
         }
     }
 }
 
 @Composable
-private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit) {
+private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     Row(
         modifier =
-        Modifier
+        modifier
             .fillMaxWidth()
             .focusStyle(focused = focused, radius = Radius.card, liftScale = 1.015f)
             .focusable(interactionSource = interaction)
@@ -773,5 +932,143 @@ private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit) {
             tint = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextFaint,
             modifier = Modifier.size(16.dp),
         )
+    }
+}
+
+private enum class PlayMode {
+    /** Mid-episode — pick up at the stored offset. Button: "Resume SxEy". */
+    RESUME,
+
+    /** Last watched episode is finished; advance to the next in season/episode order. Button: "Play SxEy". */
+    PLAY_NEXT,
+
+    /** No watch history at all — start at S1E1 (or the first available row). Button: "Play SxEy". */
+    PLAY_FIRST,
+
+    /** Every episode finished; loop back to the first one. Button: "Watch again SxEy". */
+    WATCH_AGAIN,
+}
+
+private data class NextEpisodeChoice(val episode: EpisodeInfo, val mode: PlayMode)
+
+/**
+ * Resolve which episode the Play button should target given the loaded
+ * episode list and the most-recent watch-history row. Returns null only
+ * for an empty episode list — the caller falls back to onPlayContent.
+ *
+ * Sort order is (seasonNumber, episodeNumber, id). The id tiebreak keeps
+ * runs of unnumbered specials stable rather than letting them swap on
+ * each recomposition.
+ */
+private fun computeNextEpisode(
+    episodes: List<EpisodeInfo>,
+    resumeInfo: EpisodeResumeInfo?,
+): NextEpisodeChoice? {
+    if (episodes.isEmpty()) return null
+    val sorted = episodes.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }, { it.id }))
+    if (resumeInfo == null) {
+        return NextEpisodeChoice(sorted.first(), PlayMode.PLAY_FIRST)
+    }
+    val watchedIdx = sorted.indexOfFirst { it.id == resumeInfo.episodeId }
+    if (watchedIdx < 0) {
+        // History row references an episode that's no longer in the list
+        // (re-sync dropped it, source rotated catalogs). Fall back to first.
+        return NextEpisodeChoice(sorted.first(), PlayMode.PLAY_FIRST)
+    }
+    if (!resumeInfo.isFinished()) {
+        return NextEpisodeChoice(sorted[watchedIdx], PlayMode.RESUME)
+    }
+    val next = sorted.getOrNull(watchedIdx + 1)
+    return if (next != null) {
+        NextEpisodeChoice(next, PlayMode.PLAY_NEXT)
+    } else {
+        NextEpisodeChoice(sorted.first(), PlayMode.WATCH_AGAIN)
+    }
+}
+
+private fun resumeButtonLabel(choice: NextEpisodeChoice): String {
+    val ep = choice.episode
+    val sxe = "S${ep.seasonNumber}E${ep.episodeNumber}"
+    return when (choice.mode) {
+        PlayMode.RESUME -> "Resume $sxe"
+        PlayMode.PLAY_NEXT -> "Play $sxe"
+        PlayMode.PLAY_FIRST -> "Play $sxe"
+        PlayMode.WATCH_AGAIN -> "Watch again $sxe"
+    }
+}
+
+@Composable
+private fun SeasonPickerOverlay(
+    seasons: java.util.SortedMap<Int, List<EpisodeInfo>>,
+    selectedSeason: Int,
+    onDismiss: () -> Unit,
+    onSeasonSelect: (Int) -> Unit,
+) {
+    BackHandler { onDismiss() }
+    val selectedAnchor = rememberPlacedFocusAnchor()
+    LaunchedEffect(Unit) { selectedAnchor.awaitAndRequest() }
+
+    // Outer scrim — fills the screen, dims everything behind, eats taps
+    // outside the panel for tap-to-dismiss. focusGroup() traps focus
+    // inside this overlay so D-pad can't escape into the page LazyColumn
+    // underneath.
+    Box(
+        modifier =
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f))
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } }
+            .focusGroup(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier =
+            Modifier
+                .width(480.dp)
+                .heightIn(max = 480.dp)
+                .clip(RoundedCornerShape(Radius.panel))
+                .background(LocalYancoPalette.current.BackgroundRaised)
+                .border(1.dp, LocalYancoPalette.current.PanelBorder, RoundedCornerShape(Radius.panel))
+                // Eat taps inside the panel so the outer scrim's
+                // dismiss-on-tap doesn't fire when the user taps a
+                // SeasonOption.
+                .pointerInput(Unit) { detectTapGestures { } },
+        ) {
+            Text(
+                text = "Select season",
+                color = LocalYancoPalette.current.TextPrimary,
+                style = YancoType.LabelStrong,
+                modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.md),
+            )
+            Box(
+                modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(LocalYancoPalette.current.PanelBorder),
+            )
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                itemsIndexed(seasons.keys.toList(), key = { _, s -> "ovrly:$s" }) { idx, season ->
+                    Column {
+                        if (idx > 0) {
+                            Box(
+                                modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(LocalYancoPalette.current.PanelBorder),
+                            )
+                        }
+                        SeasonOption(
+                            label = if (season == 0) "Specials" else "Season $season",
+                            count = seasons[season]?.size ?: 0,
+                            selected = season == selectedSeason,
+                            onClick = { onSeasonSelect(season) },
+                            modifier = if (season == selectedSeason) Modifier.placedFocus(selectedAnchor) else Modifier,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
