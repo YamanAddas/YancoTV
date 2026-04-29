@@ -29,10 +29,35 @@ object CrashReportPrefs {
     private const val KEY_ENABLED = "crash_reports_enabled"
     private const val DEFAULT_ENABLED = true
 
+    // In-memory cache for the Sentry hot path. Sentry's `beforeSend` and
+    // `beforeBreadcrumb` callbacks fire on every event; reading
+    // SharedPreferences from each call was tripping StrictMode disk-read
+    // warnings during cold start. We prime once at SentryInit and update
+    // synchronously from setEnabled — the only legitimate writer.
+    @Volatile
+    private var cachedEnabled: Boolean = DEFAULT_ENABLED
+
+    /**
+     * Read the persisted value once and stash it in [cachedEnabled].
+     * Called from [com.yancotv.android.crash.SentryInit.install] before
+     * Sentry init so the beforeSend hook never has to touch disk.
+     *
+     * One main-thread SharedPreferences load is unavoidable here — Sentry
+     * needs the value before it processes its first event — but we only
+     * pay it once, not per-event.
+     */
+    fun prime(context: Context) {
+        cachedEnabled = prefs(context).getBoolean(KEY_ENABLED, DEFAULT_ENABLED)
+    }
+
+    /** Cached read — safe from any thread, zero I/O. Must be primed first. */
+    fun isEnabledCached(): Boolean = cachedEnabled
+
     fun isEnabled(context: Context): Boolean =
         prefs(context).getBoolean(KEY_ENABLED, DEFAULT_ENABLED)
 
     fun setEnabled(context: Context, enabled: Boolean) {
+        cachedEnabled = enabled
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
 

@@ -33,6 +33,12 @@ object SentryInit {
             return
         }
 
+        // Prime the opt-out cache once before Sentry init so the hot-path
+        // beforeSend / beforeBreadcrumb callbacks read from memory instead
+        // of hitting SharedPreferences on every event (was the source of
+        // a StrictMode disk-read warning during cold start).
+        CrashReportPrefs.prime(context)
+
         SentryAndroid.init(context) { options ->
             options.dsn = dsn
             // Stage 5.6 — privacy opt-out. The user can toggle off
@@ -40,14 +46,15 @@ object SentryInit {
             // unconditionally so the SDK is ready if the user later
             // opts back in, but every event passes through this gate
             // first; a `null` return drops the event before it leaves
-            // the device. Cheap synchronous SharedPreferences read on
-            // each event — no Koin dependency since SentryInit runs
-            // before `startKoin` in YancoApp.onCreate.
+            // the device. Cached @Volatile read — setEnabled (the only
+            // writer) updates the cache atomically before the disk
+            // write, so the gate flips immediately when the user
+            // toggles the setting.
             options.setBeforeSend { event, _ ->
-                if (CrashReportPrefs.isEnabled(context)) event else null
+                if (CrashReportPrefs.isEnabledCached()) event else null
             }
             options.setBeforeBreadcrumb { breadcrumb, _ ->
-                if (CrashReportPrefs.isEnabled(context)) breadcrumb else null
+                if (CrashReportPrefs.isEnabledCached()) breadcrumb else null
             }
             // Release tag groups events by app version in the Sentry UI.
             // Format matches Sentry's expectations: package@versionName+versionCode.
