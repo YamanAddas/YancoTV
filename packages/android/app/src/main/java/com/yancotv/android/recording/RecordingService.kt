@@ -16,6 +16,7 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
 import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.recording.HlsRecorder
 import com.yancotv.shared.recording.MpegTsRecorder
@@ -23,7 +24,9 @@ import com.yancotv.shared.recording.RecordInput
 import com.yancotv.shared.recording.RecordResult
 import com.yancotv.shared.recording.RecorderClock
 import com.yancotv.shared.recording.RecordingFormat
+import com.yancotv.shared.recording.RecordingScheduleRepository
 import com.yancotv.shared.recording.RecordingsRepository
+import com.yancotv.shared.recording.scheduleOutcomeFromBytes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +65,12 @@ import java.util.concurrent.ConcurrentHashMap
 @UnstableApi
 class RecordingService : Service() {
     private val recordings: RecordingsRepository by inject()
+    // MB-212 — schedule repo lookup happens in handleStop so the schedule
+    // transitions to its terminal state from the same coroutine that
+    // finalises the recording row's bytes. Avoids the receiver-side
+    // race where the schedule could lock as FAILED ahead of the row's
+    // markCompleted call.
+    private val schedules: RecordingScheduleRepository by inject()
     private val http: HttpClient by inject()
     private val prefs: com.yancotv.android.prefs.AppPreferences by inject()
     private val logger: com.yancotv.shared.logger.Logger by inject()
@@ -444,6 +453,38 @@ class RecordingService : Service() {
                     )
                 }
             }.onFailure { Log.w(TAG, "stop[$recordId] transition failed", it) }
+
+            // MB-212 — schedule transition lives HERE (post-flush) so
+            // the schedule's terminal state agrees with the recording
+            // row's bytes count. Pre-fix the receiver made this call
+            // BEFORE the async flush completed; in a sub-100ms window
+            // the schedule could lock FAILED while the row eventually
+            // transitioned to COMPLETED.
+            //
+            // scheduleId is derived from the recordId via the
+            // deterministic prefix (`sched-rec-<id>`) so we don't have
+            // to plumb it through RecordInput / Intent extras / the
+            // activeJobs map. Manual record-now recordings have no
+            // prefix → null → we skip the schedule call entirely.
+            //
+            // Race-tolerance: if the schedule is already terminal
+            // (user cancelled, or receiver-fallback transitioned a
+            // row-missing case to FAILED earlier in this handleEnd
+            // call), `transitionTo` throws IllegalArgumentException
+            // and runCatching swallows. MB-214 pins this exact
+            // behaviour at the repo layer.
+            RecordingScheduleScheduler.scheduleIdFromRecordId(recordId)?.let { schedId ->
+                val outcome = scheduleOutcomeFromBytes(bytes)
+                runCatching {
+                    schedules.transitionTo(schedId, outcome.state, errorReason = outcome.reason)
+                }.onFailure {
+                    Log.d(
+                        TAG,
+                        "schedule[$schedId] transition rejected — likely already terminal: ${it.message}",
+                    )
+                }
+            }
+
             refreshNotification()
             maybeStop()
         }

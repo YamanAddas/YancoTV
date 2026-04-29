@@ -239,49 +239,51 @@ class RecordingScheduleReceiver :
             schedule.recordingId
                 ?: RecordingScheduleScheduler.recordIdForSchedule(scheduleId)
         Log.i(TAG, "end[$scheduleId] stopping recording $recordId")
+        // Always send the stop intent — even on the row-missing path —
+        // so any in-flight pre-markStarted launch (e.g. resolveOutputOrFail
+        // still running) gets cancelled cleanly via cancelAndJoin.
         RecordingService.stop(context, recordId)
 
-        // **MB-208 (2026-04-27).** Don't unconditionally transition the
-        // schedule to COMPLETED — that lied about successful capture
-        // when the recording never actually started (process death
-        // mid-window, FGS-from-background restriction, or
-        // resolveOutputOrFail throwing before markStarted). Check the
-        // recording row instead:
+        // **MB-212 (2026-04-28).** Schedule transition for the
+        // recording-exists path now happens INSIDE
+        // `RecordingService.handleStop` — after `cancelAndJoin` +
+        // `output.close()` + `output.size()` have landed the actual
+        // disk byte count. That's the only place with a non-stale read,
+        // so the schedule's terminal state agrees with the recording
+        // row's. See `RecordingScheduleRepository.scheduleOutcomeFromBytes`
+        // for the pinned decision table.
         //
-        //   - row missing                → FAILED (`recording_never_started`)
-        //   - row present but 0 bytes    → FAILED (`zero_bytes_captured`)
-        //   - row present with bytes     → COMPLETED (recording row's own
-        //                                   status reflects whether the
-        //                                   stop-flush succeeded)
+        // Pre-MB-212 we read `recordings.fileSizeBytes` here and made
+        // the call ourselves — but `RecordingService.stop` is an Intent
+        // dispatch and the actual flush completes asynchronously, so
+        // in a sub-100ms window the read returned 0 bytes while the
+        // recording was about to mark COMPLETED. Schedule locked FAILED;
+        // recording landed COMPLETED. The two histories disagreed.
         //
-        // RecordingService.stop dispatches an Intent; the actual flush
-        // happens asynchronously, so reading row status here would race.
-        // Row presence + size is enough to distinguish "never recorded"
-        // from "did record" without needing to wait for the flush.
-        val finalState: RecordingScheduleState
-        val reason: String?
+        // The receiver still handles ONE case: row missing entirely.
+        // That happens when the service was never started, or crashed
+        // before `markStarted` (FGS-from-background restriction,
+        // process death mid-resolveOutputOrFail). The service's
+        // `handleStop` would also try to transition the schedule in
+        // that case, but if the row never existed it'll be marked
+        // failed by the row-missing path here AND swallowed at the
+        // service side via runCatching — whichever runs first wins.
         val row = runCatching { recordings.getById(recordId) }.getOrNull()
-        when {
-            row == null -> {
-                finalState = RecordingScheduleState.FAILED
-                reason = "recording_never_started"
-            }
-            (row.fileSizeBytes ?: 0L) <= 0L -> {
-                finalState = RecordingScheduleState.FAILED
-                reason = "zero_bytes_captured"
-            }
-            else -> {
-                finalState = RecordingScheduleState.COMPLETED
-                reason = null
-            }
+        if (row == null) {
+            Log.i(TAG, "end[$scheduleId] row=null -> FAILED(recording_never_started)")
+            runCatching {
+                schedules.transitionTo(
+                    scheduleId,
+                    RecordingScheduleState.FAILED,
+                    errorReason = RecordingScheduleRepository.REASON_RECORDING_NEVER_STARTED,
+                )
+            }.onFailure { Log.w(TAG, "schedule[$scheduleId] row-missing transition failed", it) }
+        } else {
+            Log.i(
+                TAG,
+                "end[$scheduleId] row=${row.id} status=${row.status} — service.handleStop will transition schedule",
+            )
         }
-        Log.i(
-            TAG,
-            "end[$scheduleId] row=${row?.id} status=${row?.status} bytes=${row?.fileSizeBytes} -> $finalState",
-        )
-        runCatching {
-            schedules.transitionTo(scheduleId, finalState, errorReason = reason)
-        }.onFailure { Log.w(TAG, "schedule[$scheduleId] $finalState-transition failed", it) }
     }
 
     private fun startRecording(

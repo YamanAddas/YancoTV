@@ -391,5 +391,54 @@ class RecordingScheduleRepository(
         const val REASON_CONCURRENT_RECORDING_ACTIVE = "concurrent_recording_active"
         const val REASON_CHANNEL_DELETED = "channel_deleted"
         const val REASON_FRESH_GET_FAILED_NO_FALLBACK = "fresh_get_failed_no_fallback"
+
+        /** MB-212 — failure reason when the schedule's end alarm fires
+         *  before any recording row exists for the derived recordId.
+         *  Means the service was never started, or crashed before
+         *  reaching markStarted. */
+        const val REASON_RECORDING_NEVER_STARTED = "recording_never_started"
+
+        /** MB-212 — failure reason when the recording row exists but
+         *  finalised with zero bytes (server stalled, network died, or
+         *  user stopped before any payload arrived). */
+        const val REASON_NO_RESPONSE_FROM_SERVER = "no_response_from_server"
     }
 }
+
+/**
+ * MB-212 / pure-function extraction (analog to MK.23.C.1, MK.24.E.3,
+ * MK.24.G.2) — maps a finalised on-disk byte count to the schedule's
+ * terminal state + reason. Called by Android `RecordingService.handleStop`
+ * after `cancelAndJoin` + `output.close()` + `output.size()` have
+ * landed the actual byte count, so the schedule's terminal state
+ * matches the recording row's terminal state exactly.
+ *
+ * Pre-MB-212 the `RecordingScheduleReceiver.handleEnd` made this
+ * decision based on a stale read of `recordings.fileSizeBytes` BEFORE
+ * the asynchronous `handleStop` had finished flushing. In a sub-100ms
+ * window the schedule could lock as FAILED while the recording row
+ * eventually transitioned to COMPLETED — the two histories disagreed.
+ * Post-fix the decision moves into the service's `handleStop` coroutine
+ * (single source of truth for "the recording is done"), and this pure
+ * function is shared for unit-test pinning.
+ *
+ * Bytes <= 0 → FAILED + `REASON_NO_RESPONSE_FROM_SERVER`.
+ * Bytes  > 0 → COMPLETED, no error reason.
+ */
+data class ScheduleOutcomeFromBytes(
+    val state: RecordingScheduleState,
+    val reason: String?,
+)
+
+fun scheduleOutcomeFromBytes(bytesWritten: Long): ScheduleOutcomeFromBytes =
+    if (bytesWritten <= 0L) {
+        ScheduleOutcomeFromBytes(
+            RecordingScheduleState.FAILED,
+            RecordingScheduleRepository.REASON_NO_RESPONSE_FROM_SERVER,
+        )
+    } else {
+        ScheduleOutcomeFromBytes(
+            RecordingScheduleState.COMPLETED,
+            null,
+        )
+    }
