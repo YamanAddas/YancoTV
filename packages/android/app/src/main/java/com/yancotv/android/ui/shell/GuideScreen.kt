@@ -1047,6 +1047,33 @@ private fun ChannelRow(
     // bare `Box`. Leading gap stays a bare `Box` so RIGHT-from-
     // ChannelCell finds the first programme block, never an off-
     // viewport empty cell (the focus regression we hit yesterday).
+    // MK.EPG.I — quantize the scroll-driven re-filter to 30-min buckets.
+    //
+    // Pre-fix the `visibleProgrammes` derivedStateOf read `hScroll.value`
+    // directly. Every horizontal scroll tick (~60fps during user scroll)
+    // mutated hScroll → invalidated this derived state → re-ran the
+    // `channel.programmes.filter { ... }` lambda → allocated a new
+    // `List<EpgProgramme>` per visible channel. On the user's 4022-channel
+    // install with ~15 visible rows that's ~900 list allocations / sec
+    // during scroll, on top of every Compose layout pass. Logcat showed
+    // measurable GC pressure during sustained horizontal scrolling even
+    // after MK.EPG.A.fix2 took the cmd-list pipeline out of the picture.
+    //
+    // Two-tier derivedStateOf: inner bucket runs every frame but does
+    // cheap math (one division) and emits the same value within a bucket;
+    // outer filter only re-runs when the bucket value actually changes,
+    // i.e. once per 30 min of scroll motion. The 60-min `bufferMin`
+    // safety margin (kept on both sides of the snapped viewport) covers
+    // any programmes the user can scroll past within a single bucket
+    // before the next re-filter triggers — bucket=30min < buffer=60min,
+    // so the active result set always covers the actual viewport.
+    val scrollBucketMin by remember(pxPerMin) {
+        derivedStateOf {
+            val bucketWidthMin = 30L
+            val pxPerBucket = (bucketWidthMin * pxPerMin).toLong().coerceAtLeast(1L)
+            (hScroll.value.toLong() / pxPerBucket) * bucketWidthMin
+        }
+    }
     val visibleProgrammes by remember(
         channel.programmes,
         windowStart,
@@ -1055,14 +1082,18 @@ private fun ChannelRow(
         viewportWidthPx,
     ) {
         derivedStateOf {
-            val scrollPx = hScroll.value.toLong()
-            val viewportEndPx = scrollPx + viewportWidthPx
-            val viewportStartMin = scrollPx / pxPerMin
-            val viewportEndMin = viewportEndPx / pxPerMin
+            val viewportStartMin = scrollBucketMin
+            val viewportMin = (viewportWidthPx.toLong() / pxPerMin).coerceAtLeast(0L)
+            // bucketWidthMin (30) added to the forward extent so a user
+            // who scrolls all the way to the bucket's far edge still has
+            // their viewport covered before the next bucket triggers
+            // a re-filter.
+            val bucketWidthMin = 30L
             val bufferMin = 60L
             val rangeStartTime =
                 windowStart + ((viewportStartMin - bufferMin).coerceAtLeast(0L)) * 60L
-            val rangeEndTime = windowStart + (viewportEndMin + bufferMin) * 60L
+            val rangeEndTime =
+                windowStart + (viewportStartMin + bucketWidthMin + viewportMin + bufferMin) * 60L
             channel.programmes.filter { p ->
                 val pe = p.endTime.coerceAtMost(windowEnd)
                 val ps = p.startTime.coerceAtLeast(windowStart)
