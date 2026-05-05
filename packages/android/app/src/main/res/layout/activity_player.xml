@@ -33,6 +33,18 @@
         android:layout_marginTop="32dp"
         android:layout_marginEnd="32dp" />
 
+    <!-- MK.25.A.2 — transient seek-flash overlay. Renders a +Ns/-Ns
+         badge for 600 ms on each LEFT/RIGHT seek press, with multi-
+         press coalescing inside the window. Eager-inflated like
+         recording_indicator (zero cost when idle — observes a
+         StateFlow, renders nothing while seekFlashFlow.value == 0). -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/seek_flash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
+
     <!-- Zap bar: channel name + now/next, top-start. Fades with Media3 controller. -->
     <LinearLayout
         android:id="@+id/zap_bar"

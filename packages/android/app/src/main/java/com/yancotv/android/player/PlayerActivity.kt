@@ -87,6 +87,18 @@ class PlayerActivity : AppCompatActivity() {
         private const val QUICK_INFO_AUTO_HIDE_MS = 10_000L
         private const val PROGRESS_TICK_MS = 15_000L
 
+        // MK.25.A.1 — post-seek window during which a STATE_BUFFERING
+        // event is treated as a benign keyframe re-align rather than a
+        // genuine network stall. 1500 ms covers the common re-align
+        // (~500 ms) plus jitter; a real stall outside the window still
+        // surfaces the chrome buffering overlay.
+        private const val SEEK_BUFFER_GRACE_MS = 1500L
+
+        // MK.25.A.2 — seek-flash auto-hide window. Multi-press inside
+        // this window stacks into one badge ("+30s" not three "+10s")
+        // so a TV remote keypress flurry doesn't thrash the visual.
+        private const val SEEK_FLASH_HIDE_MS = 600L
+
         // MK.8.2 — live-edge poll cadence and "you're behind live" floor.
         // 1 s is fine; the subsequent UI write is a single TextView update.
         // 8 s threshold ignores the normal ExoPlayer live latency (a few
@@ -106,6 +118,22 @@ class PlayerActivity : AppCompatActivity() {
     // episode prepare window where ExoPlayer can fire ENDED a second time.
     // Reset whenever a new MediaItem starts (STATE_READY).
     private var autoplayInFlight: Boolean = false
+
+    // MK.25.A.1 — track the wall-clock of the most recent user seek so the
+    // STATE_BUFFERING listener can distinguish a seek-induced re-buffer
+    // (silent — keyframe re-align is a normal playback artefact) from a
+    // genuine network stall (deserves the chrome buffering overlay). 1500 ms
+    // is wide enough to cover a typical re-align (~500 ms) plus jitter, tight
+    // enough that a real stall right after a seek surfaces within an
+    // acceptable window.
+    private var lastSeekAtMs: Long = 0L
+
+    // MK.25.A.2 — multi-press-coalescing seek flash. Each LEFT/RIGHT press
+    // adds ±10 to the current accumulator; a 600 ms timer clears it. Three
+    // presses inside the window show "+30s", not three separate "+10s"
+    // flashes — TV remotes spam keys.
+    private val seekFlashFlow = kotlinx.coroutines.flow.MutableStateFlow(0)
+    private var seekFlashJob: Job? = null
 
     // MK.10.4 — numeric channel-jump state. Activity-scoped (a fresh
     // PlayerActivity gets a fresh entry buffer); not Koin since nothing
@@ -261,7 +289,21 @@ class PlayerActivity : AppCompatActivity() {
                         // Don't stack a buffering overlay on top of an
                         // error the user hasn't dismissed, and skip the
                         // initial prepare's BUFFERING (hasBeenReady=false).
-                        if (hasBeenReady && chromeState != VodChromeState.ERROR) {
+                        // MK.25.A.1 — also suppress when this BUFFERING
+                        // landed inside the post-seek window: ExoPlayer's
+                        // realignment to the next keyframe routinely
+                        // burns 200–800 ms of STATE_BUFFERING that has
+                        // nothing to do with network health, so the
+                        // "Tuning the stream" overlay was firing on
+                        // every RIGHT/LEFT press. A real network stall
+                        // outside the 1500 ms window still surfaces.
+                        val sinceSeek =
+                            android.os.SystemClock.elapsedRealtime() - lastSeekAtMs
+                        if (
+                            hasBeenReady &&
+                            chromeState != VodChromeState.ERROR &&
+                            sinceSeek > SEEK_BUFFER_GRACE_MS
+                        ) {
                             bufferingShowJob?.cancel()
                             bufferingShowJob =
                                 lifecycleScope.launch {
@@ -313,6 +355,20 @@ class PlayerActivity : AppCompatActivity() {
                         controller = controller,
                         recordings = recordings,
                     )
+                }
+            }
+
+        // MK.25.A.2 — seek-flash overlay. Eager-inflated: zero render cost
+        // when seekFlashFlow.value == 0 (composable returns an empty Box),
+        // and the trigger path can call into a ready ComposeView without
+        // a stub-inflation latency hit on the user's first seek.
+        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.seek_flash)
+            .apply {
+                setViewCompositionStrategy(
+                    androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
+                setContent {
+                    SeekFlashOverlay(seekFlashFlow = seekFlashFlow)
                 }
             }
 
@@ -1221,6 +1277,32 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
+     * MK.25.A — record a user-initiated seek and surface the +N/-N flash.
+     *
+     * Two side effects:
+     *   - bumps [lastSeekAtMs] so the STATE_BUFFERING listener can
+     *     suppress the chrome buffering overlay during the post-seek
+     *     re-buffer window (A.1).
+     *   - accumulates [deltaSec] into [seekFlashFlow] and (re)starts a
+     *     600 ms timer that clears it (A.2). Multi-press inside the
+     *     window stacks: three RIGHT presses → "+30s", not three
+     *     "+10s" sequential flashes that thrash the visual.
+     *
+     * Sign convention: positive for forward seek, negative for back.
+     * [SeekFlashOverlay] keys the badge edge off the sign.
+     */
+    private fun onUserSeek(deltaSec: Int) {
+        lastSeekAtMs = android.os.SystemClock.elapsedRealtime()
+        seekFlashFlow.value = seekFlashFlow.value + deltaSec
+        seekFlashJob?.cancel()
+        seekFlashJob =
+            lifecycleScope.launch {
+                delay(SEEK_FLASH_HIDE_MS)
+                seekFlashFlow.value = 0
+            }
+    }
+
+    /**
      * Autoplay the next episode in the current series when STATE_ENDED
      * fires, gated by the user's `autoPlayNext` pref. No-ops in the
      * common cases that aren't series playback (movies, live TV, no
@@ -1853,6 +1935,7 @@ class PlayerActivity : AppCompatActivity() {
                         val p = controller.player
                         if (isTimeshifting(p)) {
                             p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                            onUserSeek(-10)
                         } else {
                             showSurf()
                         }
@@ -1863,6 +1946,7 @@ class PlayerActivity : AppCompatActivity() {
                         // the dock auto-hide timer gating each press).
                         val p = controller.player
                         p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                        onUserSeek(-10)
                         return true
                     }
                 }
@@ -1877,12 +1961,14 @@ class PlayerActivity : AppCompatActivity() {
                             // Cap at live edge: liveOffset 0 == at edge.
                             val target = p.currentPosition + 10_000L
                             p.seekTo(target)
+                            onUserSeek(+10)
                             return true
                         }
                     } else {
                         val p = controller.player
                         val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
                         p.seekTo((p.currentPosition + 10_000L).coerceAtMost(dur))
+                        onUserSeek(+10)
                         return true
                     }
                 }
