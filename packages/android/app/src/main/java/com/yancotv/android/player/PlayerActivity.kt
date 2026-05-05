@@ -87,12 +87,14 @@ class PlayerActivity : AppCompatActivity() {
         private const val QUICK_INFO_AUTO_HIDE_MS = 10_000L
         private const val PROGRESS_TICK_MS = 15_000L
 
-        // MK.25.A.1 — post-seek window during which a STATE_BUFFERING
-        // event is treated as a benign keyframe re-align rather than a
-        // genuine network stall. 1500 ms covers the common re-align
-        // (~500 ms) plus jitter; a real stall outside the window still
-        // surfaces the chrome buffering overlay.
-        private const val SEEK_BUFFER_GRACE_MS = 1500L
+        // MK.25.A.1 — safety timeout that drops the seek-rebuffer
+        // suppression even if STATE_READY never arrives (genuinely
+        // stuck seek — server unreachable, end of stream, etc.). Long
+        // enough to let slow IPTV re-aligns finish (4–5 s in the wild)
+        // without ever showing a misleading "Tuning the stream"
+        // overlay during a normal interaction; short enough that a
+        // truly stuck stream eventually surfaces feedback.
+        private const val SEEK_REBUFFER_TIMEOUT_MS = 5000L
 
         // MK.25.A.2 — seek-flash auto-hide window. Multi-press inside
         // this window stacks into one badge ("+30s" not three "+10s")
@@ -119,14 +121,16 @@ class PlayerActivity : AppCompatActivity() {
     // Reset whenever a new MediaItem starts (STATE_READY).
     private var autoplayInFlight: Boolean = false
 
-    // MK.25.A.1 — track the wall-clock of the most recent user seek so the
-    // STATE_BUFFERING listener can distinguish a seek-induced re-buffer
-    // (silent — keyframe re-align is a normal playback artefact) from a
-    // genuine network stall (deserves the chrome buffering overlay). 1500 ms
-    // is wide enough to cover a typical re-align (~500 ms) plus jitter, tight
-    // enough that a real stall right after a seek surfaces within an
-    // acceptable window.
-    private var lastSeekAtMs: Long = 0L
+    // MK.25.A.1 — suppress the chrome buffering overlay during the
+    // seek-induced re-buffer phase. Initial fix used a fixed 1500 ms
+    // wall-clock gate, but the user's IPTV server pushed re-aligns past
+    // that window (the overlay fired on slow seeks). Replaced with a
+    // state-based flag: set on every user seek, cleared on the next
+    // STATE_READY (= seek resolved), with a 5 s safety timeout for
+    // genuinely-stuck streams so the user still gets feedback if the
+    // seek never resolves at all.
+    private var inSeekRebuffer: Boolean = false
+    private var seekRebufferTimeoutJob: Job? = null
 
     // MK.25.A.2 — multi-press-coalescing seek flash. Each LEFT/RIGHT press
     // adds ±10 to the current accumulator; a 600 ms timer clears it. Three
@@ -279,6 +283,12 @@ class PlayerActivity : AppCompatActivity() {
                         // autoplay-in-flight guard so the next end-of-episode
                         // can fire the autoplay flow again.
                         autoplayInFlight = false
+                        // MK.25.A.1 — seek-rebuffer resolved. Drop the
+                        // suppression flag so subsequent BUFFERING events
+                        // (genuine network stalls) surface the overlay.
+                        inSeekRebuffer = false
+                        seekRebufferTimeoutJob?.cancel()
+                        seekRebufferTimeoutJob = null
                         // Any non-error overlay clears on READY; the error
                         // state has its own retry flow and shouldn't auto-
                         // clear until the retry fires and we actually hit
@@ -289,20 +299,18 @@ class PlayerActivity : AppCompatActivity() {
                         // Don't stack a buffering overlay on top of an
                         // error the user hasn't dismissed, and skip the
                         // initial prepare's BUFFERING (hasBeenReady=false).
-                        // MK.25.A.1 — also suppress when this BUFFERING
-                        // landed inside the post-seek window: ExoPlayer's
-                        // realignment to the next keyframe routinely
-                        // burns 200–800 ms of STATE_BUFFERING that has
-                        // nothing to do with network health, so the
-                        // "Tuning the stream" overlay was firing on
-                        // every RIGHT/LEFT press. A real network stall
-                        // outside the 1500 ms window still surfaces.
-                        val sinceSeek =
-                            android.os.SystemClock.elapsedRealtime() - lastSeekAtMs
+                        // MK.25.A.1 — also suppress while [inSeekRebuffer]
+                        // is true: the user just seeked and ExoPlayer is
+                        // re-aligning to the next keyframe. The overlay
+                        // would lie ("Tuning the stream" implies network
+                        // / tuner issue, not a normal seek artefact) and
+                        // adds visual noise to a normal interaction. Flag
+                        // is cleared on the next STATE_READY or via the
+                        // 5 s safety timeout for genuinely-stuck seeks.
                         if (
                             hasBeenReady &&
                             chromeState != VodChromeState.ERROR &&
-                            sinceSeek > SEEK_BUFFER_GRACE_MS
+                            !inSeekRebuffer
                         ) {
                             bufferingShowJob?.cancel()
                             bufferingShowJob =
@@ -1280,9 +1288,11 @@ class PlayerActivity : AppCompatActivity() {
      * MK.25.A — record a user-initiated seek and surface the +N/-N flash.
      *
      * Two side effects:
-     *   - bumps [lastSeekAtMs] so the STATE_BUFFERING listener can
-     *     suppress the chrome buffering overlay during the post-seek
-     *     re-buffer window (A.1).
+     *   - sets [inSeekRebuffer] so the STATE_BUFFERING listener
+     *     suppresses the chrome buffering overlay until the next
+     *     STATE_READY (or the 5 s safety timeout, whichever first).
+     *     A.1 — the user's IPTV server can take several seconds to
+     *     re-align to a keyframe; a fixed time window was too short.
      *   - accumulates [deltaSec] into [seekFlashFlow] and (re)starts a
      *     600 ms timer that clears it (A.2). Multi-press inside the
      *     window stacks: three RIGHT presses → "+30s", not three
@@ -1292,7 +1302,15 @@ class PlayerActivity : AppCompatActivity() {
      * [SeekFlashOverlay] keys the badge edge off the sign.
      */
     private fun onUserSeek(deltaSec: Int) {
-        lastSeekAtMs = android.os.SystemClock.elapsedRealtime()
+        // A.1 — suppress overlay until next READY or safety timeout.
+        inSeekRebuffer = true
+        seekRebufferTimeoutJob?.cancel()
+        seekRebufferTimeoutJob =
+            lifecycleScope.launch {
+                delay(SEEK_REBUFFER_TIMEOUT_MS)
+                inSeekRebuffer = false
+            }
+        // A.2 — accumulating multi-press flash.
         seekFlashFlow.value = seekFlashFlow.value + deltaSec
         seekFlashJob?.cancel()
         seekFlashJob =
