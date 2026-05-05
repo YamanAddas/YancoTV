@@ -1,11 +1,16 @@
 package com.yancotv.shared.history
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.logger.Log
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.HistoryEntry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Watch-history writes and resume-point lookups. Live channels are skipped —
@@ -95,6 +100,68 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
             )
         }
     }
+
+    /**
+     * Reactive [recent] — backed by SQLDelight's [asFlow]. Emits the
+     * current snapshot on collection, then re-emits every time any
+     * `watch_history` write notifier fires (including the
+     * `PlaybackController.persistResumePoint` upserts that fire on
+     * pause / stop / queue transition / lifecycle hooks).
+     *
+     * The Home screen's Continue Watching rail subscribes to this so a
+     * just-watched movie's new offset reflects the moment the user
+     * exits the player — without the rail needing to know writes
+     * happened. Mirrors [com.yancotv.shared.favorites.FavoritesRepository.allFlow].
+     *
+     * Per-row content join runs inside the [map] — re-fetching ~30
+     * `content` rows on every history write is cheap (indexed by id)
+     * and keeps the Flow snapshot self-contained without a custom
+     * SQLDelight join query.
+     *
+     * Dispatches to [Dispatchers.Default] (NOT [Dispatchers.IO]) so the
+     * common-main code compiles for iOS — `Dispatchers.IO` is JVM /
+     * Android only.
+     */
+    fun recentFlow(limit: Long = 30): Flow<List<HistoryEntry>> = db.watchHistoryQueries
+        .selectRecent(limit)
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows ->
+            if (rows.isEmpty()) return@map emptyList()
+            val byContent = rows.groupBy { it.content_id }
+            val contents =
+                byContent.keys
+                    .mapNotNull { id -> db.contentQueries.selectById(id).executeAsOneOrNull() }
+                    .associateBy { it.id }
+            rows.mapNotNull { row ->
+                val c = contents[row.content_id] ?: return@mapNotNull null
+                HistoryEntry(
+                    id = row.id,
+                    contentId = row.content_id,
+                    episodeId = row.episode_id,
+                    positionSeconds = row.position_seconds.toDouble(),
+                    durationSeconds = row.duration_seconds?.toDouble(),
+                    watchedAt = row.watched_at,
+                    content =
+                    ContentItem(
+                        id = c.id,
+                        sourceId = c.source_id,
+                        type = contentTypeFromDb(c.type),
+                        title = c.title,
+                        cleanTitle = c.clean_title,
+                        groupName = c.group_name,
+                        streamUrl = c.stream_url,
+                        logoUrl = c.logo_url,
+                        tvgId = c.tvg_id,
+                        metadataJson = c.metadata_json,
+                        sortOrder = c.sort_order.toInt(),
+                        createdAt = c.created_at,
+                        nameOverride = c.name_override,
+                        logoOverride = c.logo_override,
+                    ),
+                )
+            }
+        }
 
     /**
      * Resume position (seconds) for a content-level row — that is, a row

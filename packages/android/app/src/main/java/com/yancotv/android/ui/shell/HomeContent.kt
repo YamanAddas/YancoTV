@@ -114,12 +114,30 @@ fun HomeContent(
     epg: EpgRepository = koinInject(),
     content: ContentRepository = koinInject(),
 ) {
-    val continueWatching = remember { mutableStateListOf<ContentItem>() }
     val favoriteList by favorites.allFlow().collectAsState(initial = emptyList())
     val hiddenIds by parental.hiddenIds.collectAsState()
     val lockedIds by parental.lockedIds.collectAsState()
 
-    val resumeByContent = remember { mutableStateOf<Map<String, HistoryEntry>>(emptyMap()) }
+    // MK.25.B-prep — Continue Watching is reactive via the SQLDelight Flow.
+    // The previous LaunchedEffect(Unit) was a one-shot read; the user's
+    // resume offset persisted correctly to disk on player exit but Home
+    // never saw the write because nothing re-ran the read. Now the rail
+    // re-renders every time `watch_history` is upserted (i.e. on every
+    // PlaybackController.persistResumePoint call), so exiting the player
+    // returns the user to a Home that already reflects their new offset.
+    val recentHistory by history.recentFlow(limit = 30).collectAsState(initial = emptyList())
+    val resumeByContent by remember {
+        derivedStateOf { recentHistory.associateBy { it.contentId } }
+    }
+    val continueWatching by remember {
+        derivedStateOf {
+            recentHistory
+                .map { it.content }
+                .filter { it.id !in hiddenIds }
+                .distinctBy { it.id }
+                .take(12)
+        }
+    }
     val onNowItems = remember { mutableStateListOf<NowPairing>() }
     val upNextItems = remember { mutableStateListOf<NowPairing>() }
     val recentlyAdded = remember { mutableStateListOf<ContentItem>() }
@@ -138,27 +156,8 @@ fun HomeContent(
         }
     }
 
-    // Continue watching + resume lookup map come from the same table;
-    // load both in one pass so the resume map is ready as soon as the
-    // rail renders.
-    LaunchedEffect(Unit) {
-        val recent =
-            withContext(Dispatchers.IO) {
-                runCatching { history.recent(limit = 30) }.getOrElse { emptyList() }
-            }
-        resumeByContent.value = recent.associateBy { it.contentId }
-        val cwItems =
-            recent
-                .map { it.content }
-                .filter { it.id !in hiddenIds }
-                .distinctBy { it.id }
-                .take(12)
-        // MB-93: atomic so no recomposition fires between clear() and addAll().
-        Snapshot.withMutableSnapshot {
-            continueWatching.clear()
-            continueWatching.addAll(cwItems)
-        }
-    }
+    // (Continue Watching + resume map now derived from `history.recentFlow`
+    // above — the previous one-shot LaunchedEffect was the bug.)
 
     // Favorites-derived: non-live favorites for the Favorites rail,
     // and live favorites' tvgIds for the On Now + Up Next EPG batch.
@@ -254,7 +253,7 @@ fun HomeContent(
             Triple(
                 continueWatching.firstOrNull()?.id,
                 onNowItems.take(2).map { it.channel.id to it.programme.title },
-                resumeByContent.value.size,
+                resumeByContent.size,
             )
         }
     }
@@ -262,7 +261,7 @@ fun HomeContent(
         remember(heroSlidesKey) {
             buildHeroSlides(
                 continueWatching = continueWatching.toList(),
-                resumeByContent = resumeByContent.value,
+                resumeByContent = resumeByContent,
                 onNow = onNowItems.toList(),
             )
         }
@@ -293,7 +292,7 @@ fun HomeContent(
                 slides = heroSlides,
                 lockedIds = lockedIds,
                 onPlay = { slide ->
-                    onPlay(listOf(slide.item), 0, resumeByContent.value[slide.item.id]?.episodeId)
+                    onPlay(listOf(slide.item), 0, resumeByContent[slide.item.id]?.episodeId)
                 },
                 modifier = Modifier.padding(horizontal = Space.section),
             )
@@ -306,11 +305,11 @@ fun HomeContent(
                 caption = "Jump back where you left off",
                 items = continueWatching,
                 lockedIds = lockedIds,
-                resumeByContent = resumeByContent.value,
+                resumeByContent = resumeByContent,
                 onPlay = { item ->
                     val snapshot = continueWatching.toList()
                     val idx = snapshot.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent.value[item.id]?.episodeId)
+                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
                 },
             )
         }
@@ -334,10 +333,10 @@ fun HomeContent(
                 caption = "Movies and series you starred",
                 items = nonLiveFavorites,
                 lockedIds = lockedIds,
-                resumeByContent = resumeByContent.value,
+                resumeByContent = resumeByContent,
                 onPlay = { item ->
                     val idx = nonLiveFavorites.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(nonLiveFavorites, idx, resumeByContent.value[item.id]?.episodeId)
+                    if (idx >= 0) onPlay(nonLiveFavorites, idx, resumeByContent[item.id]?.episodeId)
                 },
             )
         }
@@ -360,11 +359,11 @@ fun HomeContent(
                 caption = "New movies and series in your library",
                 items = recentlyAdded,
                 lockedIds = lockedIds,
-                resumeByContent = resumeByContent.value,
+                resumeByContent = resumeByContent,
                 onPlay = { item ->
                     val snapshot = recentlyAdded.toList()
                     val idx = snapshot.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent.value[item.id]?.episodeId)
+                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
                 },
             )
         }
