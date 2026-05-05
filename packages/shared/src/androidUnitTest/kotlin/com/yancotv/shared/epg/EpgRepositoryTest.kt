@@ -483,6 +483,11 @@ class EpgRepositoryTest {
         // when they share start_time. Mirrors the single-channel
         // `getProgrammesForChannel orders priority then start_time` test
         // but exercises the batched path.
+        //
+        // MK.EPG.G follow-up — same-(channel, start_time) duplicates
+        // are now dedup'd to the highest-priority row, so this test
+        // also pins that the WINNING row of a multi-source overlap is
+        // the high-priority one (not the low-priority one).
         val (db, driver) = newDbPair()
         insertSource(db, "src-low", null, epgPriority = 0L)
         insertSource(db, "src-high", null, epgPriority = 10L)
@@ -513,11 +518,192 @@ class EpgRepositoryTest {
         assertEquals(1, page.channels.size)
         val cnn = page.channels.single()
         assertEquals("cnn.us", cnn.tvgId)
-        // Both rows present (dedup is a separate fix); high-priority
-        // first per the priority-DESC contract.
-        assertEquals(2, cnn.programmes.size)
-        assertEquals("High source", cnn.programmes[0].title)
-        assertEquals("Low source", cnn.programmes[1].title)
+        // Post-MK.EPG.G: dedup collapses (channel, start_time)
+        // duplicates to the highest-priority row.
+        assertEquals(1, cnn.programmes.size, "duplicate (channel, start_time) across sources must collapse")
+        assertEquals("High source", cnn.programmes.single().title, "high-priority source wins the dedup")
+    }
+
+    /**
+     * MK.EPG.G — multi-source dedup. When the user wires up two EPG
+     * sources covering the same channel (common: provider's xmltv.php
+     * + a global epg.xz), both publish a programme for the same
+     * `(channel_tvg_id, start_time)` slot. Pre-fix, every read query
+     * returned BOTH rows and the Guide cell rendered duplicates
+     * (same title overlapping, sometimes with different descriptions
+     * stacked on top). The fix adds a `NOT EXISTS` priority filter
+     * that keeps the highest-priority row per (channel, start_time)
+     * with deterministic id-based tie-break on equal priorities.
+     *
+     * Tests below pin all three deduped queries:
+     * `forChannelRange` (single channel), `forChannelsRange`
+     * (batched, used by getGuideData), and `nowNextForChannel`
+     * (which previously could return "now-A + now-B" instead of
+     * "now + next" when priorities tied).
+     */
+    @Test fun `getProgrammesForChannel dedupes same-time programmes from multiple sources`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-low", null, epgPriority = 0L)
+        insertSource(db, "src-high", null, epgPriority = 10L)
+
+        // Two sources, same channel, same start_time — duplicates.
+        val start = 1_500L
+        db.epgProgrammesQueries.upsert(
+            id = "low-prog", source_id = "src-low", channel_tvg_id = "cnn.us",
+            title = "Low version", description = null,
+            start_time = start, end_time = start + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "high-prog", source_id = "src-high", channel_tvg_id = "cnn.us",
+            title = "High version", description = null,
+            start_time = start, end_time = start + 100,
+            category = null, icon_url = null,
+        )
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 0L })
+        val rows = repo.getProgrammesForChannel("cnn.us", startTime = 0L, endTime = 10_000L)
+        assertEquals(1, rows.size, "duplicate (channel, start_time) across sources must collapse to one row")
+        assertEquals("High version", rows.single().title, "highest epg_priority must win")
+    }
+
+    @Test fun `getProgrammesForChannel dedup tiebreak is deterministic on equal priorities`() = runTest {
+        // Equal-priority tie-break is by `id` ascending — among
+        // duplicates with the same epg_priority, the row with the
+        // lexicographically-smallest id wins. The id format is
+        // `channelId|startTime|sourceKey`, so for ties this resolves
+        // to "smallest sourceKey wins" which is stable across queries.
+        // A regression that flipped the comparison would still dedup
+        // but pick the OTHER row, breaking caller assumptions.
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-aaa", null, epgPriority = 5L)
+        insertSource(db, "src-zzz", null, epgPriority = 5L)
+
+        val start = 1_500L
+        db.epgProgrammesQueries.upsert(
+            id = "cnn.us|$start|src-aaa", source_id = "src-aaa", channel_tvg_id = "cnn.us",
+            title = "AAA version", description = null,
+            start_time = start, end_time = start + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "cnn.us|$start|src-zzz", source_id = "src-zzz", channel_tvg_id = "cnn.us",
+            title = "ZZZ version", description = null,
+            start_time = start, end_time = start + 100,
+            category = null, icon_url = null,
+        )
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 0L })
+        val rows = repo.getProgrammesForChannel("cnn.us", startTime = 0L, endTime = 10_000L)
+        assertEquals(1, rows.size)
+        assertEquals("AAA version", rows.single().title, "ties resolve to smallest id (= AAA's source key)")
+    }
+
+    @Test fun `getProgrammesForChannel does not dedup distinct start_times`() = runTest {
+        // Sanity guard — the dedup applies only to (channel, start_time)
+        // collisions, not to a single source's adjacent programmes.
+        // A regression that over-applied the dedup (e.g. comparing on
+        // channel only, ignoring start_time) would silently collapse
+        // every programme on a channel to one row.
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null)
+        for (i in 0 until 5) {
+            db.epgProgrammesQueries.upsert(
+                id = "p$i", source_id = "src-A", channel_tvg_id = "cnn.us",
+                title = "Show $i", description = null,
+                start_time = (i * 1000L), end_time = (i * 1000L + 500),
+                category = null, icon_url = null,
+            )
+        }
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { 0L })
+        val rows = repo.getProgrammesForChannel("cnn.us", startTime = 0L, endTime = 10_000L)
+        assertEquals(5, rows.size, "distinct start_times must NOT be collapsed")
+    }
+
+    @Test fun `getGuideData dedupes batched query across multi-source channels`() = runTest {
+        // Same scenario as `getProgrammesForChannel dedupes ...` but
+        // exercises the batched `forChannelsRange` path used by the
+        // Guide grid. Verifies the dedup carries across the IN-list
+        // form (the per-channel test above doesn't — they're
+        // separate SQL queries).
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-low", null, epgPriority = 0L)
+        insertSource(db, "src-high", null, epgPriority = 10L)
+        insertContent(db, "ch-cnn", "src-high", "cnn.us", "CNN")
+        insertContent(db, "ch-bbc", "src-high", "bbc.uk", "BBC")
+
+        val now = 1_700_000_000L
+        // CNN: duplicate from both sources.
+        db.epgProgrammesQueries.upsert(
+            id = "cnn-low", source_id = "src-low", channel_tvg_id = "cnn.us",
+            title = "Low CNN", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "cnn-high", source_id = "src-high", channel_tvg_id = "cnn.us",
+            title = "High CNN", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+        // BBC: single source, no duplicates — verifies dedup is
+        // scoped per-channel and doesn't cross-talk.
+        db.epgProgrammesQueries.upsert(
+            id = "bbc-only", source_id = "src-high", channel_tvg_id = "bbc.uk",
+            title = "BBC News", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L)
+        val byTvg = page.channels.associateBy { it.tvgId }
+
+        assertEquals(1, byTvg["cnn.us"]?.programmes?.size, "CNN duplicate must collapse to one row")
+        assertEquals("High CNN", byTvg["cnn.us"]?.programmes?.first()?.title)
+        assertEquals(1, byTvg["bbc.uk"]?.programmes?.size, "BBC's single row must survive")
+        assertEquals("BBC News", byTvg["bbc.uk"]?.programmes?.first()?.title)
+    }
+
+    @Test fun `getNowNext returns deduped now + next when two equal-priority sources cover the same now slot`() = runTest {
+        // Pre-fix bug shape: `nowNextForChannel` LIMIT 2 returned
+        // [now-from-source-A, now-from-source-B] — two copies of
+        // "now" and no "next" — when both sources had the same
+        // epg_priority. With dedup, LIMIT 2 sees the deduped row set
+        // [now, next] and returns the correct pair.
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-aaa", null, epgPriority = 5L)
+        insertSource(db, "src-zzz", null, epgPriority = 5L)
+
+        val now = 1_700_000_000L
+        // Both sources publish the SAME "now" programme (same start_time).
+        db.epgProgrammesQueries.upsert(
+            id = "cnn.us|${now - 100}|src-aaa", source_id = "src-aaa", channel_tvg_id = "cnn.us",
+            title = "Now AAA", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "cnn.us|${now - 100}|src-zzz", source_id = "src-zzz", channel_tvg_id = "cnn.us",
+            title = "Now ZZZ", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+        // Source AAA has the upcoming "next" programme.
+        db.epgProgrammesQueries.upsert(
+            id = "cnn.us|${now + 100}|src-aaa", source_id = "src-aaa", channel_tvg_id = "cnn.us",
+            title = "Next AAA", description = null,
+            start_time = now + 100, end_time = now + 1100,
+            category = null, icon_url = null,
+        )
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val nn = repo.getNowNext("cnn.us")
+        assertNotNull(nn.now, "now must be populated — pre-fix dedup-less query lost it to the duplicate")
+        assertEquals("Now AAA", nn.now!!.title, "smaller-id source wins on equal priority")
+        assertNotNull(nn.next, "next must survive — duplicate now-rows previously consumed both LIMIT slots")
+        assertEquals("Next AAA", nn.next!!.title)
     }
 
     @Test fun `getProgrammesForChannel orders priority then start_time`() = runTest {

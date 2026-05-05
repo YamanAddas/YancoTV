@@ -33,10 +33,26 @@ WHERE p.channel_tvg_id = ? AND p.start_time <= ? AND p.end_time > ?
 ORDER BY COALESCE(s.epg_priority, 0) DESC
 LIMIT 1;
 
+-- MK.EPG.G — same NOT EXISTS dedup as `forChannelRange`. Without it,
+-- two equal-priority sources covering the same `now` slot would both
+-- claim rows 1+2 of the LIMIT 2 — caller would see "now" + "now"
+-- duplicate and lose "next" entirely. With dedup, LIMIT 2 returns
+-- the deduped now + next pair the caller expects.
 nowNextForChannel:
 SELECT p.* FROM epg_programmes p
 LEFT JOIN sources s ON s.id = p.source_id
 WHERE p.channel_tvg_id = ? AND p.end_time > ?
+  AND NOT EXISTS (
+    SELECT 1 FROM epg_programmes p2
+    LEFT JOIN sources s2 ON s2.id = p2.source_id
+    WHERE p2.channel_tvg_id = p.channel_tvg_id
+      AND p2.start_time = p.start_time
+      AND p2.id != p.id
+      AND (
+        COALESCE(s2.epg_priority, 0) > COALESCE(s.epg_priority, 0)
+        OR (COALESCE(s2.epg_priority, 0) = COALESCE(s.epg_priority, 0) AND p2.id < p.id)
+      )
+  )
 ORDER BY COALESCE(s.epg_priority, 0) DESC, p.start_time ASC
 LIMIT 2;
 
@@ -59,10 +75,35 @@ WHERE p.channel_tvg_id = ?
   AND p.start_time < ?
 ORDER BY COALESCE(s.epg_priority, 0) DESC, p.start_time ASC;
 
+-- MK.EPG.G — multi-source dedup. When 2+ sources cover the same
+-- (channel_tvg_id, start_time) (common when the user has both an
+-- Xtream provider's xmltv.php AND a global epg.xz wired up), the
+-- pre-fix query returned every row, so a Guide cell rendered the
+-- same programme twice from different sources. The NOT EXISTS clause
+-- keeps only the highest-priority row per (channel, start_time);
+-- ties break on smallest `id` so the choice is deterministic across
+-- repeated queries (id format `channelId|startTime|sourceKey` makes
+-- this effectively "smallest sourceKey wins" for ties).
+--
+-- Single-source DBs see no behaviour change — the inner subquery
+-- evaluates to false for every row (no other p2 with same
+-- (channel, start_time) and `id != p.id` exists). Cost there is one
+-- empty index seek per outer row via `idx_epg_channel_time`, ~µs.
 forChannelRange:
 SELECT p.* FROM epg_programmes p
 LEFT JOIN sources s ON s.id = p.source_id
 WHERE p.channel_tvg_id = ? AND p.end_time > ? AND p.start_time < ?
+  AND NOT EXISTS (
+    SELECT 1 FROM epg_programmes p2
+    LEFT JOIN sources s2 ON s2.id = p2.source_id
+    WHERE p2.channel_tvg_id = p.channel_tvg_id
+      AND p2.start_time = p.start_time
+      AND p2.id != p.id
+      AND (
+        COALESCE(s2.epg_priority, 0) > COALESCE(s.epg_priority, 0)
+        OR (COALESCE(s2.epg_priority, 0) = COALESCE(s.epg_priority, 0) AND p2.id < p.id)
+      )
+  )
 ORDER BY COALESCE(s.epg_priority, 0) DESC, p.start_time;
 
 -- MK.EPG.F — batched programme fetch for the Guide grid. The per-channel
@@ -79,10 +120,25 @@ ORDER BY COALESCE(s.epg_priority, 0) DESC, p.start_time;
 -- source rows come first when MK.15.7 multi-EPG is configured).
 -- Caller must chunk to stay under SQLITE_MAX_VARIABLE_NUMBER (999);
 -- `EpgRepository.GUIDE_FETCH_CHUNK` enforces 500.
+--
+-- MK.EPG.G — same NOT EXISTS dedup as `forChannelRange` (see comment
+-- above). The Guide grid is the dedup's load-bearing caller — without
+-- it a multi-EPG user sees every programme rendered twice.
 forChannelsRange:
 SELECT p.* FROM epg_programmes p
 LEFT JOIN sources s ON s.id = p.source_id
 WHERE p.channel_tvg_id IN ? AND p.end_time > ? AND p.start_time < ?
+  AND NOT EXISTS (
+    SELECT 1 FROM epg_programmes p2
+    LEFT JOIN sources s2 ON s2.id = p2.source_id
+    WHERE p2.channel_tvg_id = p.channel_tvg_id
+      AND p2.start_time = p.start_time
+      AND p2.id != p.id
+      AND (
+        COALESCE(s2.epg_priority, 0) > COALESCE(s.epg_priority, 0)
+        OR (COALESCE(s2.epg_priority, 0) = COALESCE(s.epg_priority, 0) AND p2.id < p.id)
+      )
+  )
 ORDER BY p.channel_tvg_id, COALESCE(s.epg_priority, 0) DESC, p.start_time;
 
 insert:
