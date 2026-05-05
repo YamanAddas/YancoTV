@@ -260,11 +260,23 @@ LIMIT :limitCount;
 -- in the window, which is up to ~48 per channel before GROUP BY collapses
 -- them. EXISTS short-circuits as soon as one programme matches.
 --
--- ORDER BY title, tvg_id — title alone isn't stable when two channels
--- share a title (common when a provider ships multiple language feeds).
--- The secondary sort on tvg_id makes LIMIT/OFFSET pagination deterministic
--- across pages; without it the user can scroll and see the same channel
--- repeat on page boundaries.
+-- MK.EPG.H — order by provider position (`MIN(c.sort_order)`), not
+-- alphabetical title. IPTV providers ship channels in a deliberate
+-- order: favourites first, then sports, then news/entertainment,
+-- then geo-tagged feeds. Alphabetising threw that signal away —
+-- "Channel 1" landed between "AlJazeera" and "BBC" instead of at
+-- the top of the list. TiviMate-style provider order matches user
+-- expectation and makes the M3U `tvg-chno` / playlist position
+-- carry meaning. Mirrors the same fix MK.20.1 applied to category
+-- groups (`distinctGroupsForType`, `distinctGuideGroups`).
+--
+-- MIN over the GROUP BY tvg_id pick — when two content variants
+-- share a tvg_id (1080p + 720p, or two sources both shipping the
+-- same channel), the earliest playlist position wins. Equal-
+-- sort_order ties resolve by tvg_id secondary sort, which keeps
+-- LIMIT/OFFSET pagination deterministic across pages (without it
+-- the user can scroll and see the same channel repeat on page
+-- boundaries).
 
 guideChannelsAll:
 SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
@@ -276,7 +288,7 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
       AND ep.end_time > :startTime AND ep.start_time < :endTime
   )
 GROUP BY c.tvg_id
-ORDER BY c.title ASC, c.tvg_id ASC;
+ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC;
 
 guideChannelsBySource:
 SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url
@@ -289,7 +301,7 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
       AND ep.end_time > :startTime AND ep.start_time < :endTime
   )
 GROUP BY c.tvg_id
-ORDER BY c.title ASC, c.tvg_id ASC;
+ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC;
 
 guideChannelsAllPaged:
 SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
@@ -301,11 +313,11 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
       AND ep.end_time > :startTime AND ep.start_time < :endTime
   )
 GROUP BY c.tvg_id
-ORDER BY c.title ASC, c.tvg_id ASC
+ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC
 LIMIT :limit OFFSET :offset;
 
 guideChannelsBySourcePaged:
-SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, c.sort_order
+SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
 FROM content c
 WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
   AND c.source_id = :sourceId
@@ -315,7 +327,7 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
       AND ep.end_time > :startTime AND ep.start_time < :endTime
   )
 GROUP BY c.tvg_id
-ORDER BY c.title ASC, c.tvg_id ASC
+ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC
 LIMIT :limit OFFSET :offset;
 
 countGuideChannelsAll:
@@ -341,6 +353,7 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
 -- guideChannelsAllPaged but constrains to a single group_name. Used by
 -- GuideScreen's group chip strip so the user can narrow the guide to
 -- (e.g.) Sports without scrolling through every live channel.
+-- MK.EPG.H — provider order, see comment block above guideChannelsAll.
 guideChannelsByGroupPaged:
 SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
 FROM content c
@@ -352,7 +365,7 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
       AND ep.end_time > :startTime AND ep.start_time < :endTime
   )
 GROUP BY c.tvg_id
-ORDER BY c.title ASC, c.tvg_id ASC
+ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC
 LIMIT :limit OFFSET :offset;
 
 countGuideChannelsByGroup:

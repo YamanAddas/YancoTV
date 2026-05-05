@@ -706,6 +706,94 @@ class EpgRepositoryTest {
         assertEquals("Next AAA", nn.next!!.title)
     }
 
+    /**
+     * MK.EPG.H — Guide channel ordering. The pre-fix queries
+     * (`guideChannelsAll/BySource/ByGroupPaged`) sorted alphabetically
+     * by `c.title`, throwing away the playlist position the provider
+     * carefully arranged (favourites first, then sports, news, etc.).
+     * The fix swaps to `MIN(c.sort_order) ASC, c.tvg_id ASC` so the
+     * Guide opens in provider order (TiviMate-equivalent) and
+     * `tvg-chno` from the M3U becomes meaningful for navigation.
+     *
+     * Tests below pin all three paged variants so a future ORDER BY
+     * tweak that drops the sort_order can't silently regress.
+     */
+    @Test fun `getGuideData paged returns channels in provider sort_order not alphabetical`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null)
+
+        val now = 1_700_000_000L
+        // Three channels — alphabetical order would be A, B, Z; provider
+        // order (sort_order) is Z, A, B. The test fails if the sort
+        // falls back to alphabetical.
+        insertContent(db, "ch-1", "src-A", "ztop.tv", "Z Top", sortOrder = 1)
+        insertContent(db, "ch-2", "src-A", "amid.tv", "A Middle", sortOrder = 2)
+        insertContent(db, "ch-3", "src-A", "bend.tv", "B End", sortOrder = 3)
+        insertProgramme(db, "ztop.tv", now - 100, now + 100, "src-A")
+        insertProgramme(db, "amid.tv", now - 100, now + 100, "src-A")
+        insertProgramme(db, "bend.tv", now - 100, now + 100, "src-A")
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L)
+        assertEquals(
+            listOf("ztop.tv", "amid.tv", "bend.tv"),
+            page.channels.map { it.tvgId },
+            "channels must come out in provider sort_order, not alphabetical",
+        )
+    }
+
+    @Test fun `getGuideData paged tiebreaks equal sort_order on tvg_id for stable pagination`() = runTest {
+        // Pagination determinism guard — the user can scroll through
+        // pages and the same channel must not appear twice across page
+        // boundaries. Equal `sort_order` resolves to ascending
+        // `tvg_id` so each channel has a unique position in the sort.
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null)
+
+        val now = 1_700_000_000L
+        // All four channels share sort_order=0; tiebreak by tvg_id
+        // gives a stable order: aa, bb, cc, dd.
+        insertContent(db, "ch-cc", "src-A", "cc.tv", "Channel CC", sortOrder = 0)
+        insertContent(db, "ch-aa", "src-A", "aa.tv", "Channel AA", sortOrder = 0)
+        insertContent(db, "ch-dd", "src-A", "dd.tv", "Channel DD", sortOrder = 0)
+        insertContent(db, "ch-bb", "src-A", "bb.tv", "Channel BB", sortOrder = 0)
+        for (tvg in listOf("aa.tv", "bb.tv", "cc.tv", "dd.tv")) {
+            insertProgramme(db, tvg, now - 100, now + 100, "src-A")
+        }
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page1 = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L, limit = 2L, offset = 0L)
+        val page2 = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L, limit = 2L, offset = 2L)
+        assertEquals(listOf("aa.tv", "bb.tv"), page1.channels.map { it.tvgId })
+        assertEquals(listOf("cc.tv", "dd.tv"), page2.channels.map { it.tvgId })
+    }
+
+    @Test fun `getGuideData paged byGroup respects sort_order within the group`() = runTest {
+        // Group-scoped variant of the same fix — `guideChannelsByGroupPaged`
+        // also needs the sort_order ORDER BY for consistency. A regression
+        // that updated only the unfiltered/source-filtered paths would
+        // leak alphabetical sort into the group-chip-filtered view.
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null)
+
+        val now = 1_700_000_000L
+        insertContent(db, "ch-1", "src-A", "z.tv", "Z News", sortOrder = 1, groupName = "News")
+        insertContent(db, "ch-2", "src-A", "a.tv", "A News", sortOrder = 2, groupName = "News")
+        // Outside the group — must not appear.
+        insertContent(db, "ch-3", "src-A", "outside.tv", "Outside", sortOrder = 0, groupName = "Sports")
+        insertProgramme(db, "z.tv", now - 100, now + 100, "src-A")
+        insertProgramme(db, "a.tv", now - 100, now + 100, "src-A")
+        insertProgramme(db, "outside.tv", now - 100, now + 100, "src-A")
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L, groupName = "News")
+        assertEquals(
+            listOf("z.tv", "a.tv"),
+            page.channels.map { it.tvgId },
+            "group-scoped page must order by sort_order; outside-group channel must be excluded",
+        )
+    }
+
     @Test fun `getProgrammesForChannel orders priority then start_time`() = runTest {
         val (db, driver) = newDbPair()
         insertSource(db, "src-low", null, epgPriority = 0L)
@@ -743,19 +831,27 @@ class EpgRepositoryTest {
         assertEquals("Low 2", rows[2].title)
     }
 
-    private fun insertContent(db: com.yancotv.shared.db.YancoDb, id: String, sourceId: String, tvgId: String, title: String) {
+    private fun insertContent(
+        db: com.yancotv.shared.db.YancoDb,
+        id: String,
+        sourceId: String,
+        tvgId: String,
+        title: String,
+        sortOrder: Long = 0L,
+        groupName: String? = null,
+    ) {
         db.contentQueries.insert(
             id = id,
             source_id = sourceId,
             type = "live",
             title = title,
             clean_title = title,
-            group_name = null,
+            group_name = groupName,
             stream_url = "http://stream/$id",
             logo_url = null,
             tvg_id = tvgId,
             metadata_json = null,
-            sort_order = 0L,
+            sort_order = sortOrder,
             created_at = 0L,
         )
     }
