@@ -456,8 +456,27 @@ fun GuideScreen(
                 flattenCategoryTree(tree, guideExpandedParents)
             }
         }
+    // **MK.EPG.A.fix3 (2026-05-05) — match BrowseSection's mount gate.**
+    //
+    // Pre-fix the rail stayed mounted whenever `groups.isNotEmpty()`,
+    // independent of `panelFocus`. After the user entered the timeline
+    // (`panelFocus == Content`) the rail's pills were still in the
+    // focus tree. RIGHT-from-ChannelCell triggered a focus search that
+    // — if it couldn't find a clean target inside the grid focusGroup
+    // (e.g. the timeline cells were partially off-screen and Compose
+    // bailed mid-bringIntoView) — expanded UP to the parent focusGroup,
+    // found a pill, focused it. CategoryRail's `onFocusChanged` then
+    // fired `onPanelFocusChanged(Categories)`, and the user reported
+    // "RIGHT from channels jumps back to categories".
+    //
+    // BrowseSection (Live TV / Movies / Series) avoids this by gating
+    // the rail mount on `panelFocus != Content`. Mirroring that here
+    // removes the pills from the focus tree entirely whenever the user
+    // is browsing the timeline. They re-mount on LEFT/BACK from the
+    // grid, which already flips `panelFocus` back to Categories.
+    val categoriesVisible = panelFocus != PanelFocus.Content
     Row(modifier = modifier.fillMaxSize()) {
-        if (groups.isNotEmpty()) {
+        if (categoriesVisible && groups.isNotEmpty()) {
             CategoryRail(
                 groups = if (guideSmartEnabled) emptyList() else groups,
                 selected = railSelected,
