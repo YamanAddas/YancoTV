@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1077,25 +1078,41 @@ private fun ChannelRow(
                 .fillMaxHeight(),
         ) {
             for (cmd in visibleCells) {
-                when (cmd) {
-                    is TimelineCmd.Spacer -> {
-                        Box(modifier = Modifier.width((cmd.widthMin * pxPerMin).dp).fillMaxHeight())
+                // MK.EPG.A.fix1 — keyed by absolute time anchor + type
+                // tag. Without this, a cmd-list shift (typical when
+                // horizontal scroll re-derives `visibleCells`) recomposed
+                // each position-indexed slot with new data and the
+                // currently-focused cell lost its composable identity.
+                // Compose then walked outward to recover focus and
+                // landed on the categories rail (the user's "RIGHT from
+                // channels jumps to main menu" report).
+                val cmdKey =
+                    when (cmd) {
+                        is TimelineCmd.Spacer -> "S-${cmd.keyStartTime}"
+                        is TimelineCmd.ProgrammeCmd -> "P-${cmd.prog.id}"
+                        is TimelineCmd.NoEpgCmd -> "N-${cmd.startTime}"
                     }
-                    is TimelineCmd.ProgrammeCmd -> {
-                        ProgrammeBlock(
-                            programme = cmd.prog,
-                            widthDp = (cmd.widthMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
-                            onActivate = { onProgrammeAction(cmd.prog) },
-                        )
-                    }
-                    is TimelineCmd.NoEpgCmd -> {
-                        NoEpgCell(
-                            startTime = cmd.startTime,
-                            endTime = cmd.endTime,
-                            widthDp = (cmd.widthMin * pxPerMin).dp,
-                            onPlayLive = onPlayChannel,
-                            onLongPress = onLongPressChannel,
-                        )
+                key(cmdKey) {
+                    when (cmd) {
+                        is TimelineCmd.Spacer -> {
+                            Box(modifier = Modifier.width((cmd.widthMin * pxPerMin).dp).fillMaxHeight())
+                        }
+                        is TimelineCmd.ProgrammeCmd -> {
+                            ProgrammeBlock(
+                                programme = cmd.prog,
+                                widthDp = (cmd.widthMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
+                                onActivate = { onProgrammeAction(cmd.prog) },
+                            )
+                        }
+                        is TimelineCmd.NoEpgCmd -> {
+                            NoEpgCell(
+                                startTime = cmd.startTime,
+                                endTime = cmd.endTime,
+                                widthDp = (cmd.widthMin * pxPerMin).dp,
+                                onPlayLive = onPlayChannel,
+                                onLongPress = onLongPressChannel,
+                            )
+                        }
                     }
                 }
             }
@@ -1111,18 +1128,29 @@ private fun ChannelRow(
  * buffer collapse to a [Spacer] to preserve absolute timeline position
  * without paying the cost of composing a focusable, clickable text cell
  * for every off-screen second.
+ *
+ * Each cmd also carries a stable `keyStartTime` (absolute time anchor)
+ * used as a Compose `key()` at render time so focus survives cmd-list
+ * shifts triggered by horizontal scroll (MK.EPG.A.fix1, 2026-05-05).
  */
 private sealed class TimelineCmd {
     abstract val widthMin: Int
 
+    /** Stable identity for `key()` — same time anchor → same composable across recompositions. */
+    abstract val keyStartTime: Long
+
     /** Invisible filler — off-viewport sections of any kind. */
-    data class Spacer(override val widthMin: Int) : TimelineCmd()
+    data class Spacer(override val keyStartTime: Long, override val widthMin: Int) : TimelineCmd()
 
     /** A real programme inside the viewport (± buffer). */
-    data class ProgrammeCmd(val prog: EpgProgramme, override val widthMin: Int) : TimelineCmd()
+    data class ProgrammeCmd(val prog: EpgProgramme, override val widthMin: Int) : TimelineCmd() {
+        override val keyStartTime: Long get() = prog.startTime
+    }
 
     /** Empty time slot inside the viewport (± buffer) — focusable. */
-    data class NoEpgCmd(val startTime: Long, val endTime: Long, override val widthMin: Int) : TimelineCmd()
+    data class NoEpgCmd(val startTime: Long, val endTime: Long, override val widthMin: Int) : TimelineCmd() {
+        override val keyStartTime: Long get() = startTime
+    }
 }
 
 /**
@@ -1162,22 +1190,37 @@ private fun buildVisibleCells(
     val viewportEndPx = scrollPx + viewportWidthPx
     val viewportStartMin = scrollPx / pxPerMin
     val viewportEndMin = viewportEndPx / pxPerMin
-    val bufferMin = 60L
-    val rangeStartTime =
-        windowStart + ((viewportStartMin - bufferMin).coerceAtLeast(0L)) * 60L
-    val rangeEndTime =
-        (windowStart + (viewportEndMin + bufferMin) * 60L).coerceAtMost(windowEnd)
+
+    // MK.EPG.A.fix1 (2026-05-05) — leading buffer dropped to 0, trailing
+    // kept at 60 min. **Why:** the original symmetrical 60-min buffer
+    // emitted focusable [NoEpgCmd]s in the off-viewport-LEFT area. When
+    // the user pressed RIGHT from a [ChannelCell], Compose's focus
+    // search picked one of those off-viewport cells (closer in layout x
+    // than the visible programmes), which triggered `bringIntoView` →
+    // scroll-left → cmd-list re-derivation → focus loss → outward
+    // recovery to the categories rail. The user reported "press RIGHT
+    // from channels and the selector goes back to the main menu".
+    //
+    // With leading buffer = 0 the leftmost focusable in the cmd list
+    // is always inside the visible viewport, so RIGHT-from-ChannelCell
+    // lands without triggering scroll. Trailing buffer is preserved so
+    // fast scroll-RIGHT (the common direction — toward future programmes)
+    // doesn't briefly show Spacer for newly revealed cells.
+    val rangeStartTime = (windowStart + viewportStartMin * 60L).coerceAtMost(windowEnd)
+    val rangeEndTime = (windowStart + (viewportEndMin + 60L) * 60L).coerceAtMost(windowEnd)
 
     val cmds = mutableListOf<TimelineCmd>()
 
-    fun addSpacer(min: Long) {
+    fun addSpacer(startAt: Long, min: Long) {
         val w = (min / 60L).toInt()
         if (w <= 0) return
         val last = cmds.lastOrNull()
         if (last is TimelineCmd.Spacer) {
-            cmds[cmds.size - 1] = TimelineCmd.Spacer(last.widthMin + w)
+            // Coalesce: keep the OLD startAt so the key stays stable
+            // across re-derivations that happen to extend a Spacer.
+            cmds[cmds.size - 1] = TimelineCmd.Spacer(last.keyStartTime, last.widthMin + w)
         } else {
-            cmds.add(TimelineCmd.Spacer(w))
+            cmds.add(TimelineCmd.Spacer(startAt, w))
         }
     }
 
@@ -1185,7 +1228,7 @@ private fun buildVisibleCells(
         if (to <= from) return
         // Off-viewport leading portion → Spacer
         val visStart = from.coerceAtLeast(rangeStartTime)
-        if (visStart > from) addSpacer(visStart - from)
+        if (visStart > from) addSpacer(from, visStart - from)
         // Visible portion → hour-bucketed NoEpgCmd
         val visEnd = to.coerceAtMost(rangeEndTime)
         if (visEnd > visStart) {
@@ -1198,14 +1241,14 @@ private fun buildVisibleCells(
             }
         }
         // Off-viewport trailing portion → Spacer
-        if (to > visEnd) addSpacer(to - visEnd)
+        if (to > visEnd) addSpacer(visEnd, to - visEnd)
     }
 
     fun emitProgramme(s: Long, e: Long, prog: EpgProgramme) {
         if (e <= s) return
         if (e <= rangeStartTime || s >= rangeEndTime) {
             // Off-viewport — collapse to Spacer.
-            addSpacer(e - s)
+            addSpacer(s, e - s)
         } else {
             val w = ((e - s) / 60L).toInt().coerceAtLeast(1)
             cmds.add(TimelineCmd.ProgrammeCmd(prog, w))
