@@ -83,6 +83,29 @@ class AndroidEpgImporter(
         suspend fun report(msg: String)
     }
 
+    /**
+     * Two-phase refresh — MK.EPG.B (2026-05-04).
+     *
+     * **Phase 1: download all sources to temp files. No SQLite transaction.**
+     *   - Per-source try/catch isolates download failures; one failed
+     *     source doesn't kill the others.
+     *   - Pre-existing `epg-*.bin` cache leftovers from process-killed
+     *     prior runs are swept here.
+     *
+     * **Phase 2: open one transaction, parse + write each downloaded
+     *   file, then commit.**
+     *   - Transaction holds for the parse + insert window only —
+     *     typically seconds, not the minutes the previous architecture
+     *     held it (downloads inside the transaction blocked every other
+     *     UI write — favourites toggle, watch history persist — for the
+     *     full duration of the slowest network leg).
+     *   - All-or-nothing semantics preserved: the swap is atomic at
+     *     commit; rollback restores the prior snapshot if anything in
+     *     this phase throws.
+     *
+     * **Cleanup:** every temp file we created is deleted in `finally`,
+     *   regardless of which phase failed.
+     */
     suspend fun refresh(onProgress: Progress = Progress { /* no-op */ }): EpgRefreshResult =
         withContext(Dispatchers.IO) {
             val targets = collectTargets()
@@ -96,12 +119,16 @@ class AndroidEpgImporter(
                 "EPG stream: user has ${knownTvgIds.size} live channels with tvg_id; EPG rows for unknown channels will be filtered out",
             )
 
-            val session = writer.openSession()
+            // Sweep stale temp files from process-killed prior runs. Only
+            // touches our `epg-*.bin` prefix so other apps' caches stay
+            // intact.
+            sweepStaleTempFiles()
+
+            val downloaded = mutableListOf<DownloadedTarget>()
             val errors = mutableListOf<String>()
-            var anySucceeded = false
 
             try {
-                session.begin()
+                // ───── Phase 1: downloads (NO transaction held) ─────
                 for ((idx, target) in targets.withIndex()) {
                     val label = "${idx + 1}/${targets.size} (${target.sourceKey})"
                     onProgress.report("Downloading EPG $label")
@@ -109,62 +136,95 @@ class AndroidEpgImporter(
                     try {
                         val dlStart = System.currentTimeMillis()
                         val bytes = downloadToFile(target.url, tempFile)
-                        logger.info("EPG stream: downloaded $bytes bytes in ${System.currentTimeMillis() - dlStart}ms from ${target.url}")
-
-                        onProgress.report("Parsing EPG $label")
-                        val parseStart = System.currentTimeMillis()
-                        val beforeRows = session.rowsWritten
-                        streamInto(
-                            session = session,
-                            sourceKey = target.sourceKey,
-                            sourceIdForDb = if (target.sourceKey == GLOBAL) null else target.sourceKey,
-                            file = tempFile,
-                            knownTvgIds = knownTvgIds,
-                            onProgress = onProgress,
-                        )
-                        val written = session.rowsWritten - beforeRows
-                        logger.info(
-                            "EPG stream: source ${target.sourceKey} ingested $written rows (filtered) in ${System.currentTimeMillis() - parseStart}ms",
-                        )
-                        if (written > 0) anySucceeded = true else errors.add("${target.sourceKey}: 0 programmes after filter")
+                        logger.info("EPG download: ${target.sourceKey} fetched $bytes B in ${System.currentTimeMillis() - dlStart}ms")
+                        downloaded.add(DownloadedTarget(target, tempFile))
                     } catch (t: Throwable) {
                         val msg = t.message ?: t::class.simpleName ?: "unknown"
-                        errors.add("${target.sourceKey}: $msg")
-                        logger.error("EPG stream failed for ${target.sourceKey}: $msg")
-                    } finally {
+                        errors.add("${target.sourceKey} download: $msg")
+                        logger.error("EPG download failed for ${target.sourceKey}: $msg")
                         runCatching { tempFile.delete() }
                     }
                 }
 
-                if (!anySucceeded) {
-                    session.rollback()
+                if (downloaded.isEmpty()) {
                     val detail = if (errors.isEmpty()) "All EPG sources produced no rows" else errors.joinToString(" | ")
                     recordError(detail)
                     return@withContext EpgRefreshResult(ok = false, error = detail)
                 }
 
-                onProgress.report("Writing ${session.rowsWritten} programmes to database…")
-                session.commit(lastRefreshedMs = System.currentTimeMillis())
-                if (errors.isEmpty()) {
-                    recordError(null)
-                } else {
-                    recordError("Partial: " + errors.joinToString(" | "))
-                }
+                // ───── Phase 2: parse + write (transaction held only here) ─────
+                val session = writer.openSession()
+                var anySucceeded = false
+                try {
+                    session.begin()
+                    for ((idx, df) in downloaded.withIndex()) {
+                        val label = "${idx + 1}/${downloaded.size} (${df.target.sourceKey})"
+                        onProgress.report("Parsing EPG $label")
+                        val parseStart = System.currentTimeMillis()
+                        val beforeRows = session.rowsWritten
+                        try {
+                            streamInto(
+                                session = session,
+                                sourceKey = df.target.sourceKey,
+                                sourceIdForDb = if (df.target.sourceKey == GLOBAL) null else df.target.sourceKey,
+                                file = df.file,
+                                knownTvgIds = knownTvgIds,
+                                onProgress = onProgress,
+                            )
+                            val written = session.rowsWritten - beforeRows
+                            logger.info(
+                                "EPG parse: ${df.target.sourceKey} ingested $written rows (filtered) in ${System.currentTimeMillis() - parseStart}ms",
+                            )
+                            if (written > 0) anySucceeded = true else errors.add("${df.target.sourceKey}: 0 programmes after filter")
+                        } catch (t: Throwable) {
+                            val msg = t.message ?: t::class.simpleName ?: "unknown"
+                            errors.add("${df.target.sourceKey} parse: $msg")
+                            logger.error("EPG parse failed for ${df.target.sourceKey}: $msg")
+                        }
+                    }
 
-                logger.info("EPG stream: total ${session.rowsWritten} rows across ${session.channelCount} channels committed")
-                EpgRefreshResult(
-                    ok = true,
-                    programmeCount = session.rowsWritten,
-                    channelCount = session.channelCount,
-                )
-            } catch (t: Throwable) {
-                runCatching { session.rollback() }
-                val msg = t.message ?: t::class.simpleName ?: "unknown"
-                logger.error("EPG stream aborted: $msg")
-                recordError(msg)
-                EpgRefreshResult(ok = false, error = msg)
+                    if (!anySucceeded) {
+                        session.rollback()
+                        val detail = if (errors.isEmpty()) "All EPG sources produced no rows" else errors.joinToString(" | ")
+                        recordError(detail)
+                        return@withContext EpgRefreshResult(ok = false, error = detail)
+                    }
+
+                    onProgress.report("Writing ${session.rowsWritten} programmes to database…")
+                    session.commit(lastRefreshedMs = System.currentTimeMillis())
+                    if (errors.isEmpty()) {
+                        recordError(null)
+                    } else {
+                        recordError("Partial: " + errors.joinToString(" | "))
+                    }
+
+                    logger.info("EPG stream: total ${session.rowsWritten} rows across ${session.channelCount} channels committed")
+                    EpgRefreshResult(
+                        ok = true,
+                        programmeCount = session.rowsWritten,
+                        channelCount = session.channelCount,
+                    )
+                } catch (t: Throwable) {
+                    runCatching { session.rollback() }
+                    val msg = t.message ?: t::class.simpleName ?: "unknown"
+                    logger.error("EPG stream aborted: $msg")
+                    recordError(msg)
+                    EpgRefreshResult(ok = false, error = msg)
+                }
+            } finally {
+                // Always clean up our temp files — Phase-1 successes,
+                // Phase-2 thrown-mid, and anything we managed to add to
+                // `downloaded` before an outer abort.
+                downloaded.forEach { runCatching { it.file.delete() } }
             }
         }
+
+    private fun sweepStaleTempFiles() {
+        runCatching {
+            context.cacheDir.listFiles { _, name -> name.startsWith("epg-") && name.endsWith(".bin") }
+                ?.forEach { file -> runCatching { file.delete() } }
+        }
+    }
 
     // ───── download ─────
 
@@ -407,6 +467,9 @@ class AndroidEpgImporter(
     }
 
     private data class EpgTarget(val url: String, val sourceKey: String)
+
+    /** MK.EPG.B — Phase-1 result: a target paired with its downloaded temp file, ready for Phase-2 ingest. */
+    private data class DownloadedTarget(val target: EpgTarget, val file: File)
 
     companion object {
         private const val GLOBAL = EpgRepository.GLOBAL_SOURCE_KEY
