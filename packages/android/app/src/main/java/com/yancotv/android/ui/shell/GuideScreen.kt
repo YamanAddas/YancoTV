@@ -119,15 +119,15 @@ private const val NOW_TICK_MS = 60_000L
 private const val GUIDE_PAGE_SIZE = 100L
 private const val PREFETCH_THRESHOLD = 20
 
-// MK.EPG.A — empty time slots between programmes (or trailing the final
-// programme until windowEnd) used to render as bare `Box` filler that
-// D-pad couldn't focus. The user saw a "grey area I can't reach". Each
-// gap is now decomposed into 60-minute focusable [NoEpgCell] buckets so
-// D-pad RIGHT walks through the gap one hour at a time, and CENTER plays
-// the channel live (long-press opens the channel actions menu). Keeping
-// the bucket at 60 min matches the typical programme cadence — finer
-// slices would multiply focus targets without helping the user.
-private const val NO_EPG_BUCKET_MIN = 60
+// MK.EPG.A — empty time slots between programmes (and the trailing span
+// after the last visible programme up to `windowEnd`) used to render as
+// bare `Box` filler that D-pad couldn't focus. The user saw "grey areas
+// I can't reach". Each is now a focusable [NoEpgCell] (one cell per gap
+// — D-pad RIGHT/LEFT hops the gap in a single press; CENTER plays the
+// channel live; long-press opens the channel actions menu). The leading
+// gap (before the first visible programme) intentionally stays a bare
+// non-focusable Box — see the comment in `ChannelRow` for why
+// (MK.EPG.A.fix1, 2026-05-05).
 
 /** MK.14.6 — series-binding lookahead window. 7 days covers the full
  *  EPG horizon most providers populate; longer windows are wasted because
@@ -1005,32 +1005,30 @@ private fun ChannelRow(
     onProgrammeAction: (EpgProgramme) -> Unit,
     onExitLeftFromChannel: () -> Unit,
 ) {
-    // Stage 5.4 perf slice 2 + MK.EPG.A — virtualised cell stream.
+    // Stage 5.4 perf slice 2 — virtualise the programme list.
     //
-    // The row's timeline is described as a list of [TimelineCmd]:
-    //   - [TimelineCmd.Spacer]   — invisible filler, off-viewport
-    //   - [TimelineCmd.ProgrammeCmd] — full programme block (focusable)
-    //   - [TimelineCmd.NoEpgCmd] — empty time slot (focusable, click-to-
-    //                              watch-live, long-press → channel menu)
+    // The pre-MK.EPG.A architecture: emit only programmes whose
+    // `[startTime, endTime]` intersects the viewport ± 60-min buffer.
+    // Each programme renders as a [ProgrammeBlock] inside a flow Row,
+    // separated by bare `Box` gaps. Compose's sibling focus search
+    // walks D-pad RIGHT/LEFT through them naturally.
     //
-    // Two design notes:
-    //   1. Cells outside the viewport ± 60-min buffer collapse to a
-    //      Spacer of the same time-width, preserving absolute timeline
-    //      position without the focus / text composition cost. Same trick
-    //      as the pre-MK.EPG.A "leading gap Box" but extended to every
-    //      off-viewport span (programme bodies included).
-    //   2. Pre-fix the inter-programme empty space rendered as a bare
-    //      `Box`. D-pad couldn't focus it → the user reported "grey area
-    //      I can't reach" (2026-05-04). Now those spans become
-    //      hour-bucketed [NoEpgCell]s, focusable + clickable. Trailing
-    //      space (between the last programme's end and `windowEnd`) is
-    //      bucketed the same way so the right edge of every row is also
-    //      reachable.
+    // MK.EPG.A.fix2 (2026-05-05) reverts the cmd-list pipeline that
+    // was added on 2026-05-04 — it was per-frame allocating a fresh
+    // `List<TimelineCmd>` per visible channel on every scroll tick,
+    // which on the user's 4022-channel install pushed `~10 MB/s` GC
+    // churn and a `FLUIDITY_ALERT: 50/199 frames dropped` per minute
+    // from logcat. The user reported this as "can't navigate the
+    // timeline" — focus changes felt locked because every key press
+    // landed inside a janky frame.
     //
-    // `derivedStateOf` keeps the derive cheap on scroll (re-evaluates
-    // every frame) but only recomposes consumers when the *cmd list*
-    // changes — i.e. crossing a viewport boundary, not on every pixel.
-    val visibleCells by remember(
+    // The empty-time-slot fix from MK.EPG.A is preserved by a smaller
+    // change in the render loop below: inter-programme gaps and the
+    // trailing gap now render as focusable [NoEpgCell]s instead of
+    // bare `Box`. Leading gap stays a bare `Box` so RIGHT-from-
+    // ChannelCell finds the first programme block, never an off-
+    // viewport empty cell (the focus regression we hit yesterday).
+    val visibleProgrammes by remember(
         channel.programmes,
         windowStart,
         windowEnd,
@@ -1038,14 +1036,19 @@ private fun ChannelRow(
         viewportWidthPx,
     ) {
         derivedStateOf {
-            buildVisibleCells(
-                programmes = channel.programmes,
-                windowStart = windowStart,
-                windowEnd = windowEnd,
-                pxPerMin = pxPerMin,
-                viewportWidthPx = viewportWidthPx,
-                scrollPx = hScroll.value.toLong(),
-            )
+            val scrollPx = hScroll.value.toLong()
+            val viewportEndPx = scrollPx + viewportWidthPx
+            val viewportStartMin = scrollPx / pxPerMin
+            val viewportEndMin = viewportEndPx / pxPerMin
+            val bufferMin = 60L
+            val rangeStartTime =
+                windowStart + ((viewportStartMin - bufferMin).coerceAtLeast(0L)) * 60L
+            val rangeEndTime = windowStart + (viewportEndMin + bufferMin) * 60L
+            channel.programmes.filter { p ->
+                val pe = p.endTime.coerceAtMost(windowEnd)
+                val ps = p.startTime.coerceAtLeast(windowStart)
+                pe > rangeStartTime && ps < rangeEndTime && pe > ps
+            }
         }
     }
 
@@ -1065,11 +1068,9 @@ private fun ChannelRow(
             onExitLeft = onExitLeftFromChannel,
         )
 
-        // Programme lane. Flow-layout: cells emitted in source / time
-        // order so Compose's sibling focus search walks D-pad RIGHT/LEFT
-        // through them naturally. Total content width matches the
-        // sum of cmd widths; `width(timelineWidth)` caps the Row so
-        // hScroll bounds stay aligned with `TimeHeader`.
+        // Programme lane. Same flow-Row layout the OLD code used —
+        // bare leading gap + alternating ProgrammeBlocks / focusable
+        // NoEpgCells (gap fillers) + focusable trailing NoEpgCell.
         Row(
             modifier =
             Modifier
@@ -1077,208 +1078,68 @@ private fun ChannelRow(
                 .width(timelineWidth)
                 .fillMaxHeight(),
         ) {
-            for (cmd in visibleCells) {
-                // MK.EPG.A.fix1 — keyed by absolute time anchor + type
-                // tag. Without this, a cmd-list shift (typical when
-                // horizontal scroll re-derives `visibleCells`) recomposed
-                // each position-indexed slot with new data and the
-                // currently-focused cell lost its composable identity.
-                // Compose then walked outward to recover focus and
-                // landed on the categories rail (the user's "RIGHT from
-                // channels jumps to main menu" report).
-                val cmdKey =
-                    when (cmd) {
-                        is TimelineCmd.Spacer -> "S-${cmd.keyStartTime}"
-                        is TimelineCmd.ProgrammeCmd -> "P-${cmd.prog.id}"
-                        is TimelineCmd.NoEpgCmd -> "N-${cmd.startTime}"
-                    }
-                key(cmdKey) {
-                    when (cmd) {
-                        is TimelineCmd.Spacer -> {
-                            Box(modifier = Modifier.width((cmd.widthMin * pxPerMin).dp).fillMaxHeight())
-                        }
-                        is TimelineCmd.ProgrammeCmd -> {
-                            ProgrammeBlock(
-                                programme = cmd.prog,
-                                widthDp = (cmd.widthMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
-                                onActivate = { onProgrammeAction(cmd.prog) },
-                            )
-                        }
-                        is TimelineCmd.NoEpgCmd -> {
+            var cursor = windowStart
+            var firstEmitted = true
+            for (prog in visibleProgrammes) {
+                val clampedStart = prog.startTime.coerceAtLeast(windowStart)
+                val clampedEnd = prog.endTime.coerceAtMost(windowEnd)
+                if (clampedEnd <= clampedStart) continue
+                val gapStartFrom = if (firstEmitted) windowStart else cursor
+                val gapMin = ((clampedStart - gapStartFrom) / 60L).toInt().coerceAtLeast(0)
+                if (gapMin > 0) {
+                    if (firstEmitted) {
+                        // **Leading gap stays a bare, NON-focusable Box.**
+                        // Otherwise RIGHT-from-ChannelCell would find this
+                        // empty cell as the leftmost focusable, trigger
+                        // bringIntoView → scroll left → focus regression
+                        // we hit on 2026-05-05. The user can still reach
+                        // this empty span by scrolling left until it
+                        // becomes an inter-programme gap (covered below).
+                        Box(modifier = Modifier.width((gapMin * pxPerMin).dp).fillMaxHeight())
+                    } else {
+                        key("N-$gapStartFrom") {
                             NoEpgCell(
-                                startTime = cmd.startTime,
-                                endTime = cmd.endTime,
-                                widthDp = (cmd.widthMin * pxPerMin).dp,
+                                startTime = gapStartFrom,
+                                endTime = clampedStart,
+                                widthDp = (gapMin * pxPerMin).dp,
                                 onPlayLive = onPlayChannel,
                                 onLongPress = onLongPressChannel,
                             )
                         }
                     }
                 }
+                val durMin = ((clampedEnd - clampedStart) / 60L).toInt().coerceAtLeast(1)
+                key("P-${prog.id}") {
+                    ProgrammeBlock(
+                        programme = prog,
+                        widthDp = (durMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
+                        onActivate = { onProgrammeAction(prog) },
+                    )
+                }
+                cursor = clampedEnd
+                firstEmitted = false
+            }
+            // **Trailing focusable cell** so the right edge of every
+            // row is reachable — pre-MK.EPG.A this area was unallocated
+            // empty space inside the fixed-width Row. Capped at the
+            // window's end so we don't fabricate a focusable cell over
+            // off-viewport future programmes that the filter excluded.
+            if (!firstEmitted && cursor < windowEnd) {
+                val trailingMin = ((windowEnd - cursor) / 60L).toInt()
+                if (trailingMin > 0) {
+                    key("N-$cursor") {
+                        NoEpgCell(
+                            startTime = cursor,
+                            endTime = windowEnd,
+                            widthDp = (trailingMin * pxPerMin).dp,
+                            onPlayLive = onPlayChannel,
+                            onLongPress = onLongPressChannel,
+                        )
+                    }
+                }
             }
         }
     }
-}
-
-/**
- * MK.EPG.A — render-cmd primitive for a channel row's timeline lane.
- *
- * Each cmd carries its width in minutes so the renderer can multiply by
- * `pxPerMin` to get the dp width. Cells outside the visible viewport ±
- * buffer collapse to a [Spacer] to preserve absolute timeline position
- * without paying the cost of composing a focusable, clickable text cell
- * for every off-screen second.
- *
- * Each cmd also carries a stable `keyStartTime` (absolute time anchor)
- * used as a Compose `key()` at render time so focus survives cmd-list
- * shifts triggered by horizontal scroll (MK.EPG.A.fix1, 2026-05-05).
- */
-private sealed class TimelineCmd {
-    abstract val widthMin: Int
-
-    /** Stable identity for `key()` — same time anchor → same composable across recompositions. */
-    abstract val keyStartTime: Long
-
-    /** Invisible filler — off-viewport sections of any kind. */
-    data class Spacer(override val keyStartTime: Long, override val widthMin: Int) : TimelineCmd()
-
-    /** A real programme inside the viewport (± buffer). */
-    data class ProgrammeCmd(val prog: EpgProgramme, override val widthMin: Int) : TimelineCmd() {
-        override val keyStartTime: Long get() = prog.startTime
-    }
-
-    /** Empty time slot inside the viewport (± buffer) — focusable. */
-    data class NoEpgCmd(val startTime: Long, val endTime: Long, override val widthMin: Int) : TimelineCmd() {
-        override val keyStartTime: Long get() = startTime
-    }
-}
-
-/**
- * MK.EPG.A — translate the channel's full programme list + the current
- * scroll position into a [TimelineCmd] list.
- *
- * Algorithm (single sweep over time-sorted programmes, clamped to the
- * window):
- *   1. Walk programmes in start-time order.
- *   2. For each gap between programmes (and the trailing gap from the
- *      last programme to `windowEnd`):
- *        - The portion inside `[viewportStart − buffer, viewportEnd +
- *          buffer]` is split into 60-minute [NoEpgCmd] buckets.
- *        - Off-viewport portions collapse to a [Spacer].
- *   3. Programme bodies render in full when they intersect the visible
- *      range; otherwise they collapse to a [Spacer] of the same width
- *      so subsequent cells keep their absolute time position.
- *
- * Adjacent [Spacer]s coalesce so the final cmd list never contains two
- * consecutive Spacers (avoids extra layout nodes for back-to-back
- * off-viewport programmes + gaps).
- *
- * The total sum of `widthMin` across the returned list equals
- * `(windowEnd − windowStart) / 60`, so the row's content width matches
- * the timeline's full extent and `hScroll` bounds stay correct.
- */
-private fun buildVisibleCells(
-    programmes: List<EpgProgramme>,
-    windowStart: Long,
-    windowEnd: Long,
-    pxPerMin: Int,
-    viewportWidthPx: Int,
-    scrollPx: Long,
-): List<TimelineCmd> {
-    if (windowEnd <= windowStart) return emptyList()
-
-    val viewportEndPx = scrollPx + viewportWidthPx
-    val viewportStartMin = scrollPx / pxPerMin
-    val viewportEndMin = viewportEndPx / pxPerMin
-
-    // MK.EPG.A.fix1 (2026-05-05) — leading buffer dropped to 0, trailing
-    // kept at 60 min. **Why:** the original symmetrical 60-min buffer
-    // emitted focusable [NoEpgCmd]s in the off-viewport-LEFT area. When
-    // the user pressed RIGHT from a [ChannelCell], Compose's focus
-    // search picked one of those off-viewport cells (closer in layout x
-    // than the visible programmes), which triggered `bringIntoView` →
-    // scroll-left → cmd-list re-derivation → focus loss → outward
-    // recovery to the categories rail. The user reported "press RIGHT
-    // from channels and the selector goes back to the main menu".
-    //
-    // With leading buffer = 0 the leftmost focusable in the cmd list
-    // is always inside the visible viewport, so RIGHT-from-ChannelCell
-    // lands without triggering scroll. Trailing buffer is preserved so
-    // fast scroll-RIGHT (the common direction — toward future programmes)
-    // doesn't briefly show Spacer for newly revealed cells.
-    val rangeStartTime = (windowStart + viewportStartMin * 60L).coerceAtMost(windowEnd)
-    val rangeEndTime = (windowStart + (viewportEndMin + 60L) * 60L).coerceAtMost(windowEnd)
-
-    val cmds = mutableListOf<TimelineCmd>()
-
-    fun addSpacer(startAt: Long, min: Long) {
-        val w = (min / 60L).toInt()
-        if (w <= 0) return
-        val last = cmds.lastOrNull()
-        if (last is TimelineCmd.Spacer) {
-            // Coalesce: keep the OLD startAt so the key stays stable
-            // across re-derivations that happen to extend a Spacer.
-            cmds[cmds.size - 1] = TimelineCmd.Spacer(last.keyStartTime, last.widthMin + w)
-        } else {
-            cmds.add(TimelineCmd.Spacer(startAt, w))
-        }
-    }
-
-    fun emitGap(from: Long, to: Long) {
-        if (to <= from) return
-        // Off-viewport leading portion → Spacer
-        val visStart = from.coerceAtLeast(rangeStartTime)
-        if (visStart > from) addSpacer(from, visStart - from)
-        // Visible portion → hour-bucketed NoEpgCmd
-        val visEnd = to.coerceAtMost(rangeEndTime)
-        if (visEnd > visStart) {
-            var bs = visStart
-            while (bs < visEnd) {
-                val be = (bs + NO_EPG_BUCKET_MIN * 60L).coerceAtMost(visEnd)
-                val w = ((be - bs) / 60L).toInt().coerceAtLeast(1)
-                cmds.add(TimelineCmd.NoEpgCmd(bs, be, w))
-                bs = be
-            }
-        }
-        // Off-viewport trailing portion → Spacer
-        if (to > visEnd) addSpacer(visEnd, to - visEnd)
-    }
-
-    fun emitProgramme(s: Long, e: Long, prog: EpgProgramme) {
-        if (e <= s) return
-        if (e <= rangeStartTime || s >= rangeEndTime) {
-            // Off-viewport — collapse to Spacer.
-            addSpacer(s, e - s)
-        } else {
-            val w = ((e - s) / 60L).toInt().coerceAtLeast(1)
-            cmds.add(TimelineCmd.ProgrammeCmd(prog, w))
-        }
-    }
-
-    // Sort + clamp programmes to the window. The provider may ship them
-    // in any order; clamping is needed because the EPG row may extend
-    // before / after the visible window.
-    val intervals =
-        programmes
-            .asSequence()
-            .map { p ->
-                val s = p.startTime.coerceAtLeast(windowStart)
-                val e = p.endTime.coerceAtMost(windowEnd)
-                Triple(s, e, p)
-            }
-            .filter { (s, e, _) -> e > s }
-            .sortedBy { it.first }
-            .toList()
-
-    var cursor = windowStart
-    for ((s, e, p) in intervals) {
-        if (s > cursor) emitGap(cursor, s)
-        emitProgramme(s, e, p)
-        cursor = e
-    }
-    if (cursor < windowEnd) emitGap(cursor, windowEnd)
-
-    return cmds
 }
 
 @OptIn(ExperimentalFoundationApi::class)
