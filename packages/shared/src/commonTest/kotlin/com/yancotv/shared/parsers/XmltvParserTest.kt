@@ -55,6 +55,82 @@ class XmltvParserTest {
         assertEquals(1776254400L, ts)
     }
 
+    // --- MK.EPG.C — broadened timestamp formats ---
+    //
+    // Pre-broadening only the strict canonical form parsed; everything
+    // below silently returned 0 → the EPG importer dropped the row →
+    // the channel showed grey gaps in the Guide. Pin every accepted
+    // form so a future regex tweak can't silently regress.
+
+    @Test fun parsesTimestampWithZSuffix() {
+        // 2026-04-15T12:00:00Z = 1776254400
+        assertEquals(1776254400L, parseXmltvTimestamp("20260415120000Z"))
+    }
+
+    @Test fun parsesTimestampWithUtcSuffix() {
+        assertEquals(1776254400L, parseXmltvTimestamp("20260415120000 UTC"))
+    }
+
+    @Test fun parsesTimestampWithGmtSuffix() {
+        assertEquals(1776254400L, parseXmltvTimestamp("20260415120000 GMT"))
+    }
+
+    @Test fun parsesTimestampWithBstSuffix() {
+        // BST = +0100 → subtract 1h
+        assertEquals(1776254400L - 3600L, parseXmltvTimestamp("20260415120000 BST"))
+    }
+
+    @Test fun parsesTimestampWithCestSuffix() {
+        // CEST = +0200 → subtract 2h
+        assertEquals(1776254400L - 2 * 3600L, parseXmltvTimestamp("20260415120000 CEST"))
+    }
+
+    @Test fun parsesTimestampWithEstSuffix() {
+        // EST = -0500 → add 5h
+        assertEquals(1776254400L + 5 * 3600L, parseXmltvTimestamp("20260415120000 EST"))
+    }
+
+    @Test fun parsesTimestampWithDecimalSeconds() {
+        // Trailing ".000" tolerated, dropped before offset resolution.
+        assertEquals(1776254400L, parseXmltvTimestamp("20260415120000.000 +0000"))
+    }
+
+    @Test fun parsesIso8601WithOffset() {
+        // ISO 8601 with explicit offset
+        assertEquals(1776254400L - 2 * 3600L, parseXmltvTimestamp("2026-04-15T12:00:00+02:00"))
+    }
+
+    @Test fun parsesIso8601WithZ() {
+        // ISO 8601 + Z
+        assertEquals(1776254400L, parseXmltvTimestamp("2026-04-15T12:00:00Z"))
+    }
+
+    @Test fun parsesIso8601WithSpaceSeparator() {
+        // ISO 8601-like with space instead of T
+        assertEquals(1776254400L, parseXmltvTimestamp("2026-04-15 12:00:00Z"))
+    }
+
+    @Test fun parsesIso8601WithoutOffset() {
+        // Naked ISO timestamp = UTC
+        assertEquals(1776254400L, parseXmltvTimestamp("2026-04-15T12:00:00"))
+    }
+
+    @Test fun returnsZeroForUnknownNamedTimezone() {
+        // Garbage TZ abbreviation — drop the row rather than guess
+        assertEquals(0L, parseXmltvTimestamp("20260415120000 ABCDE"))
+    }
+
+    @Test fun returnsZeroForOutOfRangeNumericOffset() {
+        // hours > 14 (the IANA cap) — should fail rather than wrap
+        assertEquals(0L, parseXmltvTimestamp("20260415120000 +1500"))
+    }
+
+    @Test fun returnsZeroForMalformedOffset() {
+        // Wrong number of digits
+        assertEquals(0L, parseXmltvTimestamp("20260415120000 +200"))
+        assertEquals(0L, parseXmltvTimestamp("20260415120000 +20000"))
+    }
+
     // --- parseXmltv ---
 
     @Test

@@ -73,26 +73,117 @@ fun parseXmltv(input: ByteArray, logger: Logger = NOOP_LOGGER): XmltvResult = pa
 // XMLTV timestamp parsing — pure string math, no java.time/kotlinx.datetime.
 // -----------------------------------------------------------------------------
 
+// MK.EPG.C — broadened from the strict canonical XMLTV form. The trailing
+// `(?:\.\d+)?` accepts decimal seconds (some generators ship "...000.000
+// +0000"); the offset alternation accepts a numeric `±HHMM`, the literal
+// `Z` (= UTC), or a 1–5-letter named timezone abbreviation. Unrecognised
+// names resolve via [NAMED_TZ_OFFSETS] — the abbreviation set covers the
+// IANA-common UTC, GMT, BST, CET/CEST, EET/EEST, EST/EDT, CST/CDT,
+// MST/MDT, PST/PDT plus the bare `Z` form. Anything else returns 0L
+// (treated as unparseable, programme is silently skipped, same as the
+// pre-fix behaviour for completely invalid input).
 private val TIMESTAMP_REGEX =
-    Regex("""^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-]\d{4})?$""")
+    Regex("""^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\.\d+)?\s*([+-]\d{4}|[A-Za-z]{1,5})?$""")
+
+// MK.EPG.C — ISO 8601 / RFC 3339 fallback. Some XMLTV generators ship
+// `2026-04-15T14:00:00+02:00` instead of the canonical packed form;
+// the providers are non-conforming but their feeds are otherwise valid
+// XMLTV. Allow `T` or space as the date/time separator and an optional
+// colon inside the numeric offset.
+private val ISO8601_REGEX =
+    Regex("""^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2}|[A-Za-z]{1,5})?$""")
+
+// Named timezone abbreviations → numeric `±HHMM` form. Limited to the
+// abbreviations that are unambiguous (e.g. CST is omitted because it
+// could mean Central Standard Time -0600 OR China Standard Time +0800;
+// the worst case for an unknown abbreviation is the row gets dropped,
+// which the existing `daysBack` window will recover from on next refresh).
+private val NAMED_TZ_OFFSETS: Map<String, String> =
+    mapOf(
+        "Z" to "+0000",
+        "UTC" to "+0000",
+        "UT" to "+0000",
+        "GMT" to "+0000",
+        "WET" to "+0000",
+        "WEST" to "+0100",
+        "BST" to "+0100",
+        "CET" to "+0100",
+        "CEST" to "+0200",
+        "EET" to "+0200",
+        "EEST" to "+0300",
+        "EST" to "-0500",
+        "EDT" to "-0400",
+        "CDT" to "-0500",
+        "MST" to "-0700",
+        "MDT" to "-0600",
+        "PST" to "-0800",
+        "PDT" to "-0700",
+        "AKST" to "-0900",
+        "AKDT" to "-0800",
+        "HST" to "-1000",
+    )
 
 /**
- * Parse XMLTV timestamp: "YYYYMMDDHHmmss +HHMM" or "YYYYMMDDHHmmss".
- * Returns Unix seconds, or 0 if unparseable.
+ * Parse XMLTV timestamp into Unix seconds. Returns 0 if unparseable.
+ *
+ * **Accepted forms** (MK.EPG.C — broadened 2026-05-04):
+ *  - `YYYYMMDDHHMMSS` — canonical, treated as UTC
+ *  - `YYYYMMDDHHMMSS +HHMM` / `-HHMM` — canonical with numeric offset
+ *  - `YYYYMMDDHHMMSSZ` — `Z` suffix = UTC
+ *  - `YYYYMMDDHHMMSS UTC` / `GMT` / `BST` / `CEST` / etc. — named TZ
+ *    (see [NAMED_TZ_OFFSETS]); unknown names resolve to 0 (programme
+ *    skipped) rather than guessing
+ *  - `YYYYMMDDHHMMSS.fff +HHMM` — decimal seconds tolerated, dropped
+ *  - ISO 8601 `YYYY-MM-DDTHH:MM:SS+HH:MM` (with `T` or space separator)
+ *
+ * Pre-broadening only the first two forms parsed; everything else
+ * silently returned 0, causing the EPG importer to drop the row. Real-
+ * world IPTV providers ship the wider forms and the user reported
+ * partial-EPG / "grey areas" in the Guide on 2026-05-04 — broadening
+ * here is one of the data-side fixes for that.
  */
 fun parseXmltvTimestamp(ts: String): Long {
     if (ts.isEmpty()) return 0L
     val cleaned = ts.trim()
-    val m = TIMESTAMP_REGEX.matchEntire(cleaned) ?: return 0L
 
-    val year = m.groupValues[1].toInt()
-    val month = m.groupValues[2].toInt()
-    val day = m.groupValues[3].toInt()
-    val hour = m.groupValues[4].toInt()
-    val minute = m.groupValues[5].toInt()
-    val second = m.groupValues[6].toInt()
-    val offset = m.groupValues[7] // "+0200" / "-0500" / ""
+    // Fast path: canonical packed form (the majority of XMLTV feeds).
+    TIMESTAMP_REGEX.matchEntire(cleaned)?.let { m ->
+        return parseTimestampMatch(
+            year = m.groupValues[1].toInt(),
+            month = m.groupValues[2].toInt(),
+            day = m.groupValues[3].toInt(),
+            hour = m.groupValues[4].toInt(),
+            minute = m.groupValues[5].toInt(),
+            second = m.groupValues[6].toInt(),
+            rawOffset = m.groupValues[7],
+        )
+    }
 
+    // Slow path: ISO 8601 (`2026-04-15T14:00:00+02:00`).
+    ISO8601_REGEX.matchEntire(cleaned)?.let { m ->
+        return parseTimestampMatch(
+            year = m.groupValues[1].toInt(),
+            month = m.groupValues[2].toInt(),
+            day = m.groupValues[3].toInt(),
+            hour = m.groupValues[4].toInt(),
+            minute = m.groupValues[5].toInt(),
+            second = m.groupValues[6].toInt(),
+            // Strip the `:` from the offset for downstream uniformity
+            // (`+02:00` → `+0200`).
+            rawOffset = m.groupValues[7].replace(":", ""),
+        )
+    }
+
+    return 0L
+}
+
+/**
+ * Shared back half of [parseXmltvTimestamp] — validates date / time
+ * components and resolves the offset (numeric, `Z`, or named TZ) into
+ * an epoch-second adjustment. Returns 0 if any component is out of
+ * range or the offset cannot be resolved.
+ */
+private fun parseTimestampMatch(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int, rawOffset: String): Long {
     if (month < 1 || month > 12) return 0L
     if (day < 1 || day > 31) return 0L
     if (hour < 0 || hour > 23) return 0L
@@ -100,19 +191,38 @@ fun parseXmltvTimestamp(ts: String): Long {
     if (second < 0 || second > 59) return 0L
     if (day > daysInMonth(year, month)) return 0L
 
-    // Epoch seconds from civil date (Howard Hinnant's algorithm).
+    val offsetSeconds = resolveOffset(rawOffset) ?: return 0L
+
     val epochDays = civilToDays(year, month, day)
-    var epochSeconds = epochDays * 86_400L + hour * 3600L + minute * 60L + second.toLong()
-
-    if (offset.isNotEmpty()) {
-        val sign = if (offset[0] == '-') -1 else 1
-        val offHours = offset.substring(1, 3).toInt()
-        val offMinutes = offset.substring(3, 5).toInt()
-        val offsetSeconds = sign * (offHours * 3600L + offMinutes * 60L)
-        epochSeconds -= offsetSeconds
-    }
-
+    val epochSeconds = epochDays * 86_400L + hour * 3600L + minute * 60L + second.toLong() - offsetSeconds
     return epochSeconds
+}
+
+/**
+ * Convert an XMLTV timezone token (numeric offset, `Z`, or a named
+ * abbreviation) into an epoch-second offset to subtract from the local
+ * clock reading. Returns null when the named abbreviation isn't in
+ * [NAMED_TZ_OFFSETS] — the caller treats that as unparseable so the
+ * row is dropped rather than getting an off-by-hours timestamp.
+ *
+ * Empty string is the documented "naked timestamp = UTC" case → 0.
+ */
+private fun resolveOffset(raw: String): Long? {
+    if (raw.isEmpty()) return 0L
+    val first = raw[0]
+    if (first == '+' || first == '-') {
+        // Numeric "±HHMM"
+        if (raw.length != 5) return null
+        val sign = if (first == '-') -1 else 1
+        val hh = raw.substring(1, 3).toIntOrNull() ?: return null
+        val mm = raw.substring(3, 5).toIntOrNull() ?: return null
+        if (hh < 0 || hh > 14 || mm < 0 || mm > 59) return null
+        return sign * (hh * 3600L + mm * 60L)
+    }
+    // Named — recurse through the lookup table to reuse the numeric
+    // resolver (so we get the same range validation).
+    val mapped = NAMED_TZ_OFFSETS[raw.uppercase()] ?: return null
+    return resolveOffset(mapped)
 }
 
 private fun isLeap(y: Int): Boolean = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
