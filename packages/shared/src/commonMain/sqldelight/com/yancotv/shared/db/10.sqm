@@ -1,0 +1,25 @@
+-- v10 → v11 (MK.EPG.D): composite (type, tvg_id) index on `content`.
+--
+-- Every Guide query filters `type = 'live'` then either matches or
+-- groups on `tvg_id`:
+--   * guideChannelsAll/BySource/ByGroupPaged + count* counterparts —
+--     `WHERE type='live' AND tvg_id IS NOT NULL ... GROUP BY tvg_id`
+--   * selectLiveByTvgId — `WHERE type='live' AND tvg_id = ?` (catchup
+--     resolution, hit on every catchup-launch click)
+--   * distinctLiveTvgIds — feeds the EPG importer's keep-set; runs
+--     before every periodic `EpgSyncWorker` tick (every 6h)
+--   * distinctGuideGroups — chip strip on the Guide screen
+--
+-- With only `idx_content_type` the planner seeks to the `live` block
+-- and then scans the full live row set per query. On a typical IPTV
+-- catalog (5–20k live channels) every channel-list page does ~15k row
+-- reads before the EXISTS subquery on `epg_programmes` runs. The
+-- composite turns the `type='live' AND tvg_id ...` filter into a
+-- direct seek and lets `GROUP BY c.tvg_id` consume rows in index
+-- order — eliminating a sort step too.
+--
+-- Pure additive: no constraint or column changes, so existing rows
+-- pick the index up on the next write/read without re-encoding.
+-- Build cost is one-shot and proportional to live row count (a few
+-- ms on a v9 DB with 20k channels).
+CREATE INDEX idx_content_type_tvg ON content(type, tvg_id);

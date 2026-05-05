@@ -193,6 +193,61 @@ class MigrationTest {
         assertEquals(true, auto.auto_sync_on_start)
     }
 
+    /**
+     * MK.EPG.D — v10 → v11 dedicated migration test.
+     *
+     * `10.sqm` adds the composite `idx_content_type_tvg` covering
+     * `(type, tvg_id)` to accelerate Guide queries. Pure additive — no
+     * column changes, no constraint changes — so the meaningful
+     * assertion is "index exists post-migration with the right shape".
+     *
+     * A regression here looks like a 100×–1000× slow-down on Guide
+     * channel-list queries (the planner falls back to `idx_content_type`
+     * + linear scan), not a crash; this test pins the index presence so
+     * a future migration tweak doesn't silently drop it.
+     */
+    @Test fun migrationV10ToV11CreatesContentTypeTvgIndex() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
+
+        // Build a minimal v10 `content` table. 10.sqm only adds an index
+        // on `content(type, tvg_id)` — neither column was added in any
+        // prior migration (both are genesis), so the v10 table just needs
+        // the columns from genesis + 2.sqm (overrides).
+        v10ContentSchema().forEach { driver.execute(null, it, 0) }
+        driver.execute(null, "PRAGMA user_version = 10;", 0)
+
+        // Seed: confirm pre-existing rows survive the index build (an
+        // index over NULL tvg_ids is fine — SQLite indexes NULLs).
+        driver.execute(null, SEED_CONTENT_V10_LIVE, 0)
+        driver.execute(null, SEED_CONTENT_V10_NULL_TVG, 0)
+
+        // Index must NOT exist before the migration runs.
+        val indexBefore = countIndex(driver, "idx_content_type_tvg")
+        assertEquals(0L, indexBefore, "Pre-migration v10 fixture must not have the new index — sanity check the harness")
+
+        YancoDb.Schema.migrate(driver, oldVersion = 10, newVersion = 11)
+
+        // Index present in sqlite_master post-migration.
+        val indexAfter = countIndex(driver, "idx_content_type_tvg")
+        assertEquals(1L, indexAfter, "10.sqm must create idx_content_type_tvg")
+
+        // Verify the index columns are (type, tvg_id) in that order — a
+        // future tweak swapping the column order would silently undo the
+        // performance win for prefix-only `WHERE type='live'` seeks.
+        val cols = indexColumns(driver, "idx_content_type_tvg")
+        assertEquals(listOf("type", "tvg_id"), cols, "Index must cover (type, tvg_id) in that order — column order matters for partial-key seeks")
+
+        // Both seeded rows still readable via the v11-shape query API.
+        val db = YancoDb(driver)
+        val live = db.contentQueries.selectById("ch-v10-live").executeAsOneOrNull()
+        assertNotNull(live, "Pre-migration row with tvg_id must survive the index build")
+        assertEquals("live.tvg", live.tvg_id)
+        val nullTvg = db.contentQueries.selectById("ch-v10-null").executeAsOneOrNull()
+        assertNotNull(nullTvg, "Pre-migration row with NULL tvg_id must survive — SQLite indexes NULLs without complaint")
+        assertNull(nullTvg.tvg_id)
+    }
+
     // ───── MK.24.G.1 / MB-227 — per-hop isolation for 3.sqm … 7.sqm ─────
     //
     // `Stage2MigrationTest` exercises v3 → current as a single bundle.
@@ -531,6 +586,97 @@ class MigrationTest {
     }
 
     private companion object {
+        /**
+         * Counts entries in `sqlite_master` matching a named index. Returns
+         * 0 if the index is absent, 1 if present. Used by the v10 → v11
+         * test to assert index creation.
+         */
+        fun countIndex(driver: app.cash.sqldelight.db.SqlDriver, indexName: String): Long = driver
+            .executeQuery(null, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '$indexName'", { cursor ->
+                cursor.next()
+                app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0) ?: 0L)
+            }, 0)
+            .value
+
+        /**
+         * Returns the column names covered by a SQLite index in their
+         * declared order. Uses `PRAGMA index_info` rather than parsing
+         * the CREATE INDEX SQL so a future-tweaked migration (e.g. a
+         * subsequent `.sqm` that drops + recreates the same name with a
+         * different column order) is still caught.
+         */
+        fun indexColumns(driver: app.cash.sqldelight.db.SqlDriver, indexName: String): List<String> = driver
+            .executeQuery(null, "PRAGMA index_info('$indexName')", { cursor ->
+                val out = mutableListOf<Pair<Long, String>>()
+                while (cursor.next().value) {
+                    // Columns: seqno (0), cid (1), name (2)
+                    val seq = cursor.getLong(0) ?: 0L
+                    val name = cursor.getString(2) ?: ""
+                    out += seq to name
+                }
+                app.cash.sqldelight.db.QueryResult.Value(out.sortedBy { it.first }.map { it.second })
+            }, 0)
+            .value
+
+        /**
+         * Hand-crafted v10 `content` schema for the v10 → v11 (10.sqm)
+         * test. Includes every column present at v10 (genesis + 2.sqm
+         * overrides) with all v10-shipped indexes — but NOT the new
+         * `idx_content_type_tvg` (which 10.sqm creates).
+         *
+         * 10.sqm only touches `content` — no need to stand up `sources`
+         * or other tables here.
+         */
+        fun v10ContentSchema(): List<String> = listOf(
+            """
+                CREATE TABLE content (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    source_id TEXT NOT NULL,
+                    type TEXT NOT NULL CHECK(type IN ('live', 'movie', 'series')),
+                    title TEXT NOT NULL,
+                    clean_title TEXT,
+                    group_name TEXT,
+                    stream_url TEXT NOT NULL,
+                    logo_url TEXT,
+                    tvg_id TEXT,
+                    metadata_json TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    name_override TEXT,
+                    logo_override TEXT
+                );
+            """.trimIndent(),
+            "CREATE INDEX idx_content_source ON content(source_id);",
+            "CREATE INDEX idx_content_type ON content(type);",
+            "CREATE INDEX idx_content_group ON content(group_name);",
+            "CREATE INDEX idx_content_clean_title ON content(clean_title);",
+            "CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);",
+        )
+
+        const val SEED_CONTENT_V10_LIVE = """
+            INSERT INTO content (
+                id, source_id, type, title, clean_title, group_name,
+                stream_url, logo_url, tvg_id, metadata_json,
+                sort_order, created_at, name_override, logo_override
+            ) VALUES (
+                'ch-v10-live', 'src-v10', 'live', 'Live channel', 'live channel', 'News',
+                'https://example.com/live.ts', NULL, 'live.tvg', NULL,
+                0, 1700000000000, NULL, NULL
+            );
+        """
+
+        const val SEED_CONTENT_V10_NULL_TVG = """
+            INSERT INTO content (
+                id, source_id, type, title, clean_title, group_name,
+                stream_url, logo_url, tvg_id, metadata_json,
+                sort_order, created_at, name_override, logo_override
+            ) VALUES (
+                'ch-v10-null', 'src-v10', 'movie', 'A Movie', 'a movie', 'Films',
+                'https://example.com/movie.mp4', NULL, NULL, NULL,
+                1, 1700000000001, NULL, NULL
+            );
+        """
+
         /**
          * Hand-crafted v2 schema: tables we need to exercise the migration.
          * The `content` table deliberately omits `name_override` and

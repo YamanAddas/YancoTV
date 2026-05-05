@@ -30,6 +30,17 @@ CREATE INDEX idx_content_type ON content(type);
 CREATE INDEX idx_content_group ON content(group_name);
 CREATE INDEX idx_content_clean_title ON content(clean_title);
 CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);
+-- MK.EPG.D — composite (type, tvg_id) for Guide queries. Every Guide
+-- channel-list query (`guideChannelsAll/BySource/ByGroupPaged`,
+-- `selectLiveByTvgId`, `distinctLiveTvgIds`, `distinctGuideGroups`)
+-- filters `type = 'live'` then probes/groups on `tvg_id`. With only
+-- `idx_content_type` the planner seeks to the live block then scans
+-- the full live row set per query — that's the entire live catalog
+-- (5–20k rows on typical IPTV providers). The composite turns the
+-- type+tvg_id filter into a single index seek and lets `GROUP BY
+-- c.tvg_id` consume rows in index order, eliminating a sort step.
+-- Migration in 10.sqm picks it up for existing DBs.
+CREATE INDEX idx_content_type_tvg ON content(type, tvg_id);
 
 -- unicode61 + remove_diacritics lets non-Latin titles (Arabic, Cyrillic,
 -- accented Latin) match without requiring the user to type diacritics.
