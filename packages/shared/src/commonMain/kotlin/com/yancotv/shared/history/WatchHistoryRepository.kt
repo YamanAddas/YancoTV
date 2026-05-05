@@ -110,6 +110,21 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
     }
 
     /**
+     * Resume position (seconds) for an episode's own row, keyed by
+     * `episode_id`. Returns null if the user has never opened this episode
+     * or the prior session never reached the persistResumePoint threshold.
+     *
+     * This is the EPISODE counterpart to [positionFor] — they intentionally
+     * use different lookups so a series-container open can't accidentally
+     * seek to an arbitrary episode's offset (and vice versa: an episode
+     * open can't pull the parent series' content-level row, which would
+     * be junk).
+     */
+    fun positionForEpisode(episodeId: String): Long? {
+        return db.watchHistoryQueries.selectByEpisode(episodeId).executeAsOneOrNull()?.position_seconds
+    }
+
+    /**
      * Most recently watched episode-level row for a series, or null if
      * the user has never watched any episode of [contentId]. Used by the
      * series detail page to label the Play button as "Resume SxEy"

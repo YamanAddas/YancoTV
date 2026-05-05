@@ -789,10 +789,23 @@ class PlaybackController(
         // wiring the media item on main. If the user zapped again while
         // we were awaiting the IO read, drop this result — a newer
         // loadCurrent will have kicked off a fresh lookup for the new item.
+        //
+        // Branch on episode-vs-content: an episode's own resume row is
+        // keyed by `episode_id` (not `content_id`), and `positionFor` is
+        // intentionally guarded to return only content-level rows. Without
+        // this branch, episodes always started from 0 even when the user
+        // had stopped mid-episode the prior session.
+        val episode = _currentEpisode.value
         scope.launch {
             val resumeMs =
                 withContext(Dispatchers.IO) {
-                    (repo.positionFor(item.id) ?: 0L) * 1000L
+                    val seconds =
+                        if (episode != null) {
+                            repo.positionForEpisode(episode.id)
+                        } else {
+                            repo.positionFor(item.id)
+                        }
+                    (seconds ?: 0L) * 1000L
                 }
             if (_currentItem.value?.id != item.id) return@launch
             if (resumeMs > 0) player.setMediaItem(mediaItem, resumeMs) else player.setMediaItem(mediaItem)

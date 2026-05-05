@@ -16,6 +16,9 @@ SELECT * FROM watch_history ORDER BY watched_at DESC LIMIT ?;
 selectByContent:
 SELECT * FROM watch_history WHERE content_id = ? ORDER BY watched_at DESC;
 
+selectByEpisode:
+SELECT * FROM watch_history WHERE episode_id = ? ORDER BY watched_at DESC LIMIT 1;
+
 upsert:
 INSERT OR REPLACE INTO watch_history (id, content_id, episode_id, position_seconds, duration_seconds, watched_at)
 VALUES (?, ?, ?, ?, ?, ?);
