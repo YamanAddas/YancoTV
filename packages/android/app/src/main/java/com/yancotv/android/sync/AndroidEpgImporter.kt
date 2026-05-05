@@ -114,9 +114,9 @@ class AndroidEpgImporter(
                 return@withContext EpgRefreshResult(ok = true, programmeCount = 0, channelCount = 0)
             }
 
-            val knownTvgIds = loadKnownTvgIds()
+            val canonicalById = loadCanonicalTvgIdMap()
             logger.info(
-                "EPG stream: user has ${knownTvgIds.size} live channels with tvg_id; EPG rows for unknown channels will be filtered out",
+                "EPG stream: user has ${canonicalById.size} live channels with tvg_id (case+whitespace normalised); EPG rows for unknown channels will be filtered out",
             )
 
             // Sweep stale temp files from process-killed prior runs. Only
@@ -168,7 +168,7 @@ class AndroidEpgImporter(
                                 sourceKey = df.target.sourceKey,
                                 sourceIdForDb = if (df.target.sourceKey == GLOBAL) null else df.target.sourceKey,
                                 file = df.file,
-                                knownTvgIds = knownTvgIds,
+                                canonicalById = canonicalById,
                                 onProgress = onProgress,
                             )
                             val written = session.rowsWritten - beforeRows
@@ -259,7 +259,7 @@ class AndroidEpgImporter(
         sourceKey: String,
         sourceIdForDb: String?,
         file: File,
-        knownTvgIds: Set<String>,
+        canonicalById: Map<String, String>,
         onProgress: Progress,
     ) {
         openMaybeGzipped(file).use { raw ->
@@ -272,23 +272,48 @@ class AndroidEpgImporter(
             val buffer = ArrayList<XmltvProgramme>(FLUSH_EVERY)
             var eventType = parser.eventType
             var seen = 0
-            var kept = 0
+            var keptExact = 0
+            var keptNormalised = 0
             var lastTick = System.currentTimeMillis()
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 if (eventType == XmlPullParser.START_TAG && parser.name == "programme") {
                     seen++
                     val prog = readProgramme(parser)
-                    if (prog != null && (knownTvgIds.isEmpty() || prog.channelId in knownTvgIds)) {
-                        buffer.add(prog)
-                        kept++
+                    val accepted: XmltvProgramme? =
+                        when {
+                            prog == null -> null
+                            // No filter (empty user catalog) — keep everything.
+                            canonicalById.isEmpty() -> prog
+                            else -> {
+                                val canonical = canonicalById[prog.channelId.trim().lowercase()]
+                                when {
+                                    canonical == null -> null
+                                    canonical == prog.channelId -> {
+                                        keptExact++
+                                        prog
+                                    }
+                                    else -> {
+                                        // Re-write to the user's canonical
+                                        // case so downstream queries that
+                                        // join `epg_programmes.channel_tvg_id`
+                                        // against `content.tvg_id` match.
+                                        keptNormalised++
+                                        prog.copy(channelId = canonical)
+                                    }
+                                }
+                            }
+                        }
+                    if (accepted != null) {
+                        buffer.add(accepted)
                         if (buffer.size >= FLUSH_EVERY) {
                             session.writeBatch(sourceKey, sourceIdForDb, buffer)
                             buffer.clear()
                             val now = System.currentTimeMillis()
                             if (now - lastTick >= PROGRESS_TICK_MS) {
                                 lastTick = now
-                                onProgress.report("Writing… $kept kept / $seen scanned")
+                                val totalKept = keptExact + keptNormalised
+                                onProgress.report("Writing… $totalKept kept / $seen scanned")
                             }
                         }
                     }
@@ -299,7 +324,10 @@ class AndroidEpgImporter(
                 session.writeBatch(sourceKey, sourceIdForDb, buffer)
                 buffer.clear()
             }
-            logger.info("EPG parser: scanned $seen programmes, kept $kept after tvg_id filter")
+            val totalKept = keptExact + keptNormalised
+            logger.info(
+                "EPG parser: scanned $seen, kept $totalKept ($keptExact exact + $keptNormalised normalised), dropped ${seen - totalKept}",
+            )
         }
     }
 
@@ -453,10 +481,37 @@ class AndroidEpgImporter(
         return out
     }
 
-    private fun loadKnownTvgIds(): Set<String> = db.contentQueries
-        .distinctLiveTvgIds()
-        .executeAsList()
-        .toHashSet()
+    /**
+     * MK.EPG.C.2 (2026-05-05) — map from normalized form
+     * (`trim().lowercase()`) → the user's canonical `tvg_id` casing.
+     *
+     * Real-world IPTV providers ship XMLTV with `<channel id="CNN.us">`
+     * while the same provider's M3U ships `tvg-id="cnn.us"` (or vice
+     * versa, or with trailing whitespace). The pre-fix exact-match
+     * filter dropped every such programme silently — the channel then
+     * appeared with empty EPG (or didn't appear in the Guide at all
+     * thanks to the `EXISTS` clause on `epg_programmes`). With this
+     * map the importer accepts case- and whitespace-mismatched ids
+     * and re-writes the programme with the canonical id so downstream
+     * queries (which join `epg_programmes.channel_tvg_id` against
+     * `content.tvg_id`) still match.
+     *
+     * Empty / null / duplicate-after-normalize ids: first canonical
+     * form wins. There shouldn't be intra-catalog collisions in
+     * practice (a provider doesn't ship two channels with `cnn.us`
+     * and `CNN.us`); if they ever do, the first one keeps its EPG.
+     */
+    private fun loadCanonicalTvgIdMap(): Map<String, String> {
+        val ids = db.contentQueries.distinctLiveTvgIds().executeAsList()
+        val map = HashMap<String, String>(ids.size)
+        for (id in ids) {
+            val key = id.trim().lowercase()
+            if (key.isNotEmpty()) {
+                map.putIfAbsent(key, id)
+            }
+        }
+        return map
+    }
 
     private fun recordError(msg: String?) {
         if (msg.isNullOrBlank()) {
