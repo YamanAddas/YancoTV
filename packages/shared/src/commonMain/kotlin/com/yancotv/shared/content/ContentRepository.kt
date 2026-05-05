@@ -174,6 +174,32 @@ class ContentRepository(private val db: YancoDb) {
             duration = row.duration?.toString(),
         )
     }
+
+    /**
+     * Episode immediately after [currentEpisodeId] within the same series,
+     * ordered by `(season_number, episode_number)`. Returns null when the
+     * current episode is the last one cached locally, or when the episode
+     * id can't be located in the series' list (stale id, sync drift).
+     *
+     * Backs the autoplay-next-episode flow: when an episode hits
+     * STATE_ENDED and the user has the autoplay pref on, PlayerActivity
+     * resolves the next episode here and hands it off to
+     * `PlaybackController.play(Playable.Episode)` for seamless playback.
+     */
+    fun nextEpisodeAfter(seriesId: String, currentEpisodeId: String): EpisodeInfo? {
+        val rows = db.episodesQueries.selectByContent(seriesId).executeAsList()
+        val idx = rows.indexOfFirst { it.id == currentEpisodeId }
+        if (idx < 0 || idx >= rows.size - 1) return null
+        val next = rows[idx + 1]
+        return EpisodeInfo(
+            id = next.id,
+            seasonNumber = next.season_number?.toInt() ?: 0,
+            episodeNumber = next.episode_number?.toInt() ?: 0,
+            title = next.title.orEmpty(),
+            streamUrl = next.stream_url,
+            duration = next.duration?.toString(),
+        )
+    }
 }
 
 private fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(

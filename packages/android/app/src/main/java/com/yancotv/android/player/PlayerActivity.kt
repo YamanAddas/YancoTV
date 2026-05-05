@@ -45,6 +45,7 @@ import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.shared.epg.EpgRepository
+import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgProgramme
@@ -100,6 +101,11 @@ class PlayerActivity : AppCompatActivity() {
     private val prefs: AppPreferences by inject()
     private val recordings: com.yancotv.shared.recording.RecordingsRepository by inject()
     private val favoritesRepo: com.yancotv.shared.favorites.FavoritesRepository by inject()
+    private val contentRepo: com.yancotv.shared.content.ContentRepository by inject()
+    // Guard against re-entering autoplay during the small STATE_ENDED → next
+    // episode prepare window where ExoPlayer can fire ENDED a second time.
+    // Reset whenever a new MediaItem starts (STATE_READY).
+    private var autoplayInFlight: Boolean = false
 
     // MK.10.4 — numeric channel-jump state. Activity-scoped (a fresh
     // PlayerActivity gets a fresh entry buffer); not Koin since nothing
@@ -241,6 +247,10 @@ class PlayerActivity : AppCompatActivity() {
                         hasBeenReady = true
                         bufferingShowJob?.cancel()
                         bufferingShowJob = null
+                        // A new MediaItem reaching READY clears any prior
+                        // autoplay-in-flight guard so the next end-of-episode
+                        // can fire the autoplay flow again.
+                        autoplayInFlight = false
                         // Any non-error overlay clears on READY; the error
                         // state has its own retry flow and shouldn't auto-
                         // clear until the retry fires and we actually hit
@@ -263,6 +273,7 @@ class PlayerActivity : AppCompatActivity() {
                     Player.STATE_IDLE, Player.STATE_ENDED -> {
                         bufferingShowJob?.cancel()
                         bufferingShowJob = null
+                        if (state == Player.STATE_ENDED) tryAutoplayNextEpisode()
                     }
                 }
             }
@@ -1207,6 +1218,48 @@ class PlayerActivity : AppCompatActivity() {
         v.visibility = View.VISIBLE
         playerView.hideController()
         v.post { v.requestFocus() }
+    }
+
+    /**
+     * Autoplay the next episode in the current series when STATE_ENDED
+     * fires, gated by the user's `autoPlayNext` pref. No-ops in the
+     * common cases that aren't series playback (movies, live TV, no
+     * current episode) so it's safe to call unconditionally from the
+     * STATE_ENDED branch.
+     *
+     * The DB lookup runs on `Dispatchers.IO`; the `controller.play`
+     * dispatch is back on main since [PlaybackController] is
+     * main-thread-only. [autoplayInFlight] guards against ExoPlayer
+     * occasionally double-firing STATE_ENDED while the next prepare
+     * is in progress; resets on STATE_READY of the new MediaItem.
+     */
+    private fun tryAutoplayNextEpisode() {
+        if (autoplayInFlight) return
+        val episode = controller.currentEpisode.value ?: return
+        if (!prefs.playbackFlow.value.autoPlayNext) return
+        autoplayInFlight = true
+        lifecycleScope.launch {
+            val nextPlayable =
+                withContext(Dispatchers.IO) {
+                    val nextInfo =
+                        contentRepo.nextEpisodeAfter(
+                            seriesId = episode.seriesId,
+                            currentEpisodeId = episode.id,
+                        )
+                    val series = contentRepo.findById(episode.seriesId)
+                    if (nextInfo == null || series == null) return@withContext null
+                    nextInfo.toPlayable(series)
+                }
+            if (nextPlayable == null) {
+                // End of series, episode missing locally, or series row
+                // gone. Drop the guard so a future ENDED can retry.
+                autoplayInFlight = false
+                Log.i(TAG, "autoplay: no next episode for series=${episode.seriesId}")
+                return@launch
+            }
+            Log.i(TAG, "autoplay: advancing to next episode=${nextPlayable.id}")
+            controller.play(nextPlayable)
+        }
     }
 
     /**
