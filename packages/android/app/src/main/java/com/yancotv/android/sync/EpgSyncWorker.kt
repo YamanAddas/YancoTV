@@ -11,6 +11,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.shared.epg.EpgRepository
 import java.util.concurrent.TimeUnit
 import org.koin.core.component.KoinComponent
@@ -38,6 +40,7 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
     KoinComponent {
     private val epg: EpgRepository by inject()
     private val importer: AndroidEpgImporter by inject()
+    private val prefs: AppPreferences by inject()
 
     override suspend fun doWork(): Result = try {
         // Stream-based importer keeps peak memory bounded — the shared
@@ -49,7 +52,14 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
                 setProgress(workDataOf(KEY_PROGRESS to msg))
             }
         if (result.ok) {
-            val cutoff = (System.currentTimeMillis() / 1000L) - STALE_WINDOW_SECONDS
+            // MK.EPG.E — stale cutoff honours `EpgPrefs.daysBack` instead
+            // of the old 24h hardcoded window. Pre-fix, a user with
+            // daysBack=7 saw growing "grey areas" in the Guide because
+            // every 6h periodic refresh deleted programmes the screen
+            // was still supposed to show. See
+            // [computeStaleCutoffSeconds] for the keep-window contract.
+            val daysBack = prefs.epgFlow.value.daysBack
+            val cutoff = computeStaleCutoffSeconds(System.currentTimeMillis(), daysBack)
             runCatching { epg.deleteStale(cutoff) }
             Result.success()
         } else if (runAttemptCount < MAX_RETRIES) {
@@ -73,9 +83,37 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
         private const val UNIQUE_ONESHOT = "epg-sync-oneshot"
         private const val PERIODIC_HOURS = 6L
 
-        // 24 hours of history kept on-device so Guide can show "just finished"
-        // programmes; anything older is dead weight.
-        private const val STALE_WINDOW_SECONDS = 24L * 60L * 60L
+        /**
+         * Computes the Unix-seconds cutoff fed to [EpgRepository.deleteStale].
+         * Programmes whose `end_time < cutoff` are deleted; everything
+         * `>=` is kept.
+         *
+         * Keep-window contract:
+         *   * Always keep at least [EpgPrefs.CATCHUP_BASELINE_HOURS]
+         *     of recent history so a fresh install (daysBack=0) still
+         *     surfaces "the show that just ended."
+         *   * If [daysBack] > 0, keep at least daysBack-worth — the
+         *     user's pref is the floor, never overruled by the sweep.
+         *   * Plus a 1-day safety margin so a programme whose
+         *     end_time straddles the cutoff while it's still painted
+         *     in the Guide isn't yanked mid-render.
+         *
+         * Pure function: [nowMillis] is the only system-clock
+         * dependency, so unit tests can pin behaviour without time
+         * mocking. `daysBack` is clamped at 0 (caller passes the
+         * pref directly; defensive in case a future refactor adjusts
+         * the slider's lower bound).
+         */
+        fun computeStaleCutoffSeconds(nowMillis: Long, daysBack: Int): Long {
+            val baselineSeconds = EpgPrefs.CATCHUP_BASELINE_HOURS.toLong() * 3_600L
+            val daysBackSeconds = daysBack.coerceAtLeast(0).toLong() * 86_400L
+            val keepSeconds = maxOf(daysBackSeconds, baselineSeconds) + SAFETY_MARGIN_SECONDS
+            return (nowMillis / 1_000L) - keepSeconds
+        }
+
+        // 1-day cushion on top of the user's daysBack window — see
+        // [computeStaleCutoffSeconds] doc.
+        private const val SAFETY_MARGIN_SECONDS = 86_400L
 
         fun schedulePeriodic(context: Context) {
             val constraints =
