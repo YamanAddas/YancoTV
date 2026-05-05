@@ -65,6 +65,26 @@ LEFT JOIN sources s ON s.id = p.source_id
 WHERE p.channel_tvg_id = ? AND p.end_time > ? AND p.start_time < ?
 ORDER BY COALESCE(s.epg_priority, 0) DESC, p.start_time;
 
+-- MK.EPG.F — batched programme fetch for the Guide grid. The per-channel
+-- `forChannelRange` is fine for one-off lookups (now/next, catchup) but
+-- `EpgRepository.getGuideData` previously called it once per channel in
+-- a 100-row page → 101 queries per Guide page. Replacing that loop with
+-- a single `IN ?` query lets the planner do one index seek per channel
+-- using `idx_epg_channel_end_start` and lets Kotlin do the grouping
+-- in O(N) over the result list.
+--
+-- Order matches `forChannelRange` per channel — channel_tvg_id first
+-- so the result is already in groupBy-friendly runs, then priority
+-- DESC then start_time ASC inside each channel (so high-priority
+-- source rows come first when MK.15.7 multi-EPG is configured).
+-- Caller must chunk to stay under SQLITE_MAX_VARIABLE_NUMBER (999);
+-- `EpgRepository.GUIDE_FETCH_CHUNK` enforces 500.
+forChannelsRange:
+SELECT p.* FROM epg_programmes p
+LEFT JOIN sources s ON s.id = p.source_id
+WHERE p.channel_tvg_id IN ? AND p.end_time > ? AND p.start_time < ?
+ORDER BY p.channel_tvg_id, COALESCE(s.epg_priority, 0) DESC, p.start_time;
+
 insert:
 INSERT INTO epg_programmes (id, source_id, channel_tvg_id, title, description, start_time, end_time, category, icon_url)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);

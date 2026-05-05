@@ -160,17 +160,40 @@ class EpgRepository(
             return EpgGuideData(channels = emptyList(), startTime = startTime, endTime = endTime)
         }
 
-        // Fetch programmes per channel. Same reasoning as getNowNextBatch: the
-        // (channel_tvg_id, end_time, start_time) index makes each query fast,
-        // and per-channel fetching keeps the mapping trivial.
+        // MK.EPG.F — batched programme fetch. Was 101 queries per page
+        // (one channel-list query + one `forChannelRange` per channel);
+        // now one channel-list query + ⌈N/CHUNK⌉ `forChannelsRange` calls
+        // (CHUNK=500 stays under SQLite's 999-variable limit). At the
+        // default 100-channel page that's two queries total. The planner
+        // does one index seek per IN-list element using
+        // `idx_epg_channel_end_start`, and Kotlin groups the rows by
+        // tvg_id in one O(N) pass over the result.
+        // Mirror the original loop's `tvgId ?: continue` — null tvg_ids
+        // are skipped. Empty strings are already filtered upstream by
+        // every guideChannels* query (`tvg_id IS NOT NULL AND tvg_id !=
+        // ''`), so we don't need a redundant guard here.
+        val tvgIds = channels.mapNotNull { it.tvgId }
+        val programmesByTvgId: Map<String, List<EpgProgramme>> =
+            if (tvgIds.isEmpty()) {
+                emptyMap()
+            } else {
+                val grouped = LinkedHashMap<String, MutableList<EpgProgramme>>(tvgIds.size)
+                tvgIds.chunked(GUIDE_FETCH_CHUNK).forEach { chunk ->
+                    db.epgProgrammesQueries
+                        .forChannelsRange(chunk, startTime, endTime)
+                        .executeAsList()
+                        .forEach { row ->
+                            val list = grouped.getOrPut(row.channel_tvg_id) { mutableListOf() }
+                            list.add(row.toDomain())
+                        }
+                }
+                grouped
+            }
+
         val result = ArrayList<EpgGuideChannel>(channels.size)
         for (ch in channels) {
             val tvgId = ch.tvgId ?: continue
-            val progs =
-                db.epgProgrammesQueries
-                    .forChannelRange(tvgId, startTime, endTime)
-                    .executeAsList()
-                    .map { it.toDomain() }
+            val progs = programmesByTvgId[tvgId] ?: emptyList()
             result.add(
                 EpgGuideChannel(
                     tvgId = tvgId,
@@ -417,6 +440,14 @@ class EpgRepository(
         // 500MB compressed ceiling, same as desktop. Anything bigger is almost
         // certainly a misconfigured URL returning an HTML error page.
         private const val MAX_EPG_BYTES: Long = 500L * 1024 * 1024
+
+        // MK.EPG.F — chunk size for the batched `forChannelsRange` IN-list
+        // query. SQLite's default `SQLITE_MAX_VARIABLE_NUMBER` is 999;
+        // 500 leaves headroom for the two extra positional params
+        // (start_time, end_time) and for any future driver compiled with
+        // a tighter limit. The default Guide page is 100 channels, so
+        // chunking only kicks in when a future caller raises the page.
+        private const val GUIDE_FETCH_CHUNK: Int = 500
 
         const val GLOBAL_URL_KEY: String = "epg_global_url"
         const val LAST_REFRESHED_KEY: String = "epg_last_refreshed"

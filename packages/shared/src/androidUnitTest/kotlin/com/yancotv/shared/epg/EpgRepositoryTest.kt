@@ -408,6 +408,118 @@ class EpgRepositoryTest {
         assertEquals("Solo show", repo.getNowProgramme("cnn.us")?.title)
     }
 
+    /**
+     * MK.EPG.F — batched programme fetch. The pre-fix `getGuideData`
+     * issued one `forChannelRange` per channel inside a 100-channel
+     * page → 101 queries per page; the user's 4022-channel install
+     * paid that on every guide load + every horizontal page step.
+     *
+     * These tests pin the new contract without locking the
+     * implementation to a specific number of queries (a future
+     * planner-driven refactor that goes back to per-channel for some
+     * reason should still pass):
+     *
+     *   - Each channel still gets its own programmes (no cross-channel
+     *     bleed from the IN-list).
+     *   - Programmes within a channel are ordered priority DESC then
+     *     start_time ASC, matching the per-channel `forChannelRange`
+     *     contract that `getProgrammesForChannel` pins above.
+     *   - Channels with no in-window programmes still appear in the
+     *     guide with an empty `programmes` list (the channel-list
+     *     query's EXISTS clause already filters those out — this test
+     *     pins it as a load-bearing assumption).
+     */
+    @Test fun `getGuideData groups programmes per channel without cross-bleed`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null)
+
+        // Three channels, each with two programmes — the batched IN-list
+        // would silently cross-bleed if the SQL or grouping mishandled
+        // channel_tvg_id.
+        val now = 1_700_000_000L
+        insertContent(db, "ch-1", "src-A", "alpha.tv", "Alpha")
+        insertContent(db, "ch-2", "src-A", "beta.tv", "Beta")
+        insertContent(db, "ch-3", "src-A", "gamma.tv", "Gamma")
+        insertProgramme(db, "alpha.tv", now - 1800, now - 600, "src-A")
+        insertProgramme(db, "alpha.tv", now - 600, now + 1200, "src-A")
+        insertProgramme(db, "beta.tv", now - 900, now + 100, "src-A")
+        insertProgramme(db, "beta.tv", now + 100, now + 1500, "src-A")
+        insertProgramme(db, "gamma.tv", now - 200, now + 800, "src-A")
+        insertProgramme(db, "gamma.tv", now + 800, now + 2400, "src-A")
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L)
+
+        assertEquals(3, page.channels.size)
+        val byTvg = page.channels.associateBy { it.tvgId }
+        assertEquals(2, byTvg["alpha.tv"]?.programmes?.size)
+        assertEquals(2, byTvg["beta.tv"]?.programmes?.size)
+        assertEquals(2, byTvg["gamma.tv"]?.programmes?.size)
+        // Cross-bleed guard — alpha's programme channelTvgIds must all
+        // be alpha.tv. A regression that grouped wrong (e.g. lost the
+        // grouping key, or returned every row to every channel) would
+        // tip this over.
+        byTvg["alpha.tv"]?.programmes?.forEach {
+            assertEquals("alpha.tv", it.channelTvgId, "alpha programmes must not contain beta/gamma rows")
+        }
+        byTvg["beta.tv"]?.programmes?.forEach {
+            assertEquals("beta.tv", it.channelTvgId)
+        }
+        byTvg["gamma.tv"]?.programmes?.forEach {
+            assertEquals("gamma.tv", it.channelTvgId)
+        }
+        // Within a channel, programmes ordered by start_time. Same
+        // contract as the single-channel `getProgrammesForChannel`
+        // when there's no priority tier conflict.
+        val alphaStarts = byTvg["alpha.tv"]?.programmes?.map { it.startTime }
+        assertEquals(listOf(now - 1800, now - 600), alphaStarts)
+    }
+
+    @Test fun `getGuideData preserves per-channel priority ordering across the batch`() = runTest {
+        // MK.EPG.F regression guard — the batched query has to keep the
+        // same priority-DESC tie-break as `forChannelRange` per channel,
+        // otherwise multi-EPG installs would see a low-priority source's
+        // duplicate programme leak in front of the high-priority one
+        // when they share start_time. Mirrors the single-channel
+        // `getProgrammesForChannel orders priority then start_time` test
+        // but exercises the batched path.
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-low", null, epgPriority = 0L)
+        insertSource(db, "src-high", null, epgPriority = 10L)
+
+        val now = 1_700_000_000L
+        insertContent(db, "ch-cnn", "src-high", "cnn.us", "CNN")
+        insertContent(db, "ch-cnn-low", "src-low", "cnn.us", "CNN backup")
+
+        // Two sources, same channel, overlapping programmes.
+        db.epgProgrammesQueries.upsert(
+            id = "low|${now - 100}|src-low",
+            source_id = "src-low", channel_tvg_id = "cnn.us",
+            title = "Low source", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+        db.epgProgrammesQueries.upsert(
+            id = "high|${now - 100}|src-high",
+            source_id = "src-high", channel_tvg_id = "cnn.us",
+            title = "High source", description = null,
+            start_time = now - 100, end_time = now + 100,
+            category = null, icon_url = null,
+        )
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page = repo.getGuideData(startTime = now - 3600L, endTime = now + 3600L)
+        // GROUP BY c.tvg_id collapses the two content variants to one row.
+        assertEquals(1, page.channels.size)
+        val cnn = page.channels.single()
+        assertEquals("cnn.us", cnn.tvgId)
+        // Both rows present (dedup is a separate fix); high-priority
+        // first per the priority-DESC contract.
+        assertEquals(2, cnn.programmes.size)
+        assertEquals("High source", cnn.programmes[0].title)
+        assertEquals("Low source", cnn.programmes[1].title)
+    }
+
     @Test fun `getProgrammesForChannel orders priority then start_time`() = runTest {
         val (db, driver) = newDbPair()
         insertSource(db, "src-low", null, epgPriority = 0L)
