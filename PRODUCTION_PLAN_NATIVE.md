@@ -1243,6 +1243,168 @@ Updated in [bugs.md](bugs.md):
 
 ---
 
+## MK.25 — Player UX innovation pass — planned 2026-05-04
+
+**Why now.** Two user-reported bugs surfaced the broader gap: pressing RIGHT to skip 10s shows a "Tuning the stream" overlay (terminology lies on VOD; the overlay is for live tuner re-lock), and seeking has no feedback so the user can't tell if a press registered. While investigating, an audit confirmed the player ships with the **dock + chrome scaffolding** but missing every modern streaming-player affordance the user expects from YouTube TV / Netflix / Plex / Prime: no fast-forward modes, no seek flash, no buffered-range visualization, no episode context for series, no resume-from prompt, no autoplay countdown bumper, no skip-intro/credits, no scrub-mode, no preview thumbnails. Some of these are deferred MK.16.player.vod.* slices; most are greenfield.
+
+This milestone consolidates them into a single planning thread so they can ship together, in priority order.
+
+### Companion bug-fix commits (already shipped 2026-05-04, **before** MK.25 starts)
+
+These are NOT MK.25 work — they're the bug-fix predecessors that motivated this plan. Listed here for the fresh chat's context.
+
+| Commit | Fixes |
+|---|---|
+| `584ccca` | Episode resume reads `positionForEpisode` (was always 0). |
+| `51f1e20` | Autoplay-next wired to `STATE_ENDED` + autoplay pref + `nextEpisodeAfter` lookup. |
+| `c6874dd` (earlier) | Sub-panel parent-of navigation + subtitle external-sub state. |
+
+The **autoplay countdown bumper** in this milestone (D.1) builds on `51f1e20`'s plumbing.
+
+### Read-the-file-first gates (CRITICAL)
+
+Before writing code in any slice, open the cited file and confirm the assumption — exactly the discipline that saved Sprint F. Specific gates:
+
+- **A.1** — `PlayerActivity.kt:260–271` (the `STATE_BUFFERING` debounce). Confirm the trigger is content-type-agnostic; my plan-text assumes there's no `isLive` gate. If a gate already exists, A.1 is a non-bug.
+- **A.2** — `PlayerActivity.kt:1842–1887` (RIGHT/LEFT seek branches). Confirm there's no existing flash UI being suppressed by the silent-seek path; if it exists, slice this is "wire it up" not "build it."
+- **B.2** — `VodPlayerDock.kt`. Confirm the dock currently reads `cleanTitle` only; the UI doesn't already have an episode subtitle field that's just hidden. Audit said it doesn't, but verify before designing.
+- **C.1** — Read `PlayerActivity.kt` for **any** existing long-press handling on LEFT/RIGHT (current `dispatchKeyEvent` long-press logic targets CENTER for the player options popup; there may be more). Conflict-check.
+- **C.2** — Confirm DPAD UP isn't already handling chrome show / channel-zap-up. If it is, the scrub-mode entry needs a different key.
+- **D.1** — The position-watcher timing. Confirm whether `Player.Listener` events suffice or if a periodic poll is needed (probably the latter — `onPositionDiscontinuity` only fires on seeks/transitions, not natural progress).
+- **D.2** — User-pref schema. Confirm whether `PlaybackPrefs` has room for skip-intro flags or needs a schema bump.
+
+### Slice scope ground rules
+
+- **One slice per session for C.1, C.2, D.1, D.3.** Highest blast radius (key handling, motion, async UI). Do not chain.
+- **Soft one-slice-per-session for A, B.x, C.4, D.2.** All isolated. Bundling A.1 + A.2 in one session is fine — that's ~45 min.
+- **Each slice ends with `:app:installDebug` green on Fire TV.** Manual smoke per the slice's DoD.
+- **Skip-the-cleverness rule.** Don't introduce a new abstraction layer unless a second consumer materializes. The dock has one consumer (PlayerActivity). Resist building a generic chrome state-machine.
+- **One commit per item where possible.** Bundle only when a single edit touches a single file pair (e.g. ContentRepository + ContentRepositoryTest).
+
+---
+
+### Slice 25.A — Stop the bleeding (closes the user's reported pains)
+
+**Why first.** Two specific complaints from the 2026-05-04 session: (1) "Tuning the stream" on every VOD seek, (2) silent seeks with no visual feedback. A.1 + A.2 ship together as one cohesive UX touch; ~1 commit.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 25.A.1 | **Suppress "Tuning" overlay on seek-induced re-buffers.** Track `lastSeekAtMs` in PlayerActivity; in `onPlaybackStateChanged(STATE_BUFFERING)`, if `now - lastSeekAtMs < 1500ms`, **skip** the debounce-and-show. Real network stalls (no recent seek) still surface the overlay. The 1500ms window is large enough to swallow a typical keyframe re-align (~500ms) plus jitter, small enough that a real stall right after a seek surfaces within an acceptable window. **Red team:** simpler "gate to LIVE only" suppresses real VOD network stalls — rejected. The seek-window approach preserves the genuine-stall feedback. | `PlayerActivity.kt` (set lastSeekAtMs in the LEFT/RIGHT seek branches; check it in the listener) | planned | Manual: VOD seek → no "Tuning" overlay. Pause Wi-Fi mid-VOD playback for >2s → overlay appears as before. |
+| 25.A.2 | **Seek flash overlay.** Transient `+10s` / `-10s` badge on the right/left edge for 600ms after a seek key press. Coalesces multi-press: if RIGHT is pressed 3× within 600ms, badge reads `+30s`, not three sequential `+10s`. Doesn't pull focus, doesn't show the dock — it's a non-blocking overlay. **Red team:** TV remotes spam keys; without coalescing the user sees the badge thrash. State: `seekFlashJob: Job` + `accumulatedSeekMs: Int` reset 600ms after the last press. **Red team #2:** new overlay shouldn't conflict with chrome auto-show; ensure z-order is above dock but below error/buffering chrome. | `PlayerActivity.kt` (compose-state-driven flash; new SeekFlashOverlay composable) | planned | Manual: single press shows `+10`; rapid 3 presses show `+30`; 600ms after last press, fade. No focus pulled. |
+
+**Estimate:** A.1 ~20 min, A.2 ~45 min. **Total ~1.5 h, one commit.**
+
+---
+
+### Slice 25.B — Dock + chrome upgrade (information density)
+
+Make the dock useful so the user has visibility without drilling into the options menu.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 25.B.1 | **Time remaining + ends-at clock.** Dock label: `12:34 / 45:00 — Ends at 21:47`. Compute on the fly from `currentPosition` + `duration` + `System.currentTimeMillis() + (duration - currentPosition)`. Update on the existing per-second tick. | `VodPlayerDock.kt` | planned | VOD shows position / duration / wall-clock end. Live shows position / duration only (no wall-clock — would lie on indefinite live streams). |
+| 25.B.2 | **Episode context for series.** When `controller.currentEpisode.value` is non-null, render `S01E02 — Episode Title` above the existing dock title. Series name stays in the existing title slot. **Red team:** today the dock reads `cleanTitle` which for episodes is the joined `Series — S01E02 — Title` string from `EpisodeInfo.toPlayable`. Need to render parts separately — read `currentEpisode.title` (the episode-only piece) + `seasonNumber` / `episodeNumber` instead of the joined cleanTitle. | `VodPlayerDock.kt` (read `controller.currentEpisode`) | planned | Series episode in the dock shows: `Show Name` (large), `S01E02 — Episode Title` (small kicker). Movies / live unchanged. |
+| 25.B.3 | **Buffered-range visualization on the progress bar.** Render `Player.bufferedPosition` as a lighter band behind the playhead. **Red team:** `bufferedPosition` is `Long` ms; need to clamp to duration; for Live timeshifted streams the meaning differs (needs read-the-file-first on Live's progress-bar semantics — Live should probably keep the existing rendering). | `VodPlayerDock.kt` (progress bar paint) | planned | VOD progress bar visibly shows buffered-ahead band. Pause + wait → band grows; resume + scrub forward → band shrinks. |
+| 25.B.4 | **Quick action buttons on the dock.** Single-press affordances for: subtitle toggle (cycles last-used / off, NOT a panel), audio cycle (next track), speed cycle (1× → 1.25× → 1.5× → 1× etc.). Promotes the most common controls out of the player options popup. **Red team:** these gestures already exist as LEFT/RIGHT cycles on the popup rows; this slice just exposes them as dock buttons. Don't duplicate the cycle logic — call into `cycleAudioTrack` / `cycleTextTrack` / `cycleSpeed` from `PlayerOptionsPanels.kt`. **Red team #2:** focus order on the dock matters; CENTER on a quick-action row must NOT toggle dock visibility. | `VodPlayerDock.kt` | planned | Three buttons render right of the transport controls. Each works on a single CENTER press. None reopens the options popup. |
+
+**Estimate:** B.1 ~30 min, B.2 ~45 min, B.3 ~45 min, B.4 ~1.5 h. **Total ~3.5 h, 3–4 commits (B.1 + B.2 can bundle; B.3, B.4 standalone).**
+
+---
+
+### Slice 25.C — Real seek UX (the meatier work)
+
+Fast-forward modes, scrub mode, position tooltip, resume prompt. Highest blast radius — strict one-slice-per-session.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 25.C.1 | **Long-press LEFT/RIGHT = continuous fast-forward / rewind.** Hold RIGHT → seek +10s every 250ms; after 2s of holding, accelerate to +20s every 250ms; after 4s, +40s. Symmetric for LEFT. Release → exits FF mode. Visual indicator at top: `▶▶ 4×` (i.e. seeking at 4× real-time). **Red team:** original plan said "use `setPlaybackSpeed`" — that's WRONG. setPlaybackSpeed plays content at 4× speed with audio pitched up, not fast-forward. Real FF on TV is repeated jumps; that's what this slice does. **Red team #2:** the existing single-press +10 (A.1 / A.2) and this long-press behavior must coexist — short-press fires once on UP, long-press fires repeated jumps from DOWN until UP. Use `KeyEvent.repeatCount` or a hand-rolled job that starts on first DOWN and cancels on UP. | `PlayerActivity.kt` (key handler) + `VodPlayerChrome.kt` (FF-mode badge) | planned | Tap RIGHT once → +10s flash (A.2). Hold RIGHT 1s → continuous skip with `▶▶ 4×` badge. Release → resume normal. |
+| 25.C.2 | **Scrub mode via DPAD UP.** UP = show chrome AND focus the progress bar (skipping the usual default-row focus). LEFT/RIGHT in scrub mode = fine seek (5s default; configurable). CENTER commits (no-op visually, just exits scrub). BACK cancels (returns to original position). The progress bar paints a "scrub head" distinct from the playhead while scrubbing. **Read-the-file-first gate:** confirm DPAD UP isn't currently handling something else. **Red team:** "BACK cancels by returning to original position" requires capturing `entryPosition` at scrub-mode start; the current player has no such state — needs a small state holder. | `PlayerActivity.kt` + `VodPlayerDock.kt` | planned | UP from no-chrome → chrome appears, progress bar focused. LEFT/RIGHT moves scrub head. CENTER commits. BACK reverts. Scrub head visible distinct from playhead while scrubbing. |
+| 25.C.3 | **Position tooltip while scrubbing.** Float a `23:45` timestamp above the scrub head. Updates as the user moves it. Gated behind C.2 (scrub-mode is the only state with a scrub head). | `VodPlayerDock.kt` | planned | Tooltip renders above scrub head; updates with LEFT/RIGHT presses. |
+| 25.C.4 | **Resume-from prompt.** On a fresh load with `resumePosition > 30s` AND `< duration - 30s`, render a non-blocking 5-second overlay: `Resume from 12:34 ✓ — Watch from start (DOWN)`. Default action (no input) is resume; pressing DOWN restarts at 0. Auto-fades after 5s. **Red team:** original plan said "5s prompt before playback starts" — that delays playback. This revision instead loads at the resume offset (current behavior, today's commit `584ccca`) and shows the overlay non-blocking; the user keeps watching while it's visible. | `PlayerActivity.kt` (loading-time overlay) | planned | Open VOD with saved offset >30s → overlay appears for 5s; pressing DOWN seeks to 0; otherwise fades. Open VOD without saved offset → no overlay. |
+
+**Estimate:** C.1 ~2.5 h, C.2 ~3 h, C.3 ~45 min, C.4 ~1 h. **Total ~7 h, 4 commits.**
+
+---
+
+### Slice 25.D — Smart features (selective)
+
+Greenfield. Ship the ones that match the user's priorities. D.3 is genuinely 5–8 h — defer unless explicitly asked.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 25.D.1 | **Autoplay-next countdown bumper.** Last 15s of an episode (when `(duration - position) <= 15000`): render a bottom-right overlay with next episode title + `Up next in 10s — press BACK to cancel` countdown. CENTER plays now; BACK cancels (and the existing `STATE_ENDED` autoplay path from `51f1e20` is the safety net for dropped bumpers / inaccurate durations). **Red team:** position polling — `Player.Listener` doesn't fire on natural progression. Need a periodic check (`scope.launch { while (active) { delay(1000); check } }`) tied to STATE_READY entry. **Red team #2:** a user who pauses at 14:55s shouldn't see a frozen 10s countdown — pause the countdown on `STATE_READY` flip-off. | `PlayerActivity.kt` + new `UpNextBumper.kt` composable | planned | Last 15s of episode shows bumper. CENTER plays next now. BACK cancels for current episode (no re-trigger this session). End of episode without interaction → autoplay fires (today's path). |
+| 25.D.2 | **Skip-intro / skip-credits offsets.** Global pref: `skipIntroSec: Int = 0`, `skipCreditsSec: Int = 0`. When in the first `skipIntroSec` seconds of an episode, render a `Skip intro →` button (CENTER seeks past it). Symmetric for credits in the last `skipCreditsSec` seconds. **Red team:** "user-toggleable global offset" assumes all episodes have identical-length intros — they often don't. v1 acceptable; smarter detection (chapter metadata, fingerprint) is a deferred follow-up. | `AppPreferences.kt` (schema bump? read-the-file-first) + `PlayerActivity.kt` | planned | Settings → Playback shows two sliders. With `skipIntroSec=60` set, the first 60s of an episode shows the skip button; CENTER seeks to 60s. |
+| 25.D.3 | **Seek-preview thumbnails.** On first VOD play, generate a sprite atlas (one frame every 10s) via `MediaMetadataRetriever`, persist to `cacheDir/scrub-thumbs/<contentId>/atlas.jpg` + meta JSON. While in C.2 scrub mode, render the thumbnail under the scrub head. **Red team:** for HLS / fragmented streams the retriever needs ranged GETs per segment — slow, and can fail. Wrap generation in `runCatching`; absence of thumbs falls back to the C.3 timestamp tooltip. **Red team #2:** atlas generation can run minutes for a 2h movie; do it on a background WorkManager job after first START_READY, not eagerly. | New file `ScrubThumbExtractor.kt` + `VodPlayerDock.kt` | deferred (5–8 h) | Atlas generates on first play. Subsequent scrubs render thumbnail under scrub head. Generation failure (HLS) silently falls back to tooltip. |
+| 25.D.4 | **MediaSession / lock-screen polish.** Bigger album art, episode title, transport controls. Currently MediaSession is owned by `PlaybackService` but not audited. **Read-the-file-first gate:** confirm what MediaSession metadata is currently published before scoping. | `PlaybackService` / wherever MediaSession lives | planned | Lock screen shows: episode title, series name, album art (logoUrl), play/pause/skip transport. |
+
+**Estimate:** D.1 ~2.5 h, D.2 ~2 h, D.3 ~5–8 h (deferred), D.4 ~1 h (assuming MediaSession exists; could blow up if missing). **Total ~5.5 h excl. D.3.**
+
+---
+
+### Recommended sequencing
+
+1. **A** (~1.5 h, 1 commit) — closes the two reported user complaints.
+2. **B.1 + B.2 + B.3 bundle** (~2 h, 1 commit) — coherent dock-info upgrade.
+3. **C.4 + D.1** (~3.5 h, 2 commits) — completes today's resume + autoplay fixes with their UI counterparts.
+4. **C.1** (~2.5 h, 1 commit) — fast-forward modes, the highest-impact seek polish.
+5. **C.2 + C.3 bundle** (~3.5 h, 1 commit) — scrub mode (architecturally one feature).
+6. **B.4** (~1.5 h, 1 commit) — dock quick actions; defer until B.1–3 prove themselves on real use.
+7. **D.2** (~2 h, 1 commit) — skip intro/credits.
+8. **D.4** (~1 h ± expansion, 1 commit) — MediaSession polish (file-read gates the scope).
+9. **D.3** (~5–8 h) — capstone, only if the user asks.
+
+**Total without D.3: ~17.5 h across 7–9 commits. Across multiple sessions per the strict-one-slice-per-session rule for C.1 / C.2 / D.1.**
+
+### Cost summary (red-teamed)
+
+| Slice | Items | Estimate | Net production code touched | Risk |
+|---|---|---|---|---|
+| A | 2 (suppress overlay + seek flash) | ~1.5 h | ~80 lines `PlayerActivity.kt` + new SeekFlashOverlay | Low — both isolated to PlayerActivity |
+| B | 4 (dock info upgrade) | ~3.5 h | ~150 lines `VodPlayerDock.kt` | Low — UI only, no state changes |
+| C | 4 (FF, scrub, tooltip, resume prompt) | ~7 h | ~300 lines across PlayerActivity + dock + new UpNextBumper | **High** — key handling state machine, focus mgmt |
+| D.1 | 1 (autoplay bumper) | ~2.5 h | ~120 lines new composable + position watcher | Medium — async timing |
+| D.2 | 1 (skip intro / credits) | ~2 h | ~60 lines + pref schema | Low |
+| D.4 | 1 (MediaSession) | ~1 h ± | TBD on file-read | Medium — could expand |
+| D.3 | 1 (thumbnails) | ~5–8 h | ~250 lines new + cache infra | **High** — IO-bound, format compat |
+
+### Open risks / what could derail
+
+1. **Long-press handling state machine (C.1) interferes with the existing CENTER long-press for player options popup.** Read-the-file-first will catch it but the fix may need a generic long-press dispatcher.
+2. **Scrub-mode focus (C.2) collides with the existing dock's focus targets.** The dock already has focus interactions; a scrub-bar focus-with-state requires care to not break the dock's quick-action flow (B.4) when both ship.
+3. **HLS / fragmented streams break thumbnail extraction (D.3) and possibly buffered-range visualization (B.3).** B.3 is the smaller risk — `bufferedPosition` is well-defined for HLS; D.3 may need `runCatching` + fallback.
+4. **MediaSession (D.4) could be missing entirely**, in which case the slice is "stand it up" not "polish it" — 4–6 h instead of 1.
+5. **User-toggleable skip-intro (D.2) without per-show offsets is a half-feature.** It'll work for the user's typical content but won't satisfy power users; document the limitation and treat as v1.
+
+### Files a fresh chat should open first
+
+- `packages/android/app/src/main/java/com/yancotv/android/player/PlayerActivity.kt` — the heart. `dispatchKeyEvent`, `playerListener`, dock toggle.
+- `packages/android/app/src/main/java/com/yancotv/android/player/VodPlayerDock.kt` — the VOD dock layout.
+- `packages/android/app/src/main/java/com/yancotv/android/player/VodPlayerChrome.kt` — the buffering / error overlays. Look for the `"Tuning the stream"` string.
+- `packages/android/app/src/main/java/com/yancotv/android/player/PlaybackController.kt` — `currentEpisode`, position state, `loadCurrent` (just gained the `positionForEpisode` branch in `584ccca`).
+- `packages/android/app/src/main/java/com/yancotv/android/prefs/AppPreferences.kt` — `PlaybackPrefs`, `autoPlayNext` already there; D.2 needs `skipIntroSec` / `skipCreditsSec`.
+- `packages/android/app/src/main/java/com/yancotv/android/player/options/PlayerOptionsPanels.kt` — `cycleAudioTrack`, `cycleTextTrack`, `cycleSpeed` for B.4.
+
+### Test discipline
+
+- **Pure-function helpers go in unit tests.** A.2's seek-flash accumulator (state: `accumulatedMs: Int`, `lastPressAt: Long`) → table-driven. C.1's FF-tier decision (`elapsedMs → seekStepMs`) → table-driven. D.1's bumper-trigger decision (`(position, duration) → showBumper: Bool`) → table-driven.
+- **No new instrumented tests** unless absolutely needed. Manual smoke per slice DoD on Fire TV.
+- **Smoke checklist on every slice's APK install:**
+  - Cold-start a movie. Resume offset honored (regression test for `584ccca`).
+  - Seek RIGHT × 3 fast. No "Tuning the stream" overlay (regression test for A.1).
+  - Pause Wi-Fi mid-VOD for 3s. Buffering overlay appears (regression test that A.1 didn't over-suppress).
+  - Open a series, watch to end. Autoplay fires next episode (regression test for `51f1e20`).
+
+### Out of scope for MK.25 (file as new MK if pursued)
+
+- **Volume / brightness gestures** for phone (MK.11.2 territory; not started).
+- **Chromecast / mirroring** — dropped permanently.
+- **Subtitle styling** (font, color, opacity) — separate concern; lives in subtitle stack not player UX.
+- **Picture-in-Picture** — MK.11.2.
+- **A-B repeat / loop region** — power-user feature; defer.
+- **Statistics overlay** (bitrate, codec, frame drops) — debug feature; file as MK.dev or similar.
+
+---
+
 ## Architecture rules (native)
 
 1. **Shared Kotlin is pure business logic.** No `android.*` imports in `commonMain/`. Platform-specific code goes in `androidMain/` / `iosMain/` via `expect`/`actual`.
