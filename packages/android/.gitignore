@@ -9,6 +9,9 @@ captures/
 # Stage 5.2.3 — locally staged auto-update test artifacts (APK + update.json)
 /auto-update-test/
 
+# Local installer/helper downloads used during Android TV testing.
+*.exe
+
 
 # MB-201 — release signing keystore (out-of-tree, never committed).
 /release.keystore
