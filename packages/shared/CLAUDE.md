@@ -18,7 +18,7 @@ Kotlin Multiplatform business logic. Consumed by [`../android/`](../android/) to
 2. **Ktor + Kotlinx Serialization only.** Do NOT add Retrofit, Moshi, Gson — they don't compile for iOS.
 3. **SQLDelight is the only persistence surface.** No Room, no ObjectBox. All queries live in `commonMain/sqldelight/`.
 4. **All DB timestamps are milliseconds** (`Clock.System.now().toEpochMilliseconds()`). Exception: `watch_history.position_seconds` / `duration_seconds` — those model media offsets, not wall-clock. Document the unit on every new timestamp column: `-- ms since epoch`.
-5. **`positionFor(contentId)` returns content-level OR null — never an episode row.** Series containers must not resume to an arbitrary episode's offset.
+5. **`positionFor(contentId)` returns content-level OR null — never an episode row.** Series containers must not resume to an arbitrary episode's offset. Also returns `null` when the row is at ≥95% of duration (matches `EpisodeResumeInfo.isFinished()`) — re-tapping a finished title must restart from the beginning, not seek to credits and chain into the autoplay loop. Same rule applies to `positionForEpisode(episodeId)`.
 6. **Inject platform I/O via interfaces**, not direct imports. `HttpClient`, `Logger`, `Clock` — never hard-wire Android's OkHttp or Java `System.currentTimeMillis`.
 7. **ViewModels expose `StateFlow<T>`.** Consumers (Compose, SwiftUI) subscribe. No LiveData (Android-only).
 8. **Mirror test changes.** Updating a parser or classifier? Update the test here AND the TypeScript equivalent in `packages/core/` in the same PR. The two implementations are both "canonical" and must not drift.

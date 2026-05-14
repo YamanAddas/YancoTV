@@ -446,32 +446,72 @@ fun HomeScreen(
                                         PlayerLauncher.launch(context)
                                     }
                                     ContentType.SERIES -> {
-                                        // Continue Watching path: when watch_history
-                                        // carries a non-null episode_id for this
-                                        // series, resume that exact episode at its
-                                        // stored offset. PlaybackController.play(
-                                        // Playable.Episode) reads the resume offset
-                                        // off the episode's own id (not the series),
-                                        // which is what the rail's "Xm left" badge
-                                        // already reflects. Falls back to the detail
-                                        // overlay when no episode hint exists or the
-                                        // episode row isn't cached locally yet.
+                                        // Continue Watching path. The episode the
+                                        // user gets depends on the most-recent
+                                        // watch_history row's state:
+                                        //   - No history → open detail page so the
+                                        //     user can pick (matches "first visit"
+                                        //     UX).
+                                        //   - Mid-stream → resume that episode at
+                                        //     its stored offset.
+                                        //   - Finished (≥95% per `isFinished()`) →
+                                        //     advance to the next episode in the
+                                        //     series. If no next episode (end of
+                                        //     series), restart the last one from 0.
+                                        // The "finished → next" routing is the
+                                        // Netflix-style behavior; without it,
+                                        // tapping a binge-watched series re-plays
+                                        // the just-finished episode, which is what
+                                        // the loop bug was masking.
                                         if (resumeEpisodeId == null) {
                                             detailItem = target
                                             return@gatedPlay
                                         }
                                         homeScope.launch(Dispatchers.IO) {
-                                            val episode =
+                                            val resumeInfo =
                                                 runCatching {
-                                                    repo.episodeById(resumeEpisodeId)
+                                                    history.mostRecentEpisode(target.id)
                                                 }.getOrNull()
+                                            val (episode, fromStart) =
+                                                if (resumeInfo != null && resumeInfo.isFinished()) {
+                                                    val next =
+                                                        runCatching {
+                                                            repo.nextEpisodeAfter(
+                                                                seriesId = target.id,
+                                                                currentEpisodeId = resumeInfo.episodeId,
+                                                            )
+                                                        }.getOrNull()
+                                                    if (next != null) {
+                                                        next to false
+                                                    } else {
+                                                        // End of series — restart the last
+                                                        // watched episode from 0. positionForEpisode
+                                                        // returns null on finished rows so the
+                                                        // setMediaItem path already skips the
+                                                        // seek; fromStart=true is belt-and-
+                                                        // suspenders.
+                                                        val last =
+                                                            runCatching {
+                                                                repo.episodeById(resumeInfo.episodeId)
+                                                            }.getOrNull()
+                                                        last to true
+                                                    }
+                                                } else {
+                                                    val ep =
+                                                        runCatching {
+                                                            repo.episodeById(resumeEpisodeId)
+                                                        }.getOrNull()
+                                                    ep to false
+                                                }
                                             val playable = episode?.toPlayable(target)
                                             withContext(Dispatchers.Main) {
                                                 if (playable == null) {
                                                     detailItem = target
                                                 } else {
                                                     if (controller.currentId != playable.id) {
-                                                        controller.play(playable)
+                                                        controller.play(playable, fromStart = fromStart)
+                                                    } else if (fromStart) {
+                                                        controller.play(playable, fromStart = true)
                                                     }
                                                     PlayerLauncher.launch(context)
                                                 }
@@ -562,6 +602,31 @@ fun HomeScreen(
                         }
                         PlayerLauncher.launch(context)
                     }
+                },
+                onPlayFromStart = { target, ep ->
+                    // "Play from beginning" — never honour the stored
+                    // resume offset, but also don't delete the row so a
+                    // brief restart-then-exit preserves the prior
+                    // mid-stream position. The fromStart flag on
+                    // controller.play tells loadCurrent to skip the
+                    // positionFor / positionForEpisode lookup entirely.
+                    if (ep != null) {
+                        val playable = ep.toPlayable(target)
+                        if (playable != null) {
+                            controller.play(playable, fromStart = true)
+                            PlayerLauncher.launch(context)
+                        }
+                    } else if (target.streamUrl.isNotBlank() && target.type != ContentType.SERIES) {
+                        controller.play(listOf(target), 0, fromStart = true)
+                        PlayerLauncher.launch(context)
+                    }
+                },
+                onResetProgress = { _ ->
+                    // No-op at the parent level — the detail screen
+                    // already executed the wipe via watchHistory.removeForContent
+                    // before calling back. Hook kept on the callback
+                    // surface so callers that want to react (snackbar,
+                    // analytics) have one place to do it.
                 },
                 onDismiss = { detailItem = null },
             )

@@ -20,7 +20,7 @@ Before editing, reviewing, testing, or debugging this package, use the `native-a
 - Wall-clock timestamps are milliseconds. Use `Clock.System.now().toEpochMilliseconds()`.
 - Only `watch_history.position_seconds` and `duration_seconds` are seconds because they are media offsets.
 - New timestamp schema columns need `-- ms since epoch`.
-- `positionFor(contentId)` returns a content-level row or `null`, never an episode row.
+- `positionFor(contentId)` returns a content-level row or `null`, never an episode row. Also returns `null` for rows at ≥95% of duration so the player restarts finished titles instead of seeking to credits. Same rule for `positionForEpisode(episodeId)`.
 - Platform behavior is injected through interfaces or `expect`/`actual`.
 - ViewModels expose `StateFlow<T>`.
 - Parser, classifier, title-cleaner, and catch-up changes need mirrored tests in `packages/core` when the TypeScript port is affected.

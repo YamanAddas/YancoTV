@@ -339,7 +339,17 @@ class PlayerActivity : AppCompatActivity() {
                     Player.STATE_IDLE, Player.STATE_ENDED -> {
                         bufferingShowJob?.cancel()
                         bufferingShowJob = null
-                        if (state == Player.STATE_ENDED) tryAutoplayNextEpisode()
+                        if (state == Player.STATE_ENDED) {
+                            // MB-VOD-LOOP: clear the just-finished item's resume
+                            // point BEFORE autoplay swaps the queue. Without this,
+                            // re-tapping a binge-watched series from Home seeks
+                            // straight to credits → STATE_ENDED → autoplay-next →
+                            // also at credits → loop. Idempotent with the 95%-cap
+                            // inside resumePointDecision, but covers streams with
+                            // unknown duration where the % rule can't fire.
+                            controller.markCurrentCompleted()
+                            tryAutoplayNextEpisode()
+                        }
                     }
                 }
             }

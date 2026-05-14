@@ -497,15 +497,23 @@ class PlaybackController(
      *     point so VOD mid-seeks aren't lost when the user zaps between titles
      *     without hitting a lifecycle hook.
      */
-    fun play(list: List<ContentItem>, startIndex: Int) {
+    fun play(list: List<ContentItem>, startIndex: Int, fromStart: Boolean = false) {
         when (playLaunchDecision(list, startIndex, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
             PlayLaunchDecision.SameTarget -> {
                 // Same-id: update the navigation queue for next/prev zap
                 // but don't touch the player — second OK on the current
-                // item must be a no-op.
+                // item must be a no-op. Exception: fromStart=true means
+                // "Play from beginning" was tapped on the currently-loaded
+                // item; seek the live player to 0 and ensure it's playing
+                // (STATE_ENDED leaves playWhenReady=true but a user-paused
+                // mid-stream session would not auto-resume on seek alone).
                 _queue.value = list
                 _index.value = startIndex
+                if (fromStart) {
+                    player.seekTo(0L)
+                    player.playWhenReady = true
+                }
             }
             PlayLaunchDecision.NewTarget -> {
                 // Different item: capture the outgoing offset before the queue swap.
@@ -514,7 +522,7 @@ class PlaybackController(
                 _externalSubtitle = null
                 _queue.value = list
                 _index.value = startIndex
-                loadCurrent()
+                loadCurrent(fromStart = fromStart)
             }
         }
     }
@@ -535,13 +543,17 @@ class PlaybackController(
      * synthesized view's `id` is the episode id and would FK-violate
      * if used as content_id (episodes live in their own table).
      */
-    fun play(episode: Playable.Episode) {
+    fun play(episode: Playable.Episode, fromStart: Boolean = false) {
         when (episodeLaunchDecision(episode, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
             PlayLaunchDecision.SameTarget -> {
                 _currentEpisode.value = episode
                 _queue.value = listOf(episode.toContentItemView())
                 _index.value = 0
+                if (fromStart) {
+                    player.seekTo(0L)
+                    player.playWhenReady = true
+                }
             }
             PlayLaunchDecision.NewTarget -> {
                 if (_currentItem.value != null) persistResumePoint()
@@ -549,7 +561,7 @@ class PlaybackController(
                 _externalSubtitle = null
                 _queue.value = listOf(episode.toContentItemView())
                 _index.value = 0
-                loadCurrent()
+                loadCurrent(fromStart = fromStart)
             }
         }
     }
@@ -748,7 +760,7 @@ class PlaybackController(
         }
     }
 
-    private fun loadCurrent() {
+    private fun loadCurrent(fromStart: Boolean = false) {
         val item = _queue.value.getOrNull(_index.value) ?: return
         // MK.17.5 — stage the playing source's UA / Referer so the OkHttp
         // interceptor applies them on the imminent prepare(). Look up runs
@@ -795,6 +807,18 @@ class PlaybackController(
         // intentionally guarded to return only content-level rows. Without
         // this branch, episodes always started from 0 even when the user
         // had stopped mid-episode the prior session.
+        //
+        // [fromStart] short-circuits the DB read entirely — "Play from
+        // beginning" tapped on the detail screen must always seek to 0
+        // even if the row carries a resume offset, and writing that
+        // intent into the row would lose the mid-stream position the
+        // user might want back later.
+        if (fromStart) {
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.playWhenReady = true
+            return
+        }
         val episode = _currentEpisode.value
         scope.launch {
             val resumeMs =
@@ -884,6 +908,52 @@ class PlaybackController(
                 episodeId = write.episodeId,
                 positionSeconds = write.positionSeconds,
                 durationSeconds = write.durationSeconds,
+            )
+        }
+    }
+
+    /**
+     * MB-VOD-LOOP: mark the current item / episode as fully watched —
+     * writes `position = duration` so the row trips
+     * [EpisodeResumeInfo.isFinished] / the repo's 95% rule. Series
+     * detail and Home tap routing read that signal to advance to the
+     * next episode on the next play; the player's `positionFor` /
+     * `positionForEpisode` lookups return null on finished rows so a
+     * direct re-play starts the title fresh instead of seeking to
+     * the credits.
+     *
+     * Called from [PlayerActivity]'s `STATE_ENDED` handler before
+     * autoplay fires. Defense in depth: in normal flow
+     * [persistResumePoint] would write the same near-duration offset
+     * via the autoplay transition's `controller.play(next)` →
+     * persist chain, but if ExoPlayer's currentPosition mis-reports
+     * at STATE_ENDED (we've seen brief 0-reads in the wild) the row
+     * would miss the threshold; this method forces the canonical
+     * "finished" shape.
+     *
+     * No-op when duration is unknown — without a denominator the 95%
+     * rule can't fire, and writing `position = 0` would look like a
+     * fresh-tap row instead of a completed one. Streams with no
+     * duration metadata fall back to whatever [persistResumePoint]
+     * has already written; rare in practice (most VOD has duration).
+     *
+     * LIVE / `_rec_` skip rules mirror [resumePointDecision].
+     */
+    fun markCurrentCompleted() {
+        val item = _currentItem.value ?: return
+        if (item.type == ContentType.LIVE) return
+        if (item.id.startsWith(LOCAL_RECORDING_ID_PREFIX)) return
+        val dur = player.duration.takeIf { it > 0L }?.let { it / 1000L } ?: return
+        val episode = _currentEpisode.value
+        val contentId = episode?.seriesId ?: item.id
+        val episodeId = episode?.id
+        val repo = history ?: return
+        scope.launch(Dispatchers.IO) {
+            repo.upsert(
+                contentId = contentId,
+                episodeId = episodeId,
+                positionSeconds = dur,
+                durationSeconds = dur,
             )
         }
     }
@@ -983,6 +1053,12 @@ internal fun resumePointDecision(item: ContentItem?, episode: Playable.Episode?,
     if (item.type == ContentType.LIVE) return null
     if (item.id.startsWith(PlaybackController.LOCAL_RECORDING_ID_PREFIX)) return null
     if (positionSeconds < 5L) return null
+    // Write the raw position. The 95% "finished" rule lives on the
+    // READ side (`positionFor` / `positionForEpisode` return null,
+    // `EpisodeResumeInfo.isFinished` returns true) — keeping it on
+    // the write side would erase the "this was watched" signal that
+    // the series detail page and Home tap routing need to advance
+    // to the next episode after a binge.
     return if (episode != null) {
         ResumePointWrite(
             contentId = episode.seriesId,
