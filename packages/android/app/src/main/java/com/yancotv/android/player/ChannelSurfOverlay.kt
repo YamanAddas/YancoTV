@@ -208,7 +208,7 @@ private fun SurfRow(
             else -> Color.Transparent
         }
     val border = if (focused) LocalYancoPalette.current.FocusRing else Color.Transparent
-    val title = item.cleanTitle?.ifBlank { null } ?: item.title
+    val title = item.displayTitle
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focusRequester.requestFocus() } }
@@ -236,9 +236,10 @@ private fun SurfRow(
                 .background(LocalYancoPalette.current.BackgroundDeep),
             contentAlignment = Alignment.Center,
         ) {
-            if (!item.logoUrl.isNullOrBlank()) {
+            val surfLogo = item.displayLogoUrl
+            if (!surfLogo.isNullOrBlank()) {
                 AsyncImage(
-                    model = item.logoUrl,
+                    model = surfLogo,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxWidth().padding(2.dp),
