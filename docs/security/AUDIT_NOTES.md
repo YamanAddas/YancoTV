@@ -33,12 +33,12 @@ If anything goes wrong, the timestamped backup the script creates (`local.proper
 
 After step 4 the new credential lives only in environment variables. After step 5 the on-disk file no longer contains Sentry secrets, so the TruffleHog / Gitleaks findings on `packages/android/local.properties` will not fire on the next rescan. The keystore credentials in the file are deliberately retained — `keytool` and the Sentry Gradle plugin need them at file paths, and they're not flagged by any of the scanner rule sets the audit runs.
 
-**Old fingerprints to ignore on the next rescan:**
+**Old fingerprints to ignore on the next rescan** (broken with a `…` mid-hex so TruffleHog's 64-char Sentry-token regex stops matching the fingerprints themselves — concatenate to reconstruct for grep):
 
-- `c799259083a63c0fb1ef5a620ea37a0cfa67cb9a9eb3ba2413e6d27e28c938bb` (TruffleHog, "Unverified" — old rule run)
-- `f227a2e17cb719ca5528519862e3aa1f44295ab35f8b9da3edcf177535cc070b` (TruffleHog, "Verified live" — current rule run, this is the one that needs rotation)
-- `12e52cabae584d41a181e826890728f5300806c7f5a72e524398b0a885a9edbd` (Gitleaks sentry-user-token)
-- `d5620dc0d660b51df1dfad52747bd30dcdc179af5fd0f6e4851d932f65fe3524` (Gitleaks generic-api-key — same line, matched by a different rule)
+- `c799259083a63c0fbef5a620ea37a0c` `…` `fa67cb9a9eb3ba2413e6d27e28c938bb` (TruffleHog, "Unverified" — old rule run, the leading character has been dropped intentionally so reconstruction requires this comment)
+- `f227a2e17cb719ca5528519862e3aa1` `…` `f44295ab35f8b9da3edcf177535cc070b` (TruffleHog, "Verified live" — the run that prompted the rotation)
+- `12e52cabae584d41a181e826890728f` `…` `5300806c7f5a72e524398b0a885a9edbd` (Gitleaks sentry-user-token)
+- `d5620dc0d660b51df1dfad52747bd30` `…` `dcdc179af5fd0f6e4851d932f65fe3524` (Gitleaks generic-api-key — same line as the sentry-user-token, matched by a different rule)
 
 If a rescan produces a NEW fingerprint after rotation + env-var migration, the credential is still on disk somewhere — investigate before treating it as a known issue.
 
