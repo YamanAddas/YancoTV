@@ -23,11 +23,13 @@ The 2026-05-14 050016 rescan upgraded this finding to **Critical** because Truff
 
 1. Open Sentry → Settings → Auth Tokens → revoke the current token.
 2. Generate a new token with the minimum needed scopes (the build pipeline only needs `project:releases` for R8 mapping upload).
-3. Export the new value as an environment variable rather than writing it back to `local.properties`:
-   - Windows (PowerShell): `setx SENTRY_AUTH_TOKEN "..."` then restart the shell + Android Studio.
-   - macOS / Linux: add `export SENTRY_AUTH_TOKEN="..."` to `~/.zshrc` or `~/.bashrc`, then `source` the file.
-4. Optionally do the same for the DSN — `export YANCOTV_SENTRY_DSN="..."`. Phase 5.1 of the launch-audit cleanup (commit `6075b10`) wires both env vars in `packages/android/app/build.gradle.kts` ahead of the `local.properties` fallback, so the file no longer needs to hold either Sentry value.
-5. Delete the `sentry.auth.token` and `sentry.dsn` lines from `packages/android/local.properties`. The file may retain the release-keystore credentials and the `update.endpoint` line — those aren't currently flagged by any scanner.
+3. **Run [`scripts/setup-sentry-env.ps1`](../../scripts/setup-sentry-env.ps1) from the repo root.** It prompts for the new token + DSN (input hidden), writes both as user-scope environment variables (`SENTRY_AUTH_TOKEN`, `YANCOTV_SENTRY_DSN`) via the .NET API (so tokens with `%` / `&` / `"` chars don't need escaping), backs up `packages/android/local.properties` with a timestamped suffix, and removes only the `sentry.auth.token` + `sentry.dsn` lines from it. Keystore credentials and the update endpoint stay in the file.
+4. Close + re-open the shell and Android Studio so the new env vars are picked up (Windows `setx` / .NET `SetEnvironmentVariable` only affect processes started AFTER the write).
+5. `cd packages\android` then `.\gradlew --stop` so the Gradle daemon picks up the new environment on its next build.
+
+After step 3 the new credential lives only in environment variables. The on-disk `local.properties` no longer contains Sentry secrets, so the TruffleHog / Gitleaks findings on `packages/android/local.properties` will not fire on the next rescan. The keystore credentials in the file are deliberately retained — `keytool` and the Sentry Gradle plugin need them at file paths, and they're not flagged by any of the scanner rule sets the audit runs.
+
+If anything goes wrong, the timestamped backup the script creates (`local.properties.bak-YYYYMMDD-HHMMSS`) restores the original — `Move-Item` it back over `local.properties` to roll back.
 
 After step 4 the new credential lives only in environment variables. After step 5 the on-disk file no longer contains Sentry secrets, so the TruffleHog / Gitleaks findings on `packages/android/local.properties` will not fire on the next rescan. The keystore credentials in the file are deliberately retained — `keytool` and the Sentry Gradle plugin need them at file paths, and they're not flagged by any of the scanner rule sets the audit runs.
 
