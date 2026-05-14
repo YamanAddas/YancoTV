@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": [
+    "dist/**",
+    "dist-electron/**",
+    "dist-apk/**",
+    "docs/**",
+    "packages/mobile/**",
+    "release/**",
+    "**/build/**",
+    "**/.gradle/**",
+    "scripts/**"
+  ],
+  "ignoreDependencies": [
+    "@types/*"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "src/main/index.ts",
+        "src/main/preload.ts",
+        "src/renderer/main.tsx",
+        "tests/**/*.test.{ts,tsx}",
+        "vite.config.*",
+        "tailwind.config.*",
+        "postcss.config.*"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ]
+    },
+    "packages/core": {
+      "entry": [
+        "src/index.ts",
+        "src/{parsers,clients,content,types,schemas,stalker,xtream,http,catchup,parental,stores}/index.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    }
+  }
+}

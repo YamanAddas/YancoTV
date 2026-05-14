@@ -13,6 +13,35 @@ Closed-by-fix findings move to the per-phase commit messages on the relevant lau
 
 ---
 
+## Action register (rotation required, not a code fix)
+
+### Live Sentry auth token in `packages/android/local.properties:10`
+
+The 2026-05-14 050016 rescan upgraded this finding to **Critical** because TruffleHog's verifier confirmed the token is currently live (accepted by `api.sentry.io`). The token has never been in git — `packages/android/.gitignore:3` excludes `local.properties` and `git ls-files` confirms it's never been tracked — but TruffleHog walks the working directory regardless and the file sits on disk where any process with read access can extract a working credential.
+
+**Required action** (cannot be done in code — must be performed by the user against Sentry's UI):
+
+1. Open Sentry → Settings → Auth Tokens → revoke the current token.
+2. Generate a new token with the minimum needed scopes (the build pipeline only needs `project:releases` for R8 mapping upload).
+3. Export the new value as an environment variable rather than writing it back to `local.properties`:
+   - Windows (PowerShell): `setx SENTRY_AUTH_TOKEN "..."` then restart the shell + Android Studio.
+   - macOS / Linux: add `export SENTRY_AUTH_TOKEN="..."` to `~/.zshrc` or `~/.bashrc`, then `source` the file.
+4. Optionally do the same for the DSN — `export YANCOTV_SENTRY_DSN="..."`. Phase 5.1 of the launch-audit cleanup (commit `6075b10`) wires both env vars in `packages/android/app/build.gradle.kts` ahead of the `local.properties` fallback, so the file no longer needs to hold either Sentry value.
+5. Delete the `sentry.auth.token` and `sentry.dsn` lines from `packages/android/local.properties`. The file may retain the release-keystore credentials and the `update.endpoint` line — those aren't currently flagged by any scanner.
+
+After step 4 the new credential lives only in environment variables. After step 5 the on-disk file no longer contains Sentry secrets, so the TruffleHog / Gitleaks findings on `packages/android/local.properties` will not fire on the next rescan. The keystore credentials in the file are deliberately retained — `keytool` and the Sentry Gradle plugin need them at file paths, and they're not flagged by any of the scanner rule sets the audit runs.
+
+**Old fingerprints to ignore on the next rescan:**
+
+- `c799259083a63c0fb1ef5a620ea37a0cfa67cb9a9eb3ba2413e6d27e28c938bb` (TruffleHog, "Unverified" — old rule run)
+- `f227a2e17cb719ca5528519862e3aa1f44295ab35f8b9da3edcf177535cc070b` (TruffleHog, "Verified live" — current rule run, this is the one that needs rotation)
+- `12e52cabae584d41a181e826890728f5300806c7f5a72e524398b0a885a9edbd` (Gitleaks sentry-user-token)
+- `d5620dc0d660b51df1dfad52747bd30dcdc179af5fd0f6e4851d932f65fe3524` (Gitleaks generic-api-key — same line, matched by a different rule)
+
+If a rescan produces a NEW fingerprint after rotation + env-var migration, the credential is still on disk somewhere — investigate before treating it as a known issue.
+
+---
+
 ## Accepted findings
 
 ### `mobile.readiness.cleartext.47a0a49d` — Cleartext traffic enabled globally
@@ -48,6 +77,23 @@ yancoxplorer's `mobile.readiness.cleartext` check reads the manifest attribute d
 - Android shipping a runtime allowlist API on `NetworkSecurityConfig` (no such API on the roadmap as of Android 16).
 - A reasonable maintainer-burden way to know every IPTV provider host at build time (impractical given the user-supplied source model).
 - An architectural pivot to proxy every stream through `localhost:N` (significant engineering; defers the issue rather than solving it).
+
+### `aismell.universal.localhost-in-source` — `DEV_RENDERER_URL` constant
+
+| Field | Value |
+|---|---|
+| Severity | Medium |
+| Source | yancoxplorer / AI Smell |
+| File | `src/shared/constants.ts` (post-Phase-2.4 consolidation) |
+| Decision | **Accepted — residual after consolidation** |
+| Decided | 2026-05-14 |
+| References | commit `a067abd` (Phase 2.4 consolidation: three call-site literals → one named constant) |
+
+**Why accepted:**
+
+Phase 2.4 consolidated three "Hardcoded localhost URL in source" matches (in `src/main/index.ts` × 2 and `src/main/player/overlay-window.ts` × 1) into a single named constant `DEV_RENDERER_URL = 'http://localhost:5173'` in `src/shared/constants.ts`. The yancoxplorer rule is a substring match on the literal "localhost"; the named constant still contains the literal so one match remains. Replacing with `127.0.0.1` would match the rule's IP-style sibling pattern; using a build-time-substituted value would require a Vite/esbuild define plus a runtime fallback that's far more complex than the smell warrants.
+
+The constant is intentionally a string literal — it's read by the Electron main process to load the Vite dev server, and the value is well-known per Vite's defaults. There's no production exposure: production builds use `mainWindow.loadFile(...)` and never touch this URL.
 
 ---
 
