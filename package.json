@@ -64,7 +64,7 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
     "electron": "^41.2.0",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.8.1",
     "electron-playwright-helpers": "^2.1.0",
     "esbuild": "^0.28.0",
     "eslint": "^8.57.1",
@@ -85,7 +85,7 @@
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitest": "^3.0.5",
-    "wait-on": "^8.0.3",
+    "wait-on": "^9.0.10",
     "zustand": "^5.0.3"
   },
   "pnpm": {
@@ -96,7 +96,10 @@
       "ffmpeg-static"
     ],
     "overrides": {
-      "fast-uri": "^3.1.2"
+      "fast-uri": "^3.1.2",
+      "@xmldom/xmldom": "^0.9.10",
+      "ip-address": "^10.2.0",
+      "postcss": "^8.5.14"
     }
   },
   "engines": {
