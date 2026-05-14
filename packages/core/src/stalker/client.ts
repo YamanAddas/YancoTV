@@ -1,6 +1,17 @@
 import type { Result } from '../types/index.js';
 import { NOOP_LOGGER, type Logger } from '../logger.js';
 import { HttpResponseError, type HttpClient } from '../http/index.js';
+import {
+  extractStalkerHandshakeToken,
+  stalkerCategoryItemSchema,
+  stalkerCategoryListResponseSchema,
+  stalkerChannelItemSchema,
+  stalkerChannelPageResponseSchema,
+  stalkerSeriesItemSchema,
+  stalkerSeriesPageResponseSchema,
+  stalkerVodItemSchema,
+  stalkerVodPageResponseSchema,
+} from './schemas.js';
 
 export interface StalkerAuthInfo {
   token: string;
@@ -96,10 +107,8 @@ export class StalkerClient {
     const handshakeResult = await this.request('stb', 'handshake', { prehash: '0' });
     if (!handshakeResult.ok) return handshakeResult;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tokenData = handshakeResult.value as any;
-    const token = tokenData?.js?.token ?? tokenData?.token;
-    if (!token || typeof token !== 'string') {
+    const token = extractStalkerHandshakeToken(handshakeResult.value);
+    if (!token) {
       return { ok: false, error: new Error('Stalker handshake failed: no token received') };
     }
 
@@ -122,17 +131,7 @@ export class StalkerClient {
     const data = await this.request('itv', 'get_genres');
     if (!data.ok) return data;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = (data.value as any)?.js ?? [];
-    const categories: StalkerCategory[] = (Array.isArray(raw) ? raw : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (c: any) => ({
-        id: String(c.id ?? ''),
-        title: String(c.title ?? c.name ?? ''),
-      }),
-    );
-
-    return { ok: true, value: categories };
+    return { ok: true, value: this.parseCategories(data.value) };
   }
 
   async getLiveChannels(): Promise<Result<StalkerChannel[]>> {
@@ -144,26 +143,16 @@ export class StalkerClient {
       const data = await this.request('itv', 'get_all_channels', { p: String(page) });
       if (!data.ok) return data;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const js = (data.value as any)?.js;
-      const items = js?.data ?? [];
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const ch of Array.isArray(items) ? items : []) {
-        allChannels.push({
-          id: Number(ch.id) || 0,
-          name: String(ch.name ?? ''),
-          cmd: String(ch.cmd ?? ''),
-          tvGenreId: String(ch.tv_genre_id ?? ''),
-          logo: String(ch.logo ?? ''),
-          epgId: String(ch.epg_channel_id ?? ch.xmltv_id ?? ''),
-          number: Number(ch.number) || 0,
-          tvArchive: Number(ch.tv_archive) || 0,
-          tvArchiveDuration: Number(ch.tv_archive_duration) || 0,
-        });
+      const { items, totalItems: pageTotal } = this.parsePage(
+        data.value,
+        stalkerChannelPageResponseSchema,
+      );
+      for (const raw of items) {
+        const parsed = stalkerChannelItemSchema.safeParse(raw);
+        if (parsed.success) allChannels.push(parsed.data);
       }
 
-      totalItems = Number(js?.total_items) || allChannels.length;
+      totalItems = pageTotal || allChannels.length;
       lastPageReached = page;
       if (allChannels.length >= totalItems) break;
     }
@@ -181,17 +170,7 @@ export class StalkerClient {
     const data = await this.request('vod', 'get_categories');
     if (!data.ok) return data;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = (data.value as any)?.js ?? [];
-    const categories: StalkerCategory[] = (Array.isArray(raw) ? raw : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (c: any) => ({
-        id: String(c.id ?? ''),
-        title: String(c.title ?? c.name ?? ''),
-      }),
-    );
-
-    return { ok: true, value: categories };
+    return { ok: true, value: this.parseCategories(data.value) };
   }
 
   async getVodItems(): Promise<Result<StalkerVodItem[]>> {
@@ -206,23 +185,16 @@ export class StalkerClient {
       });
       if (!data.ok) return data;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const js = (data.value as any)?.js;
-      const items = js?.data ?? [];
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const v of Array.isArray(items) ? items : []) {
-        allItems.push({
-          id: Number(v.id) || 0,
-          name: String(v.name ?? ''),
-          cmd: String(v.cmd ?? ''),
-          categoryId: String(v.category_id ?? ''),
-          logo: String(v.screenshot_uri ?? v.logo ?? ''),
-          description: String(v.description ?? ''),
-        });
+      const { items, totalItems: pageTotal } = this.parsePage(
+        data.value,
+        stalkerVodPageResponseSchema,
+      );
+      for (const raw of items) {
+        const parsed = stalkerVodItemSchema.safeParse(raw);
+        if (parsed.success) allItems.push(parsed.data);
       }
 
-      totalItems = Number(js?.total_items) || allItems.length;
+      totalItems = pageTotal || allItems.length;
       lastPageReached = page;
       if (allItems.length >= totalItems) break;
     }
@@ -240,17 +212,7 @@ export class StalkerClient {
     const data = await this.request('series', 'get_categories');
     if (!data.ok) return data;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = (data.value as any)?.js ?? [];
-    const categories: StalkerCategory[] = (Array.isArray(raw) ? raw : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (c: any) => ({
-        id: String(c.id ?? ''),
-        title: String(c.title ?? c.name ?? ''),
-      }),
-    );
-
-    return { ok: true, value: categories };
+    return { ok: true, value: this.parseCategories(data.value) };
   }
 
   async getSeriesList(): Promise<Result<StalkerSeriesItem[]>> {
@@ -265,23 +227,16 @@ export class StalkerClient {
       });
       if (!data.ok) return data;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const js = (data.value as any)?.js;
-      const items = js?.data ?? [];
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const s of Array.isArray(items) ? items : []) {
-        allSeries.push({
-          id: Number(s.id) || 0,
-          name: String(s.name ?? ''),
-          categoryId: String(s.category_id ?? ''),
-          cover: String(s.screenshot_uri ?? s.cover ?? ''),
-          plot: String(s.description ?? ''),
-          genre: String(s.genre ?? ''),
-        });
+      const { items, totalItems: pageTotal } = this.parsePage(
+        data.value,
+        stalkerSeriesPageResponseSchema,
+      );
+      for (const raw of items) {
+        const parsed = stalkerSeriesItemSchema.safeParse(raw);
+        if (parsed.success) allSeries.push(parsed.data);
       }
 
-      totalItems = Number(js?.total_items) || allSeries.length;
+      totalItems = pageTotal || allSeries.length;
       lastPageReached = page;
       if (allSeries.length >= totalItems) break;
     }
@@ -293,6 +248,43 @@ export class StalkerClient {
     }
 
     return { ok: true, value: allSeries };
+  }
+
+  /**
+   * Parse a Stalker category-listing response. Stalker returns the
+   * raw array under `js`; we map each entry through
+   * `stalkerCategoryItemSchema` and skip anything that doesn't even
+   * fit the loose category shape.
+   */
+  private parseCategories(raw: unknown): StalkerCategory[] {
+    const wrapper = stalkerCategoryListResponseSchema.safeParse(raw);
+    if (!wrapper.success) return [];
+    const items = wrapper.data.js ?? [];
+    const categories: StalkerCategory[] = [];
+    for (const item of items) {
+      const parsed = stalkerCategoryItemSchema.safeParse(item);
+      if (parsed.success) categories.push(parsed.data);
+    }
+    return categories;
+  }
+
+  /**
+   * Parse a paginated Stalker response `{ js: { data: [...], total_items: N } }`.
+   * Returns the raw items array (caller validates each with the
+   * appropriate item schema) and the parsed `total_items` count.
+   * Schema mismatch returns `{ items: [], totalItems: 0 }`, matching
+   * the pre-schema behaviour of silently skipping bad pages.
+   */
+  private parsePage(
+    raw: unknown,
+    schema: typeof stalkerChannelPageResponseSchema,
+  ): { items: unknown[]; totalItems: number } {
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) return { items: [], totalItems: 0 };
+    return {
+      items: parsed.data.js?.data ?? [],
+      totalItems: parsed.data.js?.total_items ?? 0,
+    };
   }
 
   /** Strip Stalker "cmd" playback prefixes ("ffrt", "ffmpeg", "auto") and return the URL. */

@@ -1,6 +1,18 @@
 import type { Result } from '../types/index.js';
 import { NOOP_LOGGER, type Logger } from '../logger.js';
 import { HttpResponseError, type HttpClient } from '../http/index.js';
+import {
+  xtreamAccountInfoResponseSchema,
+  transformXtreamAuthInfo,
+  xtreamCategoryItemSchema,
+  xtreamLiveStreamItemSchema,
+  xtreamVodStreamItemSchema,
+  xtreamSeriesItemSchema,
+  xtreamSeriesDetailResponseSchema,
+  transformXtreamSeriesDetail,
+  xtreamVodInfoResponseSchema,
+  transformXtreamVodDetail,
+} from './schemas.js';
 
 export interface XtreamAuthInfo {
   userInfo: {
@@ -127,17 +139,6 @@ const MAX_RESPONSE_BYTES = 150 * 1024 * 1024;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 8000];
 
-// Best-effort language sniff from a bare subtitle URL, e.g.
-// ".../movie_name.en.srt" or ".../subs/fr.vtt". Falls back to 'und'
-// (undefined/unknown) when nothing lines up so the player still shows
-// the track as a selectable option.
-function inferLangFromUrl(url: string): string {
-  const path = url.toLowerCase().split('?')[0];
-  const m = path.match(/[._/-]([a-z]{2,3})\.(?:srt|vtt|ass|ssa)$/i);
-  if (m) return m[1];
-  return 'und';
-}
-
 function isRetryableError(message: string): boolean {
   return (
     message.includes('timed out') ||
@@ -184,40 +185,18 @@ export class XtreamClient {
     const data = await this.request('get_account_info');
     if (!data.ok) return data;
 
-    const raw = data.value as Record<string, unknown>;
-    const userInfo = raw?.user_info as Record<string, unknown> | undefined;
-    if (!userInfo) {
+    const parsed = xtreamAccountInfoResponseSchema.safeParse(data.value);
+    if (!parsed.success) {
+      return { ok: false, error: new Error('Invalid auth response: malformed shape') };
+    }
+    if (!parsed.data.user_info) {
       return { ok: false, error: new Error('Invalid auth response: missing user_info') };
     }
-
-    if (userInfo.auth === 0 || userInfo.status === 'Disabled') {
+    const authInfo = transformXtreamAuthInfo(parsed.data);
+    if (!authInfo) {
       return { ok: false, error: new Error('Account disabled or invalid credentials') };
     }
-
-    const serverInfo = (raw?.server_info as Record<string, unknown>) ?? {};
-
-    return {
-      ok: true,
-      value: {
-        userInfo: {
-          username: String(userInfo.username ?? ''),
-          status: String(userInfo.status ?? 'Unknown'),
-          expDate: userInfo.exp_date ? String(userInfo.exp_date) : null,
-          isTrial: String(userInfo.is_trial) === '1',
-          activeCons: Number(userInfo.active_cons) || 0,
-          maxConnections: Number(userInfo.max_connections) || 0,
-        },
-        serverInfo: {
-          url: String(serverInfo.url ?? ''),
-          port: String(serverInfo.port ?? ''),
-          httpsPort: serverInfo.https_port ? String(serverInfo.https_port) : null,
-          rtmpPort: serverInfo.rtmp_port ? String(serverInfo.rtmp_port) : null,
-          serverProtocol: String(serverInfo.server_protocol ?? 'http'),
-          timeNow: String(serverInfo.time_now ?? ''),
-          timezone: String(serverInfo.timezone ?? ''),
-        },
-      },
-    };
+    return { ok: true, value: authInfo };
   }
 
   async getLiveCategories(): Promise<Result<XtreamCategory[]>> {
@@ -237,26 +216,7 @@ export class XtreamClient {
     const data = await this.request(`get_live_streams${extra}`);
     if (!data.ok) return data;
 
-    const streams: XtreamLiveStream[] = (Array.isArray(data.value) ? data.value : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (s: any) => ({
-        num: Number(s.num) || 0,
-        name: String(s.name ?? ''),
-        streamType: String(s.stream_type ?? 'live'),
-        streamId: Number(s.stream_id) || 0,
-        streamIcon: String(s.stream_icon ?? ''),
-        epgChannelId: String(s.epg_channel_id ?? ''),
-        added: String(s.added ?? ''),
-        categoryId: String(s.category_id ?? ''),
-        categoryIds: Array.isArray(s.category_ids) ? s.category_ids.map(Number) : [],
-        customSid: String(s.custom_sid ?? ''),
-        tvArchive: Number(s.tv_archive) || 0,
-        directSource: String(s.direct_source ?? ''),
-        tvArchiveDuration: Number(s.tv_archive_duration) || 0,
-      }),
-    );
-
-    return { ok: true, value: streams };
+    return { ok: true, value: this.parseList(data.value, xtreamLiveStreamItemSchema) };
   }
 
   async getVodStreams(categoryId?: string): Promise<Result<XtreamVodStream[]>> {
@@ -264,23 +224,7 @@ export class XtreamClient {
     const data = await this.request(`get_vod_streams${extra}`);
     if (!data.ok) return data;
 
-    const streams: XtreamVodStream[] = (Array.isArray(data.value) ? data.value : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (s: any) => ({
-        num: Number(s.num) || 0,
-        name: String(s.name ?? ''),
-        streamType: String(s.stream_type ?? 'movie'),
-        streamId: Number(s.stream_id) || 0,
-        streamIcon: String(s.stream_icon ?? ''),
-        rating: String(s.rating ?? ''),
-        added: String(s.added ?? ''),
-        categoryId: String(s.category_id ?? ''),
-        containerExtension: String(s.container_extension ?? 'mp4'),
-        directSource: String(s.direct_source ?? ''),
-      }),
-    );
-
-    return { ok: true, value: streams };
+    return { ok: true, value: this.parseList(data.value, xtreamVodStreamItemSchema) };
   }
 
   async getSeriesList(categoryId?: string): Promise<Result<XtreamSeriesInfo[]>> {
@@ -288,139 +232,35 @@ export class XtreamClient {
     const data = await this.request(`get_series${extra}`);
     if (!data.ok) return data;
 
-    const series: XtreamSeriesInfo[] = (Array.isArray(data.value) ? data.value : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (s: any) => ({
-        num: Number(s.num) || 0,
-        name: String(s.name ?? ''),
-        seriesId: Number(s.series_id) || 0,
-        cover: String(s.cover ?? ''),
-        plot: String(s.plot ?? ''),
-        cast: String(s.cast ?? ''),
-        director: String(s.director ?? ''),
-        genre: String(s.genre ?? ''),
-        releaseDate: String(s.releaseDate ?? s.release_date ?? ''),
-        rating: String(s.rating ?? ''),
-        categoryId: String(s.category_id ?? ''),
-        lastModified: String(s.last_modified ?? ''),
-      }),
-    );
-
-    return { ok: true, value: series };
+    return { ok: true, value: this.parseList(data.value, xtreamSeriesItemSchema) };
   }
 
   async getSeriesInfo(seriesId: number): Promise<Result<XtreamSeriesDetail>> {
     const data = await this.request(`get_series_info&series_id=${seriesId}`);
     if (!data.ok) return data;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = data.value as any;
-    const info = raw?.info ?? {};
-    const seasons = Array.isArray(raw?.seasons)
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        raw.seasons.map((s: any) => ({
-          seasonNumber: Number(s.season_number ?? s.season ?? 0),
-          name: String(s.name ?? `Season ${s.season_number ?? 0}`),
-        }))
-      : [];
-
-    const episodes: Record<string, XtreamSeriesEpisode[]> = {};
-    if (raw?.episodes && typeof raw.episodes === 'object') {
-      for (const [seasonNum, eps] of Object.entries(raw.episodes)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        episodes[seasonNum] = (Array.isArray(eps) ? eps : []).map((e: any) => ({
-          id: String(e.id ?? ''),
-          episodeNum: Number(e.episode_num) || 0,
-          title: String(e.title ?? ''),
-          containerExtension: String(e.container_extension ?? 'mp4'),
-          info: {
-            duration: e.info?.duration ? String(e.info.duration) : undefined,
-            season: e.info?.season ? Number(e.info.season) : undefined,
-          },
-        }));
-      }
+    const parsed = xtreamSeriesDetailResponseSchema.safeParse(data.value);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: new Error('Invalid series-info response: malformed shape'),
+      };
     }
-
-    return {
-      ok: true,
-      value: {
-        seasons,
-        episodes,
-        info: {
-          name: String(info.name ?? ''),
-          cover: String(info.cover ?? ''),
-          plot: String(info.plot ?? ''),
-          cast: String(info.cast ?? ''),
-          director: String(info.director ?? ''),
-          genre: String(info.genre ?? ''),
-          releaseDate: String(info.releaseDate ?? info.release_date ?? ''),
-          rating: String(info.rating ?? ''),
-        },
-      },
-    };
+    return { ok: true, value: transformXtreamSeriesDetail(parsed.data) };
   }
 
   async getVodInfo(vodId: number): Promise<Result<XtreamVodDetail>> {
     const data = await this.request(`get_vod_info&vod_id=${vodId}`);
     if (!data.ok) return data;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = data.value as any;
-    const info = raw?.info ?? raw?.movie_data ?? {};
-    const movieData = raw?.movie_data ?? {};
-
-    // Providers encode backdrops as:
-    //   backdrop_path: string  (single URL)
-    //   backdrop_path: string[]  (multiple)
-    //   backdropPath: string
-    const backdrop = info.backdrop_path ?? info.backdropPath ?? '';
-    const backdropUrl = Array.isArray(backdrop)
-      ? String(backdrop[0] ?? '')
-      : String(backdrop);
-
-    // Subtitles can be:
-    //   [{ lang, url }]   (preferred)
-    //   [{ language, url }]
-    //   ["http://.../en.srt"]  (bare URL list — lang inferred from filename)
-    const subs: XtreamSubtitle[] = [];
-    const rawSubs = info.subtitles ?? raw?.subtitles ?? [];
-    if (Array.isArray(rawSubs)) {
-      for (const s of rawSubs) {
-        if (typeof s === 'string' && s) {
-          subs.push({ language: inferLangFromUrl(s), url: s });
-        } else if (s && typeof s === 'object') {
-          const url = String(s.url ?? s.href ?? '');
-          if (!url) continue;
-          const language = String(
-            s.language ?? s.lang ?? s.locale ?? inferLangFromUrl(url),
-          );
-          subs.push({ language, url });
-        }
-      }
+    const parsed = xtreamVodInfoResponseSchema.safeParse(data.value);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: new Error('Invalid VOD-info response: malformed shape'),
+      };
     }
-
-    const tmdbRaw = info.tmdb_id ?? info.tmdb ?? movieData.tmdb_id ?? null;
-    const tmdbId = tmdbRaw ? Number(tmdbRaw) || null : null;
-
-    return {
-      ok: true,
-      value: {
-        name: String(info.name ?? info.title ?? ''),
-        plot: String(info.plot ?? info.description ?? ''),
-        cast: String(info.cast ?? info.actors ?? ''),
-        director: String(info.director ?? ''),
-        genre: String(info.genre ?? info.category_name ?? ''),
-        releaseDate: String(info.releasedate ?? info.release_date ?? info.releaseDate ?? ''),
-        rating: String(info.rating ?? (info.rating_5based ? `${info.rating_5based}/5` : '')),
-        duration: String(info.duration ?? info.duration_secs ?? ''),
-        cover: String(info.movie_image ?? info.cover_big ?? info.cover ?? ''),
-        backdropUrl,
-        tagline: String(info.tagline ?? ''),
-        youtubeTrailer: String(info.youtube_trailer ?? info.youtubeTrailer ?? ''),
-        subtitles: subs,
-        tmdbId,
-      },
-    };
+    return { ok: true, value: transformXtreamVodDetail(parsed.data) };
   }
 
   buildEpgUrl(): string {
@@ -473,15 +313,25 @@ export class XtreamClient {
     const data = await this.request(action);
     if (!data.ok) return data;
 
-    const categories: XtreamCategory[] = (Array.isArray(data.value) ? data.value : []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (c: any) => ({
-        categoryId: String(c.category_id ?? ''),
-        categoryName: String(c.category_name ?? ''),
-        parentId: Number(c.parent_id) || 0,
-      }),
-    );
+    return { ok: true, value: this.parseList(data.value, xtreamCategoryItemSchema) };
+  }
 
-    return { ok: true, value: categories };
+  /**
+   * Apply an item-level Zod schema to a top-level array response,
+   * skipping individual entries that fail validation. Preserves the
+   * pre-schema "tolerant on bad shape" behaviour of returning an
+   * empty list when the wrapping value isn't even an array.
+   */
+  private parseList<T>(
+    raw: unknown,
+    schema: { safeParse: (v: unknown) => { success: boolean; data?: T } },
+  ): T[] {
+    if (!Array.isArray(raw)) return [];
+    const out: T[] = [];
+    for (const item of raw) {
+      const parsed = schema.safeParse(item);
+      if (parsed.success && parsed.data !== undefined) out.push(parsed.data);
+    }
+    return out;
   }
 }
