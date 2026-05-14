@@ -1,6 +1,12 @@
 .gradle/
 build/
-local.properties
+# Per-machine secrets (Sentry DSN + auth token, keystore credentials,
+# update endpoint). `local.properties*` also covers timestamped backups
+# created by scripts/setup-sentry-env.ps1 during Sentry rotation —
+# those backups carry the old (revoked) credentials in patterns
+# secret-scanners still match, so they must not get committed or sit
+# inside the project tree where filesystem-walking scanners find them.
+local.properties*
 .idea/
 *.iml
 captures/

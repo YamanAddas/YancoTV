@@ -15,6 +15,13 @@ dist-electron/
 dist-apk/
 build/
 out/
+# Playwright auto-generates a minified HTML report bundle here that
+# CodeQL picks apart for ~70 false-positive findings (semicolon
+# insertion, superfluous trailing args, useless conditionals) against
+# its own embedded JS framework. The directory is gitignored at
+# .gitignore:21; this entry mirrors it for filesystem-walking
+# scanners that don't read .gitignore.
+playwright-report/
 
 # ── Frozen workspace ────────────────────────────────────────────────────
 # packages/mobile/ is the abandoned RN port (frozen 2026-04-20). Excluded

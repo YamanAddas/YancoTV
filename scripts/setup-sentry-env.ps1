@@ -98,8 +98,19 @@ if (-not [string]::IsNullOrWhiteSpace($dsn)) {
 
 # ─── Remove the lines from local.properties ─────────────────────────────
 if (Test-Path $localProps) {
+    # Backup OUTSIDE the project tree. Earlier versions of this script
+    # wrote the backup next to local.properties; the 2026-05-14 172439
+    # audit then flagged the backup file itself because it carried the
+    # old (now-revoked) Sentry credentials in patterns secret-scanners
+    # match. Putting backups in $env:TEMP\yancotv-backups\ keeps the
+    # rollback safety net but stops the timestamped backup from sitting
+    # inside the directory yancoxplorer walks.
+    $backupDir = Join-Path $env:TEMP 'yancotv-backups'
+    if (-not (Test-Path $backupDir)) {
+        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+    }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $backup = "$localProps.bak-$stamp"
+    $backup = Join-Path $backupDir "local.properties.bak-$stamp"
     Copy-Item -Path $localProps -Destination $backup -Force
     Write-Host ''
     Write-Host "Backed up local.properties -> $backup"

@@ -80,6 +80,43 @@ yancoxplorer's `mobile.readiness.cleartext` check reads the manifest attribute d
 - A reasonable maintainer-burden way to know every IPTV provider host at build time (impractical given the user-supplied source model).
 - An architectural pivot to proxy every stream through `localhost:N` (significant engineering; defers the issue rather than solving it).
 
+### CodeQL findings introduced by the 2026-05-14 172439 audit run
+
+CodeQL was not in the previous (050016) audit's scanner set. Its addition surfaced 80+ findings, most of which are noise (auto-generated `playwright-report/index.html` minified JS that lights up CodeQL with semicolon-insertion, superfluous-trailing-args, etc.). After deleting that directory and the script-backup file, the remaining real CodeQL findings on YancoTV source are documented below.
+
+#### Polynomial regex — accepted
+
+| Site | Pattern | Why accepted |
+|---|---|---|
+| `packages/core/src/content/title-cleaner.ts:42` | iterates `STRIP_PATTERNS` over playlist titles | Patterns strip "(2024)", "[1080p]", etc. from M3U entries. Input is bounded (M3U title field is typically <200 chars) and the patterns are well-formed enough that JavaScript's NFA backtracking is bounded in practice. Worst case is a parsing thread stall on a crafted playlist, not a security incident. |
+| `packages/core/src/content/title-cleaner.ts:101` | `/\s*Season\s+\d+.*/i` | Same risk profile. Replacing with split-based parsing is real engineering effort — out of audit-cleanup scope. |
+| `packages/core/src/content/title-cleaner.ts:104` | `/\s*S\d{1,2}\s*E\d{1,3}.*/i` | Same. |
+| `packages/core/src/stalker/client.ts:88` | `portalUrl.replace(/\/+$/, '')` | **False positive.** `\/+$` is linear-time; there's no ambiguity to backtrack over. CodeQL's heuristic flagged it anyway. |
+| `packages/core/src/xtream/client.ts:175` | `url.replace(/\/+$/, '').replace(/\/player_api\.php$/, '')` | **False positive.** Both regexes are linear. |
+
+#### File-system race conditions — accepted
+
+| Site | Pattern | Why accepted |
+|---|---|---|
+| `src/main/services/asset-fetcher.ts:358` | `if (!fs.existsSync(tvshowPath)) { fs.writeFileSync(tvshowPath, ...) }` | TOCTOU on Kodi's `tvshow.nfo`. Worst case: a concurrent write loses to ours (we overwrite). No security impact — both writes are our own application's. |
+| `src/main/services/source-sync.ts:100` | `fs.stat(path)` then `fs.readFile(path)` | TOCTOU on the user's local M3U file. If the file is deleted between stat and read, the error surfaces normally through the sync's error path. |
+
+#### `src/main/services/opensubtitles-client.ts:240` — `Network data written to file` (false positive)
+
+CodeQL flags the legitimate subtitle download → cache write path. The bytes are HTTP-fetched from `api.opensubtitles.com` (HTTPS) and written to the app's `userData/subtitles-cache/` directory via `confinePath` (Phase 2.3). The flow is exactly what the SDK is supposed to do.
+
+#### `src/main/services/update-service.ts:60` — `Useless conditional` (intentional gate)
+
+`if (!UPDATE_MANIFEST_URL)` always returns true today because `UPDATE_MANIFEST_URL` is an empty string in `src/shared/constants.ts`. The constant ships empty until Stage 5.2 wires the real manifest URL — at which point the conditional flips to discriminating and the warning self-resolves. Documented in `constants.ts`'s comment block.
+
+#### `tests/unit/source-sync.test.ts:188` — `Unused variable` (test cleanup)
+
+Trivial — an unused fixture import or variable. Code-quality only.
+
+#### `docs/design/design_handoff_yancotv/designs/tweaks-panel.jsx:187` — `Missing origin verification in postMessage handler`
+
+Already accepted as part of the `docs/design/` mockup acceptance — this is the same family as the `wildcard-postmessage-configuration` Semgrep finding. `.semgrepignore` covers `docs/` for Semgrep but not for CodeQL.
+
 ### `aismell.universal.localhost-in-source` — `DEV_RENDERER_URL` constant
 
 | Field | Value |
