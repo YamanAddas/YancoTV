@@ -7,6 +7,8 @@
 > **If you're working on Android, do NOT touch this package.** Work in `packages/android/` + `packages/shared/` against the `MK.*` milestones.
 >
 > Everything below describes the frozen state of the RN app as of commit `fe6819e` (2026-04-20). The architectural notes about native `PlayerActivity` carry forward into the Kotlin rewrite because the Activity itself is reused.
+>
+> **2026-05-14: `packages/mobile/android/` Android wrapper pruned.** The 29 files under that directory (build.gradle, AndroidManifest.xml, MainActivity.kt, PlayerActivity.kt, drawables/values/etc.) were tracked but had not been built since 2026-04-20; the launch-audit scanner kept flagging the frozen manifest's `usesCleartextTraffic="true"` and exported MainActivity. Deleted to silence those persistent findings — git history preserves the files if the RN platform wrapper ever needs to be revived (`git show <commit>:packages/mobile/android/...`). The TypeScript / JS sources in `packages/mobile/src/` remain on disk as historical reference per the freeze policy.
 
 This is the mobile-specific project guide. For monorepo context see the [root CLAUDE.md](../../CLAUDE.md). For the frozen RN roadmap, see [PRODUCTION_PLAN_ANDROID.md](../../PRODUCTION_PLAN_ANDROID.md). For the active native plan, see [PRODUCTION_PLAN_NATIVE.md](../../PRODUCTION_PLAN_NATIVE.md).
 
