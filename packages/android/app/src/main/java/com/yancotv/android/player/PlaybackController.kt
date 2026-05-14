@@ -20,6 +20,7 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.recording.RecordingDataSink
 import com.yancotv.android.recording.TeeingDataSourceFactory
 import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.http.CleartextAllowlistInterceptor
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.sources.SourceRepository
@@ -164,6 +165,16 @@ class PlaybackController(
      * no override or this dependency is absent (test paths).
      */
     private val sources: SourceRepository? = null,
+    /**
+     * MK.SEC.C — application-layer cleartext allow-list interceptor.
+     * When non-null, the per-controller OkHttp instance refuses HTTP
+     * requests to hosts that aren't in the user's source list. HTTPS
+     * traffic is unaffected. `null` in tests / older tooling that
+     * doesn't wire the allow-list — the player falls back to the
+     * pre-MK.SEC.C "manifest says cleartext OK globally" behaviour
+     * in that case.
+     */
+    private val cleartextInterceptor: CleartextAllowlistInterceptor? = null,
 ) {
     /**
      * MK.17.5 — staged per-source HTTP override read by the OkHttp
@@ -226,7 +237,7 @@ class PlaybackController(
         // AppPreferences.networkFlow on every request via an interceptor.
         // The ExoPlayer itself is constructed once; the next MediaItem
         // picks up changes without a player rebuild.
-        val okHttp =
+        val okHttpBuilder =
             OkHttpClient
                 .Builder()
                 .followRedirects(true)
@@ -255,7 +266,17 @@ class PlaybackController(
                         .withConnectTimeout(connect, TimeUnit.SECONDS)
                         .withReadTimeout(read, TimeUnit.SECONDS)
                         .proceed(builder.build())
-                }.build()
+                }
+        // MK.SEC.C — application-layer cleartext-traffic allow-list for
+        // the player's HTTP path. Added LAST in the chain so the UA /
+        // Referer / timeout interceptor still runs for allowed HTTPS
+        // requests; for HTTP-to-non-allowlisted hosts the cleartext
+        // interceptor short-circuits with a synthetic 469 before the
+        // network actually fires. Optional — tests / standalone uses
+        // of this class without Koin pass null and inherit the
+        // pre-MK.SEC.C "manifest globally permissive" behaviour.
+        cleartextInterceptor?.let { okHttpBuilder.addInterceptor(it) }
+        val okHttp = okHttpBuilder.build()
         // OkHttpDataSource.Factory.setUserAgent is intentionally NOT called —
         // the interceptor above is the sole source of the UA so user
         // overrides from Settings actually take effect per request.

@@ -203,6 +203,12 @@ val appModule =
                 history = get(),
                 recordingSink = get(),
                 sources = get(),
+                // MK.SEC.C — player HTTP path enforces the cleartext
+                // allow-list too. Shares the same interceptor singleton
+                // wired into the shared OkHttpClient and the Ktor
+                // engine, so adding a Source updates all three paths
+                // simultaneously via the lambda-deferred lookup.
+                cleartextInterceptor = get(),
             )
         }
         single {
