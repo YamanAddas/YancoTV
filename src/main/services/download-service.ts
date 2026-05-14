@@ -10,6 +10,7 @@ import log from 'electron-log/main';
 import { getDb } from './db';
 import { getSetting, setSetting } from './settings-service';
 import { fetchAssetsForDownload } from './asset-fetcher';
+import { confinePath, tryConfinePath } from '../utils/safe-path';
 import { IpcChannels } from '../../shared/ipc-channels';
 import type {
   Download,
@@ -240,20 +241,6 @@ function sanitizeFilename(name: string): string {
   return clean.slice(0, 180);
 }
 
-/**
- * Resolve a candidate path under `baseDir` and reject anything that escapes.
- * Any path traversal attempt (../ or absolute overrides) is refused.
- */
-function confinePath(baseDir: string, filename: string): string {
-  const safeBase = path.resolve(baseDir);
-  const resolved = path.resolve(safeBase, filename);
-  const rel = path.relative(safeBase, resolved);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error('Filename resolves outside downloads directory');
-  }
-  return resolved;
-}
-
 function ensureDir(dir: string): void {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
@@ -273,9 +260,24 @@ function uniqueFilePath(dir: string, title: string, url: URL): string {
   const base = sanitizeFilename(title);
   let candidate = `${base}${ext}`;
   let n = 1;
-  while (fs.existsSync(path.join(dir, candidate)) || fs.existsSync(path.join(dir, `${candidate}.part`))) {
+  // Every collision probe goes through tryConfinePath so a sanitised
+  // filename that *would* escape the dir falls back to "download (N)"
+  // instead of poking at fs.existsSync with an attacker-shaped path.
+  // sanitizeFilename already strips traversal segments, but defence
+  // in depth is cheap here.
+  let resolved = tryConfinePath(dir, candidate);
+  let partResolved = tryConfinePath(dir, `${candidate}.part`);
+  while (
+    !resolved ||
+    !partResolved ||
+    fs.existsSync(resolved) ||
+    fs.existsSync(partResolved)
+  ) {
     candidate = `${base} (${n})${ext}`;
     n++;
+    resolved = tryConfinePath(dir, candidate);
+    partResolved = tryConfinePath(dir, `${candidate}.part`);
+    if (n > 9999) throw new Error('uniqueFilePath: exhausted collision suffixes');
   }
   return confinePath(dir, candidate);
 }

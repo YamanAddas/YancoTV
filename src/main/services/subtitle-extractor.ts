@@ -3,6 +3,7 @@ import fs from 'fs';
 import { spawn, execFile } from 'child_process';
 import log from 'electron-log/main';
 import { findFfmpegPath } from './ffmpeg-path';
+import { confinePath } from '../utils/safe-path';
 
 /**
  * Extract embedded text subtitles from a finished video file via ffmpeg.
@@ -199,7 +200,17 @@ export async function extractEmbeddedSubtitles(
     }
     result.attempted++;
     const outName = subtitleFilename(baseNoExt, s.language, used);
-    const outPath = path.join(dir, outName);
+    let outPath: string;
+    try {
+      outPath = confinePath(dir, outName);
+    } catch (err) {
+      result.skipped.push({
+        language: s.language,
+        codec: s.codec,
+        reason: `unsafe output path: ${String((err as Error).message)}`,
+      });
+      continue;
+    }
     try {
       await extractOne(ffmpegPath, videoPath, s.subtitleIndex, outPath, signal);
       // Empty output means the track had no parseable cues; delete it.

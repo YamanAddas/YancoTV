@@ -5,6 +5,7 @@ import log from 'electron-log/main';
 import { APP_NAME, APP_VERSION } from '../../shared/constants';
 import { getSetting } from './settings-service';
 import { decryptCredential } from './credential-store';
+import { confinePath } from '../utils/safe-path';
 
 /**
  * OpenSubtitles REST API v1 client — https://opensubtitles.stoplight.io/
@@ -256,9 +257,12 @@ export async function downloadSubtitle(fileId: number): Promise<{ path: string; 
   await fs.promises.mkdir(cacheDir, { recursive: true });
 
   // Preserve the server-suggested filename, sanitized, falling back to a
-  // stable one based on file_id.
+  // stable one based on file_id. `fileId` comes from the OpenSubtitles
+  // API response — `confinePath` guarantees the result stays inside
+  // cacheDir even if a malformed/malicious file_id slips through the
+  // regex.
   const safeName = (dl.file_name || `${fileId}.srt`).replace(/[^\w.\- ]+/g, '_');
-  const outPath = path.join(cacheDir, `${fileId}-${safeName}`);
+  const outPath = confinePath(cacheDir, `${fileId}-${safeName}`);
   await fs.promises.writeFile(outPath, buf);
 
   return { path: outPath, remaining: dl.remaining };

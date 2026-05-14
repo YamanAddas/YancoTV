@@ -13,6 +13,7 @@ import {
   buildTvShowNfo,
 } from './nfo-writer';
 import { extractEmbeddedSubtitles } from './subtitle-extractor';
+import { confinePath, tryConfinePath } from '../utils/safe-path';
 import type {
   ContentItem,
   ContentMetadata,
@@ -317,12 +318,19 @@ export async function fetchAssetsForDownload(ctx: AssetFetchContext): Promise<As
 
   const assetsOn = fetchAssetsEnabled();
 
+  // Every output path below is funnelled through `confinePath(dir, …)`
+  // before any write. `dir` is the parent of an already-confined
+  // download file (uniqueFilePath uses confinePath), and `baseNoExt`
+  // is `path.basename(videoPath)` which strips traversal segments —
+  // but defence in depth is cheap and keeps the path-traversal
+  // detectors honest.
+
   // ─── Poster ────────────────────────────────────────────────────────────
   if (assetsOn) {
     const posterUrl = metadata?.tmdbPosterUrl || item?.logoUrl;
     if (posterUrl) {
-      const out = path.join(dir, `${baseNoExt}-poster${posterExt(posterUrl)}`);
       try {
+        const out = confinePath(dir, `${baseNoExt}-poster${posterExt(posterUrl)}`);
         await downloadToFile(posterUrl, out);
         result.poster = out;
       } catch (err) {
@@ -333,8 +341,8 @@ export async function fetchAssetsForDownload(ctx: AssetFetchContext): Promise<As
     // ─── Backdrop ───────────────────────────────────────────────────────
     const backdropUrl = metadata?.tmdbBackdropUrl;
     if (backdropUrl) {
-      const out = path.join(dir, `${baseNoExt}-fanart${posterExt(backdropUrl)}`);
       try {
+        const out = confinePath(dir, `${baseNoExt}-fanart${posterExt(backdropUrl)}`);
         await downloadToFile(backdropUrl, out);
         result.backdrop = out;
       } catch (err) {
@@ -344,7 +352,7 @@ export async function fetchAssetsForDownload(ctx: AssetFetchContext): Promise<As
 
     // ─── NFO ─────────────────────────────────────────────────────────────
     try {
-      const nfoPath = path.join(dir, `${baseNoExt}.nfo`);
+      const nfoPath = confinePath(dir, `${baseNoExt}.nfo`);
       let xml: string;
       if (episode && item) {
         xml = buildEpisodeNfo({
@@ -353,7 +361,7 @@ export async function fetchAssetsForDownload(ctx: AssetFetchContext): Promise<As
           metadata,
         });
         // Also drop a tvshow.nfo next to it if none exists (Kodi picks it up).
-        const tvshowPath = path.join(dir, 'tvshow.nfo');
+        const tvshowPath = confinePath(dir, 'tvshow.nfo');
         if (!fs.existsSync(tvshowPath)) {
           fs.writeFileSync(
             tvshowPath,
@@ -382,15 +390,21 @@ export async function fetchAssetsForDownload(ctx: AssetFetchContext): Promise<As
         const ext = subtitleExtFromUrl(u);
         let candidate = `${baseNoExt}.${lang}${ext}`;
         let n = 2;
-        while (used.has(candidate.toLowerCase()) || fs.existsSync(path.join(dir, candidate))) {
+        let probe = tryConfinePath(dir, candidate);
+        while (!probe || used.has(candidate.toLowerCase()) || fs.existsSync(probe)) {
           candidate = `${baseNoExt}.${lang}.${n}${ext}`;
           n++;
+          probe = tryConfinePath(dir, candidate);
+          if (n > 9999) break;
+        }
+        if (!probe) {
+          result.errors.push(`provider-sub (${lang}): could not produce safe filename`);
+          continue;
         }
         used.add(candidate.toLowerCase());
-        const out = path.join(dir, candidate);
         try {
-          await downloadToFile(sub.url, out);
-          result.providerSubtitles.push(out);
+          await downloadToFile(sub.url, probe);
+          result.providerSubtitles.push(probe);
         } catch (err) {
           result.errors.push(`provider-sub (${lang}): ${String((err as Error).message)}`);
         }
