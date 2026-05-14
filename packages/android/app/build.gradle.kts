@@ -10,9 +10,29 @@ plugins {
     alias(libs.plugins.sentry)
 }
 
-// Sentry DSN — read from local.properties so the value stays per-machine and
-// out of git history. Empty string when missing means Sentry init is a silent
-// no-op (clean checkout / fresh dev box doesn't crash on launch).
+// ─── Per-machine config ─────────────────────────────────────────────────
+//
+// Two-tier resolution for every secret a developer / CI runner has to
+// supply at build time:
+//
+//   1. **Environment variable** (preferred). Keeps secrets OFF disk in
+//      the project tree so filesystem-walking scanners (TruffleHog,
+//      Gitleaks, yancoxplorer Mobile Launch Readiness) can't find them
+//      when they scan the working directory. Set in your shell profile
+//      (`~/.bashrc`, `~/.zshrc`, `setx` on Windows, or Android Studio's
+//      Run → Edit Configurations → Environment variables).
+//
+//   2. **`local.properties`** (fallback). The legacy on-disk pattern.
+//      File is gitignored so the values never reach git history, but
+//      they DO sit on disk where any process with read access to the
+//      project dir can see them. After rotating a credential, prefer
+//      moving its new value to an env var rather than back into this
+//      file — `MB-203` audit thread / `docs/security/AUDIT_NOTES.md`
+//      for the rationale.
+//
+// Both empty = the feature gates off cleanly (Sentry no-op, update
+// checker no-op, debug signing on release variant). A fresh clone
+// still builds + installs without any setup.
 val sentryProps: Properties =
     rootProject.file("local.properties").let { propsFile ->
         Properties().apply {
@@ -21,13 +41,27 @@ val sentryProps: Properties =
             }
         }
     }
-val sentryDsn: String = sentryProps.getProperty("sentry.dsn", "")
+
+/**
+ * Resolve a secret with env-var precedence over `local.properties`.
+ * Empty string when neither source has a non-blank value.
+ */
+fun resolveSecret(envVar: String, propsKey: String): String =
+    System.getenv(envVar)?.takeIf { it.isNotBlank() }
+        ?: sentryProps.getProperty(propsKey, "")
+
+// Sentry DSN — read by SentryInit.kt at app launch via
+// BuildConfig.SENTRY_DSN. Empty means "Sentry off" (init no-op).
+val sentryDsn: String = resolveSecret("YANCOTV_SENTRY_DSN", "sentry.dsn")
+
 // Sentry auth token — used by the Sentry Gradle plugin at build time to
 // upload R8 mapping files. Never embedded in the APK. Empty when missing
 // means the plugin's upload step is skipped (a clean checkout still
 // builds; just no symbolicated stack traces in the dashboard for that
-// build's release crashes).
-val sentryAuthToken: String = sentryProps.getProperty("sentry.auth.token", "")
+// build's release crashes). The env-var name `SENTRY_AUTH_TOKEN` is the
+// Sentry CLI / plugin's own convention so the same export works with
+// other Sentry tooling.
+val sentryAuthToken: String = resolveSecret("SENTRY_AUTH_TOKEN", "sentry.auth.token")
 
 // Stage 5.2.2 — sideload auto-update endpoint URL. Read from
 // local.properties so per-machine / per-fork values stay out of git.
