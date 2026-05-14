@@ -84,6 +84,135 @@ class WatchHistoryRepositoryTest {
         assertEquals(42L, repo.positionFor("series-1"))
     }
 
+    // ───── Finished-row null return (MB-VOD-LOOP) ─────
+
+    @Test fun positionFor_returnsNull_whenContentRowIsFinished() = runTest {
+        // The bug: after a movie was watched to credits, the row sat at
+        // position=duration. Re-tap → loadCurrent seeks to that offset
+        // → STATE_ENDED fires immediately → user is stuck. The repo now
+        // returns null for rows that hit the 95% threshold so the player
+        // starts the title from the beginning instead of seeking to the
+        // credits.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("movie-1", positionSeconds = 6900L, durationSeconds = 7200L)
+        assertNull(
+            repo.positionFor("movie-1"),
+            "≥95% must be treated as finished — caller starts the title fresh",
+        )
+    }
+
+    @Test fun positionFor_returnsValue_justBelow95Percent() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        // 94.9% — under the threshold.
+        repo.upsert("movie-1", positionSeconds = 6831L, durationSeconds = 7200L)
+        assertEquals(6831L, repo.positionFor("movie-1"))
+    }
+
+    @Test fun positionFor_returnsValue_whenDurationUnknown() = runTest {
+        // Null duration disables the ratio check — the explicit
+        // markCurrentCompleted() path covers these on STATE_ENDED.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("movie-1", positionSeconds = 9_999L, durationSeconds = null)
+        assertEquals(9_999L, repo.positionFor("movie-1"))
+    }
+
+    @Test fun positionForEpisode_returnsNull_whenRowIsFinished() = runTest {
+        // Same rule on the episode-keyed lookup. This is the path that
+        // chained the autoplay loop for binge-watched series.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 1750L, durationSeconds = 1800L)
+        assertNull(
+            repo.positionForEpisode("ep-1"),
+            "finished episode row must return null — autoplay loop guard",
+        )
+    }
+
+    @Test fun positionForEpisode_returnsValue_whenMidEpisode() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 600L, durationSeconds = 1800L)
+        assertEquals(600L, repo.positionForEpisode("ep-1"))
+    }
+
+    @Test fun positionForEpisode_returnsValue_whenDurationUnknown() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 1_800L, durationSeconds = null)
+        assertEquals(1_800L, repo.positionForEpisode("ep-1"))
+    }
+
+    // ───── hasAnyForContent ─────
+
+    @Test fun hasAnyForContent_falseWhenNoRows() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        assertEquals(false, repo.hasAnyForContent("movie-1"))
+    }
+
+    @Test fun hasAnyForContent_trueAfterContentRowUpsert() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("movie-1", positionSeconds = 60L, durationSeconds = 7200L)
+        assertEquals(true, repo.hasAnyForContent("movie-1"))
+    }
+
+    @Test fun hasAnyForContent_trueAfterEpisodeRowUpsert() = runTest {
+        // Episode rows write seriesId as content_id (FK target), so a
+        // series with any episode history also reports true here. Used by
+        // the detail screen to decide whether to show "Reset progress".
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 300L, durationSeconds = 1800L)
+        assertEquals(true, repo.hasAnyForContent("series-1"))
+    }
+
+    @Test fun hasAnyForContent_falseAfterRemoveForContent() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 300L)
+        repo.removeForContent("series-1")
+        assertEquals(false, repo.hasAnyForContent("series-1"), "reset wipe must clear hasAny flag")
+    }
+
     @Test fun upsertOnSameKeyReplaces() = runTest {
         val db = testDb()
         insertSource(db, "src-A")

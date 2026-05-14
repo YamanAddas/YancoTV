@@ -29,9 +29,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -97,6 +99,8 @@ fun ContentDetailScreen(
     item: ContentItem,
     onPlayContent: (ContentItem) -> Unit,
     onPlayEpisode: (ContentItem, EpisodeInfo) -> Unit,
+    onPlayFromStart: (ContentItem, EpisodeInfo?) -> Unit,
+    onResetProgress: (ContentItem) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     detailService: ContentDetailService = koinInject(),
@@ -157,20 +161,52 @@ fun ContentDetailScreen(
     // "Play" → "Resume S2E4" / "Play S2E5" / "Watch again S1E1" without
     // forcing the user to wait on initial render.
     var resumeInfo by remember(item.id) { mutableStateOf<EpisodeResumeInfo?>(null) }
-    LaunchedEffect(item.id, episodes.size) {
-        if (rendered.type != ContentType.SERIES || episodes.isEmpty()) {
-            resumeInfo = null
-            return@LaunchedEffect
-        }
-        resumeInfo =
+    // Whether ANY watch_history row exists for this content (movie row
+    // OR any episode row). Drives visibility of the "Reset progress"
+    // secondary action — no point showing it on a never-watched title.
+    var hasHistory by remember(item.id) { mutableStateOf(false) }
+    // Movie-only: mid-stream resume position. Null for "no row" AND
+    // "finished" (positionFor applies the 95% rule on the read side),
+    // which collapses both into the same UX — primary button says
+    // "Play" and starts from 0. Non-null → "Continue".
+    var movieResumeSeconds by remember(item.id) { mutableStateOf<Long?>(null) }
+    // Bumped by the reset action so the LaunchedEffect re-runs and the
+    // resume / history state reflects the cleared row immediately.
+    var historyVersion by remember(item.id) { mutableStateOf(0) }
+    LaunchedEffect(item.id, episodes.size, historyVersion) {
+        val snapshot =
             withContext(Dispatchers.IO) {
-                runCatching { watchHistory.mostRecentEpisode(rendered.id) }.getOrNull()
+                val info =
+                    if (rendered.type == ContentType.SERIES && episodes.isNotEmpty()) {
+                        runCatching { watchHistory.mostRecentEpisode(rendered.id) }.getOrNull()
+                    } else {
+                        null
+                    }
+                val movieResume =
+                    if (rendered.type == ContentType.MOVIE) {
+                        runCatching { watchHistory.positionFor(rendered.id) }.getOrNull()
+                    } else {
+                        null
+                    }
+                val any = runCatching { watchHistory.hasAnyForContent(rendered.id) }.getOrDefault(false)
+                Triple(info, movieResume, any)
             }
+        resumeInfo = snapshot.first
+        movieResumeSeconds = snapshot.second
+        hasHistory = snapshot.third
     }
     val playChoice =
         remember(episodes, resumeInfo) {
             computeNextEpisode(episodes, resumeInfo)
         }
+    val sortedEpisodes =
+        remember(episodes) {
+            episodes.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }, { it.id }))
+        }
+
+    // Reset-progress confirmation dialog state. Keyed per item so opening
+    // another title resets the dialog.
+    var resetDialogOpen by remember(item.id) { mutableStateOf(false) }
 
     // Single LazyColumn governs the whole page so d-pad focus never has
     // to cross a scroll-container boundary.
@@ -215,6 +251,8 @@ fun ContentDetailScreen(
                     metadata = metadata,
                     episodes = episodes,
                     playChoice = playChoice,
+                    movieResumeSeconds = movieResumeSeconds,
+                    hasHistory = hasHistory,
                     isFavorite = isFav,
                     onPlay = {
                         when (rendered.type) {
@@ -229,6 +267,21 @@ fun ContentDetailScreen(
                             else -> onPlayContent(rendered)
                         }
                     },
+                    onPlayFromStart = {
+                        // Series: jump to the first sorted episode (S1E1
+                        // or the earliest available special). Movie: pass
+                        // a null EpisodeInfo so the parent invokes
+                        // controller.play(list, idx, fromStart=true) on
+                        // the movie itself.
+                        when (rendered.type) {
+                            ContentType.SERIES -> {
+                                val first = sortedEpisodes.firstOrNull()
+                                if (first != null) onPlayFromStart(rendered, first)
+                            }
+                            else -> onPlayFromStart(rendered, null)
+                        }
+                    },
+                    onReset = { resetDialogOpen = true },
                     onFavoriteToggle = {
                         val optimistic = !isFav
                         isFav = optimistic
@@ -310,6 +363,25 @@ fun ContentDetailScreen(
                 },
             )
         }
+
+        if (resetDialogOpen) {
+            ResetProgressDialog(
+                isSeries = rendered.type == ContentType.SERIES,
+                onConfirm = {
+                    resetDialogOpen = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { watchHistory.removeForContent(rendered.id) }
+                        }
+                        // Bump the version so the LaunchedEffect re-runs
+                        // and `hasHistory` / `resumeInfo` reflect the wipe.
+                        historyVersion += 1
+                        onResetProgress(rendered)
+                    }
+                },
+                onDismiss = { resetDialogOpen = false },
+            )
+        }
     }
 
     // Auto-focus Play on open and re-assert it when `loaded` settles.
@@ -378,8 +450,12 @@ private fun HeroBlock(
     metadata: ContentMetadata,
     episodes: List<EpisodeInfo>,
     playChoice: NextEpisodeChoice?,
+    movieResumeSeconds: Long?,
+    hasHistory: Boolean,
     isFavorite: Boolean,
     onPlay: () -> Unit,
+    onPlayFromStart: () -> Unit,
+    onReset: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onBack: () -> Unit,
     playAnchor: PlacedFocusAnchor,
@@ -435,10 +511,20 @@ private fun HeroBlock(
                         primaryLabel =
                         when (item.type) {
                             ContentType.SERIES -> playChoice?.let(::resumeButtonLabel) ?: "Play"
+                            ContentType.MOVIE -> if (movieResumeSeconds != null) "Continue" else "Play"
                             else -> "Play"
                         },
+                        // "Play from beginning" makes sense for movies and
+                        // for series with at least one cached episode; series
+                        // with zero episodes still need *some* affordance,
+                        // so we hide the button in that case rather than
+                        // wire it to a no-op.
+                        showPlayFromStart = item.type != ContentType.SERIES || episodes.isNotEmpty(),
+                        showReset = hasHistory,
                         isFavorite = isFavorite,
                         onPlay = onPlay,
+                        onPlayFromStart = onPlayFromStart,
+                        onReset = onReset,
                         onFavoriteToggle = onFavoriteToggle,
                         onBack = onBack,
                         playAnchor = playAnchor,
@@ -597,8 +683,12 @@ private fun CreditRow(label: String, value: String) {
 @Composable
 private fun ActionRow(
     primaryLabel: String,
+    showPlayFromStart: Boolean,
+    showReset: Boolean,
     isFavorite: Boolean,
     onPlay: () -> Unit,
+    onPlayFromStart: () -> Unit,
+    onReset: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onBack: () -> Unit,
     playAnchor: PlacedFocusAnchor,
@@ -612,6 +702,22 @@ private fun ActionRow(
             onClick = onPlay,
             playAnchor = playAnchor,
         )
+        if (showPlayFromStart) {
+            SecondaryButton(
+                label = "Play from beginning",
+                icon = null,
+                onClick = onPlayFromStart,
+                accent = false,
+            )
+        }
+        if (showReset) {
+            SecondaryButton(
+                label = "Reset progress",
+                icon = null,
+                onClick = onReset,
+                accent = false,
+            )
+        }
         SecondaryButton(
             label = if (isFavorite) "In favourites" else "Add to favourites",
             icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
@@ -935,6 +1041,35 @@ private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit, modifier: Modifier 
             modifier = Modifier.size(16.dp),
         )
     }
+}
+
+@Composable
+private fun ResetProgressDialog(isSeries: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val palette = LocalYancoPalette.current
+    val body =
+        if (isSeries) {
+            "This clears your resume points and watched marks for every " +
+                "episode in this series. You'll start fresh next time."
+        } else {
+            "This clears your resume point for this title. Next play will " +
+                "start from the beginning."
+        }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = palette.BackgroundRaised,
+        title = { Text("Reset progress?", color = palette.TextPrimary) },
+        text = { Text(body, color = palette.TextSecondary) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Reset", color = palette.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = palette.TextMuted)
+            }
+        },
+    )
 }
 
 private enum class PlayMode {

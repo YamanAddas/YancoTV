@@ -165,21 +165,29 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
 
     /**
      * Resume position (seconds) for a content-level row — that is, a row
-     * with `episode_id IS NULL`. Returns null if there's no such row.
+     * with `episode_id IS NULL`. Returns null if there's no such row, or
+     * if the row is already at the "finished" threshold (≥95% of duration)
+     * so the player starts the title fresh on next open instead of
+     * seeking straight to the credits and immediately re-firing STATE_ENDED.
      *
      * Do NOT fall through to episode rows here: a series container must not
      * seek to some arbitrary episode's offset just because that episode
      * happens to be the most recent entry under the same `content_id`.
      */
     fun positionFor(contentId: String): Long? {
-        val rows = db.watchHistoryQueries.selectByContent(contentId).executeAsList()
-        return rows.firstOrNull { it.episode_id == null }?.position_seconds
+        val row = db.watchHistoryQueries.selectByContent(contentId).executeAsList()
+            .firstOrNull { it.episode_id == null } ?: return null
+        if (isWatchRowFinished(row.position_seconds, row.duration_seconds)) return null
+        return row.position_seconds
     }
 
     /**
      * Resume position (seconds) for an episode's own row, keyed by
-     * `episode_id`. Returns null if the user has never opened this episode
-     * or the prior session never reached the persistResumePoint threshold.
+     * `episode_id`. Returns null if the user has never opened this episode,
+     * if the prior session never reached the persistResumePoint threshold,
+     * or if the row is already at the "finished" threshold (≥95% of
+     * duration) — re-tapping a finished episode must restart it from the
+     * beginning, not seek to credits and chain into autoplay.
      *
      * This is the EPISODE counterpart to [positionFor] — they intentionally
      * use different lookups so a series-container open can't accidentally
@@ -188,7 +196,9 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
      * be junk).
      */
     fun positionForEpisode(episodeId: String): Long? {
-        return db.watchHistoryQueries.selectByEpisode(episodeId).executeAsOneOrNull()?.position_seconds
+        val row = db.watchHistoryQueries.selectByEpisode(episodeId).executeAsOneOrNull() ?: return null
+        if (isWatchRowFinished(row.position_seconds, row.duration_seconds)) return null
+        return row.position_seconds
     }
 
     /**
@@ -213,6 +223,19 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
         )
     }
 
+    /**
+     * Whether any watch_history row exists for [contentId] — content-
+     * level OR any of its episode rows (all share the same `content_id`
+     * FK target per the schema's "episodes write seriesId as content_id"
+     * convention).
+     *
+     * Cheaper than fetching the rows for callers that only need the
+     * boolean, e.g. the detail screen deciding whether to render the
+     * "Reset progress" button.
+     */
+    fun hasAnyForContent(contentId: String): Boolean =
+        db.watchHistoryQueries.selectByContent(contentId).executeAsList().isNotEmpty()
+
     fun removeForContent(contentId: String) {
         db.watchHistoryQueries.deleteByContent(contentId)
     }
@@ -234,11 +257,27 @@ data class EpisodeResumeInfo(
      * apps; tighter than 100% to handle credits sequences and trailing
      * tail-end skips that don't represent real continuation intent.
      */
-    fun isFinished(): Boolean {
-        val dur = durationSeconds ?: return false
-        if (dur <= 0L) return false
-        return positionSeconds.toDouble() / dur.toDouble() >= 0.95
-    }
+    fun isFinished(): Boolean = isWatchRowFinished(positionSeconds, durationSeconds)
+}
+
+/**
+ * Whether a watch_history row should be treated as "finished" (≥95% of
+ * known duration). Shared between [EpisodeResumeInfo.isFinished] (UI
+ * label switch on the series detail page) and [WatchHistoryRepository]'s
+ * resume lookups (which return null on finished rows so the player
+ * starts fresh instead of seeking to the credits).
+ *
+ * Rows with unknown / non-positive duration are never "finished" by
+ * this rule — there's no denominator to compare against. The player
+ * has a separate explicit completion path (`PlaybackController.markCurrentCompleted`)
+ * that handles those on STATE_ENDED. Integer math (×100 / ×95)
+ * intentional: avoids floating-point comparison quirks at the
+ * boundary.
+ */
+internal fun isWatchRowFinished(positionSeconds: Long, durationSeconds: Long?): Boolean {
+    val dur = durationSeconds ?: return false
+    if (dur <= 0L) return false
+    return positionSeconds * 100L >= dur * 95L
 }
 
 private fun contentTypeFromDb(value: String): ContentType = when (value) {

@@ -81,6 +81,127 @@ class ResumePointDecisionTest {
         assertEquals(5L, write?.positionSeconds)
     }
 
+    // ───── Near-end behavior — writes preserve raw position (MB-VOD-LOOP) ─────
+    //
+    // The 95% "finished" rule lives on the READ side:
+    // `WatchHistoryRepository.positionFor` / `positionForEpisode` return
+    // null for finished rows so the player starts the title fresh, and
+    // `EpisodeResumeInfo.isFinished` returns true so the series detail
+    // page + Home tap routing advance to the next episode. The write
+    // side stays neutral — preserving the raw position keeps both
+    // signals (the ratio for isFinished, the raw value for any future
+    // "exact resume" callers) intact.
+
+    @Test fun `position at 95 percent of duration persists raw value`() {
+        // 95% boundary. The repo's positionFor reads this row, applies
+        // isFinished(), and returns null — but the row itself must
+        // carry the raw position so isFinished() sees a denominator.
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 6840L,
+                durationSeconds = 7200L,
+            )
+        assertEquals(6840L, write?.positionSeconds, "near-end must persist raw position; cap lives on the read side")
+        assertEquals(7200L, write?.durationSeconds, "duration must be persisted alongside")
+    }
+
+    @Test fun `position equal to duration persists raw value`() {
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 7200L,
+                durationSeconds = 7200L,
+            )
+        assertEquals(7200L, write?.positionSeconds)
+        assertEquals(7200L, write?.durationSeconds)
+    }
+
+    @Test fun `position past duration persists raw value`() {
+        // ExoPlayer's currentPosition can briefly overshoot duration
+        // during the STATE_ENDED transition. The row must reflect that
+        // — isWatchRowFinished still returns true (ratio ≥ 1.0 ≥ 0.95).
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 7300L,
+                durationSeconds = 7200L,
+            )
+        assertEquals(7300L, write?.positionSeconds)
+    }
+
+    @Test fun `position just below 95 percent persists raw value`() {
+        // 94.9% — under the threshold. Resume offset must be preserved
+        // so positionFor returns it for the next load.
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 6831L,
+                durationSeconds = 7200L,
+            )
+        assertEquals(6831L, write?.positionSeconds)
+    }
+
+    @Test fun `position at 50 percent persists raw value`() {
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 3600L,
+                durationSeconds = 7200L,
+            )
+        assertEquals(3600L, write?.positionSeconds)
+    }
+
+    @Test fun `near-end episode persists raw value and preserves FK shape`() {
+        // The decision must still write seriesId as content_id (FK
+        // target) and the episode id in the dedicated column even when
+        // the position is at the credits — without this, isFinished()
+        // wouldn't be able to detect the row's "finished" state on
+        // the next series detail open.
+        val write =
+            resumePointDecision(
+                item = movie(id = "series-9", type = ContentType.SERIES),
+                episode = episode(id = "ep-5", seriesId = "series-9"),
+                positionSeconds = 1800L,
+                durationSeconds = 1800L,
+            )
+        assertEquals("series-9", write?.contentId, "seriesId preserved as contentId")
+        assertEquals("ep-5", write?.episodeId, "episode id preserved")
+        assertEquals(1800L, write?.positionSeconds, "raw position preserved")
+    }
+
+    @Test fun `null duration persists raw position`() {
+        // ExoPlayer reports duration <= 0 for some IPTV VOD without
+        // metadata; the controller maps that to null. The 95% rule
+        // can't fire here on the read side either — markCurrentCompleted
+        // covers explicit STATE_ENDED for those streams.
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 9_999L,
+                durationSeconds = null,
+            )
+        assertEquals(9_999L, write?.positionSeconds)
+        assertNull(write?.durationSeconds)
+    }
+
+    @Test fun `zero duration persists raw position`() {
+        val write =
+            resumePointDecision(
+                item = movie(),
+                episode = null,
+                positionSeconds = 600L,
+                durationSeconds = 0L,
+            )
+        assertEquals(600L, write?.positionSeconds)
+    }
+
     // ───── Movie path ─────
 
     @Test fun `movie writes item id with null episode id`() {
