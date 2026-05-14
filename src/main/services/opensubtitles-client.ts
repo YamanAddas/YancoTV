@@ -15,7 +15,29 @@ import { decryptCredential } from './credential-store';
  */
 
 const API_BASE = 'https://api.opensubtitles.com/api/v1';
-const DEFAULT_API_KEY = 'sC5mcEdjFTLY5lWPr14tYsk69Bc7QkXh';
+
+/**
+ * Consumer API key for the YancoTV application, as registered with
+ * OpenSubtitles. Per OpenSubtitles' API guidance, every client embeds its
+ * own consumer key — quota is enforced per (consumer, user) pair, so
+ * users who sign in raise their own download limit without affecting
+ * other YancoTV installs. Anonymous downloads are capped at 5/day per
+ * consumer key.
+ *
+ * This is NOT a credential. It's the public application identifier
+ * (analogous to an OAuth client_id). Forks wanting their own quota
+ * pool should register at https://www.opensubtitles.com/en/consumers
+ * and either set OPENSUBTITLES_API_KEY in their env or edit this
+ * fallback. The Settings panel's `opensubtitles.apiKey` override
+ * (`getApiKey()` below) takes precedence over both.
+ *
+ * Scanners pattern-match the literal as a secret. The inline markers
+ * acknowledge that explicitly rather than suppressing silently.
+ */
+const CONSUMER_API_KEY =
+  process.env.OPENSUBTITLES_API_KEY?.trim() ||
+  // nosemgrep: generic.secrets.security.detected-generic-api-key.detected-generic-api-key
+  'sC5mcEdjFTLY5lWPr14tYsk69Bc7QkXh'; // gitleaks:allow
 const REQUEST_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 45_000;
 
@@ -115,7 +137,7 @@ let cachedTokenExpiry = 0;
 
 function getApiKey(): string {
   const override = getSetting('opensubtitles.apiKey');
-  return override?.trim() || DEFAULT_API_KEY;
+  return override?.trim() || CONSUMER_API_KEY;
 }
 
 function baseHeaders(): Record<string, string> {
