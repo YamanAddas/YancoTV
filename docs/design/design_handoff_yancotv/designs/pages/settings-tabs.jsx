@@ -808,7 +808,7 @@ function TabStorage() {
               <div key={b.n}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.1em', marginBottom:4 }}>
                   <span style={{ width:10, height:10, background:b.col }}/>
-                  <span dangerouslySetInnerHTML={{__html:b.n.toUpperCase()}}/>
+                  <span>{b.n.toUpperCase()}</span>
                 </div>
                 <div className="mono tab-nums" style={{ fontSize:18, fontWeight:700 }}>{b.size} <span style={{ fontSize:11, color:'var(--text-muted)' }}>MB</span></div>
               </div>
