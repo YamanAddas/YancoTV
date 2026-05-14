@@ -20,7 +20,12 @@ import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.androidGunzip
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.http.CleartextAllowlist
+import com.yancotv.shared.http.CleartextAllowlistInterceptor
 import com.yancotv.shared.http.HttpClient
+import com.yancotv.shared.http.PermitAllCleartextAllowlist
+import com.yancotv.shared.http.StaticCleartextAllowlist
+import com.yancotv.shared.http.cleartextAllowlistFromSources
 import com.yancotv.shared.http.createAndroidHttpClient
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.parental.AndroidPinHasher
@@ -62,6 +67,29 @@ val appModule =
         // timeouts should `newBuilder()` from this client — that preserves
         // the connection pool + dispatcher while letting them override
         // timeouts per request.
+        // MK.SEC.B — application-layer cleartext-traffic allow-list.
+        // OkHttp interceptor that refuses HTTP requests to hosts the
+        // user hasn't added as a Source. The `allowlistProvider`
+        // lambda is called per-request so adding a new Source in the
+        // UI takes effect without rebuilding the OkHttp instance.
+        // The cycle (interceptor → SourceRepository → SourceRepository
+        // needs HttpClient → HttpClient embeds interceptor) is broken
+        // by the lambda — `get<SourceRepository>()` runs at request
+        // time, not at single() construction time. Before
+        // SourceRepository is available we fall back to
+        // PermitAllCleartextAllowlist so very-early-startup HTTP doesn't
+        // brick.
+        // See AGENTS.md "Cleartext traffic (Android)" + MB-203.
+        single<CleartextAllowlistInterceptor> {
+            CleartextAllowlistInterceptor(
+                allowlistProvider = {
+                    runCatching {
+                        val sources = get<SourceRepository>().getAll()
+                        StaticCleartextAllowlist(cleartextAllowlistFromSources(sources)) as CleartextAllowlist
+                    }.getOrElse { PermitAllCleartextAllowlist }
+                },
+            )
+        }
         single<OkHttpClient> {
             // Explicit timeouts so a slow / dead IPTV server can't hang Coil
             // image loads, the EPG importer, or the subtitle search panel
@@ -75,6 +103,9 @@ val appModule =
                 .readTimeout(30, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
+                // MK.SEC.B — every shared-OkHttp caller (Coil, EPG importer,
+                // anything that pulls this single) inherits the allow-list.
+                .addInterceptor(get<CleartextAllowlistInterceptor>())
                 .build()
         }
         single<HttpClient> {
@@ -91,6 +122,10 @@ val appModule =
                         ?.let { it * 1000L }
                 },
                 cacheDir = androidContext().cacheDir,
+                // MK.SEC.B — Ktor-engine OkHttp also gets the interceptor;
+                // covers API calls, M3U downloads, EPG dumps, asset fetches
+                // routed via the shared Ktor HttpClient.
+                interceptors = listOf(get<CleartextAllowlistInterceptor>()),
             )
         }
         single {
