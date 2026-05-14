@@ -47,12 +47,13 @@ Fire TV target for native: `adb connect 192.168.68.56:5555` then `installDebug`.
 
 ### Cleartext traffic (Android)
 
-The Android manifest sets `android:usesCleartextTraffic="true"` globally. This is **deliberate, not a regression**, but it has a known scope.
+The Android manifest sets `android:usesCleartextTraffic="true"` globally. This is **a deliberate, accepted threat-model decision** — not a regression and not a deferred fix. The yancoxplorer / mobile-readiness scanner reports it as a HIGH finding on every audit run; **that report is acknowledged**, the rationale below is the authoritative response.
 
-- **Why it's on:** IPTV providers commonly serve plain HTTP — playlist endpoints, Xtream `player_api.php`, MPEG-TS streams, EPG XMLTV dumps. Provider host-set is user-configured at runtime, so an Android `network_security_config.xml` static allow-list isn't workable.
+- **Why it's on:** IPTV providers commonly serve plain HTTP — playlist endpoints, Xtream `player_api.php`, MPEG-TS streams, EPG XMLTV dumps. The provider host-set is user-configured at runtime, so an Android `network_security_config.xml` static allow-list isn't workable. The OS reads that XML once at `Application.onCreate` and offers no runtime mutation API — there is no platform-level mechanism to allow-list a host the user just added in Settings.
 - **What this exposes:** an attacker on the same Wi-Fi can MITM provider URL traffic. Provider credentials are already in those URLs (Xtream auth is `?username=…&password=…`); cleartext doesn't make that worse.
-- **What this does NOT expose:** Sentry telemetry (HTTPS-only by SDK config), Coil image fetches that target HTTPS CDNs (the common case). Adding any `http://` URL outside of user-configured provider hosts would expose new traffic — flag it in review.
-- **Tracked:** [bugs.md MB-203](bugs.md). Stage 5.x will narrow this with a runtime allow-list when distribution-hardening starts.
+- **What this does NOT expose:** Sentry telemetry (HTTPS-only by SDK config), Coil image fetches that target HTTPS CDNs (the common case). Adding any `http://` URL *outside of user-configured provider hosts* would expose new traffic — flag it in review.
+- **Defense-in-depth track (future `MK.SEC.*` milestone, not part of audit cleanup):** an OkHttp-application-layer allow-list seeded from the `sources` table. Refuses HTTP requests to hosts that aren't in the user's source list — without flipping the manifest setting (which would break legitimate HTTP providers at the OS layer). Tracked under [bugs.md MB-203](bugs.md).
+- **Audit posture:** the scanner finding is recorded as accepted-risk in [docs/security/AUDIT_NOTES.md](docs/security/AUDIT_NOTES.md). It will keep firing on every rescan because the manifest setting is structural to the IPTV use case; the AUDIT_NOTES entry is the durable record of why.
 
 Provider URL credentials are otherwise handled by [`redactCredentials`](packages/shared/src/commonMain/kotlin/com/yancotv/shared/http/UrlRedaction.kt) at every error / log / DB / on-screen rendering site.
 

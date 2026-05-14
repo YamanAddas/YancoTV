@@ -87,6 +87,24 @@
         <package android:name="com.brouken.player" />
     </queries>
 
+    <!--
+        usesCleartextTraffic="true" is a deliberate, accepted threat-model
+        decision — see AGENTS.md "Cleartext traffic (Android)" and
+        bugs.md MB-203 (Won't Fix). IPTV providers commonly serve plain
+        HTTP; the host-set is user-configured at runtime, so a static
+        network_security_config.xml allow-list isn't workable (Android
+        reads that XML once at Application.onCreate and offers no
+        runtime mutation API). Provider credentials are already in the
+        URLs (Xtream auth is ?username=…&password=…); cleartext doesn't
+        make that worse. Sentry telemetry is HTTPS-only by SDK config;
+        Coil CDN images are HTTPS by convention. Defense-in-depth at
+        the OkHttp layer is tracked as MK.SEC.* future work; this
+        manifest setting will not change.
+
+        The yancoxplorer mobile-readiness scanner reports this as HIGH on
+        every audit; the finding is recorded as accepted-risk in
+        docs/security/AUDIT_NOTES.md.
+    -->
     <application
         android:name=".YancoApp"
         android:allowBackup="false"
