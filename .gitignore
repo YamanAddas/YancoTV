@@ -55,3 +55,11 @@ patches-work/
 
 # Concept A design zip — local reference only
 packages/android/*.zip
+
+# Yancoxplorer launch-audit reports — dropped at repo root by the
+# scanner each run. Diff against docs/security/AUDIT_NOTES.md
+# fingerprints; the JSONs themselves are scan artifacts, not source.
+/yancoxplorer-audit-*.json
+
+# TypeScript type-coverage report directory (auto-regenerated)
+/.type-coverage/
