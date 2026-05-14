@@ -68,11 +68,19 @@ async function main() {
   rebuildForNode();
 
   // Step 2: run the tests
+  //
+  // Resolve npx via the platform-specific binary (`npx.cmd` on win32,
+  // `npx` elsewhere) instead of relying on the shell to find it. This
+  // closes the `spawn-shell-true` Semgrep finding — shell expansion
+  // would propagate the user's shell variables into the spawned
+  // process, which `child_process.spawn` does not need when the
+  // command and args are fully specified.
   const args = process.argv.slice(2);
-  const result = spawnSync('npx', ['vitest', 'run', ...args], {
+  const npxBin = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const result = spawnSync(npxBin, ['vitest', 'run', ...args], {
     stdio: 'inherit',
     cwd: ROOT,
-    shell: true,
+    shell: false,
   });
   const testExitCode = result.status ?? 1;
 

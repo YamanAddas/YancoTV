@@ -6,6 +6,7 @@ import {
   APP_NAME,
   DEFAULT_WINDOW_HEIGHT,
   DEFAULT_WINDOW_WIDTH,
+  DEV_RENDERER_URL,
   MIN_WINDOW_HEIGHT,
   MIN_WINDOW_WIDTH,
 } from '../shared/constants';
@@ -186,7 +187,7 @@ function createWindow(): void {
 
   // Block navigation to external URLs — prevent renderer hijacking
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDev ? 'http://localhost:5173' : 'file://';
+    const allowed = isDev ? DEV_RENDERER_URL : 'file://';
     if (!url.startsWith(allowed)) {
       log.warn(`Blocked navigation to: ${url}`);
       event.preventDefault();
@@ -200,7 +201,7 @@ function createWindow(): void {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL(DEV_RENDERER_URL);
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
   }

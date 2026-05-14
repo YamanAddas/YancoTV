@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import log from 'electron-log/main';
+import { DEV_RENDERER_URL } from '../../shared/constants';
 
 let overlay: BrowserWindow | null = null;
 let parent: BrowserWindow | null = null;
@@ -60,7 +61,7 @@ export function createOverlayWindow(parentWindow: BrowserWindow): BrowserWindow 
   overlay.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   if (isDev) {
-    overlay.loadURL('http://localhost:5173/overlay.html');
+    overlay.loadURL(`${DEV_RENDERER_URL}/overlay.html`);
   } else {
     overlay.loadFile(path.join(__dirname, '../../renderer/overlay.html'));
   }

@@ -122,6 +122,11 @@ function extractOne(
       '-c:s', 'srt',
       outPath,
     ];
+    // ffmpegPath has been validated by the caller (extractEmbeddedSubtitles)
+    // as an absolute, on-disk path — see the guard there. Semgrep's
+    // detect-child-process rule fires on any function-arg path going
+    // into spawn; the marker documents that this site is gated.
+    // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
     const child = spawn(ffmpegPath, args, { windowsHide: true });
     let stderr = '';
     child.stderr.on('data', (d: Buffer) => {
@@ -171,6 +176,15 @@ export async function extractEmbeddedSubtitles(
   const ffmpegPath = findFfmpegPath();
   if (!ffmpegPath) {
     log.warn('Skipping subtitle extraction: ffmpeg not available');
+    return result;
+  }
+  // `findFfmpegPath` resolves to either the bundled binary or a path
+  // the user configured in Settings. Validate it's a real, absolute
+  // path on disk before handing it to `spawn` — a relative or
+  // non-existent path would otherwise let `child_process` fall back to
+  // PATH lookup, which broadens the trust surface unnecessarily.
+  if (!path.isAbsolute(ffmpegPath) || !fs.existsSync(ffmpegPath)) {
+    log.warn(`Skipping subtitle extraction: invalid ffmpeg path '${ffmpegPath}'`);
     return result;
   }
 

@@ -17,3 +17,15 @@ export const MIN_WINDOW_HEIGHT = 600;
  * once release infra lands.
  */
 export const UPDATE_MANIFEST_URL = '';
+
+/**
+ * Dev server URL used by Electron's main process to load the renderer when
+ * `isDev` is true. Vite serves at this address by default (see vite.config
+ * `server.port`). All `isDev`-gated `loadURL` / navigation guards reference
+ * this single constant so the port is consistent across `mainWindow`,
+ * `overlay-window`, and any future renderer surface.
+ *
+ * Production builds load `file://` resources from the packaged dist
+ * folder and never touch this URL.
+ */
+export const DEV_RENDERER_URL = 'http://localhost:5173';

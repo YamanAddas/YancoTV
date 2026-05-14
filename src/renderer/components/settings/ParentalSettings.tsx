@@ -239,7 +239,7 @@ export function ParentalSettings() {
         <div className="space-y-2">
           <ToggleRow
             label="Hide adult content"
-            description="Filter out channels and VOD tagged as adult/XXX"
+            description="Filter out channels and VOD tagged as adult/18+"
             checked={settings.hideAdultContent}
             onChange={handleToggleHideAdult}
           />

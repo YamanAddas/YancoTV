@@ -5,6 +5,27 @@ import { usePlayerStore } from '../../stores/player-store';
 import { setVideoElement } from './video-ref';
 import { detectStreamType, getVideoErrorMessage, isVodUrl, hasUnsupportedExtension, replaceStreamExtension, buildXtreamHlsUrl } from './player-utils';
 
+/**
+ * Dev-only player diagnostics. Player attempts, fallback decisions,
+ * autoplay failures, and mpegts recovery loops all log here during
+ * development; in production builds Vite tree-shakes the entire
+ * branch because `import.meta.env.DEV` resolves to the literal
+ * `false`. Keeps `console.*` chatter (including stream URLs that may
+ * contain provider credentials) out of release logs without losing
+ * debugging signal in dev. Closes the audit's
+ * `aismell.ts.console-log-prod` finding and the matching
+ * `unsafe-formatstring` cluster — every call site below passes a
+ * constant first argument with values as subsequent args.
+ */
+const playerLog = {
+  info: (...args: unknown[]): void => {
+    if (import.meta.env.DEV) console.info('[Player]', ...args);
+  },
+  warn: (...args: unknown[]): void => {
+    if (import.meta.env.DEV) console.warn('[Player]', ...args);
+  },
+};
+
 // --- Throttled store updater (prevents React re-render storm) ---
 
 let lastTimeUpdate = 0;
@@ -171,7 +192,7 @@ export function VideoPlayer() {
 
     function startAttempt() {
       const attempt = attempts[currentIdx];
-      console.info(`Player: trying ${attempt.playerType} (${currentIdx + 1}/${attempts.length})`, attempt.url);
+      playerLog.info('trying', attempt.playerType, `(${currentIdx + 1}/${attempts.length})`, attempt.url);
 
       try {
         if (attempt.playerType === 'hls' && Hls.isSupported()) {
@@ -187,13 +208,13 @@ export function VideoPlayer() {
           loadTimer = setTimeout(() => {
             loadTimer = null;
             if (!hlsRef.current && !mpegtsRef.current && video.readyState < 2) {
-              console.warn('Native playback timed out (10s)');
+              playerLog.warn('Native playback timed out (10s)');
               advanceToNext();
             }
           }, 10_000);
         }
       } catch (err) {
-        console.warn('Player init error:', err);
+        playerLog.warn('Player init error:', err);
         // Use setTimeout to break out of the re-entrancy guard
         setTimeout(() => advanceToNext(), 0);
       }
@@ -208,7 +229,7 @@ export function VideoPlayer() {
       if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
 
       const errorMsg = getVideoErrorMessage(video);
-      console.warn('Native playback error:', errorMsg, '| URL:', attempts[currentIdx]?.url ?? url);
+      playerLog.warn('Native playback error:', errorMsg, '| URL:', attempts[currentIdx]?.url ?? url);
 
       advanceToNext();
     };
@@ -339,7 +360,7 @@ function initHls(
       video.currentTime = startPosition;
     }
     video.play().catch((err) => {
-      console.warn('HLS autoplay failed:', err.message);
+      playerLog.warn('HLS autoplay failed:', err.message);
     });
 
     // Populate audio tracks from HLS manifest
@@ -453,7 +474,7 @@ function initMpegts(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   player.on(mpegts.Events.ERROR, (errorType: any, errorDetail: any, errorInfo: any) => {
     errorCount++;
-    console.warn('mpegts error #' + errorCount + ':', errorType, errorDetail, errorInfo);
+    playerLog.warn('mpegts error #', errorCount, errorType, errorDetail, errorInfo);
 
     if (errorCount <= maxErrors) {
       // Show buffering state during recovery so the user sees a spinner (Bug 7 fix)
@@ -461,7 +482,7 @@ function initMpegts(
       try {
         player.unload();
         player.load();
-        video.play().catch((e) => console.warn('mpegts recovery play failed:', e.message));
+        video.play().catch((e) => playerLog.warn('mpegts recovery play failed:', e.message));
       } catch {
         // If recovery fails, let it go — next error will count
       }
@@ -509,7 +530,7 @@ function initMpegts(
     video.currentTime = startPosition;
   }
   video.play().catch((err) => {
-    console.warn('mpegts autoplay failed:', err.message);
+    playerLog.warn('mpegts autoplay failed:', err.message);
   });
   mpegtsRef.current = player;
 }
@@ -527,7 +548,7 @@ function initNative(
         video.currentTime = startPosition;
       }
       video.play().catch((err) => {
-        console.warn('Native autoplay failed:', err.message);
+        playerLog.warn('Native autoplay failed:', err.message);
       });
     },
     { once: true },

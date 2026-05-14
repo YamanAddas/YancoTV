@@ -171,16 +171,50 @@ function parseExtinfLine(line: string): Partial<M3uEntry> {
   return entry;
 }
 
-function extractAttribute(line: string, attr: string): string {
-  // Match both double and single quotes
-  const regex = new RegExp(`${attr}="([^"]*)"`, 'i');
-  const match = line.match(regex);
+/**
+ * Precompiled regex map for every M3U `#EXTINF` attribute the parser
+ * reads. Building the patterns at module load (rather than on every
+ * call via `new RegExp(`${attr}=...`)` ) closes Semgrep's
+ * detect-non-literal-regexp finding and removes the per-line regex
+ * construction cost — `extractAttribute` is called up to 7 times
+ * per channel on multi-thousand-channel playlists.
+ *
+ * Each attribute has two patterns: one matching `attr="..."` (the
+ * common form) and one matching `attr='...'`.
+ */
+const ATTRIBUTE_NAMES = [
+  'tvg-id',
+  'tvg-name',
+  'tvg-logo',
+  'group-title',
+  'url-tvg',
+  'x-tvg-url',
+  'catchup',
+  'catchup-type',
+  'catchup-source',
+  'catchup-days',
+  'tvg-rec',
+] as const;
+
+type AttributeName = (typeof ATTRIBUTE_NAMES)[number];
+
+const ATTRIBUTE_REGEX = new Map<AttributeName, { double: RegExp; single: RegExp }>(
+  ATTRIBUTE_NAMES.map((attr) => [
+    attr,
+    {
+      double: new RegExp(`${attr}="([^"]*)"`, 'i'),
+      single: new RegExp(`${attr}='([^']*)'`, 'i'),
+    },
+  ]),
+);
+
+function extractAttribute(line: string, attr: AttributeName): string {
+  const patterns = ATTRIBUTE_REGEX.get(attr);
+  if (!patterns) return '';
+  const match = line.match(patterns.double);
   if (match) return match[1];
-
-  const regexSingle = new RegExp(`${attr}='([^']*)'`, 'i');
-  const matchSingle = line.match(regexSingle);
+  const matchSingle = line.match(patterns.single);
   if (matchSingle) return matchSingle[1];
-
   return '';
 }
 
