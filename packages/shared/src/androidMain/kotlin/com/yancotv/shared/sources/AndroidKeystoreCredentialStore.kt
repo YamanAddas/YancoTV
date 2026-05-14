@@ -25,6 +25,12 @@ import javax.crypto.spec.GCMParameterSpec
  */
 class AndroidKeystoreCredentialStore(private val keyAlias: String = DEFAULT_ALIAS) : CredentialStore {
     override fun encrypt(plaintext: String): ByteArray {
+        // AES-256-GCM, key material lives in Android Keystore (StrongBox-
+        // backed on capable devices). The Keystore generates a fresh IV
+        // per call — we read it back via cipher.iv and prepend it. Semgrep
+        // gcm-detection is a review tripwire; nonce uniqueness is the
+        // Keystore's invariant, not ours.
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val iv = cipher.iv
@@ -41,7 +47,9 @@ class AndroidKeystoreCredentialStore(private val keyAlias: String = DEFAULT_ALIA
         }
         val iv = ciphertext.copyOfRange(0, IV_LENGTH)
         val ct = ciphertext.copyOfRange(IV_LENGTH, ciphertext.size)
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         val cipher = Cipher.getInstance(TRANSFORMATION)
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
         return cipher.doFinal(ct).decodeToString()
     }

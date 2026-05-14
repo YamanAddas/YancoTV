@@ -17,8 +17,16 @@ actual class BackupCipher {
     }
 
     actual fun encryptHex(plaintext: ByteArray, key: ByteArray): String {
+        // AES-256-GCM with a fresh 96-bit random IV per call (NIST SP
+        // 800-38D §8.2.1) and the standard 128-bit auth tag. IV is
+        // prepended to the ciphertext on the wire so decryptBytes() can
+        // split them back out. Semgrep's gcm-detection rule fires on
+        // every AES/GCM usage as a review tripwire — the IV-handling
+        // invariant is met here.
         val iv = ByteArray(12).also { random.nextBytes(it) }
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
         val ct = cipher.doFinal(plaintext)
         return encodeHex(iv) + encodeHex(ct)
@@ -29,7 +37,9 @@ actual class BackupCipher {
         require(all.size > 12) { "ciphertext shorter than IV" }
         val iv = all.copyOfRange(0, 12)
         val ct = all.copyOfRange(12, all.size)
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
         return cipher.doFinal(ct)
     }

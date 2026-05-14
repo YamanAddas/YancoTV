@@ -108,6 +108,13 @@
             android:name="io.sentry.auto-init"
             android:value="false" />
 
+        <!-- MainActivity is the LAUNCHER/LEANBACK_LAUNCHER entry point and
+             also responds to ACTION_SEARCH from Google Assistant / Fire TV
+             voice. Both require android:exported="true" — there is no way
+             to expose a launcher activity without it. Semgrep's
+             exported_activity rule fires on every such declaration as a
+             review tripwire; the privilege boundary is intentional. -->
+        <!-- nosemgrep: java.android.security.exported_activity.exported_activity -->
         <activity
             android:name=".MainActivity"
             android:banner="@drawable/tv_banner"

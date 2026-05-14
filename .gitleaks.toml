@@ -1,0 +1,20 @@
+# Gitleaks configuration for YancoTV.
+# Inherits default rules; only the allowlist below is project-specific.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+Per-machine config files that are gitignored and never committed.
+Gitleaks scans the filesystem (not only git history) when invoked by
+yancoxplorer, so we have to repeat the exclusion here.
+
+- packages/android/local.properties     — Sentry DSN + auth token (lines 10, 38)
+- packages/mobile/android/local.properties — frozen RN package, never shipped
+- docs/design/                          — React design mockups, not bundled
+"""
+paths = [
+    '''(.*/)?local\.properties$''',
+    '''^docs/design/.*''',
+]

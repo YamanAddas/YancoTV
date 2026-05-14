@@ -1,0 +1,37 @@
+# Semgrep paths to ignore (gitignore-style).
+# See: https://semgrep.dev/docs/ignoring-files-folders-code/
+
+# ── Documentation and design mockups ────────────────────────────────────
+# docs/design/design_handoff_yancotv/ contains React mockups (.jsx)
+# delivered by the design team. They are not part of the shipping bundle
+# (no Vite glob references them; verified 2026-05-14). Semgrep was
+# flagging dangerouslySetInnerHTML and wildcard postMessage in these
+# mockups — neither reaches production.
+docs/
+
+# ── Build artifacts ─────────────────────────────────────────────────────
+dist/
+dist-electron/
+dist-apk/
+build/
+out/
+
+# ── Frozen workspace ────────────────────────────────────────────────────
+# packages/mobile/ is the abandoned RN port (frozen 2026-04-20). Excluded
+# from the pnpm workspace as of 2026-05-14 and not part of any active
+# build target. Kept on disk as a historical reference only.
+packages/mobile/
+
+# ── Standard noise ──────────────────────────────────────────────────────
+node_modules/
+.gradle/
+.idea/
+.vscode/
+**/.next/
+**/coverage/
+
+# ── Per-machine config (gitignored) ─────────────────────────────────────
+# Defence in depth: local.properties is gitignored, but secret-scanners
+# walk the filesystem. Repeating the exclusion here avoids re-flagging
+# every audit run.
+**/local.properties
