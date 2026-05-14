@@ -1,2 +1,7 @@
 packages:
   - 'packages/*'
+  # packages/mobile/ is FROZEN (RN app, abandoned 2026-04-20 — see docs/adr/
+  # and project memory). Excluded from the workspace so its devDeps don't
+  # land in pnpm-lock.yaml. Directory + its CLAUDE.md stay on disk as a
+  # historical reference only.
+  - '!packages/mobile'
