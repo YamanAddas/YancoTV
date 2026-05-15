@@ -127,7 +127,17 @@ fun HomeContent(
     // returns the user to a Home that already reflects their new offset.
     val recentHistory by history.recentFlow(limit = 30).collectAsState(initial = emptyList())
     val resumeByContent by remember {
-        derivedStateOf { recentHistory.associateBy { it.contentId } }
+        derivedStateOf {
+            // recentHistory is ordered DESC by watched_at — newest first.
+            // Plain `associateBy` keeps the LAST entry per key (oldest in
+            // this list), so when a series has multiple episodes in the
+            // recent-30 the hero displayed the OLDEST one while the
+            // playback path (mostRecentEpisode → DESC + first) launched
+            // the NEWEST one — the user-visible "wrong episode played"
+            // bug. Use distinctBy first to keep only the newest per
+            // contentId, then associateBy on that.
+            recentHistory.distinctBy { it.contentId }.associateBy { it.contentId }
+        }
     }
     val continueWatching by remember {
         derivedStateOf {

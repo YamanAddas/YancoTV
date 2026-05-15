@@ -224,6 +224,27 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
     }
 
     /**
+     * Watch-history info for a *specific* episode (by episode id). Used
+     * by the series detail screen's episode-tile click handler to
+     * decide whether tapping a tile should resume from the saved offset
+     * or restart from 0 — Netflix-style: mid-stream → resume; finished
+     * (≥95%) → restart.
+     *
+     * Returns null when no row exists for [episodeId]. Callers should
+     * treat that the same as "finished" (no progress to resume to —
+     * play from 0).
+     */
+    fun episodeInfo(episodeId: String): EpisodeResumeInfo? {
+        val row = db.watchHistoryQueries.selectByEpisode(episodeId).executeAsOneOrNull() ?: return null
+        return EpisodeResumeInfo(
+            episodeId = row.episode_id ?: return null,
+            positionSeconds = row.position_seconds,
+            durationSeconds = row.duration_seconds,
+            watchedAt = row.watched_at,
+        )
+    }
+
+    /**
      * Whether any watch_history row exists for [contentId] — content-
      * level OR any of its episode rows (all share the same `content_id`
      * FK target per the schema's "episodes write seriesId as content_id"

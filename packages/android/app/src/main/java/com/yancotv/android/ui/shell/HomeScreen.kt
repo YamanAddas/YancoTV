@@ -508,11 +508,16 @@ fun HomeScreen(
                                                 if (playable == null) {
                                                     detailItem = target
                                                 } else {
-                                                    if (controller.currentId != playable.id) {
-                                                        controller.play(playable, fromStart = fromStart)
-                                                    } else if (fromStart) {
-                                                        controller.play(playable, fromStart = true)
-                                                    }
+                                                    // Always go through controller.play —
+                                                    // its SameTarget branch is a cheap
+                                                    // unpause-only no-rebuffer path now
+                                                    // (see PlaybackController.play).
+                                                    // The prior `if (currentId != target)`
+                                                    // guard meant tapping Continue Watching
+                                                    // on the same episode that was just
+                                                    // paused did NOTHING — the launch fired
+                                                    // but the player stayed paused.
+                                                    controller.play(playable, fromStart = fromStart)
                                                     PlayerLauncher.launch(context)
                                                 }
                                             }
@@ -595,11 +600,16 @@ fun HomeScreen(
                     // target — series rows live in `content`, episodes
                     // don't) and episode_id = ep.id, so each episode gets
                     // its own resume key without violating the FK.
+                    //
+                    // Always call controller.play — even when the player
+                    // already has this episode loaded (same-id). The
+                    // SameTarget branch in PlaybackController is now a
+                    // cheap unpause-only path. The prior `if (currentId !=
+                    // ep.id)` guard meant resuming the same paused episode
+                    // did nothing.
                     val playable = ep.toPlayable(target)
                     if (playable != null) {
-                        if (controller.currentId != ep.id) {
-                            controller.play(playable)
-                        }
+                        controller.play(playable)
                         PlayerLauncher.launch(context)
                     }
                 },

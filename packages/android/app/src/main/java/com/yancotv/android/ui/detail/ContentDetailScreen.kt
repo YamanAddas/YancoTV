@@ -357,17 +357,36 @@ fun ContentDetailScreen(
                     ) {
                         EpisodeRow(
                             ep = ep,
-                            // Clicking an episode tile is "I want to watch THIS
-                            // episode from the start" — Netflix/Disney+/Prime
-                            // all behave this way. Without fromStart the
-                            // player would seek to the saved offset; if the
-                            // user previously finished that episode the player
-                            // lands at the end and the episode "loops" (plays
-                            // the final ~0s and stops). Resume-from-offset
-                            // lives behind the dedicated Resume button at the
-                            // top of the detail screen, which uses the
-                            // computeNextEpisode-driven mode logic above.
-                            onClick = { onPlayFromStart(rendered, ep) },
+                            // Episode-tile click — smart routing per user
+                            // spec: "if the episode was not in the end then
+                            // pressing the episode acts like continue
+                            // watching, but if the episode was in the end
+                            // then pressing the episode restarts it."
+                            //
+                            // Look up THIS episode's watch_history row.
+                            // - No row, or row is finished (≥95%) → restart
+                            //   from 0 via onPlayFromStart.
+                            // - Row mid-stream → resume from offset via
+                            //   onPlayEpisode (PlaybackController.loadCurrent
+                            //   reads the saved position from history).
+                            //
+                            // Lookup runs on IO; the click lambda just
+                            // launches the coroutine. Cheap — single
+                            // SELECT keyed by episode_id.
+                            onClick = {
+                                scope.launch(Dispatchers.IO) {
+                                    val info =
+                                        runCatching { watchHistory.episodeInfo(ep.id) }.getOrNull()
+                                    val finished = info?.isFinished() == true
+                                    withContext(Dispatchers.Main) {
+                                        if (finished || info == null) {
+                                            onPlayFromStart(rendered, ep)
+                                        } else {
+                                            onPlayEpisode(rendered, ep)
+                                        }
+                                    }
+                                }
+                            },
                             modifier = if (idx == 0) Modifier.placedFocus(firstEpisodeAnchor) else Modifier,
                         )
                     }

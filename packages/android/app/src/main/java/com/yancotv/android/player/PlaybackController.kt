@@ -522,19 +522,20 @@ class PlaybackController(
         when (playLaunchDecision(list, startIndex, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
             PlayLaunchDecision.SameTarget -> {
-                // Same-id: update the navigation queue for next/prev zap
-                // but don't touch the player — second OK on the current
-                // item must be a no-op. Exception: fromStart=true means
-                // "Play from beginning" was tapped on the currently-loaded
-                // item; seek the live player to 0 and ensure it's playing
-                // (STATE_ENDED leaves playWhenReady=true but a user-paused
-                // mid-stream session would not auto-resume on seek alone).
+                // Same-id: update the navigation queue for next/prev zap.
+                // The player keeps its loaded MediaItem (no rebuffer), but
+                // we DO unpause — tapping Play / Continue Watching always
+                // means "I want playback now," even if the player happened
+                // to be paused from the prior session (user-paused, or
+                // ended-at-credits then PlayerActivity flipped
+                // playWhenReady=false). If fromStart=true we ALSO seek to
+                // 0 so the same-target restart works as a true reset.
                 _queue.value = list
                 _index.value = startIndex
                 if (fromStart) {
                     player.seekTo(0L)
-                    player.playWhenReady = true
                 }
+                player.playWhenReady = true
             }
             PlayLaunchDecision.NewTarget -> {
                 // Different item: capture the outgoing offset before the queue swap.
@@ -571,10 +572,15 @@ class PlaybackController(
                 _currentEpisode.value = episode
                 _queue.value = listOf(episode.toContentItemView())
                 _index.value = 0
+                // Always unpause — same-target play means user wants
+                // playback. fromStart=true also resets the seek head.
+                // See the list-overload's SameTarget branch for the full
+                // rationale on why the player needs to be re-armed even
+                // when the MediaItem hasn't changed.
                 if (fromStart) {
                     player.seekTo(0L)
-                    player.playWhenReady = true
                 }
+                player.playWhenReady = true
             }
             PlayLaunchDecision.NewTarget -> {
                 if (_currentItem.value != null) persistResumePoint()
