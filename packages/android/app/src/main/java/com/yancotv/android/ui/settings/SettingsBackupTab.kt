@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.DocumentsContract
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -451,6 +453,45 @@ fun SettingsBackupTab(
                         softWrap = false,
                     )
                 }
+                // v1.1.0 — Quick-restore-from-default-folder. Fire OS's
+                // DocumentsUI ignores EXTRA_INITIAL_URI and opens to
+                // "Recent" with breadcrumb nav that's effectively
+                // unreachable via D-pad. This button skips the picker
+                // entirely: scan `/sdcard/Download/YancoTV/` for
+                // yancotv-backup-*.json (read access is fine since
+                // WRITE_EXTERNAL_STORAGE/READ_EXTERNAL_STORAGE are
+                // declared with maxSdkVersion=28 + auto-granted at
+                // install on API ≤28; on API 29+ this read works
+                // because the path is in the user-visible Downloads
+                // area which scoped storage permits for the app's
+                // own filename pattern).
+                //
+                // Picks the most recently modified backup, sets it as
+                // the import target so the existing Restore button +
+                // password flow takes over.
+                SettingsOutlinedButton(
+                    onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            val picked = pickNewestBackupInDefaultFolder()
+                            withContext(Dispatchers.Main) {
+                                if (picked != null) {
+                                    importPickedUriString = Uri.fromFile(picked).toString()
+                                    importStatus = "Picked latest: ${picked.name}"
+                                } else {
+                                    importStatus =
+                                        "No yancotv-backup-*.json files found in /sdcard/Download/YancoTV/"
+                                }
+                                importFocusBump++
+                            }
+                        }
+                    },
+                ) {
+                    Text(
+                        text = "Restore latest from Downloads",
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
             if (importPickedUri != null) {
                 Text(
@@ -704,4 +745,23 @@ private fun formatImportResult(r: ImportResult): String = when (r) {
     is ImportResult.MalformedJson -> "Couldn't read the file: ${r.message}"
     is ImportResult.IoError -> "Couldn't open the file: ${r.message}"
     is ImportResult.UnexpectedError -> "Restore failed: ${r.message}"
+}
+
+/**
+ * Scan `/sdcard/Download/YancoTV/` for `yancotv-backup-*.json` files and
+ * return the most recently modified one. Used by the "Restore latest
+ * from Downloads" button to bypass Fire OS's broken DocumentsUI picker.
+ * Null when the folder doesn't exist, can't be read, or holds no
+ * matching files.
+ */
+@Suppress("DEPRECATION")
+private fun pickNewestBackupInDefaultFolder(): File? {
+    return runCatching {
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val target = File(downloads, "YancoTV")
+        if (!target.isDirectory) return@runCatching null
+        target.listFiles { f ->
+            f.isFile && f.name.startsWith("yancotv-backup-") && f.name.endsWith(".json")
+        }?.maxByOrNull { it.lastModified() }
+    }.getOrNull()
 }
