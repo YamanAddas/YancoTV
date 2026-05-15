@@ -287,6 +287,7 @@ val appModule =
             com.yancotv.android.recording.schedule.RecordingScheduleScheduler(
                 context = androidContext(),
                 repo = get(),
+                recordings = get(),
                 alarmManager = get(),
             )
         }
