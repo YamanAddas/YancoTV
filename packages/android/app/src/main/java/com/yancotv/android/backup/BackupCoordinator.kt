@@ -102,7 +102,10 @@ class BackupCoordinator(
                     ?: return@withContext ExportResult.Failed("MediaStore.Downloads insert failed")
             } else {
                 writeToPublicDownloadsLegacy(filename, bytes)
-                    ?: return@withContext ExportResult.Failed("Could not write to /sdcard/Download")
+                    ?: return@withContext ExportResult.Failed(
+                        "Could not write backup to Downloads/YancoTV or to the app-private fallback. " +
+                            "Use the 'Change folder' button to pick a writable location.",
+                    )
             }
         persistMetadata(file, storageUriString, sizeBytes, label)
         ExportResult.Success(file = file, bytesWritten = sizeBytes)
@@ -139,19 +142,58 @@ class BackupCoordinator(
         }
     }
 
+    /**
+     * API ≤28 export path. Tries the user-visible public Downloads
+     * folder first; falls back to app-private external storage when
+     * that fails — which is the common case on Fire TV / Fire OS 7
+     * (API 28) because `WRITE_EXTERNAL_STORAGE` is declared in the
+     * manifest with `maxSdkVersion=28` but never requested at
+     * runtime, so the OS denies the write with `SecurityException`.
+     *
+     * The fallback path `/sdcard/Android/data/com.yancotv.android/files/Download/YancoTV/`
+     * needs no permission on any API level, survives reboot, and is
+     * still pullable via `adb pull` (which is the recommended
+     * off-device transfer for Fire TV anyway — the device has no
+     * built-in file manager). It's wiped on app uninstall, so the
+     * "Restore" flow should be exercised before uninstalling.
+     */
     private fun writeToPublicDownloadsLegacy(filename: String, bytes: ByteArray): Pair<String, Long>? {
+        // First attempt: the user-visible public Downloads folder.
         @Suppress("DEPRECATION")
-        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val targetDir = File(downloads, "YancoTV").also { it.mkdirs() }
-        val file = File(targetDir, filename)
+        val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val publicTarget = File(publicDownloads, "YancoTV").also { runCatching { it.mkdirs() } }
+        val publicAttempt = runCatching {
+            val file = File(publicTarget, filename)
+            FileOutputStream(file).use {
+                it.write(bytes)
+                it.flush()
+            }
+            Uri.fromFile(file).toString() to file.length()
+        }
+        if (publicAttempt.isSuccess) return publicAttempt.getOrThrow()
+        Log.w(
+            TAG,
+            "Public Downloads write failed on API ${Build.VERSION.SDK_INT} (likely " +
+                "WRITE_EXTERNAL_STORAGE not granted — declared with maxSdkVersion=28 but " +
+                "never requested at runtime). Falling back to app-private external storage.",
+            publicAttempt.exceptionOrNull(),
+        )
+
+        // Fallback: app-private external storage. Needs no permission.
+        // Survives reboot, wiped on uninstall — fine for backup export
+        // where the recommended flow is "export then transfer
+        // off-device immediately."
+        val appPrivateDownloads = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
+        val privateTarget = File(appPrivateDownloads, "YancoTV").also { runCatching { it.mkdirs() } }
         return runCatching {
+            val file = File(privateTarget, filename)
             FileOutputStream(file).use {
                 it.write(bytes)
                 it.flush()
             }
             Uri.fromFile(file).toString() to file.length()
         }.getOrElse {
-            Log.e(TAG, "legacy Downloads write failed", it)
+            Log.e(TAG, "App-private external storage write also failed", it)
             null
         }
     }
