@@ -56,6 +56,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -355,6 +356,15 @@ fun ContentDetailScreen(
                             episodeCount = seasons[selectedSeason]?.size ?: 0,
                             open = seasonPickerOpen,
                             onTriggerClick = { seasonPickerOpen = true },
+                            // UP from the season-trigger pill MUST land on
+                            // the Resume button. Default spatial focus
+                            // search wanders or, when the hero is scrolled
+                            // out, finds no candidate and just nudges the
+                            // page — the user reads that as "the screen
+                            // moved but the cursor didn't go anywhere."
+                            // Explicit `up = playAnchor.requester` makes
+                            // the redirect deterministic.
+                            upTarget = playAnchor.requester,
                         )
                     }
                 }
@@ -767,9 +777,20 @@ private fun ActionRow(
     playAnchor: PlacedFocusAnchor,
     onPrimaryFocusChanged: (Boolean) -> Unit,
 ) {
+    // Compact size across the whole row. The hero column already has the
+    // detail poster taking ~280dp on its left, which leaves the action
+    // row a fairly tight horizontal slot — Standard (48dp tall, 22dp pad,
+    // 88dp min-width) for five buttons made the labels squeeze and "In
+    // favourites" wrapped onto a second line. Compact (36dp tall, 14dp
+    // pad, 64dp min-width) fits the same five buttons comfortably and
+    // every button shares one height. The Resume button is still THE
+    // primary CTA — its visual prominence comes from the solid gradient
+    // fill + scale + halo on focus, not from a height difference vs its
+    // companions.
+    val buttonSize = ButtonSize.Compact
     Row(
         modifier = Modifier.padding(top = Space.sm),
-        horizontalArrangement = Arrangement.spacedBy(Space.md),
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Primary "Resume / Play / Continue" CTA. The placedFocus(playAnchor)
@@ -778,6 +799,7 @@ private fun ActionRow(
         // in ContentDetailScreen above).
         YancoPrimaryButton(
             onClick = onPlay,
+            size = buttonSize,
             modifier =
             Modifier
                 .placedFocus(playAnchor)
@@ -786,48 +808,81 @@ private fun ActionRow(
             Icon(
                 imageVector = YancoIcons.Play,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(12.dp),
             )
-            Text(text = primaryLabel)
+            Text(
+                text = primaryLabel,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (showPlayFromStart) {
-            YancoSecondaryButton(onClick = onPlayFromStart) {
-                Text(text = "Play from beginning")
+            YancoSecondaryButton(onClick = onPlayFromStart, size = buttonSize) {
+                Text(
+                    text = "From start",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         if (showReset) {
-            YancoSecondaryButton(onClick = onReset) {
-                Text(text = "Reset progress")
+            YancoSecondaryButton(onClick = onReset, size = buttonSize) {
+                Text(
+                    text = "Reset",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         // Favourites toggle. "In favourites" (already starred) reads as
         // the applied/active state — translucent primary gives it the soft
         // accent wash + accent text so the user can tell at a glance that
         // it's the picked state, distinct from a generic secondary action.
+        // The icon flips outline ↔ filled and the label stays a single
+        // short word so the button keeps the same width whether on or off.
         if (isFavorite) {
             YancoPrimaryButton(
                 onClick = onFavoriteToggle,
+                size = buttonSize,
                 translucent = true,
             ) {
                 Icon(
                     imageVector = YancoIcons.StarFilled,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(12.dp),
                 )
-                Text(text = "In favourites")
+                Text(
+                    text = "Favourite",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         } else {
-            YancoSecondaryButton(onClick = onFavoriteToggle) {
+            YancoSecondaryButton(onClick = onFavoriteToggle, size = buttonSize) {
                 Icon(
                     imageVector = YancoIcons.StarOutline,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(12.dp),
                 )
-                Text(text = "Add to favourites")
+                Text(
+                    text = "Favourite",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-        YancoSecondaryButton(onClick = onBack) {
-            Text(text = "Back")
+        YancoSecondaryButton(onClick = onBack, size = buttonSize) {
+            Text(
+                text = "Back",
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -870,6 +925,7 @@ private fun SeasonSelector(
     episodeCount: Int,
     open: Boolean,
     onTriggerClick: () -> Unit,
+    upTarget: FocusRequester? = null,
 ) {
     Column(
         modifier =
@@ -882,12 +938,13 @@ private fun SeasonSelector(
             count = episodeCount,
             open = open,
             onClick = onTriggerClick,
+            upTarget = upTarget,
         )
     }
 }
 
 @Composable
-private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () -> Unit) {
+private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () -> Unit, upTarget: FocusRequester? = null) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
@@ -898,6 +955,13 @@ private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () 
             .clip(RoundedCornerShape(Radius.pill))
             .background(bg)
             .border(if (focused) 2.dp else 1.dp, border, RoundedCornerShape(Radius.pill))
+            .then(
+                if (upTarget != null) {
+                    Modifier.focusProperties { up = upTarget }
+                } else {
+                    Modifier
+                },
+            )
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.DropdownList, onClick = onClick)
             .padding(horizontal = Space.lg, vertical = Space.sm),
