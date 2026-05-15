@@ -656,31 +656,49 @@ fun GuideScreen(
                         "GuideScreen.onScheduleRecord: no streamUrl for tvgId=${channel.tvgId}; skipping",
                     )
                 } else {
-                    // Resolve content_id from tvg_id via the existing
-                    // findLiveByTvgId lookup so the schedule's FK + the
-                    // future "switch player to scheduled channel" step
-                    // can use the real content row.
-                    val contentItem =
-                        runCatching { contentRepo.findLiveByTvgId(channel.tvgId) }.getOrNull()
+                    // **MK.REC.RESILIENCE 2026-05-15.** Both the contentRepo
+                    // lookup and recordScheduler.schedule (which insert +
+                    // arm alarms + transitionTo, all blocking SQLDelight
+                    // and AlarmManager writes) MUST run off the main
+                    // thread. On a cold DB the chain easily exceeds the
+                    // 5s ANR budget. The series-binding path below
+                    // already does this; the single-record path was
+                    // missed. Native-android-mk skill explicitly bans
+                    // calling shared/ repos from a Compose lambda.
+                    //
+                    // recordingDisclaimerGate stays on Main — it's a
+                    // composable-side state setter that opens the disclaimer
+                    // dialog if the user hasn't accepted yet. Only the
+                    // post-gate work moves to IO.
                     recordingDisclaimerGate {
-                        runCatching {
-                            recordScheduler.schedule(
-                                contentId = contentItem?.id,
-                                programmeId = programme.id,
-                                title = programme.title,
-                                streamUrl = streamUrl,
-                                scheduledStart = programme.startTime * 1000L,
-                                scheduledEnd = programme.endTime * 1000L,
-                            )
-                        }.onFailure { Log.e("Yanco", "schedule failed for ${programme.id}", it) }
+                        coroutineScope.launch(Dispatchers.IO) {
+                            runCatching {
+                                val contentItem =
+                                    contentRepo.findLiveByTvgId(channel.tvgId)
+                                recordScheduler.schedule(
+                                    contentId = contentItem?.id,
+                                    programmeId = programme.id,
+                                    title = programme.title,
+                                    streamUrl = streamUrl,
+                                    scheduledStart = programme.startTime * 1000L,
+                                    scheduledEnd = programme.endTime * 1000L,
+                                )
+                            }.onFailure {
+                                Log.e("Yanco", "schedule failed for ${programme.id}", it)
+                            }
+                        }
                     }
                 }
                 actionTarget = null
             },
             onCancelRecord = {
+                // Cancel also blocks on AlarmManager + SQLDelight; move
+                // to IO for the same ANR reason as onScheduleRecord above.
                 existingScheduleId?.let { id ->
-                    runCatching { recordScheduler.cancel(id) }
-                        .onFailure { Log.w("Yanco", "cancel-record failed for $id", it) }
+                    coroutineScope.launch(Dispatchers.IO) {
+                        runCatching { recordScheduler.cancel(id) }
+                            .onFailure { Log.w("Yanco", "cancel-record failed for $id", it) }
+                    }
                 }
                 actionTarget = null
             },

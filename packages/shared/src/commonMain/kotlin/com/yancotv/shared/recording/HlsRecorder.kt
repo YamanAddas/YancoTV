@@ -248,6 +248,13 @@ class HlsRecorder(
         // killed live recordings at the 90s mark.
         return HttpRequestOptions(
             timeoutMs = HLS_REQUEST_TIMEOUT_MS,
+            // **MK.REC.RESILIENCE 2026-05-15.** Same reasoning as MpegTsRecorder:
+            // bound the OkHttp socket reader's per-byte wait at 20s so a
+            // CDN that accepts TCP but stalls on the manifest / segment body
+            // fails fast instead of hanging up to the 90s engine default.
+            // HLS manifest + segment fetches are short-lived so 20s is
+            // well above any reasonable CDN first-byte latency.
+            socketTimeoutMs = 20_000L,
             headers = headers,
         )
     }

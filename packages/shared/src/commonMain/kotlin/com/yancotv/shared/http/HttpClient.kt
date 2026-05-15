@@ -5,8 +5,45 @@ import kotlinx.io.Source
 import kotlinx.io.writeString
 
 data class HttpRequestOptions(
-    /** Per-request timeout in milliseconds. */
+    /**
+     * Total request timeout (connect + response + body) in milliseconds.
+     * When null, inherits the engine + Settings → Network default
+     * (90s on Android, see [HttpClientFactory]).
+     *
+     * Set [Long.MAX_VALUE] for streaming use cases whose body is
+     * intentionally long-lived (MPEG-TS catch-up bodies that run for
+     * hours). Note that disabling the overall request timeout does NOT
+     * disable [socketTimeoutMs] or the engine-level connect timeout —
+     * those are independently configured.
+     */
     val timeoutMs: Long? = null,
+    /**
+     * Per-request socket / inter-byte timeout in milliseconds. When set,
+     * overrides the engine-level `socketTimeoutMillis` (90s on Android).
+     *
+     * Critical for recorders: the engine default of 90s is the time the
+     * OkHttp socket reader will wait BETWEEN successive reads before
+     * throwing `SocketTimeoutException`. For an IPTV provider that
+     * accepts the TCP handshake but never starts sending headers / body
+     * bytes, 90s is too long — the recorder appears hung for a minute
+     * and a half before failing.
+     *
+     * Recorder paths set this to ~20s so dead URLs fail fast and the
+     * row transitions to FAILED with a clear reason; healthy providers
+     * are well under 1s for first-byte. The recorder's own per-chunk
+     * `withTimeout` (heartbeat) operates on top of this — see
+     * `MpegTsRecorder.record` — and is NOT a substitute, because
+     * `withTimeout` cannot cancel a blocking JVM `InputStream.read()`
+     * inside Ktor's `channel.toInputStream()` adapter (its `runBlocking`
+     * doesn't honour the outer coroutine's cancellation). The OkHttp
+     * socket timeout DOES kill a stuck read because it operates at the
+     * socket layer below all of that.
+     *
+     * When null, inherits the engine default. Don't set this for
+     * non-recorder callers — short timeouts will false-positive on
+     * cold-CDN catalog fetches.
+     */
+    val socketTimeoutMs: Long? = null,
     /** Extra request headers. */
     val headers: Map<String, String> = emptyMap(),
     /** Hard cap on response body size in bytes. Implementations should reject when exceeded. */

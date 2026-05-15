@@ -107,6 +107,15 @@ open class KtorHttpClient(
                         timeout { requestTimeoutMillis = ms }
                     }
                 }
+                // Honor per-request socket timeout (inter-byte read budget).
+                // Recorders set this to ~20s so a provider that accepts TCP
+                // but never sends bytes fails fast with SocketTimeoutException
+                // instead of hanging on a blocking InputStream read that
+                // the recorder's `withTimeout` heartbeat can't cancel — see
+                // HttpRequestOptions.socketTimeoutMs KDoc for the full chain.
+                options.socketTimeoutMs?.let { ms ->
+                    timeout { socketTimeoutMillis = ms }
+                }
             }
         if (!response.status.isSuccess()) {
             // Redact provider credentials before this string ends up in

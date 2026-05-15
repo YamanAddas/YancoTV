@@ -142,8 +142,26 @@ class MpegTsRecorder(
         // never ends. Without this flag, the recorder's `sink.write` loop
         // never runs and stop produces a 0-byte file regardless of how long
         // it ran. With it, bytes flow channel → caller sink as they arrive.
+        //
+        // **Critical** (MK.REC.RESILIENCE 2026-05-15): `socketTimeoutMs`
+        // bounds the time the OkHttp socket reader will wait BETWEEN reads
+        // before throwing SocketTimeoutException. The engine default of 90s
+        // produced the 17-minute zero-byte ghost recording observed on
+        // 2026-05-15: provider accepted the TCP handshake, the recorder
+        // entered its `readAtMostTo` loop, but no bytes ever arrived from
+        // the server. The recorder's own `withTimeout(heartbeatTimeoutMs)`
+        // CANNOT cancel the read because `channel.toInputStream()` (used by
+        // AndroidKtorHttpClient.getSource when streamLive=true) bridges to
+        // a blocking `InputStream.read()` via `runBlocking` — that
+        // `runBlocking` is its own coroutine scope and doesn't honour the
+        // outer cancellation. The OkHttp socket timeout kills the stuck
+        // read at the socket layer, throws up to the recorder's catch, and
+        // transitions the row to FAILED with a clear reason. 20s is well
+        // above any reasonable cold-server first-byte latency and well
+        // below the 90s "user thinks the app is frozen" threshold.
         return HttpRequestOptions(
             timeoutMs = Long.MAX_VALUE,
+            socketTimeoutMs = 20_000L,
             headers = headers,
             streamLive = true,
         )

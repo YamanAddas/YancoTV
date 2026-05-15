@@ -151,7 +151,8 @@ class RecordingService : Service() {
             }
             ACTION_STOP -> {
                 val id = intent.getStringExtra(EXTRA_RECORD_ID)
-                if (id != null) handleStop(id)
+                val userInitiated = intent.getBooleanExtra(EXTRA_USER_INITIATED, false)
+                if (id != null) handleStop(id, userInitiated = userInitiated)
             }
             ACTION_STOP_ALL -> handleStopAll()
             else -> Log.w(TAG, "RecordingService received unknown action ${intent?.action}")
@@ -402,7 +403,7 @@ class RecordingService : Service() {
         return output
     }
 
-    private fun handleStop(recordId: String) {
+    private fun handleStop(recordId: String, userInitiated: Boolean = false) {
         val job = activeJobs[recordId] ?: return
         val output = activeOutputs[recordId]
         // Pull bookkeeping off the maps up front so a duplicate ACTION_STOP
@@ -429,26 +430,45 @@ class RecordingService : Service() {
                 val secs =
                     startedAt?.let { (System.currentTimeMillis() - it) / 1000L }
                         ?.coerceAtLeast(0L) ?: 0L
-                if (bytes <= 0L) {
-                    // Recording ran but no bytes hit the disk before stop —
-                    // typically because the server never started serving the
-                    // request body within the time the user waited. Mark
-                    // FAILED so the row reads "Failed · no_response_from_server"
-                    // instead of "Saved 0 KB" (which would invite the user to
-                    // tap Play and hit the 3003 unrecognized-input error).
-                    Log.i(TAG, "stop[$recordId] failed — no bytes from server")
-                    recordings.markFailed(
-                        id = recordId,
-                        reason = "no_response_from_server",
-                        bytesWritten = 0L,
-                    )
-                } else {
-                    Log.i(TAG, "stop[$recordId] saved $bytes bytes (${secs}s)")
-                    recordings.markCompleted(
-                        id = recordId,
-                        bytesWritten = bytes,
-                        durationSeconds = secs,
-                    )
+                when {
+                    userInitiated -> {
+                        // Explicit user Cancel (UI button or
+                        // scheduler.cancel). Mark CANCELLED regardless
+                        // of bytes — a deliberate stop must not flip to
+                        // FAILED just because the recorder hadn't
+                        // received any bytes yet, or to COMPLETED if
+                        // the user wanted to discard the partial.
+                        // Real bytes-on-disk are still written to the
+                        // row's file_size_bytes so the UI can show
+                        // "Cancelled · X MB" accurately and orphan-
+                        // file cleanup has a non-zero count to work
+                        // with.
+                        Log.i(TAG, "stop[$recordId] cancelled by user — $bytes bytes (${secs}s)")
+                        recordings.markCancelled(id = recordId, bytesWritten = bytes)
+                    }
+                    bytes <= 0L -> {
+                        // End-alarm / natural-finish path with no
+                        // bytes — the server never started serving the
+                        // request body. Mark FAILED so the row reads
+                        // "Failed · no_response_from_server" instead
+                        // of "Saved 0 KB" (which would invite the
+                        // user to tap Play and hit the 3003
+                        // unrecognized-input error).
+                        Log.i(TAG, "stop[$recordId] failed — no bytes from server")
+                        recordings.markFailed(
+                            id = recordId,
+                            reason = "no_response_from_server",
+                            bytesWritten = 0L,
+                        )
+                    }
+                    else -> {
+                        Log.i(TAG, "stop[$recordId] saved $bytes bytes (${secs}s)")
+                        recordings.markCompleted(
+                            id = recordId,
+                            bytesWritten = bytes,
+                            durationSeconds = secs,
+                        )
+                    }
                 }
             }.onFailure { Log.w(TAG, "stop[$recordId] transition failed", it) }
 
@@ -472,14 +492,25 @@ class RecordingService : Service() {
             // and runCatching swallows. MB-214 pins this exact
             // behaviour at the repo layer.
             RecordingScheduleScheduler.scheduleIdFromRecordId(recordId)?.let { schedId ->
-                val outcome = scheduleOutcomeFromBytes(bytes)
-                runCatching {
-                    schedules.transitionTo(schedId, outcome.state, errorReason = outcome.reason)
-                }.onFailure {
-                    Log.d(
-                        TAG,
-                        "schedule[$schedId] transition rejected — likely already terminal: ${it.message}",
-                    )
+                if (userInitiated) {
+                    // Schedule was pre-claimed CANCELLED by
+                    // RecordingScheduleScheduler.cancel() before this
+                    // ACTION_STOP was dispatched. scheduleOutcomeFromBytes
+                    // would compute FAILED/COMPLETED here, but transitionTo
+                    // on a CANCELLED (terminal) row would be rejected by
+                    // the repo guard and runCatching would swallow it.
+                    // Skip the call entirely — keeps the debug log clean.
+                    Log.d(TAG, "schedule[$schedId] terminal transition skipped (user-cancelled)")
+                } else {
+                    val outcome = scheduleOutcomeFromBytes(bytes)
+                    runCatching {
+                        schedules.transitionTo(schedId, outcome.state, errorReason = outcome.reason)
+                    }.onFailure {
+                        Log.d(
+                            TAG,
+                            "schedule[$schedId] transition rejected — likely already terminal: ${it.message}",
+                        )
+                    }
                 }
             }
 
@@ -642,6 +673,16 @@ class RecordingService : Service() {
         const val EXTRA_MAX_DURATION_MS = "max_duration_ms"
 
         /**
+         * Signals that ACTION_STOP was triggered by an explicit user
+         * action (UI Cancel button or scheduler.cancel), as opposed to
+         * the end-alarm path. Routes `handleStop` to `markCancelled`
+         * regardless of bytes — a deliberate Cancel must read as
+         * CANCELLED, not as `FAILED:no_response_from_server` when no
+         * bytes happened to land first.
+         */
+        const val EXTRA_USER_INITIATED = "user_initiated"
+
+        /**
          * Convenience for the UI / WorkManager: kick off a new
          * recording. Returns the recordId so the caller can correlate
          * with later `recordings` table reads. Generates a UUID when
@@ -672,11 +713,21 @@ class RecordingService : Service() {
             return effectiveId
         }
 
-        fun stop(context: Context, recordId: String) {
+        /**
+         * Stop an in-flight recording. Set [userInitiated] when the
+         * caller is an explicit user Cancel (RecordingsScreen Cancel
+         * button, `RecordingScheduleScheduler.cancel`), so the row
+         * lands as CANCELLED regardless of bytes-on-disk. Defaults to
+         * `false` for end-alarm / completion paths where the row
+         * should be marked COMPLETED-or-FAILED based on the byte
+         * count `handleStop` reads.
+         */
+        fun stop(context: Context, recordId: String, userInitiated: Boolean = false) {
             val intent =
                 Intent(context, RecordingService::class.java)
                     .setAction(ACTION_STOP)
                     .putExtra(EXTRA_RECORD_ID, recordId)
+                    .putExtra(EXTRA_USER_INITIATED, userInitiated)
             context.startService(intent)
         }
 

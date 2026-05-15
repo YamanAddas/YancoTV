@@ -7,7 +7,6 @@ import com.yancotv.android.recording.RecordingService
 import com.yancotv.shared.recording.RecordingScheduleEntry
 import com.yancotv.shared.recording.RecordingScheduleRepository
 import com.yancotv.shared.recording.RecordingScheduleState
-import com.yancotv.shared.recording.RecordingsRepository
 import java.util.UUID
 
 /**
@@ -33,7 +32,6 @@ import java.util.UUID
 class RecordingScheduleScheduler(
     private val context: Context,
     private val repo: RecordingScheduleRepository,
-    private val recordings: RecordingsRepository,
     private val alarmManager: RecordingScheduleAlarmManager,
 ) {
     /**
@@ -184,53 +182,26 @@ class RecordingScheduleScheduler(
                 // row exists). Use the derivation here so cancel-during-fire
                 // can reach the right active recording.
                 val recId = entry.recordingId ?: recordIdForSchedule(scheduleId)
-                // **MB-219 (2026-05-15).** Pre-claim CANCELLED on BOTH the
-                // schedule and recording row BEFORE dispatching
-                // `RecordingService.stop`. This call runs on Dispatchers.IO
-                // (RecordingsScreen's cancel handler), and the service's
-                // `handleStop` finalises asynchronously on a different
-                // IO coroutine — so without the pre-claim, both writers
-                // race for the terminal-state slot:
+                // **MB-219 (2026-05-15, revised).** Pre-claim CANCELLED on the
+                // SCHEDULE only — not the recording row — and pass
+                // `userInitiated = true` through `RecordingService.stop` so
+                // `handleStop` routes to `markCancelled(real_bytes)` instead
+                // of `markFailed(reason=no_response_from_server)`.
                 //
-                //   - handleStop sees `output.size() == 0` (recorder
-                //     hadn't received bytes yet — common for cancel-early
-                //     scenarios) → markFailed(reason=no_response_from_server)
-                //     and transitionTo(FAILED). If this lands first, the
-                //     row goes FAILED (terminal).
-                //   - cancel()'s transitionTo(CANCELLED) then hits the
-                //     terminal-state guard in `repo.transitionTo`
-                //     (require(!current.state.isTerminal())), throws
-                //     IllegalArgumentException, runCatching swallows.
-                //   - User sees FAILED despite pressing Cancel.
-                //
-                // Reversing the order makes CANCELLED the terminal claim,
-                // and handleStop's subsequent transitionTo(FAILED) /
-                // markFailed both fail the same guard and runCatching
-                // swallows them — the schedule + row both end up
-                // CANCELLED, matching the user's action.
+                // The earlier revision pre-claimed `markCancelled(id, 0L)`
+                // on the recording row; that won the terminal-state race
+                // against `handleStop` but with a 0-byte file_size_bytes,
+                // which is wrong for live-tee recordings whose on-disk
+                // file may hold hours of captured bytes. The schedule has
+                // no byte count to lose, so its pre-claim is still
+                // correct — that fixes the "Cancel → FAILED" visible bug
+                // without throwing away the row's real byte count.
                 runCatching {
                     repo.transitionTo(scheduleId, RecordingScheduleState.CANCELLED)
                 }.onFailure {
                     Log.w(TAG, "schedule[$scheduleId] pre-claim CANCELLED failed", it)
                 }
-                // markCancelled needs the current byte count; we don't
-                // have a quick read here (the recorder owns the sink),
-                // so pass 0L. handleStop's `output.size()` would have
-                // produced the real count, but with CANCELLED already
-                // terminal that path is rejected. 0L bytes on a
-                // CANCELLED row reads correctly in the UI ("Cancelled");
-                // partial-bytes accounting is not load-bearing for
-                // CANCELLED rows.
-                runCatching {
-                    recordings.markCancelled(id = recId, bytesWritten = 0L)
-                }.onFailure { t ->
-                    // Row might not exist yet (cancel fired between
-                    // alarm and service.start completing). markFailed in
-                    // handleStop's row-missing branch will catch that
-                    // case; logging here for diagnostics only.
-                    Log.d(TAG, "recording[$recId] pre-claim CANCELLED skipped: ${t.message}")
-                }
-                RecordingService.stop(context, recId)
+                RecordingService.stop(context, recId, userInitiated = true)
             }
             else ->
                 Log.i(TAG, "cancel for terminal schedule $scheduleId state=${entry.state} — alarms cleared, row untouched")

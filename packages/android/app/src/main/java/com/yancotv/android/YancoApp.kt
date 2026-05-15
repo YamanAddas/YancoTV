@@ -15,7 +15,9 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.reminders.ReminderNotificationChannel
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.image.buildYancoImageLoader
+import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.recording.RecordingScheduleRepository
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.types.ContentType
 import io.sentry.Breadcrumb
@@ -34,6 +36,8 @@ import org.koin.core.context.startKoin
 class YancoApp : Application() {
     private val playbackController: PlaybackController by inject()
     private val recordingsRepo: RecordingsRepository by inject()
+    private val scheduleRepo: RecordingScheduleRepository by inject()
+    private val scheduler: RecordingScheduleScheduler by inject()
     private val contentRepo: ContentRepository by inject()
     private val sharedHttpClient: okhttp3.OkHttpClient by inject()
     private var startedActivities = 0
@@ -111,6 +115,39 @@ class YancoApp : Application() {
         // stuck row forever. IO-bound; off the main thread.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             runCatching { recordingsRepo.sweepOrphans() }
+        }
+        // **MK.REC.RESILIENCE 2026-05-15.** Cold-start schedule
+        // reconciliation. Mirrors what RecordingScheduleBootReceiver
+        // does on BOOT_COMPLETED, but runs on every cold app start so
+        // we're robust to Fire TV dropping BOOT_COMPLETED for
+        // non-system apps (a known Fire OS behaviour) and to the
+        // receiver itself crashing.
+        //
+        // Order matters: reconcile FIRST so the rescheduleAll pass
+        // doesn't re-arm rows we just transitioned to MISSED. Both
+        // operations are idempotent — `reconcileAfterBoot` only
+        // touches rows whose start window has actually passed, and
+        // `rescheduleAll` uses `FLAG_UPDATE_CURRENT` on its
+        // PendingIntents so re-arming an already-armed alarm is a
+        // no-op replacement.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { scheduleRepo.reconcileAfterBoot() }
+                .onSuccess { swept ->
+                    if (swept.total > 0) {
+                        android.util.Log.i(
+                            "YancoApp",
+                            "cold-start schedule reconcile: missed=${swept.markedMissed}, " +
+                                "orphaned-firing=${swept.markedFailedFromOrphan}",
+                        )
+                    }
+                }
+                .onFailure {
+                    android.util.Log.w("YancoApp", "cold-start reconcileAfterBoot failed", it)
+                }
+            runCatching { scheduler.rescheduleAll() }
+                .onFailure {
+                    android.util.Log.w("YancoApp", "cold-start rescheduleAll failed", it)
+                }
         }
         // Pre-warm the FTS index pages so the first search after launch
         // doesn't pay flash-storage page-in latency. A 1-row query against
