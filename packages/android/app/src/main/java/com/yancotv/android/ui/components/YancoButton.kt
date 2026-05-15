@@ -156,7 +156,15 @@ fun YancoPrimaryButton(
                 else -> palette.Accent
             }
     } else {
-        fill = primaryFillBrush(palette, enabled)
+        // Solid variant — rest paints the DARKER end of the accent ramp
+        // so focus has somewhere brighter to go. Pre-MK.UI.BTN-fix2 rest
+        // used `Accent → AccentDeep` (today's focus state), which on TV
+        // looked already-lit; the focus state on top of that had nowhere
+        // to climb, so the selector read as "the button got a little
+        // brighter" rather than "this one is selected." Swapping rest
+        // to `AccentDeep → AccentMuted` gives the eye a clear off→on
+        // step when the cursor lands.
+        fill = primaryFillBrush(palette, enabled = enabled, focused = focused && enabled)
         borderColor =
             if (focused && enabled) palette.FocusRing else Color.White.copy(alpha = 0.18f)
         borderWidth = if (focused && enabled) 1.5.dp else 1.dp
@@ -402,17 +410,41 @@ fun YancoDangerButton(
     }
 }
 
-private fun primaryFillBrush(palette: YancoPalette, enabled: Boolean): Brush = if (enabled) {
-    Brush.verticalGradient(
-        listOf(palette.Accent, palette.AccentDeep),
-    )
-} else {
-    Brush.verticalGradient(
-        listOf(
-            palette.AccentMuted.copy(alpha = 0.6f),
-            palette.AccentMuted.copy(alpha = 0.4f),
-        ),
-    )
+/**
+ * Top + bottom stop pair for the solid-variant vertical gradient. Pulled
+ * out as a pure function so the colour rule is unit-testable without
+ * spinning up Compose (mirrors [primarySolidColors] etc.).
+ */
+internal data class GradientStops(val top: Color, val bottom: Color)
+
+/**
+ * Solid-variant fill stops. Three states:
+ *   - disabled        → muted dark wash (no focus possible)
+ *   - enabled + rest  → `AccentDeep → AccentMuted` (darker brand ramp)
+ *   - enabled + focus → `Accent → AccentDeep` (the bright "lit" ramp)
+ *
+ * The two enabled states are an explicit brightness step apart so the
+ * cursor lighting up actually reads at TV distance. The pre-fix arrangement
+ * (rest = `Accent → AccentDeep`, focus = same gradient + halo + scale + ring)
+ * left no room for the fill to brighten — the cursor became a "scale + ring"
+ * cue only, which the user surfaced as "the selector isn't visible enough
+ * on Resume."
+ */
+internal fun primarySolidGradientStops(palette: YancoPalette, focused: Boolean, enabled: Boolean): GradientStops = when {
+    !enabled ->
+        GradientStops(
+            top = palette.AccentMuted.copy(alpha = 0.6f),
+            bottom = palette.AccentMuted.copy(alpha = 0.4f),
+        )
+    focused ->
+        GradientStops(top = palette.Accent, bottom = palette.AccentDeep)
+    else ->
+        GradientStops(top = palette.AccentDeep, bottom = palette.AccentMuted)
+}
+
+private fun primaryFillBrush(palette: YancoPalette, enabled: Boolean, focused: Boolean): Brush {
+    val stops = primarySolidGradientStops(palette, focused = focused, enabled = enabled)
+    return Brush.verticalGradient(listOf(stops.top, stops.bottom))
 }
 
 /**

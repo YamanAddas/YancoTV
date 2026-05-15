@@ -192,6 +192,58 @@ class YancoButtonColorsTest {
         }
     }
 
+    // ── solid primary brightness step (the MK.UI.BTN-fix2 fix) ───
+
+    @Test fun solidPrimaryRestIsDarkerThanFocus() {
+        // The contract that fixes the "Resume button selector isn't
+        // visible because rest is already brightest" complaint. Rest
+        // must paint the DARKER end of the accent ramp so focus has
+        // somewhere brighter to climb. Locked specifically: rest's TOP
+        // stop must be `AccentDeep` (the brand mid-tone), and focus's
+        // TOP stop must be `Accent` (the bright brand colour). If a
+        // future "let's make rest pop more" PR puts Accent back on the
+        // resting state, this test trips.
+        val rest = primarySolidGradientStops(palette, focused = false, enabled = true)
+        val focus = primarySolidGradientStops(palette, focused = true, enabled = true)
+
+        assertEquals(palette.AccentDeep, rest.top)
+        assertEquals(palette.AccentMuted, rest.bottom)
+        assertEquals(palette.Accent, focus.top)
+        assertEquals(palette.AccentDeep, focus.bottom)
+        // And the two state gradients must not be identical — if they
+        // are, the "off → on" jump disappears entirely.
+        assertNotEquals(rest, focus)
+    }
+
+    @Test fun solidPrimaryFocusTopIsBrightestTokenAvailable() {
+        // Every shipped palette must put its brightest enabled
+        // accent token on the focused button's top stop. This is what
+        // makes the cursor visible across themes — Emerald lights up
+        // `#00E28A`, Sapphire `#4A8CFF`, Amber `#FFB14A`. A future
+        // palette that forgets to define a brighter Accent than
+        // AccentDeep trips here.
+        listOf(FrostedEmerald, MidnightSapphire, WarmAmber).forEach { p ->
+            val focusTop = primarySolidGradientStops(p, focused = true, enabled = true).top
+            val restTop = primarySolidGradientStops(p, focused = false, enabled = true).top
+            assertEquals(p.Accent, focusTop)
+            assertEquals(p.AccentDeep, restTop)
+            assertNotEquals(focusTop, restTop)
+        }
+    }
+
+    @Test fun solidPrimaryDisabledStopsAreMutedRegardlessOfFocus() {
+        // Disabled buttons cannot be focused (in practice) but if they
+        // somehow are, the fill must NOT promote — that would lie to
+        // the user that they can act.
+        val restDisabled = primarySolidGradientStops(palette, focused = false, enabled = false)
+        val focusDisabled = primarySolidGradientStops(palette, focused = true, enabled = false)
+        assertEquals(restDisabled, focusDisabled)
+        // Top stop is the muted token alpha-blended down — not Accent,
+        // not AccentDeep. A regression that lets disabled paint the
+        // bright gradient trips here.
+        assertEquals(palette.AccentMuted.copy(alpha = 0.6f), restDisabled.top)
+    }
+
     @Test fun translucentPrimaryAndSecondaryAreVisuallyDistinct() {
         // Pre-unification, several screens used "translucent primary"
         // and "secondary" interchangeably — the user saw two buttons
