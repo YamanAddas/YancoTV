@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -533,6 +534,29 @@ fun SettingsBackupTab(
                     },
                     fontSize = 11.sp,
                 )
+                // v1.1.0 — live pending-count + manual retry button.
+                // After import the coordinator buffers records that
+                // reference content IDs not yet in the DB; they resolve
+                // automatically when each source's sync completes. If
+                // the auto-retry observer misses an event or the user
+                // wants confirmation, this button forces a retry pass.
+                val pending by coordinator.pendingCount.collectAsState()
+                if (pending > 0) {
+                    Text(
+                        "$pending record(s) still pending source resync.",
+                        color = LocalYancoPalette.current.TextMuted,
+                        fontSize = 11.sp,
+                    )
+                    SettingsOutlinedButton(
+                        onClick = { coordinator.retryPendingLinksNow() },
+                    ) {
+                        Text(
+                            text = "Retry pending now",
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
             }
         }
 

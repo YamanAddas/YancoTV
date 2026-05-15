@@ -27,6 +27,7 @@ import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,7 +56,7 @@ class BackupCoordinator(
     private val context: Context,
     private val db: YancoDb,
     private val credentialStore: CredentialStore,
-    syncCoordinator: SourceSyncCoordinator,
+    private val syncCoordinator: SourceSyncCoordinator,
 ) {
     /**
      * MK.19.8.4 — most-recent importer kept around so [retryPendingLinks]
@@ -306,6 +307,25 @@ class BackupCoordinator(
                 pendingImporter = importer
                 retriesRemaining = MAX_RETRY_PASSES
                 _pendingCount.value = unlinked
+
+                // v1.1.0 — auto-kick a source sync for every source that
+                // landed in this restore. The Restore UI text promises
+                // "your sources will resync" but the prior implementation
+                // only set up the post-sync-completion observer and
+                // depended on the user manually triggering a sync.
+                // Real-world reports: users restored, saw "33 pending
+                // source resync" in the status line, then nothing
+                // happened until they navigated to Sources and tapped
+                // Sync. Now we do it for them.
+                //
+                // SyncCoordinator is single-slot (refuses a concurrent
+                // start), so we chain through the sources sequentially
+                // — fire the first sync, observe the state machine, fire
+                // the next when state returns to null (which happens in
+                // SyncCoordinator's `finally` after a sync completes or
+                // crashes). All in scope = app-scoped so the chain
+                // survives the user navigating away.
+                kickRestoreSyncChain()
             } else {
                 pendingImporter = null
                 retriesRemaining = 0
@@ -324,6 +344,55 @@ class BackupCoordinator(
         } catch (e: Throwable) {
             Log.e(TAG, "unexpected import failure", e)
             ImportResult.UnexpectedError(e.message ?: e::class.simpleName ?: "unknown")
+        }
+    }
+
+    /**
+     * Kick a sync for every source currently in the DB, sequentially.
+     * Called from [import] after a successful restore that left pending
+     * records — so the user doesn't have to manually fire each source
+     * sync to get their watch history / favorites / parental controls
+     * back. Waits for `syncCoordinator.state` to return to null between
+     * sources because the coordinator is single-slot and rejects a
+     * concurrent start. Runs in the app-scoped [scope] so it survives
+     * UI navigation.
+     */
+    private fun kickRestoreSyncChain() {
+        scope.launch {
+            val sources =
+                runCatching {
+                    db.sourcesQueries.selectAll().executeAsList()
+                }.getOrNull().orEmpty()
+            for (source in sources) {
+                // Single-slot coordinator: wait for any in-flight sync
+                // to clear before starting the next.
+                while (syncCoordinator.state.value != null) {
+                    delay(250)
+                }
+                Log.i(TAG, "post-restore auto-sync kicking source ${source.id} (${source.name})")
+                syncCoordinator.start(source.id, source.name)
+            }
+        }
+    }
+
+    /**
+     * User-initiated retry — surfaced as a "Retry pending links" button
+     * in the Backup tab. Forces a `retryPendingLinks` pass on the most
+     * recent importer without waiting for a sync-coordinator emission.
+     * Useful when the auto-retry observer missed an event, or when the
+     * user wants to verify "still N pending" status hasn't moved.
+     */
+    fun retryPendingLinksNow() {
+        val importer = pendingImporter ?: return
+        scope.launch {
+            val report = runCatching { importer.retryPendingLinks() }.getOrNull()
+            val stillPending = report?.unlinked?.values?.sum() ?: 0
+            _pendingCount.value = stillPending
+            Log.i(TAG, "manual retryPendingLinks restored=${report?.totalRestored} pending=$stillPending")
+            if (stillPending == 0) {
+                pendingImporter = null
+                retriesRemaining = 0
+            }
         }
     }
 
