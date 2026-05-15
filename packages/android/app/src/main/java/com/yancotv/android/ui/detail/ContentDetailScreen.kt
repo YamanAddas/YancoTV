@@ -255,11 +255,30 @@ fun ContentDetailScreen(
                     hasHistory = hasHistory,
                     isFavorite = isFav,
                     onPlay = {
+                        // Honour the mode `computeNextEpisode` already computed:
+                        //   - RESUME      → continue from saved offset on the current episode
+                        //   - PLAY_NEXT   → next episode from 0 (current was finished)
+                        //   - PLAY_FIRST  → S1E1 (no history yet)
+                        //   - WATCH_AGAIN → S1E1 (whole series watched through)
+                        // Without this branching, every Play click went through
+                        // onPlayEpisode → controller.play(playable) with default
+                        // fromStart=false, which seeks to the stored offset. If the
+                        // chosen episode happened to be finished (PLAY_NEXT case
+                        // with stale watch_history, or the original WATCH_AGAIN
+                        // case where the first ep was already 100% watched), the
+                        // player seeks to the end and loops.
                         when (rendered.type) {
                             ContentType.SERIES -> {
-                                val ep = playChoice?.episode
+                                val choice = playChoice
+                                val ep = choice?.episode
                                 if (ep != null) {
-                                    onPlayEpisode(rendered, ep)
+                                    when (choice.mode) {
+                                        PlayMode.RESUME -> onPlayEpisode(rendered, ep)
+                                        PlayMode.PLAY_NEXT,
+                                        PlayMode.PLAY_FIRST,
+                                        PlayMode.WATCH_AGAIN,
+                                        -> onPlayFromStart(rendered, ep)
+                                    }
                                 } else {
                                     onPlayContent(rendered)
                                 }
@@ -338,7 +357,17 @@ fun ContentDetailScreen(
                     ) {
                         EpisodeRow(
                             ep = ep,
-                            onClick = { onPlayEpisode(rendered, ep) },
+                            // Clicking an episode tile is "I want to watch THIS
+                            // episode from the start" — Netflix/Disney+/Prime
+                            // all behave this way. Without fromStart the
+                            // player would seek to the saved offset; if the
+                            // user previously finished that episode the player
+                            // lands at the end and the episode "loops" (plays
+                            // the final ~0s and stops). Resume-from-offset
+                            // lives behind the dedicated Resume button at the
+                            // top of the detail screen, which uses the
+                            // computeNextEpisode-driven mode logic above.
+                            onClick = { onPlayFromStart(rendered, ep) },
                             modifier = if (idx == 0) Modifier.placedFocus(firstEpisodeAnchor) else Modifier,
                         )
                     }
