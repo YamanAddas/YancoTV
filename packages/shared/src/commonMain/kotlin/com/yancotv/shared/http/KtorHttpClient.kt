@@ -94,27 +94,44 @@ open class KtorHttpClient(
                 for ((k, v) in options.headers) {
                     if (!k.equals("User-Agent", ignoreCase = true)) header(k, v)
                 }
-                // Honor per-request timeout. The engine-level default (90s in
-                // HttpClientFactory.android.kt) is too long for a fast Xtream auth
-                // probe — without this the user sees "fetching…" for 90s × retries
-                // before getting feedback. MK.6 sync debug: caller passes 30s for
-                // auth, 60s for catalog fetches.
-                val explicit = options.timeoutMs
-                if (explicit != null) {
-                    timeout { requestTimeoutMillis = explicit }
-                } else {
-                    perRequestReadTimeoutMs()?.let { ms ->
-                        timeout { requestTimeoutMillis = ms }
+                // Honor per-request timeouts. The engine-level defaults
+                // (90s request + 15s connect + 90s socket in
+                // HttpClientFactory.android.kt) are too long for a fast
+                // Xtream auth probe — without these overrides the user
+                // sees "fetching…" for 90s × retries before getting
+                // feedback. MK.6 sync debug: callers pass 30s for auth,
+                // 60s for catalog fetches.
+                //
+                // **MK.REC.RESILIENCE fix-up (2026-05-15).** Both
+                // requestTimeout AND socketTimeout MUST be set in a
+                // SINGLE `timeout {}` block. Each call to
+                // `timeout {}` constructs a fresh
+                // `HttpTimeoutCapabilityConfiguration` and registers it
+                // via `setCapability(HttpTimeoutCapability, …)` — the
+                // second call REPLACES the first's configuration
+                // wholesale, dropping whatever properties weren't set
+                // in the second block. Splitting them produced a real
+                // bug: setting requestTimeoutMillis = Long.MAX_VALUE
+                // (recorder paths) in one block, then
+                // socketTimeoutMillis = 20s in a second block, wiped
+                // the infinity-request-timeout and the engine default
+                // (90s) reapplied. Symptom on Fire TV: a recording
+                // failed at the 90-second mark with
+                // `request_timeout has expired` instead of either
+                // streaming bytes (healthy provider) or
+                // SocketTimeoutException at 20s (dead provider).
+                val explicitRequestTimeout = options.timeoutMs
+                    ?: perRequestReadTimeoutMs()
+                val explicitSocketTimeout = options.socketTimeoutMs
+                if (explicitRequestTimeout != null || explicitSocketTimeout != null) {
+                    timeout {
+                        if (explicitRequestTimeout != null) {
+                            requestTimeoutMillis = explicitRequestTimeout
+                        }
+                        if (explicitSocketTimeout != null) {
+                            socketTimeoutMillis = explicitSocketTimeout
+                        }
                     }
-                }
-                // Honor per-request socket timeout (inter-byte read budget).
-                // Recorders set this to ~20s so a provider that accepts TCP
-                // but never sends bytes fails fast with SocketTimeoutException
-                // instead of hanging on a blocking InputStream read that
-                // the recorder's `withTimeout` heartbeat can't cancel — see
-                // HttpRequestOptions.socketTimeoutMs KDoc for the full chain.
-                options.socketTimeoutMs?.let { ms ->
-                    timeout { socketTimeoutMillis = ms }
                 }
             }
         if (!response.status.isSuccess()) {
