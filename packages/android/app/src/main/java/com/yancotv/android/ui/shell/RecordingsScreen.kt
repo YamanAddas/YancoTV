@@ -40,6 +40,9 @@ import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.recording.RecordingService
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
+import com.yancotv.android.ui.components.ButtonSize
+import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.recording.RecordingEntry
 import com.yancotv.shared.recording.RecordingScheduleEntry
@@ -337,9 +340,13 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
         Spacer(modifier = Modifier.width(12.dp))
         when (entry.status) {
             RecordingStatus.RECORDING -> {
-                FocusableInlineButton(label = "Stop", primary = true, onClick = onStop)
+                YancoPrimaryButton(onClick = onStop, size = ButtonSize.Compact, translucent = true) {
+                    Text(text = "Stop")
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+                YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
+                    Text(text = "Delete")
+                }
             }
             RecordingStatus.COMPLETED, RecordingStatus.CANCELLED -> {
                 // Manually-stopped recordings are partial but valid — the
@@ -349,12 +356,18 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
                 // row. FAILED stays Delete-only because a 0-byte file or one
                 // killed mid-write isn't something we want to surface as
                 // playable.
-                FocusableInlineButton(label = "Play", primary = true, onClick = onPlay)
+                YancoPrimaryButton(onClick = onPlay, size = ButtonSize.Compact, translucent = true) {
+                    Text(text = "Play")
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+                YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
+                    Text(text = "Delete")
+                }
             }
             RecordingStatus.FAILED -> {
-                FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+                YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
+                    Text(text = "Delete")
+                }
             }
         }
     }
@@ -428,12 +441,11 @@ private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> U
         Spacer(modifier = Modifier.width(12.dp))
         ScheduleStateBadge(kind = ScheduleStateBadgeKind.fromState(entry.state), palette = palette)
         Spacer(modifier = Modifier.width(12.dp))
-        FocusableInlineButton(
-            label =
-            if (entry.state == RecordingScheduleState.FIRING) "Stop" else "Cancel",
-            primary = false,
-            onClick = onCancel,
-        )
+        YancoSecondaryButton(onClick = onCancel, size = ButtonSize.Compact) {
+            Text(
+                text = if (entry.state == RecordingScheduleState.FIRING) "Stop" else "Cancel",
+            )
+        }
     }
 }
 
@@ -489,10 +501,14 @@ private fun HistoryScheduleRow(
         ScheduleStateBadge(kind = effectiveState, palette = palette)
         if (onPlay != null && linkedRecording != null) {
             Spacer(modifier = Modifier.width(8.dp))
-            FocusableInlineButton(label = "Play", primary = true, onClick = onPlay)
+            YancoPrimaryButton(onClick = onPlay, size = ButtonSize.Compact, translucent = true) {
+                Text(text = "Play")
+            }
         }
         Spacer(modifier = Modifier.width(8.dp))
-        FocusableInlineButton(label = "Delete", primary = false, onClick = onDelete)
+        YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
+            Text(text = "Delete")
+        }
     }
 }
 
@@ -552,61 +568,6 @@ private fun ScheduleStateBadge(kind: ScheduleStateBadgeKind, palette: com.yancot
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
-        )
-    }
-}
-
-@Composable
-private fun FocusableInlineButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
-    val palette = LocalYancoPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(6.dp)
-    val bg =
-        when {
-            focused -> palette.Accent
-            primary -> palette.AccentSoft
-            else -> palette.BackgroundElevated
-        }
-    val borderColor =
-        when {
-            focused -> palette.Accent
-            primary -> palette.Accent
-            else -> palette.PanelBorder
-        }
-    val fg =
-        when {
-            focused -> palette.BackgroundDeep
-            primary -> palette.Accent
-            else -> palette.TextPrimary
-        }
-    Box(
-        modifier =
-        Modifier
-            .clip(shape)
-            .background(bg)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = borderColor,
-                shape = shape,
-            )
-            // TV D-pad needs explicit `.focusable` paired with the
-            // clickable's MutableInteractionSource — same lesson as
-            // FavoritesScreen rows. Without this, Modifier.clickable
-            // alone is unreliable for D-pad focus on Fire TV.
-            .focusable(interactionSource = interaction)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
         )
     }
 }

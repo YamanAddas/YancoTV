@@ -72,6 +72,8 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
+import com.yancotv.android.ui.components.ButtonSize
+import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.catchup.CatchupService
@@ -907,46 +909,6 @@ private fun GuideGrid(
     }
 }
 
-/**
- * 2026-04-27 — header-level "Now" jump button. Sits in the time
- * header's channel-column area so D-pad UP from any channel row
- * naturally focuses it. Always visible (no drift threshold) — the
- * button is the user's anchor back to the live edge whenever they're
- * browsing past or future programmes.
- */
-@Composable
-private fun JumpToNowButton(onClick: () -> Unit) {
-    val palette = LocalYancoPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(6.dp)
-    val bg = if (focused) palette.Accent else palette.BackgroundElevated
-    val borderColor = if (focused) palette.Accent else palette.PanelBorder
-    val fg = if (focused) palette.BackgroundDeep else palette.Accent
-    Box(
-        modifier =
-        Modifier
-            .clip(shape)
-            .background(bg)
-            .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
-            .focusable(interactionSource = interaction)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    ) {
-        Text(
-            text = "Now",
-            color = fg,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
 @Composable
 private fun TimeHeader(
     startTime: Long,
@@ -973,7 +935,13 @@ private fun TimeHeader(
             modifier = Modifier.width(CHANNEL_COL_WIDTH).fillMaxHeight(),
             contentAlignment = Alignment.Center,
         ) {
-            JumpToNowButton(onClick = onJumpToNow)
+            YancoPrimaryButton(
+                onClick = onJumpToNow,
+                size = ButtonSize.Compact,
+                translucent = true,
+            ) {
+                Text(text = "Now")
+            }
         }
         Row(
             modifier =

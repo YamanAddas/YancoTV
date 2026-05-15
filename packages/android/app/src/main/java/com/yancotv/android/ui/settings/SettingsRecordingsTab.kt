@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.RecordingStorageMode
+import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -250,9 +251,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             if (recordingPrefs.storageMode == RecordingStorageMode.CUSTOM_SAF &&
                 recordingPrefs.folderUri != null
             ) {
-                FocusableSettingsButton(
-                    label = "Release this folder",
-                    primary = false,
+                YancoSecondaryButton(
                     onClick = {
                         // Release SAF permission and clear the URI. Mode
                         // stays CUSTOM_SAF — the row will offer "pick a
@@ -274,7 +273,9 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                             prefs.setRecordingFolderUri(null)
                         }
                     },
-                )
+                ) {
+                    Text(text = "Release this folder")
+                }
             }
         }
 
@@ -455,57 +456,6 @@ private fun ModeRow(title: String, badge: String?, subtitle: String, detail: Str
     }
 }
 
-@Composable
-private fun FocusableSettingsButton(label: String, primary: Boolean, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val palette = LocalYancoPalette.current
-    val shape = RoundedCornerShape(8.dp)
-    val borderColor =
-        when {
-            focused -> palette.Accent
-            primary -> palette.Accent
-            else -> palette.PanelBorder
-        }
-    val bg =
-        when {
-            focused -> palette.Accent
-            primary -> palette.BackgroundElevated
-            else -> palette.BackgroundElevated
-        }
-    val fg =
-        when {
-            focused -> palette.BackgroundDeep
-            primary -> palette.Accent
-            else -> palette.TextPrimary
-        }
-    Row(
-        modifier =
-        Modifier
-            .clip(shape)
-            .background(bg)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = borderColor,
-                shape = shape,
-            )
-            .focusable(interactionSource = interaction)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            fontSize = 12.sp,
-            fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}
 
 /**
  * Build an initial-URI hint for the SAF folder picker that points at

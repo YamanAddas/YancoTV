@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.types.AddSourceInput
 import com.yancotv.shared.types.SourceType
@@ -249,12 +250,12 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                GhostButton(label = "Cancel", onClick = onDismiss, enabled = !saving)
-                PrimaryButton(
-                    label = if (saving) "Saving…" else "Save",
-                    onClick = { submit() },
-                    enabled = !saving,
-                )
+                YancoSecondaryButton(onClick = onDismiss, enabled = !saving) {
+                    Text(text = "Cancel")
+                }
+                YancoPrimaryButton(onClick = { submit() }, enabled = !saving) {
+                    Text(text = if (saving) "Saving…" else "Save")
+                }
             }
         }
     }
@@ -342,74 +343,3 @@ private fun TypeChip(label: String, description: String, selected: Boolean, onSe
     }
 }
 
-@Composable
-private fun PrimaryButton(label: String, onClick: () -> Unit, enabled: Boolean) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val bg =
-        when {
-            !enabled -> LocalYancoPalette.current.AccentMuted.copy(alpha = 0.4f)
-            focused -> LocalYancoPalette.current.AccentGlow
-            else -> LocalYancoPalette.current.Accent
-        }
-    val borderColor = if (focused) LocalYancoPalette.current.TextPrimary else bg
-    Box(
-        modifier =
-        Modifier
-            .height(42.dp)
-            .widthIn(min = 120.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .focusable(enabled = enabled, interactionSource = interaction)
-            .clickable(
-                enabled = enabled,
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            ).alpha(if (enabled) 1f else 0.7f)
-            .padding(horizontal = 22.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = LocalYancoPalette.current.BackgroundDeep,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun GhostButton(label: String, onClick: () -> Unit, enabled: Boolean) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val borderColor = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
-    val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
-    Box(
-        modifier =
-        Modifier
-            .height(42.dp)
-            .widthIn(min = 104.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .focusable(enabled = enabled, interactionSource = interaction)
-            .clickable(
-                enabled = enabled,
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            ).alpha(if (enabled) 1f else 0.5f)
-            .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 14.sp,
-        )
-    }
-}

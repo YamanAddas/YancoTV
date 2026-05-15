@@ -45,7 +45,10 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.HexSurface
+import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
@@ -551,59 +554,17 @@ private fun FavoriteRow(item: ContentItem, onActivate: () -> Unit, onRemove: () 
                     QualityChips(badges = badges)
                 }
             }
-            FavoriteActionButton(label = "Play", primary = true, onClick = onActivate)
-            FavoriteActionButton(label = "Remove", primary = false, onClick = onRemove)
+            YancoPrimaryButton(
+                onClick = onActivate,
+                size = ButtonSize.Compact,
+                translucent = true,
+            ) {
+                Text(text = "Play")
+            }
+            YancoSecondaryButton(onClick = onRemove, size = ButtonSize.Compact) {
+                Text(text = "Remove")
+            }
         }
-    }
-}
-
-/**
- * Compact action button — mirror of RecordingsScreen.FocusableInlineButton
- * adapted to the favorites palette. Same focus / clickable wiring per the
- * native-android-mk skill: focusable(interactionSource) + clickable
- * (interactionSource, indication=null) so D-pad navigation reliably lights
- * up on Fire TV.
- */
-@Composable
-private fun FavoriteActionButton(label: String, primary: Boolean, onClick: () -> Unit) {
-    val palette = LocalYancoPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(6.dp)
-    val bg =
-        when {
-            focused -> palette.Accent
-            primary -> palette.AccentSoft
-            else -> palette.BackgroundElevated
-        }
-    val borderColor =
-        when {
-            focused -> palette.Accent
-            primary -> palette.Accent
-            else -> palette.PanelBorder
-        }
-    val fg =
-        when {
-            focused -> palette.BackgroundDeep
-            primary -> palette.Accent
-            else -> palette.TextPrimary
-        }
-    Box(
-        modifier =
-        Modifier
-            .clip(shape)
-            .background(bg)
-            .border(width = if (focused) 2.dp else 1.dp, color = borderColor, shape = shape)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 

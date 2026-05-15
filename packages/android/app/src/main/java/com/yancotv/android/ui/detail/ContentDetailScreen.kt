@@ -49,6 +49,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -58,6 +59,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.ui.components.ButtonSize
+import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.components.focusStyle
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.placedFocus
@@ -211,6 +215,24 @@ fun ContentDetailScreen(
     // Single LazyColumn governs the whole page so d-pad focus never has
     // to cross a scroll-container boundary.
     val listState = rememberLazyListState()
+    // When the user navigates UP from the episodes / season-selector zone
+    // back to the Play button, Compose's default `bringIntoView` for the
+    // LazyColumn only scrolls the hero item just enough to reveal the
+    // Play button — the 220dp spacer + poster top stay clipped above the
+    // viewport, which reads as "the page only half-rose." We track focus
+    // on the Play button and, when it gains focus, animate-scroll the
+    // LazyColumn back to (0, 0) so the entire hero (backdrop + poster +
+    // title + plot + Play) lands cleanly framed in the viewport. Snap is
+    // a no-op when listState is already at top, so the initial open and
+    // every left/right walk inside the action row stay still.
+    var heroPlayFocused by remember(item.id) { mutableStateOf(false) }
+    LaunchedEffect(heroPlayFocused) {
+        if (heroPlayFocused &&
+            (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0)
+        ) {
+            listState.animateScrollToItem(0, 0)
+        }
+    }
     val trapFocus = remember { FocusRequester() }
     // True once the open-time focus ladder has handed off to the Play
     // button. While false the 0-dp Spacer below is focusable so we have
@@ -254,6 +276,7 @@ fun ContentDetailScreen(
                     movieResumeSeconds = movieResumeSeconds,
                     hasHistory = hasHistory,
                     isFavorite = isFav,
+                    onPrimaryFocusChanged = { focused -> heroPlayFocused = focused },
                     onPlay = {
                         // Honour the mode `computeNextEpisode` already computed:
                         //   - RESUME      → continue from saved offset on the current episode
@@ -507,6 +530,7 @@ private fun HeroBlock(
     onFavoriteToggle: () -> Unit,
     onBack: () -> Unit,
     playAnchor: PlacedFocusAnchor,
+    onPrimaryFocusChanged: (Boolean) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         BackdropHero(url = backdropUrlOf(item, metadata))
@@ -576,6 +600,7 @@ private fun HeroBlock(
                         onFavoriteToggle = onFavoriteToggle,
                         onBack = onBack,
                         playAnchor = playAnchor,
+                        onPrimaryFocusChanged = onPrimaryFocusChanged,
                     )
                     val cast = metadata.cast?.takeIf { it.isNotBlank() }
                     val director = metadata.director?.takeIf { it.isNotBlank() }
@@ -740,125 +765,70 @@ private fun ActionRow(
     onFavoriteToggle: () -> Unit,
     onBack: () -> Unit,
     playAnchor: PlacedFocusAnchor,
+    onPrimaryFocusChanged: (Boolean) -> Unit,
 ) {
     Row(
         modifier = Modifier.padding(top = Space.sm),
         horizontalArrangement = Arrangement.spacedBy(Space.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        PrimaryButton(
-            label = primaryLabel,
+        // Primary "Resume / Play / Continue" CTA. The placedFocus(playAnchor)
+        // is what the open-time focus ladder targets; the onFocusChanged
+        // hook drives the UP-from-episodes scroll-snap (see heroPlayFocused
+        // in ContentDetailScreen above).
+        YancoPrimaryButton(
             onClick = onPlay,
-            playAnchor = playAnchor,
-        )
-        if (showPlayFromStart) {
-            SecondaryButton(
-                label = "Play from beginning",
-                icon = null,
-                onClick = onPlayFromStart,
-                accent = false,
-            )
-        }
-        if (showReset) {
-            SecondaryButton(
-                label = "Reset progress",
-                icon = null,
-                onClick = onReset,
-                accent = false,
-            )
-        }
-        SecondaryButton(
-            label = if (isFavorite) "In favourites" else "Add to favourites",
-            icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
-            onClick = onFavoriteToggle,
-            accent = isFavorite,
-        )
-        SecondaryButton(
-            label = "Back",
-            icon = null,
-            onClick = onBack,
-            accent = false,
-        )
-    }
-}
-
-@Composable
-private fun PrimaryButton(label: String, onClick: () -> Unit, playAnchor: PlacedFocusAnchor) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val bg = if (focused) LocalYancoPalette.current.AccentGlow else LocalYancoPalette.current.Accent
-    Row(
-        modifier =
-        Modifier
-            .clip(RoundedCornerShape(Radius.control))
-            .background(bg)
-            .placedFocus(playAnchor)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = Space.xxl, vertical = Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.sm),
-    ) {
-        Icon(
-            imageVector = YancoIcons.Play,
-            contentDescription = null,
-            tint = LocalYancoPalette.current.BackgroundDeep,
-            modifier = Modifier.size(14.dp),
-        )
-        Text(
-            text = label,
-            color = LocalYancoPalette.current.BackgroundDeep,
-            style = YancoType.LabelStrong,
-        )
-    }
-}
-
-@Composable
-private fun SecondaryButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, onClick: () -> Unit, accent: Boolean) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val bg =
-        when {
-            focused -> LocalYancoPalette.current.BackgroundHover
-            accent -> LocalYancoPalette.current.Accent.copy(alpha = 0.18f)
-            else -> Color.Transparent
-        }
-    val border =
-        when {
-            focused -> LocalYancoPalette.current.FocusRing
-            accent -> LocalYancoPalette.current.Accent.copy(alpha = 0.5f)
-            else -> LocalYancoPalette.current.PanelBorder
-        }
-    val textColor =
-        when {
-            accent -> LocalYancoPalette.current.Accent
-            focused -> LocalYancoPalette.current.TextPrimary
-            else -> LocalYancoPalette.current.TextSecondary
-        }
-    Row(
-        modifier =
-        Modifier
-            .clip(RoundedCornerShape(Radius.control))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(Radius.control))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = Space.lg, vertical = Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.sm),
-    ) {
-        icon?.let {
+            modifier =
+            Modifier
+                .placedFocus(playAnchor)
+                .onFocusChanged { state -> onPrimaryFocusChanged(state.hasFocus) },
+        ) {
             Icon(
-                imageVector = it,
+                imageVector = YancoIcons.Play,
                 contentDescription = null,
-                tint = textColor,
                 modifier = Modifier.size(14.dp),
             )
+            Text(text = primaryLabel)
         }
-        Text(
-            text = label,
-            color = textColor,
-            style = YancoType.Label,
-        )
+        if (showPlayFromStart) {
+            YancoSecondaryButton(onClick = onPlayFromStart) {
+                Text(text = "Play from beginning")
+            }
+        }
+        if (showReset) {
+            YancoSecondaryButton(onClick = onReset) {
+                Text(text = "Reset progress")
+            }
+        }
+        // Favourites toggle. "In favourites" (already starred) reads as
+        // the applied/active state — translucent primary gives it the soft
+        // accent wash + accent text so the user can tell at a glance that
+        // it's the picked state, distinct from a generic secondary action.
+        if (isFavorite) {
+            YancoPrimaryButton(
+                onClick = onFavoriteToggle,
+                translucent = true,
+            ) {
+                Icon(
+                    imageVector = YancoIcons.StarFilled,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(text = "In favourites")
+            }
+        } else {
+            YancoSecondaryButton(onClick = onFavoriteToggle) {
+                Icon(
+                    imageVector = YancoIcons.StarOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(text = "Add to favourites")
+            }
+        }
+        YancoSecondaryButton(onClick = onBack) {
+            Text(text = "Back")
+        }
     }
 }
 
