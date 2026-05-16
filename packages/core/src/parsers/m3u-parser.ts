@@ -198,11 +198,18 @@ const ATTRIBUTE_NAMES = [
 
 type AttributeName = (typeof ATTRIBUTE_NAMES)[number];
 
+// `attr` here is always one of the hardcoded const strings in
+// ATTRIBUTE_NAMES above — never user input. The negated character classes
+// `[^"]*` / `[^']*` are linear-time in V8; no catastrophic backtracking is
+// possible. Semgrep's non-literal-regexp rule fires on every dynamic
+// RegExp() construction as a review tripwire.
 const ATTRIBUTE_REGEX = new Map<AttributeName, { double: RegExp; single: RegExp }>(
   ATTRIBUTE_NAMES.map((attr) => [
     attr,
     {
+      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
       double: new RegExp(`${attr}="([^"]*)"`, 'i'),
+      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
       single: new RegExp(`${attr}='([^']*)'`, 'i'),
     },
   ]),

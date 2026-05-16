@@ -361,13 +361,20 @@ export async function fetchAssetsForDownload(ctx: AssetFetchContext): Promise<As
           metadata,
         });
         // Also drop a tvshow.nfo next to it if none exists (Kodi picks it up).
+        // `wx` flag: write-if-not-exists, fails atomically if another writer
+        // (or a hand-edited file) races us between check and write. Closes
+        // the existsSync→writeFileSync TOCTOU window — at worst we silently
+        // skip when EEXIST fires, which is the same outcome as the old
+        // existsSync branch.
         const tvshowPath = confinePath(dir, 'tvshow.nfo');
-        if (!fs.existsSync(tvshowPath)) {
+        try {
           fs.writeFileSync(
             tvshowPath,
             buildTvShowNfo({ title: item.cleanTitle || item.title, metadata }),
-            'utf8',
+            { encoding: 'utf8', flag: 'wx' },
           );
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
         }
       } else {
         const title = item?.cleanTitle || item?.title || baseNoExt;

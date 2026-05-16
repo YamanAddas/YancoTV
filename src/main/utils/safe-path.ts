@@ -25,6 +25,7 @@ export function confinePath(baseDir: string, filename: string): string {
   const safeBase = path.resolve(baseDir);
   // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
   const resolved = path.resolve(safeBase, filename);
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
   const rel = path.relative(safeBase, resolved);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {
     throw new Error(

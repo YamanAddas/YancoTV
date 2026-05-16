@@ -184,8 +184,10 @@ describe('source-sync', () => {
       });
       vi.mocked(http.get).mockImplementation(mockGet as unknown as typeof http.get);
 
-      // Start first sync (will not resolve)
-      const firstSync = syncSource('src-concurrent');
+      // Start first sync (will not resolve). Prefixed `_` so the unused-var
+      // lint rule treats it as deliberately retained — we keep the binding
+      // to make the "pending sync" semantics explicit at the call site.
+      const _firstSync = syncSource('src-concurrent');
 
       // Second sync should fail immediately
       const result = await syncSource('src-concurrent');
@@ -196,7 +198,7 @@ describe('source-sync', () => {
 
       // Clean up: the first sync is still pending, but the activeSyncs set
       // will be cleaned up by the finally block when the promise settles.
-      // We don't await firstSync since it will never resolve in this test.
+      // We don't await _firstSync since it will never resolve in this test.
     });
 
     it('calls M3U parser for m3u_url source type', async () => {
