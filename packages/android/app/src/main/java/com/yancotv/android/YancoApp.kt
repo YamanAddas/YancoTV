@@ -17,6 +17,7 @@ import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.image.buildYancoImageLoader
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.http.CleartextAllowlistInterceptor
 import com.yancotv.shared.recording.RecordingScheduleRepository
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.types.ContentType
@@ -95,7 +96,20 @@ class YancoApp : Application() {
         // shows up in adb logcat -s YancoCrash immediately after launch.
         CrashReporter.readAndClear(this)
 
-        SingletonImageLoader.setSafe { buildYancoImageLoader(this, sharedHttpClient) }
+        // MK.SEC.B carve-out — Coil bypasses the cleartext allow-list so
+        // plain-http channel logos (tvg-logo, served from CDNs outside the
+        // user's source hosts) load instead of being blanked by the 469.
+        // Images carry no credentials; every credential-bearing path
+        // (provider API, streams, EPG, update download) keeps the gate via
+        // the shared client. newBuilder() shares the connection pool +
+        // dispatcher; only the allow-list interceptor is dropped. See
+        // AGENTS.md "Cleartext traffic (Android)" + docs/security/AUDIT_NOTES.md.
+        val imageHttpClient =
+            sharedHttpClient
+                .newBuilder()
+                .apply { interceptors().removeAll { it is CleartextAllowlistInterceptor } }
+                .build()
+        SingletonImageLoader.setSafe { buildYancoImageLoader(this, imageHttpClient) }
         EpgSyncWorker.schedulePeriodic(this)
         // Stage 5.2.2 — sideload update check. The worker honors the
         // user's auto-check pref (no-ops when disabled), so it's safe

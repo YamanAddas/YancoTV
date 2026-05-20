@@ -103,8 +103,11 @@ val appModule =
                 .readTimeout(30, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
-                // MK.SEC.B — every shared-OkHttp caller (Coil, EPG importer,
-                // anything that pulls this single) inherits the allow-list.
+                // MK.SEC.B — every shared-OkHttp caller (EPG importer, update
+                // download, subtitle search, the Ktor API engine) inherits the
+                // allow-list. EXCEPTION: Coil's image loader strips this
+                // interceptor in YancoApp.onCreate so plain-http channel logos
+                // load — images carry no credentials. See AUDIT_NOTES.md.
                 .addInterceptor(get<CleartextAllowlistInterceptor>())
                 .build()
         }
