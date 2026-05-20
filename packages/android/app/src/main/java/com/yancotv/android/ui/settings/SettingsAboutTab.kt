@@ -124,13 +124,10 @@ fun SettingsAboutTab(
         )
 
         // ───── Version row + tagline ─────
-        // No section header — the row IS the version. "v 1.0.0" is the
-        // aspirational target we'll ship under at feature-complete +
-        // stable; the "Preview" kicker on the right tells the user
-        // this is a pre-release build so the number doesn't read as a
-        // promise. Actual BuildConfig version surfaces in Diagnostics
-        // at the bottom for bug-report context.
-        VersionRow(text = "v 1.0.0", kicker = "Preview", arabesque = arabesque)
+        // No section header — the row IS the version. Reads the real
+        // package version (same source as Diagnostics → Build) so it
+        // can't drift from what's actually installed.
+        VersionRow(text = "v ${info.version}", arabesque = arabesque)
         Text(
             text = "IPTV for Android TV, Fire TV, and phone.",
             color = palette.TextMuted,
@@ -348,7 +345,7 @@ fun SettingsAboutTab(
  * scroll the same way every other read-only-focusable row does.
  */
 @Composable
-private fun VersionRow(text: String, kicker: String? = null, arabesque: FontFamily) {
+private fun VersionRow(text: String, arabesque: FontFamily) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -377,13 +374,6 @@ private fun VersionRow(text: String, kicker: String? = null, arabesque: FontFami
             letterSpacing = 0.4.sp,
             modifier = Modifier.weight(1f),
         )
-        if (kicker != null) {
-            // Soft tag on the right — "Preview" / "Pre-release" so the
-            // aspirational v1.0.0 doesn't read as a shipping promise.
-            // Uses the same SettingsKicker primitive other tabs use for
-            // status pills so the visual language is consistent.
-            SettingsKicker(text = kicker)
-        }
     }
 }
 
