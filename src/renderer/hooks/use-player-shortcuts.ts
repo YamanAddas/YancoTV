@@ -69,7 +69,11 @@ export function usePlayerShortcuts(): void {
         }
       }
 
-      // Escape always works in theater mode (even on error).
+      // Escape always works in theater mode (even on error). The cascade:
+      // close any open settings panel → exit fullscreen → minimize back to the
+      // docked mini-player (keeps playback). The mini-player exposes an
+      // explicit Close (X) button for stopping; Escape is for getting out of
+      // theater, not for killing the stream.
       if (e.key === 'Escape' && isTheater) {
         e.preventDefault();
         if (state.showSettings) {
@@ -77,7 +81,7 @@ export function usePlayerShortcuts(): void {
         } else if (state.fullscreen) {
           state.toggleFullscreen();
         } else {
-          state.stop();
+          state.minimize();
         }
         return;
       }

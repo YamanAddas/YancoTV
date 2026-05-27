@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
@@ -40,21 +40,43 @@ const START_PAGE_ROUTES: Record<string, string> = {
 
 function AppInner() {
   const { load, get } = useSettingsStore();
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
+  const backend = usePlayerStore((s) => s.backend);
   const qc = useQueryClient();
+  const autoplayFiredRef = useRef(false);
   useNotifications();
 
-  // Load settings once on mount, then keep theme in sync. When
-  // "Remember last channel" is on (19.6) and the user actually has a recent
-  // live channel, auto-play it after settings finish loading so the app opens
-  // into whatever they were last watching.
+  // Settings load + theme sync — runs once on mount, independent of the
+  // backend-readiness gate below.
   useEffect(() => {
-    load().then(async () => {
+    load().then(() => {
       const settings = useSettingsStore.getState();
       document.documentElement.setAttribute('data-theme', settings.get('ui_theme') || 'dark');
+    });
+  }, [load]);
 
-      if (settings.get('ui_remember_last_channel') !== '1') return;
-      const lastId = useRecentChannelsStore.getState().mostRecent();
-      if (!lastId || !window.api) return;
+  // Auto-play the most recently watched live channel — but only after BOTH
+  // settings have loaded AND the player backend has been resolved by
+  // main.tsx's init(). Without the backend gate we'd race: settings often
+  // resolve before checkMpv() does, so play() would read backend='none' and
+  // take the html5 branch on machines that actually have mpv installed.
+  //
+  // The play() call defaults to mini mode (see player-store.ts) so the user
+  // lands on a fully usable menu with the previous channel docked bottom-
+  // right rather than swallowed by a full-screen theater.
+  useEffect(() => {
+    if (!settingsLoaded || backend === 'none') return;
+    if (get('ui_remember_last_channel') !== '1') return;
+    const lastId = useRecentChannelsStore.getState().mostRecent();
+    if (!lastId || !window.api) return;
+
+    // Only fire once per app launch — subsequent renders (e.g. when backend
+    // flips during retries) must not re-trigger playback. The ref lives in
+    // closure across renders.
+    if (autoplayFiredRef.current) return;
+    autoplayFiredRef.current = true;
+
+    (async () => {
       try {
         const detail = await window.api.content.getDetail(lastId);
         const item = detail?.item;
@@ -70,8 +92,8 @@ function AppInner() {
       } catch {
         // Channel deleted or source removed — silently skip.
       }
-    });
-  }, [load]);
+    })();
+  }, [settingsLoaded, backend, get]);
 
   // Invalidate cached content when any source finishes syncing, so the
   // next visit to Live / Movies / Series sees fresh data.

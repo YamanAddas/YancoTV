@@ -1,6 +1,8 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { PlayerContainer } from './player/PlayerContainer';
+import { VideoStage } from './player/VideoStage';
+import { MiniPlayer } from './player/MiniPlayer';
 import { Toaster } from './Toaster';
 import { ZapOverlay } from './ZapOverlay';
 import { usePlayerShortcuts } from '../hooks/use-player-shortcuts';
@@ -16,9 +18,11 @@ export function Layout() {
   const mode = usePlayerStore((s) => s.mode);
   const backend = usePlayerStore((s) => s.backend);
   const isTheater = mode === 'theater';
-  // When mpv is the active backend, the video is drawn by mpv embedded into
-  // this main window's HWND (via --wid) and the controls live in a separate
-  // transparent overlay BrowserWindow. The main window renders nothing extra.
+  const isMini = mode === 'mini';
+  // When mpv is the active backend, the video is drawn by mpv embedded into a
+  // dedicated child window and the theater controls live in a separate
+  // transparent overlay BrowserWindow. The main window renders only the
+  // mini-player chrome (which itself just positions an empty surface for mpv).
   const renderPlayerContainer = backend !== 'mpv';
 
   return (
@@ -58,10 +62,21 @@ export function Layout() {
         )}
       </div>
 
-      {/* Player — overlays the entire window in theater mode (html5 backend only;
-          mpv backend renders video via --wid into the main HWND and controls
-          in a separate transparent overlay BrowserWindow). */}
+      {/* Video surface (html5 backend only) — kept mounted across mini↔theater
+          transitions so playback isn't interrupted when the user expands or
+          minimises. Self-gates on backend + mode. */}
+      <VideoStage />
+
+      {/* Theater chrome — overlays the entire window in theater mode (controls,
+          settings, error states). Mounts only for non-mpv backends because mpv
+          uses a separate transparent overlay BrowserWindow for its controls.
+          The container gates itself on mode==='theater'. */}
       {renderPlayerContainer && <PlayerContainer />}
+
+      {/* Docked mini-player — shown in mini mode so the user can browse the
+          app while a stream keeps playing. Mounted at Layout level (not per
+          page) so it survives route navigation. */}
+      {isMini && <MiniPlayer />}
 
       {/* Ephemeral toasts (download-started, etc.) */}
       {!isTheater && <Toaster />}

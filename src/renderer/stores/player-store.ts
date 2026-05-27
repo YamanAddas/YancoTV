@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getVideoElement } from '../components/player/video-ref';
 import { useRecentChannelsStore } from './recent-channels-store';
 
-export type PlayerMode = 'idle' | 'theater';
+export type PlayerMode = 'idle' | 'mini' | 'theater';
 export type PlayerBackend = 'mpv' | 'html5' | 'none';
 export type SettingsTab = 'subtitles' | 'audio' | 'video' | 'speed' | 'info';
 
@@ -115,6 +115,10 @@ interface PlayerStoreActions {
   takeScreenshot: () => Promise<string | null>;
   setError: (error: string | undefined) => void;
   setMode: (mode: PlayerMode) => void;
+  /** Expand the docked mini-player into full theater mode (keeps playback). */
+  expand: () => void;
+  /** Drop from theater back to the docked mini-player (keeps playback). */
+  minimize: () => void;
   setShowSettings: (show: boolean) => void;
   /** Open the settings panel directly on a specific tab. */
   openSettings: (tab: SettingsTab) => void;
@@ -198,11 +202,18 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       }
     }
 
+    // Default mode for a new stream is the docked mini-player — the user
+    // expands to full theater when they want it. Preserves the current mode
+    // when the user re-tunes from within theater so they don't get yanked
+    // back to mini mid-watch.
+    const currentMode = get().mode;
+    const targetMode: PlayerMode = currentMode === 'theater' ? 'theater' : 'mini';
+
     if (backend === 'mpv') {
       // mpv backend: call IPC to start mpv. State updates arrive via push events.
       set({
         status: 'buffering',
-        mode: 'theater',
+        mode: targetMode,
         currentUrl: url,
         currentTitle: title,
         currentContentId: contentId,
@@ -227,7 +238,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       // html5 backend: set currentUrl so VideoPlayer component picks it up
       set({
         status: 'buffering',
-        mode: 'theater',
+        mode: targetMode,
         currentUrl: url,
         currentTitle: title,
         currentContentId: contentId,
@@ -463,6 +474,20 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   setError: (error: string | undefined) => set({ error }),
   setMode: (mode: PlayerMode) => set({ mode }),
+  expand: () => {
+    // Promotes mini → theater. No-op if we're idle or already in theater.
+    const { mode } = get();
+    if (mode === 'mini') set({ mode: 'theater' });
+  },
+  minimize: () => {
+    // Drops theater → mini, closing any open settings panels so they don't
+    // float orphaned over the docked player. No-op if we're already in mini
+    // or idle.
+    const { mode } = get();
+    if (mode === 'theater') {
+      set({ mode: 'mini', showSettings: false, showAspectMenu: false });
+    }
+  },
   setShowSettings: (show: boolean) => set({ showSettings: show }),
   openSettings: (tab) =>
     set((s) => {
@@ -524,15 +549,15 @@ export function initPlayerEventListeners(): () => void {
 
     if (mpvState.status) {
       update.status = mpvState.status as PlayerStoreState['status'];
-      // If mpv reports idle or stopped while in theater mode, the stream ended,
-      // the user clicked Back/Escape on the overlay, or mpv exited — in every
-      // case the main window must leave theater mode so the sidebar + page
-      // content become visible again. Without handling 'stopped' here, a Back
-      // click in the transparent overlay window updates only the overlay's
-      // Zustand store; the main window stays stuck on a blank theater screen.
+      // If mpv reports idle or stopped while we're showing player UI (mini or
+      // theater), the stream ended, the user clicked Back/Escape on the
+      // overlay, or mpv exited — drive the local store back to idle so the
+      // mini-player / theater dismantles itself. Without this, a Back click
+      // in the transparent overlay updates only the overlay's Zustand store;
+      // the main window stays stuck displaying stale player chrome.
       if (
         (mpvState.status === 'idle' || mpvState.status === 'stopped') &&
-        mode === 'theater'
+        (mode === 'theater' || mode === 'mini')
       ) {
         usePlayerStore.getState().stop();
         return;

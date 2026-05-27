@@ -1162,6 +1162,31 @@ export function registerIpcHandlers(): void {
     return { ok: true };
   });
 
+  // Switch the mpv presentation surface to mini / theater / idle. Called by
+  // the renderer's MiniPlayer + PlayerContainer effects whenever the player
+  // mode changes, so the embedded video child window and the transparent
+  // controls overlay stay in sync with the React tree. Idempotent: callers
+  // can fire it on every render without thrash because show/hide check the
+  // current window state.
+  ipcMain.handle(IpcChannels.PLAYER_SET_PRESENTATION, (_event, mode: unknown) => {
+    if (mode !== 'theater' && mode !== 'mini' && mode !== 'idle') {
+      return { ok: false, error: 'Invalid presentation mode' };
+    }
+    if (mode === 'theater') {
+      showVideoWindow();
+      showOverlay();
+      sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
+    } else {
+      // Both mini and idle: the docked MiniPlayer or empty-state UI lives in
+      // the main React tree, so the embedded mpv surface and the floating
+      // controls overlay both need to get out of the way.
+      hideVideoWindow();
+      hideOverlay();
+      sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
+    }
+    return { ok: true };
+  });
+
   ipcMain.handle(IpcChannels.PLAYER_PAUSE, async () => {
     try {
       await getPlayer().pause();

@@ -28,6 +28,7 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
   const pause = usePlayerStore((s) => s.pause);
   const resume = usePlayerStore((s) => s.resume);
   const stop = usePlayerStore((s) => s.stop);
+  const minimize = usePlayerStore((s) => s.minimize);
   const seek = usePlayerStore((s) => s.seek);
   const setVolume = usePlayerStore((s) => s.setVolume);
   const toggleMute = usePlayerStore((s) => s.toggleMute);
@@ -149,10 +150,15 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
     }
   }, [isVod, duration, position, seek, onInteraction]);
 
-  // The top-left "Back" button exits theater mode by stopping playback.
-  // A mini-player / PIP variant was planned (Sprint 12B / 16) but dropped
-  // in 0.2.0 — see CHANGELOG. "Back = stop" matches the button's label.
+  // The top-left "Back" button exits theater mode without killing playback —
+  // it drops to the docked mini-player so the user keeps watching while
+  // navigating the menu. The Close (X) button on the right is the only path
+  // to fully stop the stream.
   const handleBack = useCallback(() => {
+    minimize();
+  }, [minimize]);
+
+  const handleClose = useCallback(() => {
     stop();
   }, [stop]);
 
@@ -163,13 +169,13 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
       }`}
       onMouseDown={onInteraction}
     >
-      {/* Top bar — title + back */}
+      {/* Top bar — back (minimize) + title + REC/Live badges + close (stop) */}
       <div className="bg-gradient-to-b from-black/70 to-transparent px-6 pb-12 pt-4">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
-            title="Back (Esc)"
+            title="Back to menu (Esc) — keeps playing in mini-player"
           >
             <ArrowLeftIcon />
           </button>
@@ -201,6 +207,16 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
               Live
             </span>
           )}
+          {/* Close = full stop (distinct from Back/minimize). Visually distinct
+              so the user doesn't confuse the two. */}
+          <button
+            onClick={handleClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 backdrop-blur-sm transition-colors hover:bg-red-500/70 hover:text-white"
+            title="Close player — stops the stream"
+            aria-label="Close player"
+          >
+            <CloseIcon />
+          </button>
         </div>
       </div>
 
@@ -585,6 +601,14 @@ function ArrowLeftIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 }

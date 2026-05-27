@@ -170,6 +170,14 @@ const api = {
     // on top of the embedded mpv video in the main window.
     overlayShow: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_SHOW),
     overlayHide: () => ipcRenderer.invoke(IpcChannels.PLAYER_OVERLAY_HIDE),
+    /**
+     * Tell main which presentation surface mpv should use. 'theater' = full
+     * embedded video + controls overlay; 'mini' = both hidden (audio only);
+     * 'idle' = teardown. html5 backend ignores this; routed by mode effects
+     * in MiniPlayer + PlayerContainer.
+     */
+    setPresentation: (mode: 'theater' | 'mini' | 'idle') =>
+      ipcRenderer.invoke(IpcChannels.PLAYER_SET_PRESENTATION, mode),
     onOverlayShown: (
       callback: (media?: { url?: string; title?: string; contentId?: string }) => void,
     ) => {
