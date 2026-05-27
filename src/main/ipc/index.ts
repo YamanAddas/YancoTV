@@ -1091,11 +1091,22 @@ export function registerIpcHandlers(): void {
       try {
         // Embed mpv into the dedicated video-stage BrowserWindow (not main).
         // The main window's Chromium compositor would cover mpv's child surface;
-        // a separate transparent child window sidesteps that z-order trap. The
-        // video window must be visible (shown) before we pass its HWND to mpv
-        // so mpv's surface attaches to a window that's actually on screen.
+        // a separate transparent child window sidesteps that z-order trap.
+        //
+        // Show-then-hide pattern: the BrowserWindow needs to be "realized"
+        // (shown at least once) for `getNativeWindowHandle()` to return a
+        // valid HWND on Windows. We then hide it again so mpv's first frames
+        // paint into an invisible HWND — the renderer's MiniPlayer (or
+        // PlayerContainer for theater) mount-effect fires setPresentation
+        // shortly after, which re-shows the window AT THE CORRECT BOUNDS
+        // (mini rect or full area). Result: when the user finally sees the
+        // video, it's already at the right size — no brief full-area flash
+        // before mini bounds land, and no resize-jump during the first
+        // visible frames. The brief show is invisible to the user because
+        // the BrowserWindow is transparent and mpv hasn't painted yet.
         showVideoWindow();
         const wid = getVideoWindowHandle() ?? undefined;
+        if (wid) hideVideoWindow();
         // Infer live vs VOD from the content record so mpv gets the right cache
         // profile: live wants a big rewind buffer + frame-drop on underrun,
         // VOD wants a modest forward cache + clean rebuffer on underrun.

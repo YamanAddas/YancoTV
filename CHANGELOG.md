@@ -4,6 +4,23 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.8] — 2026-05-27
+
+### Fixed
+
+- **First-play flash on mpv.** Starting a new stream from idle used
+  to briefly show the mpv video at full-screen before shrinking to
+  the mini-player bounds (~50–200ms depending on how fast file-loaded
+  fired). `PLAYER_PLAY` now hides the video child window immediately
+  after capturing its HWND, so mpv's first frames paint into an
+  invisible window. The renderer's `MiniPlayer` mount-effect fires
+  `setPresentation('mini')` shortly after, which re-shows the window
+  at the correct mini rect — when the user finally sees the video,
+  it's already at the right size. The brief show-then-hide is
+  invisible because the BrowserWindow is transparent and mpv hasn't
+  painted yet at that point. Falls back to the previous behaviour
+  (standalone mpv window) if the HWND can't be captured.
+
 ## [0.3.7] — 2026-05-27
 
 ### Added
