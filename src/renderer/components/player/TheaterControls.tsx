@@ -175,15 +175,21 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
       }`}
       onMouseDown={onInteraction}
     >
-      {/* Top bar — back (minimize) + title + REC/Live badges + close (stop) */}
+      {/* Top bar — Browse (minimize) + title + REC/Live badges + close (stop) */}
       <div className="bg-gradient-to-b from-black/70 to-transparent px-6 pb-12 pt-4">
         <div className="flex items-center gap-3">
+          {/* Browse button — pill shape with visible text so users discover
+              that they can get back to the channel grid without stopping
+              playback. The icon-only Back arrow it replaced was hover-tooltip
+              -only and most users were hitting Close (X) instead, which
+              killed the stream. */}
           <button
             onClick={handleBack}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/80 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
-            title="Back to menu (Esc) — keeps playing in mini-player"
+            className="flex h-9 items-center gap-2 rounded-full bg-white/10 pl-2.5 pr-3.5 text-sm font-medium text-white/85 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+            title="Browse (Esc) — opens the channel menu, keeps playing in the mini-player"
           >
             <ArrowLeftIcon />
+            <span>Browse</span>
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-semibold text-white drop-shadow-lg">

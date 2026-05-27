@@ -4,6 +4,17 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.3] — 2026-05-27
+
+### Changed
+
+- The icon-only Back arrow at the top-left of theater mode is now a
+  labeled "Browse" pill button. Users were hitting Close (X) — which
+  stops the stream — to get back to the channel grid because the
+  Back arrow's "keeps playing in mini" tooltip was hover-only and
+  easy to miss. Same action (minimize to mini, keeps playing); just
+  obvious which button does what now.
+
 ## [0.3.2] — 2026-05-27
 
 Two mini-player UX fixes after testing 0.3.1.
