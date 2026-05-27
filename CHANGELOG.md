@@ -4,6 +4,89 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.0] — 2026-05-27
+
+Mini-player redesign. Auto-played streams no longer swallow the menu —
+they dock bottom-right while the sidebar and page content stay
+interactive. Plus an audit-driven round of P1/P2 cleanup.
+
+### Added
+
+- Docked mini-player: a new `mini` player mode runs alongside `theater`
+  and `idle`. Auto-play on launch (when "Remember last channel" is on)
+  lands in mini by default; the user clicks expand to enter full theater.
+- Theater `Back` (and `Escape`) now minimise to mini instead of stopping;
+  a new explicit `Close` (X) button is the only path to fully stop the
+  stream.
+- Error overlay in the player has a visible "Back to menu" button
+  instead of the discoverability-hostile "Press Escape" hint.
+- mpv backend repositions its embedded video child window over the mini
+  card via a new `PLAYER_SET_VIDEO_BOUNDS` IPC + `ResizeObserver`, so
+  the embedded video itself shrinks to fit (not just an audio-only
+  placeholder).
+
+### Changed
+
+- `play()` defaults to mini mode for fresh streams; theater is preserved
+  only if the user is already in theater when they tune. App lands on
+  the menu, not on a full-screen player.
+- Toaster now renders in theater too so recording errors etc. surface
+  while watching.
+- Sidebar version display pulls from `app.getVersion()` IPC (with the
+  shared constant as fallback) so the displayed version tracks
+  `package.json` rather than drifting.
+- Sidebar `Ctrl+F` + `Ctrl+B` handlers collapsed to a single stable
+  listener that doesn't rebind on every sidebar toggle.
+- Video element is mounted once at Layout level (new `VideoStage`
+  wrapper) and reshaped between mini and theater, so playback continues
+  uninterrupted across mode switches.
+
+### Fixed
+
+- Auto-play on launch used to slam the app into theater mode, which
+  hid the sidebar, page content, and toaster — leaving the user
+  staring at a blank window with audio. On mpv backend the controls
+  overlay would occasionally lose z-order on cold Windows 11 starts,
+  making it look like there were no controls at all. Mini-mode default
+  fixes both.
+- Cross-window mode sync: a new `PLAYER_MODE_BROADCAST` IPC keeps the
+  main-window store and the controls-overlay store aligned, so
+  `Back`/`Esc` in the overlay's TheaterControls now correctly
+  propagates to the main window's MiniPlayer.
+- Backend race: auto-play could fire before `checkMpv()` resolved,
+  routing mpv content through the html5 path. Now gated on
+  `backend !== 'none'` and fires at most once per launch.
+- `PLAYER_PLAY` no longer auto-shows the controls overlay; the
+  renderer drives overlay visibility via `setPresentation`. Eliminates
+  a brief full-screen theater chrome flash on mini-mode auto-play.
+- Overlay window no longer seeds `mode='theater'` on load; was causing
+  a transparent fullscreen overlay to silently cover the menu on cold
+  start before any stream existed.
+- `stop()` exits OS fullscreen before flipping React state so the menu
+  doesn't re-render inside a still-fullscreen window.
+- Recording-failed paths in TheaterControls + LiveTvPage replaced
+  `window.alert()` (which blocked the renderer thread) with toast
+  notifications.
+- `SearchPage` debounce timer + in-flight IPC response are torn down
+  on unmount; a slow query result can no longer setState on a dead
+  component or stomp a newer query.
+- `ContentDetailPage` guards its `Promise.all` fetch against
+  setState-after-unmount when the user navigates away mid-load.
+- Auto-play bails if the user has already kicked off (or stopped) a
+  stream while the channel-detail fetch was in flight.
+- Emoji glyphs in `Sidebar` suggestion icons and `SearchPage` filter
+  chips replaced with SVGs — emoji rendering is unreliable across
+  font stacks.
+
+### Internal
+
+- 3 new IPC channels (`PLAYER_SET_PRESENTATION`,
+  `PLAYER_SET_VIDEO_BOUNDS`, `PLAYER_MODE_BROADCAST`) for the
+  multi-window mini-player coordination. Channel count test bumped
+  from 147 to 150.
+- `VideoPlayer` survives mini↔theater transitions thanks to the new
+  `VideoStage` wrapper — no codec/stream restart on expand.
+
 ## [0.2.0] — 2026-04-17
 
 First feature-complete release. Covers Sprints 12–21: recording, downloads,
