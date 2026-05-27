@@ -488,7 +488,8 @@ const api = {
 
   backup: {
     export: (): Promise<
-      { ok: true; path: string; bytes: number } | { ok: false; cancelled?: boolean; error?: string }
+      | { ok: true; path: string; bytes: number; warnings: string[] }
+      | { ok: false; cancelled?: boolean; error?: string }
     > => ipcRenderer.invoke(IpcChannels.BACKUP_EXPORT),
     import: (
       mode: 'merge' | 'replace',

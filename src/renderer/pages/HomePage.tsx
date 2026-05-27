@@ -20,19 +20,33 @@ export function HomePage() {
 
   useEffect(() => {
     if (!window.api) return;
+    let cancelled = false;
+    // Silently swallow IPC failures — Home is a "best effort" overview page;
+    // a main-process hiccup shouldn't blank the whole UI or surface a stack
+    // trace via the unhandled-promise-rejection handler. Empty state is fine.
     window.api.db.status().then((status: { ok: boolean; counts?: ContentCounts }) => {
+      if (cancelled) return;
       if (status?.ok && status.counts) {
         setCounts(status.counts as ContentCounts);
       }
-    });
-    window.api.history.getRecent(10).then((data: HistoryEntry[]) => setRecentlyWatched(data));
-    window.api.favorites.getAll().then((data: FavoriteEntry[]) => setFavorites(data.slice(0, 10)));
+    }).catch(() => {});
+    window.api.history.getRecent(10)
+      .then((data: HistoryEntry[]) => { if (!cancelled) setRecentlyWatched(data); })
+      .catch(() => {});
+    window.api.favorites.getAll()
+      .then((data: FavoriteEntry[]) => { if (!cancelled) setFavorites(data.slice(0, 10)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   // Refresh favorites when favoriteIds change (user toggled from another page)
   useEffect(() => {
     if (!window.api) return;
-    window.api.favorites.getAll().then((data: FavoriteEntry[]) => setFavorites(data.slice(0, 10)));
+    let cancelled = false;
+    window.api.favorites.getAll()
+      .then((data: FavoriteEntry[]) => { if (!cancelled) setFavorites(data.slice(0, 10)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [favoriteIds]);
 
   const total = counts.live + counts.movie + counts.series;

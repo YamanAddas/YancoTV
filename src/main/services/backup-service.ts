@@ -89,10 +89,11 @@ export interface BackupFile {
 // Collection helpers
 // ---------------------------------------------------------------------------
 
-function collectSources(): SourceBackup[] {
+function collectSources(): { sources: SourceBackup[]; warnings: string[] } {
   const db = getDb();
   const sources = getAllSources();
   const enriched: SourceBackup[] = [];
+  const warnings: string[] = [];
   for (const src of sources) {
     const row = db
       .prepare(
@@ -112,12 +113,23 @@ function collectSources(): SourceBackup[] {
         if (row.password_encrypted) entry.password = decryptCredential(row.password_encrypted);
         if (row.mac_address_encrypted) entry.macAddress = decryptCredential(row.mac_address_encrypted);
       } catch (err) {
-        log.warn(`Failed to decrypt credentials for source ${src.id}:`, err);
+        // Decryption failure → credentials silently absent in the backup
+        // file. Used to be a `log.warn` only — surfaced now via the return
+        // value so the caller (export IPC) can show the user a "credentials
+        // for source X couldn't be saved, you'll need to re-enter them after
+        // restore" toast. Common cause: OS keyring rotation, profile copy
+        // between machines, or safeStorage's master key got reset.
+        const msg = err instanceof Error ? err.message : String(err);
+        log.warn(`Failed to decrypt credentials for source ${src.id}:`, msg);
+        warnings.push(
+          `Could not decrypt credentials for "${src.name}" — they're missing from this backup. ` +
+            `You'll need to re-enter them after restore.`,
+        );
       }
     }
     enriched.push(entry);
   }
-  return enriched;
+  return { sources: enriched, warnings };
 }
 
 function collectFavorites(): FavoriteBackup[] {
@@ -198,13 +210,19 @@ function collectGroupPreferences(): GroupPrefBackup[] {
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Build an in-memory backup snapshot without writing to disk. */
-export function buildBackup(): BackupFile {
-  return {
+/**
+ * Build an in-memory backup snapshot without writing to disk.
+ * Also returns any non-fatal warnings collected during the build (e.g.
+ * sources whose credentials couldn't be decrypted) so the caller can
+ * surface them to the user.
+ */
+export function buildBackup(): { backup: BackupFile; warnings: string[] } {
+  const { sources, warnings } = collectSources();
+  const backup: BackupFile = {
     version: BACKUP_VERSION,
     appVersion: app.getVersion(),
     exportedAt: Date.now(),
-    sources: collectSources(),
+    sources,
     favorites: collectFavorites(),
     history: collectHistory(),
     settings: getAllSettings(),
@@ -215,19 +233,27 @@ export function buildBackup(): BackupFile {
     },
     groupPreferences: collectGroupPreferences(),
   };
+  return { backup, warnings };
 }
 
 /** Write a backup snapshot to the given file path. */
 export async function exportBackupToFile(
   filePath: string,
-): Promise<{ ok: true; path: string; bytes: number } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; path: string; bytes: number; warnings: string[] }
+  | { ok: false; error: string }
+> {
   try {
-    const snapshot = buildBackup();
-    const json = JSON.stringify(snapshot, null, 2);
+    const { backup, warnings } = buildBackup();
+    const json = JSON.stringify(backup, null, 2);
     await fs.writeFile(filePath, json, 'utf-8');
     const stat = await fs.stat(filePath);
     log.info(`Backup exported to ${filePath} (${stat.size} bytes)`);
-    return { ok: true, path: filePath, bytes: stat.size };
+    if (warnings.length > 0) {
+      log.warn(`Backup exported with ${warnings.length} warning(s):`);
+      for (const w of warnings) log.warn(`  - ${w}`);
+    }
+    return { ok: true, path: filePath, bytes: stat.size, warnings };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error('Backup export failed:', msg);

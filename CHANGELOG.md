@@ -4,6 +4,45 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.4] — 2026-05-27
+
+Bundle of small UX wins + the architectural cleanup that prevents the
+0.3.0 packaging crash from happening again.
+
+### Added
+
+- Play/Pause and Mute controls directly in the mini-player top bar.
+  Used to require expanding to theater just to pause; now both live
+  next to the Close button. Buttons only render when a stream is
+  actually active.
+
+### Changed
+
+- `@yancotv/core` no longer re-exports its store factories from its
+  main entry. Renderer-side store imports moved to
+  `@yancotv/core/stores` (the subpath was already declared in
+  `package.json` `exports`). This prevents the Electron main process
+  from transitively pulling `zustand` → `react` just by importing
+  parsers, which is what caused the `ERR_MODULE_NOT_FOUND` crash in
+  0.3.0. Future renderer-only deps added to core will no longer leak
+  into the main-process require graph.
+
+### Fixed
+
+- `backup-service` silently dropped credentials when the OS keyring
+  refused a decrypt (rotated master key, profile copy between
+  machines, safeStorage reset). Backup file went out incomplete with
+  zero warning to the user. `exportBackupToFile` now collects
+  per-source decryption failures and returns them as `warnings: []`
+  to the renderer; AdvancedSettings surfaces them in an amber-tinted
+  list under the export button so the user knows to re-enter the
+  affected credentials after a restore.
+- `HomePage` had three `.then()` chains with no `.catch()`, so a
+  main-process IPC failure would bubble up as an unhandled promise
+  rejection. Added `.catch(() => {})` on all three plus a
+  `cancelled` guard so a slow response doesn't `setState` after the
+  page unmounts.
+
 ## [0.3.3] — 2026-05-27
 
 ### Changed

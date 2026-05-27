@@ -27,7 +27,10 @@ export function AdvancedSettings() {
   const { get, getBool, set, setBool, load, loaded } = useSettingsStore();
   const [paths, setPaths] = useState<{ userData: string; logs: string } | null>(null);
   const [backupStatus, setBackupStatus] = useState<
-    { kind: 'idle' } | { kind: 'busy' } | { kind: 'ok'; path: string; bytes: number } | { kind: 'error'; error: string }
+    | { kind: 'idle' }
+    | { kind: 'busy' }
+    | { kind: 'ok'; path: string; bytes: number; warnings: string[] }
+    | { kind: 'error'; error: string }
   >({ kind: 'idle' });
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const [importStatus, setImportStatus] = useState<
@@ -77,7 +80,7 @@ export function AdvancedSettings() {
       setBackupStatus({ kind: 'error', error: res.error ?? 'Export failed' });
       return;
     }
-    setBackupStatus({ kind: 'ok', path: res.path, bytes: res.bytes });
+    setBackupStatus({ kind: 'ok', path: res.path, bytes: res.bytes, warnings: res.warnings });
   }
 
   async function importBackup() {
@@ -214,6 +217,31 @@ export function AdvancedSettings() {
               <span className="text-xs text-red-400">{backupStatus.error}</span>
             )}
           </div>
+          {/* Surface decryption warnings — backup file is otherwise complete,
+              but the affected source(s) won't have credentials when restored. */}
+          {backupStatus.kind === 'ok' && backupStatus.warnings.length > 0 && (
+            <ul className="mt-2 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-200">
+              {backupStatus.warnings.map((w, i) => (
+                <li key={i} className="flex items-start gap-1.5 leading-snug">
+                  <svg
+                    aria-hidden
+                    className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                    />
+                  </svg>
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="rounded-xl border border-accent/5 bg-surface-900/30 px-4 py-3 space-y-3">

@@ -21,8 +21,13 @@ const MPV_TOP_INSET_PX = 32;
 export function MiniPlayer() {
   const expand = usePlayerStore((s) => s.expand);
   const stop = usePlayerStore((s) => s.stop);
+  const pause = usePlayerStore((s) => s.pause);
+  const resume = usePlayerStore((s) => s.resume);
+  const toggleMute = usePlayerStore((s) => s.toggleMute);
   const title = usePlayerStore((s) => s.currentTitle);
   const status = usePlayerStore((s) => s.status);
+  const muted = usePlayerStore((s) => s.muted);
+  const volume = usePlayerStore((s) => s.volume);
   const backend = usePlayerStore((s) => s.backend);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +127,10 @@ export function MiniPlayer() {
         </div>
       )}
 
-      {/* Top bar — title + close */}
+      {/* Top bar — title + playback controls + close. Playback controls live
+          here so the user doesn't have to expand to theater just to pause or
+          mute a stream. They only render while a stream is actually active
+          (playing/paused/buffering) so the bar stays clean on errors. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-2 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-3 py-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold text-white drop-shadow">
@@ -135,6 +143,43 @@ export function MiniPlayer() {
             <p className="truncate text-[10px] font-medium text-red-300">Playback error</p>
           )}
         </div>
+
+        {/* Play / Pause */}
+        {(status === 'playing' || status === 'paused' || status === 'buffering') && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (status === 'paused') {
+                resume();
+              } else {
+                pause();
+              }
+            }}
+            className="pointer-events-auto flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black/40 text-white/85 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+            title={status === 'paused' ? 'Play (Space)' : 'Pause (Space)'}
+            aria-label={status === 'paused' ? 'Play' : 'Pause'}
+          >
+            {status === 'paused' ? <MiniPlayIcon /> : <MiniPauseIcon />}
+          </button>
+        )}
+
+        {/* Mute toggle */}
+        {(status === 'playing' || status === 'paused' || status === 'buffering') && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMute();
+            }}
+            className="pointer-events-auto flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black/40 text-white/85 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+            title={muted || volume === 0 ? 'Unmute (M)' : 'Mute (M)'}
+            aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'}
+          >
+            {muted || volume === 0 ? <MiniMutedIcon /> : <MiniVolumeIcon />}
+          </button>
+        )}
+
+        {/* Close — last, separated visually so the destructive action is the
+            farthest from the rest. */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -160,5 +205,54 @@ export function MiniPlayer() {
         </span>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compact icons for the mini-player top bar. Sized to match the existing
+// 6×6 button slots (3.5×3.5 svg).
+// ---------------------------------------------------------------------------
+
+function MiniPlayIcon() {
+  return (
+    <svg className="ml-0.5 h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+    </svg>
+  );
+}
+
+function MiniPauseIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+      <path
+        fillRule="evenodd"
+        d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0A.75.75 0 0115 4.5h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H15a.75.75 0 01-.75-.75V5.25z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function MiniVolumeIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+      />
+    </svg>
+  );
+}
+
+function MiniMutedIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.531v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+      />
+    </svg>
   );
 }

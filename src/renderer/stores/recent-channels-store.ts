@@ -1,7 +1,7 @@
 import {
   createRecentChannelsStore,
   type RecentChannelsAdapter,
-} from '@yancotv/core';
+} from '@yancotv/core/stores';
 
 // Persistent ring buffer of recently played LIVE channel IDs. Separate from
 // watch history so we can (a) show a quick-access strip on the Live TV page,

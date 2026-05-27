@@ -1,4 +1,4 @@
-import { createFavoritesStore, type FavoritesAdapter } from '@yancotv/core';
+import { createFavoritesStore, type FavoritesAdapter } from '@yancotv/core/stores';
 
 const ipcAdapter: FavoritesAdapter = {
   getIds: async () => {
