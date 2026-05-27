@@ -63,7 +63,13 @@ export function createOverlayWindow(parentWindow: BrowserWindow): BrowserWindow 
   if (isDev) {
     overlay.loadURL(`${DEV_RENDERER_URL}/overlay.html`);
   } else {
-    overlay.loadFile(path.join(__dirname, '../../renderer/overlay.html'));
+    // overlay-window.js compiles to dist/main/main/player/overlay-window.js
+    // and the renderer build lands at dist/renderer/. That's THREE levels up
+    // from this file, not two — the previous `../../renderer/overlay.html`
+    // resolved to dist/main/renderer/overlay.html which doesn't exist, and
+    // the overlay BrowserWindow silently never loaded. Symptom: ERR_FILE_NOT
+    // _FOUND in stderr + a blank overlay every time mpv played a stream.
+    overlay.loadFile(path.join(__dirname, '../../../renderer/overlay.html'));
   }
 
   overlay.on('closed', () => {

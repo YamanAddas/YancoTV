@@ -4,6 +4,43 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.1] — 2026-05-27
+
+Hotfix for three packaging bugs in 0.3.0 that crashed (or silently
+degraded) the installer build on launch.
+
+### Fixed
+
+- `react` and `react-dom` were in root `devDependencies`, so
+  electron-builder excluded them from the asar. Main process
+  `require('@yancotv/core')` transitively loads `zustand` (added to
+  core in commit `94b7eac`, after the 0.2.0 build), whose ESM main
+  entry re-exports `zustand/react`, which `import`s `react`. Missing
+  package → `ERR_MODULE_NOT_FOUND: Cannot find package 'react'` in
+  the main process, app-fatal. Both packages moved to `dependencies`
+  along with `zustand` itself (which was also dev-scoped).
+- `overlay-window.ts` resolved `overlay.html` via
+  `path.join(__dirname, '../../renderer/overlay.html')` — but the
+  compiled file lives at `dist/main/main/player/overlay-window.js`,
+  so two-dots-twice landed at `dist/main/renderer/overlay.html`
+  (doesn't exist) instead of `dist/renderer/overlay.html`. Bumped to
+  three levels up. Pre-existing bug exposed by 0.3.0 because the
+  mini-player redesign now drives the overlay window through real
+  presentation transitions instead of relying on `PLAYER_PLAY`'s
+  auto-show.
+- Video stage + controls overlay child windows were created inside
+  `mainWindow.on('ready-to-show')`, which fires *after* the
+  renderer's first paint — and the auto-play `useEffect` already
+  fires inside that paint, so `PLAYER_PLAY` could race past the
+  child-window creation. `getVideoWindowHandle()` returned null and
+  mpv fell through to its standalone window with no embedded video
+  and no overlay controls — the exact "mpv plays in a separate
+  window with no controls" symptom the user reported on 0.2.0 (the
+  race was pre-existing; auto-play just exposed it on every launch).
+  Child windows now spawn inside `createWindow()` itself; they start
+  hidden and stay that way until the renderer's MiniPlayer /
+  PlayerContainer drives them via the presentation IPCs.
+
 ## [0.3.0] — 2026-05-27
 
 Mini-player redesign. Auto-played streams no longer swallow the menu —

@@ -150,13 +150,27 @@ function createWindow(): void {
     },
   });
 
+  // Create the video stage + controls overlay child windows BEFORE the
+  // renderer has a chance to fire PLAYER_PLAY. They were originally created
+  // in `ready-to-show`, which fires after the renderer's first paint —
+  // which is after React's useEffects, including the auto-play that
+  // dispatches PLAYER_PLAY. If PLAYER_PLAY arrived before ready-to-show,
+  // `getVideoWindowHandle()` returned null and mpv fell through to its
+  // standalone window (no embedded video, no overlay controls — the exact
+  // "I see mpv in a separate window with no controls" symptom).
+  //
+  // Both child windows are created with `show: false`, so they're invisible
+  // until the renderer's MiniPlayer or PlayerContainer drives them via the
+  // PLAYER_SET_PRESENTATION / PLAYER_SET_VIDEO_BOUNDS IPCs.
+  createVideoWindow(mainWindow);
+  createOverlayWindow(mainWindow);
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show();
-    // Create the video stage window first (mpv embeds here) and the controls
-    // overlay on top of it. Both are children of main and hidden until play.
+    // Tray icon needs the main window for context-menu actions ("Show
+    // YancoTV" / "Quit") but doesn't need any child windows, so it can stay
+    // in ready-to-show.
     if (mainWindow) {
-      createVideoWindow(mainWindow);
-      createOverlayWindow(mainWindow);
       createTray(mainWindow);
     }
   });
