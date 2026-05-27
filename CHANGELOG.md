@@ -4,6 +4,21 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.5] — 2026-05-27
+
+### Added
+
+- **Draggable mini-player.** Click + drag the card to move it anywhere
+  in the viewport — useful when the default bottom-right spot covers
+  channels you want to click in the grid. Position persists to
+  `localStorage` across launches and is clamped back inside the
+  viewport if the window is later resized smaller. Click-vs-drag is
+  decided by a 5px mouse-move threshold so casual clicks still
+  trigger expand-to-theater. For mpv backend, the video child
+  window's bounds are pushed on every frame of the drag so the
+  embedded video follows the card without lag. Hover hint updated
+  to show both gestures ("Click to expand · Drag to move").
+
 ## [0.3.4] — 2026-05-27
 
 Bundle of small UX wins + the architectural cleanup that prevents the

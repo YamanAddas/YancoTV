@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
 
 /**
@@ -7,6 +7,44 @@ import { usePlayerStore } from '../../stores/player-store';
  * pushed bounds inset by this much keeps the top bar visible above the video.
  */
 const MPV_TOP_INSET_PX = 32;
+
+/**
+ * Minimum pixel distance the user has to drag before we treat a mouse
+ * gesture as a drag rather than a click. Anything less than this fires the
+ * onClick handler (expand to theater) on mouse-up. Tuned so a steady-hand
+ * click never accidentally drags but a casual drag never accidentally
+ * expands.
+ */
+const DRAG_THRESHOLD_PX = 5;
+
+/** localStorage key for the persisted mini-player position. */
+const POSITION_STORAGE_KEY = 'yancotv.mini-player-position';
+
+type Position = { x: number; y: number };
+
+/**
+ * Read the user's last-saved mini-player position from localStorage. Returns
+ * null on first run or if the stored value is malformed. Position is in
+ * viewport pixels (top-left origin).
+ */
+function loadStoredPosition(): Position | null {
+  try {
+    const raw = localStorage.getItem(POSITION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as Position).x === 'number' &&
+      typeof (parsed as Position).y === 'number'
+    ) {
+      return parsed as Position;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Docked mini-player chrome — appears in the bottom-right corner whenever
@@ -31,6 +69,43 @@ export function MiniPlayer() {
   const backend = usePlayerStore((s) => s.backend);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // User-positioned mini location. `null` = default bottom-right corner
+  // (handled by Tailwind classes). When set, the card switches to absolute
+  // top/left placement at viewport-pixel coordinates. Initialised from
+  // localStorage so the position persists across app launches.
+  const [position, setPosition] = useState<Position | null>(() => loadStoredPosition());
+  // Whether the user is mid-drag right now. Drives cursor style and the
+  // recently-dragged guard that suppresses the click-to-expand handler on
+  // mouse-up after a real drag.
+  const [isDragging, setIsDragging] = useState(false);
+  // Captured at mouse-down for the duration of a drag. Null when no
+  // gesture is in progress.
+  const dragStartRef = useRef<{ cardX: number; cardY: number; mouseX: number; mouseY: number } | null>(null);
+  // Set true on mouse-up of a real drag and cleared on the very next click
+  // event so onClick={expand} doesn't fire after release.
+  const justDraggedRef = useRef(false);
+
+  // Compute + push the mpv video-stage bounds. Lifted out of the effect so
+  // the drag-move handler can call it on every frame instead of waiting for
+  // the next ResizeObserver tick (which doesn't fire on position-only
+  // changes).
+  const pushMpvBounds = useCallback(() => {
+    if (backend !== 'mpv' || !window.api?.player?.setVideoBounds) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+    const inset = MPV_TOP_INSET_PX;
+    const height = rect.height - inset;
+    if (height < 2) return;
+    window.api.player.setVideoBounds({
+      x: rect.left,
+      y: rect.top + inset,
+      width: rect.width,
+      height,
+    }).catch(() => {});
+  }, [backend]);
+
   // mpv backend: measure the card and push its bounds to main before flipping
   // the presentation to 'mini' — order matters because setPresentation('mini')
   // calls showVideoWindow, which reads customBounds. Re-push on any resize so
@@ -45,57 +120,171 @@ export function MiniPlayer() {
     const el = cardRef.current;
     if (!el) return;
 
-    const pushBounds = () => {
-      const rect = el.getBoundingClientRect();
-      // Skip zero-sized measurements (briefly possible during mount / unmount
-      // transitions); the next ResizeObserver tick will deliver real bounds.
-      if (rect.width < 2 || rect.height < 2) return;
-      const inset = MPV_TOP_INSET_PX;
-      const height = rect.height - inset;
-      if (height < 2) return;
-      window.api.player.setVideoBounds({
-        x: rect.left,
-        y: rect.top + inset,
-        width: rect.width,
-        height,
-      }).catch(() => {});
-    };
-
-    pushBounds();
+    pushMpvBounds();
     // Bring up the mpv surface at our just-pushed bounds. setPresentation is
     // idempotent on the main side, so re-entering mini from a previous mini
     // session is a no-op.
     window.api.player.setPresentation('mini').catch(() => {});
 
-    const ro = new ResizeObserver(pushBounds);
+    const ro = new ResizeObserver(() => pushMpvBounds());
     ro.observe(el);
-    // Card uses `fixed bottom-4 right-4`, so its renderer-relative position
-    // shifts when the window itself resizes — but its size doesn't change,
+    // Card uses `fixed bottom-4 right-4` by default — its renderer-relative
+    // position shifts when the window itself resizes (size doesn't change),
     // so ResizeObserver misses it. The main-side parent-resize listener
     // re-syncs with stale customBounds (still pointing at the pre-resize
     // position) which leaves the mpv surface offset from the card. Push
     // fresh bounds on window resize too.
-    window.addEventListener('resize', pushBounds);
+    const onResize = () => pushMpvBounds();
+    window.addEventListener('resize', onResize);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', pushBounds);
+      window.removeEventListener('resize', onResize);
       // Clear the custom bounds on unmount so the next presentation (theater
       // or idle) starts from a clean full-content state.
       window.api.player.setVideoBounds(null).catch(() => {});
     };
-  }, [backend]);
+  }, [backend, pushMpvBounds]);
+
+  // When the card moves (user-driven drag), the mpv video-stage child window
+  // needs to follow on every frame. Position changes don't trigger
+  // ResizeObserver, so a separate effect watches `position` and re-pushes.
+  useEffect(() => {
+    pushMpvBounds();
+  }, [position, pushMpvBounds]);
+
+  // Drag handlers. Mouse-down captures the start state but doesn't start
+  // dragging until the cursor moves past DRAG_THRESHOLD_PX — keeps casual
+  // clicks from accidentally moving the card.
+  const handleMouseDown = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      // Don't initiate a drag if the user is pressing on a button — those
+      // have their own click handlers (close/play/pause/mute) and the
+      // user's intent is to interact with the control, not move the card.
+      if ((e.target as HTMLElement).closest('button')) return;
+      // Right/middle clicks are not drag gestures.
+      if (e.button !== 0) return;
+      const el = cardRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      dragStartRef.current = {
+        cardX: rect.left,
+        cardY: rect.top,
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+      };
+    },
+    [],
+  );
+
+  // Global mouse-move + mouse-up listeners for the duration of a gesture.
+  // Mounted only while `dragStartRef.current` is potentially set so the
+  // listeners aren't on the window forever, but in practice it's fine to
+  // keep them attached: they early-return when no drag is in progress.
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const start = dragStartRef.current;
+      if (!start) return;
+      const dx = e.clientX - start.mouseX;
+      const dy = e.clientY - start.mouseY;
+      if (!isDragging) {
+        if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+        setIsDragging(true);
+      }
+      const el = cardRef.current;
+      if (!el) return;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const maxX = window.innerWidth - w;
+      const maxY = window.innerHeight - h;
+      const nextX = Math.max(0, Math.min(maxX, start.cardX + dx));
+      const nextY = Math.max(0, Math.min(maxY, start.cardY + dy));
+      setPosition({ x: nextX, y: nextY });
+    };
+    const onUp = () => {
+      if (!dragStartRef.current) return;
+      dragStartRef.current = null;
+      if (isDragging) {
+        setIsDragging(false);
+        justDraggedRef.current = true;
+        // Persist the final position. Wrapped because some sandbox modes
+        // disable localStorage; persistence is best-effort.
+        try {
+          if (cardRef.current) {
+            const rect = cardRef.current.getBoundingClientRect();
+            localStorage.setItem(
+              POSITION_STORAGE_KEY,
+              JSON.stringify({ x: rect.left, y: rect.top }),
+            );
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
+  // The card's onClick fires after a click-finished gesture. If the gesture
+  // was actually a drag, swallow the click so the user's drag-to-move
+  // doesn't also trigger an expand-to-theater.
+  const handleCardClick = useCallback(() => {
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+    expand();
+  }, [expand]);
+
+  // Reposition the card if its persisted position is off-screen (user
+  // resized the window smaller after last drag, or moved to a smaller
+  // monitor). Clamp back into the viewport once per mount + on window
+  // resize.
+  useEffect(() => {
+    const clamp = () => {
+      const el = cardRef.current;
+      if (!el || !position) return;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const maxX = window.innerWidth - w;
+      const maxY = window.innerHeight - h;
+      const clamped: Position = {
+        x: Math.max(0, Math.min(maxX, position.x)),
+        y: Math.max(0, Math.min(maxY, position.y)),
+      };
+      if (clamped.x !== position.x || clamped.y !== position.y) {
+        setPosition(clamped);
+      }
+    };
+    clamp();
+    window.addEventListener('resize', clamp);
+    return () => window.removeEventListener('resize', clamp);
+  }, [position]);
 
   const isBuffering = status === 'buffering';
   const isReconnecting = status === 'reconnecting';
   const isError = status === 'error';
 
+  const positionedClass = position
+    ? 'group fixed z-50 aspect-video w-96 overflow-hidden rounded-lg ring-1 ring-accent/30 hover:ring-accent/60'
+    : 'group fixed bottom-4 right-4 z-50 aspect-video w-96 overflow-hidden rounded-lg ring-1 ring-accent/30 hover:ring-accent/60';
+  const positionedStyle: CSSProperties = position
+    ? { left: position.x, top: position.y, cursor: isDragging ? 'grabbing' : 'grab' }
+    : { cursor: isDragging ? 'grabbing' : 'grab' };
+
   return (
     <div
       ref={cardRef}
-      className="group fixed bottom-4 right-4 z-50 aspect-video w-96 cursor-pointer overflow-hidden rounded-lg ring-1 ring-accent/30 transition-all hover:ring-accent/60"
-      onClick={expand}
+      className={positionedClass}
+      style={positionedStyle}
+      onMouseDown={handleMouseDown}
+      onClick={handleCardClick}
       role="button"
-      aria-label="Expand player to theater mode"
+      aria-label="Expand player to theater mode (drag to move)"
     >
       {/* Card is intentionally transparent. For html5, VideoStage at z-40
           paints the <video> through it. For mpv, the embedded child window
@@ -195,15 +384,28 @@ export function MiniPlayer() {
         </button>
       </div>
 
-      {/* Expand hint — only visible on hover for low visual noise */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-center bg-gradient-to-t from-black/70 to-transparent px-3 py-2 opacity-0 transition-opacity group-hover:opacity-100">
-        <span className="flex items-center gap-1.5 text-[10px] font-display uppercase tracking-widest-plus text-white/90">
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-          </svg>
-          Click to expand
-        </span>
-      </div>
+      {/* Hover hint — surfaces the two gestures the card supports so the
+          drag affordance is discoverable. Hidden during the actual drag so
+          the floating label doesn't follow the cursor distractingly. */}
+      {!isDragging && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-3 bg-gradient-to-t from-black/70 to-transparent px-3 py-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="flex items-center gap-1.5 text-[10px] font-display uppercase tracking-widest-plus text-white/90">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {/* arrows-out / expand */}
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+            </svg>
+            Click to expand
+          </span>
+          <span className="text-white/40">·</span>
+          <span className="flex items-center gap-1.5 text-[10px] font-display uppercase tracking-widest-plus text-white/90">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {/* arrows-pointing-out / move */}
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+            </svg>
+            Drag to move
+          </span>
+        </div>
+      )}
     </div>
   );
 }
