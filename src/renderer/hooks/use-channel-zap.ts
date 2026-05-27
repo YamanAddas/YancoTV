@@ -13,18 +13,19 @@ type LiveChannel = {
 };
 
 /**
- * Channel zapping (Sprint 19.4).
+ * Channel zapping (Sprint 19.4, extended to mini mode in 0.3.7).
  *
  * Flow:
- * 1. User presses PageUp/PageDown while watching a LIVE channel.
+ * 1. User presses PageUp/PageDown while watching a LIVE channel (theater or
+ *    docked mini).
  * 2. We show a floating preview (zapTarget in the player store) with the next
  *    channel's name + logo, without actually switching streams. Rapid presses
  *    scroll through the list without tearing down mpv.
  * 3. 2s after the last press we commit — call play() on the target channel.
  *
- * Only active when mode === 'theater' and the currently-playing item is a
- * live channel; movies/series ignore the keys so seeking-by-chapter stays
- * unambiguous in the future.
+ * Active in both 'theater' and 'mini' modes and only for live content;
+ * movies/series ignore the keys so seeking-by-chapter stays unambiguous in
+ * the future. Idle (no stream) ignores them too.
  */
 export function useChannelZap(): void {
   const channelsRef = useRef<LiveChannel[] | null>(null);
@@ -86,7 +87,9 @@ export function useChannelZap(): void {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
       const state = usePlayerStore.getState();
-      if (state.mode !== 'theater') return;
+      // Mini + theater both allow zap. Idle ignores. The mode check is OR'd
+      // (rather than `!== 'idle'`) so future modes don't auto-opt-in.
+      if (state.mode !== 'theater' && state.mode !== 'mini') return;
       if (state.currentContentType !== 'live') return;
 
       e.preventDefault();

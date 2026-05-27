@@ -4,6 +4,16 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.7] — 2026-05-27
+
+### Added
+
+- **Channel zap works in mini mode now.** PageUp/PageDown switches
+  channels while the docked mini-player is showing — previously only
+  theater mode honoured the keys. The floating "next channel" preview
+  badge (top-center, z-[900]) appears the same way in both modes;
+  releases auto-commit after 2 s of no further presses.
+
 ## [0.3.6] — 2026-05-27
 
 ### Fixed
