@@ -4,6 +4,37 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.2] — 2026-05-27
+
+Two mini-player UX fixes after testing 0.3.1.
+
+### Fixed
+
+- Switching channels closed the mini-player instead of switching the
+  stream. Root cause: when mpv is already running, `play(new-url)`
+  sends `loadfile … replace`, which makes mpv emit an `end-file`
+  event for the OUTGOING file (reason `redirect` on modern mpv).
+  The default end-file handler interpreted any non-`stop`/`quit`
+  reason as a drop and flipped `status` to `stopped`, which the
+  renderer's mpv-state listener treated as "tear down the player".
+  Each pending `loadfile` now queues a suppression in
+  `pendingLoadfileEndFiles`; the matching end-file is consumed
+  silently and the next `file-loaded` flips status straight to
+  `playing`. A counter (not a boolean) so rapid channel-flipping
+  doesn't lose suppressions.
+- The mini-player card showed no feedback during the gap between
+  click and first painted frame — looked frozen. Added a centered
+  buffering / reconnecting spinner (dim backdrop + accent ring)
+  shown whenever `status === 'buffering' || 'reconnecting'`. mpv's
+  embedded child window paints over it once the first frame lands.
+
+### Internal
+
+- `play()` in the mpv loadfile branch now broadcasts an explicit
+  `status='buffering'` + new `currentUrl` state-change before the
+  loadfile command, so both renderers see the transition starting
+  even though they already set the same optimistically.
+
 ## [0.3.1] — 2026-05-27
 
 Hotfix for three packaging bugs in 0.3.0 that crashed (or silently

@@ -66,6 +66,19 @@ export class MpvPlayer implements IPlayer {
   private lastPlayContext: { url: string; options?: PlayOptions } | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempt = 0;
+  /**
+   * Channel-switching via `loadfile … replace` causes mpv to emit an
+   * `end-file` event for the OUTGOING stream — reason `redirect` on modern
+   * mpv, `eof`/`unknown` on older builds. The default end-file handler
+   * interprets every non-`stop`/`quit` end as a stream drop and flips the
+   * status to `stopped`, which the renderer treats as "the user wanted to
+   * stop" and tears the mini-player down. Each pending `loadfile` bumps
+   * this counter; each end-file decrements it before reaching the
+   * reconnect-or-stopped path. A counter (not a flag) is correct because
+   * rapid channel-flipping can queue multiple loadfiles before the first
+   * end-file arrives, and we want all of them suppressed.
+   */
+  private pendingLoadfileEndFiles = 0;
 
   constructor() {
     this.pipeName = `mpv-yancotv-${randomUUID().slice(0, 8)}`;
@@ -90,6 +103,16 @@ export class MpvPlayer implements IPlayer {
 
     // If mpv is already running, just load the new file
     if (this.process && this.ipc?.isConnected()) {
+      // Queue a suppression for the impending end-file event so the
+      // renderer's "mpv reported stopped → tear down the player" listener
+      // doesn't close the mini-player mid-switch.
+      this.pendingLoadfileEndFiles++;
+      // Keep the renderer informed that we're transitioning: 'buffering' is
+      // the same status used during the initial spawn, and the next
+      // file-loaded will flip it to 'playing'.
+      this.state.status = 'buffering';
+      this.state.currentUrl = url;
+      this.emitEvent('state-change', this.state);
       await this.ipc.command(['loadfile', url, 'replace']);
       if (options?.startPosition && options.startPosition > 0) {
         // Wait briefly for file to load before seeking
@@ -99,7 +122,6 @@ export class MpvPlayer implements IPlayer {
       if (options?.subtitleFile) {
         await this.ipc.command(['sub-add', options.subtitleFile]);
       }
-      this.state.currentUrl = url;
       return;
     }
 
@@ -121,6 +143,9 @@ export class MpvPlayer implements IPlayer {
     // User-initiated stop cancels any pending reconnect.
     this.cancelReconnect();
     this.lastPlayContext = null;
+    // Drop any queued loadfile end-file suppressions — a fresh play() after
+    // stop will re-queue if it needs to.
+    this.pendingLoadfileEndFiles = 0;
 
     if (!this.ipc?.isConnected()) {
       this.state = defaultState();
@@ -287,6 +312,7 @@ export class MpvPlayer implements IPlayer {
     this.destroyed = true;
     this.cancelReconnect();
     this.lastPlayContext = null;
+    this.pendingLoadfileEndFiles = 0;
     if (this.ipc) {
       try {
         if (this.ipc.isConnected()) {
@@ -651,6 +677,15 @@ export class MpvPlayer implements IPlayer {
         this.emitEvent('state-change', this.state);
         break;
       case 'end-file':
+        // Channel-switch via `loadfile … replace` queues a suppression for
+        // this event because the OUTGOING file's end-file would otherwise be
+        // misread as an unexpected drop. Consume the queue entry and bail
+        // before any reconnect-or-stopped handling — the incoming
+        // file-loaded will flip status straight to 'playing'.
+        if (this.pendingLoadfileEndFiles > 0) {
+          this.pendingLoadfileEndFiles--;
+          break;
+        }
         // Attempt auto-reconnect for unexpected drops. `stop` is user-initiated
         // and must never trigger a retry.
         if (msg.reason !== 'stop' && msg.reason !== 'quit' && this.maybeScheduleReconnect()) {

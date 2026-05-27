@@ -80,6 +80,7 @@ export function MiniPlayer() {
     };
   }, [backend]);
 
+  const isBuffering = status === 'buffering';
   const isReconnecting = status === 'reconnecting';
   const isError = status === 'error';
 
@@ -91,10 +92,35 @@ export function MiniPlayer() {
       role="button"
       aria-label="Expand player to theater mode"
     >
-      {/* html5 backend: VideoStage paints the <video> through the transparent
-          card. mpv backend: the embedded child window paints on top (no React
-          surface needed); the card surface stays empty as a fallback for the
-          brief moment before main repositions mpv. */}
+      {/* Card is intentionally transparent. For html5, VideoStage at z-40
+          paints the <video> through it. For mpv, the embedded child window
+          (a separate Win32 HWND) paints above the Chromium tree. The chrome
+          (title bar + spinner + hover hint) layers on top via z-indexes. */}
+
+      {/* Centered buffering spinner — shown during initial mpv spawn /
+          channel switches / reconnect so the user gets a "something is
+          happening" cue instead of staring at an empty card. The dim
+          backdrop only covers the card body (skips the top-bar area) so
+          the close button + title stay readable. */}
+      {(isBuffering || isReconnecting) && (
+        <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-surface-950/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-2 rounded-xl bg-surface-900/85 px-5 py-3 shadow-lg ring-1 ring-white/5">
+            <svg
+              className={`h-7 w-7 animate-spin ${isReconnecting ? 'text-amber-400' : 'text-accent'}`}
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {isReconnecting && (
+              <span className="text-[10px] font-medium uppercase tracking-widest-plus text-amber-200">
+                Reconnecting
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Top bar — title + close */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-2 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-3 py-2">
