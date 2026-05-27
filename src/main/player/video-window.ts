@@ -8,11 +8,20 @@ let isActive = false;
 let parentListeners: Array<{ event: string; handler: (...args: unknown[]) => void }> = [];
 /**
  * When set, the video child window positions over this rect (renderer-relative,
- * DIPs) on every sync instead of covering the full parent content area. Used
- * by the docked mini-player so the embedded mpv surface shrinks to fit the
- * card. Null = full content area (theater mode).
+ * DIPs) on every sync — but only when `presentationMode === 'mini'`. Theater
+ * mode ignores it and uses the full parent content area, so we can preserve
+ * the last-known mini rect across a theater detour and restore it on the
+ * next minimize without a renderer round-trip.
  */
 let customBounds: Rectangle | null = null;
+/**
+ * Tracks which presentation the mpv child window is currently serving. Drives
+ * syncBounds: 'mini' honours customBounds (if set), 'theater' always uses the
+ * full parent content area, 'idle' is the no-stream state.
+ *
+ * Maintained by setPresentation() in ipc/index.ts; never set by the renderer.
+ */
+let presentationMode: 'theater' | 'mini' | 'idle' = 'idle';
 
 /**
  * The "video stage" window — a transparent, frameless BrowserWindow that
@@ -177,6 +186,22 @@ export function getVideoWindowCustomBounds(): Rectangle | null {
 }
 
 /**
+ * Set the presentation mode that drives syncBounds' choice between
+ * customBounds (mini) and the full parent content area (theater). Re-syncs
+ * immediately so the change is visible without waiting for the next parent
+ * move/resize event.
+ *
+ * Idempotent — repeating the same mode is a no-op apart from a single
+ * re-sync, which itself is a no-op if the bounds haven't moved.
+ */
+export function setVideoWindowPresentationMode(mode: 'theater' | 'mini' | 'idle'): void {
+  presentationMode = mode;
+  if (videoWin && !videoWin.isDestroyed() && parent && !parent.isDestroyed() && isActive) {
+    syncBounds();
+  }
+}
+
+/**
  * Return the native HWND of the video window as a decimal string — this is
  * what we pass to mpv via --wid so mpv embeds its video surface here instead
  * of in the main window (whose Chromium compositor would hide it).
@@ -203,7 +228,7 @@ function syncBounds(): void {
   if (!parent || parent.isDestroyed()) return;
   try {
     const parentBounds = parent.getContentBounds();
-    if (customBounds) {
+    if (presentationMode === 'mini' && customBounds) {
       // Translate renderer-relative DIPs into absolute screen DIPs. Electron's
       // BrowserWindow APIs all work in DIPs (logical pixels) — CSS pixels in
       // the renderer match 1:1, so no DPR scaling needed here.
@@ -220,6 +245,7 @@ function syncBounds(): void {
         height: Math.max(1, Math.min(maxH, Math.round(customBounds.height))),
       });
     } else {
+      // theater (or no customBounds) — full content area.
       videoWin.setBounds(parentBounds);
     }
   } catch (err) {

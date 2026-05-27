@@ -484,15 +484,27 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     // Promotes mini → theater. No-op if we're idle or already in theater.
     const { mode, backend } = get();
     if (mode !== 'mini') return;
-    set({ mode: 'theater' });
-    // For mpv backend the controls + theater chrome live in a separate overlay
-    // BrowserWindow with its own Zustand store. Main → main process →
-    // broadcast keeps both stores aligned, and showOverlay() actually paints
-    // the chrome. html5 backend handles all chrome inline in the main React
-    // tree, so the IPC is a no-op there (PlayerContainer mode gate already
-    // re-renders correctly without it).
     if (backend === 'mpv' && window.api?.player?.setPresentation) {
-      window.api.player.setPresentation('theater').catch(() => {});
+      // mpv: defer the local `mode` update to the PLAYER_MODE_BROADCAST
+      // that arrives after main process has resized the video child window
+      // and shown the overlay — both happen synchronously in the
+      // PLAYER_SET_PRESENTATION handler. Updating local mode optimistically
+      // would let React commit the menu-hide + MiniPlayer-unmount before
+      // the visual theater state lands, producing a ~50ms flash where the
+      // sidebar is gone but the mpv surface is still mini-sized and the
+      // overlay chrome hasn't appeared. The broadcast-driven update fires
+      // AFTER those operations, so the React commit and the visual state
+      // arrive together.
+      window.api.player.setPresentation('theater').catch(() => {
+        // IPC failed → fall back to the optimistic update so the UI doesn't
+        // appear frozen on the user's click.
+        set({ mode: 'theater' });
+      });
+    } else {
+      // html5 / other: no IPC involved — flip locally so VideoStage moves
+      // the html5 <video> element into the theater-sized box and
+      // PlayerContainer's chrome mounts.
+      set({ mode: 'theater' });
     }
   },
   minimize: () => {
@@ -501,13 +513,20 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     // or idle.
     const { mode, backend } = get();
     if (mode !== 'theater') return;
-    set({ mode: 'mini', showSettings: false, showAspectMenu: false });
-    // mpv: the overlay's TheaterControls fire this; main window's MiniPlayer
-    // will re-fire setPresentation('mini') with bounds once it mounts. The
-    // call here drives main process to hide the overlay BrowserWindow and
-    // broadcasts mode so the *other* window's store updates.
     if (backend === 'mpv' && window.api?.player?.setPresentation) {
-      window.api.player.setPresentation('mini').catch(() => {});
+      // Same flash-avoidance principle as expand(): main process handles
+      // the video-window shrink + overlay-hide in one synchronous block,
+      // *then* broadcasts MODE='mini'. The renderer commits the
+      // chrome-swap once visual state has already changed. Critical detail:
+      // customBounds is preserved across theater (the presentationMode
+      // setter switches syncBounds' branch instead of clearing the rect),
+      // so the shrink lands at the correct mini bounds without waiting for
+      // MiniPlayer's mount-effect to re-push them.
+      window.api.player.setPresentation('mini').catch(() => {
+        set({ mode: 'mini', showSettings: false, showAspectMenu: false });
+      });
+    } else {
+      set({ mode: 'mini', showSettings: false, showAspectMenu: false });
     }
   },
   setShowSettings: (show: boolean) => set({ showSettings: show }),

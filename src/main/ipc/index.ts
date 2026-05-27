@@ -10,7 +10,12 @@ import { syncSource } from '../services/source-sync';
 import { getMainWindow, getOverlayWindow, getVideoWindowHandle } from '../index';
 import { findMpvPath } from '../player/mpv-path';
 import { showOverlay, hideOverlay } from '../player/overlay-window';
-import { showVideoWindow, hideVideoWindow, setVideoWindowBounds } from '../player/video-window';
+import {
+  showVideoWindow,
+  hideVideoWindow,
+  setVideoWindowBounds,
+  setVideoWindowPresentationMode,
+} from '../player/video-window';
 import {
   getContentByType,
   getCategories,
@@ -1176,31 +1181,42 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: 'Invalid presentation mode' };
     }
     if (mode === 'theater') {
-      // Theater = video covers full content area (clear any custom bounds
-      // left over from a previous mini session).
-      setVideoWindowBounds(null);
+      // Theater = video covers full content area. Keep customBounds stashed
+      // so a subsequent minimize can restore mini bounds atomically without
+      // waiting for the renderer to re-push them. The presentation-mode
+      // setter swaps syncBounds' branch from 'mini+customBounds' to 'full'
+      // and re-runs the sync — so the video resize lands here, in the same
+      // synchronous block as showOverlay() below. Result: no flash gap
+      // between the menu hiding and theater chrome appearing.
+      setVideoWindowPresentationMode('theater');
       showVideoWindow();
       showOverlay();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
     } else if (mode === 'mini') {
-      // Mini = video positioned over the renderer-supplied custom bounds (set
-      // by PLAYER_SET_VIDEO_BOUNDS before this call), no controls overlay.
-      // showVideoWindow re-runs syncBounds which now respects customBounds.
+      // Mini = video positioned over customBounds (either freshly pushed by
+      // MiniPlayer's effect, or stashed from a previous mini session). The
+      // presentation-mode setter switches syncBounds back to honour
+      // customBounds and re-runs it, so the video shrink + overlay hide
+      // happen in the same handler call — no full-area-no-chrome flash on
+      // minimize from theater.
+      setVideoWindowPresentationMode('mini');
       showVideoWindow();
       hideOverlay();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
     } else {
       // idle: tear everything down so the next play() / setPresentation can
       // restart from a clean slate.
+      setVideoWindowPresentationMode('idle');
       setVideoWindowBounds(null);
       hideVideoWindow();
       hideOverlay();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
     }
     // Broadcast the mode to all renderers so the main-window store and the
-    // overlay-window store stay in sync — e.g. Back/Esc from TheaterControls
-    // fires this in the overlay context and the main window's MiniPlayer
-    // needs to mount in response.
+    // overlay-window store stay in sync. For mpv backend, expand()/
+    // minimize() in the player-store defer their local `mode` update to
+    // *this* broadcast so the React tree doesn't commit the menu-hide /
+    // chrome-mount until after the visual transition above has landed.
     sendToPlayerRenderers(IpcChannels.PLAYER_MODE_BROADCAST, mode);
     return { ok: true };
   });
@@ -1260,6 +1276,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.PLAYER_STOP, async () => {
     try {
       await getPlayer().stop();
+      // Tear down the embedded surfaces and reset the presentation-state
+      // so the next play() starts from a clean slate — otherwise a stale
+      // customBounds from the previous session would briefly position the
+      // mpv child window before the new MiniPlayer mounts and re-pushes
+      // fresh bounds.
+      setVideoWindowPresentationMode('idle');
+      setVideoWindowBounds(null);
       hideOverlay();
       hideVideoWindow();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);

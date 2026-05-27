@@ -139,9 +139,14 @@ export function MiniPlayer() {
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', onResize);
-      // Clear the custom bounds on unmount so the next presentation (theater
-      // or idle) starts from a clean full-content state.
-      window.api.player.setVideoBounds(null).catch(() => {});
+      // Don't clear customBounds here. We used to call setVideoBounds(null)
+      // on unmount so the next presentation started fresh, but the main
+      // process now keeps customBounds stashed across a theater detour and
+      // uses a `presentationMode` flag to decide whether to honour them —
+      // so on a theater→mini round trip the shrink can land instantly at
+      // the right rect without waiting for MiniPlayer to remount and
+      // re-push them (avoids the visible flash). Idle stop clears bounds
+      // via PLAYER_STOP, not from here.
     };
   }, [backend, pushMpvBounds]);
 

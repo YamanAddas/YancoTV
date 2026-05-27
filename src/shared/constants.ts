@@ -1,5 +1,5 @@
 export const APP_NAME = 'YancoTV';
-export const APP_VERSION = '0.3.5';
+export const APP_VERSION = '0.3.6';
 
 export const DB_FILE_NAME = 'yancotv.db';
 

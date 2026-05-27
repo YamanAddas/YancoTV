@@ -4,6 +4,30 @@ All notable changes to YancoTV are tracked here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 version numbers follow [SemVer](https://semver.org/).
 
+## [0.3.6] — 2026-05-27
+
+### Fixed
+
+- **Mini → theater flash on mpv.** Expanding from mini used to show a
+  ~50 ms gap where the menu had hidden + MiniPlayer had unmounted but
+  the mpv video child window hadn't yet grown to full size and the
+  controls overlay hadn't appeared. Main process now runs the video
+  resize + overlay show synchronously and only then broadcasts
+  `MODE='theater'`; the renderer's `expand()` for mpv backend waits
+  for that broadcast before committing local mode (with an optimistic
+  fallback if the IPC rejects). By the time the menu hides, the
+  theater chrome is already on screen — no visible gap.
+
+### Internal
+
+- New `presentationMode` flag in `video-window.ts` so `syncBounds` can
+  choose between `customBounds` (mini) and the full parent content
+  area (theater) without clearing the stash on every transition. This
+  lets minimise from theater land the video at the right mini rect
+  atomically, without waiting for `MiniPlayer`'s mount-effect to
+  re-push bounds. `PLAYER_STOP` resets both `presentationMode` and
+  `customBounds` so the next play() starts from a clean slate.
+
 ## [0.3.5] — 2026-05-27
 
 ### Added
