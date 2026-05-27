@@ -4,14 +4,18 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../stores/settings-store';
 import { usePlayerStore } from '../stores/player-store';
 import type { ContentItem } from '../../shared/types';
-import { APP_VERSION } from '../../shared/constants';
+import { APP_VERSION as APP_VERSION_FALLBACK } from '../../shared/constants';
 
 const SUGGEST_LIMIT = 6;
 const SUGGEST_DEBOUNCE_MS = 200;
-const TYPE_ICON: Record<'live' | 'movie' | 'series', string> = {
-  live: '📡',
-  movie: '🎬',
-  series: '📺',
+// Map content type → key in `iconMap`. Reuses the same SVG paths as the main
+// nav items so the suggestion dropdown stays visually consistent. Emoji
+// glyphs are deliberately avoided per project rule (text rendering is
+// unreliable across Windows/Linux/macOS font stacks).
+const TYPE_ICON_KEY: Record<'live' | 'movie' | 'series', string> = {
+  live: 'tv',
+  movie: 'film',
+  series: 'layers',
 };
 
 const navItems = [
@@ -63,6 +67,10 @@ export function Sidebar() {
   const [suggestions, setSuggestions] = useState<ContentItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  // Real package version via IPC (matches `app.getVersion()` from main).
+  // Falls back to the shared constant during the brief window before the
+  // IPC round-trip lands, and on any failure.
+  const [appVersion, setAppVersion] = useState(APP_VERSION_FALLBACK);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchSeqRef = useRef(0);
@@ -70,6 +78,16 @@ export function Sidebar() {
   const play = usePlayerStore((s) => s.play);
   const showClock = useSettingsStore((s) => s.getBool('ui_show_clock'));
   const time = useClock();
+
+  useEffect(() => {
+    let cancelled = false;
+    window.api?.app?.getVersion?.().then((v) => {
+      if (!cancelled && typeof v === 'string' && v) setAppVersion(v);
+    }).catch(() => {
+      // Keep the fallback — non-fatal, the constant is good enough.
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const resetSuggestions = useCallback(() => {
     setSuggestions([]);
@@ -170,23 +188,28 @@ export function Sidebar() {
     }
   };
 
-  // Ctrl+F to focus search
+  // Ctrl+F to focus search, Ctrl+B to toggle sidebar — single stable listener
+  // so a sidebar collapse/expand doesn't re-bind window.keydown on every
+  // toggle. The Ctrl+F branch reads `expanded` via setExpanded's functional
+  // setter (no closure over the value), which keeps the effect dep array
+  // empty without staleness.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === 'f') {
         e.preventDefault();
-        if (!expanded) setExpanded(true);
-        setTimeout(() => inputRef.current?.focus(), 100);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [expanded]);
-
-  // Ctrl+B to toggle sidebar
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        setExpanded((prev) => {
+          if (!prev) {
+            // Defer focus until the expand animation has placed the input
+            // in the DOM (the search field is conditionally rendered).
+            setTimeout(() => inputRef.current?.focus(), 100);
+            return true;
+          }
+          // Already expanded — focus immediately.
+          inputRef.current?.focus();
+          return prev;
+        });
+      } else if (e.key === 'b') {
         e.preventDefault();
         setExpanded((prev) => !prev);
       }
@@ -310,9 +333,20 @@ export function Sidebar() {
                               : 'text-surface-200 hover:bg-surface-700/40'
                           }`}
                         >
-                          <span aria-hidden className="flex-shrink-0 text-base leading-none">
-                            {TYPE_ICON[item.type]}
-                          </span>
+                          <svg
+                            aria-hidden
+                            className="h-4 w-4 flex-shrink-0 text-surface-500"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d={iconMap[TYPE_ICON_KEY[item.type]]}
+                            />
+                          </svg>
                           <span className="min-w-0 flex-1 truncate">{title}</span>
                           {item.groupName && (
                             <span className="hidden truncate text-xs text-surface-500 sm:inline">
@@ -414,7 +448,7 @@ export function Sidebar() {
               {showClock && (
                 <p className="mb-1 text-sm font-medium tabular-nums text-surface-300">{time}</p>
               )}
-              <p className="text-xs text-surface-600">v{APP_VERSION}</p>
+              <p className="text-xs text-surface-600">v{appVersion}</p>
             </motion.div>
           ) : (
             <motion.div

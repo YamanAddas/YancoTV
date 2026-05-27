@@ -11,6 +11,7 @@ import { useFavoritesStore } from '../stores/favorites-store';
 import { useParentalStore } from '../stores/parental-store';
 import { useSettingsStore } from '../stores/settings-store';
 import { useRecentChannelsStore } from '../stores/recent-channels-store';
+import { useToastStore } from '../stores/toast-store';
 import { useNowNextBatch } from '../hooks/use-epg';
 
 const EMPTY_ITEMS: ContentCardData[] = [];
@@ -237,8 +238,10 @@ export function LiveTvPage() {
       streamUrl: item.streamUrl,
     });
     if (!res.ok) {
-      // eslint-disable-next-line no-alert
-      alert(`Could not start recording: ${res.error}`);
+      useToastStore.getState().push({
+        kind: 'error',
+        message: `Could not start recording: ${res.error}`,
+      });
     }
   }, []);
 

@@ -274,6 +274,16 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   stop: () => {
     const { backend, fullscreen } = get();
 
+    // Exit OS fullscreen FIRST so the window decoration is back before the
+    // React tree re-renders the menu inside a still-fullscreen window. The
+    // IPC handler calls BrowserWindow.setFullScreen synchronously on main,
+    // so the OS-level transition starts immediately; the await is omitted
+    // intentionally because callers (button onClicks) aren't promise-aware
+    // and the order — not the await — is what fixes the visual jank.
+    if (fullscreen && window.api) {
+      window.api.player.setFullscreen(false).catch(() => {});
+    }
+
     if (backend === 'mpv') {
       window.api?.player.stop().catch(() => {});
     } else {
@@ -304,10 +314,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       _startPosition: undefined,
       zapTarget: null,
     });
-
-    if (fullscreen && window.api) {
-      window.api.player.setFullscreen(false).catch(() => {});
-    }
   },
 
   seek: (seconds: number) => {
@@ -476,16 +482,32 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   setMode: (mode: PlayerMode) => set({ mode }),
   expand: () => {
     // Promotes mini → theater. No-op if we're idle or already in theater.
-    const { mode } = get();
-    if (mode === 'mini') set({ mode: 'theater' });
+    const { mode, backend } = get();
+    if (mode !== 'mini') return;
+    set({ mode: 'theater' });
+    // For mpv backend the controls + theater chrome live in a separate overlay
+    // BrowserWindow with its own Zustand store. Main → main process →
+    // broadcast keeps both stores aligned, and showOverlay() actually paints
+    // the chrome. html5 backend handles all chrome inline in the main React
+    // tree, so the IPC is a no-op there (PlayerContainer mode gate already
+    // re-renders correctly without it).
+    if (backend === 'mpv' && window.api?.player?.setPresentation) {
+      window.api.player.setPresentation('theater').catch(() => {});
+    }
   },
   minimize: () => {
     // Drops theater → mini, closing any open settings panels so they don't
     // float orphaned over the docked player. No-op if we're already in mini
     // or idle.
-    const { mode } = get();
-    if (mode === 'theater') {
-      set({ mode: 'mini', showSettings: false, showAspectMenu: false });
+    const { mode, backend } = get();
+    if (mode !== 'theater') return;
+    set({ mode: 'mini', showSettings: false, showAspectMenu: false });
+    // mpv: the overlay's TheaterControls fire this; main window's MiniPlayer
+    // will re-fire setPresentation('mini') with bounds once it mounts. The
+    // call here drives main process to hide the overlay BrowserWindow and
+    // broadcasts mode so the *other* window's store updates.
+    if (backend === 'mpv' && window.api?.player?.setPresentation) {
+      window.api.player.setPresentation('mini').catch(() => {});
     }
   },
   setShowSettings: (show: boolean) => set({ showSettings: show }),
@@ -597,6 +619,21 @@ export function initPlayerEventListeners(): () => void {
     usePlayerStore.setState({ status: 'error', error: message });
   });
   cleanups.push(unsubError);
+
+  // Mode broadcasts keep the main-window and overlay-window stores aligned.
+  // A minimize fired from the overlay's TheaterControls (mpv backend) updates
+  // the overlay's local mode, then this broadcast tells the main window to
+  // flip to 'mini' so MiniPlayer mounts and pushes its bounds. The receiver
+  // ignores broadcasts that match the local mode to avoid re-entrant loops.
+  if (window.api.player.onModeBroadcast) {
+    const unsubMode = window.api.player.onModeBroadcast((mode) => {
+      const current = usePlayerStore.getState().mode;
+      if (current === mode) return;
+      if (mode !== 'theater' && mode !== 'mini' && mode !== 'idle') return;
+      usePlayerStore.setState({ mode });
+    });
+    cleanups.push(unsubMode);
+  }
 
   // --- History position updates (both backends) ---
   // Track the last update per historyId so switching content rapidly doesn't

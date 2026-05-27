@@ -207,6 +207,18 @@ const api = {
         ipcRenderer.removeListener(IpcChannels.PLAYER_OVERLAY_HIDDEN, handler);
       };
     },
+    /**
+     * Subscribe to mode-sync broadcasts so the main-window and overlay-window
+     * Zustand stores stay aligned. Handler receives 'theater' | 'mini' | 'idle'.
+     */
+    onModeBroadcast: (callback: (mode: 'theater' | 'mini' | 'idle') => void) => {
+      const handler = (_event: IpcRendererEvent, mode: 'theater' | 'mini' | 'idle') =>
+        callback(mode);
+      ipcRenderer.on(IpcChannels.PLAYER_MODE_BROADCAST, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.PLAYER_MODE_BROADCAST, handler);
+      };
+    },
 
     onStateChange: (callback: (state: unknown) => void) => {
       const handler = (_event: IpcRendererEvent, state: unknown) => callback(state);

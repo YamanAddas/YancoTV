@@ -26,19 +26,32 @@ export function ContentDetailPage() {
   const isFavorite = useFavoritesStore((s) => s.isFavorite);
   const pushToast = useToastStore((s) => s.push);
 
-  // Fetch detail + related
+  // Fetch detail + related. Guard against the user navigating away (or
+  // switching detail IDs) while the IPC round-trip is in flight — without
+  // this, the resolution lands on an unmounted component or stomps state
+  // from a newer fetch.
   useEffect(() => {
     if (!id || !window.api) return;
+    let cancelled = false;
     setIsLoading(true);
 
     Promise.all([
       window.api.content.getDetail(id),
       window.api.content.getRelated(id),
     ]).then(([detailData, relatedData]) => {
+      if (cancelled) return;
       setDetail(detailData);
       setRelated(relatedData ?? { sameGroup: [], sameSource: [] });
       setIsLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      // Settle isLoading so the spinner doesn't spin forever on IPC failure.
+      setIsLoading(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const metadata = useMemo<ContentMetadata>(() => {

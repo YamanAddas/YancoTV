@@ -14,7 +14,11 @@ export function VideoStage() {
   const mode = usePlayerStore((s) => s.mode);
   const backend = usePlayerStore((s) => s.backend);
 
-  if (backend !== 'html5' || mode === 'idle') return null;
+  // Anything that isn't mpv falls through to the html5 path (covers the brief
+  // window during startup where main.tsx's checkMpv() hasn't resolved yet and
+  // backend is still 'none' — without this, a user click in that window would
+  // update the store but no VideoPlayer would mount and nothing would play).
+  if (backend === 'mpv' || mode === 'idle') return null;
 
   const isMini = mode === 'mini';
 

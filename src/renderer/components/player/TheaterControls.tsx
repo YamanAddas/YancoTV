@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
+import { useToastStore } from '../../stores/toast-store';
 
 interface TheaterControlsProps {
   visible: boolean;
@@ -98,8 +99,13 @@ export function TheaterControls({ visible, onInteraction }: TheaterControlsProps
         if (res.ok) {
           setRecordingId(res.id);
         } else {
-          // eslint-disable-next-line no-alert
-          alert(`Could not start recording: ${res.error}`);
+          // Surface via the existing Toaster (now rendered in theater too) so
+          // the user gets a non-blocking, dismissable notification instead of
+          // a modal alert() that freezes the renderer thread.
+          useToastStore.getState().push({
+            kind: 'error',
+            message: `Could not start recording: ${res.error}`,
+          });
         }
       }
     } finally {

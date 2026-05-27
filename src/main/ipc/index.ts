@@ -1128,14 +1128,17 @@ export function registerIpcHandlers(): void {
           title: typeof title === 'string' ? title : undefined,
           contentId: typeof contentId === 'string' ? contentId : undefined,
         };
-        if (opts.wid) {
-          showOverlay();
-          sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
-        } else {
+        if (!opts.wid) {
           // No handle — fall back to mpv's own standalone window. Hide the
-          // video stage we optimistically showed.
+          // video stage we optimistically showed to expose the HWND.
           hideVideoWindow();
         }
+        // Overlay visibility is renderer-driven (PlayerContainer's effect
+        // calls setPresentation('theater') when mode === 'theater'). Auto-
+        // showing it here would flash full-screen theater chrome on every
+        // mini-mode auto-play — exactly what the redesign is meant to fix.
+        // The setPresentation handler re-broadcasts PLAYER_OVERLAY_SHOWN
+        // with currentMedia at the moment the overlay actually appears.
         // Auto-search subtitles when enabled (fire-and-forget)
         if (!isLive && contentId) {
           void autoSearchSubtitles(contentId, title, episodeId).catch(() => {});
@@ -1194,6 +1197,11 @@ export function registerIpcHandlers(): void {
       hideOverlay();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
     }
+    // Broadcast the mode to all renderers so the main-window store and the
+    // overlay-window store stay in sync — e.g. Back/Esc from TheaterControls
+    // fires this in the overlay context and the main window's MiniPlayer
+    // needs to mount in response.
+    sendToPlayerRenderers(IpcChannels.PLAYER_MODE_BROADCAST, mode);
     return { ok: true };
   });
 

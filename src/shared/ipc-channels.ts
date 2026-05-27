@@ -231,6 +231,16 @@ export const IpcChannels = {
    * side; HiDPI scaling is a no-op (Electron + CSS px both work in DIPs).
    */
   PLAYER_SET_VIDEO_BOUNDS: 'player:setVideoBounds',
+  /**
+   * main → all renderers: broadcast the player mode whenever it transitions
+   * via setPresentation. Both the main window and the controls-overlay
+   * BrowserWindow keep their own Zustand stores; without a sync broadcast,
+   * an action in one (e.g. Back/Esc in the overlay's TheaterControls) wouldn't
+   * propagate to the other (the main window's MiniPlayer wouldn't know to
+   * mount). Receivers ignore the broadcast when the value already matches
+   * their local mode.
+   */
+  PLAYER_MODE_BROADCAST: 'player:modeBroadcast',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

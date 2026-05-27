@@ -25,11 +25,21 @@ function toCardData(item: ContentItem): ContentCardData {
 
 type TypeFilter = 'all' | 'live' | 'movie' | 'series';
 
-const FILTER_OPTIONS: { value: TypeFilter; label: string; icon: string }[] = [
-  { value: 'all', label: 'All', icon: '✦' },
-  { value: 'live', label: 'Live', icon: '📡' },
-  { value: 'movie', label: 'Movies', icon: '🎬' },
-  { value: 'series', label: 'Series', icon: '📺' },
+// SVG path data for the filter chip + zone-header icons. Emoji glyphs are
+// deliberately avoided per project rule (text rendering is unreliable across
+// Windows/Linux/macOS font stacks).
+const FILTER_ICON: Record<TypeFilter, string> = {
+  all: 'M12 2.25l2.378 7.32h7.696l-6.226 4.523 2.378 7.32L12 16.89l-6.226 4.523 2.378-7.32L1.926 9.57h7.696L12 2.25z',
+  live: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  movie: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z',
+  series: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10',
+};
+
+const FILTER_OPTIONS: { value: TypeFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'live', label: 'Live' },
+  { value: 'movie', label: 'Movies' },
+  { value: 'series', label: 'Series' },
 ];
 
 function parseTypeFilter(value: string | null): TypeFilter {
@@ -45,6 +55,10 @@ export function SearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<string[]>(() => getSearchHistory());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sequence guard so a slow search response can't overwrite results from a
+  // newer query, and a setState after unmount can't slip through.
+  const searchSeqRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const navigate = useNavigate();
   const play = usePlayerStore((s) => s.play);
@@ -56,8 +70,12 @@ export function SearchPage() {
       setResults([]);
       return;
     }
+    const seq = ++searchSeqRef.current;
     setIsLoading(true);
     const data: ContentItem[] = await window.api.content.search(q.trim());
+    // Stale response (newer query already in flight) or unmounted — bail
+    // before touching state.
+    if (seq !== searchSeqRef.current || !mountedRef.current) return;
     setResults(data);
     setIsLoading(false);
     // Only record once we have actual results — avoids history entries for
@@ -66,6 +84,19 @@ export function SearchPage() {
       recordSearch(q);
       setHistory(getSearchHistory());
     }
+  }, []);
+
+  // Tear down the pending debounce timer + mark unmounted so an in-flight
+  // search() resolution doesn't setState on a dead component (React would
+  // log "Can't perform a React state update on an unmounted component").
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
   }, []);
 
   const handleHistoryPick = (q: string) => {
@@ -188,7 +219,20 @@ export function SearchPage() {
                     : 'border-surface-700 bg-surface-800 text-surface-400 hover:border-surface-600 hover:text-surface-200'
                 }`}
               >
-                <span aria-hidden>{opt.icon}</span>
+                <svg
+                  aria-hidden
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d={FILTER_ICON[opt.value]}
+                  />
+                </svg>
                 {opt.label}
               </button>
             );
@@ -264,7 +308,7 @@ export function SearchPage() {
 
       {!isLoading && (typeFilter === 'all' || typeFilter === 'live') && live.length > 0 && (
         <section>
-          <ZoneHeader icon="📡" label="Live TV" total={allLive.length} cap={ZONE_DISPLAY_CAP} />
+          <ZoneHeader kind="live" label="Live TV" total={allLive.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow
             items={live}
             onItemClick={handleItemClick}
@@ -276,7 +320,7 @@ export function SearchPage() {
 
       {!isLoading && (typeFilter === 'all' || typeFilter === 'movie') && movies.length > 0 && (
         <section>
-          <ZoneHeader icon="🎬" label="Movies" total={allMovies.length} cap={ZONE_DISPLAY_CAP} />
+          <ZoneHeader kind="movie" label="Movies" total={allMovies.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow
             items={movies}
             onItemClick={handleItemClick}
@@ -288,7 +332,7 @@ export function SearchPage() {
 
       {!isLoading && (typeFilter === 'all' || typeFilter === 'series') && series.length > 0 && (
         <section>
-          <ZoneHeader icon="📺" label="Series" total={allSeries.length} cap={ZONE_DISPLAY_CAP} />
+          <ZoneHeader kind="series" label="Series" total={allSeries.length} cap={ZONE_DISPLAY_CAP} />
           <HorizontalContentRow
             items={series}
             onItemClick={handleItemClick}
@@ -302,12 +346,12 @@ export function SearchPage() {
 }
 
 function ZoneHeader({
-  icon,
+  kind,
   label,
   total,
   cap,
 }: {
-  icon: string;
+  kind: 'live' | 'movie' | 'series';
   label: string;
   total: number;
   cap: number;
@@ -315,7 +359,16 @@ function ZoneHeader({
   const overflow = total - cap;
   return (
     <div className="mb-3 flex items-center gap-2">
-      <span className="text-base leading-none">{icon}</span>
+      <svg
+        aria-hidden
+        className="h-4 w-4 text-surface-500"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d={FILTER_ICON[kind]} />
+      </svg>
       <h3 className="text-sm font-semibold uppercase tracking-wider text-surface-400">
         {label}
       </h3>

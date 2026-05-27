@@ -36,8 +36,13 @@ function OverlayApp() {
   return <PlayerContainer />;
 }
 
-// Seed synchronously for the first-run case before any IPC events flow.
-usePlayerStore.setState({ mode: 'theater', backend: 'mpv' });
+// Backend is mpv by definition for the overlay (it only exists when an mpv
+// stream is embedded). Mode starts as 'idle' and flips to 'theater' when the
+// main process actually shows the overlay (PLAYER_OVERLAY_SHOWN listener
+// below, plus the PLAYER_MODE_BROADCAST sync); seeding 'theater' here used to
+// kick PlayerContainer's setPresentation effect on overlay-window load and
+// caused a blank, full-screen overlay on cold app start.
+usePlayerStore.setState({ backend: 'mpv' });
 
 async function init() {
   if (window.api) {

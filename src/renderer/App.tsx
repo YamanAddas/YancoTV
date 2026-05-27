@@ -79,6 +79,10 @@ function AppInner() {
     (async () => {
       try {
         const detail = await window.api.content.getDetail(lastId);
+        // If the user already kicked off playback (or stopped one) while
+        // getDetail was in flight, bail — the autoplay shouldn't barge in on
+        // an explicit user action.
+        if (usePlayerStore.getState().mode !== 'idle') return;
         const item = detail?.item;
         if (item?.streamUrl) {
           usePlayerStore.getState().play(

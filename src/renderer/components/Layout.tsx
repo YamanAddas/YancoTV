@@ -78,8 +78,12 @@ export function Layout() {
           page) so it survives route navigation. */}
       {isMini && <MiniPlayer />}
 
-      {/* Ephemeral toasts (download-started, etc.) */}
-      {!isTheater && <Toaster />}
+      {/* Ephemeral toasts (download-started, recording errors, etc.) — also
+          rendered in theater so a "recording failed to start" toast doesn't
+          get swallowed when the user is mid-watch. Toaster lives at z-[1000]
+          (top-right) which sits cleanly above TheaterControls (z-[45]) and
+          doesn't fight with the MiniPlayer card (bottom-right). */}
+      <Toaster />
 
       {/* Channel zap preview — shown in theater mode when PageUp/Down is pressed */}
       <ZapOverlay />
