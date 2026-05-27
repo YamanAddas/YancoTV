@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, type Rectangle } from 'electron';
 import log from 'electron-log/main';
 
 let videoWin: BrowserWindow | null = null;
@@ -6,6 +6,13 @@ let parent: BrowserWindow | null = null;
 let syncScheduled = false;
 let isActive = false;
 let parentListeners: Array<{ event: string; handler: (...args: unknown[]) => void }> = [];
+/**
+ * When set, the video child window positions over this rect (renderer-relative,
+ * DIPs) on every sync instead of covering the full parent content area. Used
+ * by the docked mini-player so the embedded mpv surface shrinks to fit the
+ * card. Null = full content area (theater mode).
+ */
+let customBounds: Rectangle | null = null;
 
 /**
  * The "video stage" window — a transparent, frameless BrowserWindow that
@@ -150,6 +157,26 @@ export function getVideoWindow(): BrowserWindow | null {
 }
 
 /**
+ * Set a renderer-relative bounding rect for the embedded mpv video child
+ * window. Used by the docked mini-player so mpv's surface paints into the
+ * card instead of covering the full content area. Pass null to restore
+ * full-content tracking (theater mode).
+ *
+ * Re-syncs immediately so the change is visible without waiting for the
+ * next parent move/resize event.
+ */
+export function setVideoWindowBounds(rect: Rectangle | null): void {
+  customBounds = rect;
+  if (videoWin && !videoWin.isDestroyed() && parent && !parent.isDestroyed() && isActive) {
+    syncBounds();
+  }
+}
+
+export function getVideoWindowCustomBounds(): Rectangle | null {
+  return customBounds;
+}
+
+/**
  * Return the native HWND of the video window as a decimal string — this is
  * what we pass to mpv via --wid so mpv embeds its video surface here instead
  * of in the main window (whose Chromium compositor would hide it).
@@ -175,8 +202,26 @@ function syncBounds(): void {
   if (!videoWin || videoWin.isDestroyed()) return;
   if (!parent || parent.isDestroyed()) return;
   try {
-    const bounds = parent.getContentBounds();
-    videoWin.setBounds(bounds);
+    const parentBounds = parent.getContentBounds();
+    if (customBounds) {
+      // Translate renderer-relative DIPs into absolute screen DIPs. Electron's
+      // BrowserWindow APIs all work in DIPs (logical pixels) — CSS pixels in
+      // the renderer match 1:1, so no DPR scaling needed here.
+      // Clamp to the parent content area so a stale or off-page rect (e.g.
+      // mid-resize) doesn't fling the video window onto another monitor.
+      const x = Math.max(parentBounds.x, parentBounds.x + Math.round(customBounds.x));
+      const y = Math.max(parentBounds.y, parentBounds.y + Math.round(customBounds.y));
+      const maxW = parentBounds.x + parentBounds.width - x;
+      const maxH = parentBounds.y + parentBounds.height - y;
+      videoWin.setBounds({
+        x,
+        y,
+        width: Math.max(1, Math.min(maxW, Math.round(customBounds.width))),
+        height: Math.max(1, Math.min(maxH, Math.round(customBounds.height))),
+      });
+    } else {
+      videoWin.setBounds(parentBounds);
+    }
   } catch (err) {
     log.error('Failed to sync video window bounds:', err);
   }

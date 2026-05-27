@@ -1,19 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePlayerStore } from '../../stores/player-store';
 
 /**
+ * Pixels reserved at the top of the mini card for the title + Close button
+ * row. mpv's child window paints over Chromium chrome on Windows, so the
+ * pushed bounds inset by this much keeps the top bar visible above the video.
+ */
+const MPV_TOP_INSET_PX = 32;
+
+/**
  * Docked mini-player chrome — appears in the bottom-right corner whenever
- * mode === 'mini'. Positioned to overlap the matching mini cell rendered by
- * VideoStage (for html5) so the video surface and chrome line up visually.
+ * mode === 'mini'. For the html5 backend, VideoStage paints the actual video
+ * underneath this card. For the mpv backend, the renderer measures this card
+ * and pushes its DIP-space rect to the main process via setVideoBounds, so
+ * mpv's embedded video child window resizes/moves over the card to match.
  *
- * Click anywhere on the card → expand to theater. The Close (X) button is the
- * only path to fully stop playback from mini.
- *
- * For mpv backend in this commit, the embedded video window stays hidden in
- * mini mode (the main process drops it on PLAYER_SET_PRESENTATION='mini') so
- * the user gets audio + the docked chrome without a misplaced full-window
- * surface obscuring the menu. Phase 2 will reposition mpv's window over this
- * card so the video itself shrinks to fit.
+ * Click anywhere → expand to theater. The Close (X) button is the only path
+ * to fully stop playback from mini.
  */
 export function MiniPlayer() {
   const expand = usePlayerStore((s) => s.expand);
@@ -21,50 +24,77 @@ export function MiniPlayer() {
   const title = usePlayerStore((s) => s.currentTitle);
   const status = usePlayerStore((s) => s.status);
   const backend = usePlayerStore((s) => s.backend);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // mpv backend: in mini mode the dedicated video child window must hide so
-  // the sidebar and page content remain interactive. Restore presentation
-  // when the user expands (theater) or stops (idle).
+  // mpv backend: measure the card and push its bounds to main before flipping
+  // the presentation to 'mini' — order matters because setPresentation('mini')
+  // calls showVideoWindow, which reads customBounds. Re-push on any resize so
+  // a Sidebar collapse / window resize keeps the mpv surface aligned.
+  //
+  // Z-order: the mpv child window paints on top of the Chromium-rendered
+  // chrome, so if we pushed the full card rect the top bar (title + Close
+  // button) would disappear behind the video. Inset the pushed rect by the
+  // top-bar height so chrome stays visible and clickable.
   useEffect(() => {
-    if (backend !== 'mpv' || !window.api?.player?.setPresentation) return;
+    if (backend !== 'mpv' || !window.api?.player?.setVideoBounds) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    const pushBounds = () => {
+      const rect = el.getBoundingClientRect();
+      // Skip zero-sized measurements (briefly possible during mount / unmount
+      // transitions); the next ResizeObserver tick will deliver real bounds.
+      if (rect.width < 2 || rect.height < 2) return;
+      const inset = MPV_TOP_INSET_PX;
+      const height = rect.height - inset;
+      if (height < 2) return;
+      window.api.player.setVideoBounds({
+        x: rect.left,
+        y: rect.top + inset,
+        width: rect.width,
+        height,
+      }).catch(() => {});
+    };
+
+    pushBounds();
+    // Bring up the mpv surface at our just-pushed bounds. setPresentation is
+    // idempotent on the main side, so re-entering mini from a previous mini
+    // session is a no-op.
     window.api.player.setPresentation('mini').catch(() => {});
+
+    const ro = new ResizeObserver(pushBounds);
+    ro.observe(el);
+    // Card uses `fixed bottom-4 right-4`, so its renderer-relative position
+    // shifts when the window itself resizes — but its size doesn't change,
+    // so ResizeObserver misses it. The main-side parent-resize listener
+    // re-syncs with stale customBounds (still pointing at the pre-resize
+    // position) which leaves the mpv surface offset from the card. Push
+    // fresh bounds on window resize too.
+    window.addEventListener('resize', pushBounds);
     return () => {
-      // Don't reach into the store here — the next mount (MiniPlayer for
-      // another stream, or PlayerContainer entering theater) will set the
-      // appropriate presentation. We only need to clean up our own claim.
+      ro.disconnect();
+      window.removeEventListener('resize', pushBounds);
+      // Clear the custom bounds on unmount so the next presentation (theater
+      // or idle) starts from a clean full-content state.
+      window.api.player.setVideoBounds(null).catch(() => {});
     };
   }, [backend]);
 
   const isReconnecting = status === 'reconnecting';
   const isError = status === 'error';
-  const showAudioLabel = backend === 'mpv';
 
   return (
     <div
+      ref={cardRef}
       className="group fixed bottom-4 right-4 z-50 aspect-video w-96 cursor-pointer overflow-hidden rounded-lg ring-1 ring-accent/30 transition-all hover:ring-accent/60"
       onClick={expand}
       role="button"
       aria-label="Expand player to theater mode"
     >
-      {/* mpv backend: visible card surface (the video itself isn't drawn here
-          in this phase). html5 backend: transparent so VideoStage shows
-          through underneath. */}
-      {showAudioLabel && (
-        <div className="absolute inset-0 flex items-center justify-center bg-surface-900">
-          <div className="flex flex-col items-center gap-2 text-surface-500">
-            <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.25}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"
-              />
-            </svg>
-            <span className="text-[10px] font-display uppercase tracking-widest-plus">
-              Audio playing
-            </span>
-          </div>
-        </div>
-      )}
+      {/* html5 backend: VideoStage paints the <video> through the transparent
+          card. mpv backend: the embedded child window paints on top (no React
+          surface needed); the card surface stays empty as a fallback for the
+          brief moment before main repositions mpv. */}
 
       {/* Top bar — title + close */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-2 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-3 py-2">

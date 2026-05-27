@@ -215,13 +215,22 @@ export const IpcChannels = {
   PLAYER_OVERLAY_HIDDEN: 'player:overlayHidden',
   /**
    * Renderer → main: select the mpv presentation surface for the current
-   * stream — 'theater' shows both the embedded video child window and the
-   * transparent controls overlay; 'mini' hides both (audio continues, the
-   * docked MiniPlayer renders chrome in the main React tree); 'idle' is the
-   * post-stop / no-stream state. html5 backend ignores this channel since
-   * its surface lives inside the main React tree via VideoStage.
+   * stream — 'theater' shows both the embedded video child window (full area)
+   * and the transparent controls overlay; 'mini' shows the video at the
+   * renderer-supplied custom bounds (see PLAYER_SET_VIDEO_BOUNDS) and hides
+   * the controls overlay; 'idle' tears both down. html5 backend ignores this
+   * channel since its surface lives inside the main React tree via
+   * VideoStage.
    */
   PLAYER_SET_PRESENTATION: 'player:setPresentation',
+  /**
+   * Renderer → main: position the embedded mpv video child window over a
+   * specific rect (in renderer-relative DIPs) for the docked mini-player.
+   * Pass null/undefined to clear the custom bounds and restore full-content
+   * tracking. Bounds are clamped to the parent content area on the main
+   * side; HiDPI scaling is a no-op (Electron + CSS px both work in DIPs).
+   */
+  PLAYER_SET_VIDEO_BOUNDS: 'player:setVideoBounds',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

@@ -10,7 +10,7 @@ import { syncSource } from '../services/source-sync';
 import { getMainWindow, getOverlayWindow, getVideoWindowHandle } from '../index';
 import { findMpvPath } from '../player/mpv-path';
 import { showOverlay, hideOverlay } from '../player/overlay-window';
-import { showVideoWindow, hideVideoWindow } from '../player/video-window';
+import { showVideoWindow, hideVideoWindow, setVideoWindowBounds } from '../player/video-window';
 import {
   getContentByType,
   getCategories,
@@ -1173,19 +1173,63 @@ export function registerIpcHandlers(): void {
       return { ok: false, error: 'Invalid presentation mode' };
     }
     if (mode === 'theater') {
+      // Theater = video covers full content area (clear any custom bounds
+      // left over from a previous mini session).
+      setVideoWindowBounds(null);
       showVideoWindow();
       showOverlay();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_SHOWN, currentMedia);
+    } else if (mode === 'mini') {
+      // Mini = video positioned over the renderer-supplied custom bounds (set
+      // by PLAYER_SET_VIDEO_BOUNDS before this call), no controls overlay.
+      // showVideoWindow re-runs syncBounds which now respects customBounds.
+      showVideoWindow();
+      hideOverlay();
+      sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
     } else {
-      // Both mini and idle: the docked MiniPlayer or empty-state UI lives in
-      // the main React tree, so the embedded mpv surface and the floating
-      // controls overlay both need to get out of the way.
+      // idle: tear everything down so the next play() / setPresentation can
+      // restart from a clean slate.
+      setVideoWindowBounds(null);
       hideVideoWindow();
       hideOverlay();
       sendToPlayerRenderers(IpcChannels.PLAYER_OVERLAY_HIDDEN);
     }
     return { ok: true };
   });
+
+  // Renderer-driven bounds update for the embedded mpv video child window —
+  // fires from MiniPlayer's ResizeObserver + window-event listeners whenever
+  // the docked card moves or resizes. Cheap and idempotent; setVideoWindowBounds
+  // only re-syncs if the window is active.
+  ipcMain.handle(
+    IpcChannels.PLAYER_SET_VIDEO_BOUNDS,
+    (_event, rect: unknown) => {
+      if (rect === null || rect === undefined) {
+        setVideoWindowBounds(null);
+        return { ok: true };
+      }
+      if (
+        typeof rect !== 'object' ||
+        typeof (rect as { x?: unknown }).x !== 'number' ||
+        typeof (rect as { y?: unknown }).y !== 'number' ||
+        typeof (rect as { width?: unknown }).width !== 'number' ||
+        typeof (rect as { height?: unknown }).height !== 'number'
+      ) {
+        return { ok: false, error: 'Invalid bounds rect' };
+      }
+      const r = rect as { x: number; y: number; width: number; height: number };
+      if (!isFinite(r.x) || !isFinite(r.y) || !isFinite(r.width) || !isFinite(r.height)) {
+        return { ok: false, error: 'Bounds must be finite numbers' };
+      }
+      setVideoWindowBounds({
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+      });
+      return { ok: true };
+    },
+  );
 
   ipcMain.handle(IpcChannels.PLAYER_PAUSE, async () => {
     try {
