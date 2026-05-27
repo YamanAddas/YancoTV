@@ -27,9 +27,22 @@ test.afterAll(async () => {
 });
 
 test('app window is visible', async () => {
-  const isVisible = await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    return win?.isVisible() ?? false;
+  // beforeAll resolves once the main window's DOM is parsed, but the
+  // BrowserWindow itself isn't visible until ready-to-show fires (it's
+  // created with show:false then explicitly shown). Poll briefly so the
+  // assertion isn't racing the show() call. Also: getAllWindows()[0] is no
+  // longer guaranteed to be main once the controls-overlay and video-stage
+  // child windows exist — those load fast and hidden, so a naive [0] would
+  // pick one of them up.
+  const isVisible = await app.evaluate(async ({ BrowserWindow }) => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      const wins = BrowserWindow.getAllWindows();
+      const main = wins.find((w) => w.webContents.getURL().includes('/renderer/index.html'));
+      if (main?.isVisible()) return true;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
   });
   expect(isVisible).toBe(true);
 });
