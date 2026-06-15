@@ -17,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
 import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.shared.handoff.HandoffOutcome
 import com.yancotv.shared.handoff.HandoffPlayCommand
@@ -160,6 +161,7 @@ class HandoffReceiverService : Service() {
             is HandoffOutcome.PlayContent -> {
                 withContext(Dispatchers.Main) {
                     controller.playHandoff(listOf(outcome.item), outcome.userAgent, outcome.referer)
+                    surfaceFullscreenPlayer()
                 }
                 logger.info("Handoff: playing ${outcome.item.id}")
                 null
@@ -168,11 +170,26 @@ class HandoffReceiverService : Service() {
             is HandoffOutcome.PlayEpisode -> {
                 withContext(Dispatchers.Main) {
                     controller.playHandoff(outcome.episode, outcome.userAgent, outcome.referer)
+                    surfaceFullscreenPlayer()
                 }
                 logger.info("Handoff: playing episode ${outcome.episode.id}")
                 null
             }
         }
+    }
+
+    /**
+     * Bring the TV's fullscreen [PlayerActivity] to the front so the handed-off
+     * video actually shows. The receiver runs headless and `playHandoff` only
+     * feeds the shared player — without this the stream plays with no visible
+     * surface. Main-thread only (Activity launch + the controller is main-only).
+     * On the canonical Fire TV target (API 28) a foreground service can start an
+     * activity; OSes with background-activity-launch limits may instead require
+     * the user to open the app — de-risk item for A.5.
+     */
+    private fun surfaceFullscreenPlayer() {
+        runCatching { PlayerLauncher.launch(this) }
+            .onFailure { logger.warn("Handoff: couldn't surface the player — ${it.message}") }
     }
 
     // ── Notification / foreground ─────────────────────────────────
