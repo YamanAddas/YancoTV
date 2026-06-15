@@ -31,12 +31,16 @@ sealed interface HandoffOutcome {
         val item: ContentItem,
         val resumePositionSeconds: Long,
         val fromStart: Boolean,
+        val userAgent: String? = null,
+        val referer: String? = null,
     ) : HandoffOutcome
 
     data class PlayEpisode(
         val episode: Playable.Episode,
         val resumePositionSeconds: Long,
         val fromStart: Boolean,
+        val userAgent: String? = null,
+        val referer: String? = null,
     ) : HandoffOutcome
 
     data class Rejected(val reason: HandoffReject) : HandoffOutcome
@@ -66,19 +70,21 @@ fun resolveHandoffCommand(
         return HandoffOutcome.Rejected(HandoffReject.UNSUPPORTED_SCHEMA)
     }
     val position = command.resumePositionSeconds.coerceAtLeast(0L)
+    val ua = command.item.userAgent?.takeIf { it.isNotBlank() }
+    val referer = command.item.referer?.takeIf { it.isNotBlank() }
     return when (command.item.kind) {
         HandoffKind.EPISODE -> {
             val episode =
                 command.item.toEpisodePlayable()
                     ?: return HandoffOutcome.Rejected(HandoffReject.INVALID_ITEM)
-            HandoffOutcome.PlayEpisode(episode, position, command.fromStart)
+            HandoffOutcome.PlayEpisode(episode, position, command.fromStart, ua, referer)
         }
 
         HandoffKind.CHANNEL, HandoffKind.MOVIE -> {
             val item =
                 command.item.toContentItem()
                     ?: return HandoffOutcome.Rejected(HandoffReject.INVALID_ITEM)
-            HandoffOutcome.PlayContent(item, position, command.fromStart)
+            HandoffOutcome.PlayContent(item, position, command.fromStart, ua, referer)
         }
     }
 }

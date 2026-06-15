@@ -152,4 +152,44 @@ class HandoffResolverTest {
         assertEquals(742L, play.resumePositionSeconds)
         assertEquals(true, play.fromStart)
     }
+
+    @Test
+    fun forwardedHeadersFlowIntoTheOutcome() {
+        val cmd =
+            HandoffPlayCommand(
+                pairingToken = "tok",
+                item =
+                    HandoffItem(
+                        id = "ch:1",
+                        kind = HandoffKind.CHANNEL,
+                        title = "News",
+                        streamUrl = "http://p/1.ts",
+                        userAgent = "VLC/3.0.20",
+                        referer = "http://p/",
+                    ),
+            )
+        val play = assertIs<HandoffOutcome.PlayContent>(resolveHandoffCommand(cmd, null))
+        assertEquals("VLC/3.0.20", play.userAgent)
+        assertEquals("http://p/", play.referer)
+    }
+
+    @Test
+    fun blankHeadersBecomeNull() {
+        val cmd =
+            HandoffPlayCommand(
+                pairingToken = "tok",
+                item =
+                    HandoffItem(
+                        id = "ch:1",
+                        kind = HandoffKind.CHANNEL,
+                        title = "News",
+                        streamUrl = "http://p/1.ts",
+                        userAgent = "",
+                        referer = "   ",
+                    ),
+            )
+        val play = assertIs<HandoffOutcome.PlayContent>(resolveHandoffCommand(cmd, null))
+        assertEquals(null, play.userAgent)
+        assertEquals(null, play.referer)
+    }
 }

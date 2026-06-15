@@ -145,7 +145,7 @@ class HandoffReceiverService : Service() {
 
             is HandoffOutcome.PlayContent -> {
                 withContext(Dispatchers.Main) {
-                    controller.play(listOf(outcome.item), 0, outcome.fromStart)
+                    controller.playHandoff(listOf(outcome.item), outcome.userAgent, outcome.referer)
                 }
                 logger.info("Handoff: playing ${outcome.item.id}")
                 null
@@ -153,7 +153,7 @@ class HandoffReceiverService : Service() {
 
             is HandoffOutcome.PlayEpisode -> {
                 withContext(Dispatchers.Main) {
-                    controller.play(outcome.episode, outcome.fromStart)
+                    controller.playHandoff(outcome.episode, outcome.userAgent, outcome.referer)
                 }
                 logger.info("Handoff: playing episode ${outcome.episode.id}")
                 null

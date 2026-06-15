@@ -49,7 +49,9 @@ class HandoffServer(private val port: Int, private val logger: Logger, private v
                             try {
                                 call.receive<HandoffPlayCommand>()
                             } catch (t: Throwable) {
-                                logger.warn("Handoff: malformed play command — ${t.message}")
+                                // Don't log t.message — a deserialization error can echo the
+                                // request body, which carries the credentialed stream URL.
+                                logger.warn("Handoff: malformed play command (${t::class.simpleName})")
                                 call.respond(HttpStatusCode.BadRequest)
                                 return@post
                             }

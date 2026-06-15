@@ -1091,6 +1091,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
     val scope = rememberCoroutineScope()
     val prefs: AppPreferences = org.koin.compose.koinInject()
     val handoff: com.yancotv.shared.handoff.HandoffClient = org.koin.compose.koinInject()
+    val sources: com.yancotv.shared.sources.SourceRepository = org.koin.compose.koinInject()
     val logger: com.yancotv.shared.logger.Logger = org.koin.compose.koinInject()
 
     val currentItem by controller.currentItem.collectAsState()
@@ -1137,10 +1138,17 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
 
     fun send(host: String, port: Int) {
         scope.launch(Dispatchers.IO) {
+            // Resolve this source's provider headers (MK.26.A.4) so a gated
+            // stream plays on the TV, whose source ids differ from this phone's.
+            val src = runCatching { sources.getById(handoffItem.sourceId) }.getOrNull()
+            val ua =
+                src?.userAgent?.takeIf { it.isNotBlank() }
+                    ?: prefs.networkFlow.value.userAgentOverride?.takeIf { it.isNotBlank() }
+            val referer = src?.referer?.takeIf { it.isNotBlank() }
             val command =
                 com.yancotv.shared.handoff.HandoffPlayCommand(
                     pairingToken = com.yancotv.android.handoff.HandoffReceiverService.TOKEN_STUB,
-                    item = handoffItem,
+                    item = handoffItem.copy(userAgent = ua, referer = referer),
                     resumePositionSeconds = resumeSeconds,
                 )
             val message =

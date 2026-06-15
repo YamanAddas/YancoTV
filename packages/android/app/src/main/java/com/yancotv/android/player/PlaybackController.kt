@@ -186,6 +186,19 @@ class PlaybackController(
     @Volatile
     private var currentSourceNet: SourceNetworkOverride? = null
 
+    // MK.26.A.4 — explicit per-source headers forwarded by a handoff SENDER.
+    // When set, the OkHttp interceptor prefers it over [currentSourceNet]:
+    // a handed-off stream's source isn't in THIS device's source list (source
+    // ids are random per-install), so the local DB lookup can't resolve its
+    // UA/Referer. Staged by [playHandoff] into [pendingHandoffOverride] and
+    // consumed at the next play(); a normal local play() resets it (pending is
+    // null), so handoff headers never leak onto a locally-started stream.
+    @Volatile
+    private var handoffNetOverride: SourceNetworkOverride? = null
+
+    @Volatile
+    private var pendingHandoffOverride: SourceNetworkOverride? = null
+
     /**
      * The shared ExoPlayer. Mutable to support MK.9.4's FFmpeg crash
      * watchdog: on a confirmed FFmpeg-renderer crash the controller
@@ -249,7 +262,9 @@ class PlaybackController(
                     // don't carry an override: source UA → global UA →
                     // hard-coded default. Referer is only sent when the
                     // active source explicitly opts in.
-                    val perSource = currentSourceNet
+                    // A handoff-forwarded override (MK.26.A.4) wins over the
+                    // local source lookup; null for all normal local playback.
+                    val perSource = handoffNetOverride ?: currentSourceNet
                     val ua =
                         perSource?.userAgent?.takeIf { it.isNotBlank() }
                             ?: net.userAgentOverride?.takeIf { it.isNotBlank() }
@@ -519,6 +534,10 @@ class PlaybackController(
      *     without hitting a lifecycle hook.
      */
     fun play(list: List<ContentItem>, startIndex: Int, fromStart: Boolean = false) {
+        // Consume any handoff-forwarded headers staged by playHandoff; a plain
+        // local play (pending == null) clears the override so it can't leak.
+        handoffNetOverride = pendingHandoffOverride
+        pendingHandoffOverride = null
         when (playLaunchDecision(list, startIndex, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
             PlayLaunchDecision.SameTarget -> {
@@ -566,6 +585,8 @@ class PlaybackController(
      * if used as content_id (episodes live in their own table).
      */
     fun play(episode: Playable.Episode, fromStart: Boolean = false) {
+        handoffNetOverride = pendingHandoffOverride
+        pendingHandoffOverride = null
         when (episodeLaunchDecision(episode, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
             PlayLaunchDecision.SameTarget -> {
@@ -591,6 +612,30 @@ class PlaybackController(
                 loadCurrent(fromStart = fromStart)
             }
         }
+    }
+
+    /**
+     * MK.26.A.4 — play a handed-off channel/movie applying the SENDER's
+     * resolved provider headers ([userAgent] / [referer]) via
+     * [handoffNetOverride], because the source isn't in this device's source
+     * list. Goes through the normal [play] path otherwise (queue, resume,
+     * two-tap no-op).
+     */
+    fun playHandoff(list: List<ContentItem>, userAgent: String?, referer: String?) {
+        pendingHandoffOverride = networkOverrideOf(userAgent, referer)
+        play(list, 0)
+    }
+
+    /** [playHandoff] for a handed-off series episode. */
+    fun playHandoff(episode: Playable.Episode, userAgent: String?, referer: String?) {
+        pendingHandoffOverride = networkOverrideOf(userAgent, referer)
+        play(episode)
+    }
+
+    private fun networkOverrideOf(userAgent: String?, referer: String?): SourceNetworkOverride? {
+        val ua = userAgent?.takeIf { it.isNotBlank() }
+        val ref = referer?.takeIf { it.isNotBlank() }
+        return if (ua == null && ref == null) null else SourceNetworkOverride(ua, ref)
     }
 
     /**
