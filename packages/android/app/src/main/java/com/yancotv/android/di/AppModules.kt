@@ -19,6 +19,7 @@ import com.yancotv.shared.epg.BulkEpgWriter
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.androidGunzip
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.handoff.HandoffClient
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.http.CleartextAllowlist
 import com.yancotv.shared.http.CleartextAllowlistInterceptor
@@ -37,6 +38,8 @@ import com.yancotv.shared.sources.AndroidKeystoreCredentialStore
 import com.yancotv.shared.sources.CredentialStore
 import com.yancotv.shared.sources.FileContentReader
 import com.yancotv.shared.sources.SourceRepository
+import io.ktor.client.HttpClient as KtorHttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
@@ -129,6 +132,25 @@ val appModule =
                 // covers API calls, M3U downloads, EPG dumps, asset fetches
                 // routed via the shared Ktor HttpClient.
                 interceptors = listOf(get<CleartextAllowlistInterceptor>()),
+            )
+        }
+        // MK.26.A.3 — sender-side handoff client. DEDICATED ktor (OkHttp)
+        // client with NO cleartext allow-list interceptor: the target is the
+        // user's own TV on the LAN (http://<ip>:8731), not a provider host, so
+        // the allow-list (which would 469-block it) must not apply here —
+        // parallel to the Coil image-loader carve-out. Short timeouts: a TV
+        // either answers on the LAN fast or isn't reachable.
+        single {
+            HandoffClient(
+                http =
+                    KtorHttpClient(OkHttp) {
+                        engine {
+                            config {
+                                connectTimeout(3, TimeUnit.SECONDS)
+                                readTimeout(10, TimeUnit.SECONDS)
+                            }
+                        }
+                    },
             )
         }
         single {

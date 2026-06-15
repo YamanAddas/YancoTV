@@ -330,6 +330,11 @@ dependencies {
     implementation(libs.ktor.server.cio)
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
+    // MK.26.A.3 — ktor client (OkHttp engine) for the SENDER side. A
+    // dedicated client WITHOUT the cleartext allow-list interceptor (the
+    // target is the user's own TV on the LAN, not a provider host).
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
 
     // MK.9 — checker-qual annotations are referenced by the vendored
     // androidx.media3.decoder.ffmpeg sources for nullness static analysis.
