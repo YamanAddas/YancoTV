@@ -17,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
 import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.shared.handoff.HandoffOutcome
 import com.yancotv.shared.handoff.HandoffPlayCommand
 import com.yancotv.shared.handoff.HandoffReject
@@ -26,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 
@@ -53,6 +55,7 @@ import org.koin.android.ext.android.inject
 class HandoffReceiverService : Service() {
     private val controller: PlaybackController by inject()
     private val logger: Logger by inject()
+    private val prefs: AppPreferences by inject()
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -86,6 +89,9 @@ class HandoffReceiverService : Service() {
         runCatching { server.start() }
             .onFailure { logger.error("Handoff: failed to start receiver — ${it.message}") }
         advertise()
+        // Ensure this TV has a pairing code so Settings can display it and the
+        // receiver can validate against it (generates one on first run).
+        serviceScope.launch { prefs.getOrGenerateHandoffPairingCode() }
         return START_STICKY
     }
 
@@ -136,8 +142,16 @@ class HandoffReceiverService : Service() {
      * [HandoffReject] reason (mapped to an HTTP status by [HandoffServer]).
      * Runs on a Ktor request coroutine; the controller call hops to main.
      */
-    private suspend fun handlePlay(command: HandoffPlayCommand): HandoffReject? =
-        when (val outcome = resolveHandoffCommand(command, expectedToken = TOKEN_STUB)) {
+    private suspend fun handlePlay(command: HandoffPlayCommand): HandoffReject? {
+        // Validate against THIS TV's pairing code (never a shared constant). A
+        // missing code means the receiver hasn't generated one yet — reject
+        // rather than fall through to the resolver's null-skips-auth path.
+        val expected = prefs.readHandoffPairingCode()
+        if (expected.isNullOrBlank()) {
+            logger.warn("Handoff: no pairing code on this TV yet — rejecting")
+            return HandoffReject.UNAUTHORIZED
+        }
+        return when (val outcome = resolveHandoffCommand(command, expectedToken = expected)) {
             is HandoffOutcome.Rejected -> {
                 logger.warn("Handoff: rejected command — ${outcome.reason}")
                 outcome.reason
@@ -159,6 +173,7 @@ class HandoffReceiverService : Service() {
                 null
             }
         }
+    }
 
     // ── Notification / foreground ─────────────────────────────────
 
@@ -217,14 +232,6 @@ class HandoffReceiverService : Service() {
 
         const val ACTION_START = "com.yancotv.android.handoff.START"
         const val ACTION_STOP = "com.yancotv.android.handoff.STOP"
-
-        /**
-         * Placeholder pairing token until MK.26.A.4 establishes a real
-         * per-pairing secret. The sender must echo this in
-         * [HandoffPlayCommand.pairingToken]; it is NOT a security boundary
-         * yet — A.4 replaces it with a paired token + LAN-only binding.
-         */
-        const val TOKEN_STUB = "yanco-dev"
 
         fun start(context: Context) {
             val intent = Intent(context, HandoffReceiverService::class.java).setAction(ACTION_START)

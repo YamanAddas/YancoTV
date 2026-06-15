@@ -2,6 +2,7 @@ package com.yancotv.android.prefs
 
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.types.ContentType
+import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +39,13 @@ class AppPreferences(private val db: YancoDb) {
     // Null/blank = unpaired. Port is fixed at HandoffServer.DEFAULT_PORT (8731).
     private val _pairedTvHost = MutableStateFlow(readPairedTvHost())
     val pairedTvHostFlow: StateFlow<String?> = _pairedTvHost.asStateFlow()
+
+    // MK.26.A.4-sec — the "Play on TV" pairing code. On a RECEIVER (TV) the
+    // service generates one on first start (shown in Settings); a SENDER
+    // (phone) enters the TV's code here. The receiver only accepts commands
+    // whose pairingToken matches its code, replacing the old shared stub.
+    private val _handoffPairingCode = MutableStateFlow(readHandoffPairingCode())
+    val handoffPairingCodeFlow: StateFlow<String?> = _handoffPairingCode.asStateFlow()
 
     // MK.20 polish-sweep — pin-a-bucket. Per-content-type ordered list of
     // pinned parent codes (e.g. "ar", "us"). Storage shape: 3 settings
@@ -271,6 +279,24 @@ class AppPreferences(private val db: YancoDb) {
 
     fun readPairedTvHost(): String? = readString(KEY_PAIRED_TV_HOST)?.takeIf { it.isNotBlank() }
 
+    fun readHandoffPairingCode(): String? = readString(KEY_HANDOFF_PAIRING_CODE)?.takeIf { it.isNotBlank() }
+
+    suspend fun setHandoffPairingCode(code: String?) = write(KEY_HANDOFF_PAIRING_CODE, code.orEmpty()) {
+        _handoffPairingCode.value = code?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * Receiver-side: the TV's own pairing code, generating + persisting one on
+     * first call so it never falls back to a guessable constant. The phone
+     * must echo this exact code in its handoff commands.
+     */
+    suspend fun getOrGenerateHandoffPairingCode(): String {
+        readHandoffPairingCode()?.let { return it }
+        val code = (1..6).map { PAIRING_ALPHABET[Random.nextInt(PAIRING_ALPHABET.length)] }.joinToString("")
+        setHandoffPairingCode(code)
+        return code
+    }
+
     // ───── Hidden groups ─────
     //
     // Providers routinely push 400+ category groups, most of which a
@@ -488,6 +514,10 @@ class AppPreferences(private val db: YancoDb) {
         private const val KEY_EXT_PLAYER_MOVIE = "pref_ext_player_movie"
         private const val KEY_EXT_PLAYER_SERIES = "pref_ext_player_series"
         private const val KEY_PAIRED_TV_HOST = "pref_paired_tv_host"
+        private const val KEY_HANDOFF_PAIRING_CODE = "pref_handoff_pairing_code"
+
+        // No ambiguous glyphs (no I/O/0/1) so the code is easy to read off a TV.
+        private const val PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     }
 }
 

@@ -1138,6 +1138,18 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
 
     fun send(host: String, port: Int) {
         scope.launch(Dispatchers.IO) {
+            val code = prefs.readHandoffPairingCode()
+            if (code.isNullOrBlank()) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast
+                        .makeText(
+                            context,
+                            "Enter your TV's pairing code in Settings, under Network.",
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                }
+                return@launch
+            }
             // Resolve this source's provider headers (MK.26.A.4) so a gated
             // stream plays on the TV, whose source ids differ from this phone's.
             val src = runCatching { sources.getById(handoffItem.sourceId) }.getOrNull()
@@ -1147,7 +1159,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
             val referer = src?.referer?.takeIf { it.isNotBlank() }
             val command =
                 com.yancotv.shared.handoff.HandoffPlayCommand(
-                    pairingToken = com.yancotv.android.handoff.HandoffReceiverService.TOKEN_STUB,
+                    pairingToken = code,
                     item = handoffItem.copy(userAgent = ua, referer = referer),
                     resumePositionSeconds = resumeSeconds,
                 )

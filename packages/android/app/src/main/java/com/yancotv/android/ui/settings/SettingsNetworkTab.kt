@@ -141,15 +141,24 @@ fun SettingsNetworkTab(
         // TV's LAN address here. Port is fixed at HandoffServer.DEFAULT_PORT.
         SettingsSection(
             title = "Play on TV",
-            sub = "The TV on your network that receives \"Play on TV\" handoffs from this phone. Enter its IP address.",
+            sub = "Send playback to your TVs. On a TV this shows its pairing code; on a phone, set the TV's address and code below.",
         ) {
             val pairedHost by prefs.pairedTvHostFlow.collectAsState()
+            val pairingCode by prefs.handoffPairingCodeFlow.collectAsState()
             SettingsClickToEditField(
                 label = "Paired TV address",
                 description = "Your TV's IPv4 address or hostname. Leave blank to unpair. Port 8731 is fixed.",
                 value = pairedHost.orEmpty(),
                 onValueChange = { input -> scope.launch { prefs.setPairedTvHost(input.trim().take(64)) } },
                 hint = "192.168.68.56",
+            )
+            SettingsRowSpacer()
+            SettingsClickToEditField(
+                label = "Pairing code",
+                description = "On a TV: the code to type into your phone. On a phone: enter your TV's code here.",
+                value = pairingCode.orEmpty(),
+                onValueChange = { input -> scope.launch { prefs.setHandoffPairingCode(input.trim().uppercase().take(12)) } },
+                hint = "K7P2QX",
             )
         }
     }
