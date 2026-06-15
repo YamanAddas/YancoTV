@@ -319,6 +319,13 @@ dependencies {
     implementation(libs.play.services.cast.framework)
     implementation(libs.mediarouter)
 
+    // MK.26 B.2 — ffmpeg-kit (16KB-page fork) for the on-device cast proxy:
+    // TS->HLS remux + AC-3->AAC transcode so raw-TS IPTV plays on a bare
+    // Chromecast's Default Receiver. Bundles its own libav*.so; the vendored
+    // media3 FFmpeg audio decoder is statically linked into libffmpegJNI.so
+    // (different name), so no .so collision — verified at packaging.
+    implementation(libs.ffmpeg.kit)
+
     // Media3 — powers PlayerActivity
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)

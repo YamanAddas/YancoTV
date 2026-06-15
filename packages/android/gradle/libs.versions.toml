@@ -13,6 +13,9 @@ tvprovider = "1.0.0"
 # MK.26 Track B — Google Cast (raw CAF SDK, isolated from Media3)
 mediarouter = "1.6.0"
 playServicesCast = "21.5.0"
+# MK.26 B.2 — 16KB-page fork of the retired arthenica ffmpeg-kit (cast proxy
+# TS->HLS remux + AC-3->AAC). Official is dead; this is the maintained successor.
+ffmpegKit = "6.1.1"
 
 media3 = "1.5.1"
 okhttp = "4.12.0"
@@ -62,6 +65,7 @@ tvprovider = { module = "androidx.tvprovider:tvprovider", version.ref = "tvprovi
 # GoogleApiAvailability. mediarouter powers the cast/device-picker button.
 mediarouter = { module = "androidx.mediarouter:mediarouter", version.ref = "mediarouter" }
 play-services-cast-framework = { module = "com.google.android.gms:play-services-cast-framework", version.ref = "playServicesCast" }
+ffmpeg-kit = { module = "com.moizhassan.ffmpeg:ffmpeg-kit-16kb", version.ref = "ffmpegKit" }
 
 # Media3
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
