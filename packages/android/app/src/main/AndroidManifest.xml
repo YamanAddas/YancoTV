@@ -133,6 +133,13 @@
             android:name="io.sentry.auto-init"
             android:value="false" />
 
+        <!-- MK.26 Track B — Google Cast options provider. Read lazily by CAF on
+             the first CastContext.getSharedInstance() (which YancoTV gates
+             behind Google Play Services, so it never fires on Fire OS). -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.yancotv.android.cast.CastOptionsProvider" />
+
         <!-- MainActivity is the LAUNCHER/LEANBACK_LAUNCHER entry point and
              also responds to ACTION_SEARCH from Google Assistant / Fire TV
              voice. Both require android:exported="true" — there is no way

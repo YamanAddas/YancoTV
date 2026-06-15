@@ -313,6 +313,12 @@ dependencies {
     // MK.10.1 — Android TV launcher Recommendations channel.
     implementation(libs.tvprovider)
 
+    // MK.26 Track B — Google Cast (CAF). Gated behind Google Play Services so
+    // it's dark on Fire OS. Isolated from Media3 (the Chromecast is its own
+    // remote player), so no media3 bump and no risk to the local ExoPlayer.
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.mediarouter)
+
     // Media3 — powers PlayerActivity
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)
