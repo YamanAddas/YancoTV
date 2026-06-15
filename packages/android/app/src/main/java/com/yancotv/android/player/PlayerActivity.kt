@@ -1191,7 +1191,27 @@ class PlayerActivity : AppCompatActivity() {
                 currentValue = "—",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL) },
             )
+        // MK.26.A.3 — "Play on TV" is a PHONE-ONLY sender: on a TV this app IS
+        // the receiver (MainActivity starts HandoffReceiverService when it
+        // detects a TV), so the row is hidden there. UiModeManager is the
+        // canonical form-factor seam (not screen-size heuristics).
+        if (!isTvDevice()) {
+            rows +=
+                com.yancotv.android.player.options.PlayerOptionsRow(
+                    category = com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV,
+                    label = "Play on TV",
+                    currentValue = "—",
+                    onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV) },
+                )
+        }
         return rows
+    }
+
+    private fun isTvDevice(): Boolean {
+        val uiModeManager =
+            getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        return uiModeManager?.currentModeType ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
     }
 
     /**

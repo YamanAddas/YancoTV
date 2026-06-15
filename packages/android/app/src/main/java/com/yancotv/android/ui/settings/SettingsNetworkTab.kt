@@ -141,7 +141,7 @@ fun SettingsNetworkTab(
         // TV's LAN address here. Port is fixed at HandoffServer.DEFAULT_PORT.
         SettingsSection(
             title = "Play on TV",
-            sub = "The TV on your network that receives \"Play on TV\" handoffs from this phone. Enter its IP address. Automatic discovery is coming; for now, set it here.",
+            sub = "The TV on your network that receives \"Play on TV\" handoffs from this phone. Enter its IP address.",
         ) {
             val pairedHost by prefs.pairedTvHostFlow.collectAsState()
             SettingsClickToEditField(

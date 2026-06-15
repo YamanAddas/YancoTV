@@ -27,6 +27,7 @@ enum class PlayerOptionCategory {
     RECORD,
     FAVORITES,
     EXTERNAL,
+    PLAY_ON_TV,
     SUBTITLE_SEARCH,
     ;
 

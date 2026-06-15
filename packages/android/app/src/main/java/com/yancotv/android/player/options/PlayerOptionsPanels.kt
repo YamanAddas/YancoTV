@@ -67,7 +67,9 @@ import com.yancotv.android.player.subtitles.SubtitleResult
 import com.yancotv.android.player.subtitles.buildSubtitleQuery
 import okhttp3.OkHttpClient
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.shared.handoff.toHandoffItem
 import com.yancotv.shared.playback.Playable
+import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.android.prefs.ResizeMode
@@ -170,6 +172,8 @@ fun PlayerOptionsPanelHost(
                                 FavoritesPanelContent(controller, onPickOption)
                             PlayerOptionCategory.EXTERNAL ->
                                 ExternalPanelContent(controller, onPickOption)
+                            PlayerOptionCategory.PLAY_ON_TV ->
+                                PlayOnTvPanelContent(controller, onPickOption)
                             PlayerOptionCategory.SUBTITLE_SEARCH ->
                                 SubtitleSearchPanelContent(controller, onPickOption)
                         }
@@ -202,6 +206,7 @@ private fun labelFor(c: PlayerOptionCategory): String = when (c) {
     PlayerOptionCategory.RECORD -> "Record"
     PlayerOptionCategory.FAVORITES -> "Favorites"
     PlayerOptionCategory.EXTERNAL -> "External player"
+    PlayerOptionCategory.PLAY_ON_TV -> "Play on TV"
     PlayerOptionCategory.SUBTITLE_SEARCH -> "Search subtitles"
 }
 
@@ -1072,6 +1077,76 @@ private fun ExternalPanelContent(controller: PlaybackController, onPickOption: (
                 positionMs = positionMs,
                 app = null,
             )
+            onPickOption()
+        },
+    )
+}
+
+// ───── Play on TV (MK.26.A.3 — LAN companion-handoff sender) ─────
+
+@UnstableApi
+@Composable
+private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs: AppPreferences = org.koin.compose.koinInject()
+    val handoff: com.yancotv.shared.handoff.HandoffClient = org.koin.compose.koinInject()
+
+    val currentItem by controller.currentItem.collectAsState()
+    val currentEpisode by controller.currentEpisode.collectAsState()
+    val firstRowAnchor = rememberPlacedFocusAnchor()
+
+    // Episode-first: currentItem is a synthesized MOVIE-typed view of an
+    // episode, so toPlayable() on it would mis-tag the handoff kind.
+    val playable: Playable? = currentEpisode ?: currentItem?.toPlayable()
+
+    LaunchedEffect(playable?.id) {
+        if (playable != null) firstRowAnchor.awaitAndRequest()
+    }
+    if (playable == null) {
+        EmptyLine("Nothing playing — start a stream to send to your TV.")
+        return
+    }
+
+    // player.currentPosition is main-thread-only — snapshot here, before IO.
+    val resumeSeconds =
+        if (playable.isLive) 0L else controller.player.currentPosition.coerceAtLeast(0L) / 1000L
+
+    OptionRow(
+        label = "Send to paired TV",
+        selected = false,
+        focusAnchor = firstRowAnchor,
+        onPick = {
+            scope.launch(Dispatchers.IO) {
+                val host = prefs.readPairedTvHost()
+                val message =
+                    if (host == null) {
+                        "No paired TV. Set its address in Settings, under Network."
+                    } else {
+                        val command =
+                            com.yancotv.shared.handoff.HandoffPlayCommand(
+                                pairingToken = com.yancotv.android.handoff.HandoffReceiverService.TOKEN_STUB,
+                                item = playable.toHandoffItem(),
+                                resumePositionSeconds = resumeSeconds,
+                            )
+                        when (
+                            val result =
+                                handoff.play(host, com.yancotv.android.handoff.HandoffServer.DEFAULT_PORT, command)
+                        ) {
+                            is com.yancotv.shared.handoff.HandoffSendResult.Accepted ->
+                                "Playing on your TV"
+                            is com.yancotv.shared.handoff.HandoffSendResult.Rejected ->
+                                "TV refused the request (${result.reason})"
+                            is com.yancotv.shared.handoff.HandoffSendResult.Unreachable ->
+                                "Couldn't reach the TV at $host (${result.message})"
+                        }
+                    }
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast
+                        .makeText(context, message, android.widget.Toast.LENGTH_LONG)
+                        .show()
+                }
+            }
             onPickOption()
         },
     )
