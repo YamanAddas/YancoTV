@@ -37,6 +37,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 
+// MK.26 testing — DEBUG-only sample source seeded on a fresh install. The
+// iptv-org news category is publicly-available free-to-air broadcaster streams
+// (legal, daily-validated); used only so the app is testable without a provider.
+private const val SAMPLE_M3U_URL = "https://iptv-org.github.io/iptv/categories/news.m3u"
+private const val SAMPLE_VOD_NAME = "Sample movies (bundled)"
+
 @UnstableApi
 class MainActivity : ComponentActivity() {
     // We silently accept whatever the user chooses. Reminders still schedule
@@ -132,6 +138,48 @@ class MainActivity : ComponentActivity() {
         if (!didStartAutoSync) {
             didStartAutoSync = true
             lifecycleScope.launch {
+                // DEBUG-only: seed a free/legal sample source on a fresh install
+                // so the app is testable without manually adding a provider.
+                // Skipped once ANY source exists (never re-adds, never overrides
+                // the user's own). Marked auto-sync so the loop below populates
+                // it on this same launch.
+                if (com.yancotv.android.BuildConfig.DEBUG) {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            val existing = sourceRepo.getAll()
+                            // Fresh install only: seed the free live-news sample.
+                            if (existing.isEmpty()) {
+                                val news =
+                                    sourceRepo.addSource(
+                                        com.yancotv.shared.types.AddSourceInput(
+                                            name = "iptv-org news (sample)",
+                                            type = com.yancotv.shared.types.SourceType.M3U_URL,
+                                            url = SAMPLE_M3U_URL,
+                                        ),
+                                    )
+                                sourceRepo.setAutoSyncOnStart(news.id, true)
+                            }
+                            // Always ensure the bundled VOD sample (Blender
+                            // open movies) is present so movie playback +
+                            // casting are testable. M3U_FILE + android.resource://
+                            // reads the bundled res/raw asset via ContentResolver
+                            // — no network, no HttpClient. Added independently of
+                            // the live seed so it shows up even when the user
+                            // already has the news source.
+                            if (existing.none { it.name == SAMPLE_VOD_NAME }) {
+                                val vod =
+                                    sourceRepo.addSource(
+                                        com.yancotv.shared.types.AddSourceInput(
+                                            name = SAMPLE_VOD_NAME,
+                                            type = com.yancotv.shared.types.SourceType.M3U_FILE,
+                                            filePath = "android.resource://$packageName/raw/sample_catalog",
+                                        ),
+                                    )
+                                sourceRepo.setAutoSyncOnStart(vod.id, true)
+                            }
+                        }
+                    }
+                }
                 val targets =
                     withContext(Dispatchers.IO) {
                         runCatching { sourceRepo.autoSyncOnStartList() }.getOrElse { emptyList() }

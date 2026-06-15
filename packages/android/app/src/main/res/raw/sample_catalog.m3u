@@ -1,0 +1,13 @@
+#EXTM3U
+# YancoTV bundled sample catalog (DEBUG builds only).
+# Blender Foundation "open movies" — Creative Commons Attribution (CC-BY).
+# (c) Blender Foundation, www.blender.org. H.264/AAC MP4 over HTTPS, so they
+# play locally AND cast to a Chromecast Default Receiver.
+#EXTINF:-1 tvg-logo="https://archive.org/services/img/BigBuckBunny_124" group-title="Movies",Big Buck Bunny
+https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4
+#EXTINF:-1 tvg-logo="https://archive.org/services/img/ElephantsDream" group-title="Movies",Elephants Dream
+https://archive.org/download/ElephantsDream/ed_1024.mp4
+#EXTINF:-1 tvg-logo="https://archive.org/services/img/Sintel" group-title="Movies",Sintel
+https://archive.org/download/Sintel/sintel-2048-surround_512kb.mp4
+#EXTINF:-1 tvg-logo="https://archive.org/services/img/Tears-of-Steel" group-title="Movies",Tears of Steel
+https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4
