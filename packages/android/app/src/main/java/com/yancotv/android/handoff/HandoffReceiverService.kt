@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -54,6 +56,9 @@ class HandoffReceiverService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    private var nsdManager: NsdManager? = null
+    private var registrationListener: NsdManager.RegistrationListener? = null
+
     private val server: HandoffServer by lazy {
         HandoffServer(
             port = HandoffServer.DEFAULT_PORT,
@@ -80,13 +85,50 @@ class HandoffReceiverService : Service() {
         startForegroundIfNeeded()
         runCatching { server.start() }
             .onFailure { logger.error("Handoff: failed to start receiver — ${it.message}") }
+        advertise()
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopAdvertising()
         runCatching { server.stop() }
         serviceScope.cancel()
+    }
+
+    /** Advertise this receiver on the LAN via NSD so phones can auto-find it (A.2). */
+    private fun advertise() {
+        if (registrationListener != null) return
+        val nsd = getSystemService(NsdManager::class.java) ?: return
+        val info =
+            NsdServiceInfo().apply {
+                serviceName = "YancoTV (${Build.MODEL})"
+                serviceType = HandoffDiscovery.SERVICE_TYPE
+                port = HandoffServer.DEFAULT_PORT
+            }
+        val l =
+            object : NsdManager.RegistrationListener {
+                override fun onServiceRegistered(registered: NsdServiceInfo) {
+                    logger.info("Handoff: advertised as ${registered.serviceName}")
+                }
+
+                override fun onRegistrationFailed(failed: NsdServiceInfo, errorCode: Int) {
+                    logger.warn("Handoff: advertise failed: $errorCode")
+                }
+
+                override fun onServiceUnregistered(unregistered: NsdServiceInfo) {}
+
+                override fun onUnregistrationFailed(failed: NsdServiceInfo, errorCode: Int) {}
+            }
+        registrationListener = l
+        nsdManager = nsd
+        runCatching { nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, l) }
+            .onFailure { logger.warn("Handoff: registerService failed: ${it.message}") }
+    }
+
+    private fun stopAdvertising() {
+        registrationListener?.let { active -> runCatching { nsdManager?.unregisterService(active) } }
+        registrationListener = null
     }
 
     /**
