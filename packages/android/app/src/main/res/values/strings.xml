@@ -12,4 +12,10 @@
 
     <!-- MK.10.3 — voice search hint shown in the launcher's "Search YancoTV" widget. -->
     <string name="search_hint">Channels, movies, shows</string>
+
+    <!-- MK.26.A.1 — LAN companion-handoff receiver foreground service. -->
+    <string name="handoff_channel_name">Play on TV</string>
+    <string name="handoff_channel_description">Receiving playback handed off from your phone</string>
+    <string name="handoff_notification_title">Ready to play from your phone</string>
+    <string name="handoff_notification_body">YancoTV can receive playback from your phone on this network</string>
 </resources>

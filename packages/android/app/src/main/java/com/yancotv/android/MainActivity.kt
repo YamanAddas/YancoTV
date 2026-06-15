@@ -21,6 +21,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import com.yancotv.android.handoff.HandoffReceiverService
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.focus.TvContextActionState
@@ -73,6 +74,14 @@ class MainActivity : ComponentActivity() {
 
         val isTv = detectTv()
         requestNotificationsPermissionIfNeeded()
+
+        // MK.26.A.1 — on a TV, run the LAN companion-handoff receiver so a
+        // phone can "Play on TV". Phones are senders, not receivers, so this
+        // is TV-only. Started from the foregrounded launcher activity to
+        // satisfy Android 12+ foreground-service-start rules. Idempotent.
+        if (isTv) {
+            HandoffReceiverService.start(this)
+        }
 
         setContent {
             YancoTheme(isTv = isTv) {

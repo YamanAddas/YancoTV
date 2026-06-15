@@ -140,8 +140,8 @@ android {
         applicationId = "com.yancotv.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.1.1"
+        versionCode = 7
+        versionName = "1.1.2"
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
@@ -320,6 +320,16 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.media3.datasource.okhttp)
     implementation(libs.okhttp)
+
+    // MK.26.A.1 — embedded Ktor (CIO) server for the LAN companion-handoff
+    // receiver. Android-only (the receiver runs on the TV). The matching
+    // ktor client + kotlinx-serialization live in :shared as `implementation`
+    // (not on this module's compile classpath), so the JSON converter is
+    // declared here explicitly for ContentNegotiation.
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
 
     // MK.9 — checker-qual annotations are referenced by the vendored
     // androidx.media3.decoder.ffmpeg sources for nullness static analysis.

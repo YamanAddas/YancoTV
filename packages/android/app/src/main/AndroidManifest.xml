@@ -35,6 +35,13 @@
          on earlier releases it's a harmless no-op. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- MK.26.A.1 — LAN companion-handoff receiver foreground service. The
+         `mediaPlayback` type fits: the service exists to start and keep
+         playback running on this device at a paired phone's request. The
+         base FOREGROUND_SERVICE permission above covers pre-14 releases;
+         this variant is required from Android 14 (API 34) to declare the
+         type. No effect on the canonical Fire TV target (API 28). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- Stage 5.2.3 — sideload auto-update install flow. Lets the user
          tap "Install" inside the app and have the system PackageInstaller
@@ -213,6 +220,16 @@
             android:name=".recording.RecordingService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- MK.26.A.1 — LAN companion-handoff receiver. Hosts an embedded
+             Ktor server; a paired phone POSTs a play command and this
+             device's own player plays it (zero added lag, full codec/header
+             support). exported="false": reached over the LAN socket, never
+             via Intent from another app. -->
+        <service
+            android:name=".handoff.HandoffReceiverService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Stage 5.2.3 — FileProvider exposes the downloaded APK to the
              system PackageInstaller via a content:// URI (file:// is
