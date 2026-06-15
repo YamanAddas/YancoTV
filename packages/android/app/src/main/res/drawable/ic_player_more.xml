@@ -1,0 +1,18 @@
+<!-- "More options" (vertical 3-dot / more_vert). White, for the live
+     player's touch overflow button (MB-* live-options-unreachable-on-phone).
+     Material icon path; 24dp canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,8m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,12m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,16m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+</vector>

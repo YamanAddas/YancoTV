@@ -197,6 +197,36 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var liveOffsetLabel: TextView
     private lateinit var liveJumpButton: Button
 
+    // Phone player chrome (MK.26.A.3): on-screen Back + More (⋮) + Cast
+    // buttons. The player is D-pad-first; a phone needs touch affordances to
+    // exit the player and to reach the options popup / "Play on TV". Shown
+    // for a phone while controls are up (live controller OR VOD dock); hidden
+    // on TV. Visibility driven by updatePlayerChrome(). moreButton + castButton
+    // live inside the topActions row.
+    private lateinit var backButton: android.widget.ImageButton
+    private lateinit var moreButton: android.widget.ImageButton
+    private lateinit var castButton: android.widget.ImageButton
+    private lateinit var topActions: View
+
+    // Phone single-tap → surface controls. The player is D-pad-first; without
+    // this a touchscreen tap does nothing for VOD (the Compose dock is
+    // otherwise opened only by KEYCODE_DPAD_CENTER) and LIVE leans on Media3's
+    // own touch toggle. Routes both through onPlayerSingleTap() so touch and
+    // remote behave identically. Lazy — needs the Activity as context.
+    private val playerTapDetector by lazy {
+        android.view.GestureDetector(
+            this,
+            object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: android.view.MotionEvent): Boolean = true
+
+                override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
+                    onPlayerSingleTap()
+                    return true
+                }
+            },
+        )
+    }
+
     // VOD chrome overlay (MK.16.player.vod.chrome). Hosts the Compose
     // BUFFERING / ERROR states — see VodPlayerChrome.kt. Inflated lazily
     // from the `vod_chrome_stub` ViewStub on first show; most sessions
@@ -359,6 +389,7 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -429,6 +460,28 @@ class PlayerActivity : AppCompatActivity() {
         liveJumpButton = findViewById(R.id.live_jump_button)
         liveJumpButton.setOnClickListener { jumpToLive() }
 
+        // Phone player chrome (Back / More / Cast). Gated in
+        // updatePlayerChrome(): Back exits the player, More opens the options
+        // popup, Cast jumps straight to the "Play on TV" panel.
+        backButton = findViewById(R.id.player_back_button)
+        moreButton = findViewById(R.id.player_more_button)
+        castButton = findViewById(R.id.player_cast_button)
+        topActions = findViewById(R.id.player_top_actions)
+        backButton.setOnClickListener { finish() }
+        moreButton.setOnClickListener { openPlayerOptions(null) }
+        castButton.setOnClickListener {
+            openPlayerOptions(com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV)
+        }
+        // The Back button shares the top-start corner with the zap bar on
+        // live; nudge the zap bar right (phone only) so they don't overlap.
+        // Form factor is fixed at runtime, so do it once.
+        if (!isTvDevice()) {
+            (zapBar.layoutParams as? android.widget.FrameLayout.LayoutParams)?.let {
+                it.marginStart = (76 * resources.displayMetrics.density).toInt()
+                zapBar.layoutParams = it
+            }
+        }
+
         // surfOverlay / chromeOverlay stay null — inflated lazily on first
         // show via their ViewStubs. Keeps Compose owner setup off the
         // launch path (MK.16.player.vod.chrome).
@@ -441,8 +494,19 @@ class PlayerActivity : AppCompatActivity() {
         // mini preview. The user's mental model is: the picture fills the
         // screen, OK toggles the controls. See 2026-04-22 fix.
         playerView.controllerAutoShow = false
-        playerView.controllerHideOnTouch = true
+        // Phone touch drives controller/dock via our own single-tap detector
+        // (below), so disable Media3's built-in touch toggle to avoid
+        // double-handling. TV uses D-pad keys and is unaffected.
+        playerView.controllerHideOnTouch = false
         playerView.setControllerShowTimeoutMs(CONTROLLER_TIMEOUT_MS)
+
+        // The player is D-pad-first. On a phone, a single tap on the video
+        // must surface the controls — LIVE toggles Media3's built-in
+        // controller, VOD toggles the Compose dock (otherwise reachable only
+        // via KEYCODE_DPAD_CENTER, so phones saw nothing on tap). Controller
+        // buttons / dock chips are child / overlay views that consume their
+        // own taps first, so only video-area taps reach this and toggle.
+        playerView.setOnTouchListener { _, event -> playerTapDetector.onTouchEvent(event) }
 
         // Tie our zap bar + program progress to Media3's own controller
         // visibility — one clock governs all overlays so they fade together
@@ -713,6 +777,7 @@ class PlayerActivity : AppCompatActivity() {
         if (item == null) {
             zapBar.visibility = View.GONE
             progressRow.visibility = View.GONE
+            updatePlayerChrome()
             return
         }
         val displayTitle = item.cleanTitle?.ifBlank { null } ?: item.title
@@ -759,6 +824,54 @@ class PlayerActivity : AppCompatActivity() {
             currentProgramme != null &&
                 controller.currentItem.value?.type == ContentType.LIVE
         progressRow.visibility = if (controllerVisible && liveWithEpg) View.VISIBLE else View.GONE
+        updatePlayerChrome()
+    }
+
+    /**
+     * Show/hide the phone chrome (Back / More / Cast) with the controls. Phone
+     * only — TV uses the remote's BACK + MENU. LIVE keys off the Media3
+     * controller visibility; VOD off the Compose dock.
+     */
+    private fun updatePlayerChrome() {
+        if (isTvDevice()) {
+            backButton.visibility = View.GONE
+            topActions.visibility = View.GONE
+            return
+        }
+        val show =
+            when (controller.currentItem.value?.type) {
+                ContentType.LIVE -> controllerVisible
+                ContentType.MOVIE, ContentType.SERIES -> dockVisible
+                null -> false
+            }
+        val vis = if (show) View.VISIBLE else View.GONE
+        backButton.visibility = vis
+        topActions.visibility = vis
+    }
+
+    /**
+     * Phone chrome → options popup. Hides the VOD dock first (the popup
+     * replaces it) and lands on [category] when given (Cast → PLAY_ON_TV).
+     */
+    private fun openPlayerOptions(category: com.yancotv.android.player.options.PlayerOptionCategory?) {
+        if (dockVisible) hideVodDock()
+        showOptionsV2(category)
+    }
+
+    /**
+     * Phone single-tap on the video surface — mirror the KEYCODE_DPAD_CENTER
+     * handling so touch and remote behave identically. LIVE toggles Media3's
+     * built-in controller; VOD toggles the Compose dock. Full-screen overlays
+     * (options popup / surf) sit above the PlayerView and consume their own
+     * taps, so this only fires on the bare video area.
+     */
+    private fun onPlayerSingleTap() {
+        val isLive = controller.currentItem.value?.type == ContentType.LIVE
+        if (isLive) {
+            if (controllerVisible) playerView.hideController() else playerView.showController()
+        } else {
+            if (dockVisible) hideVodDock() else showVodDock()
+        }
     }
 
     // ───── Program progress ─────
@@ -1608,6 +1721,7 @@ class PlayerActivity : AppCompatActivity() {
         dockData = buildDockData(controller.currentItem.value)
         dockProgress = readDockProgress()
         dockVisible = true
+        updatePlayerChrome()
         val v = ensureVodDockOverlay()
         v.visibility = View.VISIBLE
         v.post { v.requestFocus() }
@@ -1618,6 +1732,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun hideVodDock() {
         if (!dockVisible) return
         dockVisible = false
+        updatePlayerChrome()
         vodDockOverlay?.visibility = View.GONE
         stopDockProgressTicker()
         dockAutoHideJob?.cancel()

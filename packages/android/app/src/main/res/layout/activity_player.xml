@@ -340,6 +340,64 @@
         android:inflatedId="@+id/vod_dock"
         android:layout="@layout/player_vod_dock" />
 
+    <!-- Phone player chrome (MB-231 / MK.26.A.3). The player is D-pad-first;
+         on a phone it needs touch affordances. Placed ABOVE the VOD dock in
+         the z-order so it also shows over movies/series (the dock is a
+         full-screen ComposeView). Visibility driven by
+         PlayerActivity.updatePlayerChrome(): phone only, while the live
+         controller OR the VOD dock is visible. Hidden on TV — the remote's
+         BACK key + MENU / long-press own these there. focusable=false so the
+         buttons never enter D-pad focus traversal. -->
+    <ImageButton
+        android:id="@+id/player_back_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/player_overlay_pill"
+        android:src="@drawable/ic_player_back"
+        android:scaleType="centerInside"
+        android:padding="10dp"
+        android:focusable="false"
+        android:contentDescription="Back"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/player_top_actions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="12dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/player_more_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/player_overlay_pill"
+            android:src="@drawable/ic_player_more"
+            android:scaleType="centerInside"
+            android:padding="12dp"
+            android:focusable="false"
+            android:contentDescription="More options" />
+
+        <ImageButton
+            android:id="@+id/player_cast_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/player_overlay_pill"
+            android:src="@drawable/ic_player_cast"
+            android:scaleType="centerInside"
+            android:padding="11dp"
+            android:focusable="false"
+            android:contentDescription="Cast or play on TV" />
+    </LinearLayout>
+
     <!-- MK.options.redesign — lightweight options popup + per-category
          floating panels. Replaces the heavy MK.16.sheet entry path on the
          live player. Hosts a single ComposeView that paints both the menu
