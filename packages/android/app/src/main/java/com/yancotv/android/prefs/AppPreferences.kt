@@ -34,6 +34,11 @@ class AppPreferences(private val db: YancoDb) {
     private val _hiddenGroups = MutableStateFlow(readHiddenGroups())
     val hiddenGroupsFlow: StateFlow<Set<String>> = _hiddenGroups.asStateFlow()
 
+    // MK.26.A.3 — manually-paired TV host for "Play on TV" (Track A sender).
+    // Null/blank = unpaired. Port is fixed at HandoffServer.DEFAULT_PORT (8731).
+    private val _pairedTvHost = MutableStateFlow(readPairedTvHost())
+    val pairedTvHostFlow: StateFlow<String?> = _pairedTvHost.asStateFlow()
+
     // MK.20 polish-sweep — pin-a-bucket. Per-content-type ordered list of
     // pinned parent codes (e.g. "ar", "us"). Storage shape: 3 settings
     // keys, one per content type, each holding a newline-delimited list.
@@ -257,6 +262,15 @@ class AppPreferences(private val db: YancoDb) {
 
     fun readBackupFolderUri(): String? = readString(KEY_BACKUP_FOLDER_URI)?.takeIf { it.isNotBlank() }
 
+    // MK.26.A.3 — paired-TV host for the LAN "Play on TV" sender. Blank clears
+    // the pairing (write() deletes the row). Discovery (MK.26.A.2) will later
+    // set this automatically; until then the user types it in Settings.
+    suspend fun setPairedTvHost(host: String?) = write(KEY_PAIRED_TV_HOST, host.orEmpty()) {
+        _pairedTvHost.value = host?.takeIf { it.isNotBlank() }
+    }
+
+    fun readPairedTvHost(): String? = readString(KEY_PAIRED_TV_HOST)?.takeIf { it.isNotBlank() }
+
     // ───── Hidden groups ─────
     //
     // Providers routinely push 400+ category groups, most of which a
@@ -473,6 +487,7 @@ class AppPreferences(private val db: YancoDb) {
         private const val KEY_EXT_PLAYER_LIVE = "pref_ext_player_live"
         private const val KEY_EXT_PLAYER_MOVIE = "pref_ext_player_movie"
         private const val KEY_EXT_PLAYER_SERIES = "pref_ext_player_series"
+        private const val KEY_PAIRED_TV_HOST = "pref_paired_tv_host"
     }
 }
 

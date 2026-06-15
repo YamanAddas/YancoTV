@@ -135,6 +135,23 @@ fun SettingsNetworkTab(
         ) {
             TestConnectionRow(scope = scope, sources = sources, http = http)
         }
+
+        // MK.26.A.3 — manual pairing for "Play on TV" (the in-player sender).
+        // Automatic discovery is MK.26.A.2; until then the user enters the
+        // TV's LAN address here. Port is fixed at HandoffServer.DEFAULT_PORT.
+        SettingsSection(
+            title = "Play on TV",
+            sub = "The TV on your network that receives \"Play on TV\" handoffs from this phone. Enter its IP address. Automatic discovery is coming; for now, set it here.",
+        ) {
+            val pairedHost by prefs.pairedTvHostFlow.collectAsState()
+            SettingsClickToEditField(
+                label = "Paired TV address",
+                description = "Your TV's IPv4 address or hostname. Leave blank to unpair. Port 8731 is fixed.",
+                value = pairedHost.orEmpty(),
+                onValueChange = { input -> scope.launch { prefs.setPairedTvHost(input.trim().take(64)) } },
+                hint = "192.168.68.56",
+            )
+        }
     }
 }
 
