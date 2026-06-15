@@ -385,7 +385,13 @@ internal fun SettingsSlider(
                 // would clip on the right edge; using an absolute-position Box
                 // inside a BoxWithConstraints is cleaner and lets us keep the
                 // knob centered on the point regardless of width.
-                val maxOffset = maxWidth - knobSize
+                // coerceAtLeast(0.dp): during the first/transient measure pass
+                // BoxWithConstraints can report maxWidth < knobSize (or 0),
+                // making maxOffset negative → a negative knobX → `.padding`
+                // throws "Padding must be non-negative" and crashes the whole
+                // tab. Clamp so the knob just pins to the start until the real
+                // width resolves. (Bit the phone's narrower Settings layout.)
+                val maxOffset = (maxWidth - knobSize).coerceAtLeast(0.dp)
                 val knobX =
                     (maxOffset.value * progress.coerceIn(0f, 1f))
                         .dp
