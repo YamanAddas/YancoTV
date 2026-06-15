@@ -7,7 +7,7 @@ Native Android + Android TV / Fire TV / Google TV. Jetpack Compose + Media3 ExoP
 ## Stack (quick reference)
 
 - **Kotlin 2.x** + **Jetpack Compose** + **`androidx.tv.material`** on TV / **Material3** on phone
-- **Media3 ExoPlayer** direct (no bridge). One instance shared between `MiniPlayer` and `PlayerActivity` via `PlayerView.switchTargetView()`
+- **Media3 ExoPlayer** direct (no bridge). One instance shared between `MiniPlayer` and `PlayerActivity` by swapping the output Surface (`setVideoSurface` / `clearVideoSurface`) — not `PlayerView.switchTargetView()`
 - **Coil 3** images, **Koin** DI, **Kermit** logging
 - **Compose Navigation 3** with adaptive layouts
 - **WorkManager** for background (EPG reminders, source sync)

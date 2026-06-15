@@ -40,7 +40,7 @@ Lessons from real session red-teams. Run through these before declaring a task c
 
 - Don't couple desktop code to mpv directly (use `IPlayer`).
 - Don't call `android.*` from `packages/shared/commonMain/`.
-- Don't instantiate a second `ExoPlayer` — share via `switchTargetView()`.
+- Don't instantiate a second `ExoPlayer` — share the one player by swapping its output Surface (`setVideoSurface` / `clearVideoSurface`, not `switchTargetView()`). The cast work (MK.26) keeps this rule: Track B wraps the same ExoPlayer in a `CastPlayer`; Track A hands off to a *remote* device's own single player.
 - Don't add features outside the active plan. If it's not in a `MK.*` or Sprint task, amend the plan first.
 - Don't touch `packages/mobile/` except for P0 RN bugs.
 

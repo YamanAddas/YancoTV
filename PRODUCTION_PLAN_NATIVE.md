@@ -188,7 +188,7 @@ every backfill, default, and new table contract.
 | 3.1 | **MK.14 Recording — full HLS *and* MPEG-TS.** Foreground service (`FOREGROUND_SERVICE_TYPE_DATA_SYNC`), MediaStore writes, WorkManager schedules, EPG long-press hook, recordings browser, playback-conflict handling, recording sheet panel. **Storage management ships in this stage (not deferred):** user-set max-disk cap (default 16 GB), auto-cleanup oldest-first when cap hit, per-recording size shown in browser, low-storage warning before scheduled record fires. **Spec the "record while playing? while another channel plays?" interaction questions BEFORE writing code.** MPEG-TS is non-negotiable — Xtream catch-up is mostly TS; HLS-only is not "complete". | MK.14.1–14.7 (re-scoped) |
 | 3.2 | **MK.11.1/2 Phone PIP + gesture controls.** `enterPictureInPictureMode` on phone player. Gesture seek / volume / brightness. | MK.11.1, MK.11.2 |
 
-(MK.11.3 Cast and MK.18.3/4/5 dropped — see Locked decisions below.)
+(MK.11.3 Cast + MK.18.3/4/5: **revisited 2026-06-15 → MK.26.** Handoff (18.5) revived as Track A primary; Cast (11.3 / 18.3) revived as Track B secondary; DLNA (18.4) stays dropped. See MK.26.)
 
 ### Stage 4 — Surface features
 
@@ -209,7 +209,7 @@ every backfill, default, and new table contract.
 | 5.2 | **Sideload auto-update check** — split into 3 sub-slices. **5.2.1 ✅ shipped 2026-04-28** (`2202460`): `UpdateChecker` pure-logic poller in `:shared/commonMain` + 11 table-driven tests. Polls a custom `update.json` (chosen over GitHub Releases API to avoid coupling update logic to tag-naming conventions). **5.2.2 ✅ shipped 2026-04-28** (`79c39b4` + `3c09162` + UI iterations through `bc47ef0`): `UpdateRepository` (mutex-coalesced, in-memory `StateFlow<UpdateInfo?>`) + `UpdateCheckWorker` (24h periodic + one-shot `KEY_FORCE` bypass) + `BuildConfig.UPDATE_ENDPOINT` from `local.properties` + Settings → About panel showing "v X.Y.Z available" / "You're on the latest version" with auto-check toggle, "Check now" button, and "Open release page" fallback (`Intent.ACTION_VIEW`). **5.2.3 ✅ shipped 2026-04-28:** `UpdateInstaller` singleton (`StateFlow<State>` of Idle / Downloading(pct) / ReadyToInstall / Failed) downloads APK via shared OkHttp into `getExternalFilesDir(null)/updates/yancotv-<versionCode>.apk` with whole-percent progress throttling, then hands off to system PackageInstaller via FileProvider content:// URI + `ACTION_VIEW` + `application/vnd.android.package-archive`. `REQUEST_INSTALL_PACKAGES` declared in manifest; on Android 8+ a `canRequestPackageInstalls()` gate routes the user to `Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES` if not yet granted. About-tab banner morphs through Download → Cancel → Install / Retry; "Open release page" fallback stays available in every state for browser sideload. End-to-end ship-readiness verification deferred to user on-device test. | new |
 | 5.3 | **Accessibility audit** ✅ shipped 2026-04-28 — TalkBack semantic-role pass across every interactive surface in the app. Audited 27 files / 44 distinct control sites; added explicit `role = Role.{Button,Switch,Tab,DropdownList}` to every custom `Row`/`Box` + `.clickable` so TalkBack announces the control type instead of just "double-tap to activate". Settings primitives (`SettingsButton`, `SettingsRow`, `SettingsToggleRow`, `SettingsChip`, `SettingsSelect`) cover most settings tabs by composition; per-tab inline controls (Appearance theme/accent swatches, Groups visibility/pin chips, Recordings storage picker, Text field overlays) updated individually. Player primitives (`TransportButton`, `SecondaryChip`, `VodPlayerChrome` taps, Player options menu rows) all carry `Role.Button`; sidebar items + category pills carry `Role.Tab`; toggles carry `Role.Switch`; selects carry `Role.DropdownList`. Guide grid: `JumpToNowButton`, `ChannelCell` (`combinedClickable`), `ProgrammeBlock` all wired. Bulk transformation done with a Python regex to keep the 27-file edit reviewable; `SettingsScreen.kt` already had the role set via `Modifier.semantics` and was left untouched. AsyncImage audit: all 12 sites have explicit `contentDescription` (real string for standalone tiles, `null` for decorative images paired with adjacent text labels). D-pad traversal: validated continuously through real-use across all prior Stage 3-4 work, so no separate sweep needed. | new |
 | 5.4 | **Performance audit** ✅ shipped 2026-04-28 — release-build matrix on AFTDCT31. **Cold start passed cleanly:** debug 11.3s → release 1.75s p50 (budget ≤ 2.5s, comfortably under after warm-up). **EPG scroll gap closed in two slices:** slice 1 (`edaa41d`) moved the now-line indicator's `hScroll.value` read into `Modifier.offset { }` so it's a layout-time-only event (was forcing whole-grid recomposition every scroll frame); slice 2 (`03215e5`) virtualised programme lanes via `BoxWithConstraints` + `derivedStateOf` filter so each `ChannelRow` only emits programmes intersecting the viewport ± 60 min buffer (was 750–2250 `ProgrammeBlock` instances in the layout tree). Vertical p95 went 450 → 57 ms (8× total tail improvement); user-confirmed feels smooth in real use. Two residual gap items (per-cell `TextLayoutResult` caching + `RGB_565` channel logos) tracked in `packages/android/PERFORMANCE.md` for a follow-up perf sprint after distribution-readiness work; not v1.0-blocking. | MK.19 perf piece |
-| 5.5 | **Placeholder audit** ✅ shipped 2026-04-28 — every "COMING IN MK.XX" string is gone from shipped code paths. Audit findings: `SettingsAppearanceTab` filled by Stage 4.6 (theme + accent picker, real content); `SettingsRecordingsTab` filled by Stage 3.1 (SAF storage picker, recording defaults, real content); orphan tabs (`SettingsSubtitlesTab`, `SettingsNotificationsTab`, `SettingsStorageTab`) unwired from sidebar in `ae6dc25` and have no remaining callers — files kept per plan for post-v1 hookup. Player-options sheet panels all wired with real content (`PlayerOptionsPanels.kt`): SLEEP, RECORD, FAVORITES, EXTERNAL each have shipped logic; CAST and LOOK never landed in the enum (Cast permanently dropped, LOOK absorbed into Settings → Appearance). One stale code comment in `VodPlayerDock.kt:471` calling FAV a "COMING IN MK.XX" stub fixed in this slice — FAV chip routes to the wired FavoritesPanelContent. | new |
+| 5.5 | **Placeholder audit** ✅ shipped 2026-04-28 — every "COMING IN MK.XX" string is gone from shipped code paths. Audit findings: `SettingsAppearanceTab` filled by Stage 4.6 (theme + accent picker, real content); `SettingsRecordingsTab` filled by Stage 3.1 (SAF storage picker, recording defaults, real content); orphan tabs (`SettingsSubtitlesTab`, `SettingsNotificationsTab`, `SettingsStorageTab`) unwired from sidebar in `ae6dc25` and have no remaining callers — files kept per plan for post-v1 hookup. Player-options sheet panels all wired with real content (`PlayerOptionsPanels.kt`): SLEEP, RECORD, FAVORITES, EXTERNAL each have shipped logic; CAST and LOOK never landed in the enum (Cast was dropped 2026-04-25 — now revived 2026-06-15 as MK.26, but via a MediaRouteButton + LAN-handoff picker, NOT this old player-options CAST tab; LOOK absorbed into Settings → Appearance). One stale code comment in `VodPlayerDock.kt:471` calling FAV a "COMING IN MK.XX" stub fixed in this slice — FAV chip routes to the wired FavoritesPanelContent. | new |
 | 5.6 | **Privacy policy + ToS + content rating** ✅ shipped 2026-04-29. Code surface: `CrashReportPrefs` (SharedPreferences-backed, no Koin since SentryInit runs before Koin starts) + `Sentry.beforeSend` / `beforeBreadcrumb` callbacks gating every event on the toggle; `RecordingDisclaimer` + `rememberRecordingDisclaimerGate` Composable wrapped at all three user-initiated record entry points (player options Record panel, Guide → Schedule recording, Guide → Schedule series); Settings → About has a new **Privacy** section with "Send crash reports" toggle + "Privacy policy" + "Terms of service" links (open URLs in system browser, currently pointing at `example.invalid` placeholders until docs are hosted). Doc artifacts at repo root: [PRIVACY.md](PRIVACY.md), [TERMS.md](TERMS.md), [CONTENT_RATING.md](CONTENT_RATING.md) — drafts user reviews + customises (contact email, jurisdiction) before any public store submission. | new |
 | 5.7 | **Distribution pipeline** — Play Console listing (TV + phone), Amazon Appstore (Fire TV), GitHub Releases signed APK + `update.json` endpoint feeding 5.2. | MK.19.2, 19.3, 19.4 |
 | 5.8 | **Manual QA matrix** ✅ checklist shipped 2026-04-29 — [QA_MATRIX.md](QA_MATRIX.md). Lightweight per-device + per-feature smoke-test checklist for the friend-group beta. Fire TV AFTDCT31 + phone HT74J0206349 are the primary targets verified hands-on through Stage 1–5 development; Google TV (192.168.68.52, adb-discoverable but never authorised), Fire TV Stick 4K, mid-range Android TV box are tier-2/3 targets to fan out to during the friend-group beta. This is a CONTINUOUS phase from now on — your testers ARE the QA matrix; the file just gives them (and you) a structured way to log what's working + what isn't. | MK.19.6 (expanded) |
@@ -234,10 +234,10 @@ This is the only way "complete v1.0" doesn't end with a 3-week regression-fixing
 | Decision | Status |
 |---|---|
 | Sentry over Firebase Crashlytics | **Adopted** |
-| Chromecast (MK.11.3 / MK.18.3) | **Dropped permanently** — receiver feasibility uncertain for IPTV streams; install YancoTV directly on every TV |
+| Chromecast (MK.11.3 / MK.18.3) | ~~**Dropped permanently**~~ — **REVISED 2026-06-15 → MK.26 Track B** (secondary/droppable, app-less Chromecasts only); IPTV-feasibility concern confirmed (needs custom receiver + proxy, never zero-lag) |
 | TIF live-channels integration (MK.10.2) | **Deferred — post-v1 study.** Fire TV doesn't support TIF, value is Google-Android-TV-only |
-| DLNA / UPnP (MK.18.4) | **Dropped permanently** — built for stored media not live streams; usage pattern doesn't need it |
-| Cross-device handoff (MK.18.5) | **Deferred — post-v1 study.** Requires either a cloud backend (out of scope) or LAN-only (loses home/away use case) |
+| DLNA / UPnP (MK.18.4) | **Dropped permanently** — built for stored media not live streams; usage pattern doesn't need it (reconfirmed by 2026-06-15 red-team) |
+| Cross-device handoff (MK.18.5) | ~~**Deferred — post-v1 study.**~~ — **REVISED 2026-06-15 → MK.26 Track A (PRIMARY)** — LAN-only "play on my TV" handoff, the zero-lag all-content path |
 | MK.10 TIF replacement | **Recommendations channel + voice search deep link only** |
 | Recording (MK.14) scope | **HLS + MPEG-TS both, in v1.0.** HLS-only is not "complete" |
 | Definition-of-Done per feature | **Adopted** — see above |
@@ -249,7 +249,7 @@ Flagged here so future-us doesn't re-litigate from scratch. Both depend on archi
 
 - **TIF (TV Input Framework)** — inject YancoTV channels into the Android TV system Live Channels app. Pros: voice search tunes directly, channel up/down works system-wide, surfaces in Google TV "Live" recommendations. Cons: Fire TV doesn't support TIF (zero value on the canonical test target); massive scope (`TvInputService`, channel/program metadata sync into TIF DB, surface session for video, EPG re-ingestion, parental re-wired); maintenance burden as TIF data desyncs from app data. Revisit only if Google TV becomes the primary target.
 
-- **Cross-device handoff** — pause on TV, resume on phone where you left off. Pros: nice continuity UX for VOD/series. Cons: needs either a cloud backend (Supabase/Firebase + privacy policy + GDPR if EU users) or LAN-only (loses the home/away use case which is the only reason handoff is interesting); marginal value for live TV (most IPTV usage). Revisit only if a cloud backend gets added for other reasons.
+- **Cross-device handoff** — **NOTE 2026-06-15:** this entry conflated two directions. The *phone→TV "play on my TV"* direction is now **MK.26 Track A** (LAN-only, no cloud). What remains post-v1 is only the *TV↔phone resume-continuity* (away case) below. ~~pause on TV, resume on phone where you left off. Pros: nice continuity UX for VOD/series. Cons: needs either a cloud backend (Supabase/Firebase + privacy policy + GDPR if EU users) or LAN-only (loses the home/away use case which is the only reason handoff is interesting); marginal value for live TV (most IPTV usage). Revisit only if a cloud backend gets added for other reasons.~~ The away-case continuity still needs a cloud backend — revisit only if one gets added for other reasons.
 
 ---
 
@@ -330,8 +330,8 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 |---|---|---|
 | MK.6.1 | `PlaybackService.kt` (Media3 `MediaSessionService`) owns a single `ExoPlayer` + `MediaSession` | player survives config changes; resumes after background |
 | MK.6.2 | `MiniPlayerView.kt` — `PlayerView` in the top-right slot of `HomeShell`, binds to the shared `ExoPlayer` | plays in the corner while user browses |
-| MK.6.3 | `PlayerActivity.kt` (port) — fullscreen; attaches **the same** `ExoPlayer` to its `PlayerView` via `PlayerView.switchTargetView()` → no rebuffer | Enter on focused channel expands to fullscreen with zero rebuffer |
-| MK.6.4 | Back from fullscreen → `switchTargetView()` returns surface to mini slot; player keeps playing | no black frame, no audio gap |
+| MK.6.3 | `PlayerActivity.kt` (port) — fullscreen; attaches **the same** `ExoPlayer` to its `PlayerView` by swapping the output Surface (`setVideoSurface` / `clearVideoSurface`; the plan originally said `switchTargetView()`, but the shipped code uses Surface-swapping) → no rebuffer | Enter on focused channel expands to fullscreen with zero rebuffer |
+| MK.6.4 | Back from fullscreen → the Surface is handed back to the mini slot (symmetric `clearVideoSurface` / `setVideoSurface`); player keeps playing | no black frame, no audio gap |
 | MK.6.5 | D-pad Up/Down on fullscreen zaps channels (preview via brief `seekTo(0)` on swap) | TiviMate-style zap |
 
 **Ship criterion:** tap channel in `ContentPanel` → plays in mini slot → Enter fullscreens seamlessly → Back returns to mini. No rebuffer. No black frame.
@@ -366,7 +366,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 | MK.9.1 | Clone `androidx/media` at matching tag; build FFmpeg decoder extension via NDK for armeabi-v7a + arm64-v8a + x86_64 | `.so` artifacts produced |
 | MK.9.2 | Vendor libs into `packages/android/app/src/main/jniLibs/`; APK splits per ABI | APK ships all three ABIs via splits, sub-60MB each |
 | MK.9.3 | Register `FfmpegAudioRenderer` / `FfmpegVideoRenderer` in `PlaybackService`'s `DefaultRenderersFactory` with `EXTENSION_RENDERER_MODE_PREFER` | extension preferred over platform codecs |
-| MK.9.4 | **Crash watchdog** — `Player.Listener.onPlayerError` catches FFmpeg native crashes, releases the current `ExoPlayer`, rebuilds it on the same `PlaybackService` path with a platform-only `RenderersFactory` (preserves Architecture rule 4: still one ExoPlayer at a time, never two simultaneously), retries `prepare()` once; if that also fails, surfaces error overlay (no hard-crash of `PlayerActivity`). The `MiniPlayerView`/`PlayerView.switchTargetView()` path stays valid because the new player is bound to the same service. | Force-fault the FFmpeg renderer in a debug build → playback recovers on platform decoder; mini-preview and fullscreen continue to share the rebuilt instance |
+| MK.9.4 | **Crash watchdog** — `Player.Listener.onPlayerError` catches FFmpeg native crashes, releases the current `ExoPlayer`, rebuilds it on the same `PlaybackService` path with a platform-only `RenderersFactory` (preserves Architecture rule 4: still one ExoPlayer at a time, never two simultaneously), retries `prepare()` once; if that also fails, surfaces error overlay (no hard-crash of `PlayerActivity`). The mini-preview ↔ fullscreen Surface-swap path (`setVideoSurface` / `clearVideoSurface`) stays valid because the new player is bound to the same service. | Force-fault the FFmpeg renderer in a debug build → playback recovers on platform decoder; mini-preview and fullscreen continue to share the rebuilt instance |
 | MK.9.5 | **R8 keep rules for native libs + JNI surfaces** — registered in same commit so release build doesn't strip the native registrations | `./gradlew :app:assembleRelease` plays the same regression streams as debug |
 | MK.9.6 | Regression test against 10 real IPTV channels that were audio-only on the RN build (MB-14 register) | all 10 render picture; MB-14 closed |
 
@@ -385,7 +385,7 @@ Each milestone ends in a tagged APK (and later TestFlight build) + a commit seri
 |---|---|---|
 | MK.11.1 | Phone PIP (`enterPictureInPictureMode`) | home button during playback → floating PIP |
 | MK.11.2 | Gesture seek / volume / brightness on phone player | feels native |
-| ~~MK.11.3~~ | ~~Chromecast sender via Media3's `CastPlayer`~~ — **DROPPED PERMANENTLY** (decision 2026-04-25). Default Cast receiver feasibility uncertain for IPTV streams (raw TS over HTTP with custom UA may not work without a Custom Web Receiver). User pattern: install YancoTV directly on every TV instead. Schema doesn't change so revisitable post-v1 if a new use case emerges | N/A in v1.0 |
+| ~~MK.11.3~~ | ~~Chromecast sender via Media3's `CastPlayer`~~ — **DROPPED 2026-04-25 → REVIVED 2026-06-15 as MK.26 Track B** (secondary/droppable). The feasibility concern was confirmed (needs Custom Web Receiver + server-side proxy, never zero-lag), so Cast is scoped to app-less Chromecasts, movies/series-first; the LAN handoff (Track A) is the primary path | MK.26 Track B |
 
 ---
 
@@ -606,9 +606,9 @@ Current `SettingsEpgTab` only wraps sync. TiviMate has ~15 display options; we w
 |---|---|---|---|
 | MK.18.1 | ~~"Open in external" action in MK.12 sheet — `Intent.ACTION_VIEW` with package hints for VLC / MX Player / Just Player; detect installed apps via `PackageManager`~~ — **DONE `f15ffb8`** (2026-04-24) | 🔴 new | ✅ |
 | MK.18.2 | Persist default external player per content-type (Live / Movie / Series) in prefs | 🟡 glue | Live defaults to VLC, VOD to internal (example); honored on next launch |
-| ~~MK.18.3~~ | ~~Chromecast sender via Media3 `CastPlayer`~~ — **DROPPED PERMANENTLY** (decision 2026-04-25). See MK.11.3 for full reasoning. Sheet's CAST tab is removed in Stage 5.5 (placeholder audit) | — | N/A in v1.0 |
-| ~~MK.18.4~~ | ~~DLNA / UPnP~~ — **DROPPED PERMANENTLY** (re-confirmed 2026-04-25). Built for stored media, not live streams; older smart TVs without Cast aren't a target | — | N/A |
-| ~~MK.18.5~~ | ~~Cross-device handoff~~ — **DEFERRED post-v1** (decision 2026-04-25). Requires either a cloud backend (out of scope) or LAN-only (loses home/away use case which is the only reason handoff is interesting). See "Post-v1 ideas register" above | — | N/A in v1.0 |
+| ~~MK.18.3~~ | ~~Chromecast sender via Media3 `CastPlayer`~~ — **DROPPED 2026-04-25 → REVIVED 2026-06-15 as MK.26 Track B** (secondary). See MK.11.3 + MK.26 | — | MK.26 Track B |
+| ~~MK.18.4~~ | ~~DLNA / UPnP~~ — **DROPPED PERMANENTLY** (re-confirmed 2026-04-25 **and again by 2026-06-15 red-team**: raw TS fails DLNA compliance, renderers reject live HLS, Fire TV has no renderer). Built for stored media, not live streams | — | N/A |
+| ~~MK.18.5~~ | ~~Cross-device handoff~~ — **DEFERRED 2026-04-25 → REVIVED 2026-06-15 as MK.26 Track A (PRIMARY)**, LAN-only "play on my TV" (no cloud → no GDPR). The away-case resume-continuity stays post-v1. See MK.26 | — | MK.26 Track A |
 
 ---
 
@@ -1138,10 +1138,10 @@ What survived and what got cut. Full reasoning captured in the 2026-04-24 planni
 - Cross-source user groups (MK.13.5) — phase 2
 - SOCKS proxy (MK.17.6) — phase 2
 - Connection profiles (MK.17) — phase 2
-- DLNA / UPnP (MK.18.4) — **DROPPED PERMANENTLY** (re-confirmed 2026-04-25)
-- Cross-device handoff (MK.18.5) — **DEFERRED post-v1 study** (2026-04-25)
+- DLNA / UPnP (MK.18.4) — **DROPPED PERMANENTLY** (re-confirmed 2026-04-25; reconfirmed by 2026-06-15 red-team)
+- Cross-device handoff (MK.18.5) — ~~**DEFERRED post-v1 study** (2026-04-25)~~ → **REVIVED 2026-06-15 → MK.26 Track A (primary)**
 - Custom hex accent (MK.16.3) — 4 presets only
-- Chromecast (MK.11.3 / MK.18.3) — **DROPPED PERMANENTLY** (2026-04-25)
+- Chromecast (MK.11.3 / MK.18.3) — ~~**DROPPED PERMANENTLY** (2026-04-25)~~ → **REVIVED 2026-06-15 → MK.26 Track B (secondary)**
 - TIF live-channels (MK.10.2) — **DEFERRED post-v1 study** (2026-04-25)
 
 **Ordering constraints** (deviate = rework):
@@ -1397,11 +1397,105 @@ Greenfield. Ship the ones that match the user's priorities. D.3 is genuinely 5�
 ### Out of scope for MK.25 (file as new MK if pursued)
 
 - **Volume / brightness gestures** for phone (MK.11.2 territory; not started).
-- **Chromecast / mirroring** — dropped permanently.
+- **Chromecast / mirroring** — ~~dropped permanently~~ → Chromecast revived 2026-06-15 as **MK.26 Track B**; mirroring stays out.
 - **Subtitle styling** (font, color, opacity) — separate concern; lives in subtitle stack not player UX.
 - **Picture-in-Picture** — MK.11.2.
 - **A-B repeat / loop region** — power-user feature; defer.
 - **Statistics overlay** (bitrate, codec, frame drops) — debug feature; file as MK.dev or similar.
+
+---
+
+## MK.26 — Cast to TV: LAN companion handoff (primary) + Google Cast (secondary) — planned 2026-06-15
+
+**Why now.** User asked for "stream to TV" parity — cast live TV, movies, and series to a TV — "the best, no lag, no mistakes." A two-workflow research + adversarial red-team pass (2026-06-14/15, 20 agents) established the hard constraints and **reverses the 2026-04-25 permanent-drop of Chromecast (MK.11.3 / MK.18.3) and revives the deferred cross-device handoff (MK.18.5)** — but with a different *primary* transport than originally assumed. Findings:
+
+- **Google Cast cannot carry YancoTV's live catalog without a server we operate.** The Cast Web Receiver is an HTTPS browser page: it silently drops `User-Agent`, can't set `Referer`, blocks cleartext `http://`, requires CORS providers don't send, treats AC-3/E-AC-3 as HDMI passthrough-only (silent video), and rejects HEVC-in-TS. Xtream live + timeshift are always raw MPEG-TS. So every nontrivial stream would have to route through a server-side transcode/remux proxy, and standard HLS is structurally **~10–20s behind live** regardless. "No lag" over Cast is physically impossible.
+- **Fire TV — the canonical device — is not a Cast receiver at all.** Amazon Fling reached end-of-support 2026-03-05; its successor Matter Casting is app-launch-only. No Google Cast path reaches Fire TV.
+- **The winning transport is a LAN companion handoff.** Because the user installs YancoTV on every TV, the phone can tell the YancoTV *already running on the TV* "play content X at position Y." The TV's own ExoPlayer fetches the original URL and plays it exactly as if opened locally — raw TS, AC-3, HEVC, `.mkv`, provider headers, cleartext, all of it — at **zero added lag** (the stream never relays through the phone). Two independent red-team agents confirmed this is the only zero-added-lag, all-content path. This is how Plex / Jellyfin / Kodi do "play on my TV."
+
+**Strategy.** Track A (handoff) is PRIMARY and ships standalone — it delivers the full ask (live + movies + series, zero lag) to every Fire TV / Android TV the user owns. Track B (Google Cast) is SECONDARY and droppable — it only adds reach to app-less Chromecasts the user doesn't control, movies/series-first, live as a costly/laggy stretch. The two tracks are independent; **B must not gate A.**
+
+**Accepted coverage gaps (do not paper over).**
+- Generic non-Cast smart TVs (Roku, older Samsung/LG without built-in Cast, dumb TVs) have **no app path** for live IPTV. Honest answer: a ~$35 Google TV / Fire stick running YancoTV (becomes the zero-lag handoff path), or the TV's own IPTV app. Do NOT ship cast-to-any-smart-TV.
+- Bare Chromecast: movies/series via Cast; live H.264-only at ~10–20s lag via the proxy; HEVC / AC-3 / `.mkv` need server-side transcode.
+
+### Read-the-file-first gates (CRITICAL)
+
+Before writing code in any slice, open the cited file and confirm the assumption.
+
+- **A.1** — `PlaybackController.kt:521` (`play(list, startIndex, fromStart)`) + `:568` (`play(episode, fromStart)`). The receiver maps a handoff envelope onto these EXACT calls — confirm signatures unchanged; reuse, don't fork.
+- **A.1 / A.4** — `PlaybackController.kt:849–865` (resume-read branch: `positionForEpisode(id)` / `positionFor(id)` return SECONDS, then `× 1000`). The envelope carries SECONDS; convert at the receiver boundary only. `episodes.duration` column unit is UNDOCUMENTED (bare INTEGER; `EpisodeInfo.duration:String?` vs `Episode.duration:Double?` disagree) — do NOT use it as a duration without verifying against the Xtream parser; prefer `watch_history.duration_seconds` / `player.duration`.
+- **A.4** — `PlaybackController.kt:245–269` (OkHttp UA/Referer interceptor) — these headers do NOT travel with a Cast load but MUST travel in the handoff envelope (handoff's whole edge). Confirm `currentSourceNet` staging at `:772–788`.
+- **A.4** — the 3-path `CleartextAllowlistInterceptor` (`AppModules.kt:83-92,111,131,214`) — confirm the receiver's player OkHttp seeds the allow-list from the handed-off host.
+- **B.1** — surfaces bind `playerView.player = controller.player` where `var player` is typed **`ExoPlayer`** (`PlaybackController.kt:198`), NOT the `Player` interface. Track B must widen this to `Player` so a `CastPlayer` can be swapped in — high-regression change against the mini↔theater + FFmpeg-rebuild paths just stabilized in 0.3.6–0.3.8. (Surface handoff is `setVideoSurface`/`clearVideoSurface` on the shared player, NOT `switchTargetView` — see `MiniPlayer.kt:66/76`, `PlayerActivity.kt:559/688`.) Read those first.
+- **B.1** — `YancoApp.kt:46-229` init order: any eager `CastContext` init MUST come after `startKoin` (`:94`) and be guarded by `GoogleApiAvailability` (Fire TV AFTDCT31 has no Play Services → eager init crashes at launch).
+- **B.x** — `themes.xml` — `MediaRouteButton` needs an AppCompat-parented theme. `PlayerActivity` has one (`PlayerTheme`, `:7`); `MainActivity` runs Material `Theme.YancoTV` (`:3`) — reparent or use a Compose MediaRouter affordance.
+
+### Slice scope ground rules
+
+- **One slice per session for A.1, A.2, B.1.** Highest blast radius (new service, discovery, player-type widening). Do not chain.
+- **Each slice ends with `:app:installDebug` green on Fire TV (AFTDCT31) + phone (HT74J0206349).** Manual smoke per DoD; logcat + user visual check (no `adb screencap` per project rule).
+- **One MK sub-task per commit.** File bugs in `bugs.md` starting **MB-231**.
+- **Track A ships fully before Track B starts.** They share only the `PlaybackController` seam.
+
+---
+
+### Track A — LAN companion handoff (PRIMARY)
+
+**Why first.** Delivers the entire requirement — live TV + movies + series, zero added lag — to every Fire TV / Android TV the user owns. No Cast SDK, no DRM, no proxy, no HTTPS host, no $5 registration. Revives MK.18.5 with a LAN-only design (no cloud → no GDPR surface).
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 26.A.1 | **Receiver play-service on the TV.** Bound/foreground in-app HTTP+WebSocket listener that accepts a play-command envelope `{schemaVersion, pairingToken, items[], startIndex, contentType, headers{ua,referer}, resumePositionSeconds, isLive}` and routes it to the EXISTING `PlaybackController.play(list, startIndex, fromStart)` / `play(episode)`. **Red team:** MUST route through the existing single `PlaybackController` Koin singleton — never instantiate a second ExoPlayer (one-player rule). Convert `resumePositionSeconds × 1000` at the boundary only. | new `HandoffReceiverService.kt` + envelope DTO in `shared/commonMain` | planned | Phone POSTs an envelope → TV starts playback at the right position. Test asserts no 2nd ExoPlayer is constructed. |
+| 26.A.2 | **Discovery + pairing.** `NsdManager` DNS-SD advertise `_yancotv._tcp` on the TV, browse on the phone; first-class **manual pairing fallback** (enter IP / 6-digit code) because router multicast suppression + Fire OS mDNS quirks are the #1 field failure. Optional DIAL/SSDP cold-launch to wake YancoTV on the TV if not running (launch + ≤4 KB payload only). **Red team:** reject Google Nearby Connections — it needs Play Services on BOTH ends; Fire OS has none. | new `HandoffDiscovery.kt` | planned | Phone lists reachable TVs by name; manual-IP path works on a multicast-suppressed AP. |
+| 26.A.3 | **Sender UI on phone.** "Play on [TV]" target picker in the player + content-detail surfaces; builds the envelope from `controller.currentItem` / `currentEpisode` + live position (`player.currentPosition` ms → seconds); surfaces connect/handoff errors. | new `HandoffTargetSheet.kt`; reads `PlaybackController` state | planned | From a playing item, pick a TV → it plays there from the same spot. Errors shown, never silent. |
+| 26.A.4 | **Header fidelity + credential safety.** UA/Referer ride in the envelope (Cast can't carry them — handoff's edge); receiver applies them to its player OkHttp + seeds the cleartext allow-list from the handed-off host; `redactCredentials` on every log/error/on-screen render of the URL; require `pairingToken` on every command; bind the listener to LAN only. | `HandoffReceiverService.kt`, cleartext interceptor seam | planned | Gated provider plays on the TV; logcat shows redacted URLs; unpaired peer is rejected. |
+| 26.A.5 | **Fire TV de-risk + threat-model addendum.** Device-test `NsdManager` advertise/browse on AFTDCT31 (no GMS); validate manual fallback + multicast-suppressed AP; add a `docs/security/AUDIT_NOTES.md` entry for "credentialed stream URL crosses the LAN to a paired peer" (parallel to MB-203 cleartext). | test/hardening + `docs/security/AUDIT_NOTES.md` | planned | Handoff verified on Fire TV; AUDIT_NOTES addendum merged. |
+
+**Rough effort: ~8–13 days (native tends to overrun — treat as a range, not a floor).**
+
+---
+
+### Track B — Google Cast (SECONDARY, droppable)
+
+**Why second / optional.** Only adds reach to app-less Chromecast / Google-TV devices the user does NOT control. Compromised: movies/series first; live needs a custom receiver + server-side proxy and is never zero-lag. Build only if real demand for casting to a bare Chromecast appears.
+
+| # | Task | Surface | Status | DoD |
+|---|---|---|---|---|
+| 26.B.1 | **CastPlayer wrap (movies/series, H.264/AAC `.mp4` only).** Bump `media3 1.5.1 → 1.10.x` (cast rewrite needs ≥ 1.9.0) — regression-test all 5 media3 artifacts; add `androidx.media3:media3-cast` + `com.google.android.gms:play-services-cast-framework:22.3.1`; wrap via `CastPlayer.Builder(ctx).setLocalPlayer(exoPlayer).build()`; widen `PlaybackController.player` `ExoPlayer → Player`; `OptionsProvider` meta-data + `GoogleApiAvailability` gate (dark on Fire TV). | `PlaybackController.kt`, `libs.versions.toml`, `build.gradle.kts`, `AndroidManifest.xml`, new `CastOptionsProvider.kt` | planned | On a Chromecast: an `.mp4` movie casts + resumes; on Fire TV the cast UI is absent (no crash). All local-playback paths (mini↔theater, zap, FFmpeg rebuild) regression-clean. |
+| 26.B.2 | **Custom Web Receiver + HTTPS/CORS proxy (VOD/series).** Register app ID ($5); HTTPS-host an HTML5 receiver bundling Shaka; proxy re-hosts cleartext over HTTPS, adds CORS, injects UA/Referer outbound. | server-side; custom `MediaItemConverter` for `customData` | planned | A gated/cleartext `.mp4` VOD casts via the custom receiver. |
+| 26.B.3 (STRETCH · GATED) | **Live-TS over Cast.** Proxy remux TS→HLS for H.264; fMP4 repackage for HEVC; AC-3→AAC transcode. Accept ~10–20s lag. Only if app-less-Chromecast live demand is real; cost scales with concurrent viewers. | server-side transcode infra | deferred | A raw-TS live channel casts (laggy) to a bare Chromecast. |
+
+**Rough effort: B.1 ~4–6 days; B.2 ~1–2 weeks (infra); B.3 ~2–4+ weeks + ongoing opex.**
+
+---
+
+### Recommended sequencing
+
+1. **A.1 → A.5** (Track A in full) — ships the primary, all-content, zero-lag feature to the user's fleet.
+2. **B.1 only as far as movies/series** — opportunistic Chromecast reach, behind a flag.
+3. **B.2 / B.3** — gate behind proven demand for bare-Chromecast casting; may never be worth the proxy opex.
+
+### Top risks
+
+- **R-A1 — router/AP multicast suppression kills NSD** (the #1 field failure) → ship manual IP/code pairing as a first-class path (A.2), not a fallback afterthought.
+- **R-A2 — Fire OS mDNS quirks** on AFTDCT31 (no GMS) → A.5 device-test gate before "done".
+- **R-A3 — one-ExoPlayer rule on the receiver** → route through the existing `PlaybackController` singleton; test asserts no 2nd player.
+- **R-A4 — seconds↔ms resume mismatch** → convert at the receiver boundary only; table-driven unit test (mirror `ResumePointDecisionTest`).
+- **R-A5 — open LAN listener leaks credentialed URLs** → pairing token on every command, LAN-only bind, `redactCredentials` everywhere; file MB-231 if review finds a gap.
+- **R-B1 — proxy = single point of failure + linear cost** → scope B to VOD/series first; gate live transcode.
+- **R-B2 — `Player`-type widening regresses local playback** → flag-guard B.1; full mini-player / zap / FFmpeg-rebuild regression before merge.
+- **R-B3 — AC-3 silence / HEVC-in-TS look "intermittent"** → capability-detect per stream; show an honest "not castable — use handoff" message, not a black screen.
+
+### Out of scope for MK.26 (file as MB-* / future MK if pursued)
+
+- **DLNA / UPnP** — stays DROPPED. Red-team reconfirmed: raw TS fails DLNA compliance, most renderers reject live HLS, Fire TV has no renderer — it doesn't even close the Fire TV gap.
+- **AirPlay / Miracast / screen-mirroring** — no production-viable Android sender; mirroring is last-resort only.
+- **Cast-to-arbitrary-smart-TV for live IPTV** — physically unreliable; the answer is a $35 stick or the TV's native app.
+- **Matter Casting to Fire TV** — app-launch only; ~native-app effort for no streaming gain.
+- **TV↔phone resume-continuity** (the *other* half of the old MK.18.5) — still post-v1; the away case needs a cloud backend.
+
+<!-- When done: add "✅ ALL MK.26 slices complete YYYY-MM-DD. Order shipped: A.1 → ..." File bugs in bugs.md as | MB-231 | Native | <Sev> | <summary> | **Open · planned** | 2026-06-15 | <ref> |. -->
 
 ---
 
@@ -1410,7 +1504,7 @@ Greenfield. Ship the ones that match the user's priorities. D.3 is genuinely 5�
 1. **Shared Kotlin is pure business logic.** No `android.*` imports in `commonMain/`. Platform-specific code goes in `androidMain/` / `iosMain/` via `expect`/`actual`.
 2. **SQLDelight is the only persistence surface for content, EPG, favorites, history.** No `SharedPreferences` / `DataStore` for content rows.
 3. **Credentials in Android Keystore (EncryptedSharedPreferences) / iOS Keychain.** Never plaintext.
-4. **One `ExoPlayer` instance** shared between mini-preview and fullscreen via `PlayerView.switchTargetView()`. Do not instantiate a second player.
+4. **One `ExoPlayer` instance** shared between mini-preview and fullscreen by swapping the output Surface on the single shared player — `setVideoSurface` / `clearVideoSurface` (symmetric both ways), NOT `PlayerView.switchTargetView()` (which the code does not use). Do not instantiate a second player. (MK.26 Track B's `CastPlayer` swap rides this same single-player invariant.)
 5. **Compose for TV uses `androidx.tv.material`** for focus + surfaces. Never reuse `material3` clickables as focus targets on TV.
 6. **`UiModeManager.UI_MODE_TYPE_TELEVISION`** is the TV detection source of truth. Don't use screen-size heuristics.
 7. **ViewModels live in `shared/`** exposing `StateFlow<T>`. Compose screens `collectAsState()`; SwiftUI binds via KMP-generated helpers.
@@ -1442,12 +1536,15 @@ iOS / iPadOS milestones (`MK.iOS.*`) remain a separate post-Android-v1.0 block �
 | RN app frozen, not deleted | Reference during rewrite; archive after Android ships | 2026-04-20 |
 | `@yancotv/core` TS stays as-is | Double-port cost (~2 weeks) cheaper than a cross-language build toolchain | 2026-04-20 |
 | **Sentry replaces Crashlytics on Android** (supersedes 2026-04-20 decision above) | Sentry has better KMP support, doesn't tie us to Firebase, works on desktop already so one platform fewer to learn. Crashlytics requires `google-services.json` and Firebase boot-up cost not worth it for a personal app | 2026-04-25 |
-| **Chromecast (MK.11.3 / MK.18.3) dropped permanently** | Default Cast receiver feasibility uncertain for IPTV streams (raw TS over HTTP with custom UA may not work). Custom Web Receiver is a separate project. User pattern: install YancoTV on every TV directly | 2026-04-25 |
+| **Chromecast (MK.11.3 / MK.18.3) dropped permanently** — **PARTIALLY REVERSED 2026-06-15** (→ MK.26 Track B) | Default Cast receiver feasibility uncertain for IPTV streams (raw TS over HTTP with custom UA may not work). Custom Web Receiver is a separate project. User pattern: install YancoTV on every TV directly. **2026-06-15:** concern CONFIRMED by red-team (raw TS / AC-3 / HEVC-in-TS / UA-gated / cleartext all fail the default receiver; needs custom receiver + server-side proxy, never zero-lag) — so Cast is revived only as a *secondary, droppable* transport for app-less Chromecasts, movies/series-first. See MK.26 + rows below | 2026-04-25 |
 | **TIF (MK.10.2) deferred to post-v1 study** | Fire TV doesn't support TIF (zero value on canonical test target); scope is `TvInputService` + parallel channel/program DB + EPG re-ingestion. Revisit only if Google TV becomes primary target | 2026-04-25 |
 | **DLNA / UPnP (MK.18.4) dropped permanently** | Built for stored media not live streams; many DLNA renderers reject HLS/MPEG-TS or transcode badly. Older smart TVs aren't a target audience | 2026-04-25 |
-| **Cross-device handoff (MK.18.5) deferred to post-v1 study** | Requires either a cloud backend (out of scope, GDPR implications) or LAN-only sync (loses home/away use case). Marginal value for live TV. Revisit only if cloud backend gets added for other reasons | 2026-04-25 |
+| **Cross-device handoff (MK.18.5) deferred to post-v1 study** — **REVERSED 2026-06-15** (→ MK.26 Track A, PRIMARY) | Requires either a cloud backend (out of scope, GDPR implications) or LAN-only sync (loses home/away use case). Marginal value for live TV. **2026-06-15:** the *phone→TV "play on my TV"* direction needs only LAN (no cloud → no GDPR) and red-team confirmed it's the only zero-added-lag, all-content path (incl. Fire TV) — so it's revived as the PRIMARY cast transport. The "marginal for live TV" note was wrong: handoff is the *best* live-TV path. The *TV↔phone resume-continuity* (away case) stays post-v1 | 2026-04-25 |
 | **No timeline / week estimates on the active plan** | Work proceeds at user's pace; sessions resume when rested. Estimates create false-precision pressure that doesn't match the actual cadence | 2026-04-25 |
 | **Definition-of-Done per Stage 3+ feature** (R8 + Sentry + TalkBack + D-pad + Fire TV soak + no-new-placeholders) | Avoids the regression-fixing tail at the end of v1.0. Catches reflection breakage, accessibility regressions, and stub-shipping inline as features land | 2026-04-25 |
 | **Schema migrations bundled into Stage 2** | Fragmenting migrations across features causes migration-A-vs-migration-B conflicts; one upgrade test pass over a single schema bump is safer | 2026-04-25 |
 | **MK.9 (FFmpeg) is Stage 1, not late-stage** | MB-14 leaves ~30% of streams audio-only; UX polish on broken playback is wasted. Risk-front-loading: if NDK / R8 keep rules / ABI splits go sideways, we want to know before stacking 6 features on top | 2026-04-25 |
 | **MK.14 Recording = HLS + MPEG-TS, both, in v1.0** (overrides 2026-04-24 phase-2 deferral of MPEG-TS) | "HLS-only recording" ships broken on Xtream catch-up which is mostly TS. Recording must work on the streams the user actually has, or it's not "complete" | 2026-04-25 |
+| **Cast-to-TV approved as MK.26 — reverses the 2026-04-25 Chromecast drop + handoff deferral** | Two research + adversarial red-team workflows (2026-06-14/15, 20 agents) established: Google Cast can't carry raw-TS / AC-3 / UA-gated / cleartext live without a server-side proxy and is never zero-lag; Fire TV isn't a Cast receiver (Fling EOL 2026-03-05, Matter Casting is app-launch-only); the LAN companion handoff to YancoTV-on-the-TV is zero-lag for ALL content. User wants live + movies + series cast | 2026-06-15 |
+| **LAN companion handoff is the PRIMARY cast transport (MK.26 Track A)** | Reuses the TV's native player — handles raw TS / AC-3 / HEVC / `.mkv` / headers / cleartext at zero added lag; LAN-only, no cloud, no GDPR. Matches the user's "install YancoTV on every TV" pattern. Google Cast is SECONDARY / droppable (MK.26 Track B) for app-less Chromecasts only | 2026-06-15 |
+| **Generic non-Cast smart TVs (Roku, old Samsung/LG, dumb TVs) are an accepted coverage gap** | No reliable Android-app path for live IPTV (not Cast receivers, no DLNA push for live TS, Android can't send AirPlay). Workaround: a ~$35 Google TV / Fire stick running YancoTV, or the TV's own IPTV app. DLNA stays dropped (reconfirmed by red-team) | 2026-06-15 |
