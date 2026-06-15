@@ -16,12 +16,8 @@ import com.google.android.gms.cast.framework.SessionProvider
  * transcode proxy (B.2/B.3, out of scope for the in-app integration).
  */
 class CastOptionsProvider : OptionsProvider {
-    override fun getCastOptions(context: Context): CastOptions =
-        CastOptions
-            .Builder()
-            // Default Media Receiver — registration-free.
-            .setReceiverApplicationId("CC1AD845")
-            .build()
+    // Default Media Receiver (CC1AD845) — registration-free, no Console reg.
+    override fun getCastOptions(context: Context): CastOptions = CastOptions.Builder().setReceiverApplicationId("CC1AD845").build()
 
     override fun getAdditionalSessionProviders(context: Context): List<SessionProvider>? = null
 }

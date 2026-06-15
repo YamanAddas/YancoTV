@@ -1092,6 +1092,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
     val prefs: AppPreferences = org.koin.compose.koinInject()
     val handoff: com.yancotv.shared.handoff.HandoffClient = org.koin.compose.koinInject()
     val sources: com.yancotv.shared.sources.SourceRepository = org.koin.compose.koinInject()
+    val castController: com.yancotv.android.cast.CastController = org.koin.compose.koinInject()
     val logger: com.yancotv.shared.logger.Logger = org.koin.compose.koinInject()
 
     val currentItem by controller.currentItem.collectAsState()
@@ -1181,7 +1182,9 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
         onPickOption()
     }
 
-    if (targets.isEmpty()) {
+    val castAvailable = castController.isAvailable()
+
+    if (targets.isEmpty() && !castAvailable) {
         EmptyLine(
             "Searching for your TV… open YancoTV on it, or set its address in Settings, under Network.",
         )
@@ -1194,6 +1197,21 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
             selected = false,
             focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = { send(target.host, target.port) },
+        )
+    }
+
+    // MK.26 Track B — cast to a bare Chromecast (a TV without YancoTV). Only
+    // when Google Play Services is present, so it's absent on Fire OS. The
+    // default receiver plays the VOD subset; failures surface on the TV.
+    if (castAvailable) {
+        OptionRow(
+            label = "Cast to Chromecast",
+            selected = false,
+            focusAnchor = if (targets.isEmpty()) firstRowAnchor else null,
+            onPick = {
+                castController.showDevicePicker(context)
+                onPickOption()
+            },
         )
     }
 }

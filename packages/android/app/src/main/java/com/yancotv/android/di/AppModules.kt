@@ -2,6 +2,7 @@ package com.yancotv.android.di
 
 import androidx.media3.common.util.UnstableApi
 import app.cash.sqldelight.db.SqlDriver
+import com.yancotv.android.cast.CastController
 import com.yancotv.android.logger.AndroidLogger
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.prefs.AppPreferences
@@ -234,6 +235,15 @@ val appModule =
                 // engine, so adding a Source updates all three paths
                 // simultaneously via the lambda-deferred lookup.
                 cleartextInterceptor = get(),
+            )
+        }
+        // MK.26 Track B — Google Cast controller. Gated behind Play Services
+        // (inert on Fire OS); the Chromecast is its own remote player.
+        single {
+            CastController(
+                appContext = androidContext(),
+                controller = get(),
+                logger = get(),
             )
         }
         single {
