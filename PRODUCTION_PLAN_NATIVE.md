@@ -1590,7 +1590,41 @@ segment is *unbuildable*, and seekability doesn't require it):
 **Mandatory de-risk before building Piece 1:** an on-device probe — serve a *static, fully-pre-transcoded*
 short VOD `.m3u8` (full `#EXTINF` + `#EXT-X-ENDLIST`, `-c:v copy` segments) from the Ktor route and confirm
 on a real Chromecast/Google TV that the Default Receiver shows a working scrubber + seek. Isolates "is the
-manifest theory right" from "does on-demand work." Effort: **large**.
+manifest theory right" from "does on-demand work." Effort: **large**. ✅ DONE 2026-06-16 — proven on
+"Yaman's Google TV": complete VOD playlist gives scrubber + seek + resume + reverse-continuity.
+
+#### Status 2026-06-16 — Piece 1 attempt #1 (continuous-head) shipped to phone, then RED-TEAMED as unsound for long movies. PICK UP HERE NEXT SESSION.
+
+**What's on the phone now** (`CastProxy.kt`, uncommitted→committed this session): a *fast-start* variant that
+**deviates from the keyframe-map design above**. It takes `durationMs` from the local player (no probe →
+instant start), hand-authors a **FIXED 4s grid** playlist, and produces segments with a single **continuous
+`-c:v copy -hls_time 4 -copyts` head** that input-seeks to the play offset; a seek relaunches the head; a
+lead-cap stops/resumes it; eviction keeps a window around the play position. User-tested: **fast start ✅,
+no crash ✅, seek ✅, playback "between smooth and stutter."**
+
+**Red-team verdict (28-agent workflow, 8 confirmed findings)** — the fixed grid is **fundamentally unsound in
+copy mode**, and this is the root of the stutter + would fail the *3–4 hr movie* requirement:
+- **#1 (root):** `-c:v copy` can only cut on the source's **keyframes** (movies: ~6–10s GOP), so real
+  segments are ~GOP-length while the playlist declares 4s. The error **accumulates** (scrubber vs picture
+  drift) and the **segment count mismatches** (playlist lists `dur/4`, head emits `dur/GOP`) → playback
+  breaks near the end of long movies. Short / frequent-keyframe clips mostly mask it (why the test "worked").
+- **#2/#7:** every lead-cap resume relaunches with `-ss + -copyts` → keyframe-snapped **PTS overlap** at the
+  seam, no `#EXT-X-DISCONTINUITY` → a hitch every ~2.5 min.
+- **#6/#8:** lead-cap enforced only on request (head freewheels → disk spike when receiver pauses); eviction
+  centers on non-monotonic `lastReqSeg` (back-seek yanks the forward buffer + cancels the head early).
+
+**Fixed + committed this session (safe, no-architecture-change):** cold-start concurrency race (CREATED-vs-
+RUNNING → coverage now keyed off `headBase`); serve-vs-evict TOCTOU (read bytes before evict, guard read);
+`seg_*.ts.tmp` leak (swept on relaunch).
+
+**CONFIRMED NEXT STEP — implement the keyframe-map design above (Piece 1 as originally specified):** FFprobe
+the real keyframe timestamps → author **variable `#EXTINF` = keyframe gaps** so segment N ↔ media time is
+exact and the count matches → relaunch/cut **only on keyframe boundaries** (clean seams, no drift). The only
+cost is the probe in the start path; **minimize it** — run it in parallel with warming the first segment +
+show a brief "Preparing…", and **measure on the user's real provider** (the earlier 9.5s was archive.org +
+a now-removed *duration* probe; duration comes from the player, so it's a single keyframe probe). The user's
+dealbreaker is the *minutes-long* wait, not a couple seconds. Fold the deferred #6/#8 fixes into this rewrite
+(`-readrate`/`-t` to bound the producer; monotonic play-frontier for lead + eviction).
 
 ### Out of scope for MK.26 (file as MB-* / future MK if pursued)
 

@@ -221,6 +221,10 @@ class CastController(
         // Applied as a receiver-side seek via setCurrentTime — now that the proxy
         // serves a complete VOD playlist (MK.26.B.3) the receiver actually honors it.
         val resumeMs = if (item.type == ContentType.LIVE) 0L else controller.player.currentPosition.coerceAtLeast(0L)
+        // The local player already knows the VOD length — hand it to the proxy so it
+        // can author a complete seekable playlist with NO probe (fast start). 0 (or
+        // C.TIME_UNSET, coerced) means unknown → the proxy probes as a fallback.
+        val durationMs = if (item.type == ContentType.LIVE) 0L else controller.player.duration.coerceAtLeast(0L)
         controller.player.pause()
         scope.launch {
             // Resolve the provider headers the same way the local player does.
@@ -232,7 +236,7 @@ class CastController(
             val isLive = item.type == ContentType.LIVE
             // ffmpeg remux/transcode -> HLS the Default Receiver can play.
             val proxyUrl =
-                when (val outcome = proxy.start(url, ua, referer, isLive)) {
+                when (val outcome = proxy.start(url, ua, referer, isLive, durationMs)) {
                     is CastProxyOutcome.Ready -> outcome.url
                     CastProxyOutcome.NoNetwork -> {
                         logger.warn("Cast: no Wi-Fi address to serve ${item.id}")
@@ -251,7 +255,7 @@ class CastController(
                 }
             val request =
                 MediaLoadRequestData.Builder()
-                    .setMediaInfo(buildMediaInfo(item, proxyUrl))
+                    .setMediaInfo(buildMediaInfo(item, proxyUrl, durationMs))
                     .setAutoplay(true)
                     .apply { if (resumeMs > 0L) setCurrentTime(resumeMs) }
                     .build()
@@ -311,20 +315,23 @@ class CastController(
             .onFailure { logger.warn("Cast: couldn't resume local playback — ${it.message}") }
     }
 
-    private fun buildMediaInfo(item: ContentItem, contentUrl: String): MediaInfo {
+    private fun buildMediaInfo(item: ContentItem, contentUrl: String, durationMs: Long): MediaInfo {
         val metadata =
             MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
                 putString(MediaMetadata.KEY_TITLE, item.displayTitle)
                 item.displayLogoUrl?.takeIf { it.isNotBlank() }?.let { addImage(WebImage(Uri.parse(it))) }
             }
-        val streamType =
-            if (item.type == ContentType.LIVE) MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED
+        val isLive = item.type == ContentType.LIVE
+        val streamType = if (isLive) MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED
         return MediaInfo
             .Builder(contentUrl)
             .setStreamType(streamType)
             // The proxy always serves HLS.
             .setContentType("application/x-mpegurl")
             .setMetadata(metadata)
+            // Hand the receiver the known VOD length up front (ms) so the scrubber +
+            // duration show immediately, alongside the complete VOD playlist.
+            .apply { if (!isLive && durationMs > 0L) setStreamDuration(durationMs) }
             .build()
     }
 }
