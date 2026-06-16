@@ -4,12 +4,15 @@ import android.content.Context
 import android.net.Uri
 import androidx.media3.common.util.UnstableApi
 import androidx.mediarouter.app.MediaRouteChooserDialog
+import com.google.android.gms.cast.Cast
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
+import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.images.WebImage
@@ -68,6 +71,48 @@ class CastController(
      */
     val sessionState: StateFlow<CastSessionState> = _sessionState.asStateFlow()
 
+    // Last receiver position (ms), tracked continuously while casting so a remote
+    // BACK — which stops the receiver WITHOUT ending the Cast session — can still
+    // resume local playback at the right spot (by the time the user taps Stop, the
+    // receiver has dropped its position).
+    @Volatile private var lastCastPositionMs = 0L
+
+    private fun currentClient(): RemoteMediaClient? = castContext?.sessionManager?.currentCastSession?.remoteMediaClient
+
+    private val progressListener =
+        RemoteMediaClient.ProgressListener { positionMs, _ -> if (positionMs > 0L) lastCastPositionMs = positionMs }
+
+    // The receiver stopped (remote BACK / finished) but the session is still
+    // connected — tear the overlay down + resume local instead of leaving the phone
+    // stuck on "Casting…" until the user manually taps Stop.
+    private val mediaCallback =
+        object : RemoteMediaClient.Callback() {
+            override fun onStatusUpdated() {
+                val status = currentClient()?.mediaStatus
+                val state = status?.playerState ?: MediaStatus.PLAYER_STATE_UNKNOWN
+                // Media finished or the receiver went idle → auto-clear + resume.
+                // (NOTE: the TV remote's BACK button sends NO event at all — confirmed
+                // via logcat — so it can't be auto-cleared; use the phone's Stop.)
+                // Only act while we believe we're casting, so a stray pre-load /
+                // transition update can't tear down a healthy session.
+                val stopped = status == null || state == MediaStatus.PLAYER_STATE_IDLE
+                if (stopped && _sessionState.value is CastSessionState.Active) {
+                    endCast()
+                }
+            }
+        }
+
+    // Fires when the receiver APPLICATION goes away — including dismissing the
+    // Default Receiver with the TV's own BACK button, which (confirmed via logcat)
+    // sends NO media/session event. This is the only signal for that case.
+    private val castListener =
+        object : Cast.Listener() {
+            override fun onApplicationDisconnected(statusCode: Int) {
+                logger.info("Cast: application disconnected status=$statusCode")
+                endCast()
+            }
+        }
+
     /** True only where Google Play Services is present (never on Fire OS). */
     fun isAvailable(): Boolean = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext) == ConnectionResult.SUCCESS
 
@@ -113,7 +158,9 @@ class CastController(
 
             override fun onSessionResumeFailed(session: CastSession, error: Int) = endCast()
 
-            override fun onSessionSuspended(session: CastSession, reason: Int) {}
+            override fun onSessionSuspended(session: CastSession, reason: Int) {
+                logger.info("Cast: session suspended reason=$reason")
+            }
         }
 
     // All SessionManagerListener callbacks fire on the main thread.
@@ -125,20 +172,38 @@ class CastController(
         // nothing touches the CastSession off-main (that IllegalStateException
         // crash only surfaced once the proxy started succeeding).
         val deviceName = session.castDevice?.friendlyName ?: "your TV"
+        runCatching { session.addCastListener(castListener) }
         _sessionState.value = CastSessionState.Active(deviceName)
         loadCurrent(session, deviceName)
     }
 
     /**
      * Session ended / failed: stop the proxy, clear the casting state so the
-     * overlay hides, and resume the local player we paused on cast start. All
-     * three are idempotent, so calling this from ending+ended (or a start-fail
-     * where nothing was paused) is safe.
+     * overlay hides, and resume the local player — CONTINUING where the cast left
+     * off, not where it started. Reads the receiver's last position (best-effort:
+     * the session may be tearing down) and seeks the local player there so playback
+     * is continuous both ways. All idempotent (safe from ending+ended / start-fail).
      */
     private fun endCast() {
+        // Prefer the continuously-tracked position (it survives a receiver-side stop
+        // where a live read would already be gone); fall back to a live read.
+        val resumeMs =
+            lastCastPositionMs.takeIf { it > 0L }
+                ?: runCatching { currentClient()?.approximateStreamPosition ?: 0L }.getOrDefault(0L)
+        lastCastPositionMs = 0L
+        runCatching {
+            currentClient()?.let {
+                it.removeProgressListener(progressListener)
+                it.unregisterCallback(mediaCallback)
+            }
+        }
+        runCatching { castContext?.sessionManager?.currentCastSession?.removeCastListener(castListener) }
         proxy.stop()
         _sessionState.value = CastSessionState.Idle
-        runCatching { controller.player.play() }
+        runCatching {
+            if (resumeMs > 0L) controller.player.seekTo(resumeMs)
+            controller.player.play()
+        }
     }
 
     /** Stop button on the casting overlay: end the session (→ [endCast]). */
@@ -152,6 +217,10 @@ class CastController(
     private fun loadCurrent(session: CastSession, deviceName: String) {
         val item = controller.currentItem.value ?: return
         val url = item.streamUrl.takeIf { it.isNotBlank() } ?: return
+        // Resume position (ms), captured on the MAIN thread (ExoPlayer is main-only).
+        // Applied as a receiver-side seek via setCurrentTime — now that the proxy
+        // serves a complete VOD playlist (MK.26.B.3) the receiver actually honors it.
+        val resumeMs = if (item.type == ContentType.LIVE) 0L else controller.player.currentPosition.coerceAtLeast(0L)
         controller.player.pause()
         scope.launch {
             // Resolve the provider headers the same way the local player does.
@@ -181,7 +250,11 @@ class CastController(
                     }
                 }
             val request =
-                MediaLoadRequestData.Builder().setMediaInfo(buildMediaInfo(item, proxyUrl)).setAutoplay(true).build()
+                MediaLoadRequestData.Builder()
+                    .setMediaInfo(buildMediaInfo(item, proxyUrl))
+                    .setAutoplay(true)
+                    .apply { if (resumeMs > 0L) setCurrentTime(resumeMs) }
+                    .build()
             withContext(Dispatchers.Main) {
                 val client = session.remoteMediaClient
                 if (client == null) {
@@ -195,7 +268,15 @@ class CastController(
                     // HEVC until Phase 2) resolves ASYNC here and does NOT throw.
                     // Cover both the sync throw (onFailure) and the async reject.
                     client.load(request).setResultCallback { result ->
-                        if (!result.status.isSuccess) {
+                        if (result.status.isSuccess) {
+                            // Track the receiver position + watch for a receiver-side
+                            // stop (remote BACK) so the phone overlay + local resume
+                            // stay in sync with the TV.
+                            runCatching {
+                                client.registerCallback(mediaCallback)
+                                client.addProgressListener(progressListener, 1_000L)
+                            }
+                        } else {
                             logger.warn("Cast: receiver rejected media — status ${result.status.statusCode}")
                             failCast(castFailedMessage(deviceName))
                         }

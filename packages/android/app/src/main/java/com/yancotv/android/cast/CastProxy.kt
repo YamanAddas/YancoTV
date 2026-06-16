@@ -69,21 +69,19 @@ class CastProxy(private val context: Context, private val logger: Logger) {
             return CastProxyOutcome.NotReady
         }
 
-        // Wait for ffmpeg to write the first playlist before handing the URL to
-        // the Chromecast (otherwise it 404s master.m3u8). VOD needs longer: a
-        // non-faststart MP4 (moov atom at the END) makes ffmpeg read far into the
-        // file before it can emit the first segment. Bounded; start() runs on
-        // Dispatchers.IO (CastController), so the blocking wait is fine.
-        val timeout = if (isLive) LIVE_READY_TIMEOUT_MS else VOD_READY_TIMEOUT_MS
-        if (!awaitMaster(master, timeout)) {
-            // ffmpeg may have run fine but not produced master.m3u8 where we look.
-            // Dump what it actually wrote so the cause is unambiguous (e.g. a
-            // leftover master.m3u8.tmp = temp_file rename issue, or only seg_*.ts
-            // = playlist deferred / written elsewhere).
+        // LIVE: hand the URL over as soon as the first segment + playlist exist.
+        // VOD (MK.26.B.3 probe): wait for ffmpeg to FINISH so master.m3u8 is a
+        // COMPLETE VOD playlist (#EXT-X-PLAYLIST-TYPE:VOD + real keyframe #EXTINF +
+        // #EXT-X-ENDLIST). The Default Receiver decides VOD-vs-LIVE solely by
+        // ENDLIST, so only a finished playlist gives a scrubber + seek + resume.
+        // The full-transcode wait is short-clip-only and is removed by Piece 1
+        // (hand-authored playlist + on-demand segments).
+        val ready = if (isLive) awaitMaster(master, LIVE_READY_TIMEOUT_MS) else awaitComplete(master, VOD_COMPLETE_TIMEOUT_MS)
+        if (!ready) {
             val listing =
                 runCatching { outDir.listFiles()?.joinToString(", ") { "${it.name}=${it.length()}B" } ?: "<null>" }
                     .getOrElse { "<list error: ${it.message}>" }
-            logger.warn("CastProxy: master.m3u8 not ready within ${timeout}ms. outDir=[$listing]")
+            logger.warn("CastProxy: playlist not ready (isLive=$isLive). outDir=[$listing]")
             stop()
             return CastProxyOutcome.NotReady
         }
@@ -128,15 +126,14 @@ class CastProxy(private val context: Context, private val logger: Logger) {
             if (isLive) {
                 listOf("-hls_list_size", "6", "-hls_flags", "delete_segments+omit_endlist")
             } else {
-                // VOD: EVENT playlist. It is written incrementally (unlike "vod",
-                // which ffmpeg defers to finalize so master.m3u8 never appeared)
-                // AND the receiver starts at the FIRST segment, not the live edge.
-                // ffmpeg is left to race ahead (no -re) so the receiver gets a deep
-                // buffer and doesn't starve mid-stream — under realtime pacing it
-                // stalled (BUFFERING, buffered=0): audio-only, video never rendered.
-                // Keeps every segment (list_size 0). Disk grows for long movies — a
-                // sliding window / readrate pacing is a follow-up.
-                listOf("-hls_list_size", "0", "-hls_playlist_type", "event")
+                // VOD (MK.26.B.3 probe): a "vod" playlist makes ffmpeg write the
+                // segments now and finalize master.m3u8 with #EXT-X-PLAYLIST-TYPE:VOD
+                // + real keyframe #EXTINF + #EXT-X-ENDLIST when it finishes. start()
+                // waits for that finish (awaitComplete) so the Default Receiver — which
+                // decides VOD-vs-LIVE solely by ENDLIST — gives a scrubber + seek +
+                // resume. (Piece 1 replaces this with a hand-authored playlist +
+                // on-demand segments to drop the full-transcode wait.)
+                listOf("-hls_list_size", "0", "-hls_playlist_type", "vod")
             }
         args += listOf("-hls_segment_filename", File(outDir, "seg_%05d.ts").absolutePath)
         args += master.absolutePath
@@ -232,12 +229,33 @@ class CastProxy(private val context: Context, private val logger: Logger) {
     private fun playlistReady(master: File): Boolean =
         master.exists() && runCatching { master.readText().contains(".ts") }.getOrDefault(false)
 
+    // VOD probe: block until ffmpeg ENDS and master.m3u8 holds a COMPLETE vod
+    // playlist (#EXT-X-ENDLIST present). This waits out the whole transcode — short
+    // clips only; Piece 1's hand-authored playlist + on-demand segments removes it.
+    private fun awaitComplete(master: File, timeoutMs: Long): Boolean {
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end) {
+            when (session?.state) {
+                SessionState.COMPLETED ->
+                    return master.exists() &&
+                        runCatching { master.readText().contains("#EXT-X-ENDLIST") }.getOrDefault(false)
+                SessionState.FAILED -> return false
+                else -> Thread.sleep(POLL_MS)
+            }
+        }
+        return false
+    }
+
     companion object {
         const val DEFAULT_PORT: Int = 8732
         private const val STOP_GRACE_MS = 200L
         private const val STOP_TIMEOUT_MS = 500L
         private const val LIVE_READY_TIMEOUT_MS = 15_000L
-        private const val VOD_READY_TIMEOUT_MS = 25_000L
+
+        // VOD probe waits for the FULL transcode to finish (a short clip races
+        // through at many ×realtime). 3 min covers ~10-15 min clips; long movies
+        // time out (probe = short clips). Piece 1 removes the wait entirely.
+        private const val VOD_COMPLETE_TIMEOUT_MS = 180_000L
 
         // Poll the cache file every 50ms (was 200ms) — a cheap stat that trims up
         // to ~150ms of slack off the playlist-ready wait.
