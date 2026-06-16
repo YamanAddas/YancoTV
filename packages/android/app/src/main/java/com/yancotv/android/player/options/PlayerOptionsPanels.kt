@@ -173,7 +173,11 @@ fun PlayerOptionsPanelHost(
                             PlayerOptionCategory.EXTERNAL ->
                                 ExternalPanelContent(controller, onPickOption)
                             PlayerOptionCategory.PLAY_ON_TV ->
-                                PlayOnTvPanelContent(controller, onPickOption)
+                                // Cast/handoff are terminal — fully dismiss the
+                                // whole options UI (onDismiss), not one panel
+                                // level (onPickOption), or the root menu pops
+                                // back up and strands the user (MB-233).
+                                PlayOnTvPanelContent(controller, onDismiss)
                             PlayerOptionCategory.SUBTITLE_SEARCH ->
                                 SubtitleSearchPanelContent(controller, onPickOption)
                         }
@@ -1086,7 +1090,7 @@ private fun ExternalPanelContent(controller: PlaybackController, onPickOption: (
 
 @UnstableApi
 @Composable
-private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
+private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs: AppPreferences = org.koin.compose.koinInject()
@@ -1138,6 +1142,13 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
         }
 
     fun send(host: String, port: Int) {
+        // The send runs on the panel's composition scope, which stays alive
+        // while the options popup is up — so do the POST first and dismiss the
+        // UI only once it completes (dismissing clears activePanel, which
+        // removes this panel and cancels the scope). That fixes the stuck menu
+        // (MB-233): the menu auto-clears after the send instead of lingering
+        // until system BACK, and on success the sender player closes (the
+        // stream is on the TV) rather than leaving a paused frame behind it.
         scope.launch(Dispatchers.IO) {
             val code = prefs.readHandoffPairingCode()
             if (code.isNullOrBlank()) {
@@ -1148,6 +1159,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
                             "Enter your TV's pairing code in Settings, under Network.",
                             android.widget.Toast.LENGTH_LONG,
                         ).show()
+                    onDismissAll()
                 }
                 return@launch
             }
@@ -1164,8 +1176,9 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
                     item = handoffItem.copy(userAgent = ua, referer = referer),
                     resumePositionSeconds = resumeSeconds,
                 )
+            val result = handoff.play(host, port, command)
             val message =
-                when (val result = handoff.play(host, port, command)) {
+                when (result) {
                     is com.yancotv.shared.handoff.HandoffSendResult.Accepted ->
                         "Playing on your TV"
                     is com.yancotv.shared.handoff.HandoffSendResult.Rejected ->
@@ -1177,9 +1190,12 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
                 android.widget.Toast
                     .makeText(context, message, android.widget.Toast.LENGTH_LONG)
                     .show()
+                onDismissAll()
+                if (result is com.yancotv.shared.handoff.HandoffSendResult.Accepted) {
+                    (context as? android.app.Activity)?.finish()
+                }
             }
         }
-        onPickOption()
     }
 
     val castAvailable = castController.isAvailable()
@@ -1209,8 +1225,10 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onPickOption: (
             selected = false,
             focusAnchor = if (targets.isEmpty()) firstRowAnchor else null,
             onPick = {
+                // Fully dismiss the options UI BEFORE the system cast chooser
+                // so it can't lurk behind / after the chooser (MB-233).
+                onDismissAll()
                 castController.showDevicePicker(context)
-                onPickOption()
             },
         )
     }
