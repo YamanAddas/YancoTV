@@ -188,7 +188,9 @@ class HandoffReceiverService : Service() {
      * the user to open the app — de-risk item for A.5.
      */
     private fun surfaceFullscreenPlayer() {
-        runCatching { PlayerLauncher.launch(this) }
+        // forceInternal: a handoff must play on THIS TV's own player and keep the
+        // provider UA/Referer overrides, never bounce to a configured external app.
+        runCatching { PlayerLauncher.launch(this, forceInternal = true) }
             .onFailure { logger.warn("Handoff: couldn't surface the player — ${it.message}") }
     }
 

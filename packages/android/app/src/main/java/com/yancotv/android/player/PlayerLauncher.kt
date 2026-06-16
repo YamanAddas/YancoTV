@@ -12,10 +12,16 @@ import org.koin.core.context.GlobalContext
  * In-process launcher for [PlayerActivity]. The shared [PlaybackController]
  * owns the queue + URL; this just opens the fullscreen surface on top.
  * Call `controller.play(list, index)` first, then invoke this.
+ *
+ * [forceInternal] bypasses the external-player short-circuit. The LAN handoff
+ * path sets it: "Play on TV" means play on THIS TV's own player, and the
+ * handoff carries provider User-Agent/Referer overrides that only the internal
+ * player applies — bouncing to a configured VLC/MX would drop those headers and
+ * break header-gated streams (release-audit HRS-5).
  */
 @UnstableApi
 object PlayerLauncher {
-    fun launch(ctx: Context) {
+    fun launch(ctx: Context, forceInternal: Boolean = false) {
         val koin = runCatching { GlobalContext.get() }.getOrNull()
         val controller = runCatching { koin?.get<PlaybackController>() }.getOrNull()
         val prefs = runCatching { koin?.get<AppPreferences>() }.getOrNull()
@@ -29,7 +35,7 @@ object PlayerLauncher {
         val streamUrl = current?.streamUrl?.takeIf { it.isNotBlank() }
         val choice = prefs?.externalPlayerFlow?.value?.forContentType(current?.type ?: ContentType.MOVIE)
         val app = choice?.app
-        if (current != null && streamUrl != null && choice != DefaultExternalPlayer.INTERNAL && app != null) {
+        if (!forceInternal && current != null && streamUrl != null && choice != DefaultExternalPlayer.INTERNAL && app != null) {
             val installed = ExternalPlayer.installed(ctx).contains(app)
             if (installed) {
                 val isLive = current.type == ContentType.LIVE

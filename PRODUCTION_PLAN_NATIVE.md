@@ -1570,11 +1570,13 @@ of ship-with-caveats items. Shipped this pass:
 - **Version → 1.2.0** (`versionCode 8`), `bugs.md` banner refreshed, `AUDIT_NOTES` entry for the new
   LAN handoff network surface.
 
+**Receiver forces the internal player (fixed in the polish pass, was deferred):**
+`PlayerLauncher.launch` gained a `forceInternal` flag and `surfaceFullscreenPlayer()` passes it, so a
+handoff always plays on this TV's own player and keeps the provider UA/Referer overrides instead of
+bouncing to a user-configured external app (which would drop the headers — release-audit HRS-5).
+
 **Deferred to MK.26 Phase 2 / later (documented, not blocking a release):**
 
-- **Receiver routes through `PlayerLauncher`** — `surfaceFullscreenPlayer()` calls
-  `PlayerLauncher.launch`, which honours the external-player short-circuit; a handoff should force the
-  *internal* player. Low impact (default config plays internally) but wrong-in-principle.
 - **Handoff resume-position fidelity** — the sender's exact position is carried in the outcome but not
   seeked-to (A.3 scope, still open).
 - **HEVC over Cast** — `CastProxy` copies HEVC video; fails on the Default Receiver until the Phase-2
