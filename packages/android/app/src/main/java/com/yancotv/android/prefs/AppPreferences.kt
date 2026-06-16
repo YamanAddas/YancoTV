@@ -2,7 +2,7 @@ package com.yancotv.android.prefs
 
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.types.ContentType
-import kotlin.random.Random
+import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -292,7 +292,10 @@ class AppPreferences(private val db: YancoDb) {
      */
     suspend fun getOrGenerateHandoffPairingCode(): String {
         readHandoffPairingCode()?.let { return it }
-        val code = (1..6).map { PAIRING_ALPHABET[Random.nextInt(PAIRING_ALPHABET.length)] }.joinToString("")
+        // Cryptographic RNG: the pairing code is the sole auth secret for the
+        // LAN handoff receiver, so it must not be predictable from kotlin.random.
+        val rng = SecureRandom()
+        val code = (1..6).map { PAIRING_ALPHABET[rng.nextInt(PAIRING_ALPHABET.length)] }.joinToString("")
         setHandoffPairingCode(code)
         return code
     }

@@ -213,14 +213,24 @@ class HandoffReceiverService : Service() {
 
     private fun startForegroundIfNeeded() {
         val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        // Android 14+ enforces runtime prerequisites on a mediaPlayback FGS and
+        // can throw ForegroundServiceStartNotAllowedException / a type-specific
+        // SecurityException at startForeground (Google TV / newer Android TV run
+        // API 34+). Degrade gracefully instead of crashing — the receiver is
+        // simply unavailable there until A.5 attaches a MediaSession.
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        }.onFailure {
+            logger.error("Handoff: startForeground failed — ${it.message}; stopping receiver")
+            runCatching { stopSelf() }
         }
     }
 

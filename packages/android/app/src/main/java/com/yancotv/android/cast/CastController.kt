@@ -120,16 +120,51 @@ class CastController(
             val proxyUrl = proxy.start(url, ua, referer, isLive)
             if (proxyUrl == null) {
                 logger.warn("Cast: proxy unavailable — cannot cast ${item.id}")
+                withContext(Dispatchers.Main) { failCast("Couldn't cast — check your Wi-Fi connection.") }
                 return@launch
             }
             val request =
                 MediaLoadRequestData.Builder().setMediaInfo(buildMediaInfo(item, proxyUrl)).setAutoplay(true).build()
             withContext(Dispatchers.Main) {
-                runCatching { session.remoteMediaClient?.load(request) }
-                    .onFailure { logger.warn("Cast: load failed — ${it.message}") }
+                val client = session.remoteMediaClient
+                if (client == null) {
+                    logger.warn("Cast: no RemoteMediaClient on session")
+                    failCast(castFailedMessage(session))
+                    return@withContext
+                }
+                runCatching {
+                    // load() returns a PendingResult: a receiver-side rejection
+                    // (the Default Receiver can't decode the proxied stream — e.g.
+                    // HEVC until Phase 2) resolves ASYNC here and does NOT throw.
+                    // Cover both the sync throw (onFailure) and the async reject.
+                    client.load(request).setResultCallback { result ->
+                        if (!result.status.isSuccess) {
+                            logger.warn("Cast: receiver rejected media — status ${result.status.statusCode}")
+                            failCast(castFailedMessage(session))
+                        }
+                    }
+                }.onFailure {
+                    logger.warn("Cast: load failed — ${it.message}")
+                    failCast(castFailedMessage(session))
+                }
             }
             logger.info("Cast: proxying ${item.id} to ${session.castDevice?.friendlyName}")
         }
+    }
+
+    private fun castFailedMessage(session: CastSession): String = "Couldn't cast this stream to ${session.castDevice?.friendlyName ?: "your TV"}."
+
+    /**
+     * Main-thread only. A cast attempt didn't take — tell the user AND resume the
+     * local player we paused in [loadCurrent]. Without the resume the phone is
+     * left on a frozen frame with no way back but a manual tap (audit CAST-1/2).
+     * Safe on every failure path: nothing is playing on the receiver (the load
+     * never succeeded), so there is no double-playback.
+     */
+    private fun failCast(message: String) {
+        android.widget.Toast.makeText(appContext, message, android.widget.Toast.LENGTH_LONG).show()
+        runCatching { controller.player.play() }
+            .onFailure { logger.warn("Cast: couldn't resume local playback — ${it.message}") }
     }
 
     private fun buildMediaInfo(item: ContentItem, contentUrl: String): MediaInfo {

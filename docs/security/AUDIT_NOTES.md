@@ -135,6 +135,32 @@ Phase 2.4 consolidated three "Hardcoded localhost URL in source" matches (in `sr
 
 The constant is intentionally a string literal — it's read by the Electron main process to load the Vite dev server, and the value is well-known per Vite's defaults. There's no production exposure: production builds use `mainWindow.loadFile(...)` and never touch this URL.
 
+### MK.26 — LAN companion-handoff receiver (new network surface)
+
+| Field | Value |
+|---|---|
+| Severity | Medium |
+| Source | Self-documented (proactive — ahead of next yancoxplorer rescan) |
+| File | `packages/android/app/src/main/java/com/yancotv/android/handoff/HandoffReceiverService.kt`, `HandoffServer.kt` |
+| Decision | **Accepted — mitigated by pairing-code auth** |
+| Decided | 2026-06-15 |
+| References | [project_cast_mk26](../../PRODUCTION_PLAN_NATIVE.md) (MK.26 Track A), `AppPreferences.getOrGenerateHandoffPairingCode` |
+
+**What it is:**
+
+MK.26 Track A adds an embedded Ktor (CIO) HTTP server on a fixed LAN port inside `HandoffReceiverService`, advertised over NSD so a phone can discover the TV and POST a `HandoffPlayCommand` (stream URL + provider `User-Agent` / `Referer` + a pairing token). The TV plays the handed-off stream on its single shared player. This is a new inbound network surface that did not exist before MK.26.
+
+**Why accepted:**
+
+- **Auth gate.** Every command is validated against the TV's own pairing code — a 6-char code from a 32-symbol alphabet (`SecureRandom`-generated as of the 2026-06-15 polish; ~30 bits) persisted per device. A missing code rejects with `UNAUTHORIZED` rather than falling through to an unauthenticated path (`HandoffReceiverService.handlePlay`). The phone must echo the exact code, set out-of-band by the user.
+- **Bounded blast radius.** The command flow is inbound-only: it tells the TV *what to play*. It carries no path that returns the TV's stored provider credentials to the caller, so a successful command cannot exfiltrate secrets — worst case an on-LAN attacker who has the pairing code makes the TV play a URL of their choosing.
+- **Same trust boundary as the existing cleartext decision.** Traffic is plain HTTP on the local network, consistent with — and no worse than — the already-accepted [`mobile.readiness.cleartext`](#mobilereadinesscleartext47a0a49d--cleartext-traffic-enabled-globally) entry. The handoff client uses a dedicated Ktor client deliberately exempt from the cleartext allow-list (it talks to user-paired TVs, not provider hosts).
+
+**Residual risk / what would change the decision:**
+
+- A ~30-bit code is resistant to casual guessing but not to a determined on-LAN brute-force. If the threat model ever extends to hostile actors already on the user's LAN, raise the code entropy and/or add rate-limiting + lockout on repeated `UNAUTHORIZED` rejects on the receiver.
+- The on-device `CastProxy` (Track B) serves remuxed HLS on the LAN for the duration of a cast; it injects provider headers server-side and is reachable by any LAN host while active. It carries the media bytes, not the provider credentials. Tracked as a Phase-2 hardening item if the cast feature graduates from secondary status.
+
 ---
 
 ## How to use this file in a rescan

@@ -1549,6 +1549,44 @@ opposite of today's simultaneous-pane cascade. The existing `PanelFocus` enum
 → 27.B (the big navigator — the selector request) → 27.E → 27.F. 27.B is the largest and most
 invasive (shell + cascade-nav); do it on its own with the smoke test.
 
+### Release-polish pass (2026-06-15)
+
+Final pre-release sweep before tagging the Cast/handoff build as the new app version. A 4-agent
+release-readiness audit found exactly **one hard blocker** (the R8 release-build failure) plus a set
+of ship-with-caveats items. Shipped this pass:
+
+- **R8 release blocker (THE gate)** — the embedded Ktor server (`io.ktor.util.debug.IntellijIdeaDebugDetector`)
+  references JVM-only `java.lang.management.*`; `:app:minifyReleaseWithR8` aborted on the missing
+  classes. Fixed with `-dontwarn` rules in `proguard-rules.pro`. `assembleRelease` now green.
+- **Cast-failure feedback** — `CastController.loadCurrent` showed nothing on the phone when a cast
+  failed. Now toasts on every failure path — proxy-unavailable, null `RemoteMediaClient`, a
+  synchronous `load()` throw, **and** the async receiver-side rejection (the common case — `load()`
+  returns a `PendingResult` that does not throw, so this needed a `setResultCallback`; caught in the
+  release-blocker audit, CAST-1). Each path also resumes the local player it paused, so a failed cast
+  doesn't strand the phone on a frozen frame (CAST-2).
+- **Receiver `startForeground` hardened** — wrapped in `runCatching` so an Android-14+ `mediaPlayback`
+  FGS prerequisite failure degrades (stop receiver) instead of crashing the app.
+- **`SecureRandom` pairing code** — handoff pairing code was `kotlin.random.Random`; now cryptographic.
+- **Version → 1.2.0** (`versionCode 8`), `bugs.md` banner refreshed, `AUDIT_NOTES` entry for the new
+  LAN handoff network surface.
+
+**Deferred to MK.26 Phase 2 / later (documented, not blocking a release):**
+
+- **Receiver routes through `PlayerLauncher`** — `surfaceFullscreenPlayer()` calls
+  `PlayerLauncher.launch`, which honours the external-player short-circuit; a handoff should force the
+  *internal* player. Low impact (default config plays internally) but wrong-in-principle.
+- **Handoff resume-position fidelity** — the sender's exact position is carried in the outcome but not
+  seeked-to (A.3 scope, still open).
+- **HEVC over Cast** — `CastProxy` copies HEVC video; fails on the Default Receiver until the Phase-2
+  hardware transcode.
+- **`CastProxy` LAN-bind robustness** — binds on the Wi-Fi IPv4; no retry/fallback if the interface
+  flaps mid-cast.
+- **Chrome-behind-popup / `YancoTheme(isTv=false)` for the options popup** — already tracked under 27.A.
+
+**Release gate (NOT shipped — user action):** `MB-230` / `MB-229` Critical heap items remain Open. The
+new on-device ffmpeg cast proxy adds memory pressure; run a **1+ hour Fire TV soak** with casting
+exercised before tagging 1.2.0 as the published build.
+
 ---
 
 ## Timeline
