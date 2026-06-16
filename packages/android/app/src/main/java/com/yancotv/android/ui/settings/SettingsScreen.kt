@@ -2,7 +2,6 @@ package com.yancotv.android.ui.settings
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -42,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -553,16 +551,11 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
     val labelColor =
         if (focused || selected) palette.TextPrimary else palette.TextSecondary
     val borderColor = if (focused) palette.FocusRing else Color.Transparent
-    // MK.22.B.3: previously this shadow popped 0 → 18 dp instantly while
-    // the scale tweened smoothly over 200 ms — visual mismatch read as
-    // "row scales smoothly, halo flashes." Tween the elevation on the
-    // same curve as the scale so the focus transition lands as one
-    // motion. animateDpAsState shares the scale tween's 200 ms duration.
-    val shadowElevation by animateDpAsState(
-        targetValue = if (focused) 18.dp else 0.dp,
-        animationSpec = tween(durationMillis = 200),
-        label = "tabShadow",
-    )
+    // 2026-06-15 — dropped the `.shadow(18dp, …)` focus halo: its elevation
+    // shadow rendered as a dark horizontal band THROUGH the row's translucent
+    // green fill (≈30% darker, full-width, at the vertical centre — the
+    // "annoying black line" the user reported). The focus state still reads
+    // clearly from the accent border + brighter `rowBrush` + 1.04 scale.
 
     Box(
         modifier =
@@ -573,17 +566,6 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
                 scaleX = scale
                 scaleY = scale
             }
-            // Soft accent halo on focus — colored shadow gives the
-            // design's "1.5dp ring + 28px halo" feel without a manual
-            // glow layer. Spot/ambient colors render colored on
-            // API 28+; on older builds it falls back to a neutral
-            // shadow which is still a useful focus cue.
-            .shadow(
-                elevation = shadowElevation,
-                shape = shape,
-                ambientColor = palette.AccentGlow,
-                spotColor = palette.AccentGlow,
-            )
             .clip(shape)
             .background(rowBrush)
             .border(
