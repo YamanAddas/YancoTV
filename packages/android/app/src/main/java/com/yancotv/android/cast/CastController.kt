@@ -22,6 +22,9 @@ import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -54,6 +57,17 @@ class CastController(
     private var castContext: CastContext? = null
     private var registered = false
 
+    private val _sessionState = MutableStateFlow<CastSessionState>(CastSessionState.Idle)
+
+    /**
+     * Active while a Cast session is connected. The phone player observes this
+     * and shows a "Casting to <device>" overlay (with a Stop control) instead of
+     * the frozen, locally-paused video frame. Stays [CastSessionState.Idle]
+     * forever where Cast is unavailable (no Play Services), so the overlay never
+     * appears there.
+     */
+    val sessionState: StateFlow<CastSessionState> = _sessionState.asStateFlow()
+
     /** True only where Google Play Services is present (never on Fire OS). */
     fun isAvailable(): Boolean = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext) == ConnectionResult.SUCCESS
 
@@ -83,24 +97,50 @@ class CastController(
 
     private val sessionListener =
         object : SessionManagerListener<CastSession> {
-            override fun onSessionStarted(session: CastSession, sessionId: String) = loadCurrent(session)
+            override fun onSessionStarted(session: CastSession, sessionId: String) = startCast(session)
 
-            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = loadCurrent(session)
+            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = startCast(session)
 
             override fun onSessionStarting(session: CastSession) {}
 
-            override fun onSessionStartFailed(session: CastSession, error: Int) {}
+            override fun onSessionStartFailed(session: CastSession, error: Int) = endCast()
 
-            override fun onSessionEnding(session: CastSession) = proxy.stop()
+            override fun onSessionEnding(session: CastSession) = endCast()
 
-            override fun onSessionEnded(session: CastSession, error: Int) = proxy.stop()
+            override fun onSessionEnded(session: CastSession, error: Int) = endCast()
 
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
 
-            override fun onSessionResumeFailed(session: CastSession, error: Int) {}
+            override fun onSessionResumeFailed(session: CastSession, error: Int) = endCast()
 
             override fun onSessionSuspended(session: CastSession, reason: Int) {}
         }
+
+    // All SessionManagerListener callbacks fire on the main thread.
+
+    /** Session connected: surface the casting state, then load the current item. */
+    private fun startCast(session: CastSession) {
+        _sessionState.value = CastSessionState.Active(session.castDevice?.friendlyName ?: "your TV")
+        loadCurrent(session)
+    }
+
+    /**
+     * Session ended / failed: stop the proxy, clear the casting state so the
+     * overlay hides, and resume the local player we paused on cast start. All
+     * three are idempotent, so calling this from ending+ended (or a start-fail
+     * where nothing was paused) is safe.
+     */
+    private fun endCast() {
+        proxy.stop()
+        _sessionState.value = CastSessionState.Idle
+        runCatching { controller.player.play() }
+    }
+
+    /** Stop button on the casting overlay: end the session (→ [endCast]). */
+    fun stopCasting() {
+        runCatching { castContext?.sessionManager?.endCurrentSession(true) }
+            .onFailure { logger.warn("Cast: stop failed — ${it.message}") }
+    }
 
     // onSessionStarted fires on the main thread; pause the local player there,
     // then do the header lookup + proxy spin-up off-main and load on main.
@@ -163,6 +203,10 @@ class CastController(
      */
     private fun failCast(message: String) {
         android.widget.Toast.makeText(appContext, message, android.widget.Toast.LENGTH_LONG).show()
+        // The media didn't load, so drop the casting overlay and hand the user
+        // back their local playback rather than a "Casting…" screen with nothing
+        // on the TV.
+        _sessionState.value = CastSessionState.Idle
         runCatching { controller.player.play() }
             .onFailure { logger.warn("Cast: couldn't resume local playback — ${it.message}") }
     }
@@ -183,4 +227,11 @@ class CastController(
             .setMetadata(metadata)
             .build()
     }
+}
+
+/** Phone-side cast UI state — drives the player's "Casting to <device>" overlay. */
+sealed interface CastSessionState {
+    data object Idle : CastSessionState
+
+    data class Active(val deviceName: String) : CastSessionState
 }

@@ -128,6 +128,7 @@ class PlayerActivity : AppCompatActivity() {
     private val recordings: com.yancotv.shared.recording.RecordingsRepository by inject()
     private val favoritesRepo: com.yancotv.shared.favorites.FavoritesRepository by inject()
     private val contentRepo: com.yancotv.shared.content.ContentRepository by inject()
+    private val castController: com.yancotv.android.cast.CastController by inject()
     // Guard against re-entering autoplay during the small STATE_ENDED → next
     // episode prepare window where ExoPlayer can fire ENDED a second time.
     // Reset whenever a new MediaItem starts (STATE_READY).
@@ -207,6 +208,12 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var moreButton: android.widget.ImageButton
     private lateinit var castButton: android.widget.ImageButton
     private lateinit var topActions: View
+
+    // MK.26.B — Chromecast sender state overlay. Covers the locally-paused video
+    // with a "Casting to <device>" card + Stop while a Cast session is active.
+    private lateinit var castOverlay: View
+    private lateinit var castOverlayDevice: android.widget.TextView
+    private lateinit var castOverlayStop: View
 
     // Phone single-tap → surface controls. The player is D-pad-first; without
     // this a touchscreen tap does nothing for VOD (the Compose dock is
@@ -472,6 +479,10 @@ class PlayerActivity : AppCompatActivity() {
         castButton.setOnClickListener {
             openPlayerOptions(com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV)
         }
+        castOverlay = findViewById(R.id.cast_overlay)
+        castOverlayDevice = findViewById(R.id.cast_overlay_device)
+        castOverlayStop = findViewById(R.id.cast_overlay_stop)
+        castOverlayStop.setOnClickListener { castController.stopCasting() }
         // The Back button shares the top-start corner with the zap bar on
         // live; nudge the zap bar right (phone only) so they don't overlap.
         // Form factor is fixed at runtime, so do it once.
@@ -543,6 +554,30 @@ class PlayerActivity : AppCompatActivity() {
                     attachShared()
                 }
             }
+        }
+        // MK.26.B — show the casting overlay while a Cast session is active so the
+        // phone isn't left on a frozen, locally-paused frame. Inert where Cast is
+        // unavailable (sessionState never leaves Idle).
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                castController.sessionState.collect { applyCastOverlay(it) }
+            }
+        }
+    }
+
+    /**
+     * MK.26.B — reflect [com.yancotv.android.cast.CastController.sessionState] on
+     * screen. Active covers the paused video with the full-screen "Casting to
+     * <device>" overlay; Idle hides it. The overlay is GONE in XML, so this is the
+     * only thing that surfaces it.
+     */
+    private fun applyCastOverlay(state: com.yancotv.android.cast.CastSessionState) {
+        when (state) {
+            is com.yancotv.android.cast.CastSessionState.Active -> {
+                castOverlayDevice.text = state.deviceName
+                castOverlay.visibility = View.VISIBLE
+            }
+            com.yancotv.android.cast.CastSessionState.Idle -> castOverlay.visibility = View.GONE
         }
     }
 

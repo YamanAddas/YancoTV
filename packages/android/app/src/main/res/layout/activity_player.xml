@@ -434,4 +434,70 @@
         android:inflatedId="@+id/vod_chrome"
         android:layout="@layout/player_vod_chrome" />
 
+    <!-- MK.26.B — Chromecast sender state. While a Cast session is active the
+         local player is paused (no double-playback), so instead of leaving the
+         phone on a frozen frame this covers it with a "Casting to <device>"
+         card + a Stop control. Topmost child so it sits over everything.
+         clickable=true so taps don't fall through to the player beneath. GONE
+         by default; PlayerActivity shows it only while CastController.sessionState
+         is Active — so it never appears where Cast is unavailable. -->
+    <LinearLayout
+        android:id="@+id/cast_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#E6000000"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_player_cast"
+            android:contentDescription="@null"
+            android:alpha="0.92" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Casting"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/cast_overlay_device"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:gravity="center"
+            android:textColor="#FFB9C4CF"
+            android:textSize="15sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/cast_overlay_stop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Stop casting"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:letterSpacing="0.04"
+            android:background="@drawable/player_overlay_pill"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:focusable="true"
+            android:focusableInTouchMode="false" />
+    </LinearLayout>
+
 </FrameLayout>
