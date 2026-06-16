@@ -1547,6 +1547,51 @@ feature is secondary/droppable so weighted accordingly):
   that doesn't exist; only helps the https+no-headers+H.264/AAC minority, since IPTV is mostly
   gated/cleartext that must keep the proxy); ffmpeg native-lib pre-warm; subtitle/multi-audio passthrough.
 
+### MK.26.B.3 — seekable + resumable cast (correct architecture) — designed 2026-06-16
+
+Supersedes **MB-240** (resume) and the cast-seek work. A research workflow (Plex/Jellyfin/Emby + Google
+Cast docs + red-team of our proxy) established the **definitive root cause** and the correct design.
+
+**Root cause (confirmed against Google's spec):** the Default Media Receiver decides VOD-vs-LIVE *solely*
+by the presence of `#EXT-X-ENDLIST` — it explicitly ignores `#EXT-X-PLAYLIST-TYPE`. Our proxy runs ffmpeg
+with `-hls_playlist_type event`, which **never writes ENDLIST** while encoding, and races the encode ahead
+with no finite EXTINF sum. So the receiver classifies the cast as **LIVE**: duration = -1, no scrubber,
+`COMMAND_SEEK` withheld → `RemoteMediaClient.seek`/`setCurrentTime` are genuine no-ops (not sender bugs),
+and a live stream loads at segment 0 (no resume). That one fact produced *all three* symptoms. (The earlier
+`-ss`+`-c:v copy` stall was an orthogonal copy-seek/keyframe issue.) Every prior cast "fix" was a band-aid
+on a live-shaped manifest.
+
+**How real apps do it:** "manifest-first VOD HLS + on-demand segments." They do NOT let ffmpeg author the
+playlist — they hand-write a complete VOD media playlist up front from the known runtime (full `#EXTINF`
+list + `#EXT-X-PLAYLIST-TYPE:VOD` + `#EXT-X-ENDLIST`), so it's finite + seekable instantly; segments are
+transcoded lazily when the receiver GETs them. Seek == "receiver requests a far-ahead segment → server
+transcodes from that offset"; resume == "load with `currentTime=N`". Custom receivers exist only for
+branding/auth — the **Default Receiver seeks fine on a proper VOD manifest** (no Cast Console registration
+needed).
+
+**The architecture for us** (keep Default Receiver + `-c:v copy`; we vendor the non-GPL `main-tls`
+ffmpeg-kit fork which has **no libx264** and no reliable `h264_mediacodec` encoder → re-encoding every
+segment is *unbuildable*, and seekability doesn't require it):
+- **Piece 0 (ships first, small):** **direct-cast** the `CastStreamClassifier` REMUX subset (H.264+AAC,
+  natively-playable container) — skip the proxy, load the *original* URL with `setStreamDuration` +
+  `setCurrentTime(resumeMs)`. Native seek/resume/scrub, zero phone CPU.
+- **Piece 1 (load-bearing):** manifest-first VOD HLS with **copy-safe keyframe segments** for streams that
+  must be repackaged: (1) **FFprobe** for duration + the real video **keyframe timestamps**; (2) hand-author
+  `master.m3u8` in Kotlin — VOD + ENDLIST, **variable `#EXTINF` equal to the real keyframe gaps** (so
+  `-c:v copy` cuts land exactly on keyframes — no desync); serve *that*, never ffmpeg's file; (3) on a GET
+  for an uncached `seg_N`, spawn a bounded `ffmpeg -ss kf[N] -i url -t (kf[N+1]-kf[N]) -c:v copy -c:a aac
+  -copyts -avoid_negative_ts make_zero -output_ts_offset kf[N] -f mpegts` → cache (LRU) + a 2-3 concurrency
+  semaphore; (4) `setStreamDuration`; (5) resume + the overlay seek bar now work via `setCurrentTime`/
+  `RemoteMediaClient.seek` for free. Replaces the single-session proxy with a small process pool
+  (coordinate with **MB-235**).
+- **Piece 2 (deferred, dependency-gated):** re-encode for HEVC — only when a fork with libx264 / verified
+  `h264_mediacodec` is swapped in. Until then HEVC stays MIRROR.
+
+**Mandatory de-risk before building Piece 1:** an on-device probe — serve a *static, fully-pre-transcoded*
+short VOD `.m3u8` (full `#EXTINF` + `#EXT-X-ENDLIST`, `-c:v copy` segments) from the Ktor route and confirm
+on a real Chromecast/Google TV that the Default Receiver shows a working scrubber + seek. Isolates "is the
+manifest theory right" from "does on-demand work." Effort: **large**.
+
 ### Out of scope for MK.26 (file as MB-* / future MK if pursued)
 
 - **DLNA / UPnP** — stays DROPPED. Red-team reconfirmed: raw TS fails DLNA compliance, most renderers reject live HLS, Fire TV has no renderer — it doesn't even close the Fire TV gap.
