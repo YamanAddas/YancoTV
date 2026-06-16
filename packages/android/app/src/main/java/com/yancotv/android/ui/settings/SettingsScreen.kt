@@ -120,11 +120,12 @@ enum class SettingsTab(val label: String, val icon: ImageVector) {
 // it doesn't clash with the emerald gradient.
 private val OnAccentInk: Color = Color(0xFF04130C)
 
-// MK.27.C — below this available width the TV two-pane Settings (380dp sidebar
-// + content) squeezes the content pane to an unreadable sliver on a phone, so
-// collapse to a single-pane master/detail below it. ~600dp keeps the two-pane
-// on tablets / landscape phones / TV.
-private val COMPACT_SETTINGS_WIDTH = 600.dp
+// MK.27.C — phone-class threshold (Android's sw600dp). Below it a PHONE gets the
+// single-pane Settings in BOTH orientations; tablets (sw ≥ 600) and TVs keep the
+// two-pane. smallestScreenWidthDp is orientation-independent, so a landscape
+// phone (wide, but sw ≈ 411) still collapses — which the old slot-width check
+// missed (a landscape phone's slot is huge → it fell into the two-pane).
+private const val COMPACT_SETTINGS_SW_DP = 600
 
 /**
  * Settings entry. Branches on the available width: a phone (compact) gets a
@@ -134,8 +135,15 @@ private val COMPACT_SETTINGS_WIDTH = 600.dp
 @UnstableApi
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
-    androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        if (maxWidth < COMPACT_SETTINGS_WIDTH) {
+    // Keyed off FORM FACTOR, not the slot width: a landscape phone is wide but
+    // still wants the focused tab full-screen, so a width breakpoint missed it.
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    val isTv =
+        (config.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+    val singlePane = config.smallestScreenWidthDp < COMPACT_SETTINGS_SW_DP && !isTv
+    Box(modifier = modifier.fillMaxSize()) {
+        if (singlePane) {
             SettingsPhoneLayout(initialTab = initialTab, onExit = onExitToMainSidebar)
         } else {
             SettingsTwoPaneLayout(initialTab = initialTab, onExitToMainSidebar = onExitToMainSidebar)
