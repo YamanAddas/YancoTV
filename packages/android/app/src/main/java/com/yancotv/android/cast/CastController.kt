@@ -2,6 +2,7 @@ package com.yancotv.android.cast
 
 import android.content.Context
 import android.net.Uri
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.mediarouter.app.MediaRouteChooserDialog
 import com.google.android.gms.cast.Cast
@@ -225,37 +226,64 @@ class CastController(
         // can author a complete seekable playlist with NO probe (fast start). 0 (or
         // C.TIME_UNSET, coerced) means unknown → the proxy probes as a fallback.
         val durationMs = if (item.type == ContentType.LIVE) 0L else controller.player.duration.coerceAtLeast(0L)
+        // Codecs of what's playing locally, read on the MAIN thread — they decide
+        // whether this stream can be DIRECT-cast (Tier 0: the receiver fetches + seeks
+        // the original URL itself, no proxy) vs needs the repackaging proxy (Tier 1).
+        val videoMime = if (item.type == ContentType.LIVE) null else controller.player.videoFormat?.sampleMimeType
+        val audioMime = if (item.type == ContentType.LIVE) null else controller.player.audioFormat?.sampleMimeType
         controller.player.pause()
         scope.launch {
-            // Resolve the provider headers the same way the local player does.
             val src = runCatching { sources.getById(item.sourceId) }.getOrNull()
-            val ua =
-                src?.userAgent?.takeIf { it.isNotBlank() }
-                    ?: prefs.networkFlow.value.userAgentOverride?.takeIf { it.isNotBlank() }
-            val referer = src?.referer?.takeIf { it.isNotBlank() }
+            // The SOURCE's own headers (not the global UA fallback). A header-gated
+            // provider can't be direct-cast — the receiver can't send custom headers.
+            val srcUa = src?.userAgent?.takeIf { it.isNotBlank() }
+            val srcReferer = src?.referer?.takeIf { it.isNotBlank() }
             val isLive = item.type == ContentType.LIVE
-            // ffmpeg remux/transcode -> HLS the Default Receiver can play.
-            val proxyUrl =
-                when (val outcome = proxy.start(url, ua, referer, isLive, durationMs)) {
-                    is CastProxyOutcome.Ready -> outcome.url
-                    CastProxyOutcome.NoNetwork -> {
-                        logger.warn("Cast: no Wi-Fi address to serve ${item.id}")
-                        withContext(Dispatchers.Main) {
-                            failCast("Couldn't cast — make sure the phone is on the same Wi-Fi as the TV.")
+
+            // ── Tier 0: DIRECT-CAST (no proxy) ────────────────────────────────
+            // H.264 + AAC in an MP4 over HTTPS with no provider headers is exactly
+            // what the Default Media Receiver plays natively — hand it the ORIGINAL
+            // URL and it fetches + seeks via HTTP Range itself: native scrubber +
+            // resume, zero phone CPU, no transcode, no drift. (Conservative: unknown
+            // codecs fall through to the proxy.)
+            val directCast =
+                !isLive &&
+                    videoMime == MimeTypes.VIDEO_H264 &&
+                    audioMime == MimeTypes.AUDIO_AAC &&
+                    url.startsWith("https://", ignoreCase = true) &&
+                    looksLikeMp4(url) &&
+                    srcUa == null &&
+                    srcReferer == null
+
+            val mediaInfo =
+                if (directCast) {
+                    logger.info("Cast: direct-cast (no proxy) ${item.id} to $deviceName")
+                    buildMediaInfo(item, url, durationMs, "video/mp4")
+                } else {
+                    // Tier 1: the repackaging proxy (ffmpeg -> HLS + provider headers +
+                    // CORS) for header-gated / cleartext / raw-TS / AC-3 / unknown.
+                    val ua = srcUa ?: prefs.networkFlow.value.userAgentOverride?.takeIf { it.isNotBlank() }
+                    when (val outcome = proxy.start(url, ua, srcReferer, isLive, durationMs)) {
+                        is CastProxyOutcome.Ready -> buildMediaInfo(item, outcome.url, durationMs, "application/x-mpegurl")
+                        CastProxyOutcome.NoNetwork -> {
+                            logger.warn("Cast: no Wi-Fi address to serve ${item.id}")
+                            withContext(Dispatchers.Main) {
+                                failCast("Couldn't cast — make sure the phone is on the same Wi-Fi as the TV.")
+                            }
+                            return@launch
                         }
-                        return@launch
-                    }
-                    CastProxyOutcome.NotReady -> {
-                        logger.warn("Cast: proxy couldn't prepare ${item.id} for casting")
-                        withContext(Dispatchers.Main) {
-                            failCast("Couldn't prepare this video for casting — it may be an unsupported format (e.g. HEVC).")
+                        CastProxyOutcome.NotReady -> {
+                            logger.warn("Cast: proxy couldn't prepare ${item.id} for casting")
+                            withContext(Dispatchers.Main) {
+                                failCast("Couldn't prepare this video for casting — it may be an unsupported format (e.g. HEVC).")
+                            }
+                            return@launch
                         }
-                        return@launch
                     }
                 }
             val request =
                 MediaLoadRequestData.Builder()
-                    .setMediaInfo(buildMediaInfo(item, proxyUrl, durationMs))
+                    .setMediaInfo(mediaInfo)
                     .setAutoplay(true)
                     .apply { if (resumeMs > 0L) setCurrentTime(resumeMs) }
                     .build()
@@ -267,21 +295,21 @@ class CastController(
                     return@withContext
                 }
                 runCatching {
-                    // load() returns a PendingResult: a receiver-side rejection
-                    // (the Default Receiver can't decode the proxied stream — e.g.
-                    // HEVC until Phase 2) resolves ASYNC here and does NOT throw.
-                    // Cover both the sync throw (onFailure) and the async reject.
+                    // load() returns a PendingResult resolved ASYNC. Distinguish the
+                    // CASES (status code 2002 = CANCELED is a sender-side lifecycle
+                    // outcome — NOT a media reject; a real reject is 2100 + a
+                    // mediaError.detailedErrorCode). Log both so failures are diagnosable.
                     client.load(request).setResultCallback { result ->
                         if (result.status.isSuccess) {
-                            // Track the receiver position + watch for a receiver-side
-                            // stop (remote BACK) so the phone overlay + local resume
-                            // stay in sync with the TV.
                             runCatching {
                                 client.registerCallback(mediaCallback)
                                 client.addProgressListener(progressListener, 1_000L)
                             }
                         } else {
-                            logger.warn("Cast: receiver rejected media — status ${result.status.statusCode}")
+                            logger.warn(
+                                "Cast: load not OK — status=${result.status.statusCode} " +
+                                    "detailedError=${runCatching { result.mediaError?.detailedErrorCode }.getOrNull()}",
+                            )
                             failCast(castFailedMessage(deviceName))
                         }
                     }
@@ -290,8 +318,14 @@ class CastController(
                     failCast(castFailedMessage(deviceName))
                 }
             }
-            logger.info("Cast: proxying ${item.id} to $deviceName")
+            logger.info("Cast: loaded ${item.id} to $deviceName (direct=$directCast)")
         }
+    }
+
+    /** A direct-castable progressive container (the receiver plays MP4 natively). */
+    private fun looksLikeMp4(url: String): Boolean {
+        val path = url.substringBefore('?').substringBefore('#').lowercase(java.util.Locale.ROOT)
+        return path.endsWith(".mp4") || path.endsWith(".m4v")
     }
 
     private fun castFailedMessage(deviceName: String): String = "Couldn't cast this stream to $deviceName."
@@ -315,7 +349,7 @@ class CastController(
             .onFailure { logger.warn("Cast: couldn't resume local playback — ${it.message}") }
     }
 
-    private fun buildMediaInfo(item: ContentItem, contentUrl: String, durationMs: Long): MediaInfo {
+    private fun buildMediaInfo(item: ContentItem, contentUrl: String, durationMs: Long, contentType: String): MediaInfo {
         val metadata =
             MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
                 putString(MediaMetadata.KEY_TITLE, item.displayTitle)
@@ -326,11 +360,12 @@ class CastController(
         return MediaInfo
             .Builder(contentUrl)
             .setStreamType(streamType)
-            // The proxy always serves HLS.
-            .setContentType("application/x-mpegurl")
+            // "video/mp4" for a direct-cast progressive file; "application/x-mpegurl" for
+            // the proxy's HLS. The receiver uses this to pick its player.
+            .setContentType(contentType)
             .setMetadata(metadata)
             // Hand the receiver the known VOD length up front (ms) so the scrubber +
-            // duration show immediately, alongside the complete VOD playlist.
+            // duration show immediately.
             .apply { if (!isLive && durationMs > 0L) setStreamDuration(durationMs) }
             .build()
     }

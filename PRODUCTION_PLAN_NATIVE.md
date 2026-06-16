@@ -1626,6 +1626,41 @@ a now-removed *duration* probe; duration comes from the player, so it's a single
 dealbreaker is the *minutes-long* wait, not a couple seconds. Fold the deferred #6/#8 fixes into this rewrite
 (`-readrate`/`-t` to bound the producer; monotonic play-frontier for lead + eviction).
 
+#### BREAKTHROUGH 2026-06-16 (later) — two-tier: Piece 0 DIRECT-CAST shipped + works; the proxy is the narrow fallback.
+
+After the keyframe-map manifest proved correct but the proxy SEGMENT engine hit wall after wall (HLS muxer with
+`-c:v copy` ignores `-hls_time` and cuts at EVERY keyframe → fixed-grid drift; per-keyframe boundaries → segments
+too small, receiver won't play; segment muxer `-segment_times` ignored → 103s first segment; per-segment extraction
+→ "status 2002"), a 5-agent research workflow (web + Jellyfin/Plex source) settled it:
+- **"status 2002" = `CastStatusCodes.CANCELED` (SENDER-side), NOT a receiver media reject.** A real reject is
+  `2100` (FAILED) + a `MediaError.detailedErrorCode` (905 LOAD_FAILED / 316 HLS_SEGMENT_PARSING / 412 …). Default
+  sender load timeout is 0, so a slow segment does NOT trip it. We had been MISDIAGNOSING every proxy failure
+  because `CastController` only logged `status.statusCode`, never `mediaError.detailedErrorCode` — now fixed.
+- **The manifest side (keyframe-derived variable-`#EXTINF` complete VOD playlist) is already the Jellyfin/Plex
+  model and is CORRECT.** Their `ComputeSegments` derives EXTINF FROM probed keyframes (never a fixed grid) — our
+  `keyframeBoundaries()` already does this. The drift was the fixed grid; the keyframe version is sound.
+- **The right architecture is DIRECT-CAST-FIRST.** For H.264 + AAC in `.mp4` over **https** with no provider
+  headers, hand the receiver the ORIGINAL url + `setStreamDuration` + `setCurrentTime`; it fetches + Range-seeks
+  natively (native scrubber + resume, zero phone CPU, no proxy, no drift). The proxy is only for the streams that
+  can't: cleartext `http://`, header-gated, raw-TS, AC-3/E-AC-3, non-MP4 container.
+
+**SHIPPED this session — Piece 0 (Tier 0 direct-cast):** `CastController.loadCurrent` reads
+`controller.player.videoFormat/audioFormat.sampleMimeType` on main; if H.264+AAC && https && `.mp4`/`.m4v` &&
+no source UA/Referer → loads the ORIGINAL url with `contentType=video/mp4`, BUFFERED, duration + resume. **User-
+verified on "Yaman's Google TV": starts fast, seeks cleanly, plays to end, reverse-continuity intact.** Also added
+the `detailedErrorCode` logging. Decision rule + caveats: non-faststart MP4 has no auto-fallback yet; codec read
+needs local playback to have started.
+
+**STILL OPEN — Tier 1 proxy (incompatible streams), now with a CLEAR roadmap (no more guessing):** keep the
+keyframe manifest; replace per-segment-on-demand's fragility with the research's fixes — (1) **pre-warm seg 0-2 to
+disk before `load()`** so the first GET hits a warm file; (2) add **`-mpegts_flags resend_headers -pat_period 0.1`**
+so every TS leads with PAT/PMT (the real fix for HLS_SEGMENT_PARSING); (3) use **either** `-copyts -start_at_zero`
+**or** `-output_ts_offset`, never both; (4) set `hlsVideoSegmentFormat=MPEG2_TS` + `contentType=
+application/vnd.apple.mpegurl` on the proxy LoadRequest; (5) guarantee exactly ONE `load()` per attempt and no
+teardown racing the pending load (the 2002=CANCELED cause); (6) add a manifest-vs-real-duration ffprobe diff as the
+red-team gate. Jellyfin uses a SINGLE continuous head (kill+restart on seek), not per-segment — reconsider that vs.
+pre-warmed per-segment. Full research in the session transcript + memory [[project_cast_mk26]].
+
 ### Out of scope for MK.26 (file as MB-* / future MK if pursued)
 
 - **DLNA / UPnP** — stays DROPPED. Red-team reconfirmed: raw TS fails DLNA compliance, most renderers reject live HLS, Fire TV has no renderer — it doesn't even close the Fire TV gap.
