@@ -80,6 +80,15 @@
 -dontwarn io.ktor.client.engine.darwin.**
 -dontwarn io.ktor.client.engine.cio.**
 
+# MK.26 — the embedded Ktor SERVER (CIO) added for the LAN handoff receiver +
+# cast proxy pulls in io.ktor.util.debug.IntellijIdeaDebugDetector, which
+# references JVM-only java.lang.management.* (absent on Android). R8 aborts the
+# release build on the missing classes; that debug-detector path never runs on
+# Android, so suppress the warnings. (Without these, :app:minifyReleaseWithR8
+# fails with "Missing class java.lang.management.ManagementFactory".)
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+
 # ─────────────────────────────────────────────────────────────────────
 # Media3 — consumer rules ship; FFmpeg-specific keeps below
 # ─────────────────────────────────────────────────────────────────────
