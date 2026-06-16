@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +44,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -299,6 +306,14 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
     val duration = progress.durationMs.coerceAtLeast(1L)
     val playedPct = (progress.playedMs.toFloat() / duration).coerceIn(0f, 1f)
     val bufferedPct = (progress.bufferedMs.toFloat() / duration).coerceIn(0f, 1f)
+
+    // Touch-scrub state. While the user drags the bar, render at [scrubPct] and
+    // show the dragged time; commit the seek on release. null = follow playback.
+    var barWidthPx by remember { mutableStateOf(1f) }
+    var scrubPct by remember { mutableStateOf<Float?>(null) }
+    val shownPct = (scrubPct ?: playedPct).coerceIn(0f, 1f)
+    val shownMs = scrubPct?.let { (it * duration).toLong() } ?: progress.playedMs
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -323,32 +338,72 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
             },
     ) {
         Text(
-            text = formatMillis(progress.playedMs),
+            text = formatMillis(shownMs),
             color = palette.Accent,
             fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.width(80.dp),
         )
+        // 28dp touch surface holding the 8dp visual bar + a draggable thumb.
+        // PHONE: tap jumps there; drag the thumb scrubs and commits on release.
+        // TV: the Row above is focusable and the ±10 keys/buttons still seek.
         Box(
             modifier = Modifier
-                .height(8.dp)
+                .height(28.dp)
                 .weight(1f)
-                .clip(hexRowShape(3.dp))
-                .background(palette.BackgroundRaised),
+                .onSizeChanged { barWidthPx = it.width.toFloat().coerceAtLeast(1f) }
+                .pointerInput(duration) {
+                    detectTapGestures { offset ->
+                        onUserInteraction()
+                        onSeekTo(((offset.x / barWidthPx).coerceIn(0f, 1f) * duration).toLong())
+                    }
+                }
+                .pointerInput(duration) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            onUserInteraction()
+                            scrubPct = (offset.x / barWidthPx).coerceIn(0f, 1f)
+                        },
+                        onDragEnd = {
+                            scrubPct?.let { onSeekTo((it * duration).toLong()) }
+                            scrubPct = null
+                        },
+                        onDragCancel = { scrubPct = null },
+                    ) { change, _ ->
+                        scrubPct = (change.position.x / barWidthPx).coerceIn(0f, 1f)
+                    }
+                },
+            contentAlignment = Alignment.CenterStart,
         ) {
-            // Buffered layer — pale fill up to the buffered percent.
             Box(
                 modifier = Modifier
                     .height(8.dp)
-                    .fillMaxWidth(bufferedPct)
-                    .background(palette.BorderSubtle.copy(alpha = 0.6f)),
-            )
-            // Played layer
+                    .fillMaxWidth()
+                    .clip(hexRowShape(3.dp))
+                    .background(palette.BackgroundRaised),
+            ) {
+                // Buffered layer — pale fill up to the buffered percent.
+                Box(
+                    modifier = Modifier
+                        .height(8.dp)
+                        .fillMaxWidth(bufferedPct)
+                        .background(palette.BorderSubtle.copy(alpha = 0.6f)),
+                )
+                // Played / scrub layer.
+                Box(
+                    modifier = Modifier
+                        .height(8.dp)
+                        .fillMaxWidth(shownPct)
+                        .background(palette.Accent),
+                )
+            }
+            // Draggable thumb (the "marker"), centered on the played/scrub point.
             Box(
                 modifier = Modifier
-                    .height(8.dp)
-                    .fillMaxWidth(playedPct)
+                    .offset { IntOffset((shownPct * barWidthPx - 9.dp.toPx()).toInt(), 0) }
+                    .size(18.dp)
+                    .clip(CircleShape)
                     .background(palette.Accent),
             )
         }
