@@ -32,14 +32,18 @@ import java.net.NetworkInterface
  * on real hardware — this is compile-verified scaffolding.
  */
 class CastProxy(private val context: Context, private val logger: Logger) {
-    private var server: EmbeddedServer<*, *>? = null
-    private var session: FFmpegSession? = null
-    private var dir: File? = null
+    // @Volatile: start() runs on Dispatchers.IO, stop() on the main thread (Cast
+    // SDK callbacks) — the writes must be visible across threads. (Full
+    // start/stop mutual-exclusion is tracked as MB-235.)
+    @Volatile private var server: EmbeddedServer<*, *>? = null
+
+    @Volatile private var session: FFmpegSession? = null
+
+    @Volatile private var dir: File? = null
 
     /**
-     * Start transcoding [providerUrl] to HLS and serving it on the LAN. Returns
-     * the Chromecast-facing `http://<wifi-ip>:<port>/master.m3u8` URL, or null
-     * when there's no usable Wi-Fi address. Idempotent: re-calling stops first.
+     * Start transcoding [providerUrl] to HLS and serving it on the LAN. Returns a
+     * [CastProxyOutcome]. Idempotent: re-calling stops first.
      */
     fun start(providerUrl: String, userAgent: String?, referer: String?, isLive: Boolean): CastProxyOutcome {
         stop()
@@ -56,7 +60,14 @@ class CastProxy(private val context: Context, private val logger: Logger) {
         val master = File(outDir, "master.m3u8")
 
         startFfmpeg(providerUrl, userAgent, referer, isLive, outDir, master)
-        startServer(ip, outDir)
+        if (!startServer(ip, outDir)) {
+            // Port already held (e.g. a prior cast's server leaked) or bind failed.
+            // Returning NotReady lets the caller show a clean message instead of an
+            // uncaught BindException crashing the IO coroutine.
+            logger.warn("CastProxy: HLS server failed to bind on $ip:$DEFAULT_PORT")
+            stop()
+            return CastProxyOutcome.NotReady
+        }
 
         // Wait for ffmpeg to write the first playlist before handing the URL to
         // the Chromecast (otherwise it 404s master.m3u8). VOD needs longer: a
@@ -102,6 +113,9 @@ class CastProxy(private val context: Context, private val logger: Logger) {
         // (covers AC-3/E-AC-3 + unknown audio, whose passthrough is unreliable).
         // HEVC video is copied and will fail on Cast — Phase 2 adds a hardware
         // HEVC->H.264 transcode. Args as an array to avoid command-string quoting.
+        // NOTE: resume (-ss input seek) was tried + reverted — with -c:v copy it
+        // gave the receiver a few seconds then stalled at buffered=0 (the copy-seek
+        // timestamp-discontinuity hazard). Resume is deferred to MB-240.
         val args = mutableListOf<String>()
         if (headers.isNotEmpty()) {
             args += "-headers"
@@ -146,8 +160,8 @@ class CastProxy(private val context: Context, private val logger: Logger) {
             }
     }
 
-    private fun startServer(ip: String, outDir: File) {
-        server =
+    private fun startServer(ip: String, outDir: File): Boolean {
+        val srv =
             embeddedServer(CIO, port = DEFAULT_PORT, host = ip) {
                 routing {
                     get("/{path...}") {
@@ -172,8 +186,19 @@ class CastProxy(private val context: Context, private val logger: Logger) {
                         call.respondBytes(f.readBytes(), type)
                     }
                 }
-            }.also { it.start(wait = false) }
-        logger.info("CastProxy: serving HLS on http://$ip:$DEFAULT_PORT/")
+            }
+        // Guard the bind: a leaked prior server (MB-235) can still hold 8732, and
+        // an uncaught BindException here would crash the IO coroutine.
+        return runCatching {
+            srv.start(wait = false)
+            server = srv
+            logger.info("CastProxy: serving HLS on http://$ip:$DEFAULT_PORT/")
+            true
+        }.getOrElse {
+            logger.warn("CastProxy: server start failed — ${it.message}")
+            runCatching { srv.stop(0, 0) }
+            false
+        }
     }
 
     /** First non-loopback IPv4 (the Wi-Fi LAN address the Chromecast can reach). */
@@ -189,7 +214,7 @@ class CastProxy(private val context: Context, private val logger: Logger) {
     private fun awaitMaster(master: File, timeoutMs: Long): Boolean {
         val end = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < end) {
-            if (master.exists() && master.length() > 0L) return true
+            if (playlistReady(master)) return true
             // ffmpeg already ended without writing a playlist (provider 403,
             // unreadable input, …) — fail fast instead of blocking the whole
             // timeout. Only a still-running session is worth waiting on.
@@ -197,8 +222,15 @@ class CastProxy(private val context: Context, private val logger: Logger) {
             if (state == SessionState.FAILED || state == SessionState.COMPLETED) break
             Thread.sleep(POLL_MS)
         }
-        return master.exists() && master.length() > 0L
+        return playlistReady(master)
     }
+
+    // Ready only once the playlist actually references a segment — a freshly
+    // created EVENT playlist holds just the #EXTM3U header (length>0) for a beat
+    // before seg_00000.ts is added; handing that to the receiver makes it fetch a
+    // segment-less playlist and re-poll (an extra round-trip / false start).
+    private fun playlistReady(master: File): Boolean =
+        master.exists() && runCatching { master.readText().contains(".ts") }.getOrDefault(false)
 
     companion object {
         const val DEFAULT_PORT: Int = 8732
@@ -206,7 +238,10 @@ class CastProxy(private val context: Context, private val logger: Logger) {
         private const val STOP_TIMEOUT_MS = 500L
         private const val LIVE_READY_TIMEOUT_MS = 15_000L
         private const val VOD_READY_TIMEOUT_MS = 25_000L
-        private const val POLL_MS = 200L
+
+        // Poll the cache file every 50ms (was 200ms) — a cheap stat that trims up
+        // to ~150ms of slack off the playlist-ready wait.
+        private const val POLL_MS = 50L
     }
 }
 

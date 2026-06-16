@@ -1490,6 +1490,63 @@ Before writing code in any slice, open the cited file and confirm the assumption
 - **R-B2 — `Player`-type widening regresses local playback** → flag-guard B.1; full mini-player / zap / FFmpeg-rebuild regression before merge.
 - **R-B3 — AC-3 silence / HEVC-in-TS look "intermittent"** → capability-detect per stream; show an honest "not castable — use handoff" message, not a black screen.
 
+### MK.26.B cast hardening — 2026-06-16 audit (6-dimension workflow + adversarial verify)
+
+After Cast was proven working end-to-end on real hardware (`6c8d2a6`), a hardening audit (correctness/
+lifecycle, latency, memory/disk, reliability, resume/UX, security/threading) ran with adversarial
+verification of every high/blocker finding.
+
+**Shipped in the hardening pass** (safe, on-device-verifiable): **orphan-cache startup sweep**
+(`cacheDir/cast-proxy` wiped in `YancoApp.onCreate` — audit CAST-DISK-5); **server-bind guarded**
+(`startServer` returns false on `BindException` → clean `NotReady` instead of an uncaught crash);
+`@Volatile` proxy fields; **`failCast` now stops the proxy** (receiver-reject reached it without an
+`onSessionEnded`, leaking ffmpeg+server — CAST-SEC-7); playlist-ready gated on an actual `.ts`
+reference (not just file existence) + 50ms poll.
+
+**Tried + reverted:** VOD resume via `-ss` input seek (+`-avoid_negative_ts make_zero`) and `-hls_time`
+4→2. On-device the `-ss`/`-c:v copy` combo gave the receiver a few seconds then stalled it at
+`buffered=0` (the copy-seek timestamp-discontinuity hazard the audit flagged); reverted to the
+known-good stream config. Resume is **MB-240** below.
+
+**Deferred backlog** (real, verified — but need deliberate impl + on-device race/VPN testing; the
+feature is secondary/droppable so weighted accordingly):
+
+- **MB-235 · High · cast start/stop lifecycle race.** `CastProxy.start()` (IO, blocks ≤25s in
+  `awaitMaster`) and `stop()` (main, Cast SDK callbacks) mutate `server/session/dir` with no mutual
+  exclusion, and the `loadCurrent` coroutine is untracked — a Stop→Cast / reconnect can leak an
+  ffmpeg+Ktor server holding port 8732 (next cast fails) and feeds MB-230. **Fix carefully:** a naive
+  `cancelAndJoin` on the main callback thread would ANR (`awaitMaster` uses `Thread.sleep`, not
+  cancellable). Needs a generation token + cooperative `awaitMaster` bail + non-blocking job cancel +
+  async (`scope.launch`) `proxy.stop()` off-main (which also fixes **CAST-SEC-1**: stop()'s
+  `server.stop` + recursive delete currently block the UI thread).
+- **MB-234 · High · VOD cache unbounded.** `-hls_list_size 0` keeps every segment; no `-re`, so a 2h
+  movie remuxes wholesale to `cacheDir` (GBs). **Fix:** size-watchdog ceiling (~1.5GB → `failCast`,
+  version-independent) and/or `-readrate 1.5` (verify the gnutls fork supports `-readrate` first).
+- **MB-236 · Medium · cast memory + HEVC.** (a) the HLS server does `respondBytes(f.readBytes())` —
+  whole-segment heap copy per request (MB-230 intersection); switch to streaming. (b) HEVC is `-c:v
+  copy`'d → receiver plays audio-only with a stuck overlay and no error; add a pre-flight
+  `videoFormat` codec check (fail fast) or a `RemoteMediaClient` stall watchdog.
+- **MB-237 · Medium · `wifiIpv4()` wrong NIC.** Returns the first non-loopback IPv4 — picks VPN
+  (`tun0`)/cellular/tether ahead of `wlan0`, so the Chromecast gets an unreachable URL. **Fix:**
+  `ConnectivityManager` `TRANSPORT_WIFI`/`ETHERNET` link address, fall back to the current heuristic.
+- **MB-238 · Medium · no "Preparing" feedback.** The overlay shows "Casting" immediately, then blocks
+  ≤25s before the receiver gets anything → users tap Stop on a cast about to succeed. Add a
+  `Preparing` overlay state before `Active`.
+- **MB-239 · Medium (governance) · LAN media server is unauthenticated** (wildcard CORS, fixed port).
+  Any LAN host can pull the remuxed content (not credentials) while casting. **Fix:** random
+  per-session path token; promote the [AUDIT_NOTES](docs/security/AUDIT_NOTES.md) cast foot-note to a
+  proper accepted-risk decision row. (Path-traversal guard + host-bind were verified **sound**.)
+- **MB-240 · Medium · VOD resume from watch position.** Casting a half-watched movie restarts at 0
+  (the user's named bug). The fast fix (`-ss` input seek so ffmpeg starts at the resume point) stalls
+  the receiver under `-c:v copy` (timestamp discontinuity → `buffered=0`); the safe fix (receiver-side
+  `setCurrentTime`) makes the receiver wait for ffmpeg to race past the resume offset (bad for large
+  positions on the event playlist). **Needs:** either a clean copy-seek incantation validated on real
+  hardware (e.g. `-ss` + `-copyts`/`-start_at_zero` tuning, or seek to the nearest keyframe and trim),
+  or accept `setCurrentTime` for small offsets only. Reverted from the 2026-06-16 pass.
+- **Low / deferred:** wiring `CastStreamClassifier` for direct-cast (downgraded — needs a codec prober
+  that doesn't exist; only helps the https+no-headers+H.264/AAC minority, since IPTV is mostly
+  gated/cleartext that must keep the proxy); ffmpeg native-lib pre-warm; subtitle/multi-audio passthrough.
+
 ### Out of scope for MK.26 (file as MB-* / future MK if pursued)
 
 - **DLNA / UPnP** — stays DROPPED. Red-team reconfirmed: raw TS fails DLNA compliance, most renderers reject live HLS, Fire TV has no renderer — it doesn't even close the Fire TV gap.

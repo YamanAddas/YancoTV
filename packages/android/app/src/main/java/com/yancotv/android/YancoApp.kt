@@ -130,6 +130,14 @@ class YancoApp : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             runCatching { recordingsRepo.sweepOrphans() }
         }
+        // MK.26.B (audit CAST-DISK-5) — reclaim an orphaned cast-proxy cache. If
+        // the process was killed mid-cast (OOM / force-stop / crash) CastProxy.stop
+        // never ran, so a whole transcoded movie (potentially GBs) can sit in
+        // cacheDir/cast-proxy until the next cast. No cast can be active at process
+        // start, so this is race-free. IO-bound; off the main thread.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { java.io.File(cacheDir, "cast-proxy").deleteRecursively() }
+        }
         // **MK.REC.RESILIENCE 2026-05-15.** Cold-start schedule
         // reconciliation. Mirrors what RecordingScheduleBootReceiver
         // does on BOOT_COMPLETED, but runs on every cold app start so

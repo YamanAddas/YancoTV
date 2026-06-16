@@ -220,9 +220,11 @@ class CastController(
      */
     private fun failCast(message: String) {
         android.widget.Toast.makeText(appContext, message, android.widget.Toast.LENGTH_LONG).show()
-        // The media didn't load, so drop the casting overlay and hand the user
-        // back their local playback rather than a "Casting…" screen with nothing
-        // on the TV.
+        // Tear the proxy down: a receiver-reject reaches here WITHOUT an
+        // onSessionEnded, so without this the ffmpeg transcode + Ktor server leak
+        // (audit CAST-SEC-7). Then drop the casting overlay and hand the user back
+        // their local playback rather than a "Casting…" screen with nothing on TV.
+        runCatching { proxy.stop() }
         _sessionState.value = CastSessionState.Idle
         runCatching { controller.player.play() }
             .onFailure { logger.warn("Cast: couldn't resume local playback — ${it.message}") }
