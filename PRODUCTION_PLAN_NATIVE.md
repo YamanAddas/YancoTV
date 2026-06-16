@@ -1517,6 +1517,40 @@ Before writing code in any slice, open the cited file and confirm the assumption
 
 ---
 
+## MK.27 — Phone UX adaptation (touch + small-screen + single-pane selector) — planned 2026-06-15
+
+The app is a single **TV/D-pad-first Compose shell rendered unchanged on a phone.** `isTv`
+(`UiModeManager`, computed in `MainActivity`) only picks one-tap-vs-two-tap activation, the
+fullscreen-launch decision, and the theme — it **never branches the layout.** So every screen
+renders its TV multi-pane, remote-driven form on a ~380–420dp phone: cramped panes, controls
+that only respond to a D-pad, overlays with no touch dismissal. Surfaced 2026-06-15 when the user
+moved to phone testing for MK.26. Diagnosed by a 4-agent investigation workflow (2026-06-15).
+
+**Root cause (one sentence):** there is no form-factor-aware layout layer; `isTv` gates behaviour
+but not structure, and the focus/selector model assumes a remote.
+
+**User's headline request:** "wherever the selector is, the menu/category it's in shall be ALWAYS
+full screen until the selector moves (back or forward)." That is a **single-pane navigator** — the
+opposite of today's simultaneous-pane cascade. The existing `PanelFocus` enum
+(Sidebar → Categories → Content) is the right spine to build it on.
+
+### Slices
+
+| Slice | Scope | Notes |
+|---|---|---|
+| **27.A — Cast/player touch fixes** ✅ partial (MB-233 shipped 2026-06-15) | Cast/handoff no longer strands the stuck options menu; LAN returns to the app on success. | Remaining: a visible touch close/"Done" on the options popup; Chromecast sender end-state (auto-return / "Playing on TV" instead of a paused frame); `YancoTheme(isTv = !isTvDevice())` for the popup. |
+| **27.B — Phone single-pane navigator** (the selector request) | On phone (compact width) render exactly ONE pane full-screen keyed off `PanelFocus`: Sidebar OR CategoryRail OR Content, never simultaneously. Forward (tap/OK) advances + swaps; BACK steps back (Content→Categories→Sidebar→exit, the existing back-chain). Hide the sidebar (width 0) when Content owns the screen. Keep the TV multi-pane path behind `isTv`. | LARGE. Reuses `PanelFocus`, the per-pane `BackHandler`s, `PlacedFocusAnchor`. Make **taps** the primary driver (commit a category on click, not on focus-landing). Add on-screen back/forward affordances. Run the cascade-nav smoke test after. |
+| **27.C — Settings phone mode** | Collapse the fixed `380dp sidebar + content` two-pane `Row` to a single pane below a width breakpoint: tab strip / drawer / back-navigable list. Cut the 48dp page padding + 380dp width on compact. Replace the `moveFocus(Right)` tab→content focus (silent no-op, MB-108) with an explicit per-tab `FocusRequester`. | Settings has ZERO responsive logic today. Branch once at `SettingsScreen` entry; keep the per-row primitives layout-agnostic. |
+| **27.D — Phone typography + spacing scale** | One phone scale off the same form-factor branch: section/title fonts down ~15–25%, smaller tab rows + logo, page padding 48→~12–16dp, per-tab padding 32→~16dp. | Today all dims are hard-coded "read at 3 m on Fire TV." |
+| **27.E — Player overlay + dialog touch affordances** | Touch entry + on-screen close for: channel-surf list, quick-info, the options-row "< >" quick-cycle (tappable prev/next or drop the misleading hint). VOD dock phone layout (shrink 44sp title + 88dp orbs, wrap/scroll the transport+chip row, drop "OK HIDE / BACK" hints). Add-source dialog responsive width (forces `widthIn(min = 560.dp)` — wider than a phone). | Several overlays are remote-key-only with no touch path. Numeric channel-zap stays TV-only (acceptable). |
+| **27.F — Selector bug fixes** | (1) `BrowseSection.awaitAndRequest` can deadlock on Sidebar→Categories if the selected pill's identity changes (stale anchor) — `withTimeoutOrNull` fallback or re-key the anchor. (2) Settings tab→content `moveFocus(Right)` silent no-op (MB-108) — explicit requester. (3) Detail-close focus-restoration effects gated on `isTv`. | Real focus bugs found during the audit; fix regardless of phone work. |
+
+**Sequencing:** 27.A (mostly done) → 27.C + 27.D (Settings — the user's named pain, self-contained)
+→ 27.B (the big navigator — the selector request) → 27.E → 27.F. 27.B is the largest and most
+invasive (shell + cascade-nav); do it on its own with the smoke test.
+
+---
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
