@@ -319,11 +319,14 @@ dependencies {
     implementation(libs.play.services.cast.framework)
     implementation(libs.mediarouter)
 
-    // MK.26 B.2 — ffmpeg-kit (16KB-page fork) for the on-device cast proxy:
-    // TS->HLS remux + AC-3->AAC transcode so raw-TS IPTV plays on a bare
-    // Chromecast's Default Receiver. Bundles its own libav*.so; the vendored
-    // media3 FFmpeg audio decoder is statically linked into libffmpegJNI.so
-    // (different name), so no .so collision — verified at packaging.
+    // MK.26 B.2 — ffmpeg-kit (16KB-page, TLS-enabled fork) for the on-device
+    // cast proxy: TS->HLS remux + AC-3->AAC transcode so raw-TS IPTV plays on a
+    // bare Chromecast's Default Receiver. JamaisMagic -tls build (--enable-gnutls)
+    // replaces com.moizhassan's TLS-less build, which failed "https protocol not
+    // found" on every https provider URL. Same com.arthenica.ffmpegkit package.
+    // Bundles its own libffmpegkit.so + libav*.so; the vendored media3 FFmpeg
+    // audio decoder is statically linked into libffmpegJNI.so (different name),
+    // so no .so collision — verify at packaging.
     implementation(libs.ffmpeg.kit)
 
     // Media3 — powers PlayerActivity

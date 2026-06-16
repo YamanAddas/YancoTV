@@ -120,8 +120,13 @@ class CastController(
 
     /** Session connected: surface the casting state, then load the current item. */
     private fun startCast(session: CastSession) {
-        _sessionState.value = CastSessionState.Active(session.castDevice?.friendlyName ?: "your TV")
-        loadCurrent(session)
+        // getCastDevice() is main-thread-only and we're on the SDK's main callback
+        // here — capture the name now and thread it through the IO coroutine so
+        // nothing touches the CastSession off-main (that IllegalStateException
+        // crash only surfaced once the proxy started succeeding).
+        val deviceName = session.castDevice?.friendlyName ?: "your TV"
+        _sessionState.value = CastSessionState.Active(deviceName)
+        loadCurrent(session, deviceName)
     }
 
     /**
@@ -144,7 +149,7 @@ class CastController(
 
     // onSessionStarted fires on the main thread; pause the local player there,
     // then do the header lookup + proxy spin-up off-main and load on main.
-    private fun loadCurrent(session: CastSession) {
+    private fun loadCurrent(session: CastSession, deviceName: String) {
         val item = controller.currentItem.value ?: return
         val url = item.streamUrl.takeIf { it.isNotBlank() } ?: return
         controller.player.pause()
@@ -157,19 +162,31 @@ class CastController(
             val referer = src?.referer?.takeIf { it.isNotBlank() }
             val isLive = item.type == ContentType.LIVE
             // ffmpeg remux/transcode -> HLS the Default Receiver can play.
-            val proxyUrl = proxy.start(url, ua, referer, isLive)
-            if (proxyUrl == null) {
-                logger.warn("Cast: proxy unavailable — cannot cast ${item.id}")
-                withContext(Dispatchers.Main) { failCast("Couldn't cast — check your Wi-Fi connection.") }
-                return@launch
-            }
+            val proxyUrl =
+                when (val outcome = proxy.start(url, ua, referer, isLive)) {
+                    is CastProxyOutcome.Ready -> outcome.url
+                    CastProxyOutcome.NoNetwork -> {
+                        logger.warn("Cast: no Wi-Fi address to serve ${item.id}")
+                        withContext(Dispatchers.Main) {
+                            failCast("Couldn't cast — make sure the phone is on the same Wi-Fi as the TV.")
+                        }
+                        return@launch
+                    }
+                    CastProxyOutcome.NotReady -> {
+                        logger.warn("Cast: proxy couldn't prepare ${item.id} for casting")
+                        withContext(Dispatchers.Main) {
+                            failCast("Couldn't prepare this video for casting — it may be an unsupported format (e.g. HEVC).")
+                        }
+                        return@launch
+                    }
+                }
             val request =
                 MediaLoadRequestData.Builder().setMediaInfo(buildMediaInfo(item, proxyUrl)).setAutoplay(true).build()
             withContext(Dispatchers.Main) {
                 val client = session.remoteMediaClient
                 if (client == null) {
                     logger.warn("Cast: no RemoteMediaClient on session")
-                    failCast(castFailedMessage(session))
+                    failCast(castFailedMessage(deviceName))
                     return@withContext
                 }
                 runCatching {
@@ -180,19 +197,19 @@ class CastController(
                     client.load(request).setResultCallback { result ->
                         if (!result.status.isSuccess) {
                             logger.warn("Cast: receiver rejected media — status ${result.status.statusCode}")
-                            failCast(castFailedMessage(session))
+                            failCast(castFailedMessage(deviceName))
                         }
                     }
                 }.onFailure {
                     logger.warn("Cast: load failed — ${it.message}")
-                    failCast(castFailedMessage(session))
+                    failCast(castFailedMessage(deviceName))
                 }
             }
-            logger.info("Cast: proxying ${item.id} to ${session.castDevice?.friendlyName}")
+            logger.info("Cast: proxying ${item.id} to $deviceName")
         }
     }
 
-    private fun castFailedMessage(session: CastSession): String = "Couldn't cast this stream to ${session.castDevice?.friendlyName ?: "your TV"}."
+    private fun castFailedMessage(deviceName: String): String = "Couldn't cast this stream to $deviceName."
 
     /**
      * Main-thread only. A cast attempt didn't take — tell the user AND resume the
