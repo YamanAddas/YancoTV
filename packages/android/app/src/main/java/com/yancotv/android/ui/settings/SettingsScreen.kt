@@ -120,10 +120,139 @@ enum class SettingsTab(val label: String, val icon: ImageVector) {
 // it doesn't clash with the emerald gradient.
 private val OnAccentInk: Color = Color(0xFF04130C)
 
-@OptIn(ExperimentalComposeUiApi::class)
+// MK.27.C — below this available width the TV two-pane Settings (380dp sidebar
+// + content) squeezes the content pane to an unreadable sliver on a phone, so
+// collapse to a single-pane master/detail below it. ~600dp keeps the two-pane
+// on tablets / landscape phones / TV.
+private val COMPACT_SETTINGS_WIDTH = 600.dp
+
+/**
+ * Settings entry. Branches on the available width: a phone (compact) gets a
+ * single-pane master/detail (tab list → one tab body full-width); everything
+ * wider keeps the unchanged TV two-pane layout. (MK.27.C)
+ */
 @UnstableApi
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        if (maxWidth < COMPACT_SETTINGS_WIDTH) {
+            SettingsPhoneLayout(initialTab = initialTab, onExit = onExitToMainSidebar)
+        } else {
+            SettingsTwoPaneLayout(initialTab = initialTab, onExitToMainSidebar = onExitToMainSidebar)
+        }
+    }
+}
+
+/**
+ * Phone single-pane Settings (MK.27.C). Master = the full-width tab list;
+ * detail = one tab's body full-width with a touch Back. Tap a tab to drill in;
+ * the top-bar Back (or system BACK) returns to the list, and BACK from the list
+ * exits Settings — touch-first, no D-pad required.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@UnstableApi
+@Composable
+private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
+    var tab by rememberSaveable { mutableStateOf(initialTab) }
+    var drilledIn by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        if (drilledIn) drilledIn = false else onExit()
+    }
+
+    Column(
+        modifier =
+        Modifier
+            .fillMaxSize()
+            .background(LocalYancoPalette.current.BackgroundDeep),
+    ) {
+        if (!drilledIn) {
+            SidebarHeader()
+            HairlineDivider()
+            Column(
+                modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                for (entry in SettingsTab.entries) {
+                    TabItem(
+                        entry = entry,
+                        selected = entry == tab,
+                        onClick = {
+                            tab = entry
+                            drilledIn = true
+                        },
+                    )
+                }
+            }
+        } else {
+            PhoneTabTopBar(tab = tab, onBack = { drilledIn = false })
+            HairlineDivider()
+            Box(
+                modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                androidx.compose.runtime.key(tab) {
+                    TabContent(tab = tab)
+                }
+            }
+        }
+    }
+}
+
+/** Top bar for a drilled-in phone tab: a touch Back + the tab's icon + label. */
+@Composable
+private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
+    val palette = LocalYancoPalette.current
+    Row(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .clickable(role = Role.Button, onClick = onBack)
+                .semantics { contentDescription = "Back to settings list" },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = androidx.compose.ui.res.painterResource(id = com.yancotv.android.R.drawable.ic_player_back),
+                contentDescription = null,
+                tint = palette.TextPrimary,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Icon(
+            imageVector = tab.icon,
+            contentDescription = null,
+            tint = palette.Accent,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = tab.label,
+            color = palette.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@UnstableApi
+@Composable
+private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val scope = rememberCoroutineScope()
     // Two layers, two keys, one rule per layer:
@@ -160,7 +289,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = Sett
 
     Row(
         modifier =
-        modifier
+        Modifier
             .fillMaxSize()
             .background(LocalYancoPalette.current.BackgroundDeep)
             .padding(
