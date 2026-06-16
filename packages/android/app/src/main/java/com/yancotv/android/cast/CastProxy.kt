@@ -22,6 +22,7 @@ import io.ktor.server.routing.routing
 import java.io.File
 import java.net.NetworkInterface
 import java.util.Locale
+import java.util.concurrent.Semaphore
 import kotlin.math.ceil
 
 /**
@@ -31,14 +32,15 @@ import kotlin.math.ceil
  *
  * Two pipelines:
  *  - LIVE: one continuous ffmpeg writes a sliding-window event playlist (no seek).
- *  - VOD (MK.26.B.3 Piece 1): we HAND-AUTHOR a complete VOD playlist up front from
- *    the duration the local player already knows — so the receiver shows a scrubber
- *    + seek + resume INSTANTLY, with no probe wait. Segments are produced by a
- *    CONTINUOUS transcode "head" (the Plex/Jellyfin model): one ffmpeg input-seeks
- *    to the playing offset and segments forward at keyframes (so `-c:v copy` stays
- *    clean — the vendored ffmpeg-kit has no x264). A seek just relaunches the head
- *    at the new offset. Start is fast (no probe, first segment only) and a 4-hour
- *    movie works because only the watched/sought region is ever transcoded.
+ *  - VOD (MK.26.B.3 Piece 1, keyframe-map): we PROBE the source's real video
+ *    keyframes and HAND-AUTHOR a complete VOD playlist whose segment boundaries +
+ *    #EXTINF are exactly where `-c:v copy` will cut (so there is no playlist↔PTS
+ *    drift and no segment-count mismatch — sound for a 4-hour movie). Segments are
+ *    produced by a CONTINUOUS transcode "head" (the Plex/Jellyfin model): one ffmpeg
+ *    input-seeks to a keyframe boundary and segments forward with `-copyts` (video
+ *    copied — the vendored ffmpeg-kit has no x264). A seek/lead-cap relaunch lands on
+ *    another keyframe boundary, so the seam is clean. Only the watched/sought region
+ *    is ever transcoded; the lone start cost is the keyframe probe.
  *
  * Runtime behaviour is only verifiable on real hardware.
  */
@@ -54,29 +56,35 @@ class CastProxy(private val context: Context, private val logger: Logger) {
 
     @Volatile private var vod: VodPlan? = null
 
-    // The continuous VOD transcode head + the segment index it was launched from.
-    @Volatile private var headSession: FFmpegSession? = null
+    // The receiver's play frontier (segment index): the most recent forward request,
+    // resets only on a genuine backward jump (a small in-buffer back-scrub keeps the
+    // window — finding #8). Drives which cached segments we keep.
+    @Volatile private var frontier: Int = -1
 
-    @Volatile private var headBase: Int = -1
-
-    // The segment the receiver most recently asked for ≈ its play frontier. Drives
-    // both how far the head is allowed to run ahead and which segments we keep.
-    @Volatile private var lastReqSeg: Int = -1
-
-    // Serializes head launch/restart across concurrent segment requests.
-    private val headLock = Any()
+    // Cap concurrent on-demand segment transcodes so the receiver's read-ahead can't
+    // spawn a swarm of ffmpeg processes.
+    private val segGate = Semaphore(MAX_CONCURRENT_SEGMENTS, true)
 
     @Volatile private var generation = 0
 
+    // boundaries[i]..boundaries[i+1] is segment i, and both ends are REAL source
+    // keyframes (from the probe) so `-c:v copy` cuts land exactly on them and the
+    // declared #EXTINF matches what ffmpeg actually produces — no drift, no count
+    // mismatch, clean keyframe-aligned relaunch seams (findings #1/#2/#7).
     private class VodPlan(
         val gen: Int,
         val url: String,
         val headers: String,
         val outDir: File,
-        val segSec: Double,
-        val segCount: Int,
+        val boundaries: DoubleArray,
         val durationSec: Double,
-    )
+    ) {
+        val segCount: Int get() = boundaries.size - 1
+
+        fun segStart(i: Int): Double = boundaries[i]
+
+        fun segDur(i: Int): Double = boundaries[i + 1] - boundaries[i]
+    }
 
     /**
      * Start serving [providerUrl] to the LAN. [durationMs] (the local player's known
@@ -108,12 +116,10 @@ class CastProxy(private val context: Context, private val logger: Logger) {
     fun stop() {
         generation++
         vod = null
-        headBase = -1
-        lastReqSeg = -1
-        headSession = null
+        frontier = -1
         runCatching { liveSession?.cancel() }
         liveSession = null
-        // Cancel any in-flight head / segment ffmpeg sessions.
+        // Cancel any in-flight live / on-demand segment ffmpeg sessions.
         runCatching { FFmpegKit.cancel() }
         runCatching { server?.stop(STOP_GRACE_MS, STOP_TIMEOUT_MS) }
         server = null
@@ -151,135 +157,126 @@ class CastProxy(private val context: Context, private val logger: Logger) {
     // ── VOD (Piece 1) ────────────────────────────────────────────────────
 
     private fun startVod(gen: Int, url: String, headers: String, ip: String, outDir: File, durationMs: Long): CastProxyOutcome {
-        // The local player already knows the duration — no probe needed. Only fall
-        // back to a (slower) container probe if it didn't (e.g. duration unknown).
+        // The local player already knows the duration — no probe needed for it. Only
+        // fall back to a container probe if it didn't (e.g. duration unknown).
         val durationSec =
             if (durationMs > 0L) {
                 durationMs / 1000.0
             } else {
-                val t0 = System.currentTimeMillis()
-                val probed = probeDuration(url, headers)
-                logger.info("CastProxy: VOD duration probe = ${probed}s in ${System.currentTimeMillis() - t0}ms")
-                probed
+                probeDuration(url, headers)
             }
         if (durationSec <= 0.0) {
             stop()
             return CastProxyOutcome.NotReady
         }
-        val segCount = ceil(durationSec / SEGMENT_SEC).toInt().coerceAtLeast(1)
-        val plan = VodPlan(gen, url, headers, outDir, SEGMENT_SEC, segCount, durationSec)
+
+        // Read the real video keyframe layout so the playlist boundaries match what
+        // `-c:v copy` will actually cut. This is the single added start cost; measured
+        // on-device. If it can't be read, fall back to a coarse fixed grid (sound only
+        // for short / frequent-keyframe content — same as the pre-keyframe-map build).
+        val t0 = System.currentTimeMillis()
+        val keyframes = probeKeyframes(url, headers)
+        val probeMs = System.currentTimeMillis() - t0
+        val boundaries =
+            if (keyframes != null && keyframes.size >= 2) {
+                keyframeBoundaries(keyframes, durationSec, TARGET_SEC)
+            } else {
+                logger.warn("CastProxy: VOD keyframe probe unusable (${keyframes?.size ?: 0} kf) — fixed-grid fallback")
+                fixedBoundaries(durationSec, TARGET_SEC)
+            }
+        logger.info(
+            "CastProxy: VOD probe ${probeMs}ms → ${boundaries.size - 1} segments, " +
+                "${"%.1f".format(Locale.ROOT, durationSec / 60)} min (${keyframes?.size ?: 0} keyframes)",
+        )
+
+        val plan = VodPlan(gen, url, headers, outDir, boundaries, durationSec)
         vod = plan
         File(outDir, "master.m3u8").writeText(buildVodPlaylist(plan))
         if (!startServer(ip, outDir)) {
             stop()
             return CastProxyOutcome.NotReady
         }
-        logger.info("CastProxy: VOD ready — $segCount segments, ${"%.1f".format(Locale.ROOT, durationSec / 60)} min")
         return CastProxyOutcome.Ready("http://$ip:$DEFAULT_PORT/master.m3u8")
     }
 
     /** Hand-authored complete VOD media playlist — the receiver reads this as seekable VOD. */
-    private fun buildVodPlaylist(plan: VodPlan): String =
-        buildString {
+    private fun buildVodPlaylist(plan: VodPlan): String {
+        val maxSeg = (0 until plan.segCount).maxOf { plan.segDur(it) }
+        return buildString {
             append("#EXTM3U\n")
             append("#EXT-X-VERSION:3\n")
-            append("#EXT-X-TARGETDURATION:${ceil(plan.segSec).toInt()}\n")
+            append("#EXT-X-TARGETDURATION:${ceil(maxSeg).toInt().coerceAtLeast(1)}\n")
             append("#EXT-X-MEDIA-SEQUENCE:0\n")
             append("#EXT-X-PLAYLIST-TYPE:VOD\n")
             for (i in 0 until plan.segCount) {
-                val segDur = if (i < plan.segCount - 1) plan.segSec else plan.durationSec - i * plan.segSec
-                append("#EXTINF:${"%.3f".format(Locale.ROOT, segDur.coerceAtLeast(0.001))},\n")
+                append("#EXTINF:${"%.3f".format(Locale.ROOT, plan.segDur(i).coerceAtLeast(0.001))},\n")
                 append("seg_%05d.ts\n".format(Locale.ROOT, i))
             }
             append("#EXT-X-ENDLIST\n")
         }
+    }
 
     /**
-     * Make sure the continuous head is producing segment [n]: launch (or relaunch on a
-     * seek) so ffmpeg input-seeks to n's offset and segments forward from there.
-     * Already-produced/cached segments short-circuit. Synchronized so concurrent
-     * read-ahead requests don't spawn duplicate heads.
+     * Produce VOD segment [n] on demand by EXTRACTING it as its OWN clip. This is the
+     * one ffmpeg invocation this build can't misbehave on: no muxer cutting logic to
+     * ignore our boundaries. We input-seek to n's keyframe start, copy video / re-encode
+     * audio for exactly n's keyframe window (`-t` = the keyframe gap), and shift the
+     * written timestamps to absolute (`-output_ts_offset`) so the segment's PTS equals
+     * its playlist position — adjacent segments stay continuous, seeks land exact.
+     * Cached + served atomically (write `.part`, rename). Bounded concurrency.
      */
-    private fun ensureHeadCovers(plan: VodPlan, n: Int) {
-        synchronized(headLock) {
-            if (plan.gen != generation) return
-            lastReqSeg = n
-            val tip = maxProducedIndex(plan.outDir)
-            // A just-launched FFmpegKit session is briefly CREATED before RUNNING;
-            // treat both as "alive" so concurrent cold-start read-ahead requests
-            // don't each see "no head" and relaunch at a higher index, orphaning
-            // the lower segments (MB-235 race).
-            val state = headSession?.state
-            val alive = state == SessionState.RUNNING || state == SessionState.CREATED
-
-            // 1. n isn't on disk and the alive head won't reach it soon → (re)launch
-            //    at n. Covers first play, forward seek, back-seek into evicted
-            //    territory, and a head stopped (lead-capped) with n past its tip.
-            if (!segmentReady(plan.outDir, n)) {
-                val willProduce = alive && headBase in 0..n && n > tip && n <= tip + FORWARD_WAIT_MARGIN
-                if (!willProduce) {
-                    launchHead(plan, n)
-                    return
-                }
+    private fun produceSegment(plan: VodPlan, n: Int): File? {
+        if (plan.gen != generation) return null
+        updateFrontier(n)
+        val out = File(plan.outDir, "seg_%05d.ts".format(Locale.ROOT, n))
+        if (out.exists() && out.length() > 0L) return out
+        segGate.acquire()
+        try {
+            if (plan.gen != generation) return null
+            if (out.exists() && out.length() > 0L) return out
+            val tmp = File(plan.outDir, "seg_%05d.ts.part".format(Locale.ROOT, n))
+            val start = plan.segStart(n)
+            val args = mutableListOf<String>()
+            args += "-y"
+            if (plan.headers.isNotEmpty()) {
+                args += "-headers"
+                args += plan.headers
             }
-            val running = state == SessionState.RUNNING
-
-            // 2. Bound the head's lead so a long movie isn't transcoded + cached all at
-            //    once: stop it once it's far enough ahead, and resume when the receiver
-            //    has caught up — while still RESUME_GAP segments buffered, so the
-            //    relaunch (a reconnect) finishes before playback would ever starve.
-            if (running) {
-                if (tip - lastReqSeg >= LEAD_CAP) runCatching { headSession?.cancel() }
-            } else if (tip in 0 until plan.segCount - 1 && tip - lastReqSeg <= RESUME_GAP) {
-                launchHead(plan, tip + 1)
+            // -ss biased a hair past the boundary keyframe (so a rounded value can't snap
+            // to the PREVIOUS keyframe). NO -copyts: that makes `-t` measure from PTS 0
+            // and breaks the clip. Plain `-t` (relative duration) is reliable, then
+            // -output_ts_offset shifts the written PTS to the segment's absolute start so
+            // segments are continuous on the receiver's timeline.
+            args += listOf("-ss", "%.3f".format(Locale.ROOT, if (n == 0) 0.0 else start + SS_EPSILON))
+            args += listOf("-i", plan.url)
+            args += listOf("-c:v", "copy", "-c:a", "aac", "-ac", "2", "-b:a", "128k")
+            args += listOf("-t", "%.3f".format(Locale.ROOT, plan.segDur(n)))
+            args += listOf("-output_ts_offset", "%.3f".format(Locale.ROOT, start))
+            args += listOf("-muxpreload", "0", "-muxdelay", "0")
+            args += listOf("-f", "mpegts", tmp.absolutePath)
+            val session = FFmpegKit.executeWithArguments(args.toTypedArray())
+            if (ReturnCode.isSuccess(session.returnCode) && tmp.exists() && tmp.length() > 0L) {
+                runCatching { out.delete() }
+                if (!tmp.renameTo(out)) runCatching { tmp.copyTo(out, overwrite = true); tmp.delete() }
+                return out.takeIf { it.exists() && it.length() > 0L }
             }
+            runCatching { tmp.delete() }
+            logFfmpegEnd("seg$n", session)
+            return null
+        } finally {
+            segGate.release()
         }
     }
 
-    private fun launchHead(plan: VodPlan, base: Int) {
-        runCatching { headSession?.cancel() }
-        // A cancelled head abandons its in-progress seg_*.ts.tmp (temp_file flag) —
-        // those never match the .ts eviction filter, so sweep them here or they leak
-        // for the whole session (MB-234).
-        runCatching {
-            plan.outDir.listFiles { f -> f.name.startsWith("seg_") && f.name.endsWith(".tmp") }
-                ?.forEach { runCatching { it.delete() } }
+    // Advance the play frontier on forward progress; reset only on a genuine backward
+    // jump (a small in-buffer back-scrub keeps the window — finding #8).
+    private fun updateFrontier(n: Int) {
+        frontier = when {
+            n > frontier -> n
+            n < frontier - SEEK_BACK_THRESHOLD -> n
+            else -> frontier
         }
-        val args = mutableListOf<String>()
-        args += "-y"
-        if (plan.headers.isNotEmpty()) {
-            args += "-headers"
-            args += plan.headers
-        }
-        // Input-seek to the segment offset, keep absolute timestamps (-copyts) so every
-        // head's segments line up on the receiver's timeline regardless of where it
-        // started. (Provider-friendly pacing via -readrate is a follow-up — left off
-        // here so the initial buffer fills at full speed for the fastest start.)
-        args += listOf("-ss", "%.3f".format(Locale.ROOT, base * plan.segSec))
-        args += listOf("-i", plan.url)
-        args += listOf("-copyts")
-        args += listOf("-c:v", "copy", "-c:a", "aac", "-ac", "2", "-b:a", "128k")
-        args += listOf("-f", "hls", "-hls_time", "%.3f".format(Locale.ROOT, plan.segSec), "-hls_list_size", "0")
-        args += listOf("-start_number", base.toString())
-        args += listOf("-hls_flags", "temp_file+independent_segments")
-        args += listOf("-hls_segment_filename", File(plan.outDir, "seg_%05d.ts").absolutePath)
-        args += File(plan.outDir, "_head.m3u8").absolutePath
-        headBase = base
-        headSession = FFmpegKit.executeWithArgumentsAsync(args.toTypedArray()) { c -> logFfmpegEnd("head@$base", c) }
     }
-
-    private fun segmentReady(outDir: File, n: Int): Boolean {
-        val f = File(outDir, "seg_%05d.ts".format(Locale.ROOT, n))
-        return f.exists() && f.length() > 0L
-    }
-
-    /** Highest produced segment index on disk, or -1 if none. */
-    private fun maxProducedIndex(outDir: File): Int =
-        runCatching {
-            outDir.listFiles { f -> f.name.startsWith("seg_") && f.name.endsWith(".ts") }
-                ?.maxOfOrNull { it.name.removePrefix("seg_").removeSuffix(".ts").toIntOrNull() ?: -1 }
-                ?: -1
-        }.getOrDefault(-1)
 
     /**
      * Keep only a window of segments around the receiver's play position [center]:
@@ -296,6 +293,64 @@ class CastProxy(private val context: Context, private val logger: Logger) {
                 if (idx < low || idx > high) runCatching { f.delete() }
             }
         }
+    }
+
+    /**
+     * Video keyframe timestamps (seconds), read from the demux packet index (no
+     * decode). Returns null if ffprobe failed. Fast for indexed containers (MP4);
+     * a raw stream that needs a full scan just makes start slower (still correct).
+     */
+    private fun probeKeyframes(url: String, headers: String): List<Double>? {
+        val args = mutableListOf<String>()
+        if (headers.isNotEmpty()) {
+            args += "-headers"
+            args += headers
+        }
+        args += listOf("-v", "error", "-select_streams", "v:0")
+        args += listOf("-show_entries", "packet=pts_time,flags", "-of", "csv=p=0", url)
+        val session = FFprobeKit.executeWithArguments(args.toTypedArray())
+        if (!ReturnCode.isSuccess(session.returnCode)) {
+            logger.warn("CastProxy: keyframe probe failed — ${redactCredentials(session.allLogsAsString?.trim()?.takeLast(400).orEmpty())}")
+            return null
+        }
+        // Each line: "<pts_time>,<flags>"; a keyframe packet has 'K' in its flags.
+        return session.allLogsAsString
+            ?.lineSequence()
+            ?.mapNotNull { line ->
+                val parts = line.split(',')
+                if (parts.size >= 2 && parts[1].contains('K')) parts[0].trim().toDoubleOrNull() else null
+            }
+            ?.toList()
+    }
+
+    /**
+     * Grouped segment boundaries: starting at 0, take the first keyframe at least
+     * [target] seconds past the current boundary. Every boundary is a REAL keyframe, so
+     * the segment muxer (which we drive with these as explicit `-segment_times`) cuts
+     * exactly here with `-c:v copy` — the produced .ts match the declared #EXTINF and
+     * relaunching at any boundary is a clean keyframe seam. Standard ~target-sized
+     * segments (receiver-friendly), unlike per-keyframe cutting.
+     */
+    private fun keyframeBoundaries(keyframes: List<Double>, durationSec: Double, target: Double): DoubleArray {
+        val kf = keyframes.asSequence().filter { it.isFinite() && it in 0.0..durationSec }.sorted().toList()
+        val b = ArrayList<Double>()
+        b += 0.0
+        for (k in kf) {
+            if (k - b.last() >= target) b += k
+        }
+        // Close out the final segment at the exact duration.
+        if (durationSec - b.last() > MIN_SEG_EPS) {
+            b += durationSec
+        } else if (b.size >= 2) {
+            b[b.size - 1] = durationSec
+        }
+        return if (b.size >= 2) b.toDoubleArray() else doubleArrayOf(0.0, durationSec)
+    }
+
+    /** Coarse fixed grid — only the fallback when keyframes can't be read. */
+    private fun fixedBoundaries(durationSec: Double, target: Double): DoubleArray {
+        val n = ceil(durationSec / target).toInt().coerceAtLeast(1)
+        return DoubleArray(n + 1) { i -> (i * target).coerceAtMost(durationSec) }
     }
 
     /** Total duration (seconds) from the container metadata (VOD fallback only). */
@@ -340,18 +395,18 @@ class CastProxy(private val context: Context, private val logger: Logger) {
                                 call.respond(HttpStatusCode.NotFound)
                                 return@get
                             }
-                            val seg = awaitSegment(plan, n)
+                            val seg = produceSegment(plan, n)
                             // Read the bytes into memory BEFORE evicting: a concurrent
                             // request's evictOutsideWindow could unlink this file between
-                            // the awaitSegment existence check and the read, and a bare
-                            // readBytes() on a deleted file throws out of the route (→ a
-                            // dropped 500 the receiver sees as a stalled segment).
+                            // produce and the read, and a bare readBytes() on a deleted
+                            // file throws out of the route (→ a dropped 500 the receiver
+                            // sees as a stalled segment).
                             val bytes = seg?.let { runCatching { it.readBytes() }.getOrNull() }
                             if (bytes == null) {
                                 call.respond(HttpStatusCode.NotFound)
                                 return@get
                             }
-                            evictOutsideWindow(outDir, n)
+                            evictOutsideWindow(outDir, frontier)
                             call.response.header("Access-Control-Allow-Origin", "*")
                             call.respondBytes(bytes, ContentType.parse("video/mp2t"))
                             return@get
@@ -377,21 +432,6 @@ class CastProxy(private val context: Context, private val logger: Logger) {
             runCatching { srv.stop(0, 0) }
             false
         }
-    }
-
-    /** Block until VOD segment [n] is on disk (launching/relaunching the head as needed). */
-    private fun awaitSegment(plan: VodPlan, n: Int): File? {
-        ensureHeadCovers(plan, n)
-        val f = File(plan.outDir, "seg_%05d.ts".format(Locale.ROOT, n))
-        val end = System.currentTimeMillis() + SEGMENT_WAIT_MS
-        while (System.currentTimeMillis() < end) {
-            if (plan.gen != generation) return null
-            if (f.exists() && f.length() > 0L) return f
-            // The head died (provider error, unsupported) — fail fast.
-            if (headSession?.state == SessionState.FAILED) return null
-            Thread.sleep(POLL_MS)
-        }
-        return f.takeIf { it.exists() && it.length() > 0L }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
@@ -438,25 +478,30 @@ class CastProxy(private val context: Context, private val logger: Logger) {
         private const val STOP_TIMEOUT_MS = 500L
         private const val LIVE_READY_TIMEOUT_MS = 15_000L
         private const val POLL_MS = 50L
-        private const val SEGMENT_SEC = 4.0
 
-        // How far ahead of the head's produced tip a request may be before we treat it
-        // as a seek (relaunch) rather than wait.
-        private const val FORWARD_WAIT_MARGIN = 12
+        // Target segment length: keyframeBoundaries() takes the first keyframe at least
+        // this far past the previous boundary, giving ~target-sized, receiver-friendly
+        // segments that each begin on a real keyframe.
+        private const val TARGET_SEC = 4.0
 
-        // Per-segment serve timeout (covers the head's connect + first-segment encode).
-        private const val SEGMENT_WAIT_MS = 15_000L
+        // Seek bias so a rounded `-ss` still lands on (not before) the boundary keyframe.
+        // Must be smaller than any real keyframe gap; 10ms is well under 25fps all-intra.
+        private const val SS_EPSILON = 0.01
 
-        // Lead control (segments, ~4s each): let the head run up to LEAD_CAP (~4 min)
-        // ahead of the play frontier, then stop; resume once only RESUME_GAP (~1.5 min)
-        // of buffer remains — so the reconnect is always covered by buffered segments.
-        private const val LEAD_CAP = 60
-        private const val RESUME_GAP = 22
+        // Tiny tail-segment guard when closing the boundary list at the duration.
+        private const val MIN_SEG_EPS = 0.2
 
-        // Cache window around the play frontier. AHEAD_KEEP must exceed LEAD_CAP so the
-        // head's look-ahead is never evicted; BACK_BUFFER allows instant back-scrub.
-        private const val BACK_BUFFER = 40
-        private const val AHEAD_KEEP = 75
+        // A backward request more than this many segments below the frontier is a real
+        // seek (recenters the cache window); smaller is read-ahead jitter / a tiny scrub.
+        private const val SEEK_BACK_THRESHOLD = 6
+
+        // Concurrent on-demand segment extractions.
+        private const val MAX_CONCURRENT_SEGMENTS = 3
+
+        // Cache window around the play frontier (segments). Generous look-ahead so the
+        // receiver's read-ahead stays cached; BACK_BUFFER allows instant back-scrub.
+        private const val BACK_BUFFER = 30
+        private const val AHEAD_KEEP = 90
     }
 }
 
