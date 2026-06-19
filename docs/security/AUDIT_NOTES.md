@@ -159,7 +159,35 @@ MK.26 Track A adds an embedded Ktor (CIO) HTTP server on a fixed LAN port inside
 **Residual risk / what would change the decision:**
 
 - A ~30-bit code is resistant to casual guessing but not to a determined on-LAN brute-force. If the threat model ever extends to hostile actors already on the user's LAN, raise the code entropy and/or add rate-limiting + lockout on repeated `UNAUTHORIZED` rejects on the receiver.
-- The on-device `CastProxy` (Track B) serves remuxed HLS on the LAN for the duration of a cast; it injects provider headers server-side and is reachable by any LAN host while active. It carries the media bytes, not the provider credentials. Tracked as a Phase-2 hardening item if the cast feature graduates from secondary status.
+- The on-device `CastProxy` (Track B) serves remuxed HLS on the LAN for the duration of a cast — see the dedicated entry below.
+
+### MK.26 Track B — On-device Cast proxy + Tier 0 direct-cast (new network surface)
+
+| Field | Value |
+|---|---|
+| Severity | Medium |
+| Source | Self-documented (proactive — ahead of next yancoxplorer rescan) |
+| File | `packages/android/app/src/main/java/com/yancotv/android/cast/CastProxy.kt`, `CastController.kt` |
+| Decision | **Accepted — bounded by per-cast lifetime + provider credentials never reach the LAN** |
+| Decided | 2026-06-18 (v1.3.0) |
+| References | [PRODUCTION_PLAN_NATIVE.md](../../PRODUCTION_PLAN_NATIVE.md) (MK.26 Track B + MK.26.B.3), commits `1fa73c0` (B.1), `911a3a3` (B.2 phase 1), `6c8d2a6` (TLS), `070254d` (hardening), `883b116` (Piece 1 manifest), `482aaba` (Piece 0 direct-cast) |
+
+**What it is:**
+
+MK.26 Track B is a Chromecast sender. For Tier 0–eligible streams (H.264 + AAC + MP4 + HTTPS + no source UA/Referer), the receiver fetches the ORIGINAL provider URL directly — no proxy server on the phone, no new network surface. For everything else (raw-TS / AC-3 / cleartext / header-gated / unknown codecs), the phone starts an embedded Ktor (CIO) HTTP server bound to its Wi-Fi IPv4, runs ffmpeg to remux/transcode the provider stream to HLS, and hands the Default Media Receiver a `http://<phone-wifi-ip>:N/…m3u8`. The proxy is reachable by any host on the same LAN for the duration of the cast.
+
+**Why accepted:**
+
+- **Provider credentials never reach the LAN.** ffmpeg on the phone fetches the original provider URL with the source's UA/Referer; only the repackaged media bytes leave the phone. The proxy URL contains no provider auth.
+- **Lifetime is bounded to a single cast session.** `CastProxy.start()` is called only when a Cast session connects; `stop()` is called on session end (`endCast`), receiver-reject (`failCast`), and on the next `start()` (idempotent). The Ktor server is not running outside of an active cast.
+- **Wi-Fi-only bind, no-network refuses.** `wifiIpv4()` returns null when the phone has no Wi-Fi address — the cast attempt is refused with a user-visible toast rather than falling through to a default-interface bind.
+- **Generation counter rejects stale segments.** Each `start()` bumps `generation`; any segment request keyed to an old generation is rejected. A leftover receiver request from a prior cast cannot fetch fresh media.
+- **Same trust boundary as the existing cleartext decision.** Traffic is plain HTTP on the local network, consistent with the already-accepted [`mobile.readiness.cleartext`](#mobilereadinesscleartext47a0a49d--cleartext-traffic-enabled-globally) entry. The receiver doesn't speak HTTPS to LAN devices anyway (the Default Receiver is a plain-http LAN client by design).
+
+**Residual risk / what would change the decision:**
+
+- An on-LAN attacker can fetch the in-flight media bytes from the proxy URL while a cast is active. They cannot get provider URLs or credentials. If the threat model ever extends to hostile actors already on the user's LAN, add a per-session bearer token on every proxy GET (mirror the handoff pairing-code pattern) and bind to the specific Wi-Fi interface address with an allowlist on the source IP equal to the connected Chromecast.
+- Tier 1 proxy quality (MK.26.B.3 Piece 1) is WIP — Cast may fail for several stream families (raw-TS / AC-3 / HEVC). When it fails it shows a "Couldn't prepare this video for casting" toast and resumes local playback (`CastController.failCast`); the user is not stranded and no media plays on the receiver. The release reflects this accepted gap explicitly.
 
 ---
 

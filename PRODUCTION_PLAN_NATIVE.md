@@ -1760,6 +1760,52 @@ bouncing to a user-configured external app (which would drop the headers — rel
 new on-device ffmpeg cast proxy adds memory pressure; run a **1+ hour Fire TV soak** with casting
 exercised before tagging 1.2.0 as the published build.
 
+### Release-polish pass (2026-06-18) — v1.3.0
+
+Cuts a new version on top of v1.2.0 to capture the Cast Tier 0 breakthrough + the touch-scrubber +
+post-1.2.0 hardening. No new code in this pass — version bump, audit-notes addendum, release-record
+only. The 10 commits shipped since v1.2.0:
+
+- **MK.26 Tier 0 direct-cast** (`482aaba`) — H.264 + AAC + MP4 + HTTPS streams with no source UA/Referer
+  skip the proxy and hand the receiver the ORIGINAL URL with `setStreamDuration` + `setCurrentTime`.
+  Native scrubber, native resume, zero phone CPU, no transcode, no drift. **User-verified** on a real
+  Chromecast — starts fast, seeks cleanly, plays to end, reverse-continuity to local intact.
+- **MK.26 Tier 1 proxy progress** (`883b116`, `94870cc`, `750d425`, `39b9908`) — MK.26.B.3 Piece 1
+  keyframe-map manifest + per-segment proxy. **Status: WIP** — works for some VODs, fails for several
+  raw-TS / AC-3 / HEVC paths. When it fails, `CastController.failCast` toasts "Couldn't prepare this
+  video for casting" and resumes local playback (no black screen, no strand). The next milestone
+  (pre-warm seg 0-2, `-mpegts_flags resend_headers`, single-`load()` contract) is documented in
+  MK.26.B.3 above.
+- **MK.26 Cast end-to-end + hardening** (`6c8d2a6`, `070254d`, `3ac3d5b`) — TLS ffmpeg fork, HLS
+  plumbing, crash fixes, "Casting to <device>" overlay + Stop, orphan-process sweep, bind guard, leak fix.
+- **VOD player touch scrubber** (`f8017c9`) — drag/tap the progress bar to seek on phone.
+- **MK.26 handoff fixes** (`f600fa3`) — handoff forces the internal player on the receiver (HRS-5).
+
+Shipped this pass:
+- `versionCode 9`, `versionName 1.3.0`.
+- `AUDIT_NOTES.md` — new "MK.26 Track B — On-device Cast proxy + Tier 0 direct-cast" entry
+  documenting the per-session LAN network surface and the Tier-0 / Tier-1 split. Existing handoff
+  entry trimmed to point at the new entry.
+
+**Deferred (documented, not blocking the release):**
+
+- **MK.26.B.3 Tier 1 proxy hardening** — pre-warm seg 0-2 before `load()`; `-mpegts_flags resend_headers
+  -pat_period 0.1`; resolve `-copyts -start_at_zero` vs `-output_ts_offset`; set `hlsVideoSegmentFormat=
+  MPEG2_TS`; one-`load()`-per-attempt contract; manifest-vs-real-duration ffprobe diff. Roadmap is
+  written; the work is unblocked.
+- **MK.26 A.5 Fire TV de-risk + AUDIT_NOTES addendum for handoff** — handoff entry shipped 2026-06-15;
+  the on-device Fire TV smoke on `_yancotv._tcp` + multicast-suppressed-AP test is still A.5 scope.
+- **HEVC over Cast** — still copies; fails on the Default Receiver until the Phase-2 hardware transcode
+  (B.3 phase 2, gated).
+- **MB-230 / MB-229 1h Fire TV heap soak** — same accepted-risk position as v1.2.0. The proxy
+  hardening + the Tier 0 path (which transfers ZERO bytes through the phone) should lower memory
+  pressure on the most common case, but a real soak hasn't been run on this build.
+
+**Release gate (NOT shipped — accepted-risk for v1.3.0):** the MB-230/MB-229 heap soak. Same posture
+as v1.2.0. Users casting MP4/HTTPS movies (the Tier 0 path) are well-tested; users casting raw-TS live
+through Tier 1 either get a clean toast or a longer-running proxy session — flag if reports of OOM or
+hangs surface.
+
 ---
 
 ## Timeline
