@@ -883,7 +883,7 @@ private fun ActionRow(
                     modifier = Modifier.size(12.dp),
                 )
                 Text(
-                    text = "Favourite",
+                    text = "Favorite",
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
@@ -897,7 +897,7 @@ private fun ActionRow(
                     modifier = Modifier.size(12.dp),
                 )
                 Text(
-                    text = "Favourite",
+                    text = "Favorite",
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,

@@ -199,7 +199,7 @@ fun FavoritesScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "No favourites in this list", color = LocalYancoPalette.current.TextPrimary)
+                    Text(text = "No favorites in this list", color = LocalYancoPalette.current.TextPrimary)
                     Text(
                         text = "Focus a channel or title and press the star in the info panel.",
                         color = LocalYancoPalette.current.TextMuted,

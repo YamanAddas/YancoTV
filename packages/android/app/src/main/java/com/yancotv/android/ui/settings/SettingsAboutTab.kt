@@ -236,7 +236,7 @@ fun SettingsAboutTab(
             title = "About YancoTV",
             sub =
             "An IPTV client for Android TV, Fire TV, and phones. Bring your M3U or Xtream playlist; " +
-                "we handle the EPG, recordings, favourites, multi-list, and smart category grouping.",
+                "we handle the EPG, recordings, favorites, multi-list, and smart category grouping.",
         ) {}
 
         // ───── Privacy ─────

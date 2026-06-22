@@ -100,7 +100,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
                 ActionRow(
-                    label = if (isFav) "Remove from favourites" else "Add to favourites",
+                    label = if (isFav) "Remove from favorites" else "Add to favorites",
                     onClick = {
                         // MK.13.4 — when multiple lists exist, picking
                         // "Add to favourites" should let the user choose
