@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -473,7 +475,10 @@ private fun HomeHero(slides: List<HeroSlide>, lockedIds: Set<String>, onPlay: (H
             .fillMaxWidth()
             .height(320.dp)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = { onPlay(slide) }),
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = { onPlay(slide) })
+            // Audit catch — merge title + subhead into one TalkBack
+            // button announcement instead of "Button" with no name.
+            .semantics(mergeDescendants = true) { contentDescription = slide.headline },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AnimatedContent(
@@ -820,6 +825,7 @@ private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?
             if (dur <= 0) 0f else (entry.positionSeconds / dur).toFloat().coerceIn(0f, 1f)
         } ?: 0f
 
+    val tileTitle = item.cleanTitle?.ifBlank { null } ?: item.title
     HexSurface(
         shape = YancoShapes.CutCornerCardSmall,
         focused = focused,
@@ -828,7 +834,10 @@ private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?
         modifier
             .width(ShellDim.posterTile)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            // Audit catch — name the button after the title so
+            // TalkBack reads "<Title>, Button" instead of "Button".
+            .semantics(mergeDescendants = true) { contentDescription = tileTitle },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -917,6 +926,7 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
     val dur = (pair.programme.endTime - pair.programme.startTime).coerceAtLeast(1)
     val elapsed = (nowSec - pair.programme.startTime).coerceIn(0, dur)
     val progressPct = (elapsed.toFloat() / dur.toFloat()).coerceIn(0f, 1f)
+    val onNowDesc = "${pair.programme.title} on ${pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title}"
 
     HexSurface(
         shape = YancoShapes.CutCornerCardSmall,
@@ -926,7 +936,8 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
         modifier
             .width(ShellDim.posterTile)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = onNowDesc },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -996,6 +1007,7 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
 private fun UpNextTile(pair: NowPairing, locked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val upNextDesc = "${pair.programme.title} on ${pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title}, starts ${formatClock(pair.programme.startTime)}"
 
     HexSurface(
         shape = YancoShapes.CutCornerCardSmall,
@@ -1005,7 +1017,8 @@ private fun UpNextTile(pair: NowPairing, locked: Boolean, onClick: () -> Unit, m
         modifier
             .width(ShellDim.posterTile)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = upNextDesc },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(

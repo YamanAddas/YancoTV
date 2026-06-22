@@ -39,6 +39,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
@@ -243,6 +246,13 @@ private fun Chip(
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
+            // Audit catch — merge label + selection state so TalkBack
+            // announces "<label>, Tab, selected/not selected" instead
+            // of just "Tab".
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Category: $label"
+                this.selected = selected
+            }
             .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.xs),

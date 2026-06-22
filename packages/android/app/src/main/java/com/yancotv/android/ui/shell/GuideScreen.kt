@@ -1297,6 +1297,13 @@ private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui
                 role = Role.Button,
                 onClick = onActivate,
             )
+            // Audit catch — merge programme title + start clock into
+            // one TalkBack announcement. With hundreds of programme
+            // cells per visible EPG window this is the highest-volume
+            // silent-button site in the app.
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${programme.title}, starts ${formatHourMinute(programme.startTime)}"
+            }
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {

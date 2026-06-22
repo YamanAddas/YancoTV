@@ -565,7 +565,11 @@ private fun SearchOrb(item: ContentItem, progress: WatchProgress?, onActivate: (
                     shape = YancoShapes.HexCapsule,
                 )
                 .focusable(interactionSource = interaction)
-                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate),
+                .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onActivate)
+                // Audit catch — merge title into the orb's TalkBack
+                // announcement so the result is "<title>, Button" not
+                // "Button".
+                .semantics(mergeDescendants = true) { contentDescription = title },
             contentAlignment = Alignment.Center,
         ) {
             if (!item.logoUrl.isNullOrBlank()) {
