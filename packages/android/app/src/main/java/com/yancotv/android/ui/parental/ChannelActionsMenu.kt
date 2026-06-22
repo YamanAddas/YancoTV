@@ -150,6 +150,15 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                         // out of `visible` froze the focus system mid-dismiss → ANR.
                         // Dismiss first, then write off the main thread.
                         onDismiss()
+                        // MK.32.2 — Toast feedback. Hide makes the row
+                        // visibly vanish which can read as a glitch; the
+                        // toast confirms the action AND points the user
+                        // at the un-hide surface.
+                        android.widget.Toast.makeText(
+                            context,
+                            "Channel hidden — manage in Settings → Parental",
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
                         scope.launch(Dispatchers.IO) {
                             runCatching { repo.hideChannel(item.id) }
                         }

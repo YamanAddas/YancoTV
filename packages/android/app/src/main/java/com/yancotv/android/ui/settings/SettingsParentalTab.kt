@@ -238,16 +238,22 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                     modifier = Modifier.weight(1f),
                 )
                 if (hiddenIds.isNotEmpty()) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
                     SettingsOutlinedButton(
                         onClick = {
-                            // Bulk unhide — snapshot first so the flow-driven
-                            // remove doesn't ConcurrentModification the set.
-                            // MK.8 threading: N SQLDelight deletes on Main is
-                            // an ANR risk on Fire TV when N is large.
                             val toUnhide = hiddenIds.toList()
+                            val count = toUnhide.size
                             scope.launch(Dispatchers.IO) {
                                 toUnhide.forEach(repo::unhideChannel)
                             }
+                            // MK.32.2 — Confirm the action: bulk-unhide
+                            // updates the list silently, the toast says
+                            // it landed.
+                            android.widget.Toast.makeText(
+                                context,
+                                "Restored $count channel${if (count == 1) "" else "s"}",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
                         },
                     ) {
                         Text("Unhide all", fontSize = 12.sp)

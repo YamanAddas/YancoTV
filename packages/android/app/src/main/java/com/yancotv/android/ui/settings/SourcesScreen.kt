@@ -107,6 +107,7 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
     // the user out of the source they were editing.
     var selectedSourceId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val active by coordinator.state.collectAsState()
 
@@ -262,6 +263,15 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
                             addError = null
                             refresh()
                             coordinator.start(saved.id, saved.name)
+                            // MK.32.2 — Confirm the action. The dialog
+                            // dismisses + the list updates, but the user
+                            // doesn't know the sync started until rows
+                            // start appearing minutes later.
+                            android.widget.Toast.makeText(
+                                context,
+                                "Source added — syncing ${saved.name}…",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
                         }.onFailure { t ->
                             addError =
                                 when (t) {
