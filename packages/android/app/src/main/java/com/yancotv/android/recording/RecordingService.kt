@@ -18,6 +18,7 @@ import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.shared.http.HttpClient
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.recording.HlsRecorder
 import com.yancotv.shared.recording.MpegTsRecorder
 import com.yancotv.shared.recording.RecordInput
@@ -368,7 +369,7 @@ class RecordingService : Service() {
                     )
                     recordings.markFailed(
                         id = input.recordId,
-                        reason = "file_allocation_failed: ${t.message ?: t::class.simpleName}",
+                        reason = "file_allocation_failed: ${redactErrorMessage(t)}",
                         bytesWritten = 0L,
                     )
                 }.onFailure { Log.w(TAG, "markFailed bookkeeping failed for ${input.recordId}", it) }

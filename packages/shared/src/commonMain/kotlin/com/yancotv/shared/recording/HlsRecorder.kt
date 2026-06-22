@@ -3,6 +3,7 @@ package com.yancotv.shared.recording
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import kotlinx.coroutines.CancellationException
@@ -79,7 +80,7 @@ class HlsRecorder(
                 // to failManifest would race-write FAILED on top.
                 throw c
             } catch (t: Throwable) {
-                return failManifest(input.recordId, "manifest_error: ${t.message ?: t::class.simpleName}", t, 0L)
+                return failManifest(input.recordId, "manifest_error: ${redactErrorMessage(t)}", t, 0L)
             }
 
         var bytesWritten = 0L
@@ -106,7 +107,7 @@ class HlsRecorder(
                             // probably rotated. Failing here is the right move.
                             return failManifest(
                                 input.recordId,
-                                "manifest_refresh_error: ${t.message ?: t::class.simpleName}",
+                                "manifest_refresh_error: ${redactErrorMessage(t)}",
                                 t,
                                 bytesWritten,
                             )
@@ -135,7 +136,7 @@ class HlsRecorder(
                         throw c
                     } catch (t: Throwable) {
                         // Per §2 Q9, lost segments aren't fatal — log + skip.
-                        logger.warn("HlsRecorder segment fetch failed seq=${segment.sequence}: ${t.message}")
+                        logger.warn("HlsRecorder segment fetch failed seq=${segment.sequence}: ${redactErrorMessage(t)}")
                         continue
                     }
                 sink.write(segmentBytes)

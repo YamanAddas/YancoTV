@@ -5,6 +5,8 @@ import com.yancotv.shared.db.Epg_programmes
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
+import com.yancotv.shared.http.redactCredentials
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import com.yancotv.shared.parsers.parseXmltv
@@ -302,7 +304,13 @@ class EpgRepository(
                     )
                 }
             } catch (error: Throwable) {
-                val msg = error.message ?: error::class.simpleName ?: "unknown"
+                // Redact before logging / persisting: Ktor + OkHttp exception
+                // messages routinely echo the request URL, which for Xtream
+                // xmltv.php endpoints includes `?username=…&password=…`. Raw
+                // propagation hits three leak sinks (logger.error → Sentry,
+                // the `errors` list shown to the user, Android logcat).
+                // Mirror the SourceRepository pattern.
+                val msg = redactErrorMessage(error)
                 errors.add("${t.sourceKey}: $msg")
                 logger.error("EPG fetch/parse failed for ${t.sourceKey}: $msg")
             }
@@ -383,7 +391,7 @@ class EpgRepository(
         val bytes = http.getBytes(url, options)
         val inflated =
             if (bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()) {
-                logger.info("EPG fetch: gzip detected at $url (${bytes.size} B compressed)")
+                logger.info("EPG fetch: gzip detected at ${redactCredentials(url)} (${bytes.size} B compressed)")
                 gunzip(bytes)
             } else {
                 bytes

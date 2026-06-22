@@ -563,7 +563,13 @@ class SourceRepository(
             )
             return total
         } catch (t: Throwable) {
-            logger.error("syncSource[${source.id}] failed: ${t.message} — rolling back partial writes")
+            // Redact before logging: Ktor exception messages echo the
+            // request URL, which for Xtream `player_api.php` includes
+            // `?username=…&password=…`. The sibling outer-handler at
+            // line 323 already redacts for the persisted column, but
+            // the logcat / Sentry breadcrumb sink leaked uncensored
+            // until this redaction landed.
+            logger.error("syncSource[${source.id}] failed: ${redactErrorMessage(t)} — rolling back partial writes")
             bulk.abortSource(source.id)
             throw t
         }

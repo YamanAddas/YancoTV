@@ -3,6 +3,7 @@ package com.yancotv.shared.recording
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.http.HttpResponseError
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import kotlinx.coroutines.CancellationException
@@ -114,7 +115,13 @@ class MpegTsRecorder(
             // race-write FAILED on top of CANCELLED.
             throw c
         } catch (t: Throwable) {
-            failWithReason(input.recordId, "stream_error: ${t.message ?: t::class.simpleName}", t, bytesWritten)
+            // redactErrorMessage strips ?username=…&password=… that
+            // Ktor / OkHttp echoes back in exception messages for failed
+            // requests against Xtream `/live/<user>/<pass>/<id>.ts` URLs.
+            // `reason` is persisted to the recordings row + StateFlow +
+            // any Sentry breadcrumb, so the raw form would leak provider
+            // creds three ways. Audit catch.
+            failWithReason(input.recordId, "stream_error: ${redactErrorMessage(t)}", t, bytesWritten)
         }
     }
 
