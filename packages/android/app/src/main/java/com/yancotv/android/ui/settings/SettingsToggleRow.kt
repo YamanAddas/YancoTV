@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -89,7 +90,12 @@ internal fun SettingsToggleRow(label: String, description: String, checked: Bool
             else -> palette.BorderSubtle
         }
 
-    Row(
+    // MK.29.2 — Box wraps the Row so the ON-state accent rail can paint
+    // on top, aligned to CenterStart of the visual rectangle. The Row
+    // owns layout + click input; the Box owns the focus chrome (scale,
+    // shadow, clip, background, border) so the rail isn't pushed
+    // around by the 22dp horizontal padding.
+    Box(
         modifier =
         Modifier
             .fillMaxWidth()
@@ -117,28 +123,60 @@ internal fun SettingsToggleRow(label: String, description: String, checked: Bool
                 enabled = enabled,
                 role = Role.Switch,
                 onClick = { onCheckedChange(!checked) },
-            )
-            .padding(horizontal = 22.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                color = if (enabled) palette.TextPrimary else palette.TextMuted,
-                fontSize = 15.sp,
-                lineHeight = 19.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = description,
-                color = if (enabled) palette.TextMuted else palette.TextFaint,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
+        // MK.29.2 — ON-state rail. Mirrors the sidebar's selected-tab
+        // rail (3dp × 44dp, vertical accent gradient, square leading
+        // edge clipped by the row's 12dp corner). The whole row reads
+        // as ON from across the room — the small VerdantSwitch on the
+        // right only confirms it up close. Hidden when off OR disabled
+        // (a disabled-but-ON toggle is conceptually still ON, but the
+        // row chrome is muted anyway so the rail at full saturation
+        // would clash; mute it via alpha).
+        if (checked) {
+            Box(
+                modifier =
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .width(3.dp)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(
+                                if (enabled) palette.Accent else palette.AccentMuted,
+                                if (enabled) palette.AccentDeep else palette.AccentMuted,
+                            ),
+                        ),
+                    ),
             )
         }
-        VerdantSwitch(checked = checked, enabled = enabled)
+        Row(
+            modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    color = if (enabled) palette.TextPrimary else palette.TextMuted,
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    color = if (enabled) palette.TextMuted else palette.TextFaint,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                )
+            }
+            VerdantSwitch(checked = checked, enabled = enabled)
+        }
     }
 }
 
