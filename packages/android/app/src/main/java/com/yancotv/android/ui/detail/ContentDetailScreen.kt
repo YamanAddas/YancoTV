@@ -36,8 +36,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -61,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.ui.components.ButtonSize
+import com.yancotv.android.ui.components.ProgressStripe
+import com.yancotv.android.ui.components.WatchedCheckBadge
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.components.focusStyle
@@ -77,6 +81,7 @@ import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.EpisodeResumeInfo
 import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
@@ -147,6 +152,28 @@ fun ContentDetailScreen(
             seasons[selectedSeason].orEmpty()
         }
     var seasonPickerOpen by remember(item.id) { mutableStateOf(false) }
+
+    // MK.28.5 — Per-episode progress subscription. Reactive map of the
+    // CURRENT season's episodes → their watch_history rows. Used by
+    // EpisodeRow to paint a progress stripe + ✓ watched glyph so the
+    // user can tell at a glance which episodes they've already seen
+    // without opening the player. Re-keys on selectedSeason so seasons
+    // 2..N don't carry season-1's flow subscription.
+    val episodeIds by remember(visibleEpisodes) {
+        derivedStateOf { visibleEpisodes.map { it.id }.toSet() }
+    }
+    val episodeProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), episodeIds) {
+        if (episodeIds.isEmpty()) {
+            value = emptyMap()
+            return@produceState
+        }
+        runCatching {
+            watchHistory.entriesByEpisodeFlow(episodeIds).collect { value = it }
+        }.onFailure { t ->
+            android.util.Log.w("Yanco", "ContentDetailScreen episode-progress flow failed: ${t.message}", t)
+            value = emptyMap()
+        }
+    }
     // Anchor for the first visible episode of the active season. Re-keyed
     // on selectedSeason so each season change spawns a *fresh* anchor —
     // and thus a fresh FocusRequester. Reusing one across seasons hits a
@@ -390,6 +417,7 @@ fun ContentDetailScreen(
                     ) {
                         EpisodeRow(
                             ep = ep,
+                            progress = episodeProgress[ep.id],
                             // Episode-tile click — smart routing per user
                             // spec: "if the episode was not in the end then
                             // pressing the episode acts like continue
@@ -1049,79 +1077,129 @@ private fun SeasonOption(
 }
 
 @Composable
-private fun EpisodeRow(ep: EpisodeInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun EpisodeRow(ep: EpisodeInfo, progress: WatchProgress?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    Row(
+    val finished = progress?.isFinished() == true
+    // Wrapping Box so MK.28.5's ProgressStripe can paint along the row's
+    // bottom edge without breaking the existing Row layout.
+    Box(
         modifier =
         modifier
             .fillMaxWidth()
             .focusStyle(focused = focused, radius = Radius.card, liftScale = 1.015f)
             .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = Space.lg, vertical = Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.lg),
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick),
     ) {
-        Box(
+        Row(
             modifier =
             Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(Radius.chip))
-                .background(
-                    if (focused) {
-                        LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
-                    } else {
-                        LocalYancoPalette.current.BackgroundElevated
-                    },
-                ),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = Space.lg, vertical = Space.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.lg),
         ) {
-            Text(
-                text = "E%02d".format(ep.episodeNumber),
-                color = LocalYancoPalette.current.Accent,
-                style = YancoType.LabelStrong,
-            )
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Space.xxs),
-        ) {
-            Text(
-                text = ep.title.takeIf { it.isNotBlank() } ?: "Episode ${ep.episodeNumber}",
-                color = LocalYancoPalette.current.TextPrimary,
-                style = YancoType.TitleS,
-                maxLines = 1,
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Space.sm),
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(Radius.chip))
+                    .background(
+                        if (focused) {
+                            LocalYancoPalette.current.Accent.copy(alpha = 0.22f)
+                        } else {
+                            LocalYancoPalette.current.BackgroundElevated
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Season ${ep.seasonNumber}",
-                    color = LocalYancoPalette.current.TextMuted,
-                    style = YancoType.Caption,
+                    text = "E%02d".format(ep.episodeNumber),
+                    color = LocalYancoPalette.current.Accent,
+                    style = YancoType.LabelStrong,
                 )
-                ep.duration?.takeIf { it.isNotBlank() }?.let {
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Space.xxs),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                ) {
                     Text(
-                        text = "\u00b7",
-                        color = LocalYancoPalette.current.TextFaint,
-                        style = YancoType.Caption,
+                        text = ep.title.takeIf { it.isNotBlank() } ?: "Episode ${ep.episodeNumber}",
+                        color = LocalYancoPalette.current.TextPrimary,
+                        style = YancoType.TitleS,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
+                    // MK.28.5 \u2014 Per-episode Watched \u2713 chip when finished.
+                    // Mid-stream rows surface progress via the bottom
+                    // stripe + a "12m left" caption so the chip clutter
+                    // stays minimal.
+                    if (finished) {
+                        WatchedCheckBadge()
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = it,
+                        text = "Season ${ep.seasonNumber}",
                         color = LocalYancoPalette.current.TextMuted,
                         style = YancoType.Caption,
                     )
+                    ep.duration?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = "\u00b7",
+                            color = LocalYancoPalette.current.TextFaint,
+                            style = YancoType.Caption,
+                        )
+                        Text(
+                            text = it,
+                            color = LocalYancoPalette.current.TextMuted,
+                            style = YancoType.Caption,
+                        )
+                    }
+                    // Mid-stream remaining-time caption \u2014 only renders for
+                    // rows where positionFor returned a value AND duration
+                    // is known (otherwise progress is null or remaining is
+                    // null). Finished rows skip this in favour of the \u2713.
+                    if (progress != null && !finished) {
+                        val rem = progress.remainingSeconds()
+                        if (rem != null) {
+                            Text(
+                                text = "\u00b7",
+                                color = LocalYancoPalette.current.TextFaint,
+                                style = YancoType.Caption,
+                            )
+                            val minutes = (rem / 60).toInt().coerceAtLeast(1)
+                            Text(
+                                text = "${minutes}m left",
+                                color = LocalYancoPalette.current.Accent,
+                                style = YancoType.Caption,
+                            )
+                        }
+                    }
                 }
             }
+            Icon(
+                imageVector = YancoIcons.Play,
+                contentDescription = null,
+                tint = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextFaint,
+                modifier = Modifier.size(16.dp),
+            )
         }
-        Icon(
-            imageVector = YancoIcons.Play,
-            contentDescription = null,
-            tint = if (focused) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextFaint,
-            modifier = Modifier.size(16.dp),
-        )
+        // MK.28.5 \u2014 Progress stripe across the row's bottom edge. Only
+        // for mid-stream rows; finished rows already surface as \u2713 above.
+        if (progress != null && !finished && progress.ratio > 0f) {
+            ProgressStripe(
+                progress = progress.ratio,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 }
 
