@@ -2,6 +2,7 @@ package com.yancotv.shared.history
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import com.yancotv.shared.db.SelectRecentWithContent
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.logger.Log
 import com.yancotv.shared.types.ContentItem
@@ -59,48 +60,17 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
     /**
      * Most recently watched items (VOD first, since live isn't recorded).
      * The UI uses this to build a "Continue watching" row.
+     *
+     * Audit catch — previously did SELECT * FROM watch_history then a
+     * per-content_id selectById loop (N+1: 1 + ~30 PK lookups per
+     * emit). Now uses the JOIN-backed selectRecentWithContent so the
+     * Flow does ONE query. Same algorithm for both `recent()` and
+     * `recentFlow()`.
      */
-    fun recent(limit: Long = 30): List<HistoryEntry> {
-        val rows = db.watchHistoryQueries.selectRecent(limit).executeAsList()
-        if (rows.isEmpty()) return emptyList()
-        // Join is done client-side because SQLDelight's JOIN syntax with
-        // multiple tables requires a dedicated query file; keeping it here
-        // avoids a migration just to grow `WatchHistory.sq`.
-        val byContent = rows.groupBy { it.content_id }
-        val contents =
-            byContent.keys
-                .mapNotNull { id ->
-                    db.contentQueries.selectById(id).executeAsOneOrNull()
-                }.associateBy { it.id }
-        return rows.mapNotNull { row ->
-            val c = contents[row.content_id] ?: return@mapNotNull null
-            HistoryEntry(
-                id = row.id,
-                contentId = row.content_id,
-                episodeId = row.episode_id,
-                positionSeconds = row.position_seconds.toDouble(),
-                durationSeconds = row.duration_seconds?.toDouble(),
-                watchedAt = row.watched_at,
-                content =
-                ContentItem(
-                    id = c.id,
-                    sourceId = c.source_id,
-                    type = contentTypeFromDb(c.type),
-                    title = c.title,
-                    cleanTitle = c.clean_title,
-                    groupName = c.group_name,
-                    streamUrl = c.stream_url,
-                    logoUrl = c.logo_url,
-                    tvgId = c.tvg_id,
-                    metadataJson = c.metadata_json,
-                    sortOrder = c.sort_order.toInt(),
-                    createdAt = c.created_at,
-                    nameOverride = c.name_override,
-                    logoOverride = c.logo_override,
-                ),
-            )
-        }
-    }
+    fun recent(limit: Long = 30): List<HistoryEntry> = db.watchHistoryQueries
+        .selectRecentWithContent(limit)
+        .executeAsList()
+        .map { row -> row.toHistoryEntry() }
 
     /**
      * Reactive [recent] — backed by SQLDelight's [asFlow]. Emits the
@@ -124,45 +94,10 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
      * Android only.
      */
     fun recentFlow(limit: Long = 30): Flow<List<HistoryEntry>> = db.watchHistoryQueries
-        .selectRecent(limit)
+        .selectRecentWithContent(limit)
         .asFlow()
         .mapToList(Dispatchers.Default)
-        .map { rows ->
-            if (rows.isEmpty()) return@map emptyList()
-            val byContent = rows.groupBy { it.content_id }
-            val contents =
-                byContent.keys
-                    .mapNotNull { id -> db.contentQueries.selectById(id).executeAsOneOrNull() }
-                    .associateBy { it.id }
-            rows.mapNotNull { row ->
-                val c = contents[row.content_id] ?: return@mapNotNull null
-                HistoryEntry(
-                    id = row.id,
-                    contentId = row.content_id,
-                    episodeId = row.episode_id,
-                    positionSeconds = row.position_seconds.toDouble(),
-                    durationSeconds = row.duration_seconds?.toDouble(),
-                    watchedAt = row.watched_at,
-                    content =
-                    ContentItem(
-                        id = c.id,
-                        sourceId = c.source_id,
-                        type = contentTypeFromDb(c.type),
-                        title = c.title,
-                        cleanTitle = c.clean_title,
-                        groupName = c.group_name,
-                        streamUrl = c.stream_url,
-                        logoUrl = c.logo_url,
-                        tvgId = c.tvg_id,
-                        metadataJson = c.metadata_json,
-                        sortOrder = c.sort_order.toInt(),
-                        createdAt = c.created_at,
-                        nameOverride = c.name_override,
-                        logoOverride = c.logo_override,
-                    ),
-                )
-            }
-        }
+        .map { rows -> rows.map { it.toHistoryEntry() } }
 
     /**
      * MK.28.1 — Batched reactive tile-progress lookup. Returns a map keyed
@@ -436,3 +371,34 @@ private fun contentTypeFromDb(value: String): ContentType = when (value) {
     "series" -> ContentType.SERIES
     else -> error("Unknown content type: $value")
 }
+
+/**
+ * Maps a single joined `watch_history × content` row into [HistoryEntry].
+ * Shared between [WatchHistoryRepository.recent] and [recentFlow] so
+ * both paths use identical decoding (audit catch — was duplicated body
+ * across the two functions).
+ */
+private fun SelectRecentWithContent.toHistoryEntry(): HistoryEntry = HistoryEntry(
+    id = wh_id,
+    contentId = wh_content_id,
+    episodeId = wh_episode_id,
+    positionSeconds = wh_position_seconds.toDouble(),
+    durationSeconds = wh_duration_seconds?.toDouble(),
+    watchedAt = wh_watched_at,
+    content = ContentItem(
+        id = c_id,
+        sourceId = c_source_id,
+        type = contentTypeFromDb(c_type),
+        title = c_title,
+        cleanTitle = c_clean_title,
+        groupName = c_group_name,
+        streamUrl = c_stream_url,
+        logoUrl = c_logo_url,
+        tvgId = c_tvg_id,
+        metadataJson = c_metadata_json,
+        sortOrder = c_sort_order.toInt(),
+        createdAt = c_created_at,
+        nameOverride = c_name_override,
+        logoOverride = c_logo_override,
+    ),
+)

@@ -19,6 +19,39 @@ CREATE INDEX idx_watch_history_episode ON watch_history(episode_id) WHERE episod
 selectRecent:
 SELECT * FROM watch_history ORDER BY watched_at DESC LIMIT ?;
 
+-- Audit catch — `recent()` / `recentFlow()` previously did a SELECT *
+-- on watch_history then issued one selectById per distinct content_id
+-- (N+1, ~30 PK lookups per Home-rail emit; recentFlow fires on every
+-- persistResumePoint upsert). JOIN it once at the DB so the Flow does
+-- one SELECT and the row mapper has every field it needs. Same shape
+-- as how Favorites + EPG already JOIN.
+selectRecentWithContent:
+SELECT
+    wh.id AS wh_id,
+    wh.content_id AS wh_content_id,
+    wh.episode_id AS wh_episode_id,
+    wh.position_seconds AS wh_position_seconds,
+    wh.duration_seconds AS wh_duration_seconds,
+    wh.watched_at AS wh_watched_at,
+    c.id AS c_id,
+    c.source_id AS c_source_id,
+    c.type AS c_type,
+    c.title AS c_title,
+    c.clean_title AS c_clean_title,
+    c.group_name AS c_group_name,
+    c.stream_url AS c_stream_url,
+    c.logo_url AS c_logo_url,
+    c.tvg_id AS c_tvg_id,
+    c.metadata_json AS c_metadata_json,
+    c.sort_order AS c_sort_order,
+    c.created_at AS c_created_at,
+    c.name_override AS c_name_override,
+    c.logo_override AS c_logo_override
+FROM watch_history wh
+JOIN content c ON c.id = wh.content_id
+ORDER BY wh.watched_at DESC
+LIMIT ?;
+
 selectByContent:
 SELECT * FROM watch_history WHERE content_id = ? ORDER BY watched_at DESC;
 

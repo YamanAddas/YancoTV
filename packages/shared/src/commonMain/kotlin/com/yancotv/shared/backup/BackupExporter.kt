@@ -158,21 +158,27 @@ class BackupExporter(private val db: YancoDb, private val credentialStore: Crede
     }
 
     private fun exportWatchHistory(): List<WatchHistoryRecord> {
-        val rows = db.watchHistoryQueries.selectRecent(Long.MAX_VALUE).executeAsList()
-        return rows.mapNotNull { row ->
-            val content = db.contentQueries.selectById(row.content_id).executeAsOneOrNull() ?: return@mapNotNull null
+        // Audit catch — was N+1 (1 selectRecent + N selectById per row).
+        // Backup exports EVERY row (Long.MAX_VALUE), so on an active
+        // user's library this was the slowest part of an export. The
+        // JOIN-backed selectRecentWithContent gives the same data in
+        // one query. Episodes are still per-row (rare for an episode
+        // to be in the export but not its container) — leaving that
+        // pattern alone keeps the diff small.
+        val rows = db.watchHistoryQueries.selectRecentWithContent(Long.MAX_VALUE).executeAsList()
+        return rows.map { row ->
             WatchHistoryRecord(
-                historyId = row.id,
-                sourceId = content.source_id,
-                streamUrl = content.stream_url,
-                title = content.title,
-                tvgId = content.tvg_id,
-                episodeStreamUrl = row.episode_id?.let { eid ->
+                historyId = row.wh_id,
+                sourceId = row.c_source_id,
+                streamUrl = row.c_stream_url,
+                title = row.c_title,
+                tvgId = row.c_tvg_id,
+                episodeStreamUrl = row.wh_episode_id?.let { eid ->
                     db.episodesQueries.selectById(eid).executeAsOneOrNull()?.stream_url
                 },
-                positionSeconds = row.position_seconds,
-                durationSeconds = row.duration_seconds,
-                watchedAt = row.watched_at,
+                positionSeconds = row.wh_position_seconds,
+                durationSeconds = row.wh_duration_seconds,
+                watchedAt = row.wh_watched_at,
             )
         }
     }
