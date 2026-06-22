@@ -45,6 +45,7 @@ import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.shared.epg.EpgRepository
+import com.yancotv.shared.http.redactCredentials
 import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -1631,8 +1632,15 @@ class PlayerActivity : AppCompatActivity() {
                 -> "This device can't decode the stream"
                 else -> "Couldn't open this stream"
             }
+        // Audit catch — ExoPlayer's localizedMessage wraps OkHttp's
+        // exception text, which routinely echoes the request URL. For
+        // Xtream sources that URL contains `?username=&password=`, so
+        // the user-visible error overlay was literally painting
+        // credentials on the TV screen. Same redaction helper the
+        // EpgRepository / SourceRepository / Recorder log paths use.
         val description =
-            error.localizedMessage ?: "Check your connection or try another source."
+            error.localizedMessage?.let(::redactCredentials)
+                ?: "Check your connection or try another source."
         return VodChromeError(
             codeName = error.errorCodeName,
             codeNumeric = error.errorCode.toString(),
