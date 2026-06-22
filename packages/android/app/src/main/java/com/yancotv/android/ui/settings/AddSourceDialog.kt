@@ -40,6 +40,11 @@ import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.types.AddSourceInput
 import com.yancotv.shared.types.SourceType
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Add-source modal. Every field is a click-to-edit row: it sits there as
@@ -67,6 +72,33 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
     // PlaybackController interceptor).
     var userAgent by remember { mutableStateOf("") }
     var referer by remember { mutableStateOf("") }
+    // Audit catch — M3U_FILE picks a content:// URI via SAF; STALKER
+    // needs a MAC address alongside the host. Both source types are
+    // advertised in the SourcesScreen empty-state copy but the dialog
+    // previously offered only Xtream + M3U_URL.
+    var filePath by remember { mutableStateOf<String?>(null) }
+    var fileDisplayName by remember { mutableStateOf("") }
+    var macAddress by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val filePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri: Uri? ->
+            if (uri != null) {
+                // Persist permission so the source survives a process
+                // restart — without this the URI becomes unreadable on
+                // every cold launch. Memory convention:
+                // `file_path` columns store content:// URIs.
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                filePath = uri.toString()
+                fileDisplayName = uri.lastPathSegment?.substringAfterLast('/') ?: uri.toString()
+            }
+        }
     var validationError by remember { mutableStateOf<String?>(null) }
 
     fun submit() {
@@ -75,12 +107,18 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
             validationError = "Give the source a name."
             return
         }
-        if (url.isBlank()) {
+        if (type == SourceType.M3U_FILE) {
+            if (filePath.isNullOrBlank()) {
+                validationError = "Pick an M3U file from your device."
+                return
+            }
+        } else if (url.isBlank()) {
             validationError =
-                if (type == SourceType.XTREAM) {
-                    "Host URL is required (e.g. http://provider.tv:8080)."
-                } else {
-                    "M3U URL is required."
+                when (type) {
+                    SourceType.XTREAM -> "Host URL is required (e.g. http://provider.tv:8080)."
+                    SourceType.M3U_URL -> "M3U URL is required."
+                    SourceType.STALKER -> "Portal URL is required (e.g. http://portal.tv/c/)."
+                    else -> "URL is required."
                 }
             return
         }
@@ -88,14 +126,24 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
             validationError = "Xtream needs both a username and a password."
             return
         }
+        if (type == SourceType.STALKER && macAddress.isBlank()) {
+            validationError = "Stalker needs the device MAC address (e.g. 00:1A:79:XX:XX:XX)."
+            return
+        }
         validationError = null
         onSubmit(
             AddSourceInput(
                 name = name.trim(),
                 type = type,
-                url = url.trim(),
+                // M3U_FILE persists the content:// URI in `filePath`; the
+                // `url` column is unused for that type but the schema
+                // wants a non-null value, so seed it with the URI string
+                // so the row is consistent.
+                url = if (type == SourceType.M3U_FILE) (filePath ?: "") else url.trim(),
+                filePath = filePath?.takeIf { type == SourceType.M3U_FILE },
                 username = username.takeIf { it.isNotBlank() }?.trim(),
                 password = password.takeIf { it.isNotBlank() },
+                macAddress = macAddress.takeIf { type == SourceType.STALKER && it.isNotBlank() }?.trim(),
                 epgUrl = epgUrl.takeIf { it.isNotBlank() }?.trim(),
                 userAgent = userAgent.takeIf { it.isNotBlank() }?.trim(),
                 referer = referer.takeIf { it.isNotBlank() }?.trim(),
@@ -164,19 +212,39 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 SectionLabel("Source type")
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TypeChip(
-                        label = "Xtream",
-                        description = "Host + user + pass",
-                        selected = type == SourceType.XTREAM,
-                        onSelect = { type = SourceType.XTREAM },
-                    )
-                    TypeChip(
-                        label = "M3U URL",
-                        description = "Hosted playlist link",
-                        selected = type == SourceType.M3U_URL,
-                        onSelect = { type = SourceType.M3U_URL },
-                    )
+                // Two rows of two chips — keeps the layout readable on
+                // phone widths where 4 inline chips overflow. Audit
+                // catch: M3U_FILE + STALKER were never wired into this
+                // dialog despite SourcesScreen advertising them.
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TypeChip(
+                            label = "Xtream",
+                            description = "Login API (Codes / Xtream). Host + user + pass.",
+                            selected = type == SourceType.XTREAM,
+                            onSelect = { type = SourceType.XTREAM },
+                        )
+                        TypeChip(
+                            label = "M3U URL",
+                            description = "Hosted playlist link (ends in .m3u or .m3u8).",
+                            selected = type == SourceType.M3U_URL,
+                            onSelect = { type = SourceType.M3U_URL },
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TypeChip(
+                            label = "M3U File",
+                            description = "Pick a .m3u file already on your device.",
+                            selected = type == SourceType.M3U_FILE,
+                            onSelect = { type = SourceType.M3U_FILE },
+                        )
+                        TypeChip(
+                            label = "Stalker",
+                            description = "MAG-style portal — portal URL + MAC address.",
+                            selected = type == SourceType.STALKER,
+                            onSelect = { type = SourceType.STALKER },
+                        )
+                    }
                 }
 
                 SectionLabel("Details")
@@ -187,14 +255,48 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     onValueChange = { name = it },
                     bare = true,
                 )
-                SettingsClickToEditField(
-                    label = if (type == SourceType.XTREAM) "Host URL" else "M3U URL",
-                    hint = if (type == SourceType.XTREAM) "http://host:port" else "https://provider.tv/list.m3u",
-                    value = url,
-                    onValueChange = { url = it },
-                    keyboardType = KeyboardType.Uri,
-                    bare = true,
-                )
+                if (type == SourceType.M3U_FILE) {
+                    // SAF-backed file picker. The button is the focus
+                    // target; the picker hands back a content:// URI
+                    // and we take persistent read permission so the
+                    // source survives process restarts.
+                    SettingsRow(
+                        label = "M3U file",
+                        hint = if (fileDisplayName.isNotBlank()) {
+                            "Selected: $fileDisplayName"
+                        } else {
+                            "Tap to pick a .m3u or .m3u8 file from your device."
+                        },
+                        onClick = {
+                            filePickerLauncher.launch(
+                                arrayOf(
+                                    "audio/x-mpegurl",
+                                    "audio/mpegurl",
+                                    "application/x-mpegurl",
+                                    "application/vnd.apple.mpegurl",
+                                    "*/*",
+                                ),
+                            )
+                        },
+                    )
+                } else {
+                    SettingsClickToEditField(
+                        label = when (type) {
+                            SourceType.XTREAM -> "Host URL"
+                            SourceType.STALKER -> "Portal URL"
+                            else -> "M3U URL"
+                        },
+                        hint = when (type) {
+                            SourceType.XTREAM -> "http://host:port"
+                            SourceType.STALKER -> "http://portal.tv/c/ or http://portal.tv/stalker_portal/c/"
+                            else -> "https://provider.tv/list.m3u"
+                        },
+                        value = url,
+                        onValueChange = { url = it },
+                        keyboardType = KeyboardType.Uri,
+                        bare = true,
+                    )
+                }
 
                 if (type == SourceType.XTREAM) {
                     SectionLabel("Credentials")
@@ -212,6 +314,17 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                         onValueChange = { password = it },
                         transformation = PasswordVisualTransformation(),
                         keyboardType = KeyboardType.Password,
+                        bare = true,
+                    )
+                }
+
+                if (type == SourceType.STALKER) {
+                    SectionLabel("Device identity")
+                    SettingsClickToEditField(
+                        label = "MAC address",
+                        hint = "00:1A:79:XX:XX:XX — usually printed on the back of your MAG box.",
+                        value = macAddress,
+                        onValueChange = { macAddress = it },
                         bare = true,
                     )
                 }
