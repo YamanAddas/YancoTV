@@ -75,6 +75,7 @@ class ContentWriter(private val db: YancoDb) {
                         catchupType = entry.catchupType,
                         catchupSource = entry.catchupSource,
                         tvArchiveDuration = entry.catchupDays,
+                        catchupCorrection = entry.catchupCorrection,
                     )
                 db.contentQueries.insert(
                     id = id,

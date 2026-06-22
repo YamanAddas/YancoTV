@@ -20,6 +20,14 @@ fun buildXtreamTimeshiftUrl(
     originalStreamUrl: String,
     programmeStart: Long,
     programmeDuration: Long,
+    /**
+     * `catchup-correction` value from the EXTINF line (HOURS). Offsets
+     * [programmeStart] when computing the civil-time URL components so
+     * providers whose recording archive doesn't line up with the EPG
+     * (DST boundary, reseller offset, provider-side TZ misconfig)
+     * play the right slot. Null / 0 → no offset. Audit catch.
+     */
+    correctionHours: Double? = null,
 ): String {
     // Strip query/fragment before extracting the numeric stream id.
     // Xtream live URLs frequently include `?token=...` / `?wmsAuthSign=...`
@@ -31,7 +39,8 @@ fun buildXtreamTimeshiftUrl(
     val streamIdMatch = Regex("""/(\d+)\.\w+$""").find(cleanUrl)
     val streamId = streamIdMatch?.groupValues?.get(1) ?: "0"
 
-    val civil = civilFromEpochSeconds(programmeStart)
+    val correctionSec = ((correctionHours ?: 0.0) * 3600.0).toLong()
+    val civil = civilFromEpochSeconds(programmeStart + correctionSec)
     val month = civil.month.toString().padStart(2, '0')
     val day = civil.day.toString().padStart(2, '0')
     val hours = civil.hour.toString().padStart(2, '0')
@@ -60,30 +69,33 @@ fun buildM3uCatchupUrl(
 ): String? {
     val catchupSource = metadata["catchupSource"]?.toString() ?: ""
     val catchupType = metadata["catchupType"]?.toString() ?: ""
+    val catchupCorrectionHours = (metadata["catchupCorrection"] as? Number)?.toDouble() ?: 0.0
+    val correctionSec = (catchupCorrectionHours * 3600.0).toLong()
+    val correctedStart = programmeStart + correctionSec
 
     if (catchupSource.isEmpty() && catchupType.isEmpty()) return null
 
     var template = catchupSource.ifEmpty { originalUrl }
 
     if (catchupType == "append" && catchupSource.isEmpty()) {
-        return "$originalUrl?utc=$programmeStart&lutc=$programmeStart&duration=$programmeDuration"
+        return "$originalUrl?utc=$correctedStart&lutc=$correctedStart&duration=$programmeDuration"
     }
 
     if (catchupType == "shift" && catchupSource.isEmpty()) {
-        val shift = nowSecs - programmeStart
-        return "$originalUrl?utc=$programmeStart&lutc=$programmeStart&shift=$shift"
+        val shift = nowSecs - correctedStart
+        return "$originalUrl?utc=$correctedStart&lutc=$correctedStart&shift=$shift"
     }
 
-    val civil = civilFromEpochSeconds(programmeStart)
+    val civil = civilFromEpochSeconds(correctedStart)
 
     template =
         template
-            .replace(Regex("""\{start\}"""), programmeStart.toString())
-            .replace(Regex("""\{end\}"""), (programmeStart + programmeDuration).toString())
+            .replace(Regex("""\{start\}"""), correctedStart.toString())
+            .replace(Regex("""\{end\}"""), (correctedStart + programmeDuration).toString())
             .replace(Regex("""\{duration\}"""), programmeDuration.toString())
-            .replace(Regex("""\{timestamp\}"""), programmeStart.toString())
-            .replace(Regex("""\{utc\}"""), programmeStart.toString())
-            .replace(Regex("""\{lutc\}"""), programmeStart.toString())
+            .replace(Regex("""\{timestamp\}"""), correctedStart.toString())
+            .replace(Regex("""\{utc\}"""), correctedStart.toString())
+            .replace(Regex("""\{lutc\}"""), correctedStart.toString())
             .replace(Regex("""\{Y\}"""), civil.year.toString())
             .replace(Regex("""\{m\}"""), civil.month.toString().padStart(2, '0'))
             .replace(Regex("""\{d\}"""), civil.day.toString().padStart(2, '0'))

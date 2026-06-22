@@ -417,6 +417,7 @@ class BulkContentWriter(private val driver: SqlDriver, private val logger: Logge
                                 catchupType = e.catchupType,
                                 catchupSource = e.catchupSource,
                                 tvArchiveDuration = e.catchupDays,
+                                catchupCorrection = e.catchupCorrection,
                             )
                         bindString(p++, ContentIds.m3u(sourceId, e.title, e.streamUrl))
                         bindString(p++, sourceId)

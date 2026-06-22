@@ -106,6 +106,10 @@ class CatchupService(private val contentRepo: ContentRepository, private val sou
         val mdMap = HashMap<String, Any?>(4)
         metadata?.catchupSource?.let { mdMap["catchupSource"] = it }
         metadata?.catchupType?.let { mdMap["catchupType"] = it }
+        // catchup-correction (hours) — UrlBuilder applies the offset to
+        // programmeStart before computing the civil-time URL. Optional;
+        // null is treated as 0. Audit catch.
+        metadata?.catchupCorrection?.let { mdMap["catchupCorrection"] = it }
         if (mdMap.isEmpty()) {
             return Resolution.Unavailable(UnavailableReason.MISSING_METADATA)
         }

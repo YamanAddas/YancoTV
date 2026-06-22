@@ -19,6 +19,14 @@ data class M3uEntry(
     val catchupType: String? = null,
     val catchupSource: String? = null,
     val catchupDays: Int? = null,
+    /**
+     * `catchup-correction="-1.5"` (offset in HOURS). Some providers'
+     * recording archives don't line up with the EPG (DST, provider-side
+     * TZ misconfig, reseller offset). Player libraries (TiviMate /
+     * IPTVnator / Kodi PVR) read this attribute and shift the programme
+     * start by `correction * 3600 s` when computing the catch-up URL.
+     */
+    val catchupCorrection: Double? = null,
 )
 
 data class M3uParseResult(
@@ -93,6 +101,7 @@ fun parseM3u(content: String, logger: Logger = NOOP_LOGGER): M3uParseResult {
                     catchupType = ce.catchupType,
                     catchupSource = ce.catchupSource,
                     catchupDays = ce.catchupDays,
+                    catchupCorrection = ce.catchupCorrection,
                 ),
                 hasTitle = !ce.title.isNullOrEmpty(),
             )
@@ -133,6 +142,7 @@ private class PartialEntry(
     var catchupType: String? = null,
     var catchupSource: String? = null,
     var catchupDays: Int? = null,
+    var catchupCorrection: Double? = null,
 )
 
 private val DURATION_REGEX = Regex("""^(-?\d+(?:\.\d+)?)""")
@@ -156,6 +166,12 @@ private fun parseExtinfLine(line: String): PartialEntry {
     if (catchupSource.isNotEmpty()) entry.catchupSource = catchupSource
     val catchupDaysRaw = extractAttribute(line, "catchup-days").ifEmpty { extractAttribute(line, "tvg-rec") }
     if (catchupDaysRaw.isNotEmpty()) entry.catchupDays = catchupDaysRaw.toIntOrNull()
+    // `catchup-correction="-1.5"` — offset in HOURS to apply when
+    // computing the catch-up URL. Honoured by TiviMate / IPTVnator /
+    // Kodi PVR; without it providers whose archives don't line up
+    // with the EPG play the wrong slot silently. Audit catch.
+    val catchupCorrectionRaw = extractAttribute(line, "catchup-correction")
+    if (catchupCorrectionRaw.isNotEmpty()) entry.catchupCorrection = catchupCorrectionRaw.toDoubleOrNull()
 
     val lastComma = line.lastIndexOf(',')
     entry.title = if (lastComma != -1) line.substring(lastComma + 1).trim() else ""

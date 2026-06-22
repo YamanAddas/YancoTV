@@ -119,6 +119,16 @@ data class ContentMetadata(
     val tvArchiveDuration: Int? = null,
     val catchupType: String? = null,
     val catchupSource: String? = null,
+    /**
+     * Audit catch — `catchup-correction="-1.5"` on EXTINF lines. Offset
+     * in HOURS applied to programme start when computing the catch-up
+     * URL: providers whose recording archives are off-by-N from the
+     * EPG (DST boundary, provider-side TZ misconfig, Eastern-European
+     * playlists shipping a reseller offset) ship this so the player
+     * plays the right slot. Honoured by TiviMate / IPTVnator / Kodi
+     * PVR; YancoTV silently played the wrong slot before this field.
+     */
+    val catchupCorrection: Double? = null,
     val tmdbId: Long? = null,
     val tmdbType: TmdbType? = null,
     val tmdbPosterUrl: String? = null,
