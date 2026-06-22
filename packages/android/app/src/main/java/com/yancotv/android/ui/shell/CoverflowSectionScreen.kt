@@ -143,6 +143,15 @@ fun CoverflowSectionScreen(
     onExitToCategories: () -> Unit,
     onPanelFocusChanged: (Boolean) -> Unit,
     restoreFocusOnWindowRegain: Boolean,
+    /**
+     * Audit catch — when the catalogue is empty AND the user has no
+     * sources, the empty pane offers a focusable "Add a source" CTA
+     * that fires this lambda. Caller (HomeScreen via BrowseSection)
+     * switches section=Settings + pendingSettingsTab=Sources. Null is
+     * accepted so test harnesses / non-shell callers don't need to
+     * wire it; the CTA simply doesn't render.
+     */
+    onAddSource: (() -> Unit)? = null,
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
     epg: EpgRepository = koinInject(),
@@ -537,6 +546,7 @@ fun CoverflowSectionScreen(
                     CoverflowEmptyState(
                         type = type,
                         favoritesFilter = isFavoritesFilter,
+                        onAddSource = onAddSource,
                     )
             }
         }
@@ -1265,7 +1275,7 @@ private fun ContentOrb(
 }
 
 @Composable
-private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean) {
+private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean, onAddSource: (() -> Unit)? = null) {
     val title =
         when {
             favoritesFilter ->
@@ -1284,7 +1294,7 @@ private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean) {
     val body =
         when {
             favoritesFilter -> "Star something from the preview pane and it'll land here."
-            else -> "Add an IPTV source in Settings → Sources to start watching."
+            else -> "Add an IPTV source to start watching."
         }
     Column(
         modifier =
@@ -1305,5 +1315,25 @@ private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean) {
             color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Body,
         )
+        // Audit catch — pre-fix the empty pane had ZERO focusable children,
+        // so a first-run user pressing the sidebar Live TV / Movies /
+        // Series icon hit a dead pane with D-pad going nowhere. Mirror
+        // EmptyHome's pattern: when this is the "no sources yet" case
+        // (not the "no favourites" case), surface a focusable button
+        // that opens Settings → Sources directly.
+        if (!favoritesFilter && onAddSource != null) {
+            Spacer(Modifier.height(Space.xl))
+            com.yancotv.android.ui.components.YancoPrimaryButton(
+                onClick = onAddSource,
+                size = com.yancotv.android.ui.components.ButtonSize.Standard,
+            ) {
+                Icon(
+                    imageVector = YancoIcons.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(text = "Add a source")
+            }
+        }
     }
 }

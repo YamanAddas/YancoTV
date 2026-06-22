@@ -75,6 +75,8 @@ fun BrowseSection(
     onActivate: (List<ContentItem>, Int) -> Unit,
     onExitToSidebar: () -> Unit,
     restoreFocusOnWindowRegain: Boolean,
+    /** Fired by the coverflow empty-state's "Add a source" CTA. */
+    onAddSource: (() -> Unit)? = null,
     repo: ContentRepository = koinInject(),
     prefs: AppPreferences = koinInject(),
     modifier: Modifier = Modifier,
@@ -251,6 +253,7 @@ fun BrowseSection(
                 if (hasFocus) onPanelFocusChanged(PanelFocus.Content)
             },
             restoreFocusOnWindowRegain = restoreFocusOnWindowRegain,
+            onAddSource = onAddSource,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }

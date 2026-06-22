@@ -395,6 +395,12 @@ fun HomeScreen(
                         onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
                         restoreFocusOnWindowRegain =
                         detailItem == null && !searchOverlayVisible && pendingPlay == null,
+                        // Same path as HomeContent.onAddSource — surfaces
+                        // when the coverflow empty pane is rendered.
+                        onAddSource = {
+                            pendingSettingsTab = com.yancotv.android.ui.settings.SettingsTab.Sources
+                            section = AppSection.Settings
+                        },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
