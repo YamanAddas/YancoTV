@@ -28,6 +28,13 @@ CREATE TABLE content (
 CREATE INDEX idx_content_source ON content(source_id);
 CREATE INDEX idx_content_type ON content(type);
 CREATE INDEX idx_content_group ON content(group_name);
+-- Audit catch — Home "Recently added" rail runs
+-- `SELECT * FROM content WHERE type IN ('movie','series') ORDER BY created_at DESC LIMIT N`
+-- on every Home open. Without a covering index this was a full sort
+-- over the catalogue on every cold launch (on a 100k-row Xtream
+-- catalogue that's measurable). Partial WHERE skips live rows so the
+-- index stays tight.
+CREATE INDEX idx_content_vod_created_at ON content(created_at DESC) WHERE type IN ('movie', 'series');
 CREATE INDEX idx_content_clean_title ON content(clean_title);
 CREATE INDEX idx_content_sort_order ON content(source_id, type, sort_order);
 -- MK.EPG.D — composite (type, tvg_id) for Guide queries. Every Guide
