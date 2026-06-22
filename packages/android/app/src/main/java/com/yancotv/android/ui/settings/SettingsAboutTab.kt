@@ -235,8 +235,10 @@ fun SettingsAboutTab(
         SettingsSection(
             title = "About YancoTV",
             sub =
-            "An IPTV client for Android TV, Fire TV, and phones. Bring your M3U or Xtream playlist; " +
-                "we handle the EPG, recordings, favorites, multi-list, and smart category grouping.",
+            "An IPTV client for Android TV, Fire TV, and phones. Bring your Xtream login, M3U URL, " +
+                "M3U file, or Stalker portal — YancoTV handles the EPG and recordings, remembers " +
+                "where you left off in every movie and series, and ships voice search, parental " +
+                "controls, and cast-to-TV.",
         ) {}
 
         // ───── Privacy ─────

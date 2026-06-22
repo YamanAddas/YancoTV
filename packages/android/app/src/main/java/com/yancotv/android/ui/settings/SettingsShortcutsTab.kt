@@ -72,6 +72,15 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
             ShortcutRow("Back out", listOf("Back", "Esc"))
         }
 
+        SettingsSection(title = "Settings") {
+            // MK.31 — numpad 1-9 jumps to the Nth Settings tab. Order after
+            // MK.29.5: 1=Sources, 2=General, 3=Playback, 4=Parental,
+            // 5=Recordings, 6=Network, 7=Groups, 8=EPG, 9=Appearance.
+            // Gated on sidebar focus + empty search field, so typing
+            // into the search bar isn't hijacked.
+            ShortcutRow("Jump to Settings tab", listOf("1–9"))
+        }
+
         SettingsSection(title = "Playback") {
             ShortcutRow("Play / Pause", listOf("Play", "Space"))
             SettingsRowSpacer()
