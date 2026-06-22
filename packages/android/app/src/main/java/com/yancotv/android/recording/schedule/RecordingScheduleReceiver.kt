@@ -332,8 +332,90 @@ class RecordingScheduleReceiver :
                         errorReason = reason,
                     )
                 }
+                // Audit catch — pre-fix, a failed scheduled recording
+                // wrote the DB row and the user discovered it hours
+                // later when they opened the Recordings tab — way past
+                // the point of doing anything about it. Post a
+                // low-importance persistent notification so a failed
+                // 8pm recording surfaces at 8pm, not 11pm.
+                postScheduleFailedNotification(
+                    context = context,
+                    scheduleId = schedule.id,
+                    title = schedule.title,
+                    reason = reason,
+                )
             },
         )
+    }
+
+    /**
+     * Audit catch — post a low-importance, dismissible notification when
+     * a scheduled recording fails to start. Re-uses the existing
+     * RecordingService.CHANNEL_ID ("yanco_recordings") so the channel
+     * is already registered + visible in the user's per-app notification
+     * settings. Notification ID is the schedule id's hashCode + 1 so
+     * two simultaneous failures don't overwrite each other AND a retry
+     * of the same schedule re-uses the slot rather than spawning a
+     * second notification.
+     */
+    private fun postScheduleFailedNotification(context: Context, scheduleId: String, title: String, reason: String) {
+        runCatching {
+            val humanReason = when {
+                reason.startsWith("service_start_failed") ->
+                    "The app couldn't start in the background. Open the app before the scheduled time."
+                reason.contains(RecordingScheduleRepository.REASON_CONCURRENT_RECORDING_ACTIVE) ->
+                    "Another recording was already in progress (1-stream limit)."
+                reason.contains(RecordingScheduleRepository.REASON_RECORDING_NEVER_STARTED) ->
+                    "The recording service never landed bytes — check storage and source."
+                else -> reason.take(120)
+            }
+            val nm =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            // Channel is registered by RecordingService.ensureNotificationChannel;
+            // call ensure here too so a notification fired without the
+            // service having been started this session still has its
+            // channel in place. Cheap — channel lookups are idempotent.
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val existing = nm.getNotificationChannel(FAILED_CHANNEL_ID)
+                if (existing == null) {
+                    nm.createNotificationChannel(
+                        android.app.NotificationChannel(
+                            FAILED_CHANNEL_ID,
+                            "Recording failures",
+                            android.app.NotificationManager.IMPORTANCE_LOW,
+                        ).apply {
+                            description = "Posted when a scheduled recording can't start."
+                        },
+                    )
+                }
+            }
+            val launchIntent = context.packageManager
+                .getLaunchIntentForPackage(context.packageName)
+                ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+            val pi = launchIntent?.let {
+                android.app.PendingIntent.getActivity(
+                    context,
+                    scheduleId.hashCode(),
+                    it,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            }
+            val notification = androidx.core.app.NotificationCompat.Builder(context, FAILED_CHANNEL_ID)
+                .setSmallIcon(com.yancotv.android.R.drawable.ic_logo)
+                .setContentTitle("Recording didn't start")
+                .setContentText("\"$title\" — $humanReason")
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText("\"$title\" — $humanReason"))
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
+                .setAutoCancel(true)
+                .apply { if (pi != null) setContentIntent(pi) }
+                .build()
+            // Notification ID space: 9001 is the active-recordings FGS slot
+            // (RecordingService). Use 10000 + abs(hash) to avoid collision.
+            val nid = 10_000 + (kotlin.math.abs(scheduleId.hashCode()) % 10_000)
+            nm.notify(nid, notification)
+        }.onFailure { t ->
+            Log.w(TAG, "postScheduleFailedNotification failed for $scheduleId", t)
+        }
     }
 
     /**
@@ -382,5 +464,6 @@ class RecordingScheduleReceiver :
 
     companion object {
         private const val TAG = "YancoSchedReceiver"
+        private const val FAILED_CHANNEL_ID = "yanco_recordings_failures"
     }
 }
