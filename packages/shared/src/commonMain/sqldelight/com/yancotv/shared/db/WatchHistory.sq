@@ -9,6 +9,12 @@ CREATE TABLE watch_history (
 
 CREATE INDEX idx_watch_history_content ON watch_history(content_id);
 CREATE INDEX idx_watch_history_watched_at ON watch_history(watched_at DESC);
+-- MK.28 / audit catch — selectByEpisode + selectByEpisodeIds + the
+-- episode_id FK integrity check all filter on `episode_id` with no
+-- covering index, so series-detail screens (which call positionForEpisode
+-- per visible tile) full-scan watch_history on every render. Partial
+-- index keeps the size tight by skipping content-level rows.
+CREATE INDEX idx_watch_history_episode ON watch_history(episode_id) WHERE episode_id IS NOT NULL;
 
 selectRecent:
 SELECT * FROM watch_history ORDER BY watched_at DESC LIMIT ?;

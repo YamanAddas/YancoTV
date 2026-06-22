@@ -78,6 +78,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -116,7 +117,17 @@ fun HomeContent(
     epg: EpgRepository = koinInject(),
     content: ContentRepository = koinInject(),
 ) {
-    val favoriteList by favorites.allFlow().collectAsState(initial = emptyList())
+    // Audit catch — a corrupted favorites row throwing inside the
+    // SQLDelight mapper would otherwise propagate out of collectAsState
+    // and crash the Home screen (worst possible place — first surface
+    // the user sees). Empty-list fallback matches the screen's
+    // existing empty-state. Same shape for `recentHistory` below.
+    val favoriteList by remember {
+        favorites.allFlow().catch { t ->
+            android.util.Log.w("Yanco", "HomeContent favorites flow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
     val hiddenIds by parental.hiddenIds.collectAsState()
     val lockedIds by parental.lockedIds.collectAsState()
 
@@ -127,7 +138,12 @@ fun HomeContent(
     // re-renders every time `watch_history` is upserted (i.e. on every
     // PlaybackController.persistResumePoint call), so exiting the player
     // returns the user to a Home that already reflects their new offset.
-    val recentHistory by history.recentFlow(limit = 30).collectAsState(initial = emptyList())
+    val recentHistory by remember {
+        history.recentFlow(limit = 30).catch { t ->
+            android.util.Log.w("Yanco", "HomeContent history flow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
     val resumeByContent by remember {
         derivedStateOf {
             // recentHistory is ordered DESC by watched_at — newest first.

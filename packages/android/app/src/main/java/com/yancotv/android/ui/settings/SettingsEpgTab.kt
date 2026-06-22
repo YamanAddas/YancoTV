@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.flow.catch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,7 +70,14 @@ fun SettingsEpgTab(
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val epgState by prefs.epgFlow.collectAsState()
-    val allSources by sources.allFlow().collectAsState(initial = emptyList())
+    // Audit catch — protect against a corrupted source row crashing
+    // the EPG tab (lower-impact than Home but consistent with rule 7).
+    val allSources by remember {
+        sources.allFlow().catch { t ->
+            android.util.Log.w("Yanco", "SettingsEpgTab sources flow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
     val orderedSources =
         remember(allSources) { allSources.sortedByDescending { it.epgPriority } }
     val activeSources = remember(allSources) { allSources.filter { it.isActive } }

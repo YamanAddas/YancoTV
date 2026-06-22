@@ -57,6 +57,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -98,8 +99,23 @@ fun RecordingsScreen(
     // Reactive lists — flip immediately when a recording or schedule
     // changes from any surface (RecordingService writes, schedule
     // create/cancel, alarm fires, boot reconciliation).
-    val rows by remember { recordings.allFlow() }.collectAsState(initial = emptyList())
-    val allSchedules by remember { schedules.allFlow() }.collectAsState(initial = emptyList())
+    //
+    // Audit catch — wrap both flows with .catch{emit(empty)} so a
+    // corrupted state-enum / malformed file_path row doesn't crash
+    // the screen. Recordings persistence has a deferred-fix history
+    // (MB-212) — exactly the surface where a stray row could exist.
+    val rows by remember {
+        recordings.allFlow().catch { t ->
+            android.util.Log.w("Yanco", "RecordingsScreen recordings flow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
+    val allSchedules by remember {
+        schedules.allFlow().catch { t ->
+            android.util.Log.w("Yanco", "RecordingsScreen schedules flow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
 
     // MK.14.3 — "Upcoming" view shows non-terminal schedules ordered
     // soonest-first. Terminal-state rows (COMPLETED / CANCELLED /

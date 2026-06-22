@@ -69,6 +69,7 @@ import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.FavoriteList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -92,14 +93,29 @@ fun FavoritesScreen(
     // Reactive list: SQLDelight drives recomposition only when the favorites
     // table actually changes, so unstarring from InfoPanel on another screen
     // updates this list without a navigation round-trip.
-    val favorited by favorites.allFlow().collectAsState(initial = null)
+    //
+    // Audit catch — a corrupted favorites row throwing inside the
+    // SQLDelight mapper would propagate out of collectAsState and
+    // crash the screen. Empty-list fallback lands the user on the
+    // existing empty-state instead.
+    val favorited by remember {
+        favorites.allFlow().catch { t ->
+            android.util.Log.w("Yanco", "FavoritesScreen allFlow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = null)
     val loading = favorited == null
     // MK.13.4 — list tabs. `lists` reactive so creating / renaming /
     // deleting a list reflects without a navigation round-trip. Selected
     // list survives recomposition via rememberSaveable; falls back to
     // 'default' if the saved id no longer exists (e.g. user deleted the
     // list while we weren't looking).
-    val lists by favorites.listsFlow().collectAsState(initial = emptyList<FavoriteList>())
+    val lists by remember {
+        favorites.listsFlow().catch { t ->
+            android.util.Log.w("Yanco", "FavoritesScreen listsFlow failed: ${t.message}", t)
+            emit(emptyList())
+        }
+    }.collectAsState(initial = emptyList<FavoriteList>())
     var selectedListId by rememberSaveable { mutableStateOf("default") }
     LaunchedEffect(lists) {
         if (lists.isNotEmpty() && lists.none { it.id == selectedListId }) {

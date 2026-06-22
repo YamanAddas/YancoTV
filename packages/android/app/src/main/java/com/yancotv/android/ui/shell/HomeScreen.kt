@@ -222,13 +222,25 @@ fun HomeScreen(
     // bar when a focusGroup leaves composition, so the selector would
     // otherwise go dark until the user presses a d-pad key. Fires only
     // on the open→closed transition to avoid grabbing focus at startup.
+    //
+    // Audit catch — was `delay(80) + requestFocus()`, the exact
+    // anti-pattern the MK skill bans ("PlacedFocusAnchor is the only
+    // safe focus-on-open primitive; delay+requestFocus is a known
+    // race"). On Fire TV with a cold detail-close the Box hosting
+    // mainContentFocus may not be re-placed within 80 ms, so the
+    // requestFocus() lands on an unplaced node and runCatching
+    // swallows the throw — the symptom the LaunchedEffect was meant
+    // to fix. Mirror the section-change pattern at line ~195:
+    // `withFrameNanos { }` waits for *actual* placement before the
+    // focus request — one layout pass is enough now that the
+    // ContentDetail Box always remounts the focusGroup on close.
     var prevDetailOpen by remember { mutableStateOf(false) }
     LaunchedEffect(detailItem) {
         val isOpen = detailItem != null
         val justClosed = prevDetailOpen && !isOpen
         prevDetailOpen = isOpen
         if (justClosed) {
-            delay(80)
+            withFrameNanos { }
             runCatching { mainContentFocus.requestFocus() }
         }
     }
