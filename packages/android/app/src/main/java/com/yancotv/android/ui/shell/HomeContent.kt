@@ -81,6 +81,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -124,7 +125,25 @@ fun HomeContent(
     parental: ParentalRepository = koinInject(),
     epg: EpgRepository = koinInject(),
     content: ContentRepository = koinInject(),
+    sources: com.yancotv.shared.sources.SourceRepository = koinInject(),
 ) {
+    // Audit catch — without this, on every cold launch with a populated
+    // DB the five LaunchedEffects below start with empty collections,
+    // isTotallyEmpty is true for a few hundred ms, and EmptyHome flashes
+    // "Add your first source" — looking like the app forgot the user's
+    // sources. Worst possible first impression. Gate on a reactive
+    // probe of sources.allFlow: `initial = true` means we ASSUME the
+    // user has sources until the flow tells us otherwise, so the CTA
+    // only paints when sources are genuinely empty. .catch keeps the
+    // pessimistic path (don't show CTA on DB failure) consistent.
+    val hasSources by remember {
+        sources.allFlow()
+            .map { it.isNotEmpty() }
+            .catch { t ->
+                android.util.Log.w("Yanco", "HomeContent sources probe failed: ${t.message}", t)
+                emit(true)
+            }
+    }.collectAsState(initial = true)
     // Audit catch — a corrupted favorites row throwing inside the
     // SQLDelight mapper would otherwise propagate out of collectAsState
     // and crash the Home screen (worst possible place — first surface
@@ -318,7 +337,12 @@ fun HomeContent(
             .padding(top = Space.xl, bottom = Space.section),
         verticalArrangement = Arrangement.spacedBy(Space.xxxl),
     ) {
-        if (isTotallyEmpty) {
+        // Audit catch — only render EmptyHome when we KNOW sources are
+        // empty. `hasSources` starts true (probe assumes populated until
+        // proven otherwise), so a returning user never sees the "Add
+        // your first source" CTA flash during the first 300ms of cold
+        // launch while LaunchedEffects fill their lists.
+        if (isTotallyEmpty && !hasSources) {
             EmptyHome(
                 onAddSource = onAddSource,
                 modifier = Modifier.padding(horizontal = Space.section),

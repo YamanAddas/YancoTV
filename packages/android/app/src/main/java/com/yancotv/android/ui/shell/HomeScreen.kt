@@ -49,6 +49,8 @@ import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpgGuideChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -77,6 +79,7 @@ fun HomeScreen(
     parental: ParentalRepository = koinInject(),
     prefs: AppPreferences = koinInject(),
     history: WatchHistoryRepository = koinInject(),
+    sources: com.yancotv.shared.sources.SourceRepository = koinInject(),
 ) {
     val openOn = remember { prefs.generalSnapshot().openOn }
     val initialSection =
@@ -409,9 +412,26 @@ fun HomeScreen(
                     if (needsSettingsGate) {
                         SettingsLockedPlaceholder()
                     } else {
+                        // Audit catch — when the user has zero sources
+                        // configured and opens Settings (via sidebar or
+                        // any path other than the EmptyHome CTA), default
+                        // to Sources rather than General. Sources is the
+                        // one tab they actually need to make the app
+                        // useful. Returning users with ≥1 source still
+                        // land on General. The EmptyHome CTA path
+                        // already wins via pendingSettingsTab.
+                        val hasSources by remember {
+                            sources.allFlow()
+                                .map { it.isNotEmpty() }
+                                .catch { emit(true) }
+                        }.collectAsState(initial = true)
                         SettingsScreen(
                             initialTab = pendingSettingsTab
-                                ?: com.yancotv.android.ui.settings.SettingsTab.General,
+                                ?: if (hasSources) {
+                                    com.yancotv.android.ui.settings.SettingsTab.General
+                                } else {
+                                    com.yancotv.android.ui.settings.SettingsTab.Sources
+                                },
                             onExitToMainSidebar = {
                                 runCatching { sidebarFocus.requestFocus() }
                             },

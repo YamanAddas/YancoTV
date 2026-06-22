@@ -142,7 +142,11 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Scroll with the D-pad. Press OK on a field to type. Credentials are encrypted on-device.",
+                    // Audit catch — was "Scroll with the D-pad. Press OK on
+                    // a field to type." which is wrong on touch. Rewritten
+                    // form-factor-agnostic so the same string works on
+                    // Fire TV remote AND phone.
+                    text = "Tap a field to edit it. Credentials are encrypted on-device.",
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 13.sp,
                 )
@@ -212,7 +216,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     )
                 }
 
-                SectionLabel("Electronic program guide")
+                SectionLabel("Electronic programme guide")
                 SettingsClickToEditField(
                     label = "EPG URL",
                     hint = "Optional — leave blank for the provider's built-in guide",

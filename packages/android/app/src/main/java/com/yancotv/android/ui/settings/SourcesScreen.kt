@@ -273,14 +273,27 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                         }.onFailure { t ->
+                            // Audit catch — was telling end-users to run
+                            // `adb logcat -s Yanco:*`, which a Fire TV
+                            // remote user obviously can't. Friendlier
+                            // user-facing copy + redact raw t.message
+                            // (could include internals) and cap to ~140
+                            // chars for the generic else branch.
+                            android.util.Log.e(
+                                "Yanco",
+                                "AddSource failed (adb logcat -s Yanco:* shows the failing step): ${t.message}",
+                                t,
+                            )
                             addError =
                                 when (t) {
                                     is TimeoutCancellationException ->
-                                        "Save timed out after 15s — DB or Keystore is stuck. Restart the app and try again; logcat (adb logcat -s Yanco:*) shows which step stalled."
-                                    else ->
-                                        t.message?.takeIf { it.isNotBlank() }
+                                        "Saving took too long. Restart the app and try again — if it keeps happening, the credential store may need to be reset."
+                                    else -> {
+                                        val raw = t.message?.takeIf { it.isNotBlank() }
                                             ?: t::class.simpleName
                                             ?: "Unknown error"
+                                        com.yancotv.shared.http.redactCredentials(raw).take(140)
+                                    }
                                 }
                         }
                 }
