@@ -256,6 +256,18 @@ class PlayerActivity : AppCompatActivity() {
     // from flashing the overlay on cold start / zap.
     private var hasBeenReady = false
 
+    // Audit catch — single-attempt auto-retry for transient network
+    // errors. On the typical IPTV Fire TV use case (flaky Wi-Fi, 5GHz
+    // roaming, brief router blip) a 2-3s drop currently kicks the user
+    // out to the blocking error overlay. Now: first time we see an
+    // IO_NETWORK_* error on the current MediaItem, fire one delayed
+    // prepare() before surfacing UI. Resets to false on every new
+    // MediaItem and on every successful STATE_READY. This is the
+    // smallest-shape fix — a richer retry framework (NetworkCallback,
+    // backoff over N attempts) is on the next-session list.
+    private var networkRetryAttempted = false
+    private var networkRetryJob: Job? = null
+
     // VOD dock (MK.16.player.vod.dock). Replaces Media3's built-in
     // PlayerControlView for non-live items. Lazy-inflated via the
     // `vod_dock_stub` ViewStub on first show.
@@ -330,6 +342,33 @@ class PlayerActivity : AppCompatActivity() {
                     ).show()
                     return
                 }
+                // Audit catch — single-attempt auto-retry on transient
+                // network errors. Most "stream broken" reports on Fire
+                // TV are 2-3s Wi-Fi blips that resolve on their own.
+                // Fire one prepare() after 1.5s before surfacing UI; if
+                // it lands READY the attempt counter resets and the
+                // user sees nothing. If it fails again we fall through
+                // to the existing overlay path. Catchup 404s and codec
+                // errors bypass this path — they're not transient.
+                val isTransientNetwork =
+                    error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+                if (isTransientNetwork && !networkRetryAttempted) {
+                    networkRetryAttempted = true
+                    Log.i(TAG, "Transient network error — queuing auto-retry in 1500ms")
+                    android.widget.Toast.makeText(
+                        this@PlayerActivity,
+                        "Reconnecting…",
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                    networkRetryJob?.cancel()
+                    networkRetryJob = lifecycleScope.launch {
+                        delay(1500L)
+                        runCatching { player.prepare() }
+                            .onFailure { Log.w(TAG, "auto-retry prepare() failed", it) }
+                    }
+                    return
+                }
                 showStreamError(error)
             }
 
@@ -357,6 +396,13 @@ class PlayerActivity : AppCompatActivity() {
                         // autoplay-in-flight guard so the next end-of-episode
                         // can fire the autoplay flow again.
                         autoplayInFlight = false
+                        // Audit catch — successful prepare resets the
+                        // transient-network retry budget. Next blip on
+                        // this MediaItem (or a future one) gets its own
+                        // single quiet attempt.
+                        networkRetryAttempted = false
+                        networkRetryJob?.cancel()
+                        networkRetryJob = null
                         // Any non-error overlay clears on READY; the error
                         // state has its own retry flow and shouldn't auto-
                         // clear until the retry fires and we actually hit
@@ -825,6 +871,12 @@ class PlayerActivity : AppCompatActivity() {
         hasBeenReady = false
         bufferingShowJob?.cancel()
         bufferingShowJob = null
+        // Audit catch — reset transient-network retry budget when the
+        // player swaps to a different MediaItem so each title / channel
+        // gets its own single quiet attempt.
+        networkRetryAttempted = false
+        networkRetryJob?.cancel()
+        networkRetryJob = null
         // MK.16.player.vod.dock — LIVE keeps Media3's built-in controller
         // (needed for the zap bar / program-progress overlays to ride
         // alongside it). VOD (movie / episode) disables the built-in one
