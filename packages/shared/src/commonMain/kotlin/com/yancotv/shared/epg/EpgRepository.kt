@@ -102,13 +102,23 @@ class EpgRepository(
 
     /**
      * MK.14.6 — find future occurrences of a programme by title on a
-     * channel, within `[now, now + windowMs)`. Used by the manual series-
-     * binding flow ("Record all on this channel"). Exact-match on the
-     * EPG-canonical title — caller has the snapshot from the long-pressed
-     * row.
+     * channel, within `[nowSec, nowSec + windowSec)`. Used by the manual
+     * series-binding flow ("Record all on this channel"). Exact-match on
+     * the EPG-canonical title — caller has the snapshot from the
+     * long-pressed row.
+     *
+     * UNITS: both args are XMLTV epoch **SECONDS**. `epg_programmes.start_time`
+     * stores XMLTV seconds (NOT ms), so the predicate is
+     * `start_time >= nowSec AND start_time < nowSec + windowSec`. The
+     * pre-MK.28 spelling was `now: Long, windowMs: Long` — a `*Ms`
+     * suffix on what semantically had to be seconds — and the call site
+     * passed `System.currentTimeMillis()` (~1.78e12 ms) which dwarfs
+     * every real row's start_time (~1.78e9 s), so the query returned 0
+     * rows and the Record-all-series flow silently bound nothing.
+     * Audit catch.
      */
-    fun findFutureByChannelAndTitle(tvgId: String, title: String, now: Long, windowMs: Long): List<EpgProgramme> = db.epgProgrammesQueries
-        .futureByChannelAndTitle(tvgId, title, now, now + windowMs)
+    fun findFutureByChannelAndTitle(tvgId: String, title: String, nowSec: Long, windowSec: Long): List<EpgProgramme> = db.epgProgrammesQueries
+        .futureByChannelAndTitle(tvgId, title, nowSec, nowSec + windowSec)
         .executeAsList()
         .map { it.toDomain() }
 

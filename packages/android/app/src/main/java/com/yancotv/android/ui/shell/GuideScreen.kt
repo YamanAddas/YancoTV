@@ -716,13 +716,24 @@ fun GuideScreen(
                             runCatching {
                                 val contentItem =
                                     contentRepo.findLiveByTvgId(channel.tvgId)
-                                val now = System.currentTimeMillis()
+                                // epg_programmes.start_time/end_time are
+                                // XMLTV epoch SECONDS (parser at
+                                // XmltvParser.kt:186 returns epochSeconds).
+                                // The query lower bound is `start_time >= ?`
+                                // which compared a ms `now` (~1.78e12)
+                                // against a seconds column (~1.78e9), so
+                                // every row appeared "in the past" and the
+                                // list was always empty — the user tapping
+                                // Schedule-series silently bound 0
+                                // programmes. Convert to seconds at the
+                                // call site to match column units.
+                                val nowSec = System.currentTimeMillis() / 1000L
                                 val matches =
                                     epg.findFutureByChannelAndTitle(
                                         tvgId = channel.tvgId,
                                         title = programme.title,
-                                        now = now,
-                                        windowMs = SERIES_LOOKAHEAD_MS,
+                                        nowSec = nowSec,
+                                        windowSec = SERIES_LOOKAHEAD_MS / 1000L,
                                     )
                                 recordScheduler.scheduleSeries(
                                     contentId = contentItem?.id,

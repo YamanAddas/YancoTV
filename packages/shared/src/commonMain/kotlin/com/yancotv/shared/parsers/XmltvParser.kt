@@ -43,10 +43,24 @@ data class XmltvResult(val channels: List<XmltvChannel>, val programmes: List<Xm
 // Constants
 // -----------------------------------------------------------------------------
 
-private const val OPEN_PROG = "<programme "
+// OPEN_PROG / OPEN_CHAN scan for the BARE tag name; the caller verifies
+// the next char is a tag boundary (whitespace / '>' / '/') via
+// [isTagBoundary]. The pre-MK.28 spelling `"<programme "` required a
+// literal space after the name, which silently dropped tags emitted with
+// `<channel\n  id="x">` (multi-line pretty-printed XMLTV from Jellyfin /
+// Plex / many providers) or `<programme\tstart="...">`. Audit catch.
+private const val OPEN_PROG = "<programme"
 private const val CLOSE_PROG = "</programme>"
-private const val OPEN_CHAN = "<channel "
+private const val OPEN_CHAN = "<channel"
 private const val CLOSE_CHAN = "</channel>"
+
+/**
+ * True when [c] terminates an XML start-tag's name — i.e. attrs follow,
+ * the tag self-closes (`/`), or the tag closes immediately (`>`).
+ * Used to disambiguate `<channel>` from `<channels>` while still
+ * accepting newline/tab whitespace between the tag name and its attrs.
+ */
+private fun isTagBoundary(c: Char): Boolean = c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '>' || c == '/'
 
 // -----------------------------------------------------------------------------
 // Public API
@@ -259,13 +273,38 @@ private fun parseChannels(xml: String): List<XmltvChannel> {
         val start = xml.indexOf(OPEN_CHAN, pos)
         if (start == -1) break
 
-        val attrEnd = xml.indexOf('>', start + OPEN_CHAN.length)
+        val afterName = start + OPEN_CHAN.length
+        // Boundary check — `<channels>` (root wrapper) starts with
+        // `<channel` literally, so we must verify the next char ends
+        // the tag name. Skip and continue scanning if not.
+        if (afterName >= xml.length || !isTagBoundary(xml[afterName])) {
+            pos = afterName
+            continue
+        }
+
+        val attrEnd = xml.indexOf('>', afterName)
         if (attrEnd == -1) break
+
+        // Self-closing `<channel id="..."/>`. parseProgrammes already
+        // skips these; parseChannels missed it pre-MK.28, with the
+        // result that the next `</channel>` (belonging to a later
+        // full-form channel) was treated as the body of the
+        // self-closing one — corrupting display names and dropping
+        // the later channel entirely. Audit catch.
+        if (xml[attrEnd - 1] == '/') {
+            val attrs = xml.substring(afterName, attrEnd - 1)
+            pos = attrEnd + 1
+            val id = extractAttrFast(attrs, "id")
+            if (!id.isNullOrEmpty()) {
+                channels.add(XmltvChannel(id = id))
+            }
+            continue
+        }
 
         val closeStart = xml.indexOf(CLOSE_CHAN, attrEnd + 1)
         if (closeStart == -1) break
 
-        val attrs = xml.substring(start + OPEN_CHAN.length, attrEnd)
+        val attrs = xml.substring(afterName, attrEnd)
         val body = xml.substring(attrEnd + 1, closeStart)
         pos = closeStart + CLOSE_CHAN.length
 
@@ -295,7 +334,17 @@ private fun parseProgrammes(xml: String): List<XmltvProgramme> {
         val start = xml.indexOf(OPEN_PROG, pos)
         if (start == -1) break
 
-        val attrEnd = xml.indexOf('>', start + OPEN_PROG.length)
+        val afterName = start + OPEN_PROG.length
+        // Boundary check — match `<programme>` / `<programme ...>` /
+        // `<programme\n...>`, but skip past anything that just shares the
+        // prefix (no such tag in xmltv.dtd, but defensive parity with
+        // parseChannels).
+        if (afterName >= xml.length || !isTagBoundary(xml[afterName])) {
+            pos = afterName
+            continue
+        }
+
+        val attrEnd = xml.indexOf('>', afterName)
         if (attrEnd == -1) break
 
         // Skip self-closing <programme .../>.
@@ -307,7 +356,7 @@ private fun parseProgrammes(xml: String): List<XmltvProgramme> {
         val closeStart = xml.indexOf(CLOSE_PROG, attrEnd + 1)
         if (closeStart == -1) break
 
-        val attrs = xml.substring(start + OPEN_PROG.length, attrEnd)
+        val attrs = xml.substring(afterName, attrEnd)
         val body = xml.substring(attrEnd + 1, closeStart)
         pos = closeStart + CLOSE_PROG.length
 

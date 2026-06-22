@@ -4,8 +4,8 @@ CREATE TABLE epg_programmes (
     channel_tvg_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
-    start_time INTEGER NOT NULL,
-    end_time INTEGER NOT NULL,
+    start_time INTEGER NOT NULL, -- XMLTV epoch SECONDS (NOT ms — matches xmltv.dtd)
+    end_time INTEGER NOT NULL,   -- XMLTV epoch SECONDS (NOT ms — matches xmltv.dtd)
     category TEXT,
     icon_url TEXT
 );

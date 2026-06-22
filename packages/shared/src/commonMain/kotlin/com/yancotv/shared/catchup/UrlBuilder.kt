@@ -21,7 +21,14 @@ fun buildXtreamTimeshiftUrl(
     programmeStart: Long,
     programmeDuration: Long,
 ): String {
-    val streamIdMatch = Regex("""/(\d+)\.\w+$""").find(originalStreamUrl)
+    // Strip query/fragment before extracting the numeric stream id.
+    // Xtream live URLs frequently include `?token=...` / `?wmsAuthSign=...`
+    // / `#frag` suffixes; the `$` anchor in the regex would otherwise
+    // miss those entirely and `streamId` would fall back to "0",
+    // producing a timeshift URL like `.../0.ts` that the provider 404s
+    // with no user-visible clue. Audit catch.
+    val cleanUrl = originalStreamUrl.substringBefore('?').substringBefore('#')
+    val streamIdMatch = Regex("""/(\d+)\.\w+$""").find(cleanUrl)
     val streamId = streamIdMatch?.groupValues?.get(1) ?: "0"
 
     val civil = civilFromEpochSeconds(programmeStart)
@@ -84,7 +91,11 @@ fun buildM3uCatchupUrl(
             .replace(Regex("""\{M\}"""), civil.minute.toString().padStart(2, '0'))
             .replace(Regex("""\{S\}"""), civil.second.toString().padStart(2, '0'))
 
-    val streamIdMatch = Regex("""/(\d+)\.\w+$""").find(originalUrl)
+    // Strip query/fragment so URLs with `?token=...` / `?wmsAuthSign=...`
+    // resolve `{stream_id}` against the numeric id rather than silently
+    // skipping the substitution.
+    val cleanOriginal = originalUrl.substringBefore('?').substringBefore('#')
+    val streamIdMatch = Regex("""/(\d+)\.\w+$""").find(cleanOriginal)
     if (streamIdMatch != null) {
         template = template.replace(Regex("""\{stream_id\}"""), streamIdMatch.groupValues[1])
     }
