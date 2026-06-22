@@ -392,15 +392,42 @@ private fun parseProgrammes(xml: String): List<XmltvProgramme> {
 // Tag / attribute extraction helpers
 // -----------------------------------------------------------------------------
 
-/** Extract an attribute value from an attribute-string slice. */
+/**
+ * Extract an attribute value from an attribute-string slice. Accepts
+ * both `attr="value"` and `attr='value'` — XML allows either, and
+ * several Eastern-European XMLTV generators ship single-quoted
+ * attributes. The pre-MK.28 implementation hard-coded the double
+ * quote and silently dropped every programme on those feeds, leaving
+ * the user with a blank Guide for the affected source.
+ *
+ * Looks up `name=` then peeks at the next char: if it's a quote (' or
+ * "), it's the delimiter and we read until the matching one. (M3uParser's
+ * extractAttribute already handles both quote styles — this is the
+ * twin fix on the XMLTV side.)
+ */
 private fun extractAttrFast(attrs: String, name: String): String? {
-    val search = "$name=\""
-    val idx = attrs.indexOf(search)
-    if (idx == -1) return null
-    val valStart = idx + search.length
-    val valEnd = attrs.indexOf('"', valStart)
-    if (valEnd == -1) return null
-    return decodeXmlEntities(attrs.substring(valStart, valEnd))
+    val anchor = "$name="
+    var search = 0
+    while (true) {
+        val idx = attrs.indexOf(anchor, search)
+        if (idx == -1) return null
+        // Disambiguate prefix matches (e.g. asking for "id" must not
+        // match "tvg-id="). The char immediately before the match must
+        // be a whitespace or the start of the string.
+        if (idx > 0 && attrs[idx - 1].isLetterOrDigit()) {
+            search = idx + anchor.length
+            continue
+        }
+        val quote = attrs.getOrNull(idx + anchor.length) ?: return null
+        if (quote != '"' && quote != '\'') {
+            search = idx + anchor.length
+            continue
+        }
+        val valStart = idx + anchor.length + 1
+        val valEnd = attrs.indexOf(quote, valStart)
+        if (valEnd == -1) return null
+        return decodeXmlEntities(attrs.substring(valStart, valEnd))
+    }
 }
 
 /** Extract the text content of the first matching element. */

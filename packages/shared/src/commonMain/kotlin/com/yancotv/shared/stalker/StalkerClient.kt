@@ -46,16 +46,27 @@ private const val STALKER_X_USER_AGENT = "Model: MAG254; Link: Ethernet"
 
 private val STREAM_CMD_PREFIX = Regex("""^(?:ffrt|ffmpeg|auto)\s+""", RegexOption.IGNORE_CASE)
 
-private fun isRetryableError(message: String): Boolean = message.contains("timed out") ||
-    message.contains("ECONNRESET") ||
-    message.contains("ECONNREFUSED") ||
-    message.contains("ETIMEDOUT") ||
-    message.contains("ENOTFOUND") ||
-    message.contains("socket hang up") ||
-    message.contains("HTTP 429") ||
-    message.contains("HTTP 502") ||
-    message.contains("HTTP 503") ||
-    message.contains("HTTP 504")
+// Audit catch — case-insensitive match. Ktor's
+// HttpRequestTimeoutException prints "Request timeout has expired …"
+// (no "timed out"), and OkHttp lowercases platform errors on some
+// devices. Mirror the MK.6.c lower-case fix in XtreamClient so Stalker
+// catalog fetches actually retry on the first timeout instead of
+// surfacing a one-shot failure to the user.
+private fun isRetryableError(message: String): Boolean {
+    val m = message.lowercase()
+    return m.contains("timeout") ||
+        m.contains("timed out") ||
+        m.contains("econnreset") ||
+        m.contains("econnrefused") ||
+        m.contains("etimedout") ||
+        m.contains("enotfound") ||
+        m.contains("socket hang up") ||
+        m.contains("unable to resolve host") ||
+        m.contains("http 429") ||
+        m.contains("http 502") ||
+        m.contains("http 503") ||
+        m.contains("http 504")
+}
 
 private fun str(v: Any?, default: String = ""): String = if (v == null) default else v.toString()
 
