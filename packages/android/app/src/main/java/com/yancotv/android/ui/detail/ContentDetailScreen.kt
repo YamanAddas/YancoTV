@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -1325,7 +1326,11 @@ private fun SeasonPickerOverlay(
         Column(
             modifier =
             Modifier
-                .width(480.dp)
+                // Audit catch — fixed .width(480.dp) clipped on phones.
+                // Scale-down with a min/max range + fillMaxWidth so phone
+                // shrinks gracefully and TV/tablet stay capped at 480dp.
+                .widthIn(min = 280.dp, max = 480.dp)
+                .fillMaxWidth(0.92f)
                 .heightIn(max = 480.dp)
                 .clip(RoundedCornerShape(Radius.panel))
                 .background(LocalYancoPalette.current.BackgroundRaised)

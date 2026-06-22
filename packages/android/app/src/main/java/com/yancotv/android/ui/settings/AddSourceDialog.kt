@@ -115,7 +115,13 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
         Column(
             modifier =
             Modifier
-                .widthIn(min = 560.dp, max = 720.dp)
+                // Audit catch — was widthIn(min = 560.dp), which a 360-380dp
+                // phone clipped horizontally on the entry-point first-run
+                // dialog. Drop the min so phone scales to fit; keep the
+                // 720dp cap so TV / tablet don't get a 1080p slab.
+                // fillMaxWidth(0.95f) keeps a small gutter on phone.
+                .widthIn(min = 0.dp, max = 720.dp)
+                .fillMaxWidth(0.95f)
                 .heightIn(max = 640.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(LocalYancoPalette.current.BackgroundRaised)
