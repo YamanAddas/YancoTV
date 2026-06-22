@@ -71,6 +71,7 @@ import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.http.redactCredentials
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -144,6 +145,19 @@ fun HomeContent(
                 emit(true)
             }
     }.collectAsState(initial = true)
+    // Audit catch — when the user's only source has lastSyncError set,
+    // Home renders zero rails (sync didn't land any content) — looks
+    // identical to "no sources" / "content still loading". Surface the
+    // broken-source state as an inline banner so the user knows where
+    // to go to fix it, instead of staring at a blank screen.
+    val firstBrokenSource by remember {
+        sources.allFlow()
+            .map { it.firstOrNull { src -> !src.lastSyncError.isNullOrBlank() } }
+            .catch { t ->
+                android.util.Log.w("Yanco", "HomeContent broken-source probe failed: ${t.message}", t)
+                emit(null)
+            }
+    }.collectAsState(initial = null)
     // Audit catch — a corrupted favorites row throwing inside the
     // SQLDelight mapper would otherwise propagate out of collectAsState
     // and crash the Home screen (worst possible place — first surface
@@ -345,6 +359,21 @@ fun HomeContent(
         if (isTotallyEmpty && !hasSources) {
             EmptyHome(
                 onAddSource = onAddSource,
+                modifier = Modifier.padding(horizontal = Space.section),
+            )
+            return@Column
+        }
+        // Audit catch — distinct render path for the "has sources but
+        // they all failed to sync" case. Without this, Home renders
+        // zero rails and the user thinks the app is broken / their
+        // catalogue is empty. Banner points them at the offending
+        // source via the same Settings → Sources path the Quick Start
+        // CTA uses.
+        val brokenSource = firstBrokenSource
+        if (isTotallyEmpty && hasSources && brokenSource != null) {
+            BrokenSourceBanner(
+                source = brokenSource,
+                onFix = onAddSource,
                 modifier = Modifier.padding(horizontal = Space.section),
             )
             return@Column
@@ -1353,6 +1382,74 @@ private fun formatClock(unixSeconds: Long): String {
 }
 
 private fun formatTimeWindow(programme: EpgProgramme): String = "${formatClock(programme.startTime)} – ${formatClock(programme.endTime)}"
+
+/**
+ * Audit catch — inline error card surfaced when the user has at least
+ * one source but they all failed to sync. Same HexSurface idiom as
+ * EmptyHome so the empty Home reads as a deliberate "here's what's
+ * wrong + how to fix it" instead of a blank pane.
+ */
+@Composable
+private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (() -> Unit)?, modifier: Modifier = Modifier) {
+    val palette = LocalYancoPalette.current
+    val redactedError = remember(source.lastSyncError) {
+        source.lastSyncError
+            ?.let(::redactCredentials)
+            ?.take(120)
+            ?: "Unknown sync error"
+    }
+    HexSurface(
+        shape = YancoShapes.CutCornerCard,
+        focused = false,
+        bevelInset = 4.dp,
+        modifier = modifier.fillMaxWidth().height(if (onFix != null) 240.dp else 200.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(palette.BackgroundRaised, palette.BackgroundElevated),
+                    ),
+                ).padding(horizontal = Space.xxxl, vertical = Space.xxl),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Text(
+                    text = "SYNC FAILED",
+                    color = LocalYancoPalette.current.Live,
+                    style = YancoType.Overline,
+                )
+                Text(
+                    text = "Couldn't sync “${source.name}”",
+                    color = palette.TextPrimary,
+                    style = YancoType.TitleL,
+                    maxLines = 2,
+                )
+                Spacer(Modifier.height(Space.xs))
+                Text(
+                    text = redactedError,
+                    color = palette.TextSecondary,
+                    style = YancoType.Body,
+                    maxLines = 3,
+                )
+                if (onFix != null) {
+                    Spacer(Modifier.height(Space.lg))
+                    com.yancotv.android.ui.components.YancoPrimaryButton(
+                        onClick = onFix,
+                        size = com.yancotv.android.ui.components.ButtonSize.Standard,
+                    ) {
+                        Icon(
+                            imageVector = YancoIcons.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(text = "Open Sources")
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun EmptyHome(onAddSource: (() -> Unit)?, modifier: Modifier) {
