@@ -204,14 +204,18 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
             label = "Hide adult-tagged content",
             description = "Filter channels / movies / series that a provider marks as adult.",
             checked = settings.hideAdultContent,
-            onCheckedChange = { repo.setHideAdultContent(it) },
+            // MK.8 threading: setHideAdultContent is non-suspend and runs
+            // a SQLDelight upsert + StateFlow mutation on the caller
+            // thread. Compose onCheckedChange runs on Main — dispatch.
+            onCheckedChange = { scope.launch(Dispatchers.IO) { repo.setHideAdultContent(it) } },
         )
         SettingsToggleRow(
             label = "Require PIN to open Settings",
             description = "Gate this Settings screen behind the PIN so kids can't change policy.",
             enabled = settings.pinSet,
             checked = settings.requirePinForSettings,
-            onCheckedChange = { repo.setRequirePinForSettings(it) },
+            // MK.8 threading: same as above.
+            onCheckedChange = { scope.launch(Dispatchers.IO) { repo.setRequirePinForSettings(it) } },
         )
 
         // Hidden-channels manager. Hide is one-way from list screens —
@@ -238,7 +242,12 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                         onClick = {
                             // Bulk unhide — snapshot first so the flow-driven
                             // remove doesn't ConcurrentModification the set.
-                            hiddenIds.toList().forEach(repo::unhideChannel)
+                            // MK.8 threading: N SQLDelight deletes on Main is
+                            // an ANR risk on Fire TV when N is large.
+                            val toUnhide = hiddenIds.toList()
+                            scope.launch(Dispatchers.IO) {
+                                toUnhide.forEach(repo::unhideChannel)
+                            }
                         },
                     ) {
                         Text("Unhide all", fontSize = 12.sp)
@@ -263,7 +272,9 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                     items(hiddenItems, key = { it.id }) { item ->
                         HiddenRow(
                             item = item,
-                            onUnhide = { repo.unhideChannel(item.id) },
+                            // MK.8 threading: dispatch the SQLDelight write off
+                            // the Compose Main dispatcher.
+                            onUnhide = { scope.launch(Dispatchers.IO) { repo.unhideChannel(item.id) } },
                         )
                     }
                 }

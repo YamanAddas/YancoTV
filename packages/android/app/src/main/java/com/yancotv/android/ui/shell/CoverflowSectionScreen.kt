@@ -177,12 +177,26 @@ fun CoverflowSectionScreen(
 
     if (isFavoritesFilter) {
         LaunchedEffect(type) {
-            favorites.allFlow().collect { list ->
-                val filtered = list.map { it.content }.filter { it.type == type }
+            // MK.8 hard-rule 7: a corrupted favorites row throwing inside
+            // the row mapper would propagate out of the collect{} block
+            // and crash the screen. Wrap the entire collect so a single
+            // bad row falls back to empty state — the user can still
+            // exit to another category. Sibling non-favorites path at
+            // :182 below already uses runCatching for the page() call.
+            try {
+                favorites.allFlow().collect { list ->
+                    val filtered = list.map { it.content }.filter { it.type == type }
+                    items.clear()
+                    items.addAll(filtered)
+                    total = filtered.size.toLong()
+                    loaded = filtered.size.toLong()
+                    hasLoaded = true
+                }
+            } catch (t: Throwable) {
+                Log.w("Yanco", "CoverflowSection favorites flow failed: ${t.message}", t)
                 items.clear()
-                items.addAll(filtered)
-                total = filtered.size.toLong()
-                loaded = filtered.size.toLong()
+                total = 0L
+                loaded = 0L
                 hasLoaded = true
             }
         }

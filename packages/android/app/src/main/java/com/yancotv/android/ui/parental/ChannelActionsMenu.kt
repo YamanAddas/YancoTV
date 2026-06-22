@@ -37,6 +37,7 @@ import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
@@ -184,10 +185,19 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
             body = "This channel is locked. Confirm your PIN to remove the lock.",
             repo = repo,
             onSuccess = {
-                scope.launch {
-                    repo.unlockChannel(item.id)
-                    gateForUnlock = false
-                    onDismiss()
+                // MK.8 threading: unlockChannel is non-suspend and runs a
+                // SQLDelight delete + StateFlow mutation. Without the IO
+                // dispatcher, this blocks Main. Sibling sites
+                // (lockChannel / hideChannel) already use Dispatchers.IO;
+                // MB-104 commentary above them flags the rule. Hop back
+                // to Main for the UI state mutations so the dialog
+                // dismisses on the right dispatcher.
+                scope.launch(Dispatchers.IO) {
+                    runCatching { repo.unlockChannel(item.id) }
+                    withContext(Dispatchers.Main) {
+                        gateForUnlock = false
+                        onDismiss()
+                    }
                 }
             },
             onDismiss = { gateForUnlock = false },
