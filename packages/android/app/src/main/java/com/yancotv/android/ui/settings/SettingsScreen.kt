@@ -640,6 +640,10 @@ private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit, 
                 )
             }
         }
+        // Audit catch — voice affordance for remotes / phones whose IME
+        // doesn't expose a mic key. RecognizerIntent is permission-free
+        // (handoff to a system activity), so this is a 1-line wire-up.
+        VoiceInputButton(onResult = { spoken -> onValueChange(spoken) })
     }
 }
 

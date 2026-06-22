@@ -354,7 +354,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     // fires, then issues the focus request once — no delay-ladder race.
     LaunchedEffect(Unit) { fieldAnchor.awaitAndRequest() }
 
-    Box(
+    Row(
         modifier =
         Modifier
             .fillMaxWidth()
@@ -362,6 +362,8 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             .background(LocalYancoPalette.current.BackgroundRaised)
             .border(1.dp, border, RoundedCornerShape(8.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         BasicTextField(
             value = value,
@@ -377,7 +379,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
             modifier =
             Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .placedFocus(fieldAnchor)
                 .semantics { contentDescription = "Search channels, movies, and series" },
             decorationBox = { inner ->
@@ -389,6 +391,15 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                 }
                 inner()
             },
+        )
+        // Audit catch — VoiceInputButton.kt was built but never wired.
+        // The mic affordance is essential for Fire TV remotes without a
+        // hardware mic key (older Toshiba / Insignia bundled remotes)
+        // and for phone users whose IME has no voice button. The button
+        // gates itself on RecognizerIntent availability so it dims when
+        // no speech provider is installed.
+        com.yancotv.android.ui.settings.VoiceInputButton(
+            onResult = { spoken -> onValueChange(spoken) },
         )
     }
 }
