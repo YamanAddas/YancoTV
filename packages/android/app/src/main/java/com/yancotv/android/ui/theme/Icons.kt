@@ -246,7 +246,12 @@ object YancoIcons {
         }
 
     val ChevronRight: ImageVector =
-        buildLine("chevron-right") {
+        // Audit catch — autoMirror = true so the chevron flips for RTL
+        // (Arabic). The vector points right in LTR; in Arabic the same
+        // glyph means "forward / drill-in" but should point left. Used
+        // on every Settings row drill-in chevron, the breadcrumb
+        // separator, and CategoryRail markers — five visible sites.
+        buildLine("chevron-right", autoMirror = true) {
             moveTo(9f, 5f)
             lineTo(16f, 12f)
             lineTo(9f, 19f)
@@ -489,13 +494,18 @@ object YancoIcons {
             }
         }
 
-    private fun buildLine(name: String, block: PathBuilder.() -> Unit): ImageVector = ImageVector
+    private fun buildLine(
+        name: String,
+        autoMirror: Boolean = false,
+        block: PathBuilder.() -> Unit,
+    ): ImageVector = ImageVector
         .Builder(
             name = name,
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 24f,
             viewportHeight = 24f,
+            autoMirror = autoMirror,
         ).apply {
             addPath(
                 pathData =
