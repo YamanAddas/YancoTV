@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.YancoIcons
 
 /**
  * Carries the active Settings tab's [FocusRequester] down through the
@@ -260,6 +262,13 @@ internal fun SettingsRow(
                 Box(modifier = Modifier.padding(top = 12.dp)) { content() }
             }
         }
+        // MK.29.1 — Drill-in chevron. Universal "this row opens a picker"
+        // affordance: when the row itself is clickable (onClick != null)
+        // AND there's no other right-slot widget (a toggle / select / button
+        // that already telegraphs the action), paint a ›-style chevron
+        // on the right edge. Brightens to Accent on focus so the user can
+        // see WHERE the press will land before pressing OK. Pure visual —
+        // no focus target of its own (the row owns input).
         if (right != null) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -267,6 +276,13 @@ internal fun SettingsRow(
             ) {
                 right()
             }
+        } else if (onClick != null) {
+            Icon(
+                imageVector = YancoIcons.ChevronRight,
+                contentDescription = null,
+                tint = if (focused) palette.Accent else palette.TextMuted,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
