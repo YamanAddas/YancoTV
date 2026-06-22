@@ -10,6 +10,7 @@ import com.yancotv.shared.types.HistoryEntry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -164,6 +165,90 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
         }
 
     /**
+     * MK.28.1 — Batched reactive tile-progress lookup. Returns a map keyed
+     * by `contentId` whose values describe the most relevant watch_history
+     * row for that content: prefer the content-level (container) row, fall
+     * back to the most-recent episode-level row.
+     *
+     * Why prefer container over episode: a movie's only row is its own
+     * container row (no episodes). A series container has no playable
+     * stream of its own, so its tile should reflect the user's
+     * most-recent-episode progress instead — that's the Netflix-style
+     * "you're 24 min into S2E5" affordance.
+     *
+     * Empty input short-circuits to an empty emission so a coverflow with
+     * no visible items doesn't fire a `WHERE col IN ()` (invalid SQL).
+     *
+     * Re-emits on every watch_history write (via SQLDelight's
+     * notification graph), so any tile subscribed via this flow
+     * auto-updates the instant the player persists a new offset — same
+     * mechanism the Home Continue Watching rail uses.
+     *
+     * Dispatches to [Dispatchers.Default] (NOT [Dispatchers.IO]) so this
+     * compiles for iOS — `Dispatchers.IO` is JVM/Android only.
+     */
+    fun entriesByContentFlow(contentIds: Set<String>): Flow<Map<String, WatchProgress>> {
+        if (contentIds.isEmpty()) return flowOf(emptyMap())
+        return db.watchHistoryQueries
+            .selectByContentIds(contentIds)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows ->
+                if (rows.isEmpty()) return@map emptyMap()
+                rows.groupBy { it.content_id }.mapValues { (_, group) ->
+                    // Container row preferred. Group is already watched_at
+                    // DESC (query orders DESC), so .first() on the
+                    // episode-only fallback yields the most-recent episode.
+                    val row = group.firstOrNull { it.episode_id == null } ?: group.first()
+                    WatchProgress(
+                        contentId = row.content_id,
+                        episodeId = row.episode_id,
+                        positionSeconds = row.position_seconds,
+                        durationSeconds = row.duration_seconds,
+                        watchedAt = row.watched_at,
+                    )
+                }
+            }
+    }
+
+    /**
+     * MK.28.1 — Batched reactive lookup keyed by `episode_id`. Used by the
+     * series detail screen to render a per-episode progress stripe + ✓
+     * mark on the episode list.
+     *
+     * Empty input short-circuits to an empty emission. Re-emits on every
+     * watch_history write. `WHERE episode_id IN (...)` filters out
+     * content-level (null episode_id) rows at the SQL layer.
+     */
+    fun entriesByEpisodeFlow(episodeIds: Set<String>): Flow<Map<String, WatchProgress>> {
+        if (episodeIds.isEmpty()) return flowOf(emptyMap())
+        return db.watchHistoryQueries
+            .selectByEpisodeIds(episodeIds)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows ->
+                if (rows.isEmpty()) return@map emptyMap()
+                // groupBy by the non-null episode_id, then pick the most-
+                // recent row per group (already DESC). Rows are guaranteed
+                // non-null on episode_id because SQL's `IN` on a non-null
+                // column filters NULLs — but defensively keep only non-null.
+                rows.mapNotNull { row ->
+                    val key = row.episode_id ?: return@mapNotNull null
+                    key to row
+                }.groupBy({ it.first }, { it.second }).mapValues { (_, group) ->
+                    val row = group.first()
+                    WatchProgress(
+                        contentId = row.content_id,
+                        episodeId = row.episode_id,
+                        positionSeconds = row.position_seconds,
+                        durationSeconds = row.duration_seconds,
+                        watchedAt = row.watched_at,
+                    )
+                }
+            }
+    }
+
+    /**
      * Resume position (seconds) for a content-level row — that is, a row
      * with `episode_id IS NULL`. Returns null if there's no such row, or
      * if the row is already at the "finished" threshold (≥95% of duration)
@@ -263,6 +348,50 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
 
     fun clearAll() {
         db.watchHistoryQueries.clearAll()
+    }
+}
+
+/**
+ * MK.28.1 — Lean tile-progress record. Holds the bare minimum needed to
+ * render a Netflix-style progress stripe + "Resume / Watched" badge on a
+ * VOD tile, without dragging the full [HistoryEntry] join through the
+ * batched lookup path.
+ *
+ * Keep the shape minimal so the [entriesByContentFlow] /
+ * [entriesByEpisodeFlow] payload is cheap to recompute on every
+ * watch_history write — a busy player session can fire 1 Hz upserts.
+ */
+data class WatchProgress(
+    /** Content row this progress belongs to. Always populated. */
+    val contentId: String,
+    /** Non-null when the row tracks an episode; null for movie / live container rows. */
+    val episodeId: String?,
+    /** Media offset in seconds (NOT ms — `watch_history.position_seconds` is seconds). */
+    val positionSeconds: Long,
+    /** Media duration in seconds. Null when unknown (live, some VOD without metadata). */
+    val durationSeconds: Long?,
+    /** Wall clock (ms since epoch) of the last persist. Used for "watched at" recency UI. */
+    val watchedAt: Long,
+) {
+    /**
+     * 0..1 progress ratio for the progress stripe. Returns 0 when
+     * duration is unknown so the UI can hide / show a "watched" indicator
+     * without a known endpoint to compare against.
+     */
+    val ratio: Float
+        get() {
+            val d = durationSeconds ?: return 0f
+            if (d <= 0L) return 0f
+            return (positionSeconds.toFloat() / d.toFloat()).coerceIn(0f, 1f)
+        }
+
+    /** True when the row is at the ≥95% "finished" threshold. */
+    fun isFinished(): Boolean = isWatchRowFinished(positionSeconds, durationSeconds)
+
+    /** Remaining seconds, coerced ≥ 0. Returns null when duration unknown. */
+    fun remainingSeconds(): Long? {
+        val d = durationSeconds ?: return null
+        return (d - positionSeconds).coerceAtLeast(0L)
     }
 }
 

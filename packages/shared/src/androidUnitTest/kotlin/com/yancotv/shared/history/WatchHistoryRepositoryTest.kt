@@ -4,8 +4,11 @@ import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.sources.testDb
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
 /**
@@ -415,6 +418,197 @@ class WatchHistoryRepositoryTest {
                 .executeAsList()
                 .size,
         )
+    }
+
+    // ───── MK.28.1 — batched reactive tile-progress flows ─────
+
+    @Test fun entriesByContentFlow_emptyInputEmitsEmptyMap() = runTest {
+        val db = testDb()
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+
+        val snapshot = repo.entriesByContentFlow(emptySet()).first()
+        assertTrue(snapshot.isEmpty(), "empty input must short-circuit and not hit SQL")
+    }
+
+    @Test fun entriesByContentFlow_returnsContainerRowPreferredOverEpisode() = runTest {
+        // A series with both a container-level row (legacy / manual) AND an
+        // episode-level row must report the CONTAINER row's progress on its
+        // tile. Otherwise tile progress would jitter between container and
+        // episode depending on insertion order. The same rule the play-side
+        // positionFor() enforces.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        var t = 1_000L
+        val repo = WatchHistoryRepository(db, clock = { t })
+
+        // Episode row inserted FIRST (so it's the "newest" by watched_at).
+        t = 2_000L
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 600L, durationSeconds = 1800L)
+        // Container row inserted later — still wins despite identical watched_at.
+        t = 1_500L
+        repo.upsert("series-1", positionSeconds = 42L, durationSeconds = 9000L)
+
+        val snapshot = repo.entriesByContentFlow(setOf("series-1")).first()
+        val entry = assertNotNull(snapshot["series-1"], "series-1 must be present")
+        assertEquals(42L, entry.positionSeconds, "container row must win over episode row")
+        assertNull(entry.episodeId, "container row has no episode_id")
+    }
+
+    @Test fun entriesByContentFlow_fallsBackToMostRecentEpisode() = runTest {
+        // The series-tile Netflix experience: no container row → show the
+        // progress of the most-recent watched episode. This is what makes
+        // a Movies/Series wheel tile show "halfway through E5" rather than
+        // "no progress" when the user has been bingeing.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        insertEpisode(db, id = "ep-2", contentId = "series-1")
+        var t = 1_000L
+        val repo = WatchHistoryRepository(db, clock = { t })
+
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 100L, durationSeconds = 1800L)
+        t = 2_000L
+        repo.upsert("series-1", episodeId = "ep-2", positionSeconds = 700L, durationSeconds = 1800L)
+
+        val snapshot = repo.entriesByContentFlow(setOf("series-1")).first()
+        val entry = assertNotNull(snapshot["series-1"])
+        assertEquals("ep-2", entry.episodeId, "most-recent episode row should drive series tile progress")
+        assertEquals(700L, entry.positionSeconds)
+    }
+
+    @Test fun entriesByContentFlow_returnsMovieRow() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 1_000L })
+
+        repo.upsert("movie-1", positionSeconds = 90L, durationSeconds = 5400L)
+
+        val snapshot = repo.entriesByContentFlow(setOf("movie-1", "movie-unknown")).first()
+        assertEquals(1, snapshot.size, "unknown ids must drop, not 404 the lookup")
+        val entry = assertNotNull(snapshot["movie-1"])
+        assertEquals(90L, entry.positionSeconds)
+        assertNull(entry.episodeId)
+    }
+
+    @Test fun entriesByContentFlow_includesFinishedRowsSoTileShowsWatchedCheck() = runTest {
+        // The play-time positionFor() returns null on ≥95% rows to avoid
+        // seeking to credits. But the tile UI still needs to KNOW the row
+        // is finished so it can paint a ✓ instead of a progress bar. The
+        // batched flow must surface finished rows, NOT filter them away.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 1_000L })
+
+        repo.upsert("movie-1", positionSeconds = 6900L, durationSeconds = 7200L)
+
+        val snapshot = repo.entriesByContentFlow(setOf("movie-1")).first()
+        val entry = assertNotNull(snapshot["movie-1"], "finished rows must still appear in tile-progress lookup")
+        assertTrue(entry.isFinished(), "tile UI uses isFinished() to swap stripe → ✓")
+    }
+
+    @Test fun entriesByContentFlow_reemitsOnUpsert() = runTest {
+        // Reactive contract: a write must propagate to subscribed tiles
+        // without any caller-side refresh. This is the same SQLDelight
+        // notification graph that powers Home Continue Watching.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        var t = 1_000L
+        val repo = WatchHistoryRepository(db, clock = { t })
+
+        repo.upsert("movie-1", positionSeconds = 60L, durationSeconds = 3600L)
+        val first = repo.entriesByContentFlow(setOf("movie-1")).first()
+        assertEquals(60L, first["movie-1"]?.positionSeconds)
+
+        t = 2_000L
+        repo.upsert("movie-1", positionSeconds = 1200L, durationSeconds = 3600L)
+        val second = repo.entriesByContentFlow(setOf("movie-1")).first()
+        assertEquals(1200L, second["movie-1"]?.positionSeconds, "flow must re-emit on upsert")
+    }
+
+    @Test fun entriesByEpisodeFlow_keysByEpisodeId() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-S01E01", contentId = "series-1")
+        insertEpisode(db, id = "ep-S01E02", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 1_000L })
+
+        repo.upsert("series-1", episodeId = "ep-S01E01", positionSeconds = 300L, durationSeconds = 1800L)
+        repo.upsert("series-1", episodeId = "ep-S01E02", positionSeconds = 600L, durationSeconds = 1800L)
+
+        val snapshot = repo.entriesByEpisodeFlow(setOf("ep-S01E01", "ep-S01E02")).first()
+        assertEquals(2, snapshot.size)
+        assertEquals(300L, snapshot["ep-S01E01"]?.positionSeconds)
+        assertEquals(600L, snapshot["ep-S01E02"]?.positionSeconds)
+    }
+
+    @Test fun entriesByEpisodeFlow_emptyInputEmitsEmptyMap() = runTest {
+        val db = testDb()
+        val repo = WatchHistoryRepository(db, clock = { 0L })
+        assertTrue(repo.entriesByEpisodeFlow(emptySet()).first().isEmpty())
+    }
+
+    @Test fun entriesByEpisodeFlow_doesNotReturnContentLevelRows() = runTest {
+        // SQLite's `WHERE col IN (...)` skips NULLs in `col`, so content-
+        // level rows (episode_id IS NULL) must not leak into the episode
+        // lookup. Pin that contract — a future "selectByEpisodeIds" that
+        // forgets the IS NOT NULL would otherwise overshoot.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        val repo = WatchHistoryRepository(db, clock = { 1_000L })
+
+        repo.upsert("movie-1", positionSeconds = 60L, durationSeconds = 3600L)
+
+        val snapshot = repo.entriesByEpisodeFlow(setOf("ep-bogus")).first()
+        assertTrue(snapshot.isEmpty(), "content-level rows must not appear in episode lookup")
+    }
+
+    // ───── MK.28.1 — WatchProgress pure-data behaviour ─────
+
+    @Test fun watchProgress_ratioIsPositionOverDuration() = runTest {
+        val p = WatchProgress(
+            contentId = "x",
+            episodeId = null,
+            positionSeconds = 300L,
+            durationSeconds = 600L,
+            watchedAt = 0L,
+        )
+        assertEquals(0.5f, p.ratio)
+    }
+
+    @Test fun watchProgress_ratioZeroWhenDurationUnknown() = runTest {
+        val p = WatchProgress("x", null, positionSeconds = 9_999L, durationSeconds = null, watchedAt = 0L)
+        assertEquals(0f, p.ratio, "no denominator → 0 (let UI decide whether to render stripe)")
+    }
+
+    @Test fun watchProgress_ratioCoercedToZeroOneRange() = runTest {
+        val over = WatchProgress("x", null, positionSeconds = 1_000L, durationSeconds = 100L, watchedAt = 0L)
+        assertEquals(1f, over.ratio, "ratio must coerce in 0..1 even if position > duration")
+        val negative = WatchProgress("x", null, positionSeconds = -50L, durationSeconds = 100L, watchedAt = 0L)
+        assertEquals(0f, negative.ratio)
+    }
+
+    @Test fun watchProgress_isFinishedAt95Percent() = runTest {
+        val finished = WatchProgress("x", null, positionSeconds = 950L, durationSeconds = 1000L, watchedAt = 0L)
+        assertTrue(finished.isFinished())
+        val midway = WatchProgress("x", null, positionSeconds = 949L, durationSeconds = 1000L, watchedAt = 0L)
+        assertFalse(midway.isFinished())
+    }
+
+    @Test fun watchProgress_remainingSecondsClampsAtZero() = runTest {
+        val past = WatchProgress("x", null, positionSeconds = 2000L, durationSeconds = 1000L, watchedAt = 0L)
+        assertEquals(0L, past.remainingSeconds())
+        val mid = WatchProgress("x", null, positionSeconds = 300L, durationSeconds = 1000L, watchedAt = 0L)
+        assertEquals(700L, mid.remainingSeconds())
+        val unknown = WatchProgress("x", null, positionSeconds = 300L, durationSeconds = null, watchedAt = 0L)
+        assertNull(unknown.remainingSeconds(), "unknown duration → null, let UI fall through to 'Resume'")
     }
 
     // ───── fixtures ─────

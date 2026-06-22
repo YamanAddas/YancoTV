@@ -19,6 +19,17 @@ SELECT * FROM watch_history WHERE content_id = ? ORDER BY watched_at DESC;
 selectByEpisode:
 SELECT * FROM watch_history WHERE episode_id = ? ORDER BY watched_at DESC LIMIT 1;
 
+-- MK.28.1 — batched lookup for tile-level progress indicators across the
+-- whole app (browse coverflow, favorites rows, search results, episode
+-- lists). The caller passes the visible-window IDs only; the row count is
+-- bounded by the visible window, not the catalogue. DESC order lets the
+-- repo pick the most-recent row per content/episode group with .first().
+selectByContentIds:
+SELECT * FROM watch_history WHERE content_id IN ? ORDER BY watched_at DESC;
+
+selectByEpisodeIds:
+SELECT * FROM watch_history WHERE episode_id IN ? ORDER BY watched_at DESC;
+
 upsert:
 INSERT OR REPLACE INTO watch_history (id, content_id, episode_id, position_seconds, duration_seconds, watched_at)
 VALUES (?, ?, ?, ?, ?, ?);
