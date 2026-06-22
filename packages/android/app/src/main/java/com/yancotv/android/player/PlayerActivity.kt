@@ -1638,31 +1638,48 @@ class PlayerActivity : AppCompatActivity() {
      * display name via SourceRepository.nameFor and sanitizes the URL.
      */
     private fun buildErrorData(error: PlaybackException): VodChromeError {
-        val title =
-            when (error.errorCode) {
-                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-                -> "Can't reach the stream"
-                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-                    "Server refused the request"
-                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
-                PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
-                -> "Stream not found"
-                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
-                PlaybackException.ERROR_CODE_DECODING_FAILED,
-                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
-                -> "This device can't decode the stream"
-                else -> "Couldn't open this stream"
-            }
+        // Audit catch — catchup items use the id prefix "catchup:" (see
+        // CatchupService.withCatchupUrl). When the user tries to play a
+        // 3-day-old EPG recording and the provider's archive window has
+        // expired, ExoPlayer surfaces ERROR_CODE_IO_FILE_NOT_FOUND or
+        // ERROR_CODE_IO_BAD_HTTP_STATUS (404/410). The generic "Stream
+        // not found" copy made the user assume the app is broken; tell
+        // them the truth instead.
+        val isCatchup = controller.currentItem.value?.id?.startsWith("catchup:") == true
+        val isCatchup404 = isCatchup && (
+            error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+            )
+        val title = when {
+            isCatchup404 -> "This catch-up has expired"
+            error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+                "Can't reach the stream"
+            error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                "Server refused the request"
+            error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ->
+                "Stream not found"
+            error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
+                "This device can't decode the stream"
+            else -> "Couldn't open this stream"
+        }
         // Audit catch — ExoPlayer's localizedMessage wraps OkHttp's
         // exception text, which routinely echoes the request URL. For
         // Xtream sources that URL contains `?username=&password=`, so
         // the user-visible error overlay was literally painting
         // credentials on the TV screen. Same redaction helper the
         // EpgRepository / SourceRepository / Recorder log paths use.
-        val description =
+        // For catch-up 404 we replace the OkHttp text entirely with a
+        // friendlier explanation pointing at the Guide.
+        val description = if (isCatchup404) {
+            "Your provider only keeps catch-up for a limited time. Pick a more recent programme in the Guide."
+        } else {
             error.localizedMessage?.let(::redactCredentials)
                 ?: "Check your connection or try another source."
+        }
         return VodChromeError(
             codeName = error.errorCodeName,
             codeNumeric = error.errorCode.toString(),
