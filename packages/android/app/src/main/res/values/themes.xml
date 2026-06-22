@@ -4,6 +4,22 @@
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
+    <!--
+        Audit catch — pre-fix the cold launch flow was:
+          OS launcher transition → black frame → first Compose frame
+        On a fresh process this meant a half-second of black before the
+        UI painted. core-splashscreen replaces the black frame with the
+        Yanco logo over the brand BackgroundDeep colour, then hands off
+        to the regular Theme.YancoTV via postSplashScreenTheme.
+        Activity dynamically applies postSplashScreenTheme via
+        installSplashScreen() — see MainActivity.onCreate.
+    -->
+    <style name="Theme.YancoTV.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0B1410</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.YancoTV</item>
+    </style>
+
     <style name="PlayerTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowFullscreen">true</item>

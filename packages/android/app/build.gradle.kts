@@ -140,8 +140,8 @@ android {
         applicationId = "com.yancotv.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.3.4"
+        versionCode = 14
+        versionName = "1.3.5"
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
@@ -315,6 +315,7 @@ dependencies {
 
     // AndroidX core
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.appcompat)
 
     // TV

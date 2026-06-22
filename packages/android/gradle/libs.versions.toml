@@ -7,6 +7,7 @@ compose-bom = "2025.01.00"
 activity-compose = "1.9.3"
 lifecycle = "2.8.7"
 androidx-core-ktx = "1.15.0"
+androidx-core-splashscreen = "1.0.1"
 androidx-appcompat = "1.7.0"
 tv-material = "1.0.0"
 tvprovider = "1.0.0"
@@ -58,6 +59,7 @@ lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", v
 
 # AndroidX core
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidx-core-splashscreen" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 
 # TV

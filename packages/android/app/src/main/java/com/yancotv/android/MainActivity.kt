@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
@@ -76,6 +77,13 @@ class MainActivity : ComponentActivity() {
     private var keepAwakeAttachedPlayer: ExoPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Audit catch — install AndroidX SplashScreen BEFORE super.onCreate
+        // so the OS keeps the splash drawable visible through the activity
+        // warmup window. Pre-fix: cold launch went launcher → black
+        // frame → first Compose frame. Now: launcher → Yanco logo on
+        // BackgroundDeep → Compose frame. Handoff back to Theme.YancoTV
+        // happens automatically via postSplashScreenTheme in themes.xml.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         val isTv = detectTv()
