@@ -63,7 +63,15 @@ fun resolveHandoffCommand(
     command: HandoffPlayCommand,
     expectedToken: String?,
 ): HandoffOutcome {
-    if (expectedToken != null && command.pairingToken != expectedToken) {
+    // Audit catch — constant-time compare. The pairing code is the sole
+    // auth secret on the LAN-exposed /handoff/play endpoint, and a
+    // sniffable Wi-Fi could in theory let an attacker time
+    // String.equals's first-mismatch short-circuit to recover the
+    // token byte by byte. Real attack is fringe on a 6-char / 30-bit
+    // token with Wi-Fi jitter, but the project already uses
+    // timing-safe compares for PIN verification, so the inconsistency
+    // was itself the smell.
+    if (expectedToken != null && !timingSafeEquals(command.pairingToken, expectedToken)) {
         return HandoffOutcome.Rejected(HandoffReject.UNAUTHORIZED)
     }
     if (command.schemaVersion > HandoffPlayCommand.SCHEMA_VERSION) {
@@ -87,4 +95,19 @@ fun resolveHandoffCommand(
             HandoffOutcome.PlayContent(item, position, command.fromStart, ua, referer)
         }
     }
+}
+
+/**
+ * Constant-time string compare. Mirrors AndroidPinHasher.timingSafeEqual.
+ * Returns false fast on length mismatch (length is not the secret —
+ * the pairing token is a fixed 6 chars). Otherwise XORs every char
+ * and ORs the diffs so an attacker can't time the first mismatch.
+ */
+private fun timingSafeEquals(a: String, b: String): Boolean {
+    if (a.length != b.length) return false
+    var diff = 0
+    for (i in a.indices) {
+        diff = diff or (a[i].code xor b[i].code)
+    }
+    return diff == 0
 }

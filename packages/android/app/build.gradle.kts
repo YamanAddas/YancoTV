@@ -156,7 +156,16 @@ android {
         // Empty = updates disabled (the checker short-circuits before
         // any HTTP call).
         buildConfigField("String", "UPDATE_ENDPOINT", "\"$updateEndpoint\"")
-        buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"${sentryProps.getProperty("opensubtitles.apiKey", "")}\"")
+        // Audit catch — AGENTS.md threat-model section promises forks
+        // can override via the `OPENSUBTITLES_API_KEY` env var, but the
+        // pre-fix build only read local.properties. Layered fallback
+        // now: env var → local.properties → empty string. Matches the
+        // documented contract so a fork that follows the AGENTS guide
+        // doesn't get an empty Api-Key header + silent 401s.
+        val opensubtitlesApiKey =
+            System.getenv("OPENSUBTITLES_API_KEY")
+                ?: sentryProps.getProperty("opensubtitles.apiKey", "")
+        buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesApiKey\"")
 
     }
 

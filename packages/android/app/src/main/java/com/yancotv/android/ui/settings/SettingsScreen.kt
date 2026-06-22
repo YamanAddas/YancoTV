@@ -461,16 +461,39 @@ private fun Sidebar(
             // D-pad LEFT inside the inner sidebar exits Settings —
             // UNLESS the search field has focus (then LEFT moves the
             // text caret within the typed query, not out of Settings).
+            //
+            // MK.31 — Numpad 1-9 jumps to that ordinal Settings tab
+            // when the sidebar has focus and the search field is empty.
+            // Skipped when the search field has focus so the user can
+            // type a query like "1080p" without accidentally jumping.
+            // Skipped when query is non-blank so digits typed *into*
+            // search continue to land in the field if focus is
+            // elsewhere on the panel.
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    event.key == Key.DirectionLeft &&
-                    !searchHasFocus
-                ) {
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (event.key == Key.DirectionLeft && !searchHasFocus) {
                     onExit()
-                    true
-                } else {
-                    false
+                    return@onPreviewKeyEvent true
                 }
+                if (!searchHasFocus && query.isBlank()) {
+                    val n = when (event.key) {
+                        Key.One, Key.NumPad1 -> 1
+                        Key.Two, Key.NumPad2 -> 2
+                        Key.Three, Key.NumPad3 -> 3
+                        Key.Four, Key.NumPad4 -> 4
+                        Key.Five, Key.NumPad5 -> 5
+                        Key.Six, Key.NumPad6 -> 6
+                        Key.Seven, Key.NumPad7 -> 7
+                        Key.Eight, Key.NumPad8 -> 8
+                        Key.Nine, Key.NumPad9 -> 9
+                        else -> 0
+                    }
+                    if (n in 1..SettingsTab.entries.size) {
+                        onSelect(SettingsTab.entries[n - 1])
+                        return@onPreviewKeyEvent true
+                    }
+                }
+                false
             }
             .focusGroup()
             .focusRestorer(),
@@ -756,7 +779,7 @@ private fun SidebarFooterHint() {
             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
         )
         Text(
-            text = "exit  ·  ↑↓ navigate",
+            text = "exit  ·  ↑↓ navigate  ·  1-9 jump",
             color = palette.TextMuted,
             fontSize = 11.sp,
         )

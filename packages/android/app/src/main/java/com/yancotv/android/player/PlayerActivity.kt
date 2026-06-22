@@ -1100,6 +1100,15 @@ class PlayerActivity : AppCompatActivity() {
         if (items.isEmpty()) return
         val index = items.indexOfFirst { it.sortOrder == target }
         if (index < 0) return
+        // Audit catch — guard against the user re-typing the same channel
+        // number they're already watching (common D-pad fumble, or
+        // deliberate to dismiss a typed-but-wrong prefix). The
+        // PlaybackController SameTarget branch masks the rebuffer
+        // internally, but ZapLatencyTracer.markZapStart was firing on
+        // the no-op zap and contaminating telemetry with synthetic
+        // events. Short-circuit before the tracer.
+        val picked = items[index]
+        if (picked.id == controller.currentId) return
         ZapLatencyTracer.markZapStart("NUM:$target")
         controller.play(items, index)
     }
@@ -1855,7 +1864,17 @@ class PlayerActivity : AppCompatActivity() {
                     currentContentId = controller.currentId,
                     onPick = { list, idx ->
                         hideSurf()
-                        controller.play(list, idx)
+                        // Audit catch — guard against picking the
+                        // currently-playing channel (initialFocusIndex
+                        // pre-focuses it). The PlaybackController
+                        // SameTarget branch already short-circuits the
+                        // rebuffer, but the guard keeps the call site
+                        // explicit so a future controller change can't
+                        // regress this.
+                        val target = list.getOrNull(idx)
+                        if (target != null && target.id != controller.currentId) {
+                            controller.play(list, idx)
+                        }
                         playerView.requestFocus()
                     },
                     onIdleDismiss = { hideSurf() },
