@@ -145,8 +145,19 @@ fun HomeScreen(
 
     // "Require PIN for Settings" gate.
     var settingsUnlocked by rememberSaveable { mutableStateOf(false) }
+    // MK.32.4 — One-shot hint for which Settings tab to land on next
+    // time the section becomes Settings. EmptyHome's "Add your first
+    // source" CTA sets this to Sources before flipping section; sidebar
+    // taps don't, so a normal Settings open still lands on the default
+    // initialTab (General). Cleared on every Settings exit so a
+    // sidebar-driven re-open after EmptyHome doesn't keep landing on
+    // Sources.
+    var pendingSettingsTab by remember { mutableStateOf<com.yancotv.android.ui.settings.SettingsTab?>(null) }
     LaunchedEffect(section) {
-        if (section != AppSection.Settings) settingsUnlocked = false
+        if (section != AppSection.Settings) {
+            settingsUnlocked = false
+            pendingSettingsTab = null
+        }
     }
     val needsSettingsGate =
         section == AppSection.Settings &&
@@ -399,6 +410,8 @@ fun HomeScreen(
                         SettingsLockedPlaceholder()
                     } else {
                         SettingsScreen(
+                            initialTab = pendingSettingsTab
+                                ?: com.yancotv.android.ui.settings.SettingsTab.General,
                             onExitToMainSidebar = {
                                 runCatching { sidebarFocus.requestFocus() }
                             },
@@ -449,6 +462,14 @@ fun HomeScreen(
             } else if (section == AppSection.Home) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     HomeContent(
+                        // MK.32.4 — Empty-Home Quick Start CTA. Switches
+                        // the active section to Settings and asks the
+                        // shell to open Settings on the Sources tab
+                        // (instead of the default General).
+                        onAddSource = {
+                            pendingSettingsTab = com.yancotv.android.ui.settings.SettingsTab.Sources
+                            section = AppSection.Settings
+                        },
                         onPlay = { list, idx, resumeEpisodeId ->
                             val target = list.getOrNull(idx) ?: return@HomeContent
                             gatedPlay(target.id) {

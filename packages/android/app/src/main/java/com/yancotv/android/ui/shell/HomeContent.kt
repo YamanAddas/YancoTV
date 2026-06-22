@@ -112,6 +112,12 @@ fun HomeContent(
      * movies always pass null.
      */
     onPlay: (List<ContentItem>, Int, String?) -> Unit,
+    /**
+     * MK.32.4 — Fired by the "Add your first source" CTA on the empty
+     * home state. Caller switches to Settings → Sources. Optional so
+     * Home can render without sources/settings wiring (test surface).
+     */
+    onAddSource: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     history: WatchHistoryRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
@@ -313,7 +319,10 @@ fun HomeContent(
         verticalArrangement = Arrangement.spacedBy(Space.xxxl),
     ) {
         if (isTotallyEmpty) {
-            EmptyHome(modifier = Modifier.padding(horizontal = Space.section))
+            EmptyHome(
+                onAddSource = onAddSource,
+                modifier = Modifier.padding(horizontal = Space.section),
+            )
             return@Column
         }
 
@@ -1322,10 +1331,16 @@ private fun formatClock(unixSeconds: Long): String {
 private fun formatTimeWindow(programme: EpgProgramme): String = "${formatClock(programme.startTime)} – ${formatClock(programme.endTime)}"
 
 @Composable
-private fun EmptyHome(modifier: Modifier) {
+private fun EmptyHome(onAddSource: (() -> Unit)?, modifier: Modifier) {
     // Cut-corner hero-sized welcome card. Same shape family as the
     // real hero so an empty catalogue still reads as "the dashboard
     // is here, just waiting on content".
+    //
+    // MK.32.4 — When onAddSource is supplied (i.e. real shell, not a
+    // test harness), the card grows a focusable Quick Start CTA so a
+    // brand-new user can land their first source from Home in one
+    // press instead of navigating the sidebar to Settings → Sources
+    // themselves. Card height bumps to 300dp to clear the button.
     HexSurface(
         shape = YancoShapes.CutCornerCard,
         focused = false,
@@ -1333,7 +1348,7 @@ private fun EmptyHome(modifier: Modifier) {
         modifier =
         modifier
             .fillMaxWidth()
-            .height(260.dp),
+            .height(if (onAddSource != null) 300.dp else 260.dp),
     ) {
         Box(
             modifier =
@@ -1365,10 +1380,24 @@ private fun EmptyHome(modifier: Modifier) {
                 )
                 Spacer(Modifier.height(Space.xs))
                 Text(
-                    text = "Add a source in Settings → Sources, star a few channels, and this dashboard lights up with what to watch right now.",
+                    text = "Add a source, star a few channels, and this dashboard lights up with what to watch right now.",
                     color = LocalYancoPalette.current.TextSecondary,
                     style = YancoType.BodyLong,
                 )
+                if (onAddSource != null) {
+                    Spacer(Modifier.height(Space.lg))
+                    com.yancotv.android.ui.components.YancoPrimaryButton(
+                        onClick = onAddSource,
+                        size = com.yancotv.android.ui.components.ButtonSize.Standard,
+                    ) {
+                        Icon(
+                            imageVector = YancoIcons.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(text = "Add your first source")
+                    }
+                }
             }
         }
     }
