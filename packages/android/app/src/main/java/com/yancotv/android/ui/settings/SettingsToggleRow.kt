@@ -5,9 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -117,13 +119,23 @@ internal fun SettingsToggleRow(label: String, description: String, checked: Bool
                 shape = shape,
             )
             .leftExitsTo(activeTabFocus)
-            .clickable(
+            // MK.29.3 — Modifier.toggleable replaces .clickable + Role.Switch
+            // so Compose exposes the row's ToggleableState (On / Off /
+            // Indeterminate) to accessibility services. With the prior
+            // .clickable, TalkBack announced "Switch" with no name AND
+            // no on/off state. Merged semantics below names the row;
+            // toggleable supplies the state.
+            .toggleable(
+                value = checked,
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
                 role = Role.Switch,
-                onClick = { onCheckedChange(!checked) },
-            ),
+                onValueChange = onCheckedChange,
+            )
+            .semantics(mergeDescendants = true) {
+                contentDescription = label
+            },
     ) {
         // MK.29.2 — ON-state rail. Mirrors the sidebar's selected-tab
         // rail (3dp × 44dp, vertical accent gradient, square leading

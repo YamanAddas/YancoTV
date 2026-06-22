@@ -1,5 +1,7 @@
 package com.yancotv.android.ui.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,9 +65,24 @@ internal fun SettingsChip(label: String, selected: Boolean, onClick: () -> Unit,
     val colors = chipColors(palette, selected = selected, focused = focused)
     val shape = RoundedCornerShape(6.dp)
 
+    // MK.29.3 — Focus scale. A 1dp → 2dp border change on a small 6dp chip
+    // was hard to track at 3m on Fire TV; D-pad walks across a row of chips
+    // and the eye couldn't keep up. Matches the SettingsToggleRow scale
+    // (1.02) so chip focus motion belongs to the same family.
+    val targetScale = if (focused) 1.02f else 1.0f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = tween(durationMillis = 180),
+        label = "chipScale",
+    )
+
     Row(
         modifier =
         modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(shape)
             .background(colors.background)
             .border(
@@ -75,6 +96,15 @@ internal fun SettingsChip(label: String, selected: Boolean, onClick: () -> Unit,
                 role = Role.Tab,
                 onClick = onClick,
             )
+            // MK.29.3 — Merge descendants so TalkBack announces the chip
+            // as ONE tab named after its label, with selection state.
+            // Pre-fix, custom Row + .clickable surfaced as "Tab" with
+            // no name and no selected/unselected announcement (audit
+            // finding).
+            .semantics(mergeDescendants = true) {
+                contentDescription = label
+                this.selected = selected
+            }
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
