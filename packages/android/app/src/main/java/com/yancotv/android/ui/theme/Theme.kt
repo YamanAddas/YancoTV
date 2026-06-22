@@ -59,9 +59,14 @@ fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
             )
         }
 
+    // Audit catch — snapshot reduce-motion at theme entry; sites that
+    // honour the preference (FocusStyle for now) read via
+    // LocalReduceMotion.current.
+    val reduceMotion = rememberSystemReduceMotion()
     CompositionLocalProvider(
         LocalYancoPalette provides palette,
         LocalDensity provides scaledDensity,
+        LocalReduceMotion provides reduceMotion,
     ) {
         if (isTv) {
             val scheme = remember(palette) { tvColorScheme(palette) }

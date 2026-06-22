@@ -2,6 +2,7 @@ package com.yancotv.android.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.theme.LocalReduceMotion
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -81,19 +83,26 @@ fun Modifier.focusStyle(
     unfocusedBg: Color = LocalYancoPalette.current.BackgroundRaised.copy(alpha = 0.55f),
     focusedBg: Color = LocalYancoPalette.current.Accent.copy(alpha = 0.22f),
 ): Modifier {
+    // Audit catch — when the system "Remove animations" preference is
+    // on, collapse the three spring animations to snap() so focus
+    // changes paint instantly. The visual state still flips
+    // (scale + border + shadow) just with no transition. Defaults to
+    // false in LocalReduceMotion so unmigrated screens keep the
+    // existing springs.
+    val reduceMotion = LocalReduceMotion.current
     val scale by animateFloatAsState(
         targetValue = if (focused) liftScale else 1f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
+        animationSpec = if (reduceMotion) snap() else spring(dampingRatio = 0.8f, stiffness = 420f),
         label = "focus-scale",
     )
     val elevation by animateDpAsState(
         targetValue = if (focused && raised) 14.dp else 0.dp,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 420f),
+        animationSpec = if (reduceMotion) snap() else spring(dampingRatio = 0.9f, stiffness = 420f),
         label = "focus-elev",
     )
     val borderWidth by animateDpAsState(
         targetValue = if (focused) 2.dp else 1.dp,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 600f),
+        animationSpec = if (reduceMotion) snap() else spring(dampingRatio = 0.9f, stiffness = 600f),
         label = "focus-bw",
     )
     return this
