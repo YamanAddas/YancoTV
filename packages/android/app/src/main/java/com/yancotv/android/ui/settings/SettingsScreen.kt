@@ -99,17 +99,25 @@ enum class SettingsTab(val label: String, val icon: ImageVector) {
     // numbering rendered in TabItem were dropped 2026-04-28 — the
     // numbering / sub-caption read as visual noise on a 12-tab list
     // and the user's redesign pass collapsed them away.
-    General("General", YancoIcons.Settings),
-    Appearance("Appearance", YancoIcons.Theme),
-    Playback("Playback", YancoIcons.Play),
-    Network("Network", YancoIcons.Signal),
+    // MK.29.5 — Order is by FREQUENCY OF USE, not alphabet:
+    //   Sources / General / Playback / Parental / Recordings — the five
+    //     surfaces a user touches in a normal week.
+    //   Network / Groups / EPG / Appearance — power-user / one-time.
+    //   Backup / Shortcuts / About — rare / reference-only.
+    // initialTab still defaults to General (cold-open destination), so
+    // a user landing in Settings sees a familiar home; only the list
+    // order changes so Sources is the first thing to scroll past.
     Sources("Sources", YancoIcons.Link),
-    Groups("Groups", YancoIcons.Grid),
-    Epg("EPG", YancoIcons.Guide),
+    General("General", YancoIcons.Settings),
+    Playback("Playback", YancoIcons.Play),
     Parental("Parental", YancoIcons.Shield),
     Recordings("Recordings", YancoIcons.Record),
-    Shortcuts("Shortcuts", YancoIcons.Key),
+    Network("Network", YancoIcons.Signal),
+    Groups("Groups", YancoIcons.Grid),
+    Epg("EPG", YancoIcons.Guide),
+    Appearance("Appearance", YancoIcons.Theme),
     Backup("Backup", YancoIcons.Save),
+    Shortcuts("Shortcuts", YancoIcons.Key),
     About("About", YancoIcons.Info),
 }
 
