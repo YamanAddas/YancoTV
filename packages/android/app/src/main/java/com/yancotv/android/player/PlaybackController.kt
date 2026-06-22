@@ -412,12 +412,29 @@ class PlaybackController(
         // at construction so channels with multi-language audio default
         // to their pick. ExoPlayer carries TrackSelectionParameters across
         // MediaItem swaps, so one write here covers every channel zap.
-        val preferredAudio = prefs.playbackFlow.value.audioLanguage
-        if (preferredAudio.isNotBlank()) {
+        //
+        // Audit catch — same wiring for subtitleLanguage. Pre-fix the
+        // pref was saved by Settings → Playback but never read on
+        // PlayerActivity launch; users had to re-pick subtitles on every
+        // new title. Mirror the audio block, plus setTrackTypeDisabled
+        // (text) = false so a non-blank pref also un-hides the text track
+        // when ExoPlayer's default would otherwise leave it off.
+        val playbackPrefs = prefs.playbackFlow.value
+        val preferredAudio = playbackPrefs.audioLanguage
+        val preferredSubtitle = playbackPrefs.subtitleLanguage
+        if (preferredAudio.isNotBlank() || preferredSubtitle.isNotBlank()) {
             exo.trackSelectionParameters =
                 exo.trackSelectionParameters
                     .buildUpon()
-                    .setPreferredAudioLanguage(preferredAudio)
+                    .apply {
+                        if (preferredAudio.isNotBlank()) {
+                            setPreferredAudioLanguage(preferredAudio)
+                        }
+                        if (preferredSubtitle.isNotBlank()) {
+                            setPreferredTextLanguage(preferredSubtitle)
+                            setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+                        }
+                    }
                     .build()
         }
         return exo

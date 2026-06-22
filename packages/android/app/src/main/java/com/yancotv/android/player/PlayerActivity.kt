@@ -308,6 +308,28 @@ class PlayerActivity : AppCompatActivity() {
         object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "onPlayerError ${error.errorCodeName}", error)
+                // Audit catch — HLS BEHIND_LIVE_WINDOW is the canonical
+                // "user paused / timeshifted past the manifest tail"
+                // error. Media3's recommended recovery is seek-to-default
+                // + prepare; we previously surfaced the generic "Couldn't
+                // open this stream" overlay, blaming the stream for a
+                // recoverable state. Common on live IPTV channels —
+                // every brief pause that exceeds the live window
+                // triggered it.
+                val player = controller.player
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW &&
+                    player.isCurrentMediaItemLive
+                ) {
+                    Log.i(TAG, "BEHIND_LIVE_WINDOW: re-seeking to live edge and re-preparing")
+                    player.seekToDefaultPosition()
+                    player.prepare()
+                    android.widget.Toast.makeText(
+                        this@PlayerActivity,
+                        "Reconnecting to live…",
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                    return
+                }
                 showStreamError(error)
             }
 
