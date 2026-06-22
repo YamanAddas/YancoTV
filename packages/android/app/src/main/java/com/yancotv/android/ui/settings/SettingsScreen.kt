@@ -169,9 +169,17 @@ fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = Sett
 private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     var drilledIn by rememberSaveable { mutableStateOf(false) }
+    // MK.30 — Search query for the master list. Cleared when the user
+    // drills in so coming back out shows the full list again, matching
+    // a typical phone "search → tap → back → reset" pattern.
+    var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler(enabled = true) {
-        if (drilledIn) drilledIn = false else onExit()
+        when {
+            drilledIn -> drilledIn = false
+            query.isNotBlank() -> query = ""
+            else -> onExit()
+        }
     }
 
     Column(
@@ -182,7 +190,17 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
     ) {
         if (!drilledIn) {
             SidebarHeader()
+            // MK.30 — Search field. Same shape as the TV sidebar's
+            // search; the master/detail layout puts it just under the
+            // header so it's reachable without scrolling.
+            SettingsSearchField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
             HairlineDivider()
+            val visibleTabs = remember(query) { searchTabs(query) }
+            val results = remember(query) { searchSettings(query) }
             Column(
                 modifier =
                 Modifier
@@ -192,15 +210,29 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                for (entry in SettingsTab.entries) {
+                for (entry in visibleTabs) {
                     TabItem(
                         entry = entry,
                         selected = entry == tab,
                         onClick = {
                             tab = entry
                             drilledIn = true
+                            query = ""
                         },
                     )
+                }
+                if (results.isNotEmpty()) {
+                    SearchResultsSection(
+                        results = results,
+                        onSelect = { selected ->
+                            tab = selected
+                            drilledIn = true
+                            query = ""
+                        },
+                    )
+                }
+                if (visibleTabs.isEmpty() && results.isEmpty() && query.isNotBlank()) {
+                    SearchEmptyState(query = query)
                 }
             }
         } else {
@@ -269,6 +301,10 @@ private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
 private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val scope = rememberCoroutineScope()
+    // MK.30 — Search query. Owned by the parent so BackHandler can
+    // clear it on BACK (matches the "Back exits the current state, not
+    // the screen" pattern the sidebar / content layers already use).
+    var query by rememberSaveable { mutableStateOf("") }
     // Two layers, two keys, one rule per layer:
     //   - Settings tab CONTENT: BACK or LEFT-from-leftmost → focus the
     //     active tab in the inner sidebar.
@@ -316,8 +352,14 @@ private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General,
     ) {
         Sidebar(
             current = tab,
+            query = query,
+            onQueryChange = { query = it },
             onSelect = {
                 tab = it
+                // MK.30 — Clear the search after selecting a result so
+                // the user lands on the tab body, not on more search
+                // results in the sidebar.
+                query = ""
                 scope.launch {
                     // MK.22.B.1: tabs with heavy bodies (LazyColumn-based)
                     // need two frames + a retry — the first moveFocus(Right)
@@ -382,20 +424,32 @@ private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General,
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExit: () -> Unit, activeTabFocus: FocusRequester, modifier: Modifier = Modifier) {
-    // Verdant Frost — clean rounded panel (28dp `--r-xl`) replaces the
-    // hex-cut shell so the Settings screen reads as the design's
-    // "polished island" within the wider hex-cut app. The cut-corner
-    // shape is still used for chips / cards inside the tabs; only the
-    // outer Settings panels go rounded to match the redesign brief.
+private fun Sidebar(
+    current: SettingsTab,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSelect: (SettingsTab) -> Unit,
+    onExit: () -> Unit,
+    activeTabFocus: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
     val panelShape = RoundedCornerShape(28.dp)
     var sidebarHasFocus by remember { mutableStateOf(false) }
+    // MK.30 — Gate the LEFT-exits handler so the user can move the text
+    // caret inside the search field with D-pad LEFT without
+    // accidentally exiting Settings. The handler still fires for every
+    // LEFT press when focus is on a TabItem / footer / etc.
+    var searchHasFocus by remember { mutableStateOf(false) }
 
-    // BACK while focus is anywhere in the inner sidebar exits Settings.
-    // Mirrors CategoryRail: the host (HomeScreen) refocuses the main app
-    // sidebar, which auto-expands via the existing
-    // `LaunchedEffect(sidebarHasFocus)` chain.
-    BackHandler(enabled = sidebarHasFocus, onBack = onExit)
+    // BACK behaviour:
+    //   - search has text → clear text (consume BACK).
+    //   - sidebar otherwise → exit Settings (mirrors CategoryRail).
+    BackHandler(enabled = sidebarHasFocus) {
+        if (query.isNotBlank()) onQueryChange("") else onExit()
+    }
+
+    val visibleTabs = remember(query) { searchTabs(query) }
+    val results = remember(query) { searchSettings(query) }
 
     Column(
         modifier =
@@ -404,14 +458,14 @@ private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExi
             .background(LocalYancoPalette.current.BackgroundRaised)
             .border(1.dp, LocalYancoPalette.current.PanelBorder, panelShape)
             .onFocusChanged { sidebarHasFocus = it.hasFocus }
-            // D-pad LEFT inside the inner sidebar exits Settings.
-            // The sidebar is a vertical list with no horizontal
-            // siblings, so blanket-consuming LEFT is safe — there's
-            // no in-rail meaning for it. Same shape as CategoryRail's
-            // LEFT handler. Consume always so Compose's default focus
-            // search doesn't try to find an off-screen target.
+            // D-pad LEFT inside the inner sidebar exits Settings —
+            // UNLESS the search field has focus (then LEFT moves the
+            // text caret within the typed query, not out of Settings).
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                if (event.type == KeyEventType.KeyDown &&
+                    event.key == Key.DirectionLeft &&
+                    !searchHasFocus
+                ) {
                     onExit()
                     true
                 } else {
@@ -422,6 +476,18 @@ private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExi
             .focusRestorer(),
     ) {
         SidebarHeader()
+        // MK.30 — Search field. Sits between the header and the tab
+        // rail; takes voice / soft-keyboard input on TV (Fire TV remote
+        // mic dictates straight into BasicTextField). Filters the tab
+        // list AND surfaces a per-setting matches block below.
+        SettingsSearchField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier =
+            Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .onFocusChanged { searchHasFocus = it.hasFocus },
+        )
         HairlineDivider()
         Column(
             modifier =
@@ -432,7 +498,7 @@ private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExi
                 .padding(vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            for (entry in SettingsTab.entries) {
+            for (entry in visibleTabs) {
                 val isActive = entry == current
                 TabItem(
                     entry = entry,
@@ -444,15 +510,222 @@ private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExi
                     focusRequester = if (isActive) activeTabFocus else null,
                 )
             }
+            if (results.isNotEmpty()) {
+                SearchResultsSection(results = results, onSelect = onSelect)
+            }
+            if (visibleTabs.isEmpty() && results.isEmpty() && query.isNotBlank()) {
+                SearchEmptyState(query = query)
+            }
         }
-        // MK.29.4 — Persistent BACK-to-exit hint. On TV there's no Back
-        // button in the chrome; the user has to know that pressing BACK
-        // from anywhere in the sidebar exits Settings entirely. Spell
-        // that out so first-time users don't get stuck. Phone layout
+        // MK.29.4 — Persistent BACK-to-exit hint. Phone layout
         // [SettingsPhoneLayout] has its own touch Back button + system
         // gesture and uses a different shell, so this footer only
         // appears in the two-pane (TV / tablet) sidebar.
         SidebarFooterHint()
+    }
+}
+
+/**
+ * MK.30 — Search field used in both Settings layouts (TV sidebar +
+ * phone master list). A magnifying-glass icon, a single-line
+ * [BasicTextField], and a clear-× button when the field has content.
+ *
+ * Voice search "just works" on Fire TV: the remote mic dictates
+ * directly into BasicTextField via the platform IME. On phone, the
+ * soft keyboard auto-shows when focused.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val palette = LocalYancoPalette.current
+    val shape = RoundedCornerShape(10.dp)
+    val border = if (focused) palette.FocusRing else palette.BorderSubtle
+
+    Row(
+        modifier =
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.BackgroundElevated)
+            .border(if (focused) 1.5.dp else 1.dp, border, shape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = YancoIcons.Search,
+            contentDescription = null,
+            tint = if (focused) palette.Accent else palette.TextMuted,
+            modifier = Modifier.size(16.dp),
+        )
+        androidx.compose.foundation.text.BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                color = palette.TextPrimary,
+                fontSize = 14.sp,
+            ),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(palette.Accent),
+            interactionSource = interaction,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = "Search settings" },
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Search settings…",
+                        color = palette.TextFaint,
+                        fontSize = 14.sp,
+                    )
+                }
+                inner()
+            },
+        )
+        if (value.isNotEmpty()) {
+            val clearInteraction = remember { MutableInteractionSource() }
+            val clearFocused by clearInteraction.collectIsFocusedAsState()
+            Box(
+                modifier =
+                Modifier
+                    .size(22.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(
+                        if (clearFocused) palette.Accent.copy(alpha = 0.18f) else Color.Transparent,
+                    )
+                    .border(
+                        width = if (clearFocused) 1.5.dp else 0.dp,
+                        color = if (clearFocused) palette.FocusRing else Color.Transparent,
+                        shape = RoundedCornerShape(11.dp),
+                    )
+                    .clickable(
+                        interactionSource = clearInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = { onValueChange("") },
+                    )
+                    .semantics { contentDescription = "Clear search" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "×",
+                    color = if (clearFocused) palette.Accent else palette.TextMuted,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * MK.30 — "Matching settings" block rendered below the (possibly
+ * filtered) tab list when the search query is non-empty. Each row
+ * shows the setting name + the tab it belongs to so the user knows
+ * where they'll land.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun SearchResultsSection(results: List<SettingsSearchEntry>, onSelect: (SettingsTab) -> Unit) {
+    val palette = LocalYancoPalette.current
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(
+            text = "MATCHING SETTINGS",
+            color = palette.TextMuted,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.4.sp,
+            modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 8.dp),
+        )
+        for (entry in results) {
+            SearchResultRow(entry = entry, onClick = { onSelect(entry.tab) })
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val palette = LocalYancoPalette.current
+    val shape = RoundedCornerShape(10.dp)
+
+    Row(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(shape)
+            .background(
+                if (focused) palette.BackgroundElevated else Color.Transparent,
+            )
+            .border(
+                width = if (focused) 1.5.dp else 0.dp,
+                color = if (focused) palette.FocusRing else Color.Transparent,
+                shape = shape,
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${entry.label} in ${entry.tab.label}"
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = entry.tab.icon,
+            contentDescription = null,
+            tint = if (focused) palette.Accent else palette.TextMuted,
+            modifier = Modifier.size(14.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.label,
+                color = palette.TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "in ${entry.tab.label}",
+                color = palette.TextMuted,
+                fontSize = 10.sp,
+            )
+        }
+        Icon(
+            imageVector = YancoIcons.ChevronRight,
+            contentDescription = null,
+            tint = if (focused) palette.Accent else palette.TextFaint,
+            modifier = Modifier.size(12.dp),
+        )
+    }
+}
+
+@Composable
+private fun SearchEmptyState(query: String) {
+    val palette = LocalYancoPalette.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
+    ) {
+        Text(
+            text = "No matches for “$query”.",
+            color = palette.TextMuted,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Press BACK to clear search.",
+            color = palette.TextFaint,
+            fontSize = 11.sp,
+        )
     }
 }
 
