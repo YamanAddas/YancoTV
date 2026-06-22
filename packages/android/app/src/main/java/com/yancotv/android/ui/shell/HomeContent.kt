@@ -54,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.ui.components.HexSurface
+import com.yancotv.android.ui.components.ProgressStripe
+import com.yancotv.android.ui.components.ResumeBadge
 import com.yancotv.android.ui.components.WheelRow
 import com.yancotv.android.ui.components.wheelItemTransform
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -840,7 +842,7 @@ private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?
                 }
                 if (resume != null) {
                     ResumeBadge(
-                        resume = resume,
+                        label = resumeLabelFor(resume),
                         modifier =
                         Modifier
                             .align(Alignment.TopEnd)
@@ -1108,37 +1110,23 @@ private fun LockBadge(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun ResumeBadge(resume: HistoryEntry, modifier: Modifier = Modifier) {
+/**
+ * MK.28.2 — Label derivation for the [ResumeBadge] on Home tiles. The
+ * shared [com.yancotv.android.ui.components.ResumeBadge] primitive is
+ * pre-formatted text; this helper keeps the HistoryEntry-→-string mapping
+ * local to HomeContent so other surfaces (browse, favorites, search,
+ * episode list) that already source [com.yancotv.shared.history.WatchProgress]
+ * can use the shared [com.yancotv.android.ui.components.formatResumeLabel]
+ * instead.
+ */
+private fun resumeLabelFor(resume: HistoryEntry): String {
     val dur = resume.durationSeconds
-    val label =
-        if (dur != null && dur > 0) {
-            val remainingSec = (dur - resume.positionSeconds).toDouble().coerceAtLeast(0.0).roundToInt()
-            val minutes = (remainingSec / 60).coerceAtLeast(1)
-            "${minutes}m left"
-        } else {
-            "Resume"
-        }
-    Row(
-        modifier =
-        modifier
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.75f))
-            .padding(horizontal = Space.sm, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.xs),
-    ) {
-        Icon(
-            imageVector = YancoIcons.Play,
-            contentDescription = null,
-            tint = LocalYancoPalette.current.Accent,
-            modifier = Modifier.size(10.dp),
-        )
-        Text(
-            text = label,
-            color = LocalYancoPalette.current.TextPrimary,
-            style = YancoType.Caption,
-        )
+    return if (dur != null && dur > 0) {
+        val remainingSec = (dur - resume.positionSeconds).toDouble().coerceAtLeast(0.0).roundToInt()
+        val minutes = (remainingSec / 60).coerceAtLeast(1)
+        "${minutes}m left"
+    } else {
+        "Resume"
     }
 }
 
@@ -1211,32 +1199,9 @@ private fun TypeChip(item: ContentItem, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun ProgressStripe(progress: Float, modifier: Modifier) {
-    // Brush rebuilds only on palette swap (MK.16.1), not every recompose.
-    val pal = LocalYancoPalette.current
-    val tileProgressBrush =
-        remember(pal) {
-            Brush.horizontalGradient(
-                colors = listOf(pal.AccentDeep, pal.Accent, pal.AccentGlow),
-            )
-        }
-    Box(
-        modifier =
-        modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .background(pal.BackgroundDeep.copy(alpha = 0.6f)),
-    ) {
-        Box(
-            modifier =
-            Modifier
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .fillMaxHeight()
-                .background(tileProgressBrush),
-        )
-    }
-}
+// ProgressStripe lives in com.yancotv.android.ui.components.WatchIndicator
+// since MK.28.2 — same gradient bar, shared across home / browse /
+// favorites / search / episode list. Imported above.
 
 // ---------- Utilities ----------
 

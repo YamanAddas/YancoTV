@@ -192,6 +192,16 @@ object YancoIcons {
             close()
         }
 
+    /** Checkmark — used by the "Watched" badge on finished VOD tiles
+     *  (MK.28.2). Classic two-segment glyph, matches the rest of the
+     *  line-weight family. */
+    val Check: ImageVector =
+        buildLine("check") {
+            moveTo(5f, 12.5f)
+            lineTo(10f, 17.5f)
+            lineTo(19f, 7f)
+        }
+
     val StarOutline: ImageVector =
         buildLine("star-outline") {
             moveTo(12f, 3.5f)
