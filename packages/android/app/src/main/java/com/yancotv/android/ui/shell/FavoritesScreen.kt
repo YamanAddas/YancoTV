@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -194,18 +195,11 @@ fun FavoritesScreen(
             onManage = { manageListId = it },
         )
         if (items.isEmpty() && !loading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "No favorites in this list", color = LocalYancoPalette.current.TextPrimary)
-                    Text(
-                        text = "Focus a channel or title and press the star in the info panel.",
-                        color = LocalYancoPalette.current.TextMuted,
-                    )
-                }
-            }
+            // MK.32.3 — Branded empty state matching the HexSurface card
+            // language used by HomeContent.EmptyHome / CoverflowEmptyState
+            // so the screen reads as "intentionally empty, here's what
+            // to do" instead of "nothing to render".
+            FavoritesEmptyState(modifier = Modifier.fillMaxSize().padding(32.dp))
         } else {
             FavoritesListBody(
                 live = live,
@@ -349,6 +343,52 @@ private fun FavoritesListBody(
                         gatedPlay(row.id) { onOpenDetail(row) }
                     },
                     onRemove = { onRemove(row) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * MK.32.3 — Branded Favorites empty state. Same HexSurface idiom as
+ * HomeContent.EmptyHome so screens that come up empty read as a
+ * deliberate "here's what to do next" card, not a blank pane.
+ */
+@Composable
+private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
+    val palette = LocalYancoPalette.current
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        HexSurface(
+            shape = YancoShapes.CutCornerCard,
+            focused = false,
+            bevelInset = 4.dp,
+            modifier = Modifier.fillMaxWidth(0.7f).height(220.dp),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 28.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = "YOUR LIBRARY",
+                    color = palette.Accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.6.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "No favorites yet",
+                    color = palette.TextPrimary,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    lineHeight = 26.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Browse Live TV, Movies, or Series, focus a tile, then long-press OK and pick \"Add to favorites\".",
+                    color = palette.TextMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                 )
             }
         }

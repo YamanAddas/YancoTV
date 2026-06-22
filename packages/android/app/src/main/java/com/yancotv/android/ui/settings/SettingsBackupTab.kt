@@ -479,8 +479,13 @@ fun SettingsBackupTab(
                                     importPickedUriString = Uri.fromFile(picked).toString()
                                     importStatus = "Picked latest: ${picked.name}"
                                 } else {
+                                    // MK.32.3 — Friendlier copy. The
+                                    // file path was relevant only to a
+                                    // developer reading the toast; the
+                                    // user just wants to know "nothing
+                                    // to restore + how to get one".
                                     importStatus =
-                                        "No yancotv-backup-*.json files found in /sdcard/Download/YancoTV/"
+                                        "No backups in your Downloads/YancoTV folder. Use Export above to make your first one."
                                 }
                                 importFocusBump++
                             }
