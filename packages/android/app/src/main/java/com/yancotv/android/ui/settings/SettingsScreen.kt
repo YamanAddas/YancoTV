@@ -437,6 +437,48 @@ private fun Sidebar(current: SettingsTab, onSelect: (SettingsTab) -> Unit, onExi
                 )
             }
         }
+        // MK.29.4 — Persistent BACK-to-exit hint. On TV there's no Back
+        // button in the chrome; the user has to know that pressing BACK
+        // from anywhere in the sidebar exits Settings entirely. Spell
+        // that out so first-time users don't get stuck. Phone layout
+        // [SettingsPhoneLayout] has its own touch Back button + system
+        // gesture and uses a different shell, so this footer only
+        // appears in the two-pane (TV / tablet) sidebar.
+        SidebarFooterHint()
+    }
+}
+
+/**
+ * MK.29.4 — Persistent footer at the bottom of the Settings sidebar
+ * with the keyboard contract: BACK exits, D-pad up/down navigates the
+ * tab list. 11sp / muted / mono-spaced for the keycap glyphs so the
+ * hint reads as system chrome, not content.
+ */
+@Composable
+private fun SidebarFooterHint() {
+    val palette = LocalYancoPalette.current
+    HairlineDivider()
+    Row(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "BACK",
+            color = palette.Accent,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        )
+        Text(
+            text = "exit  ·  ↑↓ navigate",
+            color = palette.TextMuted,
+            fontSize = 11.sp,
+        )
     }
 }
 
