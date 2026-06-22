@@ -43,17 +43,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.produceState
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.HexSurface
+import com.yancotv.android.ui.components.ProgressStripe
+import com.yancotv.android.ui.components.WatchedCheckBadge
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
+import com.yancotv.android.ui.components.formatResumeLabel
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoShapes
+import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.QualityBadge
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.parental.AdultContentFilter
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
@@ -78,6 +87,7 @@ fun FavoritesScreen(
     favorites: FavoritesRepository = koinInject(),
     controller: PlaybackController = koinInject(),
     parental: ParentalRepository = koinInject(),
+    watchHistory: WatchHistoryRepository = koinInject(),
 ) {
     // Reactive list: SQLDelight drives recomposition only when the favorites
     // table actually changes, so unstarring from InfoPanel on another screen
@@ -130,6 +140,25 @@ fun FavoritesScreen(
     val live = remember(items) { items.filter { it.type == ContentType.LIVE } }
     val movies = remember(items) { items.filter { it.type == ContentType.MOVIE } }
     val series = remember(items) { items.filter { it.type == ContentType.SERIES } }
+
+    // MK.28.4 — Tile-progress subscription. Live channels skip (no resume),
+    // movies + series get the per-row stripe + Resume/Watched chip. Reactive
+    // so the row updates the moment the player persists a new offset.
+    val vodIds by remember(movies, series) {
+        derivedStateOf { (movies + series).map { it.id }.toSet() }
+    }
+    val watchProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), vodIds) {
+        if (vodIds.isEmpty()) {
+            value = emptyMap()
+            return@produceState
+        }
+        runCatching {
+            watchHistory.entriesByContentFlow(vodIds).collect { value = it }
+        }.onFailure { t ->
+            android.util.Log.w("Yanco", "FavoritesScreen watch-progress flow failed: ${t.message}", t)
+            value = emptyMap()
+        }
+    }
     // Hoist scroll state so a section becoming empty and re-added (e.g.
     // unstarring the last movie, then re-starring one) keeps the user's
     // scroll position rather than snapping back to the top.
@@ -166,6 +195,7 @@ fun FavoritesScreen(
                 live = live,
                 movies = movies,
                 series = series,
+                watchProgress = watchProgress,
                 listState = listState,
                 isTv = isTv,
                 controller = controller,
@@ -235,6 +265,7 @@ private fun FavoritesListBody(
     live: List<ContentItem>,
     movies: List<ContentItem>,
     series: List<ContentItem>,
+    watchProgress: Map<String, WatchProgress>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     isTv: Boolean,
     controller: PlaybackController,
@@ -257,6 +288,7 @@ private fun FavoritesListBody(
             items(live, key = { "live:${it.id}" }) { row ->
                 FavoriteRow(
                     item = row,
+                    progress = watchProgress[row.id],
                     onActivate = {
                         gatedPlay(row.id) {
                             val action = resolveActivation(controller.currentId, row.id, isTv)
@@ -273,6 +305,7 @@ private fun FavoritesListBody(
             items(movies, key = { "movie:${it.id}" }) { row ->
                 FavoriteRow(
                     item = row,
+                    progress = watchProgress[row.id],
                     onActivate = {
                         gatedPlay(row.id) {
                             val action = resolveActivation(controller.currentId, row.id, isTv)
@@ -289,6 +322,7 @@ private fun FavoritesListBody(
             items(series, key = { "series:${it.id}" }) { row ->
                 FavoriteRow(
                     item = row,
+                    progress = watchProgress[row.id],
                     onActivate = {
                         // Series containers are not Playable — calling
                         // controller.play would silently no-op (toPlayable
@@ -501,7 +535,7 @@ private fun SectionHeader(text: String) {
  * on focus); two explicit buttons is unambiguous.
  */
 @Composable
-private fun FavoriteRow(item: ContentItem, onActivate: () -> Unit, onRemove: () -> Unit) {
+private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate: () -> Unit, onRemove: () -> Unit) {
     val badges = remember(item.id) { QualityBadge.parse(item.title) }
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
@@ -514,55 +548,92 @@ private fun FavoriteRow(item: ContentItem, onActivate: () -> Unit, onRemove: () 
             .fillMaxWidth()
             .height(72.dp),
     ) {
-        Row(
-            modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(
+        // Box so MK.28.4's ProgressStripe can paint along the row's bottom
+        // edge without breaking the existing Row layout. Stripe is the
+        // last child so it draws on top of the row's background.
+        Box(modifier = Modifier.fillMaxSize()) {
+            Row(
                 modifier =
                 Modifier
-                    .size(52.dp)
-                    .clip(YancoShapes.HexCapsule)
-                    .background(LocalYancoPalette.current.BackgroundDeep),
-                contentAlignment = Alignment.Center,
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (!item.logoUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = item.logoUrl,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().padding(6.dp),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(text = displayTitle, color = LocalYancoPalette.current.TextPrimary, maxLines = 1)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Box(
+                    modifier =
+                    Modifier
+                        .size(52.dp)
+                        .clip(YancoShapes.HexCapsule)
+                        .background(LocalYancoPalette.current.BackgroundDeep),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    item.groupName?.let {
-                        Text(text = it, color = LocalYancoPalette.current.TextMuted, maxLines = 1)
+                    if (!item.logoUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = item.logoUrl,
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize().padding(6.dp),
+                        )
                     }
-                    QualityChips(badges = badges)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                    ) {
+                        Text(
+                            text = displayTitle,
+                            color = LocalYancoPalette.current.TextPrimary,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        // MK.28.4 — Resume / Watched chip inline beside the
+                        // title. Compact form (no separate icon for Watched
+                        // here — the row is dense, the stripe + chip text
+                        // carry the meaning).
+                        if (progress != null) {
+                            Text(
+                                text = formatResumeLabel(progress),
+                                color = LocalYancoPalette.current.Accent,
+                                style = YancoType.Caption,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item.groupName?.let {
+                            Text(text = it, color = LocalYancoPalette.current.TextMuted, maxLines = 1)
+                        }
+                        QualityChips(badges = badges)
+                    }
+                }
+                YancoPrimaryButton(
+                    onClick = onActivate,
+                    size = ButtonSize.Compact,
+                    translucent = true,
+                ) {
+                    Text(text = "Play")
+                }
+                YancoSecondaryButton(onClick = onRemove, size = ButtonSize.Compact) {
+                    Text(text = "Remove")
                 }
             }
-            YancoPrimaryButton(
-                onClick = onActivate,
-                size = ButtonSize.Compact,
-                translucent = true,
-            ) {
-                Text(text = "Play")
-            }
-            YancoSecondaryButton(onClick = onRemove, size = ButtonSize.Compact) {
-                Text(text = "Remove")
+            // MK.28.4 — ProgressStripe across the bottom edge of the row.
+            // Only painted for mid-stream rows; finished rows already
+            // surface via the "Watched" chip above so a full bar would be
+            // redundant.
+            if (progress != null && !progress.isFinished() && progress.ratio > 0f) {
+                ProgressStripe(
+                    progress = progress.ratio,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }

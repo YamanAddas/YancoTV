@@ -27,9 +27,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -54,12 +56,19 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
+import com.yancotv.android.ui.components.ProgressStripe
+import com.yancotv.android.ui.components.ResumeBadge
+import com.yancotv.android.ui.components.WatchedCheckBadge
+import com.yancotv.android.ui.components.formatResumeLabel
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.content.QualityBadge
+import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
@@ -91,6 +100,7 @@ fun SearchScreen(
     controller: PlaybackController = koinInject(),
     parental: com.yancotv.shared.parental.ParentalRepository = koinInject(),
     syncCoordinator: com.yancotv.android.sources.SourceSyncCoordinator = koinInject(),
+    watchHistory: WatchHistoryRepository = koinInject(),
 ) {
     // rememberSaveable so a rotation / process-death while the user has a
     // query typed doesn't wipe the term. Results are not saved — rerunning
@@ -242,6 +252,26 @@ fun SearchScreen(
                 val live = remember(visible) { visible.filter { it.type == ContentType.LIVE } }
                 val movies = remember(visible) { visible.filter { it.type == ContentType.MOVIE } }
                 val series = remember(visible) { visible.filter { it.type == ContentType.SERIES } }
+
+                // MK.28.4 — Tile-progress subscription. Live skipped (no
+                // resume on continuous streams), movies + series get the
+                // Resume/Watched indicator overlay on each orb. Reactive
+                // via the SQLDelight notification graph.
+                val vodIds by remember(movies, series) {
+                    derivedStateOf { (movies + series).map { it.id }.toSet() }
+                }
+                val watchProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), vodIds) {
+                    if (vodIds.isEmpty()) {
+                        value = emptyMap()
+                        return@produceState
+                    }
+                    runCatching {
+                        watchHistory.entriesByContentFlow(vodIds).collect { value = it }
+                    }.onFailure { t ->
+                        Log.w("Yanco", "SearchScreen watch-progress flow failed: ${t.message}", t)
+                        value = emptyMap()
+                    }
+                }
                 val onActivate: (ContentItem, List<ContentItem>) -> Unit = { item, bucket ->
                     gatedPlay(item.id) {
                         when {
@@ -266,6 +296,7 @@ fun SearchScreen(
                             SearchRail(
                                 title = "Live TV",
                                 items = live,
+                                watchProgress = watchProgress,
                                 onActivate = { onActivate(it, live) },
                             )
                         }
@@ -275,6 +306,7 @@ fun SearchScreen(
                             SearchRail(
                                 title = "Movies",
                                 items = movies,
+                                watchProgress = watchProgress,
                                 onActivate = { onActivate(it, movies) },
                             )
                         }
@@ -284,6 +316,7 @@ fun SearchScreen(
                             SearchRail(
                                 title = "Series",
                                 items = series,
+                                watchProgress = watchProgress,
                                 onActivate = { onActivate(it, series) },
                             )
                         }
@@ -477,7 +510,7 @@ private fun typeLabel(type: ContentType): String = when (type) {
  * the parent LazyColumn's focus search.
  */
 @Composable
-private fun SearchRail(title: String, items: List<ContentItem>, onActivate: (ContentItem) -> Unit) {
+private fun SearchRail(title: String, items: List<ContentItem>, watchProgress: Map<String, WatchProgress>, onActivate: (ContentItem) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = title.uppercase(),
@@ -491,7 +524,7 @@ private fun SearchRail(title: String, items: List<ContentItem>, onActivate: (Con
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp),
         ) {
             items(items, key = { it.id }) { item ->
-                SearchOrb(item = item, onActivate = { onActivate(item) })
+                SearchOrb(item = item, progress = watchProgress[item.id], onActivate = { onActivate(item) })
             }
         }
     }
@@ -505,7 +538,7 @@ private fun SearchRail(title: String, items: List<ContentItem>, onActivate: (Con
  * shared interactionSource per the native-android-mk skill.
  */
 @Composable
-private fun SearchOrb(item: ContentItem, onActivate: () -> Unit) {
+private fun SearchOrb(item: ContentItem, progress: WatchProgress?, onActivate: () -> Unit) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -549,6 +582,26 @@ private fun SearchOrb(item: ContentItem, onActivate: () -> Unit) {
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                 )
+            }
+            // MK.28.4 — Resume / Watched overlay on search-result orbs.
+            // Same shape language as the browse coverflow (MK.28.3).
+            if (progress != null) {
+                if (progress.isFinished()) {
+                    WatchedCheckBadge(
+                        modifier = Modifier.align(Alignment.TopStart).padding(Space.xs),
+                    )
+                } else {
+                    ResumeBadge(
+                        label = formatResumeLabel(progress),
+                        modifier = Modifier.align(Alignment.TopStart).padding(Space.xs),
+                    )
+                    if (progress.ratio > 0f) {
+                        ProgressStripe(
+                            progress = progress.ratio,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
+                }
             }
         }
         Text(
