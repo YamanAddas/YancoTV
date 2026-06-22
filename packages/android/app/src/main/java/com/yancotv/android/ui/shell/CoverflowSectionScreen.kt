@@ -37,6 +37,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -71,6 +72,10 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.ui.components.ProgressStripe
+import com.yancotv.android.ui.components.ResumeBadge
+import com.yancotv.android.ui.components.WatchedCheckBadge
+import com.yancotv.android.ui.components.formatResumeLabel
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.focus.tvLongClickable
@@ -84,6 +89,8 @@ import com.yancotv.android.ui.theme.YancoType
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -142,6 +149,7 @@ fun CoverflowSectionScreen(
     favorites: FavoritesRepository = koinInject(),
     parental: ParentalRepository = koinInject(),
     prefs: AppPreferences = koinInject(),
+    watchHistory: WatchHistoryRepository = koinInject(),
     modifier: Modifier = Modifier,
 ) {
     val firstItemAnchor = rememberPlacedFocusAnchor()
@@ -212,6 +220,33 @@ fun CoverflowSectionScreen(
                 hiddenIds = hiddenIds,
                 hideAdult = parentalSettings.hideAdultContent,
             )
+        }
+    }
+
+    // MK.28.3 — Tile-progress subscription. Live channels have no resume
+    // points (offset in a continuous stream is meaningless), so skip the
+    // lookup entirely for type == LIVE. For Movies / Series we subscribe
+    // to the visible-window's content IDs and the flow re-emits whenever
+    // the player persists a new resume offset — so the bottom-edge
+    // progress stripe and corner badge auto-update without any manual
+    // refresh. The query is bounded by `items.size` which the screen
+    // already caps at 1000 (line 285), well under SQLite's IN-list limit.
+    val progressIds by remember {
+        derivedStateOf {
+            if (type == ContentType.LIVE) emptySet()
+            else items.map { it.id }.toSet()
+        }
+    }
+    val watchProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), progressIds) {
+        if (progressIds.isEmpty()) {
+            value = emptyMap()
+            return@produceState
+        }
+        runCatching {
+            watchHistory.entriesByContentFlow(progressIds).collect { value = it }
+        }.onFailure { t ->
+            Log.w("Yanco", "CoverflowSection watch-progress flow failed: ${t.message}", t)
+            value = emptyMap()
         }
     }
 
@@ -469,6 +504,7 @@ fun CoverflowSectionScreen(
                         type = type,
                         nowNextMap = nowNextMap,
                         lockedIds = lockedIds,
+                        watchProgress = watchProgress,
                         focusedIndex =
                         focusedIndex.coerceIn(
                             0,
@@ -976,6 +1012,7 @@ private fun ContentCoverflow(
     type: ContentType,
     nowNextMap: Map<String, NowNext>,
     lockedIds: Set<String>,
+    watchProgress: Map<String, WatchProgress>,
     focusedIndex: Int,
     firstItemAnchor: com.yancotv.android.ui.focus.PlacedFocusAnchor,
     entryFocus: FocusRequester,
@@ -1016,6 +1053,7 @@ private fun ContentCoverflow(
                     distance = index - focusedIndex,
                     isLocked = item.id in lockedIds,
                     nowNext = item.tvgId?.let { nowNextMap[it] },
+                    progress = watchProgress[item.id],
                     placedAnchor = if (index == focusedIndex) firstItemAnchor else null,
                     entryFocus = if (index == focusedIndex) entryFocus else null,
                     onFocus = { onFocus(index, item) },
@@ -1034,6 +1072,7 @@ private fun ContentOrb(
     distance: Int,
     isLocked: Boolean,
     nowNext: NowNext?,
+    progress: WatchProgress?,
     placedAnchor: com.yancotv.android.ui.focus.PlacedFocusAnchor?,
     entryFocus: FocusRequester?,
     onFocus: () -> Unit,
@@ -1149,6 +1188,40 @@ private fun ContentOrb(
                         tint = LocalYancoPalette.current.Accent,
                         modifier = Modifier.size(12.dp),
                     )
+                }
+            }
+
+            // MK.28.3 — Watch-state overlay. TopStart corner (lock owns TopEnd
+            // when present, so the two never collide). Live channels pass
+            // progress=null so this short-circuits — channels have no resume.
+            //
+            // ProgressStripe sits at the BottomCenter of the orb hex itself
+            // so the stripe reads as part of the tile, not a divider below
+            // it. Finished rows get the WatchedCheckBadge instead of a
+            // full-bar stripe so the user can tell at a glance which titles
+            // they've already seen.
+            if (progress != null) {
+                if (progress.isFinished()) {
+                    WatchedCheckBadge(
+                        modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(Space.xs),
+                    )
+                } else {
+                    ResumeBadge(
+                        label = formatResumeLabel(progress),
+                        modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(Space.xs),
+                    )
+                    if (progress.ratio > 0f) {
+                        ProgressStripe(
+                            progress = progress.ratio,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
                 }
             }
         }
