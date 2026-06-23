@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
 /**
@@ -57,6 +58,14 @@ class UpdateCheckerTest {
         assertNull(checker.check(), "fetch failure must surface as 'no update', not throw")
     }
 
+    @Test fun httpFailure_detailedOutcomeIsFailed() = runTest {
+        val http = FakeHttpClient(Result.failure(RuntimeException("connection refused")))
+        val checker =
+            UpdateChecker(http, endpointUrl = "https://example.com/update.json", currentVersionCode = 1)
+        val outcome = checker.checkDetailed()
+        assertTrue(outcome is UpdateCheckOutcome.Failed)
+    }
+
     @Test fun malformedJson_returnsNull() = runTest {
         val http = FakeHttpClient(Result.success("this is not json {{{"))
         val checker =
@@ -92,6 +101,18 @@ class UpdateCheckerTest {
         val checker =
             UpdateChecker(http, endpointUrl = "https://example.com/update.json", currentVersionCode = 5)
         assertNull(checker.check(), "equal versionCode must NOT prompt update")
+    }
+
+    @Test fun remoteVersionEqualToCurrent_detailedOutcomeIsUpToDate() = runTest {
+        val body =
+            """
+                {"versionCode": 5, "versionName": "0.5.0", "downloadUrl": "https://x/y.apk"}
+            """.trimIndent()
+        val http = FakeHttpClient(Result.success(body))
+        val checker =
+            UpdateChecker(http, endpointUrl = "https://example.com/update.json", currentVersionCode = 5)
+        val outcome = checker.checkDetailed()
+        assertEquals(UpdateCheckOutcome.UpToDate(versionCode = 5, versionName = "0.5.0"), outcome)
     }
 
     @Test fun remoteVersionOlderThanCurrent_returnsNull() = runTest {
@@ -135,6 +156,19 @@ class UpdateCheckerTest {
         )
         assertEquals("MK.20 polish + Stage 5.2 update flow", info.releaseNotes)
         assertEquals(24, info.minOsApi)
+    }
+
+    @Test fun remoteVersionNewer_detailedOutcomeIsAvailable() = runTest {
+        val body =
+            """
+                {"versionCode": 7, "versionName": "0.7.0", "downloadUrl": "https://x/y.apk"}
+            """.trimIndent()
+        val http = FakeHttpClient(Result.success(body))
+        val checker =
+            UpdateChecker(http, endpointUrl = "https://example.com/update.json", currentVersionCode = 5)
+        val outcome = checker.checkDetailed()
+        assertTrue(outcome is UpdateCheckOutcome.Available)
+        assertEquals(7, outcome.info.versionCode)
     }
 
     @Test fun newerRemote_optionalFieldsAbsent_defaultsToNull() = runTest {

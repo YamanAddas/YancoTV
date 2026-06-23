@@ -2,6 +2,7 @@ package com.yancotv.android.update
 
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.shared.update.UpdateChecker
+import com.yancotv.shared.update.UpdateCheckOutcome
 import com.yancotv.shared.update.UpdateInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,9 @@ class UpdateRepository(private val checker: UpdateChecker, private val prefs: Ap
     private val _info = MutableStateFlow<UpdateInfo?>(null)
     val info: StateFlow<UpdateInfo?> = _info.asStateFlow()
 
+    private val _lastCheck = MutableStateFlow<UpdateCheckOutcome?>(null)
+    val lastCheck: StateFlow<UpdateCheckOutcome?> = _lastCheck.asStateFlow()
+
     /**
      * Mirrors [UpdateChecker.isConfigured] so UI can read it via
      * koinInject() without pulling the checker directly. Fixed at
@@ -61,14 +65,35 @@ class UpdateRepository(private val checker: UpdateChecker, private val prefs: Ap
      * Returns the resolved [UpdateInfo] (or null) for callers that want
      * to act immediately rather than collecting from [info].
      */
-    suspend fun triggerCheck(): UpdateInfo? = checkMutex.withLock {
-        if (!checker.isConfigured) {
-            return@withLock null
+    suspend fun triggerCheck(): UpdateInfo? {
+        return when (val outcome = triggerCheckOutcome()) {
+            is UpdateCheckOutcome.Available -> outcome.info
+            else -> null
         }
-        val result = checker.check()
-        _info.value = result
+    }
+
+    /**
+     * Manual-check friendly variant of [triggerCheck]. It keeps the
+     * reason for the outcome so Settings can say "you're on the
+     * latest version" or "couldn't check" instead of silently doing
+     * nothing when there is no update.
+     */
+    suspend fun triggerCheckOutcome(): UpdateCheckOutcome = checkMutex.withLock {
+        if (!checker.isConfigured) {
+            _lastCheck.value = UpdateCheckOutcome.Disabled
+            _info.value = null
+            return@withLock UpdateCheckOutcome.Disabled
+        }
+        _lastCheck.value = UpdateCheckOutcome.Checking
+        val outcome = checker.checkDetailed()
+        _lastCheck.value = outcome
+        _info.value =
+            when (outcome) {
+                is UpdateCheckOutcome.Available -> outcome.info
+                else -> null
+            }
         prefs.setLastUpdateCheckAt(now())
-        result
+        outcome
     }
 
     /**

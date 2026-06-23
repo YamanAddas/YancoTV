@@ -92,8 +92,21 @@ class UpdateChecker(
      * Suspending — runs on the caller's coroutine context. WorkManager
      * worker dispatches off the main thread.
      */
-    suspend fun check(): UpdateInfo? {
-        if (endpointUrl.isBlank()) return null
+    suspend fun check(): UpdateInfo? =
+        when (val outcome = checkDetailed()) {
+            is UpdateCheckOutcome.Available -> outcome.info
+            else -> null
+        }
+
+    /**
+     * Same network poll as [check], but preserves the reason for a
+     * non-update result so UI can give honest feedback after a manual
+     * "Check now" tap. The legacy [check] wrapper intentionally keeps
+     * returning nullable [UpdateInfo] for background workers and older
+     * call sites.
+     */
+    suspend fun checkDetailed(): UpdateCheckOutcome {
+        if (endpointUrl.isBlank()) return UpdateCheckOutcome.Disabled
         val body =
             runCatching {
                 http.getText(
@@ -102,30 +115,35 @@ class UpdateChecker(
                 )
             }.getOrElse { e ->
                 logger.warn("UpdateChecker: fetch failed — ${e.message}")
-                return null
+                return UpdateCheckOutcome.Failed("Could not reach the update server.")
             }
         val remote =
             runCatching { JSON.decodeFromString<UpdateManifest>(body) }
                 .getOrElse { e ->
                     logger.warn("UpdateChecker: parse failed — ${e.message}")
-                    return null
+                    return UpdateCheckOutcome.Failed("The update server returned an unreadable response.")
                 }
         if (remote.downloadUrl.isBlank()) {
             logger.warn("UpdateChecker: manifest has blank downloadUrl; treating as no-update")
-            return null
+            return UpdateCheckOutcome.Failed("The update is missing a download link.")
         }
         if (remote.versionCode <= currentVersionCode) {
             logger.info(
                 "UpdateChecker: remote versionCode=${remote.versionCode} <= current=$currentVersionCode — no update",
             )
-            return null
+            return UpdateCheckOutcome.UpToDate(
+                versionCode = remote.versionCode,
+                versionName = remote.versionName,
+            )
         }
-        return UpdateInfo(
-            versionCode = remote.versionCode,
-            versionName = remote.versionName,
-            downloadUrl = remote.downloadUrl,
-            releaseNotes = remote.releaseNotes,
-            minOsApi = remote.minOsApi,
+        return UpdateCheckOutcome.Available(
+            UpdateInfo(
+                versionCode = remote.versionCode,
+                versionName = remote.versionName,
+                downloadUrl = remote.downloadUrl,
+                releaseNotes = remote.releaseNotes,
+                minOsApi = remote.minOsApi,
+            ),
         )
     }
 
@@ -142,6 +160,23 @@ class UpdateChecker(
  * available" prompt.
  */
 data class UpdateInfo(val versionCode: Int, val versionName: String, val downloadUrl: String, val releaseNotes: String?, val minOsApi: Int?)
+
+/**
+ * Detailed result for a manual update check. Keeps "no update" and
+ * "couldn't check" separate so Settings can always respond visibly
+ * after the user presses "Check now".
+ */
+sealed interface UpdateCheckOutcome {
+    data object Disabled : UpdateCheckOutcome
+
+    data object Checking : UpdateCheckOutcome
+
+    data class UpToDate(val versionCode: Int, val versionName: String) : UpdateCheckOutcome
+
+    data class Available(val info: UpdateInfo) : UpdateCheckOutcome
+
+    data class Failed(val reason: String) : UpdateCheckOutcome
+}
 
 /**
  * On-the-wire shape of `update.json`. Internal — callers consume the

@@ -46,6 +46,7 @@ import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.update.UpdateCheckWorker
 import com.yancotv.android.update.UpdateInstaller
 import com.yancotv.android.update.UpdateRepository
+import com.yancotv.shared.update.UpdateCheckOutcome
 import com.yancotv.shared.update.UpdateInfo
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -92,6 +93,7 @@ fun SettingsAboutTab(
 
     val updatePrefs by prefs.updatePrefsFlow.collectAsState()
     val updateInfo by updateRepo.info.collectAsState()
+    val updateCheckOutcome by updateRepo.lastCheck.collectAsState()
     val installerState by installer.state.collectAsState()
     val scope = rememberCoroutineScope()
     val arabesque = remember { FontFamily(Font(R.font.arabesque_display, FontWeight.Bold)) }
@@ -153,10 +155,22 @@ fun SettingsAboutTab(
             if (isConfigured) {
                 {
                     SettingsOutlinedButton(
-                        onClick = { UpdateCheckWorker.enqueueOnce(ctx) },
+                        onClick = {
+                            scope.launch {
+                                updateRepo.triggerCheckOutcome()
+                            }
+                        },
+                        enabled = updateCheckOutcome != UpdateCheckOutcome.Checking,
                         size = ButtonSize.Compact,
                     ) {
-                        Text(text = "Check now")
+                        Text(
+                            text =
+                            if (updateCheckOutcome == UpdateCheckOutcome.Checking) {
+                                "Checking…"
+                            } else {
+                                "Check now"
+                            },
+                        )
                     }
                 }
             } else {
@@ -195,6 +209,12 @@ fun SettingsAboutTab(
                 label = "Last checked",
                 right = { ValueText(formatLastChecked(updatePrefs.lastCheckedAt)) },
             )
+            updateCheckOutcome
+                ?.takeUnless { it is UpdateCheckOutcome.Available && updateInfo != null }
+                ?.let { outcome ->
+                    SettingsRowSpacer()
+                    UpdateCheckFeedbackRow(outcome = outcome)
+                }
             updateInfo?.let { uinfo ->
                 SettingsRowSpacer()
                 UpdateAvailableBanner(
@@ -338,6 +358,28 @@ fun SettingsAboutTab(
             )
         }
     }
+}
+
+@Composable
+private fun UpdateCheckFeedbackRow(outcome: UpdateCheckOutcome) {
+    val (label, hint) =
+        when (outcome) {
+            UpdateCheckOutcome.Disabled ->
+                "Updates unavailable" to "This build does not have an update endpoint configured."
+            UpdateCheckOutcome.Checking ->
+                "Checking for updates" to "Contacting the YancoTV release feed now."
+            is UpdateCheckOutcome.UpToDate ->
+                "You're on the latest version" to "Latest published version is ${outcome.versionName} (build ${outcome.versionCode})."
+            is UpdateCheckOutcome.Failed ->
+                "Couldn't check for updates" to outcome.reason
+            is UpdateCheckOutcome.Available ->
+                "Update found" to "Version ${outcome.info.versionName} is ready to download."
+        }
+    SettingsRow(
+        label = label,
+        hint = hint,
+        readOnlyFocusable = true,
+    )
 }
 
 /**
