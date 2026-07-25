@@ -123,6 +123,31 @@ private const val NOW_TICK_MS = 60_000L
 private const val GUIDE_PAGE_SIZE = 100L
 private const val PREFETCH_THRESHOLD = 20
 
+// MB-286 — retention ceiling for the paged guide (contributes to MB-230).
+// The scroll-pagination effect below used to append forever: on a
+// 20k-live-channel provider, scrolling to the bottom pinned ~20k
+// EpgGuideChannel objects — each carrying its whole `programmes` list for
+// the entire user-configured window — in one Compose snapshot state var.
+// Fire TV's per-process heap budget is 384 MB; that alone can consume all
+// of it and tip the process into runaway GC.
+//
+// Two bounds, because a guide channel is NOT the same weight as a
+// coverflow ContentItem:
+//  - CHANNELS mirrors CoverflowSectionScreen's `items.size >= 1000` guard
+//    and is the binding cap in the common case (default window is
+//    daysBack=0 / daysForward=1, i.e. ~26 programmes per channel).
+//  - PROGRAMMES is the safety valve for wide windows. EpgPrefs allows
+//    daysBack 0-14 plus daysForward 1-14 — up to 28 days, ~670 programmes
+//    per channel — where 1000 channels would retain roughly 400 MB on
+//    their own. At ~400-600 bytes retained per EpgProgramme (the id /
+//    title / description strings dominate), 50k programmes is ~20-30 MB,
+//    which is this screen's fair share of the budget.
+//
+// Neither bound drops already-loaded rows — we only stop fetching more —
+// so LazyColumn scroll position and D-pad focus are untouched.
+private const val GUIDE_MAX_RETAINED_CHANNELS = 1000
+private const val GUIDE_MAX_RETAINED_PROGRAMMES = 50_000
+
 // MK.EPG.A — empty time slots between programmes (and the trailing span
 // after the last visible programme up to `windowEnd`) used to render as
 // bare `Box` filler that D-pad couldn't focus. The user saw "grey areas
@@ -349,6 +374,25 @@ fun GuideScreen(
     LaunchedEffect(lastVisibleIndex, allLoaded) {
         if (allLoaded || loadingMore || channels.isEmpty()) return@LaunchedEffect
         if (lastVisibleIndex < channels.size - PREFETCH_THRESHOLD) return@LaunchedEffect
+        // MB-286 — stop paginating once the retained set hits the heap
+        // ceiling. Flipping `allLoaded` instead of a bare `return` parks
+        // the effect (its own key changes, so it re-runs once and exits on
+        // the guard above) and keeps this log line from repeating on every
+        // scroll tick. Nothing already rendered is discarded. The
+        // "Showing N of T channels" header stays truthful, and a group or
+        // EPG-window change resets `allLoaded` through `reloadTick`, so the
+        // rest of the catalog is still reachable via the category rail.
+        val retainedProgrammes = channels.sumOf { it.programmes.size }
+        if (channels.size >= GUIDE_MAX_RETAINED_CHANNELS || retainedProgrammes >= GUIDE_MAX_RETAINED_PROGRAMMES) {
+            Log.i(
+                "Yanco",
+                "GuideScreen: pagination capped at ${channels.size}/$GUIDE_MAX_RETAINED_CHANNELS channels, " +
+                    "$retainedProgrammes/$GUIDE_MAX_RETAINED_PROGRAMMES programmes (of $totalChannels total channels); " +
+                    "narrow with a category filter to reach the rest",
+            )
+            allLoaded = true
+            return@LaunchedEffect
+        }
         loadingMore = true
         val nextPage =
             withContext(Dispatchers.IO) {

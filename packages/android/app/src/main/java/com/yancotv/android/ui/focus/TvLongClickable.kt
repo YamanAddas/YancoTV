@@ -1,6 +1,7 @@
 package com.yancotv.android.ui.focus
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -49,6 +50,25 @@ import androidx.compose.ui.semantics.semantics
 fun Modifier.tvLongClickable(onLongPress: () -> Unit): Modifier {
     val token = remember { Any() }
     val current by rememberUpdatedState(onLongPress)
+    // MB-287 (contributes to MB-230) — release the slot on disposal, not
+    // only on focus loss. [TvContextActionState] is a process-scoped
+    // `object`; the registered wrapper closes over `current`, which holds
+    // the call site's composition, which holds that screen's whole loaded
+    // data set — today the only call site is CoverflowSectionScreen's orb,
+    // so that's up to 1000 ContentItems plus whatever else its composition
+    // scope captures. If the composition is torn down while the card still
+    // has focus — MainActivity destroyed behind a foreground PlayerActivity,
+    // or a uiMode/locale config recreate — no focus-loss event ever arrives
+    // and that graph is pinned for the life of the PROCESS, against a
+    // 384 MB Fire TV heap budget.
+    //
+    // Keyed on `token` (a `remember { Any() }`, stable for this node's
+    // lifetime) so it does not churn on recomposition. `clearIf` is
+    // identity-guarded, so this is a no-op when another card has already
+    // taken the slot.
+    DisposableEffect(token) {
+        onDispose { TvContextActionState.clearIf(token) }
+    }
     return this
         // MK.28.8 (MB-281) — expose the context menu as a labelled long-click
         // action in the semantics tree. The Activity key-timer path below is
