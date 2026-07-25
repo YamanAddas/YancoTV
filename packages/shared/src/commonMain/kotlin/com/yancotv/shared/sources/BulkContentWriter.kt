@@ -149,16 +149,43 @@ class BulkContentWriter(private val driver: SqlDriver, private val logger: Logge
             // content_id is no longer in the catalog because the provider
             // dropped that channel/movie. Without FK enforcement during
             // sync, these would otherwise pile up forever.
+            //
+            // MB-289 (Critical, data loss) — the `EXISTS` guard is the whole
+            // point of these two statements' current shape. [prepareSource]
+            // has already deleted every row for this source, so if the
+            // provider answered with an EMPTY catalog — HTTP 200 carrying
+            // `[]`, `{"js":""}`, an HTML captive-portal page, or an expired
+            // subscription's empty response — then `content` holds nothing
+            // for this source and an unguarded `NOT IN (SELECT id FROM
+            // content)` matches EVERY favorite and EVERY watch_history row
+            // belonging to it. They are deleted, committed, and gone: the
+            // catalog re-populates on the next good sync but the user's
+            // favorites and resume points never come back. A provider
+            // outage silently destroyed data the user cannot regenerate.
+            //
+            // The guard makes the sweep a no-op unless this source actually
+            // wrote rows, which is exactly the condition under which an
+            // orphan is meaningful. Doing it in SQL rather than via a
+            // `wroteRows` parameter keeps it impossible to get wrong at a
+            // call site (there are three, plus ~20 in tests) and costs one
+            // indexed existence check per sync.
+            //
+            // Conservative by design: when this source came back empty we
+            // skip the sweep for *all* sources, so another source's genuine
+            // orphans simply wait for its own next sync. Leaving an orphan
+            // is harmless; deleting a favorite is not.
             driver.execute(
                 null,
-                "DELETE FROM favorites WHERE content_id NOT IN (SELECT id FROM content)",
-                0,
-            )
+                "DELETE FROM favorites WHERE content_id NOT IN (SELECT id FROM content) " +
+                    "AND EXISTS (SELECT 1 FROM content WHERE source_id = ?)",
+                1,
+            ) { bindString(0, sourceId) }
             driver.execute(
                 null,
-                "DELETE FROM watch_history WHERE content_id NOT IN (SELECT id FROM content)",
-                0,
-            )
+                "DELETE FROM watch_history WHERE content_id NOT IN (SELECT id FROM content) " +
+                    "AND EXISTS (SELECT 1 FROM content WHERE source_id = ?)",
+                1,
+            ) { bindString(0, sourceId) }
             driver.execute(null, "COMMIT", 0)
         } catch (t: Throwable) {
             runCatching { driver.execute(null, "ROLLBACK", 0) }

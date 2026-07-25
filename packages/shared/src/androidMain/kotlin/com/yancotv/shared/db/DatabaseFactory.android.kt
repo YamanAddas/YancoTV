@@ -145,6 +145,23 @@ actual class DatabaseFactory(private val context: Context) {
         override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
             super.onOpen(db)
             db.setForeignKeyConstraintsEnabled(true)
+            // MB-290 — restore the FTS insert trigger if a sync died between
+            // `prepareSource` (which COMMITs `DROP TRIGGER content_ai` so the
+            // bulk insert isn't taxed per row) and `finishSource` /
+            // `abortSource` (which recreate it). A process kill or OOM in
+            // that window leaves the DROP committed and durable: until the
+            // next *successful* sync for that source, freshly inserted rows
+            // never reach `content_fts` and are invisible to search.
+            //
+            // Same self-healing intent as the `setForeignKeyConstraintsEnabled`
+            // line above, which already covers the FK half of that window
+            // (see BulkContentWriter.prepareSource's KDoc). Idempotent, so it
+            // is free on every normal open.
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +
+                    "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
+                    "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
+            )
         }
     }
 

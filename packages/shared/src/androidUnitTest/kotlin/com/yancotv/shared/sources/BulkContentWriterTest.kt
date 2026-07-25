@@ -530,6 +530,81 @@ class BulkContentWriterTest {
     }
 
     /**
+     * MB-289 (Critical, data loss) — the counterpart to the orphan-sweep test
+     * above, and the reason that sweep is guarded.
+     *
+     * A provider outage does not usually look like an error: the endpoint
+     * answers HTTP 200 with an empty body (`[]`, `{"js":""}`, a captive-portal
+     * page, or an expired subscription's empty catalog). `prepareSource` has
+     * already deleted this source's rows by then, so an unguarded
+     * `DELETE FROM favorites WHERE content_id NOT IN (SELECT id FROM content)`
+     * matches *every* favorite and *every* watch_history row for the source.
+     * The catalog comes back on the next good sync; the favorites and resume
+     * points do not. Silent, permanent, user-visible data loss caused by
+     * someone else's server having a bad minute.
+     *
+     * This pins the guard: an empty sync must leave user data completely
+     * untouched.
+     */
+    @Test
+    fun `finishSource must not sweep favorites when the provider returns an empty catalog`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver)
+        val client = xtreamClient()
+
+        // Healthy sync publishes ch1 + ch2, and the user invests in them.
+        writer.prepareSource("s1")
+        writer.writeLiveChunk(
+            sourceId = "s1",
+            client = client,
+            items = listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2")),
+            categoryNames = mapOf("1" to "News"),
+            now = 100L,
+            sortOrderStart = 0L,
+        )
+        writer.finishSource("s1")
+
+        val ch1Id = ContentIds.xtreamLive("s1", "1")
+        val ch2Id = ContentIds.xtreamLive("s1", "2")
+        db.favoritesQueries.insert(id = "fav:$ch1Id", content_id = ch1Id, list_id = "default", added_at = 200L)
+        db.favoritesQueries.insert(id = "fav:$ch2Id", content_id = ch2Id, list_id = "default", added_at = 201L)
+        db.watchHistoryQueries.upsert(
+            id = "wh:$ch1Id",
+            content_id = ch1Id,
+            episode_id = null,
+            position_seconds = 42,
+            duration_seconds = 1800,
+            watched_at = 300L,
+        )
+
+        // Provider outage: 200 OK, zero items. prepareSource wipes the
+        // catalog, no chunk is written, finishSource still runs.
+        writer.prepareSource("s1")
+        writer.finishSource("s1")
+
+        assertEquals(
+            0,
+            db.contentQueries.countBySource("s1").executeAsOne().toInt(),
+            "precondition: the empty sync really did leave the catalog empty",
+        )
+        assertTrue(
+            db.favoritesQueries.isFavorite(ch1Id).executeAsOne(),
+            "an empty provider response must NOT delete favorites — they are unrecoverable",
+        )
+        assertTrue(
+            db.favoritesQueries.isFavorite(ch2Id).executeAsOne(),
+            "an empty provider response must NOT delete favorites — they are unrecoverable",
+        )
+        assertEquals(
+            1,
+            db.watchHistoryQueries.selectByContent(ch1Id).executeAsList().size,
+            "an empty provider response must NOT delete watch history (resume points)",
+        )
+    }
+
+    /**
      * MK.23.D.1 — finishSource failure path.
      *
      * Today the catch block:
