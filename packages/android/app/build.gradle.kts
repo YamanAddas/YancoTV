@@ -46,9 +46,8 @@ val sentryProps: Properties =
  * Resolve a secret with env-var precedence over `local.properties`.
  * Empty string when neither source has a non-blank value.
  */
-fun resolveSecret(envVar: String, propsKey: String): String =
-    System.getenv(envVar)?.takeIf { it.isNotBlank() }
-        ?: sentryProps.getProperty(propsKey, "")
+fun resolveSecret(envVar: String, propsKey: String): String = System.getenv(envVar)?.takeIf { it.isNotBlank() }
+    ?: sentryProps.getProperty(propsKey, "")
 
 // Sentry DSN — read by SentryInit.kt at app launch via
 // BuildConfig.SENTRY_DSN. Empty means "Sentry off" (init no-op).
@@ -166,7 +165,6 @@ android {
             System.getenv("OPENSUBTITLES_API_KEY")
                 ?: sentryProps.getProperty("opensubtitles.apiKey", "")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesApiKey\"")
-
     }
 
     // MB-201 — release signing config (only registered when local.properties
@@ -211,14 +209,37 @@ android {
             signingConfig =
                 if (releaseSigningConfigured) {
                     signingConfigs.getByName("release")
-                } else {
+                } else if (project.hasProperty("allowUnsignedRelease")) {
+                    // Explicit opt-in, used by CI (see .github/workflows/
+                    // android-tests.yml). The point of the release build there
+                    // is to exercise R8 / resource shrinking / ProGuard rules,
+                    // which the debug build never touches — signing is
+                    // irrelevant to that and CI holds no keystore.
                     logger.warn(
-                        "release.* not fully configured in local.properties — " +
-                            "assembleRelease will produce a debug-signed APK. " +
-                            "Set release.keystore.path / .password / key.alias / .password " +
-                            "before cutting a distribution build.",
+                        "allowUnsignedRelease set — producing a DEBUG-SIGNED release APK. " +
+                            "Valid for R8/lint validation only. This artifact CANNOT be " +
+                            "distributed: Android refuses same-package installs across " +
+                            "signing keys, so shipping it would strand every existing user.",
                     )
                     signingConfigs.getByName("debug")
+                } else {
+                    // MB-295 — hard failure, not a warning. This used to fall
+                    // through to debug signing with a `logger.warn` that is
+                    // invisible in normal Gradle output, so `assembleRelease`
+                    // on a machine without the keystore produced an APK that
+                    // installs fine locally and can never be updated by
+                    // anyone who already has a real build. That is a
+                    // one-way door for the whole install base, and it was
+                    // guarded by a log line.
+                    throw GradleException(
+                        "Release signing is not configured. Set release.keystore.path, " +
+                            "release.keystore.password, release.key.alias and " +
+                            "release.key.password in local.properties before cutting a " +
+                            "distribution build.\n" +
+                            "If you only need to validate R8 (CI, local minify check), " +
+                            "re-run with -PallowUnsignedRelease=true — that produces a " +
+                            "debug-signed APK which must never be distributed.",
+                    )
                 }
         }
     }
