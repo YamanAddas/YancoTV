@@ -5,6 +5,7 @@ import android.util.Log
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.platformLogWriter
 import com.yancotv.android.BuildConfig
+import com.yancotv.shared.http.redactCredentials
 import io.sentry.android.core.SentryAndroid
 
 /**
@@ -50,11 +51,46 @@ object SentryInit {
             // writer) updates the cache atomically before the disk
             // write, so the gate flips immediately when the user
             // toggles the setting.
+            // MB-292 — scrub provider credentials on the way out, as
+            // defense-in-depth behind the call-site redaction. Every event
+            // that survives the opt-out gate is rewritten: exception values
+            // and the message carry the failing URL, and Xtream playback
+            // URLs hold the username and password as PATH segments
+            // (`/live/{user}/{pass}/{id}.ts`), so a stack trace from any
+            // network failure could ship real credentials off-device. 401s
+            // and timeouts are the single most common IPTV failure, and
+            // crash reporting is opt-OUT, so this path is well-travelled.
             options.setBeforeSend { event, _ ->
-                if (CrashReportPrefs.isEnabledCached()) event else null
+                if (!CrashReportPrefs.isEnabledCached()) {
+                    null
+                } else {
+                    runCatching {
+                        event.message?.let { m ->
+                            m.formatted = m.formatted?.let(::redactCredentials)
+                            m.message = m.message?.let(::redactCredentials)
+                            m.params = m.params?.map(::redactCredentials)
+                        }
+                        event.exceptions?.forEach { ex ->
+                            ex.value = ex.value?.let(::redactCredentials)
+                        }
+                    }
+                    event
+                }
             }
             options.setBeforeBreadcrumb { breadcrumb, _ ->
-                if (CrashReportPrefs.isEnabledCached()) breadcrumb else null
+                if (!CrashReportPrefs.isEnabledCached()) {
+                    null
+                } else {
+                    runCatching {
+                        breadcrumb.message = breadcrumb.message?.let(::redactCredentials)
+                        // Breadcrumb data is an open string map; HTTP
+                        // breadcrumbs put the request URL straight into it.
+                        breadcrumb.data.entries
+                            .filter { it.value is String }
+                            .forEach { e -> breadcrumb.setData(e.key, redactCredentials(e.value as String)) }
+                    }
+                    breadcrumb
+                }
             }
             // Release tag groups events by app version in the Sentry UI.
             // Format matches Sentry's expectations: package@versionName+versionCode.

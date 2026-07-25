@@ -2,6 +2,7 @@ package com.yancotv.android.handoff
 
 import com.yancotv.shared.handoff.HandoffPlayCommand
 import com.yancotv.shared.handoff.HandoffReject
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -59,7 +60,10 @@ class HandoffServer(private val port: Int, private val logger: Logger, private v
                             try {
                                 onPlay(command)
                             } catch (t: Throwable) {
-                                logger.error("Handoff: play dispatch failed — ${t.message}")
+                                // MB-292 — the handoff payload is a stream URL,
+                                // so a dispatch failure message can carry
+                                // path-segment credentials into logcat.
+                                logger.error("Handoff: play dispatch failed — ${redactErrorMessage(t)}")
                                 call.respond(HttpStatusCode.InternalServerError)
                                 return@post
                             }

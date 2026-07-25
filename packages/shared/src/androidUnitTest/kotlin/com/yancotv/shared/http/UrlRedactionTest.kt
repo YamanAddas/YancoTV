@@ -131,4 +131,72 @@ class UrlRedactionTest {
         val expected = "HTTP 401 from http://provider.tld/?username=***&password=***"
         assertEquals(expected, redactErrorMessage(t))
     }
+
+    // ───── MB-292: Xtream path-segment credentials ─────
+    //
+    // These are the URL shapes `XtreamClient.buildStreamUrl` and
+    // `catchup/UrlBuilder` actually emit. Only `player_api.php` uses the
+    // query form covered above, so before this every live / movie /
+    // episode / catch-up URL leaked credentials verbatim into logs,
+    // `sources.last_sync_error`, Sentry breadcrumbs and on-screen errors.
+
+    @Test
+    fun redactsXtreamLiveStreamPathCredentials() {
+        val url = "http://provider.tld:8080/live/joe/s3cret/12345.ts"
+        assertEquals("http://provider.tld:8080/live/***/***/12345.ts", redactCredentials(url))
+    }
+
+    @Test
+    fun redactsXtreamMovieAndSeriesPathCredentials() {
+        assertEquals(
+            "http://provider.tld:8080/movie/***/***/99.mp4",
+            redactCredentials("http://provider.tld:8080/movie/joe/s3cret/99.mp4"),
+        )
+        assertEquals(
+            "http://provider.tld:8080/series/***/***/7.mkv",
+            redactCredentials("http://provider.tld:8080/series/joe/s3cret/7.mkv"),
+        )
+    }
+
+    @Test
+    fun redactsCatchupTimeshiftPathCredentials() {
+        val url = "http://provider.tld:8080/timeshift/joe/s3cret/120/2026-07-25:20-00/55.ts"
+        assertEquals(
+            "http://provider.tld:8080/timeshift/***/***/120/2026-07-25:20-00/55.ts",
+            redactCredentials(url),
+        )
+    }
+
+    @Test
+    fun redactsPathCredentialsInsideAnErrorMessage() {
+        val t = RuntimeException("Source error: http://provider.tld:8080/live/joe/s3cret/1.ts failed")
+        assertEquals(
+            "Source error: http://provider.tld:8080/live/***/***/1.ts failed",
+            redactErrorMessage(t),
+        )
+    }
+
+    @Test
+    fun pathRedactionDoesNotEatUnrelatedPathsOrTrailingSegments() {
+        // Only the two segments immediately after a known type segment go.
+        // A VOD title path with no credentials must survive intact.
+        assertEquals(
+            "http://cdn.tld/assets/movie/poster.jpg",
+            redactCredentials("http://cdn.tld/assets/movie/poster.jpg"),
+        )
+        // Type segment with a single following segment is not the template.
+        assertEquals(
+            "http://provider.tld/live/12345.ts",
+            redactCredentials("http://provider.tld/live/12345.ts"),
+        )
+    }
+
+    @Test
+    fun redactsBothPathAndQueryCredentialsInOneUrl() {
+        val url = "http://provider.tld/live/joe/s3cret/1.ts?username=joe&password=s3cret"
+        assertEquals(
+            "http://provider.tld/live/***/***/1.ts?username=***&password=***",
+            redactCredentials(url),
+        )
+    }
 }

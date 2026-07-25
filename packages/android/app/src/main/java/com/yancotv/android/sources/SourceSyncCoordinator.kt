@@ -1,5 +1,7 @@
 package com.yancotv.android.sources
 
+import com.yancotv.shared.http.redactCredentials
+import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.sources.SyncProgress
 import kotlinx.coroutines.CancellationException
@@ -110,7 +112,13 @@ class SourceSyncCoordinator(
                                 // throwing. Surface them on the error bus so the
                                 // Toast still fires when the user has navigated
                                 // away from Sources mid-sync.
-                                val reason = p.message?.takeIf { it.isNotBlank() } ?: "unknown error"
+                                // MB-292 — redact before this reaches a Toast.
+                                // Provider failures echo the request URL, and
+                                // Xtream playback URLs carry the username and
+                                // password as PATH segments.
+                                val reason =
+                                    p.message?.takeIf { it.isNotBlank() }?.let(::redactCredentials)
+                                        ?: "unknown error"
                                 _errors.tryEmit("Sync failed for $sourceName: $reason")
                             }
                             else -> Unit
@@ -133,8 +141,12 @@ class SourceSyncCoordinator(
                     logger.info("syncCoordinator cancelled id=$sourceId")
                     throw ce
                 } catch (t: Throwable) {
-                    logger.error("syncCoordinator crashed id=$sourceId: ${t.message}")
-                    val reason = t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
+                    // MB-292 — both sinks are credential-leak surfaces: logcat
+                    // (readable over adb / in bug reports) and a user-facing
+                    // Toast that ends up in support screenshots.
+                    val redacted = redactErrorMessage(t)
+                    logger.error("syncCoordinator crashed id=$sourceId: $redacted")
+                    val reason = redacted.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
                     _errors.tryEmit("Sync failed for $sourceName: $reason")
                 } finally {
                     // MK.28.3 (MB-253) — clear the job ref BEFORE _state (the
