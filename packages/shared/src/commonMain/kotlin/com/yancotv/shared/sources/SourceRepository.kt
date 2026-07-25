@@ -12,7 +12,8 @@ import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import com.yancotv.shared.parsers.M3uEntry
-import com.yancotv.shared.parsers.parseM3u
+import com.yancotv.shared.parsers.m3uLineSequence
+import com.yancotv.shared.parsers.parseM3uLines
 import com.yancotv.shared.stalker.StalkerClient
 import com.yancotv.shared.stalker.StalkerClientOptions
 import com.yancotv.shared.types.AddSourceInput
@@ -342,15 +343,20 @@ class SourceRepository(
         onProgress: suspend (Int, Int) -> Unit,
     ): Int {
         val url = source.url ?: error("m3u_url source missing url")
-        val text =
-            http.getText(
+        // MB-230 — stream the playlist through the parser instead of
+        // materialising it. `getText` buffered the whole body into a UTF-16
+        // String and the parser then allocated several more full copies of it
+        // (see parseM3uLines); on a 255k-entry provider that peaked at
+        // hundreds of MB against a Fire TV Stick's 384 MB heap. getSource is
+        // the same memory-bounded path the Xtream catalog fetches already use.
+        val parsed =
+            http.getSource(
                 url,
                 HttpRequestOptions(
                     timeoutMs = 120_000,
                     headers = source.userAgent?.let { mapOf("User-Agent" to it) } ?: emptyMap(),
                 ),
-            )
-        val parsed = parseM3u(text, logger)
+            ) { body -> parseM3uLines(body.m3uLineSequence(), logger) }
         adoptDiscoveredEpgUrl(source, parsed.epgUrl, now)
         return writeM3uBulk(source.id, parsed.entries, now, onProgress)
     }
@@ -362,8 +368,12 @@ class SourceRepository(
         onProgress: suspend (Int, Int) -> Unit,
     ): Int {
         val path = source.filePath ?: error("m3u_file source missing filePath")
-        val text = fileReader.readText(path)
-        val parsed = parseM3u(text, logger)
+        // MB-230 — same streaming contract as the URL path above. A local
+        // playlist is routinely the same provider dump, just off a USB stick.
+        val parsed =
+            fileReader.readSource(path) { body ->
+                parseM3uLines(body.m3uLineSequence(), logger)
+            }
         adoptDiscoveredEpgUrl(source, parsed.epgUrl, now)
         return writeM3uBulk(source.id, parsed.entries, now, onProgress)
     }

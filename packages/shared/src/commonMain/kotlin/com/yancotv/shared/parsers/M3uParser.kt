@@ -36,21 +36,48 @@ data class M3uParseResult(
 )
 
 /**
- * Streaming M3U parser. Processes line-by-line to handle large playlists
- * without loading the entire file into memory for parsing.
+ * Parse a playlist held entirely in memory.
+ *
+ * **Prefer [parseM3uLines] with a streamed line source for anything
+ * provider-sized** — see MB-230. This overload exists for tests, for the
+ * TypeScript-parity corpus, and for callers that already hold the text.
  *
  * Handles: BOM markers, Windows/Unix/old-Mac line endings, empty lines,
  * malformed entries, duplicate URL collapse, and common provider quirks.
  */
-fun parseM3u(content: String, logger: Logger = NOOP_LOGGER): M3uParseResult {
+fun parseM3u(content: String, logger: Logger = NOOP_LOGGER): M3uParseResult = parseM3uLines(content.m3uLineSequence(), logger)
+
+/**
+ * Genuinely streaming M3U parser: consumes [lines] lazily and never holds
+ * the playlist text.
+ *
+ * **MB-230 (Critical, 2026-07-25).** The previous implementation took the
+ * whole playlist as one `String` and then did
+ * `substring` → `replace("\r\n","\n")` → `replace("\r","\n")` → `split('\n')`.
+ * Every step allocates a *complete additional copy*, and JVM/ART strings are
+ * UTF-16, so a playlist weighing N bytes on the wire peaked at roughly 8-10 N
+ * of live heap — all of it reachable at once. On the reported install
+ * (255,843 entries) that is several hundred MB against a Fire TV Stick's
+ * 384 MB `largeHeap` budget, which is the runaway-GC signature captured in
+ * bugs.md: heap pinned at 376/384 MB, 101 consecutive GCs freeing 0 bytes.
+ *
+ * The line-splitting rules are unchanged and pinned by [M3uParserTest]
+ * (`handlesBomMarker`, `handlesCrlfLineEndings`, `handlesCrOnlyLineEndings`):
+ * `\r\n`, `\r` and `\n` all terminate a line, and a leading U+FEFF is dropped.
+ *
+ * What still scales with catalogue size is the returned [M3uParseResult] —
+ * one [M3uEntry] per unique stream URL, plus the URL index used to collapse
+ * duplicates. That is inherent to the de-duplication contract (a later titled
+ * entry replaces an earlier bare-URL one), it is an order of magnitude below
+ * the text copies it replaces, and it is what [com.yancotv.shared.sources.BulkContentWriter]
+ * consumes in chunks.
+ */
+fun parseM3uLines(lines: Sequence<String>, logger: Logger = NOOP_LOGGER): M3uParseResult {
     val entries = mutableListOf<M3uEntry>()
     // streamUrl -> index; titled entries replace bare URL entries on collision.
     val urlIndex = mutableMapOf<String, Int>()
     var duplicates = 0
     var epgUrl: String? = null
-
-    val cleaned = if (content.isNotEmpty() && content[0].code == 0xFEFF) content.substring(1) else content
-    val lines = cleaned.replace("\r\n", "\n").replace("\r", "\n").split('\n')
 
     var currentEntry: PartialEntry? = null
 
