@@ -107,6 +107,7 @@ import org.koin.compose.koinInject
  * round-trip completes. Enriched metadata + cover are persisted so the
  * next open is instant.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
 fun ContentDetailScreen(
@@ -289,7 +290,15 @@ fun ContentDetailScreen(
             // MK.28.1 — overlay background full-bleed; scrolling content and
             // action rows inset from system bars / cutout (zero on TV).
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .focusGroup(),
+            .focusGroup()
+            // MK.28.5 (MB-263) — trap D-pad focus inside the overlay, same
+            // pattern as SeasonPickerOverlay below. Without exit=Cancel,
+            // LEFT from the auto-focused Play button (no in-group candidate)
+            // escaped to the hidden AppSidebar behind the opaque page:
+            // the selector vanished, CENTER switched sections invisibly,
+            // and the next BACK revealed a different section. BACK
+            // (HomeScreen's handler) remains the only way out.
+            .focusProperties { exit = { FocusRequester.Cancel } },
     ) {
         Spacer(
             Modifier

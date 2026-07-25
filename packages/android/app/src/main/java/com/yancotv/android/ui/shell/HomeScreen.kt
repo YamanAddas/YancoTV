@@ -27,6 +27,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -73,6 +74,7 @@ internal fun shouldStopPlaybackOnSectionChange(playing: ContentItem?): Boolean =
  * Non-browse sections (Home, Guide, Favorites, Search, Settings) keep their
  * bespoke layouts.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
 fun HomeScreen(
@@ -665,6 +667,15 @@ fun HomeScreen(
                         // MK.28.1 — panel background full-bleed, content inset
                         // (order matters: padding after background).
                         .windowInsetsPadding(WindowInsets.safeDrawing)
+                        // MK.28.5 (MB-262) — trap D-pad focus inside the
+                        // overlay (SeasonPickerOverlay pattern). Without it,
+                        // DOWN from an empty result list / LEFT from the
+                        // leftmost orb escaped to the dimmed shell behind the
+                        // scrim: CENTER then activated invisible controls and
+                        // the shell's BackHandlers (registered later = higher
+                        // priority) ate BACK so the overlay looked stuck.
+                        .focusGroup()
+                        .focusProperties { exit = { FocusRequester.Cancel } }
                         // Eat tap so the outer scrim's dismiss
                         // doesn't fire when the user taps inside the
                         // search panel itself. Empty handler is

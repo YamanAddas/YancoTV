@@ -123,6 +123,14 @@ fun SettingsBackupTab(
     // 5 frames spread over ~80ms which beats the restorer reliably
     // on Fire TV. Tested against the export / pick-folder / pick-
     // file / clear-folder paths.
+    // MK.28.5 (MB-264) — the shipped effect bodies incremented their OWN
+    // key inside the loop and never actually requested focus: every
+    // increment cancelled + restarted the effect, which incremented again —
+    // an unbounded per-frame effect-restart chain (constant CPU/battery
+    // churn for as long as the tab stayed mounted after any action) that
+    // ALSO left the documented SAF-return focus drop unfixed. The retry now
+    // re-requests via the anchor each frame and never touches its key; the
+    // action/picker callbacks below re-arm it by bumping.
     var exportFocusBump by remember { mutableStateOf(0) }
     var importFocusBump by remember { mutableStateOf(0) }
     LaunchedEffect(exportFocusBump) {
@@ -131,14 +139,14 @@ fun SettingsBackupTab(
             // ~16ms per frame on Fire TV — five iterations covers the
             // activity-resume + recomposition + focusRestorer pulse.
             withFrameNanos { }
-            exportFocusBump++
+            runCatching { exportButtonAnchor.awaitAndRequest() }
         }
     }
     LaunchedEffect(importFocusBump) {
         if (importFocusBump == 0) return@LaunchedEffect
         repeat(5) {
             withFrameNanos { }
-            importFocusBump++
+            runCatching { importButtonAnchor.awaitAndRequest() }
         }
     }
 

@@ -43,7 +43,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -219,6 +221,31 @@ fun GuideScreen(
             PanelFocus.Categories -> pillAnchor.awaitAndRequest()
             PanelFocus.Content -> runCatching { gridFocus.requestFocus() }
             PanelFocus.Sidebar -> { /* shell sidebar owns focus */ }
+        }
+    }
+    // MK.28.5 (MB-265) — window-regain focus restore, ported from
+    // CoverflowSectionScreen. The Guide launches PlayerActivity on every
+    // programme activation, but panelFocus doesn't change across the
+    // player round-trip, so the effect above never re-fires and BACK from
+    // fullscreen left no visible selector until a D-pad nudge (the MB-84
+    // symptom class on a screen that never got the handler).
+    val guideWindowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    // rememberUpdatedState: LaunchedEffect(Unit) never restarts, so a plain
+    // capture would freeze panelFocus at its first-composition value.
+    val currentPanelFocus by rememberUpdatedState(panelFocus)
+    LaunchedEffect(Unit) {
+        var seenUnfocused = false
+        snapshotFlow { guideWindowInfo.isWindowFocused }.collect { windowFocused ->
+            if (!windowFocused) {
+                seenUnfocused = true
+            } else if (seenUnfocused) {
+                seenUnfocused = false
+                when (currentPanelFocus) {
+                    PanelFocus.Categories -> pillAnchor.awaitAndRequest()
+                    PanelFocus.Content -> runCatching { gridFocus.requestFocus() }
+                    PanelFocus.Sidebar -> { /* shell sidebar owns focus */ }
+                }
+            }
         }
     }
     // Hole-cover: RIGHT-arrow from rail moves focus into the grid via
