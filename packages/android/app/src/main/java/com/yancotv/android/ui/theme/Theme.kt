@@ -59,7 +59,7 @@ import org.koin.compose.koinInject
  * Phone is deliberately untouched (multiplier 1f): it is viewed at ~30 cm and
  * is already correctly sized.
  */
-private const val TV_TYPE_SCALE = 1.30f
+private const val TV_TYPE_SCALE = 1.00f
 
 @Composable
 fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
