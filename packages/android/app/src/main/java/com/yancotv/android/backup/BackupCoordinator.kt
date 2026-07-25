@@ -112,6 +112,12 @@ class BackupCoordinator(
         ExportResult.Success(file = file, bytesWritten = sizeBytes)
     }
 
+    // MB-294 — annotated rather than guarded again: the sole caller already
+    // gates this on `SDK_INT >= Q` (see above), but lint cannot see through
+    // the call boundary and flagged `MediaStore.Downloads.EXTERNAL_CONTENT_URI`
+    // (API 29) as an unguarded NewApi error. @RequiresApi states the contract
+    // for both lint and the next reader. Behaviour is unchanged.
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun writeToMediaStoreDownloads(filename: String, bytes: ByteArray): Pair<String, Long>? {
         val values =
             ContentValues().apply {

@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
-import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -53,6 +52,9 @@ import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.db.YancoDb
+import java.io.File
+import java.util.Calendar
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -151,14 +153,29 @@ fun SettingsBackupTab(
     }
 
     // Generate a timestamped filename.
+    //
+    // MB-294 — `java.time.LocalDateTime` is API 26 and minSdk is 24, with no
+    // core-library desugaring configured, so this threw NoClassDefFoundError
+    // on API 24/25 the moment the user tapped Export. Fire OS 6 is API 25 —
+    // this is the same bug class as MB-241 (the API-26-only PBKDF2 factory
+    // that crashed 1.3.7 at startup), just on the backup path instead of the
+    // launch path. `Calendar` is API 1 and gives the same fields.
+    //
+    // Locale.US on the format is deliberate and load-bearing: the default
+    // locale renders %04d with Arabic-Indic digits under an Arabic locale,
+    // which would put non-ASCII digits in a FILENAME. Same DefaultLocale
+    // lesson as the time-code fix in D.1a-fixes.
     fun makeFilename(): String {
-        val now = java.time.LocalDateTime.now()
-        return "yancotv-backup-%04d-%02d-%02d-%02d%02d.json".format(
-            now.year,
-            now.monthValue,
-            now.dayOfMonth,
-            now.hour,
-            now.minute,
+        val now = Calendar.getInstance()
+        return String.format(
+            Locale.US,
+            "yancotv-backup-%04d-%02d-%02d-%02d%02d.json",
+            now.get(Calendar.YEAR),
+            // Calendar.MONTH is 0-based; LocalDateTime.monthValue was 1-based.
+            now.get(Calendar.MONTH) + 1,
+            now.get(Calendar.DAY_OF_MONTH),
+            now.get(Calendar.HOUR_OF_DAY),
+            now.get(Calendar.MINUTE),
         )
     }
 
