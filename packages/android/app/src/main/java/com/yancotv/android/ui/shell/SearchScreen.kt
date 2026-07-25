@@ -1,6 +1,7 @@
 package com.yancotv.android.ui.shell
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -344,15 +347,44 @@ fun SearchScreen(
 private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val border = if (focused) LocalYancoPalette.current.FocusRing else LocalYancoPalette.current.BorderSubtle
     val fieldAnchor = rememberPlacedFocusAnchor()
     val keyboard = LocalSoftwareKeyboardController.current
 
-    // Pull focus on entry so phone users land on an active field (IME pops
-    // automatically) and TV users see the field highlighted for typing via
-    // the remote. awaitAndRequest() suspends until the field's onPlaced hook
-    // fires, then issues the focus request once — no delay-ladder race.
-    LaunchedEffect(Unit) { fieldAnchor.awaitAndRequest() }
+    // MB-296 — click-to-edit, matching [SettingsClickToEditField] and
+    // AddSourceDialog. Focus lands on the ROW; the on-screen keyboard only
+    // appears once the user commits by pressing OK (or tapping).
+    //
+    // Pre-fix this composable auto-focused the BasicTextField itself, and
+    // focusing a text field pops the IME immediately. Opening Search — which
+    // also happens on the KEYCODE_SEARCH hotkey and the voice deep-link —
+    // therefore threw a full-screen keyboard over the results before the user
+    // had asked for one, and on a TV that keyboard then has to be dismissed
+    // with BACK before anything else can be reached. The user asked for
+    // exactly this: "i dont want it to automatically open it. i want it to
+    // open if the user press on it when selecting on the box."
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val editFocus = remember { FocusRequester() }
+
+    LaunchedEffect(editing) {
+        if (editing) {
+            runCatching { editFocus.requestFocus() }
+        } else {
+            keyboard?.hide()
+            fieldAnchor.awaitAndRequest()
+        }
+    }
+
+    // BACK leaves edit mode first, so the keyboard closes without also
+    // tearing down the search overlay behind it. Only armed while editing,
+    // so the overlay's own BACK handler is untouched otherwise.
+    BackHandler(enabled = editing) { editing = false }
+
+    val border =
+        when {
+            editing -> LocalYancoPalette.current.Accent
+            focused -> LocalYancoPalette.current.FocusRing
+            else -> LocalYancoPalette.current.BorderSubtle
+        }
 
     Row(
         modifier =
@@ -365,33 +397,66 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 16.sp),
-            cursorBrush = SolidColor(LocalYancoPalette.current.Accent),
-            interactionSource = interaction,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            // Search IME button just hides the keyboard — the LaunchedEffect
-            // on `query` already drives the actual FTS call after the 220ms
-            // debounce, so there's nothing extra to fire here.
-            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-            modifier =
-            Modifier
-                .weight(1f)
-                .placedFocus(fieldAnchor)
-                .semantics { contentDescription = "Search channels, movies, and series" },
-            decorationBox = { inner ->
-                if (value.isEmpty()) {
-                    Text(
-                        text = "Search channels, movies, series…",
-                        color = LocalYancoPalette.current.TextMuted,
-                    )
-                }
-                inner()
-            },
-        )
+        if (editing) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = TextStyle(color = LocalYancoPalette.current.TextPrimary, fontSize = 16.sp),
+                cursorBrush = SolidColor(LocalYancoPalette.current.Accent),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                // Search IME button closes the keyboard and returns to browse
+                // mode — the LaunchedEffect on `query` already drives the FTS
+                // call after the 220ms debounce, so there's nothing to fire.
+                keyboardActions = KeyboardActions(onSearch = { editing = false }),
+                modifier =
+                Modifier
+                    .weight(1f)
+                    .focusRequester(editFocus)
+                    .semantics { contentDescription = "Search channels, movies, and series" },
+                decorationBox = { inner ->
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "Search channels, movies, series…",
+                            color = LocalYancoPalette.current.TextMuted,
+                        )
+                    }
+                    inner()
+                },
+            )
+        } else {
+            // Browse state: a plain focusable row. No text field is composed,
+            // so nothing can summon the IME until the user asks for it.
+            Text(
+                text = value.ifBlank { "Search channels, movies, series…" },
+                color =
+                if (value.isBlank()) {
+                    LocalYancoPalette.current.TextMuted
+                } else {
+                    LocalYancoPalette.current.TextPrimary
+                },
+                fontSize = 16.sp,
+                maxLines = 1,
+                modifier =
+                Modifier
+                    .weight(1f)
+                    .placedFocus(fieldAnchor)
+                    .focusable(interactionSource = interaction)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = { editing = true },
+                    ).semantics {
+                        contentDescription =
+                            if (value.isBlank()) {
+                                "Search channels, movies, and series. Press to type."
+                            } else {
+                                "Search: $value. Press to edit."
+                            }
+                    },
+            )
+        }
         // Audit catch — VoiceInputButton.kt was built but never wired.
         // The mic affordance is essential for Fire TV remotes without a
         // hardware mic key (older Toshiba / Insignia bundled remotes)
