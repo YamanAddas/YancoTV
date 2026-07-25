@@ -394,29 +394,42 @@ fun GuideScreen(
             return@LaunchedEffect
         }
         loadingMore = true
-        val nextPage =
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    epg.getGuideData(
-                        startTime = windowStartState,
-                        endTime = windowEndState,
-                        sourceId = null,
-                        groupName = selectedGroup,
-                        limit = GUIDE_PAGE_SIZE,
-                        offset = channels.size.toLong(),
-                    )
-                }.onFailure { Log.w("Yanco", "GuideScreen.getGuideData(more) failed: ${it.message}", it) }
-                    .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStartState, endTime = windowEndState) }
-            }
-        // Same defensive dedup: if a page overlaps with what's already loaded
-        // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
-        // we drop the duplicates so LazyColumn keys stay unique.
-        val existing = channels.mapTo(HashSet(channels.size)) { it.tvgId }
-        val newOnly = nextPage.channels.distinctBy { it.tvgId }.filter { it.tvgId !in existing }
-        val appended = channels + newOnly
-        channels = appended
-        allLoaded = nextPage.channels.isEmpty() || appended.size >= totalChannels.toInt()
-        loadingMore = false
+        // MB-288 — `loadingMore` MUST be cleared on cancellation, not just on
+        // the happy path. `lastVisibleIndex` is a key of this effect and
+        // changes on every scrolled row, so scrolling while a page is in
+        // flight cancels this coroutine at the withContext below. Without the
+        // finally, the trailing `loadingMore = false` never ran, the first
+        // guard above then rejected every subsequent attempt, and guide
+        // pagination was dead for the rest of the screen's life — while the
+        // header sat on "loading more..." forever. Nothing else resets it;
+        // the reloadTick path doesn't touch it. Pagination fires precisely
+        // WHILE the user scrolls, so this was easy to hit.
+        try {
+            val nextPage =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        epg.getGuideData(
+                            startTime = windowStartState,
+                            endTime = windowEndState,
+                            sourceId = null,
+                            groupName = selectedGroup,
+                            limit = GUIDE_PAGE_SIZE,
+                            offset = channels.size.toLong(),
+                        )
+                    }.onFailure { Log.w("Yanco", "GuideScreen.getGuideData(more) failed: ${it.message}", it) }
+                        .getOrElse { EpgGuideData(channels = emptyList(), startTime = windowStartState, endTime = windowEndState) }
+                }
+            // Same defensive dedup: if a page overlaps with what's already loaded
+            // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
+            // we drop the duplicates so LazyColumn keys stay unique.
+            val existing = channels.mapTo(HashSet(channels.size)) { it.tvgId }
+            val newOnly = nextPage.channels.distinctBy { it.tvgId }.filter { it.tvgId !in existing }
+            val appended = channels + newOnly
+            channels = appended
+            allLoaded = nextPage.channels.isEmpty() || appended.size >= totalChannels.toInt()
+        } finally {
+            loadingMore = false
+        }
     }
 
     LaunchedEffect(Unit) {
