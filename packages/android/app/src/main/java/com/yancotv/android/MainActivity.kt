@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -85,6 +86,15 @@ class MainActivity : ComponentActivity() {
         // happens automatically via postSplashScreenTheme in themes.xml.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        // MK.28.1 — one edge-to-edge regime on every Android version. On 15+
+        // the OS already forces it (targetSdk 35); opting in explicitly makes
+        // 7.0–14 render identically, so the cinematic background reaches
+        // under the transparent bars everywhere and there is ONE layout to
+        // test. Interactive content is inset via WindowInsets.safeDrawing at
+        // the shell root (HomeScreen) — on TV devices the insets resolve to
+        // zero, so the Fire TV layout is byte-for-byte unchanged.
+        enableEdgeToEdge()
 
         val isTv = detectTv()
         requestNotificationsPermissionIfNeeded()

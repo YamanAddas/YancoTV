@@ -27,6 +27,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -476,6 +477,17 @@ class PlayerActivity : AppCompatActivity() {
             systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+        // MK.28.1 — SHORT_EDGES lets fullscreen video render into the notch
+        // on Android 9–14 instead of leaving a black band beside it (the OS
+        // default keeps the window out of the cutout once the bars are
+        // hidden). Android 15+ already coerces non-floating windows to
+        // ALWAYS; this aligns the older releases with it. No cutouts on TV.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val cutoutLp = window.attributes
+            cutoutLp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            window.attributes = cutoutLp
+        }
 
         setContentView(R.layout.activity_player)
         playerView = findViewById(R.id.player_view)
@@ -559,6 +571,41 @@ class PlayerActivity : AppCompatActivity() {
             (zapBar.layoutParams as? android.widget.FrameLayout.LayoutParams)?.let {
                 it.marginStart = (76 * resources.displayMetrics.density).toInt()
                 zapBar.layoutParams = it
+            }
+        }
+
+        // MK.28.1 — the window now extends into the display cutout (see the
+        // SHORT_EDGES block above), which is right for the video but wrong
+        // for the corner chrome: the fixed-landscape rotation can put the
+        // camera hole exactly where the phone Back button renders. Offset the
+        // corner overlays by the cutout insets on top of their layout-time
+        // base margins (captured AFTER the phone zap nudge above so the 76dp
+        // base survives). System-bar insets are 0 while the bars are hidden,
+        // so cutout is the only component; TVs report none → no-op.
+        run {
+            val corners: List<View> =
+                listOf(backButton, zapBar, findViewById(R.id.recording_indicator))
+            val bases =
+                corners.associateWith { v ->
+                    val lp = v.layoutParams as ViewGroup.MarginLayoutParams
+                    intArrayOf(lp.marginStart, lp.topMargin, lp.marginEnd)
+                }
+            ViewCompat.setOnApplyWindowInsetsListener(
+                findViewById(android.R.id.content),
+            ) { _, insets ->
+                val cut = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+                val rtl =
+                    resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+                val startInset = if (rtl) cut.right else cut.left
+                val endInset = if (rtl) cut.left else cut.right
+                for ((v, base) in bases) {
+                    val lp = v.layoutParams as ViewGroup.MarginLayoutParams
+                    lp.marginStart = base[0] + startInset
+                    lp.topMargin = base[1] + cut.top
+                    lp.marginEnd = base[2] + endInset
+                    v.layoutParams = lp
+                }
+                insets
             }
         }
 

@@ -6,9 +6,12 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -299,7 +302,10 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         CinematicBackground(modifier = Modifier.fillMaxSize())
-        Row(modifier = Modifier.fillMaxSize()) {
+        // MK.28.1 — the background above stays full-bleed under the
+        // transparent system bars; every interactive child is inset by
+        // safeDrawing (system bars + display cutout + IME). Zero on TV.
+        Row(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             AppSidebar(
                 current = section,
                 onSelect = { newSection ->
@@ -618,6 +624,9 @@ fun HomeScreen(
                         .fillMaxWidth(if (isTv) 0.6f else 1f)
                         .fillMaxHeight()
                         .background(LocalYancoPalette.current.BackgroundDeep)
+                        // MK.28.1 — panel background full-bleed, content inset
+                        // (order matters: padding after background).
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
                         // Eat tap so the outer scrim's dismiss
                         // doesn't fire when the user taps inside the
                         // search panel itself. Empty handler is
