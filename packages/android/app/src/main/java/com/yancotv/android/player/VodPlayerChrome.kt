@@ -412,7 +412,14 @@ private fun ErrorOverlay(
                 Text(
                     text = "×",
                     color = palette.Error,
-                    fontSize = 96.sp,
+                    // MB-298 — pinned to dp, not sp. This is a decorative
+                    // glyph sized to fit its fixed-dp container, so it must
+                    // NOT grow with the font scale: at the TV multiplier plus
+                    // a user font-scale of 125% a raw 96sp becomes ~156sp and
+                    // bursts out of the box. toSp() converts a dp value
+                    // through the current density so it renders at a constant
+                    // physical size whatever the text scaling is.
+                    fontSize = with(LocalDensity.current) { 96.dp.toSp() },
                     fontWeight = FontWeight.Bold,
                 )
             }

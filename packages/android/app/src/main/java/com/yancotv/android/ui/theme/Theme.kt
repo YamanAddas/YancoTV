@@ -37,6 +37,30 @@ import org.koin.compose.koinInject
  * default, which matches their pre-refactor rendering. Wrapping those
  * overlays lands with MK.16.2 when runtime theme switching ships.
  */
+/**
+ * MB-298 — TV type multiplier. The user's report was "the font size to be
+ * better optimized"; on a TV that means bigger.
+ *
+ * Measured on the canonical Fire TV Stick (AFTMM): 1920x1080 at densityDpi
+ * 320 gives a 960x540 dp viewport, so 1sp is 2 physical pixels. At a ~3 m
+ * viewing distance an 11sp caption subtends roughly 10 arcmin, well under
+ * the ~16 arcmin floor for comfortable sustained reading — which is why the
+ * small text in Settings, the Guide and the poster rails reads as cramped
+ * from the couch.
+ *
+ * Why here rather than in [YancoType]: only ~96 text call sites use the type
+ * scale, while ~209 raw `fontSize = N.sp` literals across ~35 files bypass it
+ * entirely (Settings, Guide, Recordings, Sources and the player menus are
+ * essentially all hardcoded). Migrating those is days of mechanical churn
+ * with a real chance of typos; multiplying `fontScale` at the density seam
+ * lifts every one of them at once. It scales `sp` only — every `dp` layout
+ * dimension is byte-identical, so nothing moves or re-flows.
+ *
+ * Phone is deliberately untouched (multiplier 1f): it is viewed at ~30 cm and
+ * is already correctly sized.
+ */
+private const val TV_TYPE_SCALE = 1.30f
+
 @Composable
 fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
     val themeController: ThemeController = koinInject()
@@ -52,10 +76,14 @@ fun YancoTheme(isTv: Boolean, content: @Composable () -> Unit) {
     val appearance by prefs.appearanceFlow.collectAsState()
     val baseDensity = LocalDensity.current
     val scaledDensity =
-        remember(baseDensity, appearance.fontScalePercent) {
+        remember(baseDensity, appearance.fontScalePercent, isTv) {
             Density(
                 density = baseDensity.density,
-                fontScale = baseDensity.fontScale * appearance.fontScale,
+                // MB-298 — TV type multiplier, applied at the same seam as
+                // the user's font-scale preference so the two compose
+                // instead of fighting.
+                fontScale = baseDensity.fontScale * appearance.fontScale *
+                    if (isTv) TV_TYPE_SCALE else 1f,
             )
         }
 

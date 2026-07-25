@@ -19,6 +19,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -523,7 +524,7 @@ class PlayerActivity : AppCompatActivity() {
                 setViewCompositionStrategy(
                     androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
                 )
-                setContent {
+                setThemedContent {
                     RecordingIndicator(
                         controller = controller,
                         recordings = recordings,
@@ -540,7 +541,7 @@ class PlayerActivity : AppCompatActivity() {
                 setViewCompositionStrategy(
                     androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
                 )
-                setContent {
+                setThemedContent {
                     SeekFlashOverlay(seekFlashFlow = seekFlashFlow)
                 }
             }
@@ -1347,7 +1348,7 @@ class PlayerActivity : AppCompatActivity() {
         view.isFocusableInTouchMode = true
         view.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
         view.setContent {
-            com.yancotv.android.ui.theme.YancoTheme(isTv = true) {
+            com.yancotv.android.ui.theme.YancoTheme(isTv = isTvDevice()) {
                 val rows = buildOptionsV2Rows()
                 com.yancotv.android.player.options.PlayerOptionsMenu(
                     state = optionsV2State,
@@ -1551,6 +1552,25 @@ class PlayerActivity : AppCompatActivity() {
         return rows
     }
 
+    /**
+     * MB-298 — wrap a player [ComposeView] in [YancoTheme].
+     *
+     * Five of the player's Compose surfaces were calling `setContent` bare:
+     * the recording indicator, the seek-flash badge, the VOD chrome, the VOD
+     * dock and the channel-surf list. `YancoTheme` is what provides
+     * `LocalYancoPalette`, the font-scale density override and the
+     * reduce-motion flag, so outside it those surfaces silently fell back to
+     * the DEFAULT palette — meaning a user on any theme other than Frosted
+     * Emerald saw the wrong colours in the player — and the
+     * Settings -> Appearance -> Font scale preference did nothing for them at
+     * all. The channel-surf list is the most-used surface in a live session.
+     */
+    private fun ComposeView.setThemedContent(content: @Composable () -> Unit) {
+        setContent {
+            com.yancotv.android.ui.theme.YancoTheme(isTv = isTvDevice()) { content() }
+        }
+    }
+
     private fun isTvDevice(): Boolean {
         val uiModeManager =
             getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
@@ -1595,7 +1615,7 @@ class PlayerActivity : AppCompatActivity() {
             androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
         )
         view.setContent {
-            com.yancotv.android.ui.theme.YancoTheme(isTv = true) {
+            com.yancotv.android.ui.theme.YancoTheme(isTv = isTvDevice()) {
                 com.yancotv.android.player.zap.ChannelZapOverlay(state = channelZapState)
             }
         }
@@ -1620,7 +1640,7 @@ class PlayerActivity : AppCompatActivity() {
         val stub = findViewById<android.view.ViewStub>(R.id.vod_chrome_stub)
         val inflated = stub.inflate() as ComposeView
         inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        inflated.setContent {
+        inflated.setThemedContent {
             VodPlayerChrome(
                 state = chromeState,
                 buffering = chromeBuffering,
@@ -1888,7 +1908,7 @@ class PlayerActivity : AppCompatActivity() {
         val stub = findViewById<android.view.ViewStub>(R.id.vod_dock_stub)
         val inflated = stub.inflate() as ComposeView
         inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        inflated.setContent {
+        inflated.setThemedContent {
             // Reactively hide the prev/next buttons when the active queue is
             // single-item (VOD movies, per-episode play). collectAsState here
             // (not baked into dockData) keeps the visibility tied to the live
@@ -2071,7 +2091,7 @@ class PlayerActivity : AppCompatActivity() {
         val stub = findViewById<android.view.ViewStub>(R.id.surf_overlay_stub)
         val inflated = stub.inflate() as ComposeView
         inflated.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        inflated.setContent {
+        inflated.setThemedContent {
             if (surfVisible) {
                 ChannelSurfOverlay(
                     currentContentId = controller.currentId,
