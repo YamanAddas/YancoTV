@@ -6,10 +6,12 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -336,12 +338,19 @@ fun CoverflowSectionScreen(
         }
     }
 
-    LaunchedEffect(focusedIndex, total, loaded, isFavoritesFilter) {
+    // MK.28.6 (MB-267) — pagination is keyed on BOTH focusedIndex (D-pad)
+    // and the LazyRow's last visible index (touch scroll). Pre-fix the
+    // guard was focusedIndex-only, and touch never advances focus — so a
+    // phone user could never load past the first 100 items of a category
+    // (IPTV categories routinely run to thousands).
+    var lastVisibleIndex by remember(type, selectedGroup) { mutableStateOf(0) }
+    LaunchedEffect(focusedIndex, lastVisibleIndex, total, loaded, isFavoritesFilter) {
         if (isFavoritesFilter) return@LaunchedEffect
         if (loading) return@LaunchedEffect
         if (loaded >= total) return@LaunchedEffect
         if (items.size >= 1000) return@LaunchedEffect
-        if (focusedIndex < (loaded - 20)) return@LaunchedEffect
+        val reach = maxOf(focusedIndex, lastVisibleIndex)
+        if (reach < (loaded - 20)) return@LaunchedEffect
         delay(100L)
         if (loading) return@LaunchedEffect
         loading = true
@@ -440,7 +449,13 @@ fun CoverflowSectionScreen(
 
     var coverflowHasFocus by remember { mutableStateOf(false) }
     LaunchedEffect(coverflowHasFocus) { onPanelFocusChanged(coverflowHasFocus) }
-    BackHandler(enabled = coverflowHasFocus) { onExitToCategories() }
+    // MK.28.6 (MB-269) — also enabled when the pane is EMPTY: an empty
+    // category (pinned Favorites on a fresh install, all-hidden group) has
+    // no focusable node, so the focus-gated handler never armed, every
+    // handler in the back-chain fell through, and system back CLOSED THE
+    // APP from inside a browse screen. With the state gate, BACK steps
+    // back to the categories rail regardless of where focus died.
+    BackHandler(enabled = coverflowHasFocus || visible.isEmpty()) { onExitToCategories() }
 
     val playing by controller.currentItem.collectAsState()
     val previewItem = focusedItem
@@ -541,6 +556,7 @@ fun CoverflowSectionScreen(
                         },
                         onActivate = { idx -> onActivate(visible.toList(), idx) },
                         onLongPress = { item -> actionsFor = item },
+                        onLastVisible = { idx -> lastVisibleIndex = idx },
                     )
                 hasLoaded ->
                     CoverflowEmptyState(
@@ -1043,8 +1059,16 @@ private fun ContentCoverflow(
     onFocus: (Int, ContentItem) -> Unit,
     onActivate: (Int) -> Unit,
     onLongPress: (ContentItem) -> Unit,
+    onLastVisible: (Int) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    // MK.28.6 (MB-267) — report the scroll frontier so the parent's
+    // pagination effect fires for touch scrolling, not just D-pad focus.
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .distinctUntilChanged()
+            .collect { onLastVisible(it) }
+    }
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val viewportPx = with(LocalDensity.current) { maxWidth.toPx() }
         val orbPx = with(LocalDensity.current) { OrbWidth.toPx() }
@@ -1089,6 +1113,7 @@ private fun ContentCoverflow(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ContentOrb(
     item: ContentItem,
@@ -1105,13 +1130,23 @@ private fun ContentOrb(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    // MK.28.6 (MB-270) — pressed-state feedback: a touch press dips the orb
+    // so taps visibly register (focus never moves in touch mode, so the
+    // focus ring alone gave phone users zero response between finger-down
+    // and the resulting action).
+    val pressed by interaction.collectIsPressedAsState()
     LaunchedEffect(focused) { if (focused) onFocus() }
 
     val isCenter = distance == 0
     val absD = kotlin.math.abs(distance).coerceAtMost(6)
     val rotationY = (-distance.toFloat() * 16f).coerceIn(-58f, 58f)
     val scaleBase = if (isCenter) 1.18f else (1.0f - absD * 0.07f).coerceAtLeast(0.62f)
-    val scale = if (focused) scaleBase * 1.04f else scaleBase
+    val scale =
+        when {
+            pressed -> scaleBase * 0.94f
+            focused -> scaleBase * 1.04f
+            else -> scaleBase
+        }
     val alpha = if (isCenter) 1f else (1f - absD * 0.18f).coerceAtLeast(0.32f)
     val translationXDp = -distance.toFloat() * 4f
     val translationX = with(LocalDensity.current) { translationXDp.dp.toPx() }
@@ -1161,15 +1196,29 @@ private fun ContentOrb(
                 // MB-98 — registers `onLongPress` as the active context-menu
                 // action while this orb holds focus. The actual long-press
                 // timer + KEYCODE_MENU dispatch live in MainActivity (see
-                // TvContextActionState). Touch long-press is unsupported on
-                // the coverflow path — TV-only surface.
+                // TvContextActionState).
                 .tvLongClickable(onLongPress)
                 .focusable(interactionSource = interaction)
-                .clickable(
+                // MK.28.6 (MB-266/268) — combinedClickable so a TOUCH
+                // long-press also opens the 6-action context menu (rename /
+                // logo / lock / hide / share had no phone path at all; the
+                // Guide already pairs combinedClickable with the TV key
+                // timer, and MainActivity's onKeyUp swallow was designed to
+                // coexist with it). Tap = select-then-activate: a tap on a
+                // non-centered orb SELECTS it (touch never moves Compose
+                // focus, so pre-fix the preview pane / Favorite CTA /
+                // auto-preview were pinned to a stale item forever); a tap
+                // on the centered orb activates. On TV the clicked orb is
+                // always the centered one (focus recenters the wheel), so
+                // CENTER behaviour is unchanged.
+                .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
                     role = Role.Button,
-                    onClick = onActivate,
+                    onClick = {
+                        if (distance == 0) onActivate() else onFocus()
+                    },
+                    onLongClick = onLongPress,
                 ).semantics(mergeDescendants = true) { contentDescription = title },
             contentAlignment = Alignment.Center,
         ) {

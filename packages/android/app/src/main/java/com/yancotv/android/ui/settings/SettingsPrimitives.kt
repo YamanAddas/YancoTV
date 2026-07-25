@@ -26,10 +26,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -39,6 +42,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -351,6 +355,11 @@ internal fun SettingsSlider(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // MK.28.6 (MB-271) — map a track x-coordinate to a stepped value.
+            // Captured by the tap + drag handlers below; state-backed so the
+            // pointerInput lambda (which never restarts) sees current values.
+            val currentValue by rememberUpdatedState(clampedValue)
+            val currentOnChange by rememberUpdatedState(onValueChange)
             BoxWithConstraints(
                 modifier =
                 Modifier
@@ -371,6 +380,35 @@ internal fun SettingsSlider(
                                 true
                             }
                             else -> false
+                        }
+                    }
+                    // MB-271 — touch input: tap the track to jump, drag to
+                    // scrub. Pre-fix the knob was a dead visual on phone and
+                    // any value between the preset chips was unreachable by
+                    // touch. Key-driven path above is untouched (TV).
+                    .pointerInput(range, step) {
+                        fun valueForX(x: Float): Int {
+                            val fraction = (x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val raw = range.first + fraction * (range.last - range.first)
+                            val stepped = (Math.round(raw / step) * step)
+                            return stepped.coerceIn(range.first, range.last)
+                        }
+                        detectTapGestures { offset ->
+                            val next = valueForX(offset.x)
+                            if (next != currentValue) currentOnChange(next)
+                        }
+                    }
+                    .pointerInput(range, step) {
+                        fun valueForX(x: Float): Int {
+                            val fraction = (x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val raw = range.first + fraction * (range.last - range.first)
+                            val stepped = (Math.round(raw / step) * step)
+                            return stepped.coerceIn(range.first, range.last)
+                        }
+                        detectHorizontalDragGestures { change, _ ->
+                            change.consume()
+                            val next = valueForX(change.position.x)
+                            if (next != currentValue) currentOnChange(next)
                         }
                     },
                 contentAlignment = Alignment.CenterStart,
