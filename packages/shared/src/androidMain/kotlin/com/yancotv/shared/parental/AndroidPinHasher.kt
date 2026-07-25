@@ -1,14 +1,14 @@
 package com.yancotv.shared.parental
 
+import com.yancotv.shared.crypto.Pbkdf2Sha256
 import java.security.SecureRandom
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.PBEKeySpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Android implementation of [PinHasher] using PBKDF2-HMAC-SHA256, available
- * in every JDK + Android API ≥ 24 without additional deps.
+ * Android implementation of [PinHasher] using PBKDF2-HMAC-SHA256. Android's
+ * named SecretKeyFactory is available from API 26; API 24/25 use the
+ * HmacSHA256 compatibility implementation in [Pbkdf2Sha256].
  *
  * Parameters:
  *  - 100 000 iterations — tuned for ~50 ms on a 2-core Fire TV Stick 4K.
@@ -46,14 +46,11 @@ class AndroidPinHasher : PinHasher {
     }
 
     private fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray {
-        // PBEKeySpec wipes its internal char[] when `clearPassword()` is
-        // called; we do that in the finally so the PIN can't linger as
-        // plaintext in heap waiting for GC.
-        val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, KEY_BITS)
-        try {
-            return FACTORY.generateSecret(spec).encoded
+        val password = pin.toCharArray()
+        return try {
+            Pbkdf2Sha256.derive(password, salt, iterations, KEY_BITS)
         } finally {
-            spec.clearPassword()
+            password.fill('\u0000')
         }
     }
 
@@ -65,8 +62,6 @@ class AndroidPinHasher : PinHasher {
         const val MAX_ITERATIONS = 1_000_000
         const val SALT_BYTES = 16
         const val KEY_BITS = 256
-
-        val FACTORY: SecretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
 
         fun ByteArray.toHex(): String {
             val chars = CharArray(size * 2)

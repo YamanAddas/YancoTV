@@ -1808,6 +1808,23 @@ hangs surface.
 
 ---
 
+## MK.27.HF1 — Fire OS 6 startup compatibility (MB-241) — 2026-07-22
+
+Critical release hotfix for the v1.3.7 startup crash on Fire OS 6 / Android 7.1 (API 25).
+
+- [x] Reproduce the crash and capture the exact `NoSuchAlgorithmException` / initializer stack.
+- [x] Verify the installed APK matches the public v1.3.7 SHA-256 and the local release signer.
+- [x] Replace the API-26-only PBKDF2 factory initialization with a platform-first API 24/25 fallback.
+- [x] Reuse the same KDF path for PIN hashing and encrypted backups without changing stored formats.
+- [x] Pass RFC vectors, shared Android tests, and the minified signed release build; hotfix files are lint-clean
+  (the repository-wide lint gate still has pre-existing failures in unrelated Cast/Handoff/Cleartext/History files).
+- [x] Verify the APK package/version/signature, install with `adb install -r`, and pass repeated cold launches.
+
+Safety boundary: this is an in-place, same-signature APK update. Do not uninstall, clear app data, alter the
+database, downgrade the package, unlock the bootloader, or write firmware/recovery partitions.
+
+---
+
 ## MK.28 — Full-app audit + fix sweep (insets / touch / TV-focus / threading) — 2026-07-25
 
 > **Numbering note:** a few code comments that predate this section carry "MK.28.x" / "MK.30" / "MK.32"

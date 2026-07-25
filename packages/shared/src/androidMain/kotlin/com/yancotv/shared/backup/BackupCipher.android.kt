@@ -1,10 +1,9 @@
 package com.yancotv.shared.backup
 
+import com.yancotv.shared.crypto.Pbkdf2Sha256
 import java.security.SecureRandom
 import javax.crypto.Cipher
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 actual class BackupCipher {
@@ -12,8 +11,12 @@ actual class BackupCipher {
 
     actual fun deriveKey(password: String, saltHex: String, iterations: Int): ByteArray {
         val salt = decodeHex(saltHex)
-        val spec = PBEKeySpec(password.toCharArray(), salt, iterations, 256)
-        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        val passwordChars = password.toCharArray()
+        return try {
+            Pbkdf2Sha256.derive(passwordChars, salt, iterations, 256)
+        } finally {
+            passwordChars.fill('\u0000')
+        }
     }
 
     actual fun encryptHex(plaintext: ByteArray, key: ByteArray): String {
