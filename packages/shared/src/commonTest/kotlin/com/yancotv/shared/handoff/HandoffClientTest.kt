@@ -7,30 +7,27 @@ import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class HandoffClientTest {
     private val command =
         HandoffPlayCommand(
             pairingToken = "tok-xyz",
             item =
-                HandoffItem(
-                    id = "ch:1",
-                    kind = HandoffKind.CHANNEL,
-                    title = "News",
-                    streamUrl = "http://p/1.ts",
-                ),
+            HandoffItem(
+                id = "ch:1",
+                kind = HandoffKind.CHANNEL,
+                title = "News",
+                streamUrl = "http://p/1.ts",
+            ),
         )
 
-    private fun clientReturning(
-        status: HttpStatusCode,
-        capture: MutableList<HttpRequestData>? = null,
-    ): HandoffClient {
+    private fun clientReturning(status: HttpStatusCode, capture: MutableList<HttpRequestData>? = null): HandoffClient {
         val engine =
             MockEngine { request ->
                 capture?.add(request)

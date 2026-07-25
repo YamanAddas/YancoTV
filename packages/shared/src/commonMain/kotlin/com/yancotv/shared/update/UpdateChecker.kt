@@ -92,11 +92,10 @@ class UpdateChecker(
      * Suspending — runs on the caller's coroutine context. WorkManager
      * worker dispatches off the main thread.
      */
-    suspend fun check(): UpdateInfo? =
-        when (val outcome = checkDetailed()) {
-            is UpdateCheckOutcome.Available -> outcome.info
-            else -> null
-        }
+    suspend fun check(): UpdateInfo? = when (val outcome = checkDetailed()) {
+        is UpdateCheckOutcome.Available -> outcome.info
+        else -> null
+    }
 
     /**
      * Same network poll as [check], but preserves the reason for a

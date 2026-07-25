@@ -47,10 +47,9 @@ object RecordingDisclaimerPrefs {
     private const val PREFS_NAME = "yanco_legal"
     private const val KEY_ACK = "recording_disclaimer_acknowledged"
 
-    fun isAcknowledged(context: Context): Boolean =
-        context
-            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ACK, false)
+    fun isAcknowledged(context: Context): Boolean = context
+        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        .getBoolean(KEY_ACK, false)
 
     fun acknowledge(context: Context) {
         context

@@ -271,46 +271,43 @@ class SubtitleQueryBuilderTest {
 
     // ───── helpers ─────
 
-    private fun makeMovieItem(title: String, cleanTitle: String?): ContentItem =
-        ContentItem(
-            id = "id",
-            sourceId = "src",
-            type = ContentType.MOVIE,
-            title = title,
-            cleanTitle = cleanTitle,
-            groupName = null,
-            streamUrl = "http://example.com/movie.mkv",
-            logoUrl = null,
-            tvgId = null,
-            metadataJson = null,
-            sortOrder = 0,
-            createdAt = 0L,
-        )
+    private fun makeMovieItem(title: String, cleanTitle: String?): ContentItem = ContentItem(
+        id = "id",
+        sourceId = "src",
+        type = ContentType.MOVIE,
+        title = title,
+        cleanTitle = cleanTitle,
+        groupName = null,
+        streamUrl = "http://example.com/movie.mkv",
+        logoUrl = null,
+        tvgId = null,
+        metadataJson = null,
+        sortOrder = 0,
+        createdAt = 0L,
+    )
 
-    private fun makeSeriesEpisodeItem(title: String): ContentItem =
-        ContentItem(
-            id = "ep-id",
-            sourceId = "src",
-            // Episodes synthesize as MOVIE-typed in PlaybackController.
-            type = ContentType.MOVIE,
-            title = title,
-            cleanTitle = title,
-            groupName = null,
-            streamUrl = "http://example.com/ep.mkv",
-            logoUrl = null,
-            tvgId = null,
-            metadataJson = null,
-            sortOrder = 0,
-            createdAt = 0L,
-        )
+    private fun makeSeriesEpisodeItem(title: String): ContentItem = ContentItem(
+        id = "ep-id",
+        sourceId = "src",
+        // Episodes synthesize as MOVIE-typed in PlaybackController.
+        type = ContentType.MOVIE,
+        title = title,
+        cleanTitle = title,
+        groupName = null,
+        streamUrl = "http://example.com/ep.mkv",
+        logoUrl = null,
+        tvgId = null,
+        metadataJson = null,
+        sortOrder = 0,
+        createdAt = 0L,
+    )
 
-    private fun makeEpisode(title: String, season: Int, episode: Int): Playable.Episode =
-        Playable.Episode(
-            id = "ep-id",
-            seriesId = "series-id",
-            title = title,
-            streamUrl = "http://example.com/ep.mkv",
-            seasonNumber = season,
-            episodeNumber = episode,
-        )
+    private fun makeEpisode(title: String, season: Int, episode: Int): Playable.Episode = Playable.Episode(
+        id = "ep-id",
+        seriesId = "series-id",
+        title = title,
+        streamUrl = "http://example.com/ep.mkv",
+        seasonNumber = season,
+        episodeNumber = episode,
+    )
 }

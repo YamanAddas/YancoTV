@@ -19,20 +19,18 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -49,9 +47,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -1051,13 +1049,7 @@ private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () 
 }
 
 @Composable
-private fun SeasonOption(
-    label: String,
-    count: Int,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun SeasonOption(label: String, count: Int, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg =
@@ -1284,10 +1276,7 @@ private data class NextEpisodeChoice(val episode: EpisodeInfo, val mode: PlayMod
  * runs of unnumbered specials stable rather than letting them swap on
  * each recomposition.
  */
-private fun computeNextEpisode(
-    episodes: List<EpisodeInfo>,
-    resumeInfo: EpisodeResumeInfo?,
-): NextEpisodeChoice? {
+private fun computeNextEpisode(episodes: List<EpisodeInfo>, resumeInfo: EpisodeResumeInfo?): NextEpisodeChoice? {
     if (episodes.isEmpty()) return null
     val sorted = episodes.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }, { it.id }))
     if (resumeInfo == null) {

@@ -1,5 +1,11 @@
 package com.yancotv.shared.http
 
+import java.util.concurrent.TimeUnit
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.test.fail
 import okhttp3.Call
 import okhttp3.Connection
 import okhttp3.Interceptor
@@ -7,12 +13,6 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import java.util.concurrent.TimeUnit
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
-import kotlin.test.fail
 
 /**
  * Tests for the OkHttp interceptor that enforces the cleartext
@@ -203,17 +203,14 @@ class CleartextAllowlistInterceptorTest {
 
         override fun connectTimeoutMillis(): Int = 0
 
-        override fun withConnectTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain =
-            throw UnsupportedOperationException()
+        override fun withConnectTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain = throw UnsupportedOperationException()
 
         override fun readTimeoutMillis(): Int = 0
 
-        override fun withReadTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain =
-            throw UnsupportedOperationException()
+        override fun withReadTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain = throw UnsupportedOperationException()
 
         override fun writeTimeoutMillis(): Int = 0
 
-        override fun withWriteTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain =
-            throw UnsupportedOperationException()
+        override fun withWriteTimeout(timeout: Int, unit: TimeUnit): Interceptor.Chain = throw UnsupportedOperationException()
     }
 }

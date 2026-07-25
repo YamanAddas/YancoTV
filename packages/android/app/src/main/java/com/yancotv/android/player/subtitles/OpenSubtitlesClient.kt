@@ -16,10 +16,7 @@ import org.json.JSONObject
  * more, we can add username/password login + JWT caching (the desktop Electron
  * build already has this path).
  */
-class OpenSubtitlesClient(
-    private val http: OkHttpClient,
-    private val cacheDir: File,
-) {
+class OpenSubtitlesClient(private val http: OkHttpClient, private val cacheDir: File) {
     fun search(
         query: String,
         season: Int? = null,
@@ -108,7 +105,7 @@ class OpenSubtitlesClient(
             val files = attrs.optJSONArray("files") ?: continue
             if (files.length() == 0) continue
             val firstFile = files.optJSONObject(0) ?: continue
-            val subtitleId = obj.optString("id", "") .takeIf { it.isNotBlank() } ?: continue
+            val subtitleId = obj.optString("id", "").takeIf { it.isNotBlank() } ?: continue
             val fileId = firstFile.optInt("file_id", -1).takeIf { it > 0 } ?: continue
             out += SubtitleResult(
                 subtitleId = subtitleId,
@@ -156,7 +153,7 @@ class OpenSubtitlesClient(
 internal fun resolveSafeSubtitleFile(dir: File, fileId: Int, fileName: String): File {
     val sanitized = fileName.replace(Regex("[^\\w.\\- ]+"), "_").trim()
     val safeName = sanitized.ifBlank { "subtitle_$fileId.srt" }
-    val outFile = File(dir, "${fileId}-$safeName")
+    val outFile = File(dir, "$fileId-$safeName")
     val dirCanonical = dir.canonicalPath + File.separator
     if (!outFile.canonicalPath.startsWith(dirCanonical)) {
         throw OpenSubtitlesException("Subtitle filename escaped cache dir")
@@ -175,9 +172,6 @@ data class SubtitleResult(
     val aiTranslated: Boolean,
 )
 
-data class DownloadResult(
-    val file: File,
-    val remaining: Int,
-)
+data class DownloadResult(val file: File, val remaining: Int)
 
 class OpenSubtitlesException(message: String) : Exception(message)

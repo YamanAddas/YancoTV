@@ -16,12 +16,12 @@ class HandoffResolverTest {
         schemaVersion = schema,
         pairingToken = token,
         item =
-            HandoffItem(
-                id = "ch:1",
-                kind = HandoffKind.CHANNEL,
-                title = "News",
-                streamUrl = url,
-            ),
+        HandoffItem(
+            id = "ch:1",
+            kind = HandoffKind.CHANNEL,
+            title = "News",
+            streamUrl = url,
+        ),
         resumePositionSeconds = position,
         fromStart = fromStart,
     )
@@ -77,12 +77,12 @@ class HandoffResolverTest {
             HandoffPlayCommand(
                 pairingToken = "tok",
                 item =
-                    HandoffItem(
-                        id = "m:1",
-                        kind = HandoffKind.MOVIE,
-                        title = "Dune",
-                        streamUrl = "http://p/movie/1.mp4",
-                    ),
+                HandoffItem(
+                    id = "m:1",
+                    kind = HandoffKind.MOVIE,
+                    title = "Dune",
+                    streamUrl = "http://p/movie/1.mp4",
+                ),
             )
         val play = assertIs<HandoffOutcome.PlayContent>(resolveHandoffCommand(cmd, null))
         assertEquals(ContentType.MOVIE, play.item.type)
@@ -94,15 +94,15 @@ class HandoffResolverTest {
             HandoffPlayCommand(
                 pairingToken = "tok",
                 item =
-                    HandoffItem(
-                        id = "ep:1",
-                        kind = HandoffKind.EPISODE,
-                        title = "Pilot",
-                        streamUrl = "http://p/series/1.mp4",
-                        seriesId = "ser:1",
-                        seasonNumber = 1,
-                        episodeNumber = 1,
-                    ),
+                HandoffItem(
+                    id = "ep:1",
+                    kind = HandoffKind.EPISODE,
+                    title = "Pilot",
+                    streamUrl = "http://p/series/1.mp4",
+                    seriesId = "ser:1",
+                    seasonNumber = 1,
+                    episodeNumber = 1,
+                ),
             )
         val play = assertIs<HandoffOutcome.PlayEpisode>(resolveHandoffCommand(cmd, null))
         assertEquals("ser:1", play.episode.seriesId)
@@ -120,13 +120,13 @@ class HandoffResolverTest {
             HandoffPlayCommand(
                 pairingToken = "tok",
                 item =
-                    HandoffItem(
-                        id = "ep:1",
-                        kind = HandoffKind.EPISODE,
-                        title = "Orphan",
-                        streamUrl = "http://p/series/1.mp4",
-                        seriesId = null,
-                    ),
+                HandoffItem(
+                    id = "ep:1",
+                    kind = HandoffKind.EPISODE,
+                    title = "Orphan",
+                    streamUrl = "http://p/series/1.mp4",
+                    seriesId = null,
+                ),
             )
         assertEquals(
             HandoffOutcome.Rejected(HandoffReject.INVALID_ITEM),
@@ -159,14 +159,14 @@ class HandoffResolverTest {
             HandoffPlayCommand(
                 pairingToken = "tok",
                 item =
-                    HandoffItem(
-                        id = "ch:1",
-                        kind = HandoffKind.CHANNEL,
-                        title = "News",
-                        streamUrl = "http://p/1.ts",
-                        userAgent = "VLC/3.0.20",
-                        referer = "http://p/",
-                    ),
+                HandoffItem(
+                    id = "ch:1",
+                    kind = HandoffKind.CHANNEL,
+                    title = "News",
+                    streamUrl = "http://p/1.ts",
+                    userAgent = "VLC/3.0.20",
+                    referer = "http://p/",
+                ),
             )
         val play = assertIs<HandoffOutcome.PlayContent>(resolveHandoffCommand(cmd, null))
         assertEquals("VLC/3.0.20", play.userAgent)
@@ -179,14 +179,14 @@ class HandoffResolverTest {
             HandoffPlayCommand(
                 pairingToken = "tok",
                 item =
-                    HandoffItem(
-                        id = "ch:1",
-                        kind = HandoffKind.CHANNEL,
-                        title = "News",
-                        streamUrl = "http://p/1.ts",
-                        userAgent = "",
-                        referer = "   ",
-                    ),
+                HandoffItem(
+                    id = "ch:1",
+                    kind = HandoffKind.CHANNEL,
+                    title = "News",
+                    streamUrl = "http://p/1.ts",
+                    userAgent = "",
+                    referer = "   ",
+                ),
             )
         val play = assertIs<HandoffOutcome.PlayContent>(resolveHandoffCommand(cmd, null))
         assertEquals(null, play.userAgent)

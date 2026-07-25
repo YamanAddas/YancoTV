@@ -12,10 +12,10 @@ import com.yancotv.android.crash.CrashReporter
 import com.yancotv.android.crash.SentryInit
 import com.yancotv.android.di.appModule
 import com.yancotv.android.player.PlaybackController
+import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderNotificationChannel
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.image.buildYancoImageLoader
-import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.http.CleartextAllowlistInterceptor
 import com.yancotv.shared.recording.RecordingScheduleRepository

@@ -71,14 +71,7 @@ class CastProxy(private val context: Context, private val logger: Logger) {
     // keyframes (from the probe) so `-c:v copy` cuts land exactly on them and the
     // declared #EXTINF matches what ffmpeg actually produces — no drift, no count
     // mismatch, clean keyframe-aligned relaunch seams (findings #1/#2/#7).
-    private class VodPlan(
-        val gen: Int,
-        val url: String,
-        val headers: String,
-        val outDir: File,
-        val boundaries: DoubleArray,
-        val durationSec: Double,
-    ) {
+    private class VodPlan(val gen: Int, val url: String, val headers: String, val outDir: File, val boundaries: DoubleArray, val durationSec: Double) {
         val segCount: Int get() = boundaries.size - 1
 
         fun segStart(i: Int): Double = boundaries[i]
@@ -257,7 +250,12 @@ class CastProxy(private val context: Context, private val logger: Logger) {
             val session = FFmpegKit.executeWithArguments(args.toTypedArray())
             if (ReturnCode.isSuccess(session.returnCode) && tmp.exists() && tmp.length() > 0L) {
                 runCatching { out.delete() }
-                if (!tmp.renameTo(out)) runCatching { tmp.copyTo(out, overwrite = true); tmp.delete() }
+                if (!tmp.renameTo(out)) {
+                    runCatching {
+                        tmp.copyTo(out, overwrite = true)
+                        tmp.delete()
+                    }
+                }
                 return out.takeIf { it.exists() && it.length() > 0L }
             }
             runCatching { tmp.delete() }
@@ -436,11 +434,10 @@ class CastProxy(private val context: Context, private val logger: Logger) {
 
     // ── helpers ──────────────────────────────────────────────────────────
 
-    private fun buildHeaders(userAgent: String?, referer: String?): String =
-        buildString {
-            userAgent?.takeIf { it.isNotBlank() }?.let { append("User-Agent: ").append(it).append("\r\n") }
-            referer?.takeIf { it.isNotBlank() }?.let { append("Referer: ").append(it).append("\r\n") }
-        }
+    private fun buildHeaders(userAgent: String?, referer: String?): String = buildString {
+        userAgent?.takeIf { it.isNotBlank() }?.let { append("User-Agent: ").append(it).append("\r\n") }
+        referer?.takeIf { it.isNotBlank() }?.let { append("Referer: ").append(it).append("\r\n") }
+    }
 
     private fun logFfmpegEnd(tag: String, session: FFmpegSession) {
         val rc = session.returnCode

@@ -240,22 +240,17 @@ class CleartextAllowlistTest {
      * default to neutral values so individual tests only have to pass
      * the URL(s) under test.
      */
-    private fun makeSource(
-        id: String = "src-1",
-        url: String? = null,
-        epgUrl: String? = null,
-    ): Source =
-        Source(
-            id = id,
-            name = "Test Source $id",
-            type = SourceType.M3U_URL,
-            url = url,
-            epgUrl = epgUrl,
-            isActive = true,
-            priority = 0,
-            channelCount = 0,
-            autoSyncInterval = 0,
-            createdAt = 0L,
-            updatedAt = 0L,
-        )
+    private fun makeSource(id: String = "src-1", url: String? = null, epgUrl: String? = null): Source = Source(
+        id = id,
+        name = "Test Source $id",
+        type = SourceType.M3U_URL,
+        url = url,
+        epgUrl = epgUrl,
+        isActive = true,
+        priority = 0,
+        channelCount = 0,
+        autoSyncInterval = 0,
+        createdAt = 0L,
+        updatedAt = 0L,
+    )
 }

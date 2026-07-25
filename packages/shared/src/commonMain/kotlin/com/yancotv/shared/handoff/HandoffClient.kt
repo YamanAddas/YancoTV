@@ -38,29 +38,27 @@ sealed interface HandoffSendResult {
  */
 class HandoffClient(private val http: HttpClient, private val json: Json = Json) {
     /** Cheap liveness/identity probe for discovery. True iff the TV answers 200. */
-    suspend fun ping(host: String, port: Int): Boolean =
-        runCatching {
-            http.get("${baseUrl(host, port)}/handoff/ping").status == HttpStatusCode.OK
-        }.getOrDefault(false)
+    suspend fun ping(host: String, port: Int): Boolean = runCatching {
+        http.get("${baseUrl(host, port)}/handoff/ping").status == HttpStatusCode.OK
+    }.getOrDefault(false)
 
     /** Send a play command. Never throws — network failures map to [HandoffSendResult.Unreachable]. */
-    suspend fun play(host: String, port: Int, command: HandoffPlayCommand): HandoffSendResult =
-        try {
-            val response: HttpResponse =
-                http.post("${baseUrl(host, port)}/handoff/play") {
-                    contentType(ContentType.Application.Json)
-                    setBody(json.encodeToString(command))
-                }
-            when (response.status) {
-                HttpStatusCode.OK -> HandoffSendResult.Accepted
-                HttpStatusCode.Unauthorized -> HandoffSendResult.Rejected(HandoffReject.UNAUTHORIZED)
-                HttpStatusCode.Conflict -> HandoffSendResult.Rejected(HandoffReject.UNSUPPORTED_SCHEMA)
-                HttpStatusCode.UnprocessableEntity -> HandoffSendResult.Rejected(HandoffReject.INVALID_ITEM)
-                else -> HandoffSendResult.Unreachable("HTTP ${response.status.value}")
+    suspend fun play(host: String, port: Int, command: HandoffPlayCommand): HandoffSendResult = try {
+        val response: HttpResponse =
+            http.post("${baseUrl(host, port)}/handoff/play") {
+                contentType(ContentType.Application.Json)
+                setBody(json.encodeToString(command))
             }
-        } catch (t: Throwable) {
-            HandoffSendResult.Unreachable(t.message ?: t::class.simpleName ?: "network error")
+        when (response.status) {
+            HttpStatusCode.OK -> HandoffSendResult.Accepted
+            HttpStatusCode.Unauthorized -> HandoffSendResult.Rejected(HandoffReject.UNAUTHORIZED)
+            HttpStatusCode.Conflict -> HandoffSendResult.Rejected(HandoffReject.UNSUPPORTED_SCHEMA)
+            HttpStatusCode.UnprocessableEntity -> HandoffSendResult.Rejected(HandoffReject.INVALID_ITEM)
+            else -> HandoffSendResult.Unreachable("HTTP ${response.status.value}")
         }
+    } catch (t: Throwable) {
+        HandoffSendResult.Unreachable(t.message ?: t::class.simpleName ?: "network error")
+    }
 
     private fun baseUrl(host: String, port: Int): String = "http://$host:$port"
 }

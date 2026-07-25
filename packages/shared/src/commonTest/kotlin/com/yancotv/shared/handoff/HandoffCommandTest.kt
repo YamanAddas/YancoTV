@@ -2,12 +2,12 @@ package com.yancotv.shared.handoff
 
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.types.ContentType
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class HandoffCommandTest {
     private val json = Json
@@ -18,15 +18,15 @@ class HandoffCommandTest {
             HandoffPlayCommand(
                 pairingToken = "tok-123",
                 item =
-                    HandoffItem(
-                        id = "ch:42",
-                        sourceId = "src-1",
-                        kind = HandoffKind.CHANNEL,
-                        title = "BBC One HD",
-                        streamUrl = "http://provider/live/42.ts",
-                        userAgent = "VLC/3.0.20",
-                        referer = "http://provider/",
-                    ),
+                HandoffItem(
+                    id = "ch:42",
+                    sourceId = "src-1",
+                    kind = HandoffKind.CHANNEL,
+                    title = "BBC One HD",
+                    streamUrl = "http://provider/live/42.ts",
+                    userAgent = "VLC/3.0.20",
+                    referer = "http://provider/",
+                ),
                 resumePositionSeconds = 0L,
             )
 

@@ -494,11 +494,7 @@ object YancoIcons {
             }
         }
 
-    private fun buildLine(
-        name: String,
-        autoMirror: Boolean = false,
-        block: PathBuilder.() -> Unit,
-    ): ImageVector = ImageVector
+    private fun buildLine(name: String, autoMirror: Boolean = false, block: PathBuilder.() -> Unit): ImageVector = ImageVector
         .Builder(
             name = name,
             defaultWidth = 24.dp,

@@ -274,8 +274,7 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
      * boolean, e.g. the detail screen deciding whether to render the
      * "Reset progress" button.
      */
-    fun hasAnyForContent(contentId: String): Boolean =
-        db.watchHistoryQueries.selectByContent(contentId).executeAsList().isNotEmpty()
+    fun hasAnyForContent(contentId: String): Boolean = db.watchHistoryQueries.selectByContent(contentId).executeAsList().isNotEmpty()
 
     fun removeForContent(contentId: String) {
         db.watchHistoryQueries.deleteByContent(contentId)
@@ -330,12 +329,7 @@ data class WatchProgress(
     }
 }
 
-data class EpisodeResumeInfo(
-    val episodeId: String,
-    val positionSeconds: Long,
-    val durationSeconds: Long?,
-    val watchedAt: Long,
-) {
+data class EpisodeResumeInfo(val episodeId: String, val positionSeconds: Long, val durationSeconds: Long?, val watchedAt: Long) {
     /**
      * Treat ≥95% of duration as "finished". Anything less is mid-episode
      * (Resume). Matches the rule of thumb used by mainstream streaming

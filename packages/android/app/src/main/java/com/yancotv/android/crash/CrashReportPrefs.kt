@@ -53,8 +53,7 @@ object CrashReportPrefs {
     /** Cached read — safe from any thread, zero I/O. Must be primed first. */
     fun isEnabledCached(): Boolean = cachedEnabled
 
-    fun isEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_ENABLED, DEFAULT_ENABLED)
+    fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, DEFAULT_ENABLED)
 
     fun setEnabled(context: Context, enabled: Boolean) {
         cachedEnabled = enabled
@@ -67,10 +66,7 @@ object CrashReportPrefs {
      * Returns the listener for caller-side bookkeeping; the caller is
      * responsible for unregistering when its scope ends.
      */
-    fun observe(
-        context: Context,
-        onChanged: (Boolean) -> Unit,
-    ): SharedPreferences.OnSharedPreferenceChangeListener {
+    fun observe(context: Context, onChanged: (Boolean) -> Unit): SharedPreferences.OnSharedPreferenceChangeListener {
         val listener =
             SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
                 if (key == KEY_ENABLED) onChanged(p.getBoolean(key, DEFAULT_ENABLED))
@@ -79,13 +75,9 @@ object CrashReportPrefs {
         return listener
     }
 
-    fun unregister(
-        context: Context,
-        listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) {
+    fun unregister(context: Context, listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         prefs(context).unregisterOnSharedPreferenceChangeListener(listener)
     }
 
-    private fun prefs(context: Context): SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun prefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 }

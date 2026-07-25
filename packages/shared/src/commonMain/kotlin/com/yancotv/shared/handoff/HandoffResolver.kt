@@ -59,10 +59,7 @@ sealed interface HandoffOutcome {
  * @param expectedToken the receiver's current pairing token, or null to skip
  *   the check (A.1 stub; MK.26.A.4 supplies a real per-pairing token).
  */
-fun resolveHandoffCommand(
-    command: HandoffPlayCommand,
-    expectedToken: String?,
-): HandoffOutcome {
+fun resolveHandoffCommand(command: HandoffPlayCommand, expectedToken: String?): HandoffOutcome {
     // Audit catch — constant-time compare. The pairing code is the sole
     // auth secret on the LAN-exposed /handoff/play endpoint, and a
     // sniffable Wi-Fi could in theory let an attacker time

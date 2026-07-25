@@ -1,8 +1,8 @@
 package com.yancotv.android.update
 
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.shared.update.UpdateChecker
 import com.yancotv.shared.update.UpdateCheckOutcome
+import com.yancotv.shared.update.UpdateChecker
 import com.yancotv.shared.update.UpdateInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,11 +65,9 @@ class UpdateRepository(private val checker: UpdateChecker, private val prefs: Ap
      * Returns the resolved [UpdateInfo] (or null) for callers that want
      * to act immediately rather than collecting from [info].
      */
-    suspend fun triggerCheck(): UpdateInfo? {
-        return when (val outcome = triggerCheckOutcome()) {
-            is UpdateCheckOutcome.Available -> outcome.info
-            else -> null
-        }
+    suspend fun triggerCheck(): UpdateInfo? = when (val outcome = triggerCheckOutcome()) {
+        is UpdateCheckOutcome.Available -> outcome.info
+        else -> null
     }
 
     /**

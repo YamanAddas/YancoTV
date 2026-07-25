@@ -19,12 +19,7 @@ internal object Pbkdf2Sha256 {
     private const val HMAC_ALGORITHM = "HmacSHA256"
     private const val MAX_ITERATIONS = 1_000_000
 
-    fun derive(
-    password: CharArray,
-    salt: ByteArray,
-    iterations: Int,
-    keyBits: Int,
-): ByteArray {
+    fun derive(password: CharArray, salt: ByteArray, iterations: Int, keyBits: Int): ByteArray {
         validate(salt, iterations, keyBits)
         return try {
             deriveWithPlatform(password, salt, iterations, keyBits)
@@ -33,12 +28,7 @@ internal object Pbkdf2Sha256 {
         }
     }
 
-    internal fun deriveWithPlatform(
-    password: CharArray,
-    salt: ByteArray,
-    iterations: Int,
-    keyBits: Int,
-): ByteArray {
+    internal fun deriveWithPlatform(password: CharArray, salt: ByteArray, iterations: Int, keyBits: Int): ByteArray {
         validate(salt, iterations, keyBits)
         val spec = PBEKeySpec(password, salt, iterations, keyBits)
         return try {
@@ -48,12 +38,7 @@ internal object Pbkdf2Sha256 {
         }
     }
 
-    internal fun deriveCompat(
-    password: CharArray,
-    salt: ByteArray,
-    iterations: Int,
-    keyBits: Int,
-): ByteArray {
+    internal fun deriveCompat(password: CharArray, salt: ByteArray, iterations: Int, keyBits: Int): ByteArray {
         validate(salt, iterations, keyBits)
         val passwordBytes = String(password).toByteArray(Charsets.UTF_8)
         return try {
@@ -63,12 +48,7 @@ internal object Pbkdf2Sha256 {
         }
     }
 
-    private fun deriveCompatBytes(
-    password: ByteArray,
-    salt: ByteArray,
-    iterations: Int,
-    keyBytes: Int,
-): ByteArray {
+    private fun deriveCompatBytes(password: ByteArray, salt: ByteArray, iterations: Int, keyBytes: Int): ByteArray {
         val mac = Mac.getInstance(HMAC_ALGORITHM)
         mac.init(SecretKeySpec(password, HMAC_ALGORITHM))
 

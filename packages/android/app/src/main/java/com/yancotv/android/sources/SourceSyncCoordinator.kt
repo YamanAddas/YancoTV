@@ -4,6 +4,7 @@ import com.yancotv.shared.http.redactCredentials
 import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.sources.SyncProgress
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -19,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
 
 /**
  * App-scoped sync runner. A user-started sync must outlive the Settings

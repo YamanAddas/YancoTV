@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1118,7 +1117,9 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
 private fun UpNextTile(pair: NowPairing, locked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val upNextDesc = "${pair.programme.title} on ${pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title}, starts ${formatClock(pair.programme.startTime)}"
+    val upNextDesc = "${pair.programme.title} on ${pair.channel.cleanTitle?.ifBlank {
+        null
+    } ?: pair.channel.title}, starts ${formatClock(pair.programme.startTime)}"
 
     HexSurface(
         shape = YancoShapes.CutCornerCardSmall,
@@ -1514,11 +1515,7 @@ private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (
  * message rather than inventing a percentage or a fake "x of y".
  */
 @Composable
-private fun FirstSyncCard(
-    active: com.yancotv.android.sources.SourceSyncCoordinator.Active,
-    onOpenSources: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
+private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordinator.Active, onOpenSources: (() -> Unit)?, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
     HexSurface(
         shape = YancoShapes.CutCornerCard,

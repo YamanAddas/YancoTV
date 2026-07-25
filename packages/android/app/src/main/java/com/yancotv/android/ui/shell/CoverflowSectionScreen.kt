@@ -258,8 +258,11 @@ fun CoverflowSectionScreen(
     // already caps at 1000 (line 285), well under SQLite's IN-list limit.
     val progressIds by remember {
         derivedStateOf {
-            if (type == ContentType.LIVE) emptySet()
-            else items.map { it.id }.toSet()
+            if (type == ContentType.LIVE) {
+                emptySet()
+            } else {
+                items.map { it.id }.toSet()
+            }
         }
     }
     val watchProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), progressIds) {

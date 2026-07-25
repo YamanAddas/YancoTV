@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,9 +13,6 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -65,13 +65,7 @@ import com.yancotv.android.player.subtitles.MoviehashUnavailable
 import com.yancotv.android.player.subtitles.OpenSubtitlesClient
 import com.yancotv.android.player.subtitles.SubtitleResult
 import com.yancotv.android.player.subtitles.buildSubtitleQuery
-import okhttp3.OkHttpClient
 import com.yancotv.android.prefs.AppPreferences
-import com.yancotv.shared.handoff.toHandoffItem
-import com.yancotv.shared.playback.Playable
-import com.yancotv.shared.playback.toPlayable
-import com.yancotv.shared.types.ContentItem
-import com.yancotv.shared.types.ContentType
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.recording.RecordingService
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
@@ -79,15 +73,20 @@ import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.handoff.toHandoffItem
+import com.yancotv.shared.playback.Playable
+import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.recording.RecordInput
 import com.yancotv.shared.recording.RecordingFormat
 import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
+import com.yancotv.shared.types.ContentType
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 
 /**
  * MK.options.redesign — host for the per-category floating panels.
@@ -310,7 +309,13 @@ private fun applyAudioTrack(player: Player, track: AudioTrack) {
 @OptIn(ExperimentalFoundationApi::class)
 @UnstableApi
 @Composable
-private fun SubtitlesPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickExternal: () -> Unit, state: PlayerOptionsState, onPickOption: () -> Unit) {
+private fun SubtitlesPanelContent(
+    controller: PlaybackController,
+    prefs: AppPreferences,
+    onPickExternal: () -> Unit,
+    state: PlayerOptionsState,
+    onPickOption: () -> Unit,
+) {
     val tracks = rememberTextTracks(controller.player)
     val disabled = rememberTextDisabled(controller.player)
     val scope = rememberCoroutineScope()

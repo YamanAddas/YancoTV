@@ -39,17 +39,16 @@ enum class CastPlan {
  * audio is treated as risky → transcoded to AAC. Unknown video is treated
  * optimistically as H.264 (cheapest attempt; if it doesn't play the user mirrors).
  */
-fun classifyForCast(profile: CastStreamProfile): CastPlan =
-    when (profile.video) {
-        CastVideoCodec.HEVC -> CastPlan.TRANSCODE_VIDEO
-        CastVideoCodec.OTHER -> CastPlan.MIRROR
-        CastVideoCodec.H264, CastVideoCodec.UNKNOWN ->
-            when (profile.audio) {
-                CastAudioCodec.AAC -> CastPlan.REMUX
-                CastAudioCodec.AC3,
-                CastAudioCodec.EAC3,
-                CastAudioCodec.OTHER,
-                CastAudioCodec.UNKNOWN,
-                -> CastPlan.TRANSCODE_AUDIO
-            }
-    }
+fun classifyForCast(profile: CastStreamProfile): CastPlan = when (profile.video) {
+    CastVideoCodec.HEVC -> CastPlan.TRANSCODE_VIDEO
+    CastVideoCodec.OTHER -> CastPlan.MIRROR
+    CastVideoCodec.H264, CastVideoCodec.UNKNOWN ->
+        when (profile.audio) {
+            CastAudioCodec.AAC -> CastPlan.REMUX
+            CastAudioCodec.AC3,
+            CastAudioCodec.EAC3,
+            CastAudioCodec.OTHER,
+            CastAudioCodec.UNKNOWN,
+            -> CastPlan.TRANSCODE_AUDIO
+        }
+}

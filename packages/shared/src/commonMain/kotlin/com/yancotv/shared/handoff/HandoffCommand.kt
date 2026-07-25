@@ -140,50 +140,46 @@ fun HandoffItem.toEpisodePlayable(): Playable.Episode? {
  * [userAgent] / [referer] are the per-source values the sender already resolves
  * locally, forwarded so the receiver can satisfy gated providers (MK.26.A.4).
  */
-fun Playable.toHandoffItem(
-    userAgent: String? = null,
-    referer: String? = null,
-): HandoffItem =
-    when (this) {
-        is Playable.Channel ->
-            HandoffItem(
-                id = id,
-                sourceId = sourceId,
-                kind = HandoffKind.CHANNEL,
-                title = title,
-                streamUrl = streamUrl,
-                artworkUrl = artworkUrl,
-                groupName = groupName,
-                tvgId = tvgId,
-                userAgent = userAgent,
-                referer = referer,
-            )
+fun Playable.toHandoffItem(userAgent: String? = null, referer: String? = null): HandoffItem = when (this) {
+    is Playable.Channel ->
+        HandoffItem(
+            id = id,
+            sourceId = sourceId,
+            kind = HandoffKind.CHANNEL,
+            title = title,
+            streamUrl = streamUrl,
+            artworkUrl = artworkUrl,
+            groupName = groupName,
+            tvgId = tvgId,
+            userAgent = userAgent,
+            referer = referer,
+        )
 
-        is Playable.Movie ->
-            HandoffItem(
-                id = id,
-                sourceId = sourceId,
-                kind = HandoffKind.MOVIE,
-                title = title,
-                streamUrl = streamUrl,
-                artworkUrl = artworkUrl,
-                groupName = groupName,
-                userAgent = userAgent,
-                referer = referer,
-            )
+    is Playable.Movie ->
+        HandoffItem(
+            id = id,
+            sourceId = sourceId,
+            kind = HandoffKind.MOVIE,
+            title = title,
+            streamUrl = streamUrl,
+            artworkUrl = artworkUrl,
+            groupName = groupName,
+            userAgent = userAgent,
+            referer = referer,
+        )
 
-        is Playable.Episode ->
-            HandoffItem(
-                id = id,
-                sourceId = sourceId,
-                kind = HandoffKind.EPISODE,
-                title = title,
-                streamUrl = streamUrl,
-                artworkUrl = artworkUrl,
-                seriesId = seriesId,
-                seasonNumber = seasonNumber,
-                episodeNumber = episodeNumber,
-                userAgent = userAgent,
-                referer = referer,
-            )
-    }
+    is Playable.Episode ->
+        HandoffItem(
+            id = id,
+            sourceId = sourceId,
+            kind = HandoffKind.EPISODE,
+            title = title,
+            streamUrl = streamUrl,
+            artworkUrl = artworkUrl,
+            seriesId = seriesId,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            userAgent = userAgent,
+            referer = referer,
+        )
+}

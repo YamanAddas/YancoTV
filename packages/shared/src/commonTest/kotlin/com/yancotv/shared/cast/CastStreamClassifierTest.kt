@@ -4,8 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CastStreamClassifierTest {
-    private fun plan(video: CastVideoCodec, audio: CastAudioCodec) =
-        classifyForCast(CastStreamProfile(video, audio))
+    private fun plan(video: CastVideoCodec, audio: CastAudioCodec) = classifyForCast(CastStreamProfile(video, audio))
 
     @Test
     fun h264AacIsCheapRemux() {

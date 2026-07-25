@@ -18,12 +18,7 @@ import com.yancotv.shared.types.ContentType
  * release-noise (BluRay / x265 / DDP5.1 / etc.) gets stripped after.
  */
 
-internal data class SubtitleQueryBundle(
-    val query: String,
-    val season: Int?,
-    val episode: Int?,
-    val type: String?,
-)
+internal data class SubtitleQueryBundle(val query: String, val season: Int?, val episode: Int?, val type: String?)
 
 /**
  * For series episodes: `controller.currentItem` is a synthesized MOVIE-typed
@@ -87,7 +82,10 @@ internal val SUBTITLE_PREFIX_NOISE = listOf(
 )
 
 internal val SUBTITLE_RELEASE_NOISE = listOf(
-    Regex("""\b(?:BluRay|BDRip|BRRip|WEB-?DL|WEB-?Rip|HDRip|DVDRip|HDTV|PDTV|CAM|TS|TC|SCR|REMUX|PROPER|REPACK|LIMITED|INTERNAL|EXTENDED|UNRATED|IMAX|OPEN\.?MATTE)\b""", RegexOption.IGNORE_CASE),
+    Regex(
+        """\b(?:BluRay|BDRip|BRRip|WEB-?DL|WEB-?Rip|HDRip|DVDRip|HDTV|PDTV|CAM|TS|TC|SCR|REMUX|PROPER|REPACK|LIMITED|INTERNAL|EXTENDED|UNRATED|IMAX|OPEN\.?MATTE)\b""",
+        RegexOption.IGNORE_CASE,
+    ),
     Regex("""\b(?:H\.?265|H\.?264|HEVC|AVC|AAC|AC3|DTS|DDP?5\.1|DD5\.1|FLAC|OPUS|TrueHD|Atmos)\b""", RegexOption.IGNORE_CASE),
     Regex("""\b(?:x264|x265|xvid|divx|10bit|8bit)\b""", RegexOption.IGNORE_CASE),
     Regex("""\b(?:5\.1|7\.1|2\.0)\b"""),

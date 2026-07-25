@@ -145,14 +145,14 @@ val appModule =
         single {
             HandoffClient(
                 http =
-                    KtorHttpClient(OkHttp) {
-                        engine {
-                            config {
-                                connectTimeout(3, TimeUnit.SECONDS)
-                                readTimeout(10, TimeUnit.SECONDS)
-                            }
+                KtorHttpClient(OkHttp) {
+                    engine {
+                        config {
+                            connectTimeout(3, TimeUnit.SECONDS)
+                            readTimeout(10, TimeUnit.SECONDS)
                         }
-                    },
+                    }
+                },
             )
         }
         single {

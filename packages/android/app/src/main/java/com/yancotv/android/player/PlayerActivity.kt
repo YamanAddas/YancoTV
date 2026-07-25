@@ -131,6 +131,7 @@ class PlayerActivity : AppCompatActivity() {
     private val favoritesRepo: com.yancotv.shared.favorites.FavoritesRepository by inject()
     private val contentRepo: com.yancotv.shared.content.ContentRepository by inject()
     private val castController: com.yancotv.android.cast.CastController by inject()
+
     // Guard against re-entering autoplay during the small STATE_ENDED → next
     // episode prepare window where ExoPlayer can fire ENDED a second time.
     // Reset whenever a new MediaItem starts (STATE_READY).
@@ -308,6 +309,7 @@ class PlayerActivity : AppCompatActivity() {
     // the listener on the released instance.
     private var attachedPlayer: ExoPlayer? = null
     private var controllerVisible = false
+
     // Long-press CENTER → options overlay (Google TV remotes lack MENU).
     private var longPressJob: Job? = null
     private var longPressFired = false
@@ -1808,10 +1810,11 @@ class PlayerActivity : AppCompatActivity() {
         // not found" copy made the user assume the app is broken; tell
         // them the truth instead.
         val isCatchup = controller.currentItem.value?.id?.startsWith("catchup:") == true
-        val isCatchup404 = isCatchup && (
-            error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
-                error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
-            )
+        val isCatchup404 = isCatchup &&
+            (
+                error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+                    error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+                )
         val title = when {
             isCatchup404 -> "This catch-up has expired"
             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
@@ -2178,10 +2181,9 @@ class PlayerActivity : AppCompatActivity() {
      * normal dispatch chain so the controller's own focus traversal keeps
      * working once the controller is visible.
      */
-    private fun isCenterKey(keyCode: Int): Boolean =
-        keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-            keyCode == KeyEvent.KEYCODE_ENTER ||
-            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+    private fun isCenterKey(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+        keyCode == KeyEvent.KEYCODE_ENTER ||
+        keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // ── Long-press CENTER → options overlay (Google TV lacks MENU) ──
@@ -2205,8 +2207,10 @@ class PlayerActivity : AppCompatActivity() {
             return true
         }
         // Repeats while held — consume so PlayerView doesn't act on them.
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 &&
-            isCenterKey(event.keyCode) && longPressTracking
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            event.repeatCount > 0 &&
+            isCenterKey(event.keyCode) &&
+            longPressTracking
         ) {
             return true
         }
@@ -2231,8 +2235,11 @@ class PlayerActivity : AppCompatActivity() {
             // short-press action (show controller / toggle dock) is deferred
             // to ACTION_UP. If the user holds ≥500 ms the timer fires
             // showOptionsV2() instead.
-            if (event.repeatCount == 0 && isCenterKey(event.keyCode) &&
-                !controllerVisible && noOverlay && !chromeUp &&
+            if (event.repeatCount == 0 &&
+                isCenterKey(event.keyCode) &&
+                !controllerVisible &&
+                noOverlay &&
+                !chromeUp &&
                 !channelZapState.visible.value
             ) {
                 longPressJob?.cancel()

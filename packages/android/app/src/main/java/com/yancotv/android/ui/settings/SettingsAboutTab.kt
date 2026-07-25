@@ -289,9 +289,9 @@ fun SettingsAboutTab(
             SettingsToggleRow(
                 label = "Send crash reports",
                 description =
-                    "If something crashes, send a stack trace + device model + OS version " +
-                        "to our error tracker so we can fix it. No content, no playlist URLs, " +
-                        "no credentials. Off = nothing leaves the device.",
+                "If something crashes, send a stack trace + device model + OS version " +
+                    "to our error tracker so we can fix it. No content, no playlist URLs, " +
+                    "no credentials. Off = nothing leaves the device.",
                 checked = crashReportsEnabled,
                 onCheckedChange = { enabled ->
                     crashReportsEnabled = enabled

@@ -456,7 +456,6 @@ private fun ModeRow(title: String, badge: String?, subtitle: String, detail: Str
     }
 }
 
-
 /**
  * Build an initial-URI hint for the SAF folder picker that points at
  * the primary external storage volume's root. On Fire TV the stock

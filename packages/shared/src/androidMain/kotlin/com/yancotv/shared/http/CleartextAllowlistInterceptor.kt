@@ -1,10 +1,10 @@
 package com.yancotv.shared.http
 
+import java.net.UnknownHostException
 import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import java.net.UnknownHostException
 
 /**
  * OkHttp interceptor that enforces the application-layer cleartext
@@ -50,9 +50,7 @@ import java.net.UnknownHostException
  * @see CleartextAllowlist contract.
  * @see cleartextAllowlistFromSources derivation from sources list.
  */
-class CleartextAllowlistInterceptor(
-    private val allowlistProvider: () -> CleartextAllowlist,
-) : Interceptor {
+class CleartextAllowlistInterceptor(private val allowlistProvider: () -> CleartextAllowlist) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val req = chain.request()
         val scheme = req.url.scheme.lowercase()
@@ -86,10 +84,9 @@ class CleartextAllowlistInterceptor(
             ).build()
     }
 
-    private fun buildDenialBody(host: String, fullUrl: String): String =
-        "Cleartext HTTP refused at the application layer for host '$host'. " +
-            "Add a Source with this host as its URL to permit it. " +
-            "Request: ${redactCredentials(fullUrl)}"
+    private fun buildDenialBody(host: String, fullUrl: String): String = "Cleartext HTTP refused at the application layer for host '$host'. " +
+        "Add a Source with this host as its URL to permit it. " +
+        "Request: ${redactCredentials(fullUrl)}"
 }
 
 /**
@@ -99,6 +96,7 @@ class CleartextAllowlistInterceptor(
  * provided so future call sites can throw / catch this explicitly if
  * the synthetic-response approach proves inconvenient.
  */
-class CleartextNotAllowedException(host: String) : UnknownHostException(
-    "Cleartext HTTP refused for host '$host' (not in application-layer allow-list).",
-)
+class CleartextNotAllowedException(host: String) :
+    UnknownHostException(
+        "Cleartext HTTP refused for host '$host' (not in application-layer allow-list).",
+    )

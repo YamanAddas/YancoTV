@@ -1,13 +1,13 @@
 package com.yancotv.shared.parsers
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
 import kotlinx.io.Source
 import kotlinx.io.buffered
 import kotlinx.io.writeString
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * MB-230 regression cover.
@@ -35,7 +35,7 @@ class M3uLineSourceTest {
             "crlf" to "#EXTM3U\r\n#EXTINF:-1,One\r\nhttp://a\r\n",
             "cr only" to "#EXTM3U\r#EXTINF:-1,One\rhttp://a\r",
             "mixed endings" to "#EXTM3U\r\n#EXTINF:-1,One\nhttp://a\r#EXTINF:-1,Two\r\nhttp://b",
-            "bom" to "﻿#EXTM3U\n#EXTINF:-1,One\nhttp://a\n",
+            "bom" to "#EXTM3U\n#EXTINF:-1,One\nhttp://a\n",
             "bom + crlf" to "﻿#EXTM3U\r\n#EXTINF:-1,One\r\nhttp://a\r\n",
             "no trailing newline" to "#EXTM3U\n#EXTINF:-1,One\nhttp://a",
             "blank lines" to "#EXTM3U\n\n\n#EXTINF:-1,One\n\nhttp://a\n\n",
