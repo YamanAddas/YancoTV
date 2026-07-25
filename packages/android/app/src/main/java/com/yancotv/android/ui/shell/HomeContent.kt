@@ -401,6 +401,32 @@ fun HomeContent(
             )
             return@Column
         }
+        // MB-293 — the third empty state: sources exist, nothing failed, a
+        // sync is RUNNING, and no content has landed yet. That is a new user
+        // watching their first import, and it was the one case with no
+        // branch: every rail below renders nothing, so this Column ended up
+        // empty with no focusable child at all. `mainContentFocus.requestFocus()`
+        // in HomeScreen then finds no target and silently fails, leaving the
+        // D-pad dead until the user presses BACK — for the whole several
+        // minutes a large catalog takes to import on a Fire TV Stick. The
+        // app's first impression was a black screen ignoring the remote.
+        //
+        // Gated on an ACTIVE sync deliberately. `isTotallyEmpty` is also
+        // briefly true on every cold launch while the rail effects fill (the
+        // same window the `hasSources` probe above exists to paper over), so
+        // an ungated branch would flash "your library is empty" at returning
+        // users — precisely the "app forgot my sources" impression that
+        // comment warns about. With the gate, the worst a returning user can
+        // see is an accurate "Importing <source>" for a few frames.
+        val activeSync = syncState
+        if (isTotallyEmpty && hasSources && activeSync != null) {
+            FirstSyncCard(
+                active = activeSync,
+                onOpenSources = onAddSource,
+                modifier = Modifier.padding(horizontal = Space.section),
+            )
+            return@Column
+        }
 
         if (heroSlides.isNotEmpty()) {
             HomeHero(
@@ -1459,6 +1485,81 @@ private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (
                     Spacer(Modifier.height(Space.lg))
                     com.yancotv.android.ui.components.YancoPrimaryButton(
                         onClick = onFix,
+                        size = com.yancotv.android.ui.components.ButtonSize.Standard,
+                    ) {
+                        Icon(
+                            imageVector = YancoIcons.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(text = "Open Sources")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * MB-293 — "the first sync is running and nothing has landed yet".
+ *
+ * The button is the focus anchor first and a shortcut second: the bug this
+ * fixes was not the missing copy, it was that Home had no focusable child
+ * at all in this state, so `requestFocus()` failed and the remote went
+ * dead for the duration of the import.
+ *
+ * Progress text stays honest about what we actually know. The Xtream
+ * writer reports a running count with no denominator (its `total` is 0
+ * until the catalog finishes), so this shows the coordinator's own phase
+ * message rather than inventing a percentage or a fake "x of y".
+ */
+@Composable
+private fun FirstSyncCard(
+    active: com.yancotv.android.sources.SourceSyncCoordinator.Active,
+    onOpenSources: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalYancoPalette.current
+    HexSurface(
+        shape = YancoShapes.CutCornerCard,
+        focused = false,
+        bevelInset = 4.dp,
+        modifier = modifier.fillMaxWidth().height(240.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(palette.BackgroundRaised, palette.BackgroundElevated),
+                    ),
+                ).padding(horizontal = Space.xxxl, vertical = Space.xxl),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Text(
+                    text = "SETTING UP",
+                    color = palette.Accent,
+                    style = YancoType.Overline,
+                )
+                Text(
+                    text = "Importing “${active.sourceName}”",
+                    color = palette.TextPrimary,
+                    style = YancoType.TitleL,
+                    maxLines = 2,
+                )
+                Spacer(Modifier.height(Space.xs))
+                Text(
+                    text =
+                    active.progress.message?.takeIf { it.isNotBlank() }
+                        ?: "This can take a few minutes on a large playlist.",
+                    color = palette.TextSecondary,
+                    style = YancoType.Body,
+                    maxLines = 3,
+                )
+                if (onOpenSources != null) {
+                    Spacer(Modifier.height(Space.lg))
+                    com.yancotv.android.ui.components.YancoPrimaryButton(
+                        onClick = onOpenSources,
                         size = com.yancotv.android.ui.components.ButtonSize.Standard,
                     ) {
                         Icon(
