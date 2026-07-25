@@ -15,6 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -107,14 +111,23 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
                         cursorColor = LocalYancoPalette.current.Accent,
                     ),
                 )
+                // MK.28.8 (MB-279) — live region so TalkBack announces
+                // "Incorrect PIN" / the lockout countdown; without it the
+                // field clears and the Unlock button disables in silence.
                 if (lockoutSec > 0) {
                     Text(
                         text = "Too many attempts. Try again in ${lockoutSec}s.",
                         color = LocalYancoPalette.current.Error,
                         fontSize = 12.sp,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
                 } else if (error != null) {
-                    Text(text = error!!, color = LocalYancoPalette.current.Error, fontSize = 12.sp)
+                    Text(
+                        text = error!!,
+                        color = LocalYancoPalette.current.Error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
                 }
             }
         },

@@ -62,6 +62,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
@@ -887,11 +889,16 @@ private fun ActionRow(
         // it's the picked state, distinct from a generic secondary action.
         // The icon flips outline ↔ filled and the label stays a single
         // short word so the button keeps the same width whether on or off.
+        // MK.28.8 (MB-275) — state-aware TalkBack label ("In favorites" /
+        // "Favorite"), mirroring FeatureHero's TonalCta and the MB-59
+        // InfoPanel fix. The visible Text stays "Favorite" in both states
+        // so the button width never changes.
         if (isFavorite) {
             YancoPrimaryButton(
                 onClick = onFavoriteToggle,
                 size = buttonSize,
                 translucent = true,
+                modifier = Modifier.semantics { contentDescription = "In favorites" },
             ) {
                 Icon(
                     imageVector = YancoIcons.StarFilled,
@@ -906,7 +913,11 @@ private fun ActionRow(
                 )
             }
         } else {
-            YancoSecondaryButton(onClick = onFavoriteToggle, size = buttonSize) {
+            YancoSecondaryButton(
+                onClick = onFavoriteToggle,
+                size = buttonSize,
+                modifier = Modifier.semantics { contentDescription = "Favorite" },
+            ) {
                 Icon(
                     imageVector = YancoIcons.StarOutline,
                     contentDescription = null,

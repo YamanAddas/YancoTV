@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -469,6 +471,9 @@ private fun ListTabChip(label: String, selected: Boolean, onClick: () -> Unit, o
                     onClick()
                 }
             }
+            // MK.28.8 (MB-276) — announce selected state to TalkBack so the
+            // active list tab is distinguishable from the rest.
+            .semantics { this.selected = selected }
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(

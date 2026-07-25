@@ -566,9 +566,15 @@ class PlaybackController(
      *     without hitting a lifecycle hook.
      */
     fun play(list: List<ContentItem>, startIndex: Int, fromStart: Boolean = false) {
-        // Consume any handoff-forwarded headers staged by playHandoff; a plain
-        // local play (pending == null) clears the override so it can't leak.
-        handoffNetOverride = pendingHandoffOverride
+        // MK.28.8 (MB-282) — consume the staged handoff headers, but COMMIT
+        // them only on the NewTarget branch below. Pre-fix they were
+        // promoted before the launch decision, so a rejected or same-id
+        // handoff rewired the STILL-PLAYING local stream's UA/Referer (and a
+        // plain local re-tap of a playing handoff stream stripped its
+        // headers) — breaking segment fetches on header-gated providers
+        // with no visible cause. Reject/SameTarget leave the player's
+        // media untouched, so its headers must stay untouched too.
+        val pendingHandoff = pendingHandoffOverride
         pendingHandoffOverride = null
         when (playLaunchDecision(list, startIndex, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
@@ -591,6 +597,9 @@ class PlaybackController(
             PlayLaunchDecision.NewTarget -> {
                 // Different item: capture the outgoing offset before the queue swap.
                 if (_currentItem.value != null) persistResumePoint()
+                // MB-282 — a null pendingHandoff here is a normal local play
+                // and correctly clears any stale handoff override.
+                handoffNetOverride = pendingHandoff
                 _currentEpisode.value = null
                 _externalSubtitle = null
                 _queue.value = list
@@ -617,7 +626,9 @@ class PlaybackController(
      * if used as content_id (episodes live in their own table).
      */
     fun play(episode: Playable.Episode, fromStart: Boolean = false) {
-        handoffNetOverride = pendingHandoffOverride
+        // MB-282 — same commit-on-NewTarget-only contract as the list
+        // overload above.
+        val pendingHandoff = pendingHandoffOverride
         pendingHandoffOverride = null
         when (episodeLaunchDecision(episode, _currentItem.value?.id)) {
             PlayLaunchDecision.Reject -> return
@@ -637,6 +648,7 @@ class PlaybackController(
             }
             PlayLaunchDecision.NewTarget -> {
                 if (_currentItem.value != null) persistResumePoint()
+                handoffNetOverride = pendingHandoff
                 _currentEpisode.value = episode
                 _externalSubtitle = null
                 _queue.value = listOf(episode.toContentItemView())

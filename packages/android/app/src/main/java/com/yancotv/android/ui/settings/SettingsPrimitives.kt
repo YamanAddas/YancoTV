@@ -49,7 +49,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
@@ -409,6 +414,27 @@ internal fun SettingsSlider(
                             change.consume()
                             val next = valueForX(change.position.x)
                             if (next != currentValue) currentOnChange(next)
+                        }
+                    }
+                    // MK.28.8 (MB-278) — expose the slider to TalkBack: name
+                    // it with the current value + unit, publish the range so
+                    // it announces as an adjustable progress control, and
+                    // provide setProgress so AT can change the value (the
+                    // key/touch paths above are invisible to accessibility
+                    // services).
+                    .semantics {
+                        contentDescription = "$clampedValue$unit"
+                        progressBarRangeInfo =
+                            ProgressBarRangeInfo(
+                                current = clampedValue.toFloat(),
+                                range = range.first.toFloat()..range.last.toFloat(),
+                            )
+                        setProgress { target ->
+                            val stepped =
+                                (Math.round(target / step) * step)
+                                    .coerceIn(range.first, range.last)
+                            if (stepped != clampedValue) onValueChange(stepped)
+                            true
                         }
                     },
                 contentAlignment = Alignment.CenterStart,

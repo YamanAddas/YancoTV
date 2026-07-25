@@ -173,15 +173,27 @@ fun BrowseSection(
     // MK.20.3 — when the smart-grouping toggle is on, fork the rail's data
     // path: filter hidden first, run [com.yancotv.shared.content.CategoryTreeBuilder]
     // over the filtered list (provider-ordered already from MK.20.1), then
-    // flatten per the rail's expand state. Per-type expand state is kept in
-    // a rememberSaveable Set so flipping Live ↔ Movies preserves which
-    // parents the user opened. Process-death survival isn't critical (it's
-    // a UI nicety) so we accept that a Set<String> isn't trivially Saveable
-    // — we wrap it via the standard MutableStateFlow + remember pattern.
+    // flatten per the rail's expand state.
+    //
+    // MK.28.8 (MB-284) — the old comment here claimed a rememberSaveable
+    // Set that "preserves which parents the user opened" across Live ↔
+    // Movies flips; the code was plain remember(type) and preserved
+    // nothing. Now genuinely saveable (survives rotation / recreation via
+    // listSaver). Cross-type flips still reset it — HomeScreen wraps
+    // BrowseSection in key(contentType), which discards the subtree's
+    // saveable state by design; hoisting a per-type map to the shell is
+    // MK.27.B scope. The MK.20.3.2 plan text is corrected alongside this
+    // fix.
     val smartGroupingEnabled = general.smartGrouping
     val pinnedParentsByType by prefs.pinnedParentsFlow.collectAsState()
     val pinnedParents = pinnedParentsByType[type] ?: emptyList()
-    var expandedParents by remember(type) { mutableStateOf(emptySet<String>()) }
+    var expandedParents by rememberSaveable(
+        type,
+        saver = androidx.compose.runtime.saveable.listSaver(
+            save = { state -> state.value.toList() },
+            restore = { saved -> mutableStateOf(saved.toSet()) },
+        ),
+    ) { mutableStateOf(emptySet<String>()) }
     val railRows =
         remember(groupsState.toList(), hiddenGroups, smartGroupingEnabled, expandedParents, pinnedParents) {
             if (!smartGroupingEnabled) {

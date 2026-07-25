@@ -474,7 +474,13 @@ fun GuideScreen(
     val guidePinnedParentsByType by appPrefs.pinnedParentsFlow.collectAsState()
     // Guide is a live-only surface — pin list is keyed off ContentType.LIVE.
     val guidePinnedParents = guidePinnedParentsByType[com.yancotv.shared.types.ContentType.LIVE] ?: emptyList()
-    var guideExpandedParents by remember { mutableStateOf(emptySet<String>()) }
+    // MK.28.8 (MB-284) — saveable like BrowseSection's expand state.
+    var guideExpandedParents by androidx.compose.runtime.saveable.rememberSaveable(
+        saver = androidx.compose.runtime.saveable.listSaver(
+            save = { state -> state.value.toList() },
+            restore = { saved -> mutableStateOf(saved.toSet()) },
+        ),
+    ) { mutableStateOf(emptySet<String>()) }
     val guideRailRows =
         remember(groups, guideHiddenGroups, guideSmartEnabled, guideExpandedParents, guidePinnedParents) {
             if (!guideSmartEnabled) {

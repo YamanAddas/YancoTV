@@ -31,6 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -193,6 +196,9 @@ fun GuideSyncPanel(
                     text = busyLabel ?: subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
                     color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
+                    // MK.28.8 (MB-279) — live region so TalkBack announces
+                    // refresh started / finished / failed transitions.
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
             if (running || syncing) {
@@ -240,6 +246,9 @@ fun GuideSyncPanel(
                 text = subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
                 color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                 fontSize = 13.sp,
+                // MK.28.8 (MB-279) — live region so TalkBack announces
+                // refresh started / finished / failed transitions.
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
             if (busyLabel != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.R
@@ -420,7 +421,12 @@ private fun SidebarRow(
                     role = Role.Tab,
                     onClick = onClick,
                 )
-                .semantics { contentDescription = section.label }
+                // MK.28.8 (MB-276) — announce selected state to TalkBack so
+                // the current section is distinguishable from the rest.
+                .semantics {
+                    contentDescription = section.label
+                    this.selected = selected
+                }
                 .padding(horizontal = Space.md, vertical = Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.md),

@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -945,6 +946,8 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
             ).semantics {
                 role = Role.Tab
                 contentDescription = "${entry.label} settings tab"
+                // MK.28.8 (MB-276) — announce selected state to TalkBack.
+                this.selected = selected
             },
     ) {
         if (selected) {

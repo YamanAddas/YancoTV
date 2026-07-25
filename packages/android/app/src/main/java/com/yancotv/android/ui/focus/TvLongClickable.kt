@@ -6,6 +6,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 
 /**
  * MB-98 — register `onLongPress` as the active context-menu action while
@@ -47,11 +49,22 @@ import androidx.compose.ui.focus.onFocusChanged
 fun Modifier.tvLongClickable(onLongPress: () -> Unit): Modifier {
     val token = remember { Any() }
     val current by rememberUpdatedState(onLongPress)
-    return this.onFocusChanged { state ->
-        if (state.isFocused) {
-            TvContextActionState.set(token) { current() }
-        } else {
-            TvContextActionState.clearIf(token)
+    return this
+        // MK.28.8 (MB-281) — expose the context menu as a labelled long-click
+        // action in the semantics tree. The Activity key-timer path below is
+        // invisible to accessibility services, so without this the primitive
+        // contributes nothing TalkBack can surface or invoke.
+        .semantics {
+            onLongClick(label = "Options") {
+                current()
+                true
+            }
         }
-    }
+        .onFocusChanged { state ->
+            if (state.isFocused) {
+                TvContextActionState.set(token) { current() }
+            } else {
+                TvContextActionState.clearIf(token)
+            }
+        }
 }

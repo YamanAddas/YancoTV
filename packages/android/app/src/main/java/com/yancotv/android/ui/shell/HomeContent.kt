@@ -127,6 +127,7 @@ fun HomeContent(
     epg: EpgRepository = koinInject(),
     content: ContentRepository = koinInject(),
     sources: com.yancotv.shared.sources.SourceRepository = koinInject(),
+    syncCoordinator: com.yancotv.android.sources.SourceSyncCoordinator = koinInject(),
 ) {
     // Audit catch — without this, on every cold launch with a populated
     // DB the five LaunchedEffects below start with empty collections,
@@ -248,7 +249,12 @@ fun HomeContent(
     // by tvgId, so we filter the liveFavorites list back into the two
     // rails (on-now = programmes where start<=now<end; up-next = next
     // programme starting within 2h).
-    LaunchedEffect(liveFavorites) {
+    // MK.28.8 (MB-283) — re-pair every 5 minutes (nowSec already ticks at
+    // 30s; bucketing by 300s re-keys this effect each 5 min) so ended
+    // programmes leave "On Now" during a long Home dwell instead of
+    // sticking until a favorites change happened to re-trigger it.
+    val nowBucket = nowSec.value / 300
+    LaunchedEffect(liveFavorites, nowBucket) {
         if (liveFavorites.isEmpty()) {
             Snapshot.withMutableSnapshot {
                 onNowItems.clear()
@@ -299,7 +305,24 @@ fun HomeContent(
     // contains a matching language token. If the filtered result is too
     // thin (< 8), fall back to the unfiltered list so the rail never
     // collapses on a small catalog.
-    LaunchedEffect(Unit) {
+    // MK.28.8 (MB-283) — was LaunchedEffect(Unit): a one-shot read (the
+    // same defect class the Continue Watching comment above documents).
+    // With auto-sync kicking at launch while Home is the landing section,
+    // the rail read before/mid-sync and never saw the new catalog — and a
+    // title hidden via parental controls stayed visible until remount.
+    // Re-keyed on sync completion (active → null edge) and the hidden set.
+    val syncState by syncCoordinator.state.collectAsState()
+    var syncGeneration by remember { mutableStateOf(0) }
+    var sawActiveSync by remember { mutableStateOf(false) }
+    LaunchedEffect(syncState) {
+        if (syncState != null) {
+            sawActiveSync = true
+        } else if (sawActiveSync) {
+            sawActiveSync = false
+            syncGeneration++
+        }
+    }
+    LaunchedEffect(syncGeneration, hiddenIds) {
         val combined =
             withContext(Dispatchers.IO) {
                 runCatching {

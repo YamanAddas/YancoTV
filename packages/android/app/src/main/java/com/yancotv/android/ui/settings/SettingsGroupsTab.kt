@@ -2,7 +2,6 @@ package com.yancotv.android.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -260,11 +260,17 @@ private fun GroupRow(name: String, hidden: Boolean, onToggle: (Boolean) -> Unit)
                 color = if (focused) palette.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(0.dp),
             )
-            .clickable(
+            // MK.28.8 (MB-277) — Modifier.toggleable + Role.Switch per the
+            // SettingsToggleRow MK.29.3 pattern, so TalkBack announces the
+            // row's on/off state instead of a stateless "button". The switch
+            // renders "visible" (checked = !hidden), so the toggleable value
+            // matches that and onValueChange maps back to the hidden flag.
+            .toggleable(
+                value = !hidden,
                 interactionSource = interaction,
                 indication = null,
-                role = Role.Button,
-                onClick = { onToggle(!hidden) },
+                role = Role.Switch,
+                onValueChange = { visible -> onToggle(!visible) },
             )
             .padding(horizontal = 22.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -309,11 +315,15 @@ private fun ParentPinRow(label: String, prefixCode: String, kind: PrefixCatalog.
                 color = if (focused) palette.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(0.dp),
             )
-            .clickable(
+            // MK.28.8 (MB-277) — Modifier.toggleable + Role.Switch per the
+            // SettingsToggleRow MK.29.3 pattern, so TalkBack announces the
+            // pinned on/off state instead of a stateless "button".
+            .toggleable(
+                value = pinned,
                 interactionSource = interaction,
                 indication = null,
-                role = Role.Button,
-                onClick = { onToggle(!pinned) },
+                role = Role.Switch,
+                onValueChange = onToggle,
             )
             .padding(horizontal = 22.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

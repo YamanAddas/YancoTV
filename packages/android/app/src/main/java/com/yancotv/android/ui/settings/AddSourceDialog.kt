@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -458,6 +460,9 @@ private fun TypeChip(label: String, description: String, selected: Boolean, onSe
             .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
             .focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onSelect)
+            // MK.28.8 (MB-276) — announce selected state to TalkBack so the
+            // chosen source type is distinguishable from the rest.
+            .semantics { this.selected = selected }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

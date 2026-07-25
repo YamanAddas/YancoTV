@@ -1219,7 +1219,23 @@ private fun ContentOrb(
                         if (distance == 0) onActivate() else onFocus()
                     },
                     onLongClick = onLongPress,
-                ).semantics(mergeDescendants = true) { contentDescription = title },
+                )
+                // MK.28.8 (MB-280) — fold locked + watch state into the
+                // description: the explicit contentDescription overrides
+                // merged descendant text, so the icon-only lock badge and
+                // the watched / resume badges were dropped from the
+                // TalkBack announcement.
+                .semantics(mergeDescendants = true) {
+                    contentDescription =
+                        buildString {
+                            append(title)
+                            if (isLocked) append(", locked")
+                            when {
+                                progress?.isFinished() == true -> append(", watched")
+                                progress != null -> append(", in progress")
+                            }
+                        }
+                },
             contentAlignment = Alignment.Center,
         ) {
             if (item.logoUrl?.isNotBlank() == true) {

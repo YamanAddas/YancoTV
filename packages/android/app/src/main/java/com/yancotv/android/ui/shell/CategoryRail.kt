@@ -48,6 +48,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
@@ -419,7 +420,12 @@ private fun HexPillRow(
                 }
             }.focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = "Category: $label" }
+            // MK.28.8 (MB-276) — announce selected state to TalkBack, same
+            // as the phone twin CategoryChipBar.
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Category: $label"
+                this.selected = selected
+            }
             .padding(
                 start = if (indented) Space.section else Space.lg,
                 end = Space.lg,

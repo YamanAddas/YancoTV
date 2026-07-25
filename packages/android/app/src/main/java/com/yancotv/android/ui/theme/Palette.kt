@@ -71,7 +71,12 @@ val FrostedEmerald =
         TextPrimary = Color(0xFFF0FFF6),
         TextSecondary = Color(0xFFA7B8AF),
         TextMuted = Color(0xFF5F7068),
-        TextFaint = Color(0xFF3A4A43),
+        // MK.28.8 (MB-285) — was 0xFF3A4A43 (~1.9:1 on BackgroundDeep, far
+        // below any WCAG tier yet used for real instructional/placeholder
+        // text). Raised to ~3:1 (large-text AA) across every palette while
+        // staying below TextMuted so the type ramp keeps its hierarchy. A
+        // full ramp rework to 4.5:1 needs an on-device visual pass — open.
+        TextFaint = Color(0xFF56675F),
         Accent = Color(0xFF00E28A),
         AccentSoft = Color(0xFF66F0B5),
         AccentDeep = Color(0xFF00B872),
@@ -115,7 +120,8 @@ val MidnightSapphire =
         TextPrimary = Color(0xFFEDF3FF),
         TextSecondary = Color(0xFFA7B3CC),
         TextMuted = Color(0xFF5F6B85),
-        TextFaint = Color(0xFF3A4358),
+        // MB-285 — see FrostedEmerald.
+        TextFaint = Color(0xFF565F78),
         Accent = Color(0xFF4A8CFF),
         AccentSoft = Color(0xFF8FB6FF),
         AccentDeep = Color(0xFF2A6BD8),
@@ -146,7 +152,8 @@ val WarmAmber =
         TextPrimary = Color(0xFFFFF3E5),
         TextSecondary = Color(0xFFC9B5A0),
         TextMuted = Color(0xFF7A6A5C),
-        TextFaint = Color(0xFF4A3F35),
+        // MB-285 — see FrostedEmerald.
+        TextFaint = Color(0xFF6E5F52),
         Accent = Color(0xFFFFB14A),
         AccentSoft = Color(0xFFFFD18F),
         AccentDeep = Color(0xFFE08826),
@@ -235,7 +242,8 @@ val Monochrome =
         TextPrimary = Color(0xFFF5F5F5),
         TextSecondary = Color(0xFFB8B8B8),
         TextMuted = Color(0xFF6E6E6E),
-        TextFaint = Color(0xFF424242),
+        // MB-285 — see FrostedEmerald.
+        TextFaint = Color(0xFF616161),
         Accent = Color(0xFFE0E0E0),
         AccentSoft = Color(0xFFFFFFFF),
         AccentDeep = Color(0xFFB0B0B0),
