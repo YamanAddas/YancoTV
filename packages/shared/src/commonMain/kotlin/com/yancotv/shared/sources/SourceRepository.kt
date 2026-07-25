@@ -309,11 +309,48 @@ class SourceRepository(
             logger.info("syncSource[$id] done inserted=$inserted")
             send(SyncProgress(SyncProgress.Phase.DONE, inserted, inserted))
         } catch (ce: CancellationException) {
-            // User pressed Cancel (or scope was torn down). Leave the source's
-            // last-sync-error alone — cancellation isn't a "failure" the user
-            // needs to be told about on next open. Must rethrow so the Flow
-            // shuts down instead of being treated as a normal error emission.
+            // User pressed Cancel (or scope was torn down). Cancellation isn't
+            // a "failure" the user needs to be told about on next open, so the
+            // error text stays null. Must rethrow so the Flow shuts down
+            // instead of being treated as a normal error emission.
+            //
+            // MB-291 — but the STORED COUNT must not be left lying. The inner
+            // sync's `catch (t: Throwable)` also catches CancellationException
+            // (it is a Throwable) and runs `bulk.abortSource`, which drops
+            // every row written so far — and `prepareSource` already deleted
+            // the previous catalog before the first chunk. So a cancel taken
+            // after prepareSource leaves the source EMPTY while
+            // `channel_count` still holds the pre-sync figure: the Sources
+            // screen cheerfully reports "12.3k items - Ready" over an empty
+            // table, and Home/Guide render nothing with no explanation.
+            //
+            // Re-reading the real count is what makes this correct in BOTH
+            // directions — a cancel during the network fetch (before
+            // prepareSource) leaves the old catalog intact, and a blanket
+            // `channel_count = 0` would then be just as much of a lie in the
+            // other direction. Ground truth is right either way.
+            //
+            // Blocking SQLDelight calls still run inside a cancelled
+            // coroutine (cancellation only interrupts suspension points), so
+            // this write lands before the rethrow.
             logger.info("syncSource[$id] cancelled")
+            runCatching {
+                val remaining = db.contentQueries.countBySource(id).executeAsOne()
+                if (remaining != source.channelCount.toLong()) {
+                    db.sourcesQueries.updateSyncResult(
+                        last_synced = source.lastSynced,
+                        // Cancelling after the catalog was cleared is the one
+                        // cancellation the user does need surfaced: the source
+                        // is now empty and only a re-sync restores it.
+                        last_sync_error =
+                        if (remaining == 0L) "Sync cancelled before any content was written - re-sync to restore this source." else null,
+                        channel_count = remaining,
+                        updated_at = clock(),
+                        id = id,
+                    )
+                    logger.info("syncSource[$id] cancelled — channel_count corrected to $remaining")
+                }
+            }.onFailure { logger.warn("syncSource[$id] cancel-path count refresh failed: ${it.message}") }
             throw ce
         } catch (t: Throwable) {
             // Redact credentials before this string lands in three
