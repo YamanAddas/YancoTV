@@ -674,7 +674,7 @@ This collapses MK.20 to almost-pure read-side work. One small migration only if 
 | # | Task | Bucket | DoD |
 |---|---|---|---|
 | MK.20.3.1 | New preference `AppPreferences.smartCategoryGrouping: Flow<Boolean>` (default **off** until catalog is field-tested). Settings screen row: "Smart category grouping" with subtitle "Bucket categories by language / region (e.g. AR \| → Arabic)". | 🟢 wire | Toggle persists; default off |
-| MK.20.3.2 | `BrowseSection` and `GuideScreen` switch on the preference: off → existing flat `groups()` call (Slice 20.1 already gives provider order); on → call `groupsHierarchical()` and flatten visible nodes per current expand/collapse state. Expand state held in `rememberSaveable(parentCode) { mutableStateOf(false) }` per parent — survives rotation, not process death (per-screen scope). | 🟡 glue | Toggle on → rail shows `▶ Arabic (12)` and `▶ USA (8)` rows; toggle off → flat rail unchanged |
+| MK.20.3.2 | `BrowseSection` and `GuideScreen` switch on the preference: off → existing flat `groups()` call (Slice 20.1 already gives provider order); on → call `groupsHierarchical()` and flatten visible nodes per current expand/collapse state. Expand state held in a `rememberSaveable` list-saver Set per section — survives rotation/recreation while the section stays mounted; a Live ↔ Movies type swap resets it because the shell remounts `BrowseSection` under `key(contentType)` (corrected 2026-07-25, MB-284; cross-type persistence deferred to MK.27.B). | 🟡 glue | Toggle on → rail shows `▶ Arabic (12)` and `▶ USA (8)` rows; toggle off → flat rail unchanged |
 | MK.20.3.3 | `CategoryRail` row composable branches on `CategoryNode` type. Parents render as a single pill with `▶`/`▼` glyph + count badge. CENTER on a parent toggles expand. Children render indented (or with a leading `↳` glyph — pick one in design pass). Per the MK.8 cascade-nav rule: own a fresh `PlacedFocusAnchor` inside `key(expandedSet.hashCode())` so expand/collapse remounts the visible-list scope cleanly. Refresh `requestFocus()` lands on the previously-focused row's new index after expand or, if it was a now-hidden child, falls back to its parent. | 🔴 new | All three MK.8 cascade-nav flows pass on Fire TV (sidebar→rail RIGHT, rail→content RIGHT/CENTER, type swap remount) |
 | MK.20.3.4 | `GroupPreferences` interaction rules: (a) leaf with `is_hidden=true` is skipped during tree build; (b) parent with all children hidden is omitted entirely (no empty dropdown); (c) `is_pinned` on a leaf floats it to root level (out of its parent bucket) — semantics: pinning is "promote to top" and parents are visual grouping, not membership; (d) pinning a parent is not yet supported (out of scope this slice — file [bugs.md MB-211](bugs.md) "pin a whole language bucket" follow-up if user asks). | 🟡 glue | Hide a child → not visible; hide all of Arabic's children → Arabic parent disappears; pin a child → moves to top of root list, retains pin glyph |
 | MK.20.3.5 | Test: snapshot-style unit test on the visible-flatten helper — asserts that `(tree, expandedSet, hiddenSet, pinnedSet) → List<CategoryRow>` produces the expected ordering for ≥6 cases (all collapsed, one expanded, parent fully hidden, pinned-child-floats, single-child-collapse, mixed). | 🔴 new | Helper is pure / pinned by tests so refactors can't regress the rules |
@@ -1805,6 +1805,96 @@ Shipped this pass:
 as v1.2.0. Users casting MP4/HTTPS movies (the Tier 0 path) are well-tested; users casting raw-TS live
 through Tier 1 either get a clean toast or a longer-running proxy session — flag if reports of OOM or
 hangs surface.
+
+---
+
+## MK.28 — Full-app audit + fix sweep (insets / touch / TV-focus / threading) — 2026-07-25
+
+> **Numbering note:** a few code comments that predate this section carry "MK.28.x" / "MK.30" / "MK.32"
+> sub-slice labels with no matching plan section (session-local numbering from earlier work — tile
+> progress, settings search, quick-start CTA). This section claims MK.28 canonically; those comments
+> refer to already-shipped work and are unrelated.
+
+User-driven audit (user report: "the screen extended to the lower edge where android controls are and I
+wasn't able to press on a button", plus a request to find everything else and make remote + touch smooth).
+A 14-agent workflow — 7 finder dimensions (window insets, touch UX, TV focus, threading, player lifecycle,
+accessibility, state/back-nav), each adversarially verified — produced **46 confirmed findings, 0 refuted**.
+The reported bug is **MB-242 (P0)**: targetSdk 35 makes Android 15+ enforce edge-to-edge and the shell had
+zero WindowInsets handling; on TV boxes with overlay nav bars the same edge controls are covered.
+
+Fix sweep shipped same-day as MK.28.1–MK.28.8 (one commit each) + this register. IDs MB-242…MB-285.
+
+### Fixed in this sweep
+
+| MB | P | Fix | Slice |
+|---|---|---|---|
+| MB-242 | P0 | Edge-to-edge insets: explicit `enableEdgeToEdge()` + `WindowInsets.safeDrawing` padding on the shell's interactive layer, search-overlay panel, and detail overlay; backgrounds stay full-bleed; insets are zero on TV so the Fire TV layout is unchanged | 28.1 |
+| MB-243 | P1 | PlayerActivity display-cutout mode `SHORT_EDGES` (video fills the notch on Android 9–14) + corner chrome (Back / zap bar / recording pill) offset by cutout insets so the camera hole never covers them on 15+ | 28.1 |
+| MB-244 | P2 | `windowSoftInputMode` adjustPan → adjustResize; safeDrawing (includes IME) resizes the shell instead of the keyboard covering fields | 28.1 |
+| MB-246 | P1 | ExoPlayer audio focus (`setAudioAttributes(USAGE_MEDIA, handleAudioFocus=true)`) — no more mixing over other apps, pauses on calls/assistant | 28.2 |
+| MB-247 | P1 | Stream-error RETRY reachable on TV: CENTER paths gated on the chrome overlay; LIVE zap keys still work under it | 28.2 |
+| MB-248 | P1 | `onStop` surface detach typed (`clearVideoSurfaceView(own SurfaceView)`) — stops stripping the MiniPlayer's re-attached surface on BACK from fullscreen; MB-119 sync-detach guarantee preserved | 28.2 |
+| MB-249 | P2 | Keep-screen-on playback-gated in PlayerActivity (window flag + layout `keepScreenOn` removed) — paused/error/sleep-timer lets the display sleep | 28.2 |
+| MB-250 | P1 | Guide reminder isSet/set/cancel off the main thread (blocked behind whole-import EPG transaction = ANR-class) | 28.3 |
+| MB-251 | P2 | Parental setPin/removePin/verifyPin call sites dispatch DB work to IO | 28.3 |
+| MB-252 | P2 | ReminderAlarmReceiver.markFired via goAsync + IO (receiver-ANR window during EPG import) | 28.3 |
+| MB-253 | P2 | SourceSyncCoordinator.activeJob race: @Volatile, cleared before the state gate and only by its own job — Cancel can no longer become a silent no-op | 28.3 |
+| MB-255 | P1 | Phone Settings BackHandler no longer swallows BACK forever (self-disables at root list) | 28.4 |
+| MB-256 | P1 | Launch-intent replay guard (recreation / recents no longer re-fires voice-search overlay or deep-link playback; QUERY extra consumed) | 28.4 |
+| MB-257 | P1 | AddSourceDialog full form + visibility `rememberSaveable` (survives app-switch for credentials + SAF picker round-trip) | 28.4 |
+| MB-258 | P2 | Remaining user-input state saveable: EPG URL drafts ×2, PIN setup fields, Favorites dialog flags | 28.4 |
+| MB-259 | P2 | SourceDetailScreen seed-once (recreation no longer silently reverts unsaved edits); `dirty` saveable | 28.4 |
+| MB-260 | P2 | Open detail page persisted by id + re-hydrated after recreation | 28.4 |
+| MB-261 | P2 | Recreation no longer kills the mini-preview (stop-on-section-change gated on genuine change) or clobbers restored panelFocus | 28.4 |
+| MB-262 | P1 | Search overlay traps D-pad focus (`focusGroup` + `exit = Cancel`, SeasonPickerOverlay pattern) — no more invisible activation of the shell behind the scrim | 28.5 |
+| MB-263 | P1 | ContentDetailScreen same trap — LEFT from Play no longer lands on the hidden sidebar / switches sections invisibly | 28.5 |
+| MB-264 | P1 | SettingsBackupTab focus-retry rewritten: actually requests focus, and the unbounded per-frame effect-restart chain (constant CPU churn, MB-229/230 aggravator) is gone | 28.5 |
+| MB-265 | P2 | Guide window-regain focus restore (BACK from fullscreen player no longer leaves a dead selector) | 28.5 |
+| MB-266 | P1 | Coverflow tap-to-select: tapping a non-centered orb selects it (preview pane / Favorite CTA / auto-preview finally follow touch); tap on centered orb activates; TV CENTER unchanged | 28.6 |
+| MB-267 | P1 | Pagination keys on scroll frontier too — touch can now load past item 100 of a category | 28.6 |
+| MB-268 | P1 | Orb touch long-press opens the channel context menu (rename/logo/lock/hide/share had no phone path) via combinedClickable | 28.6 |
+| MB-269 | P2 | BACK from an empty category no longer exits the app (back-chain armed on state, not just focus) | 28.6 |
+| MB-270 | P2 | Pressed-state feedback on orbs (first touch feedback in the app; app-wide rollout tracked below) | 28.6 |
+| MB-271 | P2 | SettingsSlider touch: tap-to-jump + drag-to-scrub on the track | 28.6 |
+| MB-272 | P1 | Fullscreen live player: Channels button in phone chrome opens the surf overlay (zapping had zero touch path); tap-on-video dismisses the open panel | 28.7 |
+| MB-273 | P2 | VOD dock remote-hint strip (OK HIDE / BACK glyphs) TV-only | 28.7 |
+| MB-274 | P2 | Quick-info (stream stats) touch entry: long-press the More button | 28.7 |
+| MB-275 | P1 | Detail-page favorite toggle announces state to TalkBack ("In favorites" / "Favorite", FeatureHero/MB-59 pattern) | 28.8 |
+| MB-276 | P2 | `selected` semantics on CategoryRail pill, sidebar rows, settings tabs, favorites list tabs, source-type chips, accent chips | 28.8 |
+| MB-277 | P2 | ParentPinRow + GroupRow as `toggleable(Role.Switch)` (state finally announced) | 28.8 |
+| MB-278 | P2 | SettingsSlider semantics: label, `progressBarRangeInfo`, `setProgress` action | 28.8 |
+| MB-279 | P2 | Live regions: EPG sync status/errors + PIN dialog errors announce (first `liveRegion` uses in the app) | 28.8 |
+| MB-280 | P2 | Coverflow orb descriptions include locked / watched / in-progress state | 28.8 |
+| MB-281 | P2 | TvLongClickable exposes an `onLongClick` semantics action so the context menu is reachable under TalkBack | 28.8 |
+| MB-282 | P2 | playHandoff header staging commits only on NewTarget — rejected/same-id handoffs (and local re-taps of a playing handoff stream) no longer rewire the live stream's UA/Referer | 28.8 |
+| MB-283 | P2 | Home "Recently added" re-reads after sync completion + hidden-set changes; On Now / Up Next re-pairs every 5 min so ended programmes leave the rail | 28.8 |
+| MB-284 | P2 | BrowseSection expand state genuinely `rememberSaveable` (survives rotation); MK.20.3.2 spec text corrected — cross-type persistence explicitly deferred to MK.27.B | 28.8 |
+| MB-285 | P2 | TextFaint raised from ~1.9:1 to ~3:1 contrast across all four palettes (was used for real instructional text) | 28.8 |
+
+### Filed open (deliberately not fixed in this sweep)
+
+| MB | P | What | Where it lands |
+|---|---|---|---|
+| MB-245 | P2 | Full type-ramp contrast rework (TextMuted is also below 4.5:1; MB-285 only lifted the worst tier to large-text AA). Needs an on-device visual pass with the user | Appearance polish w/ user sign-off |
+| MB-254 | P2 | RecordingScheduleReceiver main-thread schedule writes can block behind the whole-import EPG transaction (receiver ANR window). goAsync + IO refactor must preserve the MB-208 play-before-service ordering — belongs with recording-subsystem context | Next recording touch, alongside MB-212 |
+| — | P1 | Coverflow scroll-follows-selection on phone (snap fling + centered-item derivation — the full wheel metaphor; MB-266 tap-to-select is the shipped interim) | MK.27.B |
+| — | P2 | Double-tap seek + swipe volume/brightness in the phone player | MK.11.2 (already planned) |
+| — | P2 | Pressed-state feedback app-wide (remaining primitives: YancoButton family, SettingsChip/Row/Toggle, HexPillRow, sidebar rows, guide blocks, surf rows) | MK.27.D/E |
+| — | P2 | Phone BACK at Settings root now falls through to the shell chain (sidebar-focus → exit); a real section back-stack is the better phone model | MK.27.B |
+
+### Verification status (honest)
+
+- Every slice compile-verified (`:app:compileDebugKotlin` green per commit). **No device was reachable
+  this session** — Fire TV timed out at both known IPs (.56 / .74), no USB phone.
+- **Required before calling MK.28 closed:**
+  1. Cascade-nav smoke test (3 flows, ~60 s) on Fire TV — 28.4/.5/.6 touched HomeScreen, BrowseSection,
+     CoverflowSectionScreen.
+  2. Android 15 phone pass: bottom-edge controls tappable (MB-242), keyboard resize (MB-244), notch
+     chrome (MB-243), tap-select browse (MB-266..268), Settings BACK (MB-255).
+  3. TalkBack spot-check of MB-275…281.
+- `:app:testDebugUnitTest` green after the full sweep. `:shared` untouched this session (its suite not
+  re-run; the working tree carries the separate uncommitted MK.27.HF1 crypto refactor, deliberately
+  left alone).
 
 ---
 
