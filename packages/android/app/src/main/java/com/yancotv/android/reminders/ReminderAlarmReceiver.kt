@@ -9,6 +9,9 @@ import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
 import com.yancotv.shared.reminders.ReminderRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -34,8 +37,21 @@ class ReminderAlarmReceiver :
         val programmeId = intent.getStringExtra(ReminderScheduler.EXTRA_PROGRAMME_ID)
         val title = intent.getStringExtra(ReminderScheduler.EXTRA_TITLE) ?: "Upcoming programme"
 
-        runCatching { repo.markFired(reminderId) }
+        // MK.28.3 (MB-252) — markFired is a blocking DB write. If an EPG
+        // import's whole-parse transaction holds the writer connection when
+        // the alarm fires, a main-thread write here freezes until commit —
+        // a BroadcastReceiver ANR. goAsync + IO keeps the receiver alive
+        // past onReceive without blocking main; the notification itself has
+        // no DB dependency and posts immediately.
         postNotification(context, reminderId, programmeId, title)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                runCatching { repo.markFired(reminderId) }
+            } finally {
+                pendingResult.finish()
+            }
+        }
     }
 
     private fun postNotification(context: Context, reminderId: String, programmeId: String?, title: String) {

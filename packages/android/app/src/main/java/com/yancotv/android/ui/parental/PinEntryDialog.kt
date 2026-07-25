@@ -24,8 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.parental.ParentalRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Reusable PIN-entry gate used by:
@@ -123,14 +125,18 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
                     if (working) return@TextButton
                     working = true
                     scope.launch {
-                        val ok = repo.verifyPin(pin)
+                        // MK.28.3 (MB-251) — verifyPin reads the settings row
+                        // (blocking) before its offloaded hash; lockout check
+                        // reads again. Both off-main.
+                        val ok = withContext(Dispatchers.IO) { repo.verifyPin(pin) }
                         working = false
                         if (ok) {
                             onSuccess()
                         } else {
                             // Check whether a lockout just started so we
                             // show the right error rather than "incorrect".
-                            val stillLocked = repo.lockoutRemainingMs() > 0L
+                            val stillLocked =
+                                withContext(Dispatchers.IO) { repo.lockoutRemainingMs() > 0L }
                             error = if (stillLocked) "Locked" else "Incorrect PIN"
                             pin = ""
                         }

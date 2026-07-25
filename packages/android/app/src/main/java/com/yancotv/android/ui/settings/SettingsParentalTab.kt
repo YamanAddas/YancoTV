@@ -147,7 +147,11 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                         enabled = newPin.length in 4..8 && newPin == confirmPin,
                         onClick = {
                             scope.launch {
-                                repo.setPin(newPin)
+                                // MK.28.3 (MB-251) — the settings-table writes
+                                // inside setPin run on the caller context; only
+                                // the hash is offloaded internally. Dispatch to
+                                // IO like the sibling toggles in this file.
+                                withContext(Dispatchers.IO) { repo.setPin(newPin) }
                                 newPin = ""
                                 confirmPin = ""
                                 awaitingNewPin = false
@@ -311,7 +315,8 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                     }
                     GateAction.REMOVE -> {
                         scope.launch {
-                            repo.removePin()
+                            // MB-251 — DB writes off-main (see setPin above).
+                            withContext(Dispatchers.IO) { repo.removePin() }
                             status = "PIN removed — parental controls disabled."
                         }
                     }

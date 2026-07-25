@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 
 /**
  * App-scoped sync runner. A user-started sync must outlive the Settings
@@ -72,6 +73,9 @@ class SourceSyncCoordinator(
         )
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
+    // MK.28.3 (MB-253) — @Volatile: written from the sync job's IO thread
+    // (finally) and the callers' main thread (start/cancel).
+    @Volatile
     private var activeJob: Job? = null
 
     data class Active(val sourceId: String, val sourceName: String, val progress: SyncProgress, val startedAtMs: Long)
@@ -133,8 +137,18 @@ class SourceSyncCoordinator(
                     val reason = t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
                     _errors.tryEmit("Sync failed for $sourceName: $reason")
                 } finally {
+                    // MK.28.3 (MB-253) — clear the job ref BEFORE _state (the
+                    // start() gate), and only when it still points at THIS
+                    // job. The old ordering (_state first, activeJob second)
+                    // let a caller pass the gate and assign the NEW job
+                    // between the two statements; the stale finally then
+                    // wiped the new job's ref, turning Cancel into a silent
+                    // no-op for that whole sync. The auto-sync loop and the
+                    // RE-SYNC buttons start the next sync the instant state
+                    // flips to null, so that window was routinely exercised.
+                    val self = coroutineContext[Job]
+                    if (activeJob === self) activeJob = null
                     _state.value = null
-                    activeJob = null
                 }
             }
     }

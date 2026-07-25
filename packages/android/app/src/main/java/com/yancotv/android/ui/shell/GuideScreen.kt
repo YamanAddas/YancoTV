@@ -600,9 +600,18 @@ fun GuideScreen(
         // (channel, title) series_key. Used to swap "Record series" for
         // "Cancel series" in the dialog.
         var isSeriesBound by remember(target.programme.id) { mutableStateOf(false) }
+        // MK.28.3 (MB-250) — reminder state loads with the schedule lookup
+        // below, NOT via a blocking scheduler.isSet() call in the composable
+        // body. That call re-ran on every recomposition (the 60s nowSeconds
+        // ticker) and, during an EPG import — whose bulk writer holds one
+        // transaction across the whole parse — queued on the writer
+        // connection from the main thread: a guaranteed multi-second freeze
+        // from the very screen hosting the REFRESH EPG button.
+        var reminderSet by remember(target.programme.id) { mutableStateOf(false) }
         LaunchedEffect(target.programme.id) {
             withContext(Dispatchers.IO) {
                 runCatching {
+                    reminderSet = scheduler.isSet(target.programme.id)
                     val all = recordSchedules.getAll()
                     existingScheduleId =
                         all.firstOrNull { entry ->
@@ -626,7 +635,7 @@ fun GuideScreen(
             channel = target.channel,
             programme = target.programme,
             nowSeconds = nowSeconds,
-            isReminderSet = scheduler.isSet(target.programme.id),
+            isReminderSet = reminderSet,
             isRecordScheduled = existingScheduleId != null,
             isSeriesBound = isSeriesBound,
             catchupItem = catchupItem,
@@ -639,11 +648,19 @@ fun GuideScreen(
                 onPlayCatchup(item)
             },
             onSetReminder = {
-                scheduler.set(target.channel.tvgId, target.programme)
+                // MB-250 — upsert + AlarmManager.setExact off-main; can block
+                // behind the whole-import EPG transaction (freeze → ANR).
+                coroutineScope.launch(Dispatchers.IO) {
+                    runCatching { scheduler.set(target.channel.tvgId, target.programme) }
+                }
+                reminderSet = true
                 actionTarget = null
             },
             onCancelReminder = {
-                scheduler.cancel(target.programme.id)
+                coroutineScope.launch(Dispatchers.IO) {
+                    runCatching { scheduler.cancel(target.programme.id) }
+                }
+                reminderSet = false
                 actionTarget = null
             },
             onScheduleRecord = {
