@@ -63,3 +63,12 @@ packages/android/*.zip
 
 # TypeScript type-coverage report directory (auto-regenerated)
 /.type-coverage/
+
+# Firecrawl scrape cache — web content pulled during research sessions.
+# Tooling output, not source.
+/.firecrawl/
+
+# Exported app backups (`yancotv-backup-<timestamp>.json`). These are the
+# user's own data written by Settings -> Backup, and an UNENCRYPTED export
+# carries provider credentials in plain text. Never commit them.
+/backups/
