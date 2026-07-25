@@ -4,7 +4,6 @@ import io.ktor.client.HttpClient as KtorClient
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.jvm.javaio.copyTo
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import java.io.File
 import java.io.FileOutputStream
