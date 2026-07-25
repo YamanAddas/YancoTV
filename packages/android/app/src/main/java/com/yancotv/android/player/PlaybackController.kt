@@ -3,6 +3,7 @@ package com.yancotv.android.player
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.VisibleForTesting
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -407,7 +408,21 @@ class PlaybackController(
                     DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory),
                 ).setLoadControl(loadControl)
                 .setHandleAudioBecomingNoisy(true)
-                .build()
+                // MK.28.2 (MB-246) — request/abandon audio focus like every
+                // other media app. Media3's builder default is
+                // handleAudioFocus=false, so pre-fix YancoTV mixed its audio
+                // over Spotify/YT Music and ignored calls/assistant taking
+                // focus. With this, ExoPlayer pauses on loss and ducks on
+                // transient loss automatically; both the initial build and
+                // the MK.9.4 watchdog rebuild pass through here.
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                        .build(),
+                    /* handleAudioFocus = */
+                    true,
+                ).build()
         // MK.12a.2 — apply the user's persisted preferred audio language
         // at construction so channels with multi-language audio default
         // to their pick. ExoPlayer carries TrackSelectionParameters across

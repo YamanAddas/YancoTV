@@ -319,6 +319,17 @@ class PlayerActivity : AppCompatActivity() {
 
     private val playerListener =
         object : Player.Listener {
+            // MK.28.2 (MB-249) — playback-gated keep-screen-on, mirroring
+            // MainActivity.keepAwakeListener. Paused / errored / sleep-timer-
+            // stopped playback lets the display sleep; active playback holds it.
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "onPlayerError ${error.errorCodeName}", error)
                 // Audit catch — HLS BEHIND_LIVE_WINDOW is the canonical
@@ -471,7 +482,13 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // MK.28.2 (MB-249) — keep-screen-on is playback-gated via
+        // onIsPlayingChanged in playerListener (mirrors MainActivity's
+        // keepAwakeListener), NOT held unconditionally. The old permanent
+        // FLAG_KEEP_SCREEN_ON (plus android:keepScreenOn in the layout)
+        // meant a paused VOD, an error overlay, or the sleep timer's pause
+        // kept the display awake forever — defeating the MK.12b.1 sleep
+        // timer's purpose and inviting OLED burn-in on TV.
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior =
@@ -771,7 +788,20 @@ class PlayerActivity : AppCompatActivity() {
         // using this SurfaceView and waits for ack BEFORE we let the view
         // hierarchy teardown begin. Cost: a few ms of main-thread block on
         // the back-press; cheap relative to the alternative.
-        controller.player.clearVideoSurface()
+        //
+        // MK.28.2 (MB-248) — the detach must be TYPED, not the no-arg
+        // clearVideoSurface(). On BACK from fullscreen live, the OS draws
+        // MainActivity before this onStop runs, and MiniPlayer re-attaches
+        // its own Surface to the shared player during that first draw. The
+        // no-arg overload cleared WHATEVER output was current — stripping
+        // the mini's freshly attached surface and leaving the hero preview
+        // black (audio still running) until a recomposition healed it. The
+        // typed clear detaches only OUR SurfaceView and no-ops when the
+        // output has already moved on, preserving the MB-119 synchronous-
+        // detach guarantee in exactly the case it was added for.
+        (playerView.videoSurfaceView as? android.view.SurfaceView)?.let {
+            controller.player.clearVideoSurfaceView(it)
+        }
         playerView.player = null
 
         // VOD audio bleed fix: nothing reclaims the surface for movies /
@@ -903,6 +933,14 @@ class PlayerActivity : AppCompatActivity() {
         target.clearVideoSurface()
         playerView.player = target
         playerView.requestFocus()
+        // MK.28.2 (MB-249) — seed keep-screen-on from the current state so
+        // re-entering fullscreen with playback already running holds the
+        // screen immediately (onIsPlayingChanged only fires on transitions).
+        if (target.isPlaying) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     // ───── Zap bar / EPG ─────
@@ -2150,6 +2188,16 @@ class PlayerActivity : AppCompatActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val optionsV2Visible = optionsV2Inflated && optionsV2State.menuVisible.value
             val noOverlay = !surfVisible && !dockVisible && !optionsV2Visible
+            // MK.28.2 (MB-247) — CENTER must reach the buffering/error chrome
+            // overlay's focused RETRY button. Pre-fix, a stream error left
+            // controllerVisible false and no overlay flag set, so the CENTER
+            // long-press tracker consumed the press and toggled the dock /
+            // controller UNDER the error card — recovery was impossible by
+            // D-pad (stream errors are routine IPTV events). Only the
+            // CENTER-key paths are gated on chrome: LEFT/RIGHT/CHANNEL zap
+            // stays live so the user can still zap away from a dead channel
+            // while the overlay is up (the pre-fix behaviour worth keeping).
+            val chromeUp = chromeState != VodChromeState.NONE
             val isLiveNow = controller.currentItem.value?.type == ContentType.LIVE
 
             // Long-press timer: start on first CENTER DOWN when no overlay
@@ -2158,7 +2206,8 @@ class PlayerActivity : AppCompatActivity() {
             // to ACTION_UP. If the user holds ≥500 ms the timer fires
             // showOptionsV2() instead.
             if (event.repeatCount == 0 && isCenterKey(event.keyCode) &&
-                !controllerVisible && noOverlay && !channelZapState.visible.value
+                !controllerVisible && noOverlay && !chromeUp &&
+                !channelZapState.visible.value
             ) {
                 longPressJob?.cancel()
                 longPressFired = false
@@ -2204,7 +2253,12 @@ class PlayerActivity : AppCompatActivity() {
                     KeyEvent.KEYCODE_SPACE,
                     KeyEvent.KEYCODE_MEDIA_STOP,
                     -> {
-                        if (onKeyDown(event.keyCode, event)) return true
+                        // MB-247 — with the chrome overlay up, CENTER/ENTER
+                        // must fall through to the overlay's focused
+                        // RETRY/BACK button instead of our handler.
+                        if (!(chromeUp && isCenterKey(event.keyCode))) {
+                            if (onKeyDown(event.keyCode, event)) return true
+                        }
                     }
                 }
             }
