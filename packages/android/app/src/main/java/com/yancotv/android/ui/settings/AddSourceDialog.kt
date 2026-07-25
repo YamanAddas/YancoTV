@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,25 +61,33 @@ import androidx.compose.ui.platform.LocalContext
  */
 @Composable
 fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, saving: Boolean = false, saveError: String? = null) {
-    var type by remember { mutableStateOf(SourceType.XTREAM) }
-    var name by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var epgUrl by remember { mutableStateOf("") }
+    // MK.28.4 (MB-257) — every field is rememberSaveable (hard rule 9):
+    // the canonical flow is "app-switch to the provider email / browser to
+    // copy URL + credentials, come back" — a background-kill window — and
+    // M3U_FILE bounces through the SAF picker activity, another one. Plain
+    // remember wiped the whole form on return. The password lives in the
+    // saved-state Bundle, which is process-private and transient —
+    // deliberate, same trade SettingsBackupTab documents for its picker
+    // round-trip.
+    var type by rememberSaveable { mutableStateOf(SourceType.XTREAM) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var url by rememberSaveable { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var epgUrl by rememberSaveable { mutableStateOf("") }
     // MK.17.5 — per-source HTTP override fields. Both optional. UA
     // overrides the app-wide pref; Referer is sent only when set
     // (some providers gate playback on Referer presence — see
     // PlaybackController interceptor).
-    var userAgent by remember { mutableStateOf("") }
-    var referer by remember { mutableStateOf("") }
+    var userAgent by rememberSaveable { mutableStateOf("") }
+    var referer by rememberSaveable { mutableStateOf("") }
     // Audit catch — M3U_FILE picks a content:// URI via SAF; STALKER
     // needs a MAC address alongside the host. Both source types are
     // advertised in the SourcesScreen empty-state copy but the dialog
     // previously offered only Xtream + M3U_URL.
-    var filePath by remember { mutableStateOf<String?>(null) }
-    var fileDisplayName by remember { mutableStateOf("") }
-    var macAddress by remember { mutableStateOf("") }
+    var filePath by rememberSaveable { mutableStateOf<String?>(null) }
+    var fileDisplayName by rememberSaveable { mutableStateOf("") }
+    var macAddress by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val filePickerLauncher =
         rememberLauncherForActivityResult(

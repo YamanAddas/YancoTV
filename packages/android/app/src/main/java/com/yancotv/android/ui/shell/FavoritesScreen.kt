@@ -132,8 +132,10 @@ fun FavoritesScreen(
         }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var showCreateList by remember { mutableStateOf(false) }
-    var manageListId by remember { mutableStateOf<String?>(null) }
+    // MK.28.4 (MB-258) — saveable so the create-list / manage-list dialogs
+    // survive recreation instead of silently vanishing.
+    var showCreateList by rememberSaveable { mutableStateOf(false) }
+    var manageListId by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Parental filters: hidden_ids drop out of favourites entirely (a hide
     // should feel consistent everywhere), lockedIds flag the row + gate the

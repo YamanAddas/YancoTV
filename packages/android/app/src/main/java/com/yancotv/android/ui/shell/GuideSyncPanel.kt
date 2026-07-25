@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,7 +84,8 @@ fun GuideSyncPanel(
     var sources by remember { mutableStateOf<List<Source>>(emptyList()) }
     var lastError by remember { mutableStateOf<String?>(null) }
     var savedGlobalUrl by remember { mutableStateOf<String?>(null) }
-    var globalUrlDraft by remember { mutableStateOf("") }
+    // MK.28.4 (MB-258) — saveable, mirrors SettingsEpgTab.
+    var globalUrlDraft by rememberSaveable { mutableStateOf("") }
     var reloadTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(reloadTick) {

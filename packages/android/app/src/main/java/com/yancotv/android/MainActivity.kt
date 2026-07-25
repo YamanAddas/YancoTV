@@ -118,7 +118,20 @@ class MainActivity : ComponentActivity() {
         // declared the searchable metadata. We pull the recognised text
         // out and prime the global search overlay; SearchScreen consumes
         // it on next composition.
-        handleSearchIntent(intent)
+        //
+        // MK.28.4 (MB-256) — launch-intent replay guard. onCreate re-runs
+        // the SAME intent on every recreation (uiMode flip, split-screen,
+        // locale) and recents relaunch redelivers the ORIGINAL extras after
+        // process death (in-memory removeExtra doesn't persist). Pre-fix the
+        // voice-search overlay popped back up with the stale query after
+        // dismissal, and a recommendation deep-link re-fired playback from
+        // recents. Only a genuinely fresh launch handles the intent here;
+        // onNewIntent keeps handling live ones.
+        val relaunchedFromHistory =
+            (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+        if (savedInstanceState == null && !relaunchedFromHistory) {
+            handleSearchIntent(intent)
+        }
 
         // Subscribe to the sync coordinator's error bus so bad-credential
         // and unreachable-host failures reach the user even when they've
@@ -266,6 +279,9 @@ class MainActivity : ComponentActivity() {
                 else -> null
             }
         if (!query.isNullOrBlank()) {
+            // MB-256 — consume the extra so a config-change recreate doesn't
+            // re-show the overlay (mirrors the deep-link branch above).
+            intent.removeExtra(android.app.SearchManager.QUERY)
             SearchOverlayState.show(query.trim())
         }
     }

@@ -127,7 +127,16 @@ fun HomeScreen(
     // the episode lookup to IO without blocking the click lambda.
     val homeScope = rememberCoroutineScope()
 
+    // MK.28.4 (MB-261) — stop-on-section-change must fire on a genuine
+    // CHANGE only. LaunchedEffect(section) also runs on the initial
+    // composition after an activity recreation (uiMode flip, split-screen,
+    // locale), where it silently killed the live mini-preview the user was
+    // watching — and autoplayAttempted (saveable) blocked the re-warm.
+    var prevSection by rememberSaveable { mutableStateOf<AppSection?>(null) }
     LaunchedEffect(section) {
+        val previous = prevSection
+        prevSection = section
+        if (previous == null || previous == section) return@LaunchedEffect
         if (shouldStopPlaybackOnSectionChange(controller.currentItem.value)) {
             controller.stop()
         }
@@ -146,8 +155,32 @@ fun HomeScreen(
 
     // Movie / series route to the detail overlay on activation; live
     // channels bypass it and go straight through to the player.
+    //
+    // MK.28.4 (MB-260) — the open detail page is persisted BY ID in
+    // rememberSaveable (a ContentItem doesn't fit a Bundle) and re-hydrated
+    // from the repo after recreation, so backgrounding the app on a detail
+    // page no longer dumps the user back onto the rail. Row gone from the
+    // DB on restore → overlay closes cleanly.
     var detailItem by remember { mutableStateOf<ContentItem?>(null) }
-    BackHandler(enabled = detailItem != null) { detailItem = null }
+    var detailItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    val openDetail: (ContentItem?) -> Unit = { item ->
+        detailItem = item
+        detailItemId = item?.id
+    }
+    LaunchedEffect(detailItemId) {
+        val id = detailItemId
+        if (id == null) {
+            detailItem = null
+            return@LaunchedEffect
+        }
+        if (detailItem?.id == id) return@LaunchedEffect
+        val restored =
+            withContext(Dispatchers.IO) {
+                runCatching { repo.findById(id) }.getOrNull()
+            }
+        if (restored != null) detailItem = restored else detailItemId = null
+    }
+    BackHandler(enabled = detailItem != null) { openDetail(null) }
 
     // "Require PIN for Settings" gate.
     var settingsUnlocked by rememberSaveable { mutableStateOf(false) }
@@ -158,7 +191,7 @@ fun HomeScreen(
     // initialTab (General). Cleared on every Settings exit so a
     // sidebar-driven re-open after EmptyHome doesn't keep landing on
     // Sources.
-    var pendingSettingsTab by remember { mutableStateOf<com.yancotv.android.ui.settings.SettingsTab?>(null) }
+    var pendingSettingsTab by rememberSaveable { mutableStateOf<com.yancotv.android.ui.settings.SettingsTab?>(null) }
     LaunchedEffect(section) {
         if (section != AppSection.Settings) {
             settingsUnlocked = false
@@ -196,7 +229,12 @@ fun HomeScreen(
     var panelFocus by rememberSaveable { mutableStateOf(PanelFocus.Sidebar) }
     // MB-89: track the last section we focused so a same-section recomposition
     // (e.g. favorites flow update) doesn't yank focus back to main content.
-    var lastFocusedSection by remember { mutableStateOf<AppSection?>(null) }
+    // MK.28.4 (MB-261) — saveable: after a recreation a plain-remember null
+    // made this effect re-fire and overwrite the rememberSaveable-restored
+    // panelFocus, contradicting the persistence comment above. Restored
+    // state now stays put; the first D-pad press (TV) or tap (phone) wakes
+    // focus, and the window-regain handlers cover the player round-trip.
+    var lastFocusedSection by rememberSaveable { mutableStateOf<AppSection?>(null) }
     LaunchedEffect(section) {
         if (section == lastFocusedSection) return@LaunchedEffect
         lastFocusedSection = section
@@ -294,7 +332,7 @@ fun HomeScreen(
                     PlayerLauncher.launch(context)
                 }
                 ContentType.MOVIE, ContentType.SERIES -> {
-                    detailItem = target
+                    openDetail(target)
                 }
             }
         }
@@ -480,7 +518,7 @@ fun HomeScreen(
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
                     FavoritesScreen(
                         isTv = isTv,
-                        onOpenDetail = { item -> detailItem = item },
+                        onOpenDetail = { item -> openDetail(item) },
                     )
                 }
             } else if (section == AppSection.Recordings) {
@@ -489,7 +527,7 @@ fun HomeScreen(
                 }
             } else if (section == AppSection.Search) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
-                    SearchScreen(isTv = isTv, onShowDetail = { detailItem = it })
+                    SearchScreen(isTv = isTv, onShowDetail = { openDetail(it) })
                 }
             } else if (section == AppSection.Home) {
                 Box(modifier = Modifier.weight(1f).focusRequester(mainContentFocus).focusGroup()) {
@@ -529,7 +567,7 @@ fun HomeScreen(
                                         // the just-finished episode, which is what
                                         // the loop bug was masking.
                                         if (resumeEpisodeId == null) {
-                                            detailItem = target
+                                            openDetail(target)
                                             return@gatedPlay
                                         }
                                         homeScope.launch(Dispatchers.IO) {
@@ -571,7 +609,7 @@ fun HomeScreen(
                                             val playable = episode?.toPlayable(target)
                                             withContext(Dispatchers.Main) {
                                                 if (playable == null) {
-                                                    detailItem = target
+                                                    openDetail(target)
                                                 } else {
                                                     // Always go through controller.play —
                                                     // its SameTarget branch is a cheap
@@ -633,7 +671,7 @@ fun HomeScreen(
                         // enough — touch consumed by pointerInput.
                         .pointerInput(Unit) { detectTapGestures { } },
                 ) {
-                    SearchScreen(isTv = isTv, onShowDetail = { detailItem = it })
+                    SearchScreen(isTv = isTv, onShowDetail = { openDetail(it) })
                 }
             }
         }
@@ -706,7 +744,7 @@ fun HomeScreen(
                     // surface so callers that want to react (snackbar,
                     // analytics) have one place to do it.
                 },
-                onDismiss = { detailItem = null },
+                onDismiss = { openDetail(null) },
             )
         }
 

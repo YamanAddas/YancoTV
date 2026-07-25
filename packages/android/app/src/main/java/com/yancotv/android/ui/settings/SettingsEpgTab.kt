@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.flow.catch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,7 +89,9 @@ fun SettingsEpgTab(
     // Settings (no nested centered-card chrome).
     var stats by remember { mutableStateOf<EpgStats?>(null) }
     var savedGlobalUrl by remember { mutableStateOf<String?>(null) }
-    var globalUrlDraft by remember { mutableStateOf("") }
+    // MK.28.4 (MB-258) — saveable: long XMLTV URLs are exactly what users
+    // app-switch to copy; plain remember lost the draft to background kill.
+    var globalUrlDraft by rememberSaveable { mutableStateOf("") }
     var lastError by remember { mutableStateOf<String?>(null) }
     var reloadTick by remember { mutableStateOf(0) }
 

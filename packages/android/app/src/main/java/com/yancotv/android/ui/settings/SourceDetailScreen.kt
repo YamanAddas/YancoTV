@@ -80,7 +80,12 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
     var epgUrlField by rememberSaveable { mutableStateOf("") }
     var referrerField by rememberSaveable { mutableStateOf("") }
     var userAgentField by rememberSaveable { mutableStateOf("") }
-    var dirty by remember { mutableStateOf(false) }
+    // MK.28.4 (MB-259) — dirty is saveable together with the field buffers,
+    // and seeding is one-shot per source: loadSource used to overwrite all
+    // seven restored buffers with DB values on every recreation, silently
+    // reverting unsaved edits while dirty=false hid the loss.
+    var dirty by rememberSaveable { mutableStateOf(false) }
+    var seeded by rememberSaveable(sourceId) { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
 
@@ -96,9 +101,13 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             return
         }
         source = loaded
-        // Seed editable fields with current persisted values. Decrypted
-        // username/password come from xtreamCredentials() for Xtream
-        // sources; M3U-URL has no credentials, Stalker has MAC.
+        // Seed editable fields with current persisted values — ONCE per
+        // source (MB-259). On a recreation the rememberSaveable buffers
+        // already hold the user's in-progress edits; re-seeding would
+        // clobber them. Decrypted username/password come from
+        // xtreamCredentials() for Xtream sources; M3U-URL has no
+        // credentials, Stalker has MAC.
+        if (seeded) return
         nameField = loaded.name
         urlField = loaded.url.orEmpty()
         epgUrlField = loaded.epgUrl.orEmpty()
@@ -113,6 +122,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             passwordField = creds?.password.orEmpty()
         }
         dirty = false
+        seeded = true
     }
 
     LaunchedEffect(sourceId) { loadSource() }

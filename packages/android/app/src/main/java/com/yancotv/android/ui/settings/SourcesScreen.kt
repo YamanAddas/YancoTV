@@ -99,7 +99,9 @@ import org.koin.compose.koinInject
 @Composable
 fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSyncCoordinator = koinInject()) {
     val sources = remember { mutableStateListOf<Source>() }
-    var showAdd by remember { mutableStateOf(false) }
+    // MK.28.4 (MB-257) — saveable so the add-source dialog survives the SAF
+    // picker round-trip / background kill together with its form fields.
+    var showAdd by rememberSaveable { mutableStateOf(false) }
     var addSaving by remember { mutableStateOf(false) }
     var addError by remember { mutableStateOf<String?>(null) }
     // When non-null, the detail pane replaces the list view. Persisted via

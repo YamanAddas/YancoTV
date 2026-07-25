@@ -174,11 +174,18 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
     // a typical phone "search → tap → back → reset" pattern.
     var query by rememberSaveable { mutableStateOf("") }
 
-    BackHandler(enabled = true) {
+    // MK.28.4 (MB-255) — the handler must DISABLE itself once there is
+    // nothing left to pop. It was enabled=true with an onExit() else-branch,
+    // but onExit only requests TV sidebar focus — it never changes section —
+    // so on a touch phone every BACK/gesture-back re-entered the same
+    // handler forever: BACK could never leave Settings or exit the app, and
+    // (being registered after the shell's search-overlay handler) it also
+    // preempted overlay dismissal. With enabled gated, the root-list BACK
+    // falls through to the shell/system like every TV handler in this file.
+    BackHandler(enabled = drilledIn || query.isNotBlank()) {
         when {
             drilledIn -> drilledIn = false
-            query.isNotBlank() -> query = ""
-            else -> onExit()
+            else -> query = ""
         }
     }
 

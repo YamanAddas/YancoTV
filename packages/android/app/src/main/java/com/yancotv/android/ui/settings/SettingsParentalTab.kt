@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,8 +62,11 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
     val settings = repo.settings.collectAsState().value
     val hiddenIds = repo.hiddenIds.collectAsState().value
 
-    var newPin by remember { mutableStateOf("") }
-    var confirmPin by remember { mutableStateOf("") }
+    // MK.28.4 (MB-258) — saveable so a mid-setup recreation doesn't silently
+    // clear the first PIN entry. The Bundle is process-private and the value
+    // short-lived; same trade as AddSourceDialog's password field.
+    var newPin by rememberSaveable { mutableStateOf("") }
+    var confirmPin by rememberSaveable { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var showGate by remember { mutableStateOf<GateAction?>(null) }
     var awaitingNewPin by remember { mutableStateOf(false) }
