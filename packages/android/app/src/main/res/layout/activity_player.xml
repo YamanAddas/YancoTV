@@ -373,6 +373,23 @@
         android:gravity="center_vertical"
         android:visibility="gone">
 
+<!-- MK.28.7 / MB-272 — touch entry to the channel-surf overlay. Zapping
+             is the core IPTV loop but every entry was a TV key code; a phone
+             user had to exit the player and re-pick to change channels.
+             Visibility gated LIVE-only in updatePlayerChrome(). -->
+        <ImageButton
+            android:id="@+id/player_channels_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/player_overlay_pill"
+            android:src="@drawable/ic_player_channels"
+            android:scaleType="centerInside"
+            android:padding="11dp"
+            android:focusable="false"
+            android:contentDescription="Channel list"
+            android:visibility="gone" />
+
         <ImageButton
             android:id="@+id/player_more_button"
             android:layout_width="48dp"

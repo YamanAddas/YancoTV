@@ -207,6 +207,7 @@ class PlayerActivity : AppCompatActivity() {
     // on TV. Visibility driven by updatePlayerChrome(). moreButton + castButton
     // live inside the topActions row.
     private lateinit var backButton: android.widget.ImageButton
+    private lateinit var channelsButton: android.widget.ImageButton
     private lateinit var moreButton: android.widget.ImageButton
     private lateinit var castButton: android.widget.ImageButton
     private lateinit var topActions: View
@@ -569,11 +570,25 @@ class PlayerActivity : AppCompatActivity() {
         // updatePlayerChrome(): Back exits the player, More opens the options
         // popup, Cast jumps straight to the "Play on TV" panel.
         backButton = findViewById(R.id.player_back_button)
+        channelsButton = findViewById(R.id.player_channels_button)
         moreButton = findViewById(R.id.player_more_button)
         castButton = findViewById(R.id.player_cast_button)
         topActions = findViewById(R.id.player_top_actions)
         backButton.setOnClickListener { finish() }
+        // MK.28.7 (MB-272) — touch entry to the surf overlay; the rows
+        // inside are already tappable, only the entry was key-code-only.
+        channelsButton.setOnClickListener {
+            playerView.hideController()
+            showSurf()
+        }
         moreButton.setOnClickListener { openPlayerOptions(null) }
+        // MK.28.7 (MB-274) — quick-info (stream stats) had only KEYCODE_INFO
+        // / GUIDE entries, keys phones don't have. Long-press More = the
+        // touch path to the same diagnostics overlay (it auto-hides itself).
+        moreButton.setOnLongClickListener {
+            toggleQuickInfo()
+            true
+        }
         castButton.setOnClickListener {
             openPlayerOptions(com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV)
         }
@@ -1033,6 +1048,7 @@ class PlayerActivity : AppCompatActivity() {
             topActions.visibility = View.GONE
             return
         }
+        val isLive = controller.currentItem.value?.type == ContentType.LIVE
         val show =
             when (controller.currentItem.value?.type) {
                 ContentType.LIVE -> controllerVisible
@@ -1042,6 +1058,8 @@ class PlayerActivity : AppCompatActivity() {
         val vis = if (show) View.VISIBLE else View.GONE
         backButton.visibility = vis
         topActions.visibility = vis
+        // MB-272 — surf is a live-TV concept; hide the entry on VOD.
+        channelsButton.visibility = if (show && isLive) View.VISIBLE else View.GONE
     }
 
     /**
@@ -1061,6 +1079,13 @@ class PlayerActivity : AppCompatActivity() {
      * taps, so this only fires on the bare video area.
      */
     private fun onPlayerSingleTap() {
+        // MK.28.7 (MB-272) — with the surf panel open, a tap on the video
+        // area dismisses it (it was BACK-only + 5s idle before; on touch
+        // the tap otherwise toggled the controller UNDERNEATH the panel).
+        if (surfVisible) {
+            hideSurf()
+            return
+        }
         val isLive = controller.currentItem.value?.type == ContentType.LIVE
         if (isLive) {
             if (controllerVisible) playerView.hideController() else playerView.showController()
@@ -1872,6 +1897,7 @@ class PlayerActivity : AppCompatActivity() {
                 data = dockData,
                 progress = dockProgress,
                 hasSiblings = queueSnapshot.size > 1,
+                isTv = isTvDevice(),
                 onTogglePlayPause = {
                     val p = controller.player
                     p.playWhenReady = !p.playWhenReady

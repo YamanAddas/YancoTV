@@ -142,6 +142,9 @@ fun VodPlayerDock(
     // ‹/› transport buttons entirely when this is false so the user isn't
     // staring at controls that no-op when pressed.
     hasSiblings: Boolean = true,
+    // MK.28.7 (MB-273) — the "◂▸ SEEK · OK HIDE · ◀ BACK" hint strip
+    // describes inputs a phone doesn't have; render it on TV only.
+    isTv: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (visibility != VodDockVisibility.VISIBLE) return
@@ -198,8 +201,10 @@ fun VodPlayerDock(
                     onUserInteraction = onUserInteraction,
                     hasSiblings = hasSiblings,
                 )
-                Spacer(Modifier.height(26.dp))
-                VodDockHintRow()
+                if (isTv) {
+                    Spacer(Modifier.height(26.dp))
+                    VodDockHintRow()
+                }
             }
         }
     }
