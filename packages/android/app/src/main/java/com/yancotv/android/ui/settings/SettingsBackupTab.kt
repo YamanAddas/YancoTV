@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.backup.BackupCoordinator
@@ -405,12 +406,17 @@ fun SettingsBackupTab(
                     // the button directly.
                     modifier = Modifier.placedFocus(exportButtonAnchor),
                 ) {
-                    Text(text = if (exporting) "Exporting…" else "Export backup", maxLines = 1, softWrap = false)
+                    Text(text = if (exporting) "Exporting…" else "Export backup", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
                 SettingsOutlinedButton(
                     onClick = { changeFolderLauncher.launch(null) },
                 ) {
-                    Text(text = if (customFolder != null) "Change folder…" else "Pick folder…", maxLines = 1, softWrap = false)
+                    Text(
+                        text = if (customFolder != null) "Change folder…" else "Pick folder…",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 if (customFolder != null) {
                     SettingsOutlinedButton(
@@ -422,7 +428,7 @@ fun SettingsBackupTab(
                             }
                         },
                     ) {
-                        Text(text = "Reset to default", maxLines = 1, softWrap = false)
+                        Text(text = "Reset to default", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -476,6 +482,7 @@ fun SettingsBackupTab(
                     Text(
                         text = if (importPickedUri == null) "Choose backup file…" else "Choose another file…",
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         softWrap = false,
                     )
                 }
@@ -520,6 +527,7 @@ fun SettingsBackupTab(
                     Text(
                         text = "Restore latest from Downloads",
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         softWrap = false,
                     )
                 }
@@ -583,6 +591,7 @@ fun SettingsBackupTab(
                         Text(
                             text = "Retry pending now",
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             softWrap = false,
                         )
                     }
@@ -721,10 +730,10 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
             enabled = row.fileUri != null,
             size = ButtonSize.Compact,
         ) {
-            Text(text = "USE", maxLines = 1, softWrap = false)
+            Text(text = "USE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
         SettingsDangerButton(onClick = onDelete, size = ButtonSize.Compact) {
-            Text(text = "DELETE", maxLines = 1, softWrap = false)
+            Text(text = "DELETE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }

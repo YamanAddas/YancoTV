@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
@@ -207,7 +208,7 @@ fun SettingsEpgTab(
                             size = ButtonSize.Compact,
                             translucent = true,
                         ) {
-                            Text(text = "REFRESH EPG", maxLines = 1, softWrap = false)
+                            Text(text = "REFRESH EPG", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         }
                         SettingsOutlinedButton(
                             onClick = {
@@ -221,7 +222,7 @@ fun SettingsEpgTab(
                             enabled = !running && !syncing && activeSources.isNotEmpty(),
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "RE-SYNC SOURCES", maxLines = 1, softWrap = false)
+                            Text(text = "RE-SYNC SOURCES", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         }
                         if (running || syncing) {
                             CircularProgressIndicator(
@@ -289,6 +290,7 @@ fun SettingsEpgTab(
                                     "SAVE"
                                 },
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 softWrap = false,
                             )
                         }

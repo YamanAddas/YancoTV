@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -269,6 +270,7 @@ private fun SurfRow(
                     fontSize = 13.sp,
                     fontWeight = if (playing) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (!nowTitle.isNullOrBlank()) {
@@ -277,6 +279,7 @@ private fun SurfRow(
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 11.sp,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             // MK.10.4 — now-progress bar. Shows how much of the live

@@ -406,7 +406,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     translucent = true,
                     size = ButtonSize.Compact,
                 ) {
-                    Text(text = if (saving) "SAVING…" else "SAVE", maxLines = 1, softWrap = false)
+                    Text(text = if (saving) "SAVING…" else "SAVE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
                 SettingsOutlinedButton(
                     onClick = {
@@ -417,7 +417,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     },
                     size = ButtonSize.Compact,
                 ) {
-                    Text(text = "SYNC", maxLines = 1, softWrap = false)
+                    Text(text = "SYNC", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
                 SettingsDangerButton(
                     onClick = {
@@ -437,7 +437,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     },
                     size = ButtonSize.Compact,
                 ) {
-                    Text(text = "DELETE", maxLines = 1, softWrap = false)
+                    Text(text = "DELETE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
             }
             saveError?.let { err ->
@@ -496,7 +496,7 @@ private fun DetailHero(source: Source, palette: YancoPalette, onBack: () -> Unit
             size = ButtonSize.Compact,
             modifier = backAnchorModifier,
         ) {
-            Text(text = "BACK", maxLines = 1, softWrap = false)
+            Text(text = "BACK", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -527,7 +527,7 @@ private fun ErrorPane(message: String, onBack: () -> Unit) {
             fontSize = 14.sp,
         )
         SettingsOutlinedButton(onClick = onBack) {
-            Text(text = "Back to list", maxLines = 1, softWrap = false)
+            Text(text = "Back to list", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }

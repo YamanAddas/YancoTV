@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,11 +65,13 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoShapes
@@ -410,7 +413,7 @@ private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General,
             activeTabFocus = activeTabFocus,
             modifier =
             Modifier
-                .width(380.dp)
+                .width(ShellDim.settingsRailWidth)
                 .fillMaxHeight(),
         )
         // Provide the active-tab requester to every Settings row primitive
@@ -1221,9 +1224,18 @@ private fun HexChip(text: String, active: Boolean, icon: ImageVector? = null) {
     // theme's hex family (the live-TV channel tiles, the category rail
     // pills) so the breadcrumb belongs to the same vocabulary.
     //
-    // Bumped horizontal padding to 22dp so the label clears the side
-    // points — at 30dp tall the cut is ~9dp wide on each side, so 22dp
-    // padding leaves ~13dp of flat space on each end of the text.
+    // MB-300 — padding was 22dp on the theory that the label needed to
+    // clear the hex side points. Measured, that was over-provisioned by
+    // 18dp per side: HexCapsuleSoft at h=34dp has cut = (68 * 0.30) = 20.4px
+    // = 10.2dp, and the 13sp text band only reaches the bevel at
+    // x ~= 4.4dp. 14dp clears it with room and returns 16dp of glyph
+    // budget per chip — which, on the *active* chip, is the entire
+    // difference between "SOURCES" fitting and wrapping.
+    //
+    // Height was a hard `.height(30.dp)` (min == max) on the same modifier
+    // chain as `.clip(shape)`, so an overflowing label was silently sliced
+    // top and bottom rather than ellipsised. `heightIn(min = ...)` lets the
+    // chip grow instead of clipping if a label ever does wrap.
     val shape = YancoShapes.HexCapsuleSoft
     val bg =
         if (active) {
@@ -1239,14 +1251,14 @@ private fun HexChip(text: String, active: Boolean, icon: ImageVector? = null) {
     Row(
         modifier =
         Modifier
-            .height(30.dp)
+            .heightIn(min = 34.dp)
             .clip(shape)
             .background(bg)
             .border(
                 1.dp,
                 if (active) Color.Transparent else LocalYancoPalette.current.BorderSubtle,
                 shape,
-            ).padding(horizontal = 22.dp),
+            ).padding(horizontal = 14.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -1264,6 +1276,14 @@ private fun HexChip(text: String, active: Boolean, icon: ImageVector? = null) {
             fontSize = 11.sp,
             fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
             letterSpacing = 1.32.sp,
+            // MB-300 — a chip is a one-line element by construction. Without
+            // these three the label wrapped inside a fixed-height clipped box
+            // and lost characters with no visible marker. `softWrap = false`
+            // is the one that actually prevents the second line; maxLines
+            // alone still lays out two and then drops one.
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

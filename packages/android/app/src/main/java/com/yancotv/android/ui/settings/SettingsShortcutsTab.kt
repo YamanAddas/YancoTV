@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.ui.focus.dpadVerticalScroll
@@ -56,7 +57,7 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "Remote &amp; keyboard",
+            title = "Remote & keyboard",
             sub =
             "Quick reference for the TV-remote and keyboard bindings YancoTV listens for. " +
                 "Shortcuts aren't user-configurable yet — let us know in the issues if any clash with your remote.",
@@ -163,6 +164,7 @@ private fun KeyChip(keys: String) {
             fontFamily = FontFamily.Monospace,
             letterSpacing = 0.4.sp,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             softWrap = false,
         )
     }

@@ -616,6 +616,7 @@ private fun HeroBlock(
                         color = LocalYancoPalette.current.TextPrimary,
                         style = YancoType.DisplayCinematic,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     metadata.tagline?.takeIf { it.isNotBlank() }?.let {
                         Text(
@@ -631,6 +632,7 @@ private fun HeroBlock(
                             color = LocalYancoPalette.current.TextSecondary,
                             style = YancoType.BodyLong,
                             maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     ActionRow(
@@ -1151,6 +1153,7 @@ private fun EpisodeRow(ep: EpisodeInfo, progress: WatchProgress?, onClick: () ->
                         color = LocalYancoPalette.current.TextPrimary,
                         style = YancoType.TitleS,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     // MK.28.5 \u2014 Per-episode Watched \u2713 chip when finished.

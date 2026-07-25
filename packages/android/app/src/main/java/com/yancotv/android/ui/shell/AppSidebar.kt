@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.R
 import com.yancotv.android.ui.nav.AppSection
@@ -452,6 +453,7 @@ private fun SidebarRow(
                     color = fg,
                     style = if (selected || focused) YancoType.LabelStrong else YancoType.Label,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.alpha(labelAlpha),
                 )
             }

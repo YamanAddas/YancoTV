@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -255,12 +256,22 @@ private fun VodDockMetadata(data: VodDockData) {
             letterSpacing = 2.2.sp,
         )
         Spacer(Modifier.height(6.dp))
+        // MB-300 — 44sp with no line clamp inside a Column capped at 444dp.
+        // A long VOD title (~117 chars is enough at 100%) grew this Text
+        // until the Column ran out of height, and Compose hands the residual
+        // to the LAST children: the hint strip, then the transport row. A
+        // `Modifier.size(88.dp)` coerced by an incoming 0 constraint measures
+        // to 0 — i.e. the play/pause control silently disappeared on exactly
+        // the titles most likely to be long. Two lines + ellipsis caps the
+        // worst case at 405dp of the 444dp budget even at a 125% font scale.
         Text(
             text = data.title.ifBlank { "—" },
             color = palette.TextPrimary,
             fontSize = 44.sp,
             fontWeight = FontWeight.Black,
             letterSpacing = (-0.8).sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         if (data.chips.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))

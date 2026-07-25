@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +33,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -395,15 +399,28 @@ private fun ErrorOverlay(
             .background(palette.BackgroundDeep.copy(alpha = 0.9f))
             .padding(horizontal = 56.dp, vertical = 48.dp),
     ) {
+        // MB-300 — this stack measured 564dp against a 444dp budget
+        // (540dp viewport less 96dp of vertical padding) with NO scroll, so
+        // Compose handed 0 height to the last children: the entire action
+        // Row (RETRY / SWITCH TO 1080P / TRY ANOTHER SOURCE / REPORT ISSUE)
+        // and the BACK button below it. A user hitting a stream error had no
+        // on-screen way out — the worst instance of this class in the app.
+        //
+        // Three changes, all needed: the scroll guarantees nothing is ever
+        // unreachable; the icon shrink (160 -> 96) and the headline
+        // (48 -> 30sp) are what keep the primary actions above the fold so
+        // the common case needs no scrolling at all.
         Column(
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Hex icon with an X mark. Static layout; the animated error
             // pulse from the design lands in a follow-up.
             Box(
                 modifier = Modifier
-                    .size(160.dp)
+                    .size(96.dp)
                     .clip(hexRowShape(30.dp))
                     .background(palette.BackgroundRaised)
                     .border(2.dp, palette.Error.copy(alpha = 0.6f), hexRowShape(30.dp)),
@@ -419,18 +436,21 @@ private fun ErrorOverlay(
                     // bursts out of the box. toSp() converts a dp value
                     // through the current density so it renders at a constant
                     // physical size whatever the text scaling is.
-                    fontSize = with(LocalDensity.current) { 96.dp.toSp() },
+                    fontSize = with(LocalDensity.current) { 58.dp.toSp() },
                     fontWeight = FontWeight.Bold,
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             HexChip(label = kicker, tone = palette.Error)
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(14.dp))
             Text(
                 text = data.title,
                 color = palette.TextPrimary,
-                fontSize = 48.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             if (data.description.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
@@ -438,6 +458,9 @@ private fun ErrorOverlay(
                     text = data.description,
                     color = palette.TextSecondary,
                     fontSize = 15.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(Modifier.height(24.dp))

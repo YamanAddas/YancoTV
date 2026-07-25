@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.placedFocus
@@ -456,6 +457,7 @@ private fun HexPillRow(
             color = fg,
             style = if (selected) YancoType.LabelStrong else YancoType.Label,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
         if (trailingText != null) {
@@ -464,6 +466,7 @@ private fun HexPillRow(
                 color = fg.copy(alpha = 0.7f),
                 style = YancoType.Caption,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

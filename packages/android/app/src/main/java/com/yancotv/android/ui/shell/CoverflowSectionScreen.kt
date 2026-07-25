@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -788,6 +789,7 @@ private fun MetaColumn(
             color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayM,
             maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         if (type == ContentType.LIVE && nowProg != null) {
             Text(
@@ -795,6 +797,7 @@ private fun MetaColumn(
                 color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleM,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             ProgressLine(start = nowProg.startTime, end = nowProg.endTime, now = nowSeconds)
         } else {
@@ -806,6 +809,7 @@ private fun MetaColumn(
                     color = LocalYancoPalette.current.TextSecondary,
                     style = YancoType.Body,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -815,6 +819,7 @@ private fun MetaColumn(
                 color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.height(Space.xs))
@@ -885,6 +890,7 @@ private fun EmptyMetaPrompt(type: ContentType, modifier: Modifier) {
             color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayS,
             maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(Space.sm))
         Text(
@@ -892,6 +898,7 @@ private fun EmptyMetaPrompt(type: ContentType, modifier: Modifier) {
             color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.BodyLong,
             maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -991,6 +998,7 @@ private fun HexCta(label: String, icon: ImageVector, primary: Boolean, highlight
             color = fg,
             style = YancoType.LabelStrong,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             softWrap = false,
         )
     }
@@ -1322,6 +1330,7 @@ private fun ContentOrb(
             color = if (isCenter) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextSecondary,
             style = if (isCenter) YancoType.LabelStrong else YancoType.Label,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         // Secondary line: EPG now-title for LIVE, group name otherwise.
         val sub =
@@ -1337,6 +1346,7 @@ private fun ContentOrb(
                 color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

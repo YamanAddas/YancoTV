@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
@@ -651,6 +652,7 @@ private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate:
                             text = displayTitle,
                             color = LocalYancoPalette.current.TextPrimary,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
                         // MK.28.4 — Resume / Watched chip inline beside the
@@ -663,6 +665,7 @@ private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate:
                                 color = LocalYancoPalette.current.Accent,
                                 style = YancoType.Caption,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -671,7 +674,7 @@ private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate:
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item.groupName?.let {
-                            Text(text = it, color = LocalYancoPalette.current.TextMuted, maxLines = 1)
+                            Text(text = it, color = LocalYancoPalette.current.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         QualityChips(badges = badges)
                     }

@@ -321,35 +321,38 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
+            // MB-300 — the count used to be a sibling Text in a Row next to
+            // the title. Because the title is unweighted and measured first,
+            // it consumed the whole budget and the count was handed
+            // maxWidth = 0: the number rendered zero-width, so the user could
+            // never actually see how many sources they had. Folding it into
+            // the overline both fixes that and buys the title the full width.
             Text(
-                text = "YOUR SOURCES",
+                text = if (count > 0) "YOUR SOURCES · $count" else "YOUR SOURCES",
                 color = palette.Accent,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = if (count == 0) "No sources yet" else "Playlists & providers",
-                    color = palette.TextPrimary,
-                    fontSize = 22.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.4).sp,
-                )
-                if (count > 0) {
-                    Spacer(modifier = Modifier.size(10.dp))
-                    Text(
-                        text = "$count",
-                        color = palette.Accent,
-                        fontSize = 22.sp,
-                        lineHeight = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.4).sp,
-                    )
-                }
-            }
+            // MB-300 — was 22sp with no maxLines/overflow inside a weighted
+            // column sharing a Row with the unweighted ADD SOURCE button.
+            // Measured, it wrapped from font scale 0.686x upward: it has
+            // never fit on this screen at ANY shipped preset, including 90%.
+            // 20sp + a 2-line clamp + ellipsis means it renders on one line
+            // at 100% and breaks at a word boundary (never mid-glyph) at 125%.
+            Text(
+                text = if (count == 0) "No sources yet" else "Playlists & providers",
+                color = palette.TextPrimary,
+                fontSize = 20.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.4).sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         SettingsAccentButton(onClick = onAddClick) {
             Text(text = "ADD SOURCE")

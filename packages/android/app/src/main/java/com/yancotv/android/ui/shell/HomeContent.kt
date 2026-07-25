@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -737,6 +738,7 @@ private fun HeroFrame(slide: HeroSlide, interaction: MutableInteractionSource, l
                 color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.DisplayM,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(Space.xs))
             Text(
@@ -744,6 +746,7 @@ private fun HeroFrame(slide: HeroSlide, interaction: MutableInteractionSource, l
                 color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.Body,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(Space.lg))
             Row(
@@ -1011,12 +1014,14 @@ private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?
                     color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = secondaryLine(item, resume),
                     color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -1101,12 +1106,14 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
                     color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
                     color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -1183,12 +1190,14 @@ private fun UpNextTile(pair: NowPairing, locked: Boolean, onClick: () -> Unit, m
                     color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleS,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
                     color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -1336,6 +1345,7 @@ private fun TypeChip(item: ContentItem, modifier: Modifier = Modifier) {
             color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.Caption,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1474,6 +1484,7 @@ private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (
                     color = palette.TextPrimary,
                     style = YancoType.TitleL,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(Space.xs))
                 Text(
@@ -1481,6 +1492,7 @@ private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (
                     color = palette.TextSecondary,
                     style = YancoType.Body,
                     maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (onFix != null) {
                     Spacer(Modifier.height(Space.lg))
@@ -1543,6 +1555,7 @@ private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordina
                     color = palette.TextPrimary,
                     style = YancoType.TitleL,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(Space.xs))
                 Text(
@@ -1552,6 +1565,7 @@ private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordina
                     color = palette.TextSecondary,
                     style = YancoType.Body,
                     maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (onOpenSources != null) {
                     Spacer(Modifier.height(Space.lg))

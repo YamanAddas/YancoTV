@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -451,6 +452,7 @@ private fun ModeRow(title: String, badge: String?, subtitle: String, detail: Str
                 color = palette.TextMuted.copy(alpha = 0.7f),
                 fontSize = 10.sp,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

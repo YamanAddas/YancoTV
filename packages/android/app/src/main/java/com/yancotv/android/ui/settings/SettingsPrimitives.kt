@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -57,6 +58,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -497,11 +499,29 @@ internal fun SettingsSlider(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                modifier = Modifier.width(70.dp),
+                // MB-300 — was a hard `.width(70.dp)`. Five monospace glyphs
+                // at 16sp need 60.1dp at a 125% font scale, so 70 is fine at
+                // the presets we ship but has no slack for a 4-digit value
+                // plus unit. Nothing depends on it being exactly 70, so let
+                // it grow rather than clip.
+                modifier = Modifier.widthIn(min = 78.dp),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         if (!presets.isNullOrEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // MB-300 — the preset chips are laid out in a plain Row with no
+            // scroll. Measured on the read-timeout row, the four chips need
+            // 122.3dp of a 124dp budget at 1.0x; at the shipped 125% font
+            // scale (or once a chip goes SemiBold on selection) the fourth
+            // chip is pushed past the edge and becomes unreachable by D-pad,
+            // because an unplaced child is not focusable. One modifier is the
+            // entire difference.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            ) {
                 presets.forEach { preset ->
                     SettingsChip(
                         label = "$preset$unit",

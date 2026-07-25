@@ -437,6 +437,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                 },
                 fontSize = 16.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier =
                 Modifier
                     .weight(1f)

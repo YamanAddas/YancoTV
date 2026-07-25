@@ -168,7 +168,7 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
 private fun bucketLabel(bucket: ExternalPlayerBucket): String = when (bucket) {
     ExternalPlayerBucket.LIVE -> "Live TV"
     ExternalPlayerBucket.MOVIE -> "Movies"
-    ExternalPlayerBucket.SERIES -> "Series &amp; episodes"
+    ExternalPlayerBucket.SERIES -> "Series & episodes"
 }
 
 private fun bucketKicker(bucket: ExternalPlayerBucket): String = when (bucket) {

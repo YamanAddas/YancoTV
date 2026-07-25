@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
@@ -329,6 +330,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -336,6 +338,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
                 color = palette.TextMuted,
                 fontSize = 11.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             entry.error?.takeIf { it.isNotBlank() }?.let { reason ->
                 Spacer(modifier = Modifier.height(4.dp))
@@ -344,6 +347,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
                     color = palette.Error,
                     fontSize = 10.sp,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -441,6 +445,7 @@ private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> U
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -448,6 +453,7 @@ private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> U
                 color = palette.TextMuted,
                 fontSize = 11.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -489,12 +495,14 @@ private fun HistoryScheduleRow(
                 color = palette.TextPrimary,
                 fontSize = 12.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = entry.historyMetaLine(),
                 color = palette.TextMuted,
                 fontSize = 10.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(modifier = Modifier.width(10.dp))

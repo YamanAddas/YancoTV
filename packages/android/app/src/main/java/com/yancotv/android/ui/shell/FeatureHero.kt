@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
@@ -258,6 +259,7 @@ private fun HeroCopy(
             color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayCinematic,
             maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
 
         // For live channels, the now-playing program is the headline
@@ -318,6 +320,7 @@ private fun LiveHeroMeta(nowProg: com.yancotv.shared.types.EpgProgramme?, nextPr
                 color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleM,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             // Progress bar with clock endpoints. Time left is the concise
             // fact worth surfacing, not start/end as full timestamps.
@@ -333,6 +336,7 @@ private fun LiveHeroMeta(nowProg: com.yancotv.shared.types.EpgProgramme?, nextPr
                 color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         MetaChipRow(
@@ -384,6 +388,7 @@ private fun HeroMetaChip(label: String) {
             color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.Caption,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

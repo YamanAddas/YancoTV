@@ -1427,6 +1427,7 @@ private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui
             color = LocalYancoPalette.current.TextMuted,
             fontSize = 10.sp,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1507,6 +1508,7 @@ private fun NoEpgCell(startTime: Long, endTime: Long, widthDp: androidx.compose.
                     color = palette.TextMuted,
                     fontSize = 10.sp,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
