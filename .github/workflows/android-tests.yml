@@ -12,11 +12,35 @@ name: Android tests
 #     decision functions, SourceSyncCoordinator re-entrancy + lifecycle, etc).
 #   * `:app:assembleDebug` — pins that the Android app still BUILDS, not just
 #     compiles tests. Catches missing resources / manifest changes / DI breakage.
+#   * `ktlintCheck` — style gate. Enforceable as of 2026-07-25: the repo was
+#     `ktlintFormat`-clean in the same commit that added this step.
+#   * `:shared:verifyCommonMainYancoDbMigration` — SQLDelight replays the .sqm
+#     ladder against the schema. Runs EXPLICITLY (see the correction below).
+#   * `:app:assembleRelease` — the R8/minify path. This is the step that would
+#     have caught the MK.26 Ktor `java.lang.management` R8 abort, which was
+#     found by hand instead. Needs `-PallowUnsignedRelease` because CI has no
+#     keystore; see app/build.gradle.kts for why that flag has to be explicit.
+#
+# CORRECTION 2026-07-25 — this header previously claimed the Windows-only
+# guard on `verifyCommonMainYancoDbMigration` "does NOT fire here (Linux
+# runner), so SQLDelight's build-time migration verification runs — exactly
+# the safety net we want CI to enforce." That was false. The task is enabled
+# on Linux, but SQLDelight wires it into `check`, and none of the steps below
+# depended on `check` — `assembleDebug` and `testDebugUnitTest` do not pull it
+# in (verified with `--dry-run`). The migration ladder WAS still covered, by
+# `MigrationTest.kt` in `:shared:androidUnitTest` at runtime, so this was a
+# documentation bug rather than an uncovered gap — but a documented-and-false
+# gate is worse than no gate, so the task is now an explicit step.
 #
 # Out of scope (for now — file as future MK if pursued):
 #   * Instrumented tests (`androidTest/`) — none exist today.
-#   * Release build — uses the debug keystore (MB-201 deferred); release-only
-#     R8 issues are caught locally before release tags.
+#   * `lintRelease` — NOT enforced yet. It currently reports 24 errors on top
+#     of an already-stale `lint-baseline.xml` (which filters 58 more). Adding
+#     it as a gate today would just break CI, and regenerating the baseline
+#     would bury them — two of the NewApi hits were real API-26-on-minSdk-24
+#     crashes (MB-294, same class as the MB-241 Fire OS 6 startup crash), so
+#     they deserve fixing, not baselining. Enable this step once the error
+#     count is zero.
 #   * iOS targets — the shared module's KMP iOS klib compile (`:shared:allTests`
 #     once iOS source set lands) belongs in a separate macOS workflow.
 #
@@ -94,6 +118,17 @@ jobs:
         # cheap insurance.
         run: chmod +x ./gradlew
 
+      - name: Check code style (ktlint)
+        # First — it's the fastest gate, so a style-only break fails in
+        # seconds instead of after the full test + build cycle.
+        run: ./gradlew :shared:ktlintCheck :app:ktlintCheck --console=plain --stacktrace
+
+      - name: Verify SQLDelight migrations
+        # The build-time task the header used to claim was already covered.
+        # Disabled on Windows hosts (sqlite-jdbc native-link failure against
+        # the Android Studio JBR) but fully functional on this Linux runner.
+        run: ./gradlew :shared:verifyCommonMainYancoDbMigration --console=plain --stacktrace
+
       - name: Run :shared:testDebugUnitTest
         run: ./gradlew :shared:testDebugUnitTest --console=plain --stacktrace
 
@@ -102,6 +137,19 @@ jobs:
 
       - name: Build :app:assembleDebug
         run: ./gradlew :app:assembleDebug --console=plain --stacktrace
+
+      - name: Build :app:assembleRelease (R8)
+        # Exercises minification + resource shrinking + the ProGuard rules,
+        # which the debug build never touches. R8 has already broken this
+        # project once (MK.26 Ktor -> java.lang.management) and was caught
+        # only by a manual pre-release build.
+        #
+        # `-PallowUnsignedRelease` opts into the debug-signing fallback. CI
+        # has no release keystore and never should; the resulting APK is a
+        # build artifact for R8 validation and is NOT distributable. Without
+        # the flag this build fails by design, so a local `assembleRelease`
+        # can't silently produce an undistributable debug-signed APK.
+        run: ./gradlew :app:assembleRelease -PallowUnsignedRelease=true --console=plain --stacktrace
 
       - name: Upload test reports on failure
         if: failure()
