@@ -90,18 +90,15 @@ fun SettingsClickToEditField(
     val editFocus = remember { FocusRequester() }
     val readOnlyFocus = remember { FocusRequester() }
 
-    // MB-301 — whether leaving edit mode should pull the selector back onto the
-    // read-only row. True for a DELIBERATE exit (initial composition, IME Done);
-    // false when edit mode ended only because the user moved the selector
-    // elsewhere — otherwise the field would snap focus back and be impossible to
-    // leave. Starts true so first-composition behaviour is unchanged.
-    var returnFocusToRow by remember { mutableStateOf(true) }
-
     LaunchedEffect(editing) {
         if (editing) {
             runCatching { editFocus.requestFocus() }
-        } else if (returnFocusToRow) {
-            returnFocusToRow = false
+        } else {
+            // MB-302 — always hand focus back to the read-only row. An earlier
+            // version gated this on a "was this a deliberate exit" flag; on TV
+            // that distinction is unreachable (the IME owns the D-pad while
+            // open, so the field can only lose focus by the IME closing) and
+            // the flag just left nothing focused and a dead D-pad.
             runCatching { readOnlyFocus.requestFocus() }
         }
     }
@@ -133,14 +130,11 @@ fun SettingsClickToEditField(
                 transformation = transformation,
                 keyboardType = keyboardType,
                 focusRequester = editFocus,
-                onDone = {
-                    returnFocusToRow = true
-                    editing = false
-                },
-                // MB-301 — the user moved the selector off the field. Drop out
-                // of edit mode so returning to the row later does NOT land on a
-                // live text field and pop the IME unasked; leave
-                // `returnFocusToRow` false so we don't fight their navigation.
+                onDone = { editing = false },
+                // MB-301 — the field lost focus, which on TV means the IME
+                // closed. Drop out of edit mode so returning to this row later
+                // does NOT land on a live text field and pop the keyboard
+                // unasked. The effect above then puts focus back on the row.
                 onFocusLost = { editing = false },
             )
         } else {

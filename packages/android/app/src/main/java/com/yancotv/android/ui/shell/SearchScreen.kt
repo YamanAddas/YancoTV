@@ -373,45 +373,42 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     val editFocus = remember { FocusRequester() }
 
-    // MB-301 — whether leaving edit mode should pull the selector back onto the
-    // search row. True for a DELIBERATE exit (initial entry, BACK, IME Search);
-    // false when edit mode ended only because the user moved the selector
-    // somewhere else. Without this split, clearing `editing` on focus-loss
-    // would make the `else` branch below yank focus straight back to the field
-    // and the row would be impossible to leave.
-    var returnFocusToRow by remember { mutableStateOf(true) }
-
     LaunchedEffect(editing) {
         if (editing) {
-            // MB-301 — the browse row that owns `fieldAnchor` has just left
+            // MB-302 — the browse row that owns `fieldAnchor` has just left
             // composition, and `PlacedFocusAnchor.isPlaced` latches true and is
-            // never cleared on unmount. Clearing it here is correct hygiene:
-            // otherwise the exit path below sees a stale `true` and can fire
-            // `requestFocus()` before the row is re-placed.
-            //
-            // Honest caveat: this is NOT verified to fix the separate
-            // focus-loss bug tracked as MB-302 (after BACK, nothing is focused
-            // at all). Device instrumentation showed `awaitAndRequest()` still
-            // returning in ~2ms and focus still not landing, so that defect has
-            // another cause. Do not read this reset as closing MB-302.
+            // never cleared on unmount. Clear it so the exit path below waits
+            // for the row to be re-placed instead of firing `requestFocus()`
+            // at a node that isn't there yet.
             fieldAnchor.reset()
             runCatching { editFocus.requestFocus() }
         } else {
             keyboard?.hide()
-            if (returnFocusToRow) {
-                returnFocusToRow = false
-                fieldAnchor.awaitAndRequest()
-            }
+            // MB-302 — ALWAYS hand focus back to the row when edit mode ends.
+            //
+            // An earlier version gated this on a `returnFocusToRow` flag meant
+            // to tell a deliberate exit (BACK) from "the user moved the
+            // selector away", so we wouldn't fight their navigation. On this
+            // device that distinction is unreachable and the flag was only ever
+            // wrong: while the IME is up it owns the D-pad, so the field cannot
+            // lose focus by navigation — only by the IME closing.
+            //
+            // Worse, the IME consumes BACK to dismiss itself, so the
+            // `BackHandler` below never runs on the first press. The IME
+            // teardown drops field focus, `onFocusChanged` ends edit mode, and
+            // the flag was still false — leaving NOTHING focused and a dead
+            // D-pad. Traced on device:
+            //     row focus -> false
+            //     EXIT edit: return=false   <- should have been true
+            fieldAnchor.awaitAndRequest()
         }
     }
 
-    // BACK leaves edit mode first, so the keyboard closes without also
-    // tearing down the search overlay behind it. Only armed while editing,
-    // so the overlay's own BACK handler is untouched otherwise.
-    BackHandler(enabled = editing) {
-        returnFocusToRow = true
-        editing = false
-    }
+    // Second BACK (or the first, on a device whose IME does not consume it)
+    // leaves edit mode without tearing down the search overlay behind it.
+    // Only armed while editing, so the overlay's own BACK handler is
+    // untouched otherwise.
+    BackHandler(enabled = editing) { editing = false }
 
     val border =
         when {
@@ -449,24 +446,22 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                 // Search IME button closes the keyboard and returns to browse
                 // mode — the LaunchedEffect on `query` already drives the FTS
                 // call after the 220ms debounce, so there's nothing to fire.
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        returnFocusToRow = true
-                        editing = false
-                    },
-                ),
+                keyboardActions = KeyboardActions(onSearch = { editing = false }),
                 modifier =
                 Modifier
                     .weight(1f)
                     .focusRequester(editFocus)
-                    // MB-301 — leave edit mode when the field genuinely loses
-                    // focus (user moved the selector off the search row).
+                    // MB-301 — leave edit mode as soon as the field loses focus.
+                    // On TV that means the IME closed (it consumes BACK itself
+                    // and owns the D-pad while open, so the `BackHandler` above
+                    // does not fire on the first press). Without this the row
+                    // stayed a live text field, and coming back to it re-focused
+                    // the field and popped the keyboard unasked.
+                    //
                     // Only on a true focused -> unfocused transition:
                     // `onFocusChanged` also reports the initial unfocused state
                     // before `editFocus.requestFocus()` lands, and acting on
                     // that would cancel edit mode the instant it opened.
-                    // `returnFocusToRow` stays false here, so the selector goes
-                    // where the user aimed it instead of snapping back.
                     .onFocusChanged { state ->
                         if (state.isFocused) {
                             hadFocus = true
