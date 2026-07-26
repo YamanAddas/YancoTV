@@ -181,7 +181,14 @@ val appModule =
                 syncSource = sourceRepo::syncSource,
                 logger = get(),
                 kickEpgRefresh = {
-                    com.yancotv.android.sync.EpgSyncWorker.enqueueOnce(androidContext())
+                    // MB-299 — POST_SYNC bypasses the active-sync guard. The
+                    // coordinator fires this from inside its try block, before
+                    // the `finally` clears `_state`, so an AUTO-tagged kick here
+                    // would see its own sync still active and skip itself.
+                    com.yancotv.android.sync.EpgSyncWorker.enqueueOnce(
+                        androidContext(),
+                        com.yancotv.android.sync.EpgSyncReason.POST_SYNC,
+                    )
                 },
             )
         }

@@ -34,6 +34,7 @@ import androidx.work.WorkManager
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
@@ -203,7 +204,7 @@ fun SettingsEpgTab(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         SettingsAccentButton(
-                            onClick = { EpgSyncWorker.enqueueOnce(ctx) },
+                            onClick = { EpgSyncWorker.enqueueOnce(ctx, EpgSyncReason.USER) },
                             enabled = !running && !syncing && activeSources.isNotEmpty(),
                             size = ButtonSize.Compact,
                             translucent = true,
@@ -274,7 +275,7 @@ fun SettingsEpgTab(
                                         }
                                     if (!ok) return@launch
                                     savedGlobalUrl = cleaned
-                                    EpgSyncWorker.enqueueOnce(ctx)
+                                    EpgSyncWorker.enqueueOnce(ctx, EpgSyncReason.USER)
                                     reloadTick++
                                 }
                             },

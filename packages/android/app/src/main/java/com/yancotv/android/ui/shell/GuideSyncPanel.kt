@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
@@ -164,7 +165,7 @@ fun GuideSyncPanel(
             else -> null
         }
 
-    val doRefreshEpg = { EpgSyncWorker.enqueueOnce(context) }
+    val doRefreshEpg = { EpgSyncWorker.enqueueOnce(context, EpgSyncReason.USER) }
     val doResyncSources = {
         scope.launch {
             for (src in activeSources) {
@@ -360,7 +361,7 @@ fun GuideSyncPanel(
                             // Kick a refresh right after save so the user sees
                             // immediate feedback. KEEP dedups if one's already
                             // in flight.
-                            EpgSyncWorker.enqueueOnce(context)
+                            EpgSyncWorker.enqueueOnce(context, EpgSyncReason.USER)
                         }
                     },
                     enabled = globalUrlDraft.trim() != (savedGlobalUrl ?: ""),

@@ -13,10 +13,37 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
+import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.shared.epg.EpgRepository
 import java.util.concurrent.TimeUnit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+
+/**
+ * MB-299 — why a refresh was requested. Decides whether it may run while a
+ * catalog sync is rebuilding the channel table.
+ */
+enum class EpgSyncReason {
+    /** Startup one-shot and the 6-hour periodic. Deferrable. */
+    AUTO,
+
+    /** The user tapped "Refresh EPG". Must never silently no-op. */
+    USER,
+
+    /**
+     * [com.yancotv.android.sources.SourceSyncCoordinator] kicking a refresh
+     * the moment a catalog lands. Runs while the coordinator's `state` is
+     * still non-null — it clears in a `finally` AFTER the kick — so this must
+     * bypass the active-sync guard or EPG would never refresh at all.
+     */
+    POST_SYNC,
+
+    ;
+
+    companion object {
+        fun fromRaw(raw: String?): EpgSyncReason = entries.firstOrNull { it.name == raw } ?: AUTO
+    }
+}
 
 /**
  * Periodic + one-shot EPG refresh. Fetches every configured source's XMLTV,
@@ -28,8 +55,11 @@ import org.koin.core.component.inject
  *   - `schedulePeriodic(context)` is called once from [com.yancotv.android.YancoApp]
  *     and uses `ExistingPeriodicWorkPolicy.KEEP` so app restarts don't reset
  *     the interval window.
- *   - `enqueueOnce(context)` runs an immediate refresh (e.g. after the user
- *     adds a source or taps "Refresh EPG" in settings).
+ *   - `enqueueOnce(context, reason)` runs an immediate refresh (e.g. after the
+ *     user adds a source or taps "Refresh EPG" in settings).
+ *
+ * MB-299 — a run tagged [EpgSyncReason.AUTO] is dropped while a catalog sync is
+ * rebuilding the channel table; see [shouldSkipForActiveSync].
  *
  * The 6-hour cadence matches the desktop `epg-service.ts` default. Shorter
  * intervals waste battery + bandwidth; longer ones mean the "now playing"
@@ -41,8 +71,39 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
     private val epg: EpgRepository by inject()
     private val importer: AndroidEpgImporter by inject()
     private val prefs: AppPreferences by inject()
+    private val syncCoordinator: SourceSyncCoordinator by inject()
 
-    override suspend fun doWork(): Result = try {
+    override suspend fun doWork(): Result {
+        val reason = EpgSyncReason.fromRaw(inputData.getString(KEY_REASON))
+        if (shouldSkipForActiveSync(reason, syncCoordinator.state.value != null)) {
+            // MB-299 — a catalog sync is mid-flight. `BulkContentWriter.prepareSource`
+            // has already DELETEd this source's content rows, so the importer would
+            // match against an empty channel table: measured on AFTMM it downloaded
+            // 77,444,321 B, parsed for 64 s and reported
+            // `scanned 226822, kept 0 (0 exact + 0 normalised), dropped 226822`.
+            // Pure waste — and worse, that 77 MB fetch overlapped the 279k-item
+            // catalog sync that was already the tightest point in the heap.
+            //
+            // `success()` rather than `retry()`: retry burns `runAttemptCount`
+            // against MAX_RETRIES, which a ~4.5-minute sync would exhaust, and it
+            // is safe to drop because the coordinator kicks a POST_SYNC refresh as
+            // soon as the catalog lands. Returning immediately also frees the
+            // UNIQUE_ONESHOT slot, so that POST_SYNC kick isn't swallowed by
+            // `ExistingWorkPolicy.KEEP`.
+            //
+            // Logged, not silent: "my EPG didn't refresh" is otherwise
+            // indistinguishable from a broken feed in a bug report.
+            android.util.Log.i(
+                "Yanco",
+                "EPG refresh skipped — catalog sync in progress (reason=$reason); " +
+                    "the coordinator re-kicks EPG when the catalog lands",
+            )
+            return Result.success()
+        }
+        return runRefresh()
+    }
+
+    private suspend fun runRefresh(): Result = try {
         // Stream-based importer keeps peak memory bounded — the shared
         // [EpgRepository.refresh] path materialises the whole XML as a
         // String and OOMs on Fire TV when the provider's feed is large.
@@ -76,7 +137,22 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
     }
 
     companion object {
+        /**
+         * MB-299 — may this refresh be dropped because a catalog sync is
+         * rebuilding the channel table?
+         *
+         * Only [EpgSyncReason.AUTO] is deferrable. [EpgSyncReason.USER] must
+         * run or a "Refresh EPG" tap becomes a silent no-op, and
+         * [EpgSyncReason.POST_SYNC] must run because the coordinator fires it
+         * while its own `state` is still non-null — skipping that one would
+         * mean EPG never refreshes at all.
+         *
+         * Pure so the policy is unit-testable without WorkManager.
+         */
+        fun shouldSkipForActiveSync(reason: EpgSyncReason, catalogSyncActive: Boolean): Boolean = catalogSyncActive && reason == EpgSyncReason.AUTO
+
         const val KEY_ERROR = "error"
+        const val KEY_REASON = "reason"
         const val KEY_PROGRESS = "progress"
         private const val MAX_RETRIES = 3
         private const val UNIQUE_PERIODIC = "epg-sync-periodic"
@@ -126,6 +202,11 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
                     PERIODIC_HOURS,
                     TimeUnit.HOURS,
                 ).setConstraints(constraints)
+                    // MB-299 — the 6-hour tick is deferrable: if it happens to
+                    // land during a catalog sync it would match against a table
+                    // being rebuilt, and the coordinator refreshes EPG anyway
+                    // once the catalog settles.
+                    .setInputData(workDataOf(KEY_REASON to EpgSyncReason.AUTO.name))
                     .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_PERIODIC,
@@ -136,7 +217,13 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
             )
         }
 
-        fun enqueueOnce(context: Context) {
+        /**
+         * @param reason MB-299 — defaults to [EpgSyncReason.AUTO], which is
+         *   dropped while a catalog sync is running. Pass [EpgSyncReason.USER]
+         *   from anything the user tapped, and [EpgSyncReason.POST_SYNC] from
+         *   the sync coordinator.
+         */
+        fun enqueueOnce(context: Context, reason: EpgSyncReason = EpgSyncReason.AUTO) {
             val constraints =
                 Constraints
                     .Builder()
@@ -145,6 +232,7 @@ class EpgSyncWorker(appContext: Context, params: WorkerParameters) :
             val request =
                 OneTimeWorkRequestBuilder<EpgSyncWorker>()
                     .setConstraints(constraints)
+                    .setInputData(workDataOf(KEY_REASON to reason.name))
                     .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_ONESHOT,
