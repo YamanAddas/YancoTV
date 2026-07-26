@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -89,10 +90,18 @@ fun SettingsClickToEditField(
     val editFocus = remember { FocusRequester() }
     val readOnlyFocus = remember { FocusRequester() }
 
+    // MB-301 — whether leaving edit mode should pull the selector back onto the
+    // read-only row. True for a DELIBERATE exit (initial composition, IME Done);
+    // false when edit mode ended only because the user moved the selector
+    // elsewhere — otherwise the field would snap focus back and be impossible to
+    // leave. Starts true so first-composition behaviour is unchanged.
+    var returnFocusToRow by remember { mutableStateOf(true) }
+
     LaunchedEffect(editing) {
         if (editing) {
             runCatching { editFocus.requestFocus() }
-        } else {
+        } else if (returnFocusToRow) {
+            returnFocusToRow = false
             runCatching { readOnlyFocus.requestFocus() }
         }
     }
@@ -124,7 +133,15 @@ fun SettingsClickToEditField(
                 transformation = transformation,
                 keyboardType = keyboardType,
                 focusRequester = editFocus,
-                onDone = { editing = false },
+                onDone = {
+                    returnFocusToRow = true
+                    editing = false
+                },
+                // MB-301 — the user moved the selector off the field. Drop out
+                // of edit mode so returning to the row later does NOT land on a
+                // live text field and pop the IME unasked; leave
+                // `returnFocusToRow` false so we don't fight their navigation.
+                onFocusLost = { editing = false },
             )
         } else {
             ReadOnlyFieldBody(
@@ -225,8 +242,15 @@ private fun EditableFieldBody(
     keyboardType: KeyboardType,
     focusRequester: FocusRequester,
     onDone: () -> Unit,
+    onFocusLost: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    // MB-301 — see the SearchScreen field for the full rationale. Only a real
+    // focused -> unfocused transition counts: `onFocusChanged` also reports the
+    // initial unfocused state before `focusRequester.requestFocus()` lands, and
+    // acting on that would cancel edit mode the instant it opened. Scoped here
+    // rather than hoisted so it resets every time the field re-enters edit mode.
+    var hadFocus by remember { mutableStateOf(false) }
     Box(
         modifier =
         Modifier
@@ -255,7 +279,15 @@ private fun EditableFieldBody(
             modifier =
             Modifier
                 .fillMaxWidth()
-                .focusRequester(focusRequester),
+                .focusRequester(focusRequester)
+                .onFocusChanged { state ->
+                    if (state.isFocused) {
+                        hadFocus = true
+                    } else if (hadFocus) {
+                        hadFocus = false
+                        onFocusLost()
+                    }
+                },
         )
     }
 }

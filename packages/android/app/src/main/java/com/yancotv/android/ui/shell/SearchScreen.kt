@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -362,22 +363,55 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     // with BACK before anything else can be reached. The user asked for
     // exactly this: "i dont want it to automatically open it. i want it to
     // open if the user press on it when selecting on the box."
-    var editing by rememberSaveable { mutableStateOf(false) }
+    // MB-301 — deliberately `remember`, NOT `rememberSaveable`. Edit mode is a
+    // transient interaction state, not user input worth restoring: the query
+    // text itself is hoisted and saved by the caller. Saved across screen
+    // re-entry it meant returning to Search restored `editing = true`, the
+    // LaunchedEffect below re-ran on re-composition and called
+    // `editFocus.requestFocus()`, and the IME opened with nothing pressed —
+    // reintroducing the exact MB-296 symptom the click-to-edit rewrite removed.
+    var editing by remember { mutableStateOf(false) }
     val editFocus = remember { FocusRequester() }
+
+    // MB-301 — whether leaving edit mode should pull the selector back onto the
+    // search row. True for a DELIBERATE exit (initial entry, BACK, IME Search);
+    // false when edit mode ended only because the user moved the selector
+    // somewhere else. Without this split, clearing `editing` on focus-loss
+    // would make the `else` branch below yank focus straight back to the field
+    // and the row would be impossible to leave.
+    var returnFocusToRow by remember { mutableStateOf(true) }
 
     LaunchedEffect(editing) {
         if (editing) {
+            // MB-301 — the browse row that owns `fieldAnchor` has just left
+            // composition, and `PlacedFocusAnchor.isPlaced` latches true and is
+            // never cleared on unmount. Clearing it here is correct hygiene:
+            // otherwise the exit path below sees a stale `true` and can fire
+            // `requestFocus()` before the row is re-placed.
+            //
+            // Honest caveat: this is NOT verified to fix the separate
+            // focus-loss bug tracked as MB-302 (after BACK, nothing is focused
+            // at all). Device instrumentation showed `awaitAndRequest()` still
+            // returning in ~2ms and focus still not landing, so that defect has
+            // another cause. Do not read this reset as closing MB-302.
+            fieldAnchor.reset()
             runCatching { editFocus.requestFocus() }
         } else {
             keyboard?.hide()
-            fieldAnchor.awaitAndRequest()
+            if (returnFocusToRow) {
+                returnFocusToRow = false
+                fieldAnchor.awaitAndRequest()
+            }
         }
     }
 
     // BACK leaves edit mode first, so the keyboard closes without also
     // tearing down the search overlay behind it. Only armed while editing,
     // so the overlay's own BACK handler is untouched otherwise.
-    BackHandler(enabled = editing) { editing = false }
+    BackHandler(enabled = editing) {
+        returnFocusToRow = true
+        editing = false
+    }
 
     val border =
         when {
@@ -398,6 +432,13 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (editing) {
+            // MB-301 — scoped to this branch on purpose. A `remember` inside the
+            // `if` is re-initialised every time edit mode is entered, so the
+            // "did this field ever actually hold focus" answer can't go stale
+            // between edits. Hoisting it would break the guard below: the next
+            // edit would start with a leftover `true` and the initial
+            // unfocused callback would immediately cancel edit mode.
+            var hadFocus by remember { mutableStateOf(false) }
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -408,11 +449,32 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                 // Search IME button closes the keyboard and returns to browse
                 // mode — the LaunchedEffect on `query` already drives the FTS
                 // call after the 220ms debounce, so there's nothing to fire.
-                keyboardActions = KeyboardActions(onSearch = { editing = false }),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        returnFocusToRow = true
+                        editing = false
+                    },
+                ),
                 modifier =
                 Modifier
                     .weight(1f)
                     .focusRequester(editFocus)
+                    // MB-301 — leave edit mode when the field genuinely loses
+                    // focus (user moved the selector off the search row).
+                    // Only on a true focused -> unfocused transition:
+                    // `onFocusChanged` also reports the initial unfocused state
+                    // before `editFocus.requestFocus()` lands, and acting on
+                    // that would cancel edit mode the instant it opened.
+                    // `returnFocusToRow` stays false here, so the selector goes
+                    // where the user aimed it instead of snapping back.
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            hadFocus = true
+                        } else if (hadFocus) {
+                            hadFocus = false
+                            editing = false
+                        }
+                    }
                     .semantics { contentDescription = "Search channels, movies, and series" },
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
