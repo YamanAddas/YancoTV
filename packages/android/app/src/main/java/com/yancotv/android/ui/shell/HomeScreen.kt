@@ -339,6 +339,18 @@ fun HomeScreen(
         }
     }
 
+    // MK.29.3 — preview-pane Watch. Same parental gate and same
+    // already-playing guard as onBrowseActivate's LIVE branch (hard rule 8:
+    // re-calling play() on the running item would re-prepare the MediaItem
+    // and rebuffer); it just skips the detail page for movies.
+    val onBrowsePlayNow = fun(list: List<ContentItem>, idx: Int) {
+        val target = list.getOrNull(idx) ?: return
+        gatedPlay(target.id) {
+            if (controller.currentId != target.id) controller.play(list, idx)
+            PlayerLauncher.launch(context)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         CinematicBackground(modifier = Modifier.fillMaxSize())
         // MK.28.1 — the background above stays full-bleed under the
@@ -437,6 +449,7 @@ fun HomeScreen(
                         panelFocus = panelFocus,
                         onPanelFocusChanged = { panelFocus = it },
                         onActivate = onBrowseActivate,
+                        onPlayNow = onBrowsePlayNow,
                         onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
                         restoreFocusOnWindowRegain =
                         detailItem == null && !searchOverlayVisible && pendingPlay == null,

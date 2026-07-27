@@ -73,6 +73,8 @@ fun BrowseSection(
     panelFocus: PanelFocus,
     onPanelFocusChanged: (PanelFocus) -> Unit,
     onActivate: (List<ContentItem>, Int) -> Unit,
+    /** MK.29.3 — preview-pane Watch on a movie: play, don't open detail. */
+    onPlayNow: (List<ContentItem>, Int) -> Unit,
     onExitToSidebar: () -> Unit,
     restoreFocusOnWindowRegain: Boolean,
     /** Fired by the coverflow empty-state's "Add a source" CTA. */
@@ -252,6 +254,7 @@ fun BrowseSection(
             type = type,
             selectedGroup = selectedGroup,
             onActivate = onActivate,
+            onPlayNow = onPlayNow,
             entryFocus = coverflowFocus,
             onExitToCategories = {
                 // Just flip the panel state — the LaunchedEffect above

@@ -69,13 +69,85 @@ object ShellDim {
      */
     val settingsRailWidth = 240.dp
     val categoriesPanelWidth = 240.dp
+
+    // MK.29.4 — no call sites. Kept (rather than deleted) because the
+    // list/info-rail layout they describe is still on the roadmap, but they
+    // were NOT recalibrated against the 960x540 dp viewport in this pass and
+    // must not be adopted as-is: `infoWidth` at 320 dp is a third of the TV
+    // screen's width, and `rowHeight` at 78 dp yields under 6 visible rows
+    // where TiviMate shows 8-9. Re-derive before first use.
     val groupsWidth = 256.dp
     val infoWidth = 320.dp
     val rowHeight = 78.dp
     val rowHeightWithEpg = 92.dp
+
     val rowThumb = 56.dp
     val posterTile = 220.dp
     val posterTileAspect = 16f / 9f
-    val heroHeight = 520.dp
-    val detailPosterWidth = 240.dp
+
+    /**
+     * MB-303 — width ÷ height of a VOD poster frame.
+     *
+     * Movie / series artwork is portrait: the Xtream `stream_icon` /
+     * `cover_big` fields and TMDB's `poster_path` are both 2:3 (TMDB
+     * serves 500x750 / 780x1170). The browse preview pane rendered that
+     * into a **444x303 dp landscape box with `ContentScale.Crop`**
+     * (measured on the Fire TV AFTMM, 960x540 dp viewport): Crop scales
+     * to cover, so a 1000x1500 poster came out 444x666 and the box
+     * showed the middle 303 dp — **45% of the poster's height, title
+     * block and credit block both cut off.**
+     *
+     * Consumers size the frame from the pane HEIGHT and derive width
+     * from this ratio, so the whole poster is always on screen. Paired
+     * with `ContentScale.Fit` (not Crop) inside the frame, because
+     * providers are inconsistent — a minority ship 16:9 grabs or square
+     * art under the same field, and Fit letterboxes those into the frame
+     * instead of cropping them a second time.
+     */
+    val posterAspect = 2f / 3f
+
+    /**
+     * Fraction of the preview row given to the poster slot on VOD. The
+     * frame is height-driven (see [posterAspect]) and centres inside the
+     * slot; the slot only exists to bound the width so a tall/narrow
+     * phone-portrait pane can't hand the poster the whole row and starve
+     * the meta column. 0.30 of the measured 740 dp TV row = 222 dp,
+     * against the 202 dp a 303 dp-tall frame actually needs — 20 dp of
+     * slack, and the remaining 0.70 (518 dp) goes to title + plot +
+     * actions.
+     */
+    val posterSlotWeight = 0.30f
+
+    /**
+     * MK.29.4 — backdrop height on the content detail page.
+     *
+     * Was 520.dp, i.e. **96% of the Fire TV's 540 dp viewport**: opening a
+     * movie showed a full screen of backdrop art and nothing else, with the
+     * title, poster, plot and Play button all below the fold. The value
+     * reads plausibly on a phone (≈65% of an 800 dp-tall portrait screen),
+     * which is how it survived — the TV case is the one that's wrong, and
+     * TV is the canonical target.
+     *
+     * 330 dp is 61% of the TV viewport, so the backdrop still dominates the
+     * top of the page while the title block lands in view. Paired with
+     * [detailHeroContentOffset], which positions that block inside it.
+     */
+    val heroHeight = 330.dp
+
+    /**
+     * Distance the detail page's title/poster/actions column is pushed down
+     * so it sits in the dark band of the backdrop's gradient rather than
+     * over the bright middle of the artwork. Scaled with [heroHeight]
+     * (was a bare 220.dp literal at the call site, tuned against the old
+     * 520 dp backdrop).
+     */
+    val detailHeroContentOffset = 140.dp
+
+    /**
+     * Detail-page poster width. At [posterAspect] this is 300 dp tall, so
+     * starting from [detailHeroContentOffset] it ends at ~472 dp — inside
+     * the 540 dp fold, which the previous 240 dp (360 dp tall, ending at
+     * 532 dp) only just was.
+     */
+    val detailPosterWidth = 200.dp
 }

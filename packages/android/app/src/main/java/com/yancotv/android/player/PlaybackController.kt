@@ -60,6 +60,14 @@ import okhttp3.OkHttpClient
  */
 internal data class SourceNetworkOverride(val userAgent: String?, val referer: String?)
 
+/**
+ * MB-306 — a side-loaded subtitle currently attached to the media item.
+ * [label] is what the user picked it by ("English", "Arabic [CC]"), carried
+ * through so the player's SUBTITLES panel can name the track before
+ * ExoPlayer has parsed the sidecar and produced a real `Format.label`.
+ */
+data class ExternalSubtitle(val uri: Uri, val mime: String?, val label: String)
+
 enum class SleepTimerOption(val durationMs: Long?) {
     MIN_15(15L * 60_000L),
     MIN_30(30L * 60_000L),
@@ -531,7 +539,56 @@ class PlaybackController(
     // Cleared whenever the item changes (zap, next/prev, stop) because the
     // URI is per-title; holding it across zaps would layer the previous
     // title's captions onto a new stream.
-    private var _externalSubtitle: Pair<Uri, String?>? = null
+    /**
+     * MB-306 — the side-loaded subtitle, as observable state.
+     *
+     * This used to be a private `Pair<Uri, String?>?`, and the player's
+     * SUBTITLES panel had no way to see it. The panel derived its selection
+     * purely from `player.currentTracks`, so it showed "Off" whenever no
+     * text track was selected — and an external subtitle is NOT in
+     * `currentTracks` until ExoPlayer has fetched and parsed the sidecar
+     * file. Between `prepare()` and that load completing, the panel
+     * confidently reported Off for a subtitle that was on its way and
+     * about to appear. Exposing it lets the panel distinguish "no subtitle"
+     * from "subtitle still loading".
+     */
+    private val _externalSubtitle = MutableStateFlow<ExternalSubtitle?>(null)
+    val externalSubtitle: StateFlow<ExternalSubtitle?> = _externalSubtitle.asStateFlow()
+
+    /**
+     * MK.29.3 — a subtitle chosen *before* playback starts, from the browse
+     * preview pane's Subtitles picker.
+     *
+     * [applyExternalSubtitle] can't serve that flow: it operates on
+     * `_currentItem`, which is still the previous title (or null) at the
+     * moment the user picks. And it can't simply be called after `play()`
+     * either — that would prepare the stream once without the subtitle and
+     * immediately re-prepare it with, costing the user a visible double
+     * buffer on every subtitled start.
+     *
+     * So the pick is *staged* here and promoted to [_externalSubtitle]
+     * inside [loadCurrent], after every transition path has run its
+     * `_externalSubtitle.value = null` reset. The staging carries the content id
+     * it was made for and is consumed one-shot, so a pick the user
+     * abandons (backs out of the pane, focuses a different poster, zaps
+     * elsewhere) can never attach itself to an unrelated later stream.
+     */
+    private var _stagedSubtitle: StagedSubtitle? = null
+
+    private data class StagedSubtitle(val contentId: String, val uri: Uri, val mime: String?, val label: String)
+
+    /**
+     * Fallback display name when a caller side-loads a subtitle without one
+     * (the "Load external file…" picker, which only has a document URI).
+     * Strips the OpenSubtitles cache prefix and the extension so a raw
+     * filename at least reads as a title rather than an id.
+     */
+    private fun defaultSubtitleLabel(uri: Uri): String = uri.lastPathSegment
+        ?.substringAfterLast('/')
+        ?.substringBeforeLast('.')
+        ?.replace(Regex("^\\d+-"), "")
+        ?.takeIf { it.isNotBlank() }
+        ?: "External subtitle"
 
     // MK.12b.1 — sleep timer. Coroutine job lives on `scope`; cancellation
     // happens via [cancelSleepTimer], lifecycle [release], or — for the
@@ -601,7 +658,7 @@ class PlaybackController(
                 // and correctly clears any stale handoff override.
                 handoffNetOverride = pendingHandoff
                 _currentEpisode.value = null
-                _externalSubtitle = null
+                _externalSubtitle.value = null
                 _queue.value = list
                 _index.value = startIndex
                 loadCurrent(fromStart = fromStart)
@@ -650,7 +707,7 @@ class PlaybackController(
                 if (_currentItem.value != null) persistResumePoint()
                 handoffNetOverride = pendingHandoff
                 _currentEpisode.value = episode
-                _externalSubtitle = null
+                _externalSubtitle.value = null
                 _queue.value = listOf(episode.toContentItemView())
                 _index.value = 0
                 loadCurrent(fromStart = fromStart)
@@ -712,7 +769,7 @@ class PlaybackController(
     fun stop() {
         persistResumePoint()
         _currentEpisode.value = null
-        _externalSubtitle = null
+        _externalSubtitle.value = null
         _queue.value = emptyList()
         _index.value = -1
         _currentItem.value = null
@@ -726,7 +783,7 @@ class PlaybackController(
     fun release() {
         persistResumePoint()
         _currentEpisode.value = null
-        _externalSubtitle = null
+        _externalSubtitle.value = null
         cancelSleepTimer()
         player.release()
         scope.cancel()
@@ -803,7 +860,7 @@ class PlaybackController(
         // Persist before mutating _index so the snapshot still reads the
         // outgoing item.
         persistResumePoint()
-        _externalSubtitle = null
+        _externalSubtitle.value = null
         _index.value = target
         loadCurrent()
         return true
@@ -822,12 +879,44 @@ class PlaybackController(
      * swapping, and seek back to [Player.getCurrentPosition] after so the
      * user sees the same frame they were on.
      */
-    fun applyExternalSubtitle(uri: Uri, mime: String?) {
+    /**
+     * MK.29.3 — stage [uri] as the subtitle for the next load of
+     * [contentId]. See [_stagedSubtitle]. Pass a null [uri] to drop a
+     * previous staging (user set the picker back to Off).
+     *
+     * Main-thread only, like the rest of this class; it touches no repo
+     * and no player state, so it is safe to call directly from a Compose
+     * click handler.
+     */
+    fun stageExternalSubtitle(contentId: String, uri: Uri?, mime: String?, label: String? = null) {
+        _stagedSubtitle = uri?.let { StagedSubtitle(contentId, it, mime, label ?: defaultSubtitleLabel(it)) }
+    }
+
+    /**
+     * MB-306 — detach the side-loaded subtitle from the media item.
+     *
+     * Turning text tracks off in the selector is not enough on its own: the
+     * subtitle stays in the [MediaItem]'s configuration, so the next
+     * [loadCurrent] (next episode, resume, zap away and back) re-attaches it
+     * with `SELECTION_FLAG_DEFAULT` and it comes back on. Called by the
+     * SUBTITLES panel's "Off" row.
+     *
+     * Deliberately does NOT rebuild the media item — the renderer is
+     * already disabled by the caller, so the user sees subtitles stop
+     * immediately, and paying a rebuffer to remove an inert track from the
+     * item would be a worse trade than letting the next natural load drop it.
+     */
+    fun clearExternalSubtitle() {
+        _externalSubtitle.value = null
+        _stagedSubtitle = null
+    }
+
+    fun applyExternalSubtitle(uri: Uri, mime: String?, label: String? = null) {
         val item = _currentItem.value ?: return
         if (item.type == ContentType.LIVE) return
         val pos = player.currentPosition.coerceAtLeast(0L)
         persistResumePoint()
-        _externalSubtitle = uri to mime
+        _externalSubtitle.value = ExternalSubtitle(uri, mime, label ?: defaultSubtitleLabel(uri))
         // Enable text tracks BEFORE setMediaItem — the order matters because
         // ExoPlayer's track selector evaluates the new tracks on prepare();
         // doing the enable after prepare leaves a window where the external
@@ -896,6 +985,31 @@ class PlaybackController(
             cancelSleepTimer()
         }
         _currentItem.value = item
+        // MK.29.3 — promote a pre-play subtitle pick. Runs here, after every
+        // caller's `_externalSubtitle.value = null` reset and before
+        // buildMediaItem, so the very first prepare() of this stream already
+        // carries the subtitle configuration — no second buffer.
+        //
+        // Consumed one-shot whether or not it matched, so an abandoned pick
+        // can't latch onto a later stream. LIVE is skipped for the same
+        // reason applyExternalSubtitle rejects it (no fixed-length file to
+        // sync against, and a rebuild mid-zap is noisy).
+        _stagedSubtitle?.let { staged ->
+            _stagedSubtitle = null
+            if (staged.contentId == item.id && item.type != ContentType.LIVE) {
+                _externalSubtitle.value = ExternalSubtitle(staged.uri, staged.mime, staged.label)
+                // Same ordering rule as applyExternalSubtitle: text must be
+                // un-disabled BEFORE the media item is set, or the selector
+                // evaluates the new tracks with text off and the subtitle
+                // loads but never renders.
+                player.trackSelectionParameters =
+                    player.trackSelectionParameters
+                        .buildUpon()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                        .build()
+            }
+        }
         val mediaItem = buildMediaItem(item)
         // MK.12a.4 — apply playback speed gated by content type. Live always
         // resets to 1.0× on a new MediaItem (a temporary speed-shift on live
@@ -984,13 +1098,18 @@ class PlaybackController(
         if (item.id.startsWith(LOCAL_RECORDING_ID_PREFIX)) {
             builder.setMimeType(androidx.media3.common.MimeTypes.VIDEO_MP2T)
         }
-        _externalSubtitle?.let { (uri, mime) ->
+        _externalSubtitle.value?.let { sub ->
             val cfg =
                 MediaItem.SubtitleConfiguration
-                    .Builder(uri)
-                    .apply { if (!mime.isNullOrBlank()) setMimeType(mime) }
+                    .Builder(sub.uri)
+                    .apply { if (!sub.mime.isNullOrBlank()) setMimeType(sub.mime) }
                     .setLanguage("und")
-                    .setLabel(uri.lastPathSegment ?: "External")
+                    // MB-306 — the picker's own label ("English", "Arabic
+                    // [CC]"), not the URI's last path segment. That segment
+                    // is the OpenSubtitles cache filename, so the player's
+                    // SUBTITLES panel used to list the track as
+                    // "1234-Some.Movie.2019.1080p.srt".
+                    .setLabel(sub.label)
                     .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
                     .build()
             builder.setSubtitleConfigurations(listOf(cfg))

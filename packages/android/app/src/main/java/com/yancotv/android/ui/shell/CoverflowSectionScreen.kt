@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -85,10 +88,12 @@ import com.yancotv.android.ui.focus.tvLongClickable
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
+import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoShapes
 import com.yancotv.android.ui.theme.YancoType
+import com.yancotv.shared.content.ContentDetailService
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.favorites.FavoritesRepository
@@ -96,6 +101,7 @@ import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.history.WatchProgress
 import com.yancotv.shared.parental.ParentalRepository
 import com.yancotv.shared.types.ContentItem
+import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.NowNext
 import kotlinx.coroutines.Dispatchers
@@ -103,6 +109,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 
 /**
@@ -142,6 +149,14 @@ fun CoverflowSectionScreen(
     type: ContentType,
     selectedGroup: String,
     onActivate: (List<ContentItem>, Int) -> Unit,
+    /**
+     * MK.29.3 — start playback immediately, bypassing the detail page.
+     * Distinct from [onActivate] because the two entry points diverge for
+     * movies: pressing OK on an orb opens detail (where episodes, credits
+     * and "play from start" live), while the preview pane's Watch button
+     * plays the thing. Both still route through the caller's parental gate.
+     */
+    onPlayNow: (List<ContentItem>, Int) -> Unit,
     entryFocus: FocusRequester,
     onExitToCategories: () -> Unit,
     onPanelFocusChanged: (Boolean) -> Unit,
@@ -157,6 +172,7 @@ fun CoverflowSectionScreen(
     onAddSource: (() -> Unit)? = null,
     repo: ContentRepository = koinInject(),
     controller: PlaybackController = koinInject(),
+    detail: ContentDetailService = koinInject(),
     epg: EpgRepository = koinInject(),
     favorites: FavoritesRepository = koinInject(),
     parental: ParentalRepository = koinInject(),
@@ -465,116 +481,230 @@ fun CoverflowSectionScreen(
     val previewItem = focusedItem
     val isPreviewPlaying = previewItem != null && playing?.id == previewItem.id
 
-    Column(
-        modifier =
-        modifier
-            .fillMaxSize()
-            .onFocusChanged { coverflowHasFocus = it.hasFocus },
-    ) {
-        // Compose key dispatch order is preview (top-down) → onKeyEvent
-        // (bottom-up) → default focus navigation. An .onKeyEvent on the outer
-        // Column still fires BEFORE focus-nav, so hoisting the "LEFT exits to
-        // categories" handler here intercepts every LEFT and defeats the
-        // LazyRow's orb-to-orb scroll. The correct placement is scoped:
-        //   1. PreviewPane's Watch CTA — LEFT from leftmost CTA exits (see
-        //      onExit wiring below; preview handler only fires when Watch is
-        //      the focused node, so Favorite → Watch via focus-nav is
-        //      untouched).
-        //   2. Coverflow Box — onPreviewKeyEvent gated on shouldExitCoverflowOnLeft
-        //      (focusedIndex <= 0). Inter-orb LEFT/RIGHT flow naturally.
-        PreviewPane(
-            type = type,
-            focused = previewItem,
-            playing = playing,
-            isPlaying = isPreviewPlaying,
-            isFavorite = isFav,
-            isLocked = previewItem?.let { it.id in lockedIds } == true,
-            nowNext = previewItem?.tvgId?.let { nowNextMap[it] },
-            nowSeconds = nowSeconds,
-            controller = controller,
-            onExitLeft = onExitToCategories,
-            onPlay = {
-                val item = previewItem ?: return@PreviewPane
-                val idx = visible.indexOfFirst { it.id == item.id }
-                if (idx >= 0) onActivate(visible.toList(), idx)
-            },
-            onToggleFavorite = {
-                val item = previewItem ?: return@PreviewPane
-                val optimistic = !isFav
-                isFav = optimistic
-                scope.launch {
-                    val newState =
-                        withContext(Dispatchers.IO) {
-                            runCatching { favorites.toggle(item.id) }
-                                .onFailure { Log.w("Yanco", "CoverflowSection favorites.toggle failed", it) }
-                                .getOrElse { !optimistic }
-                        }
-                    if (newState != optimistic) isFav = newState
-                }
-            },
-            modifier =
-            Modifier
-                .fillMaxWidth()
-                .weight(0.62f),
-        )
+    // MK.29.2 — plot / genre / year for the preview meta column.
+    //
+    // Sourced through ContentDetailService, which is cache-first: it only
+    // reaches the provider when a movie has no cached plot (or a series no
+    // cached episodes), and persists whatever it fetched back onto the row.
+    // Two guards keep that off the network on a fast wheel-scroll:
+    //
+    //   1. PREVIEW_DETAIL_DEBOUNCE_MS of dwell before anything is loaded, so
+    //      spinning past 40 posters issues zero requests.
+    //   2. A per-session id → metadata cache. The rows held in `items` keep
+    //      their sync-time metadataJson for the life of the screen, so
+    //      without this, scrolling back to an already-enriched title would
+    //      re-fetch it every time.
+    //
+    // LIVE never loads — channels have no VOD detail, and the LIVE branch of
+    // the meta column renders EPG now/next instead.
+    val detailCache = remember(type) { mutableStateMapOf<String, ContentMetadata>() }
+    var previewMeta by remember(type) { mutableStateOf<ContentMetadata?>(null) }
+    LaunchedEffect(previewItem?.id, type) {
+        val target = previewItem
+        if (target == null || type == ContentType.LIVE) {
+            previewMeta = null
+            return@LaunchedEffect
+        }
+        val cached = detailCache[target.id]
+        if (cached != null) {
+            previewMeta = cached
+            return@LaunchedEffect
+        }
+        // Paint whatever shipped with the catalog row immediately, then
+        // enrich. Without this the description area stays blank for the
+        // whole dwell window even when the row already carries a plot.
+        val fromRow = parsePreviewMetadata(target)
+        previewMeta = fromRow
+        // SERIES stops here, deliberately. `ContentDetailService.load`
+        // refreshes a series when it has no cached *episodes* — but the
+        // preview pane renders the plot, and the series listing already
+        // carries that from catalog sync. So enriching here would spend a
+        // `get_series_info` round-trip, plus an episode-table upsert, on
+        // data this pane never shows, once per title the user rests on.
+        // With MB-230's heap ceiling on this device that is not a trade
+        // worth making; the detail page still fetches episodes on open.
+        if (target.type != ContentType.MOVIE) return@LaunchedEffect
+        delay(PREVIEW_DETAIL_DEBOUNCE_MS)
+        val loaded =
+            withContext(Dispatchers.IO) {
+                runCatching { detail.load(target).metadata }
+                    .onFailure { Log.w("Yanco", "CoverflowSection detail.load(${target.id}) failed: ${it.message}", it) }
+                    .getOrNull()
+            } ?: return@LaunchedEffect
+        detailCache[target.id] = loaded
+        // The wheel may have moved on during the round-trip.
+        if (focusedItem?.id == target.id) previewMeta = loaded
+    }
 
-        Box(
+    // MK.29.3 — pre-play subtitle pick. Keyed on the focused item's id so
+    // moving the wheel drops it: a subtitle resolved for one movie must
+    // never survive onto the next. `remember`, not `rememberSaveable` —
+    // ResolvedSubtitle points at a cache file that may not outlive process
+    // death, and re-picking is one press.
+    var previewSubtitle by remember(previewItem?.id) { mutableStateOf<ResolvedSubtitle?>(null) }
+    var subtitlePickerOpen by remember(previewItem?.id) { mutableStateOf(false) }
+    // Seeds the OpenSubtitles search language from Settings → Playback →
+    // Subtitle language; the picker falls back to English when unset.
+    val playbackPrefs by prefs.playbackFlow.collectAsState()
+
+    // MK.29.3 — root Box so the subtitle sheet can stack OVER the section.
+    // It cannot be emitted as a plain sibling of the Column the way
+    // `ChannelActionsMenu` is: that one renders through `Dialog`, i.e. its
+    // own window, so it escapes this layout entirely. A bare
+    // `fillMaxSize()` overlay emitted as a sibling would instead become a
+    // second child of BrowseSection's Row — measured in the unweighted pass,
+    // taking all remaining width, and leaving the weighted coverflow Column
+    // with zero.
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
             modifier =
             Modifier
-                .fillMaxWidth()
-                .weight(0.38f)
-                // D-pad LEFT at the leftmost orb pops back to the categories
-                // rail. Inter-orb LEFT/RIGHT presses flow through to
-                // LazyRow's natural focus traversal — we only intercept
-                // when there's nowhere left to scroll inside the wheel.
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown &&
-                        ev.key == Key.DirectionLeft &&
-                        shouldExitCoverflowOnLeft(focusedIndex)
-                    ) {
-                        onExitToCategories()
-                        true
-                    } else {
-                        false
-                    }
-                }.focusGroup(),
+                .fillMaxSize()
+                .onFocusChanged { coverflowHasFocus = it.hasFocus },
         ) {
-            when {
-                visible.isNotEmpty() ->
-                    ContentCoverflow(
-                        items = visible,
-                        type = type,
-                        nowNextMap = nowNextMap,
-                        lockedIds = lockedIds,
-                        watchProgress = watchProgress,
-                        focusedIndex =
-                        focusedIndex.coerceIn(
-                            0,
-                            (visible.size - 1).coerceAtLeast(0),
-                        ),
-                        firstItemAnchor = firstItemAnchor,
-                        entryFocus = entryFocus,
-                        onFocus = { idx, item ->
-                            focusedIndex = idx
-                            focusedItem = item
-                        },
-                        onActivate = { idx -> onActivate(visible.toList(), idx) },
-                        onLongPress = { item -> actionsFor = item },
-                        onLastVisible = { idx -> lastVisibleIndex = idx },
-                    )
-                hasLoaded ->
-                    CoverflowEmptyState(
-                        type = type,
-                        favoritesFilter = isFavoritesFilter,
-                        onAddSource = onAddSource,
-                    )
+            // Compose key dispatch order is preview (top-down) → onKeyEvent
+            // (bottom-up) → default focus navigation. An .onKeyEvent on the outer
+            // Column still fires BEFORE focus-nav, so hoisting the "LEFT exits to
+            // categories" handler here intercepts every LEFT and defeats the
+            // LazyRow's orb-to-orb scroll. The correct placement is scoped:
+            //   1. PreviewPane's Watch CTA — LEFT from leftmost CTA exits (see
+            //      onExit wiring below; preview handler only fires when Watch is
+            //      the focused node, so Favorite → Watch via focus-nav is
+            //      untouched).
+            //   2. Coverflow Box — onPreviewKeyEvent gated on shouldExitCoverflowOnLeft
+            //      (focusedIndex <= 0). Inter-orb LEFT/RIGHT flow naturally.
+            PreviewPane(
+                type = type,
+                focused = previewItem,
+                playing = playing,
+                isPlaying = isPreviewPlaying,
+                isFavorite = isFav,
+                isLocked = previewItem?.let { it.id in lockedIds } == true,
+                nowNext = previewItem?.tvgId?.let { nowNextMap[it] },
+                nowSeconds = nowSeconds,
+                metadata = previewMeta,
+                subtitle = previewSubtitle,
+                controller = controller,
+                onExitLeft = onExitToCategories,
+                onOpenSubtitles = { subtitlePickerOpen = true },
+                onPlay = {
+                    val item = previewItem ?: return@PreviewPane
+                    val idx = visible.indexOfFirst { it.id == item.id }
+                    if (idx < 0) return@PreviewPane
+                    if (type == ContentType.MOVIE) {
+                        // MK.29.3 — the preview pane's Watch starts the movie
+                        // rather than opening its detail page (the orb's own OK
+                        // press still opens detail). Stage the subtitle first:
+                        // loadCurrent consumes it while building the very first
+                        // MediaItem, so the stream prepares with subtitles
+                        // already attached instead of buffering twice.
+                        previewSubtitle?.let {
+                            controller.stageExternalSubtitle(item.id, it.uri, it.mime, it.label)
+                        }
+                        onPlayNow(visible.toList(), idx)
+                    } else {
+                        onActivate(visible.toList(), idx)
+                    }
+                },
+                onToggleFavorite = {
+                    val item = previewItem ?: return@PreviewPane
+                    val optimistic = !isFav
+                    isFav = optimistic
+                    scope.launch {
+                        val newState =
+                            withContext(Dispatchers.IO) {
+                                runCatching { favorites.toggle(item.id) }
+                                    .onFailure { Log.w("Yanco", "CoverflowSection favorites.toggle failed", it) }
+                                    .getOrElse { !optimistic }
+                            }
+                        if (newState != optimistic) isFav = newState
+                    }
+                },
+                modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(0.62f),
+            )
+
+            Box(
+                modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(0.38f)
+                    // D-pad LEFT at the leftmost orb pops back to the categories
+                    // rail. Inter-orb LEFT/RIGHT presses flow through to
+                    // LazyRow's natural focus traversal — we only intercept
+                    // when there's nowhere left to scroll inside the wheel.
+                    .onPreviewKeyEvent { ev ->
+                        if (ev.type == KeyEventType.KeyDown &&
+                            ev.key == Key.DirectionLeft &&
+                            shouldExitCoverflowOnLeft(focusedIndex)
+                        ) {
+                            onExitToCategories()
+                            true
+                        } else {
+                            false
+                        }
+                    }.focusGroup(),
+            ) {
+                when {
+                    visible.isNotEmpty() ->
+                        ContentCoverflow(
+                            items = visible,
+                            type = type,
+                            nowNextMap = nowNextMap,
+                            lockedIds = lockedIds,
+                            watchProgress = watchProgress,
+                            focusedIndex =
+                            focusedIndex.coerceIn(
+                                0,
+                                (visible.size - 1).coerceAtLeast(0),
+                            ),
+                            firstItemAnchor = firstItemAnchor,
+                            entryFocus = entryFocus,
+                            onFocus = { idx, item ->
+                                focusedIndex = idx
+                                focusedItem = item
+                            },
+                            onActivate = { idx -> onActivate(visible.toList(), idx) },
+                            onLongPress = { item -> actionsFor = item },
+                            onLastVisible = { idx -> lastVisibleIndex = idx },
+                        )
+                    hasLoaded ->
+                        CoverflowEmptyState(
+                            type = type,
+                            favoritesFilter = isFavoritesFilter,
+                            onAddSource = onAddSource,
+                        )
+                }
             }
+        }
+
+        // MK.29.3 — stacked over the section inside the root Box (see the
+        // note on that Box), so the scrim covers the whole surface and the
+        // sheet's focus trap isn't clipped to the meta column's bounds.
+        //
+        // The null-item case needs no reset branch: `subtitlePickerOpen` is
+        // remembered against `previewItem?.id`, so losing the focused item
+        // re-keys the state back to false on its own. Writing to it from
+        // here would be a state write during composition.
+        previewItem?.takeIf { subtitlePickerOpen }?.let { target ->
+            PreviewSubtitleOverlay(
+                item = target,
+                metadata = previewMeta,
+                preferredLanguage = playbackPrefs.subtitleLanguage,
+                selected = previewSubtitle,
+                onDismiss = { subtitlePickerOpen = false },
+                onSelect = { previewSubtitle = it },
+            )
         }
     }
 
     // MB-98 — channel context menu, lifted out of the wheel so the dialog
     // renders over the entire CoverflowSectionScreen surface (not clipped
     // to the LazyRow viewport). Dismissed via Back or any explicit row.
+    // Stays outside the root Box: it renders through `Dialog`, i.e. its own
+    // window, so layout parentage is irrelevant to it.
     actionsFor?.let { target ->
         ChannelActionsMenu(
             item = target,
@@ -597,6 +727,40 @@ fun CoverflowSectionScreen(
  */
 internal fun shouldExitCoverflowOnLeft(focusedIndex: Int): Boolean = focusedIndex <= 0
 
+/**
+ * MK.29.2 — dwell required on a poster before the preview pane loads its
+ * detail metadata. Long enough that holding RIGHT through a category issues
+ * no provider calls at all, short enough that stopping on a title fills the
+ * description in before the user has finished reading the title.
+ */
+private const val PREVIEW_DETAIL_DEBOUNCE_MS = 450L
+
+/**
+ * Soft cap on the preview plot. The hard guarantee that the action row
+ * stays on screen comes from the plot's `weight(1f, fill = false)`, not
+ * from this number — this only stops a long synopsis from eating the whole
+ * pane on a tall phone layout where the weight has room to spare.
+ */
+private const val PREVIEW_PLOT_MAX_LINES = 4
+
+private val previewMetadataJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+}
+
+/**
+ * Decode the catalog row's own `metadata_json` for the immediate paint,
+ * before [ContentDetailService] has had a chance to enrich it. Returns null
+ * rather than throwing on a malformed blob — a bad row must not take the
+ * browse screen down (native-android-mk hard rule 7).
+ */
+private fun parsePreviewMetadata(item: ContentItem): ContentMetadata? {
+    val raw = item.metadataJson?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching { previewMetadataJson.decodeFromString(ContentMetadata.serializer(), raw) }
+        .onFailure { Log.w("Yanco", "CoverflowSection metadata parse failed for ${item.id}: ${it.message}") }
+        .getOrNull()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Preview pane — type-aware. LIVE shows the MiniPlayer (or focused channel's
 // logo when not yet playing); VOD shows the focused poster + meta + Open CTA.
@@ -614,10 +778,13 @@ private fun PreviewPane(
     isLocked: Boolean,
     nowNext: NowNext?,
     nowSeconds: Long,
+    metadata: ContentMetadata?,
+    subtitle: ResolvedSubtitle?,
     controller: PlaybackController,
     onExitLeft: () -> Unit,
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onOpenSubtitles: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -631,56 +798,21 @@ private fun PreviewPane(
         horizontalArrangement = Arrangement.spacedBy(Space.xxxl),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier =
-            Modifier
-                .weight(0.6f)
-                .fillMaxHeight()
-                .clip(YancoShapes.CutCornerCardLarge)
-                .background(LocalYancoPalette.current.BackgroundDeep)
-                .border(
-                    width = 1.dp,
-                    brush =
-                    Brush.verticalGradient(
-                        listOf(
-                            LocalYancoPalette.current.Accent.copy(alpha = 0.45f),
-                            LocalYancoPalette.current.PanelBorder,
-                        ),
-                    ),
-                    shape = YancoShapes.CutCornerCardLarge,
-                ),
-        ) {
-            when {
-                // LIVE preview — share the running ExoPlayer surface.
-                type == ContentType.LIVE && isPlaying ->
-                    MiniPlayer(
-                        modifier = Modifier.fillMaxSize(),
-                        controller = controller,
-                    )
-                // Either no logo at all or LIVE-pre-preview: show artwork.
-                focused?.logoUrl?.isNotBlank() == true ->
-                    AsyncImage(
-                        model = focused.logoUrl,
-                        contentDescription = focused.cleanTitle?.ifBlank { null } ?: focused.title,
-                        contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
-                        modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(if (type == ContentType.LIVE) Space.section else 0.dp),
-                    )
-                else -> PreviewIdleArtwork(type = type)
-            }
-            Box(
+        if (type == ContentType.LIVE) {
+            LivePreviewFrame(
+                focused = focused,
+                isPlaying = isPlaying,
+                controller = controller,
+                modifier = Modifier.weight(0.6f).fillMaxHeight(),
+            )
+        } else {
+            PosterPreviewFrame(
+                type = type,
+                focused = focused,
                 modifier =
                 Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.85f to Color.Transparent,
-                            1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f),
-                        ),
-                    ),
+                    .weight(ShellDim.posterSlotWeight)
+                    .fillMaxHeight(),
             )
         }
 
@@ -692,15 +824,133 @@ private fun PreviewPane(
             isLocked = isLocked,
             nowNext = nowNext,
             nowSeconds = nowSeconds,
+            metadata = metadata,
+            subtitle = subtitle,
             onExitLeft = onExitLeft,
             onPlay = onPlay,
             onToggleFavorite = onToggleFavorite,
+            onOpenSubtitles = onOpenSubtitles,
             modifier =
             Modifier
-                .weight(0.4f)
-                .fillMaxHeight(),
+                .weight(
+                    if (type == ContentType.LIVE) 0.4f else 1f - ShellDim.posterSlotWeight,
+                ).fillMaxHeight(),
         )
     }
+}
+
+/**
+ * LIVE preview surface — the running ExoPlayer's output, or the focused
+ * channel's logo before playback starts. Keeps the wide 16:9-ish box
+ * (weight 0.6 of the row) because that is the shape video actually is.
+ */
+@UnstableApi
+@Composable
+private fun LivePreviewFrame(focused: ContentItem?, isPlaying: Boolean, controller: PlaybackController, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.previewFrameChrome()) {
+        when {
+            isPlaying ->
+                MiniPlayer(
+                    modifier = Modifier.fillMaxSize(),
+                    controller = controller,
+                )
+            focused?.displayLogoUrl?.isNotBlank() == true ->
+                AsyncImage(
+                    model = focused.displayLogoUrl,
+                    contentDescription = focused.displayTitle,
+                    contentScale = ContentScale.Fit,
+                    modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(Space.section),
+                )
+            else -> PreviewIdleArtwork(type = ContentType.LIVE)
+        }
+        PreviewScrim()
+    }
+}
+
+/**
+ * MB-303 — VOD preview surface. Sizes a [ShellDim.posterAspect] frame to
+ * the pane height and centres it inside [modifier]'s slot, so the entire
+ * poster is on screen instead of the middle 45% the old 444x303 dp
+ * landscape box cropped to.
+ *
+ * [BoxWithConstraints] rather than `fillMaxHeight().aspectRatio(...)`
+ * deliberately: `fillMaxHeight` pins minHeight == maxHeight, and when the
+ * height-derived width doesn't fit (phone portrait — a 500 dp-tall pane
+ * wants a 333 dp-wide frame out of a ~110 dp slot) every branch of
+ * `aspectRatio`'s constraint search fails and it silently falls through to
+ * measuring with the raw constraints. Clamping the height against the
+ * slot width here has no such degenerate case on any viewport.
+ */
+@Composable
+private fun PosterPreviewFrame(type: ContentType, focused: ContentItem?, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
+        // Height-first, clamped by what the slot width can carry.
+        val frameHeight = minOf(maxHeight, maxWidth / ShellDim.posterAspect)
+        val frameWidth = frameHeight * ShellDim.posterAspect
+        Box(
+            modifier =
+            Modifier
+                .size(width = frameWidth, height = frameHeight)
+                .previewFrameChrome(),
+        ) {
+            val art = focused?.displayLogoUrl
+            if (art?.isNotBlank() == true) {
+                AsyncImage(
+                    model = art,
+                    contentDescription = focused.displayTitle,
+                    // Fit, not Crop: the frame is already poster-shaped, and
+                    // providers that ship 16:9 grabs or square art under the
+                    // same field letterbox cleanly instead of being cropped
+                    // a second time.
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                PreviewIdleArtwork(type = type)
+            }
+            PreviewScrim()
+        }
+    }
+}
+
+/** Shared cut-corner card chrome for both preview frames. */
+@Composable
+private fun Modifier.previewFrameChrome(): Modifier {
+    val palette = LocalYancoPalette.current
+    return this
+        .clip(YancoShapes.CutCornerCardLarge)
+        .background(palette.BackgroundDeep)
+        .border(
+            width = 1.dp,
+            brush =
+            Brush.verticalGradient(
+                listOf(
+                    palette.Accent.copy(alpha = 0.45f),
+                    palette.PanelBorder,
+                ),
+            ),
+            shape = YancoShapes.CutCornerCardLarge,
+        )
+}
+
+/** Bottom fade so the frame's lower edge sits into the pane background. */
+@Composable
+private fun PreviewScrim() {
+    Box(
+        modifier =
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.85f to Color.Transparent,
+                    1f to LocalYancoPalette.current.BackgroundDeep.copy(alpha = 0.55f),
+                ),
+            ),
+    )
 }
 
 @Composable
@@ -733,7 +983,7 @@ private fun PreviewIdleArtwork(type: ContentType) {
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun MetaColumn(
     type: ContentType,
@@ -743,16 +993,23 @@ private fun MetaColumn(
     isLocked: Boolean,
     nowNext: NowNext?,
     nowSeconds: Long,
+    metadata: ContentMetadata?,
+    subtitle: ResolvedSubtitle?,
     onExitLeft: () -> Unit,
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onOpenSubtitles: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (focused == null) {
         EmptyMetaPrompt(type = type, modifier = modifier)
         return
     }
-    val title = focused.cleanTitle?.ifBlank { null } ?: focused.title
+    // MK.13.2 `displayTitle` — was re-implementing the cleanTitle fallback
+    // by hand, which skipped the user's name override; the preview frame's
+    // own contentDescription already used displayTitle, so a renamed item
+    // announced one name and rendered another.
+    val title = focused.displayTitle
     val nowProg = nowNext?.now
     val nextProg = nowNext?.next
     val overline =
@@ -761,12 +1018,14 @@ private fun MetaColumn(
             ContentType.MOVIE -> "MOVIE"
             ContentType.SERIES -> "SERIES"
         }
+    // MK.29.3 — a series container has no stream of its own, so its primary
+    // action opens the episode list rather than starting playback.
     val watchLabel =
         when {
             type == ContentType.LIVE && isPlaying -> "Open fullscreen"
             type == ContentType.LIVE -> "Watch"
             type == ContentType.MOVIE -> "Watch"
-            else -> "Open"
+            else -> "Episodes"
         }
     // No widthIn cap here — the column needs to use whatever horizontal
     // space the meta side of the preview row has, otherwise a 520dp cap
@@ -787,43 +1046,83 @@ private fun MetaColumn(
         Text(
             text = title,
             color = LocalYancoPalette.current.TextPrimary,
-            style = YancoType.DisplayM,
+            style = YancoType.DisplayS,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (type == ContentType.LIVE && nowProg != null) {
-            Text(
-                text = "Now: ${nowProg.title}",
-                color = LocalYancoPalette.current.TextPrimary,
-                style = YancoType.TitleM,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            ProgressLine(start = nowProg.startTime, end = nowProg.endTime, now = nowSeconds)
-        } else {
-            // Smart-cast across module boundary needs a local val.
-            val grp = focused.groupName
-            if (!grp.isNullOrBlank()) {
+        if (type == ContentType.LIVE) {
+            if (nowProg != null) {
                 Text(
-                    text = grp,
-                    color = LocalYancoPalette.current.TextSecondary,
-                    style = YancoType.Body,
+                    text = "Now: ${nowProg.title}",
+                    color = LocalYancoPalette.current.TextPrimary,
+                    style = YancoType.TitleM,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                ProgressLine(start = nowProg.startTime, end = nowProg.endTime, now = nowSeconds)
+            } else {
+                // Smart-cast across module boundary needs a local val.
+                val grp = focused.groupName
+                if (!grp.isNullOrBlank()) {
+                    Text(
+                        text = grp,
+                        color = LocalYancoPalette.current.TextSecondary,
+                        style = YancoType.Body,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (nextProg != null) {
+                Text(
+                    text = "Up next: ${nextProg.title}",
+                    color = LocalYancoPalette.current.TextMuted,
+                    style = YancoType.Caption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        if (type == ContentType.LIVE && nextProg != null) {
-            Text(
-                text = "Up next: ${nextProg.title}",
-                color = LocalYancoPalette.current.TextMuted,
-                style = YancoType.Caption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        } else {
+            // MK.29.2 — VOD: facts line, then the plot. `metadata` is null
+            // until the debounced detail load lands, so both blocks are
+            // absent-tolerant; the column simply grows as data arrives
+            // rather than reserving a fixed gap that renders as dead space
+            // on titles the provider ships no plot for.
+            PreviewFactsLine(item = focused, meta = metadata, type = type)
+            val plot =
+                metadata?.plot?.takeIf { it.isNotBlank() }
+                    ?: metadata?.description?.takeIf { it.isNotBlank() }
+            if (plot != null) {
+                Text(
+                    text = plot,
+                    color = LocalYancoPalette.current.TextSecondary,
+                    style = YancoType.BodyLong,
+                    maxLines = PREVIEW_PLOT_MAX_LINES,
+                    overflow = TextOverflow.Ellipsis,
+                    // The plot is the ONLY flexible row in this column.
+                    // Column measures unweighted children first, so the
+                    // action row below always gets its full height and the
+                    // description absorbs whatever is left over — on a short
+                    // pane the text truncates instead of pushing Watch /
+                    // Favorite / Subtitles off the bottom. MB-300 shipped
+                    // exactly that failure on the player's error overlay
+                    // (RETRY and BACK measured at height 0); `fill = false`
+                    // keeps a short plot from padding the column out.
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
         }
         Spacer(Modifier.height(Space.xs))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+        // FlowRow, not Row: with the Subtitles control the action strip can
+        // exceed the meta column on a narrow pane (rail mounted, phone
+        // portrait, or a large font-scale preset), and a plain Row would
+        // measure the overflowing child at zero width — the MB-300 failure
+        // shape where a control is present in the tree but unreachable.
+        // Wrapping costs a line of height, which the plot above gives up.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Space.md),
+            verticalArrangement = Arrangement.spacedBy(Space.sm),
+        ) {
             // Only the Watch CTA gets the LEFT-exits-to-categories preview
             // handler. Scoping it to this subtree (not MetaColumn / Row) is
             // deliberate: onPreviewKeyEvent fires top-down along the focused
@@ -855,8 +1154,55 @@ private fun MetaColumn(
                 highlighted = isFavorite,
                 onClick = onToggleFavorite,
             )
+            // MK.29.3 — movies only. A series container has no stream, so
+            // "which episode's subtitle?" has no answer here; the player's
+            // own subtitle menu covers episodes once one is playing.
+            if (type == ContentType.MOVIE) {
+                HexCta(
+                    label = subtitle?.label ?: "Subtitles",
+                    icon = YancoIcons.Subtitles,
+                    primary = false,
+                    highlighted = subtitle != null,
+                    onClick = onOpenSubtitles,
+                )
+            }
         }
     }
+}
+
+/**
+ * MK.29.2 — one-line facts strip under the preview title: year, rating,
+ * genre, runtime, plus the provider group as a fallback so the row is
+ * never empty on titles with no enriched metadata at all. Dot-separated,
+ * single line, ellipsised — it is orientation, not content.
+ */
+@Composable
+private fun PreviewFactsLine(item: ContentItem, meta: ContentMetadata?, type: ContentType) {
+    val palette = LocalYancoPalette.current
+    val facts =
+        remember(item.id, meta, type) {
+            buildList {
+                meta?.releaseDate?.takeIf { it.isNotBlank() }?.let { add(it.take(4)) }
+                meta?.rating?.takeIf { it.isNotBlank() }?.let { add("★ $it") }
+                meta?.genre?.takeIf { it.isNotBlank() }?.let { add(it) }
+                if (type == ContentType.SERIES) {
+                    meta?.episodes?.size?.takeIf { it > 0 }?.let { add("$it episodes") }
+                } else {
+                    meta?.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
+                }
+                // Fallback only — a provider group name is better than a
+                // blank strip, but it is redundant next to real metadata.
+                if (isEmpty()) item.groupName?.takeIf { it.isNotBlank() }?.let { add(it) }
+            }
+        }
+    if (facts.isEmpty()) return
+    Text(
+        text = facts.joinToString("  ·  "),
+        color = palette.TextSecondary,
+        style = YancoType.CaptionStrong,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
@@ -1249,9 +1595,13 @@ private fun ContentOrb(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            if (item.logoUrl?.isNotBlank() == true) {
+            if (item.displayLogoUrl?.isNotBlank() == true) {
                 AsyncImage(
-                    model = item.logoUrl,
+                    // MK.13.2 `displayLogoUrl`, matching the preview frame:
+                    // the orb was reading the raw `logoUrl`, so a user logo
+                    // override showed in the preview but not on the tile it
+                    // came from.
+                    model = item.displayLogoUrl,
                     contentDescription = null,
                     contentScale = if (type == ContentType.LIVE) ContentScale.Fit else ContentScale.Crop,
                     modifier =
