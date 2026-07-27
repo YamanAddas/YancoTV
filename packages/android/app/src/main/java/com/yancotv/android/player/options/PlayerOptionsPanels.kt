@@ -15,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +50,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.C
@@ -65,6 +67,7 @@ import com.yancotv.android.player.subtitles.MoviehashUnavailable
 import com.yancotv.android.player.subtitles.OpenSubtitlesClient
 import com.yancotv.android.player.subtitles.SubtitleResult
 import com.yancotv.android.player.subtitles.buildSubtitleQuery
+import com.yancotv.android.player.subtitles.subtitleMimeFor
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.android.recording.RecordingService
@@ -116,7 +119,7 @@ fun PlayerOptionsPanelHost(
     // (touch only) is the only path that fully dismisses.
     val onPickOption: () -> Unit = remember(state) { { state.closePanel() } }
 
-    Box(
+    BoxWithConstraints(
         modifier =
         Modifier
             .fillMaxSize()
@@ -128,6 +131,17 @@ fun PlayerOptionsPanelHost(
             },
         contentAlignment = Alignment.BottomEnd,
     ) {
+        // MB-306 — the cap has to come from the actual viewport, not a
+        // constant. `PANEL_MAX_HEIGHT` was a flat 480dp while the panel sits
+        // 96dp off the bottom edge; on the Fire TV's 540dp-tall viewport
+        // that put its top at -36dp, so a long track list (BluRay rips
+        // routinely carry 10+ subtitle tracks) scrolled its first rows off
+        // the top of the screen with no way to reach them. Same shape as the
+        // MB-300 settings-rail bug: a dp figure that reads fine on a phone
+        // and overflows on TV.
+        val panelMaxHeight =
+            (maxHeight - PANEL_BOTTOM_INSET.dp - PANEL_TOP_MARGIN.dp)
+                .coerceIn(PANEL_MIN_HEIGHT.dp, PANEL_MAX_HEIGHT.dp)
         AnimatedVisibility(
             visible = active != null,
             enter = fadeIn() + slideInHorizontally(initialOffsetX = { it / 3 }),
@@ -137,9 +151,9 @@ fun PlayerOptionsPanelHost(
             Column(
                 modifier =
                 Modifier
-                    .padding(end = 32.dp, bottom = 96.dp)
+                    .padding(end = 32.dp, bottom = PANEL_BOTTOM_INSET.dp)
                     .width(PANEL_WIDTH.dp)
-                    .heightIn(max = PANEL_MAX_HEIGHT.dp)
+                    .heightIn(max = panelMaxHeight)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xEE0A1410))
                     .border(1.dp, palette.Accent, RoundedCornerShape(12.dp)),
@@ -193,7 +207,7 @@ private fun PanelHeader(label: String) {
     Text(
         text = label.uppercase(Locale.ROOT),
         color = palette.Accent,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.5.sp,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -318,6 +332,7 @@ private fun SubtitlesPanelContent(
 ) {
     val tracks = rememberTextTracks(controller.player)
     val disabled = rememberTextDisabled(controller.player)
+    val external by controller.externalSubtitle.collectAsState()
     val scope = rememberCoroutineScope()
     val firstRowAnchor = rememberPlacedFocusAnchor()
     val searchRowAnchor = rememberPlacedFocusAnchor()
@@ -349,7 +364,16 @@ private fun SubtitlesPanelContent(
         state.consumeSubPanelReturn()
     }
 
-    val offSelected = disabled || tracks.none { it.selected }
+    // MB-306 — a side-loaded subtitle is NOT in `currentTracks` until
+    // ExoPlayer has fetched and parsed the sidecar, which for a remote
+    // provider URL is a network round-trip after prepare(). Deriving the
+    // selection from tracks alone therefore reported "Off" for a subtitle
+    // that was on its way, and re-opening the menu a moment later showed it
+    // correctly — exactly the reported symptom. `external` closes that gap:
+    // while it is set and no track has surfaced yet, the panel shows the
+    // pending subtitle as the selection instead of claiming Off.
+    val externalPending = external != null && tracks.none { it.selected }
+    val offSelected = disabled || (tracks.none { it.selected } && !externalPending)
     OptionRow(
         label = "Off",
         selected = offSelected,
@@ -362,10 +386,25 @@ private fun SubtitlesPanelContent(
                     .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                     .build()
             controller.player.trackSelectionParameters = params
+            // Drop the side-loaded track too. Without this, "Off" disabled
+            // the renderer but left the subtitle attached to the MediaItem,
+            // so the next load (next episode, resume, zap back) silently
+            // brought it back.
+            controller.clearExternalSubtitle()
             scope.launch { prefs.setSubtitleLanguage("") }
             onPickOption()
         },
     )
+    // Local val: `external` is a delegated property, so it can't smart-cast.
+    val pendingExternal = external?.takeIf { externalPending }
+    if (pendingExternal != null) {
+        OptionRow(
+            label = pendingExternal.label,
+            detail = "Loading…",
+            selected = true,
+            onPick = onPickOption,
+        )
+    }
     tracks.forEach { t ->
         OptionRow(
             label = t.displayName,
@@ -402,7 +441,11 @@ private data class TextTrack(val group: Tracks.Group, val trackIndex: Int, val l
 @UnstableApi
 @Composable
 private fun rememberTextTracks(player: Player): List<TextTrack> {
-    var t by remember { mutableStateOf(readTextTracks(player)) }
+    // Keyed on `player`: MK.9.4's FFmpeg fallback releases the ExoPlayer and
+    // stands a new one up. Unkeyed, the seed value survived that swap and the
+    // panel showed the OLD player's tracks until the new one happened to emit
+    // onTracksChanged — which it may already have done before this composed.
+    var t by remember(player) { mutableStateOf(readTextTracks(player)) }
     DisposableEffect(player) {
         val l =
             object : Player.Listener {
@@ -419,7 +462,10 @@ private fun rememberTextTracks(player: Player): List<TextTrack> {
 @UnstableApi
 @Composable
 private fun rememberTextDisabled(player: Player): Boolean {
-    var d by remember { mutableStateOf(player.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)) }
+    // Keyed on `player` for the same reason as rememberTextTracks.
+    var d by remember(player) {
+        mutableStateOf(player.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT))
+    }
     DisposableEffect(player) {
         val l =
             object : Player.Listener {
@@ -580,8 +626,13 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
             if (sub.aiTranslated) append(" [AI]")
         }
         val detail = sub.release.take(40).ifBlank { sub.fileName.take(40) }
+        val busy = downloading == sub.fileId
         OptionRow(
-            label = "$label — $detail",
+            // Release info moved to the second line — it was concatenated
+            // into the label with an em dash, which pushed the language (the
+            // only part most picks turn on) off the end of a 380dp panel.
+            label = label,
+            detail = if (busy) "Downloading…" else detail,
             selected = false,
             focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {
@@ -593,13 +644,8 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
                             client.download(sub.fileId)
                         }
                         val uri = android.net.Uri.fromFile(result.file)
-                        val mime = when {
-                            result.file.name.endsWith(".srt", ignoreCase = true) -> "application/x-subrip"
-                            result.file.name.endsWith(".vtt", ignoreCase = true) -> "text/vtt"
-                            result.file.name.endsWith(".ass", ignoreCase = true) || result.file.name.endsWith(".ssa", ignoreCase = true) -> "text/x-ssa"
-                            else -> "application/x-subrip"
-                        }
-                        controller.applyExternalSubtitle(uri, mime)
+                        val mime = subtitleMimeFor(result.file.name)
+                        controller.applyExternalSubtitle(uri, mime, label)
                         onPickOption()
                     } catch (e: Exception) {
                         error = e.message ?: "Download failed"
@@ -826,7 +872,14 @@ fun cycleTextTrack(controller: PlaybackController, forward: Boolean, scope: kotl
 // ───── Shared ─────
 
 @Composable
-private fun OptionRow(label: String, selected: Boolean, onPick: () -> Unit, focusAnchor: PlacedFocusAnchor? = null) {
+private fun OptionRow(
+    label: String,
+    selected: Boolean,
+    onPick: () -> Unit,
+    focusAnchor: PlacedFocusAnchor? = null,
+    /** Optional second line — state ("Loading…") or provenance ("From provider"). */
+    detail: String? = null,
+) {
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -864,13 +917,25 @@ private fun OptionRow(label: String, selected: Boolean, onPick: () -> Unit, focu
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            color = if (selected) palette.Accent else palette.TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                color = if (selected) palette.Accent else palette.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            detail?.let {
+                Text(
+                    text = it,
+                    color = palette.TextMuted,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         if (selected) {
             Text(
                 text = "✓",
@@ -887,7 +952,7 @@ private fun EmptyLine(text: String) {
     Text(
         text = text,
         color = LocalYancoPalette.current.TextMuted,
-        fontSize = 13.sp,
+        fontSize = 14.sp,
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
     )
 }
@@ -1242,4 +1307,15 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
 private data class TvTarget(val label: String, val host: String, val port: Int)
 
 private const val PANEL_WIDTH = 380
+
+/** Gap between the panel's bottom edge and the bottom of the screen — clears the transport bar. */
+private const val PANEL_BOTTOM_INSET = 96
+
+/** Breathing room above the panel so it never runs to the very top edge. */
+private const val PANEL_TOP_MARGIN = 24
+
+/** Ceiling on tall viewports (phone landscape / tablet), where the derived height would be excessive. */
 private const val PANEL_MAX_HEIGHT = 480
+
+/** Floor, so a very short viewport still yields a scrollable panel rather than a sliver. */
+private const val PANEL_MIN_HEIGHT = 160
