@@ -113,8 +113,11 @@ fun SettingsAboutTab(
         // for a fully-read-only tab — that's no longer this tab.
     ) {
         // ───── Logo (above the Version block, centered horizontally) ─────
+        // MK.29.5 — square 140dp slot, so this takes the badge-only mark.
+        // With the 16:9 lockup, Fit rendered it 140x78 inside the square:
+        // 44% of the box was empty and the badge was ~35dp wide.
         Image(
-            painter = painterResource(id = R.drawable.ic_logo),
+            painter = painterResource(id = R.drawable.ic_logo_mark),
             contentDescription = "YancoTV logo",
             contentScale = ContentScale.Fit,
             modifier =
@@ -426,7 +429,7 @@ private fun ValueText(value: String) {
     Text(
         text = value,
         color = LocalYancoPalette.current.TextPrimary,
-        fontSize = 13.sp,
+        fontSize = 14.sp,
         fontWeight = FontWeight.SemiBold,
     )
 }
@@ -469,7 +472,7 @@ private fun UpdateAvailableBanner(
             Text(
                 text = "New version available: ${info.versionName}",
                 color = palette.Accent,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             val notes = info.releaseNotes
@@ -477,7 +480,7 @@ private fun UpdateAvailableBanner(
                 Text(
                     text = notes,
                     color = palette.TextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
@@ -487,7 +490,7 @@ private fun UpdateAvailableBanner(
                     Text(
                         text = "Download and install in place, or open the release page in a browser.",
                         color = palette.TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
                     )
                     Row {
@@ -510,7 +513,7 @@ private fun UpdateAvailableBanner(
                     Text(
                         text = "Downloading… ${s.percent}%",
                         color = palette.TextSecondary,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
                     )
                     LinearProgressBar(percent = s.percent)
@@ -526,7 +529,7 @@ private fun UpdateAvailableBanner(
                     Text(
                         text = "Download complete. Tap Install to apply the update — Android may ask you to allow installs from this app the first time.",
                         color = palette.TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
                     )
                     Row {
@@ -549,7 +552,7 @@ private fun UpdateAvailableBanner(
                     Text(
                         text = "Download failed: ${s.reason}",
                         color = palette.TextSecondary,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
                     )
                     Row {

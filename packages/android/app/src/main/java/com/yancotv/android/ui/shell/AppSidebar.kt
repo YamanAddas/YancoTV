@@ -256,16 +256,23 @@ private fun iconFor(section: AppSection): ImageVector = when (section) {
 
 @Composable
 private fun BrandMark(showWordmark: Boolean) {
-    // Shipped raster logo stretched to fill the sidebar width. Replaces the
-    // old "Y tile + YancoTV / streaming suite" text block so the brand
-    // reads as a crafted mark rather than a hand-wired monogram.
+    // MK.29.5 — the asset follows the SHAPE OF THE SLOT, not just its size.
     //
-    // When the sidebar collapses to icon-only mode the wordmark is too wide
-    // to read so we shrink the logo strip to a square brand mark — Image
-    // contentScale=Fit handles the rest. Height drops in lockstep so the
-    // sidebar header doesn't leave a tall empty band above the rows.
+    // Both states used to draw `ic_logo`, the 16:9 badge+wordmark lockup.
+    // That is right when the sidebar is expanded (260dp — a wide slot), but
+    // collapsed the slot is 92dp wide and near-square, and fitting a 16:9
+    // strip into it scales the whole lockup down until the "Y" badge — the
+    // only part still legible at that size — renders about 15dp across.
+    // Measured on the Fire TV: the header box is 60x48dp and the badge
+    // inside it was a smudge.
+    //
+    // Collapsed now draws `ic_logo_mark`: the badge alone, square, on real
+    // alpha, so it fills the slot at ~56dp instead of a quarter of it.
+    // Fit (never FillBounds) on both, so neither asset is stretched.
     Image(
-        painter = painterResource(id = R.drawable.ic_logo),
+        painter = painterResource(
+            id = if (showWordmark) R.drawable.ic_logo else R.drawable.ic_logo_mark,
+        ),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier =

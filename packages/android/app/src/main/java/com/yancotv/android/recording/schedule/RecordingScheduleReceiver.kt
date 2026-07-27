@@ -401,7 +401,13 @@ class RecordingScheduleReceiver :
                 )
             }
             val notification = androidx.core.app.NotificationCompat.Builder(context, FAILED_CHANNEL_ID)
-                .setSmallIcon(com.yancotv.android.R.drawable.ic_logo)
+                // MK.29.5 — badge-only mark. A notification small icon is
+                // rendered from its ALPHA channel alone, tinted flat by the
+                // system and drawn in a square status-bar slot: the 16:9
+                // badge+wordmark lockup became an unreadable white smear.
+                // The mark's alpha is a single solid hex, which tints to a
+                // recognisable silhouette.
+                .setSmallIcon(com.yancotv.android.R.drawable.ic_logo_mark)
                 .setContentTitle("Recording didn't start")
                 .setContentText("\"$title\" — $humanReason")
                 .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText("\"$title\" — $humanReason"))
