@@ -957,7 +957,7 @@ private fun GuideGrid(
                         "Showing ${guide.channels.size} of $totalCount channels"
                     },
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
             }
         }
@@ -1103,7 +1103,7 @@ private fun TimeHeader(
                     Text(
                         text = label,
                         color = LocalYancoPalette.current.TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(start = 6.dp),
                     )
@@ -1367,14 +1367,14 @@ private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPre
             Text(
                 text = numberPrefix,
                 color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             )
         }
         Text(
             text = channel.name,
             color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1425,7 +1425,7 @@ private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui
         Text(
             text = formatHourMinute(programme.startTime),
             color = LocalYancoPalette.current.TextMuted,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1497,7 +1497,7 @@ private fun NoEpgCell(startTime: Long, endTime: Long, widthDp: androidx.compose.
             Text(
                 text = if (focused) "No info" else "—",
                 color = if (focused) palette.TextPrimary else palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1506,7 +1506,7 @@ private fun NoEpgCell(startTime: Long, endTime: Long, widthDp: androidx.compose.
                 Text(
                     text = rangeLabel,
                     color = palette.TextMuted,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1561,7 +1561,7 @@ private fun ProgrammeActionDialog(
                 Text(
                     text = channel.name,
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                 )
                 Text(
                     text = "${formatHourMinute(programme.startTime)} – ${formatHourMinute(programme.endTime)}",
@@ -1575,7 +1575,7 @@ private fun ProgrammeActionDialog(
                     Text(
                         text = cat.uppercase(),
                         color = LocalYancoPalette.current.Accent,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(top = 8.dp),
                     )
@@ -1584,7 +1584,7 @@ private fun ProgrammeActionDialog(
                     Text(
                         text = desc,
                         color = LocalYancoPalette.current.TextPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }

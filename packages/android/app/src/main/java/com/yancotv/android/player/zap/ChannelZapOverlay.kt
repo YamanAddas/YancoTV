@@ -61,14 +61,14 @@ fun ChannelZapOverlay(state: ChannelZapNumericState) {
             Text(
                 text = "CHANNEL",
                 color = palette.TextMuted,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 2.sp,
             )
             Text(
                 text = digits.ifBlank { " " } + "_",
                 color = palette.Accent,
-                fontSize = 36.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
             )
         }

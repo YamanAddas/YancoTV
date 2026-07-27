@@ -117,7 +117,7 @@ fun SettingsClickToEditField(
             Text(
                 text = description,
                 color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
         }
     }
@@ -158,7 +158,7 @@ fun SettingsClickToEditField(
             ) {
                 labelText()
                 if (!hint.isNullOrBlank() && !editing) {
-                    Text(text = hint, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp)
+                    Text(text = hint, color = LocalYancoPalette.current.TextMuted, fontSize = 12.sp)
                 }
             }
             fieldRow()

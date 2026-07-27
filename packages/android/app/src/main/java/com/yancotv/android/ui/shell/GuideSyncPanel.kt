@@ -190,13 +190,13 @@ fun GuideSyncPanel(
                 Text(
                     text = "$programmes programmes · $channels channels",
                     color = LocalYancoPalette.current.TextPrimary,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = busyLabel ?: subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
                     color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     // MK.28.8 (MB-279) — live region so TalkBack announces
                     // refresh started / finished / failed transitions.
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
@@ -240,13 +240,13 @@ fun GuideSyncPanel(
             Text(
                 text = if (programmes == 0L) "No guide data yet" else "Guide diagnostics",
                 color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 18.sp,
+                fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
                 color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 // MK.28.8 (MB-279) — live region so TalkBack announces
                 // refresh started / finished / failed transitions.
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
@@ -259,7 +259,7 @@ fun GuideSyncPanel(
                         strokeWidth = 2.dp,
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(busyLabel, color = LocalYancoPalette.current.TextPrimary, fontSize = 13.sp)
+                    Text(busyLabel, color = LocalYancoPalette.current.TextPrimary, fontSize = 14.sp)
                 }
             }
             if (activeSources.isEmpty()) {
@@ -307,7 +307,7 @@ fun GuideSyncPanel(
                 Text(
                     text = "${brokenSources.size} source(s) last failed. Re-sync them to retry.",
                     color = LocalYancoPalette.current.Error,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
             }
 
@@ -315,7 +315,7 @@ fun GuideSyncPanel(
             Text(
                 text = "ADD / OVERRIDE EPG URL",
                 color = LocalYancoPalette.current.Accent,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -323,7 +323,7 @@ fun GuideSyncPanel(
                 "Paste an XMLTV URL to load EPG from. Used in addition to per-source URLs — " +
                     "useful when a provider's feed is broken or you want a better schedule.",
                 color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -374,7 +374,7 @@ fun GuideSyncPanel(
                 Text(
                     text = "Current: $savedGlobalUrl",
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
             }
         }

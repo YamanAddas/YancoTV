@@ -133,7 +133,7 @@ internal fun SettingsSection(
             Text(
                 text = title,
                 color = palette.TextPrimary,
-                fontSize = 20.sp,
+                fontSize = 19.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.2).sp,
             )
@@ -162,7 +162,7 @@ internal fun SettingsSection(
                 text = sub,
                 color = palette.TextMuted,
                 fontSize = 12.sp,
-                lineHeight = 18.sp,
+                lineHeight = 19.sp,
                 modifier = Modifier.padding(bottom = 16.dp).fillMaxWidth(),
             )
         }
@@ -257,7 +257,7 @@ internal fun SettingsRow(
             Text(
                 text = label,
                 color = palette.TextPrimary,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
             )
             if (hint != null) {
@@ -265,7 +265,7 @@ internal fun SettingsRow(
                     text = hint,
                     color = palette.TextMuted,
                     fontSize = 12.sp,
-                    lineHeight = 17.sp,
+                    lineHeight = 19.sp,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
@@ -309,7 +309,7 @@ internal fun SettingsKicker(text: String, modifier: Modifier = Modifier, accent:
     Text(
         text = text.uppercase(),
         color = if (accent) palette.Accent else palette.TextMuted,
-        fontSize = 10.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.6.sp,
         fontFamily = FontFamily.Monospace,
@@ -586,7 +586,7 @@ internal fun SettingsSelect(value: String, onClick: () -> Unit, modifier: Modifi
         Text(
             text = value,
             color = palette.TextPrimary,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         // Chevron-down hint — single triangle drawn with two short text

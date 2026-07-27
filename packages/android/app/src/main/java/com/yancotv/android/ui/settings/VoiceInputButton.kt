@@ -95,7 +95,7 @@ fun VoiceInputButton(modifier: Modifier = Modifier, onResult: (String) -> Unit) 
         Text(
             text = "VOICE",
             color = if (focused) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
         )
     }
 }

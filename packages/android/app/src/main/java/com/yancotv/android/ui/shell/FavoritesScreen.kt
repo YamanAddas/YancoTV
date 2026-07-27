@@ -375,7 +375,7 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
                 Text(
                     text = "YOUR LIBRARY",
                     color = palette.Accent,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.6.sp,
                 )
@@ -383,16 +383,16 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
                 Text(
                     text = "No favorites yet",
                     color = palette.TextPrimary,
-                    fontSize = 22.sp,
+                    fontSize = 23.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    lineHeight = 26.sp,
+                    lineHeight = 29.sp,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = "Browse Live TV, Movies, or Series, focus a tile, then long-press OK and pick \"Add to favorites\".",
                     color = palette.TextMuted,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
                 )
             }
         }
@@ -479,7 +479,7 @@ private fun ListTabChip(label: String, selected: Boolean, onClick: () -> Unit, o
         Text(
             text = label,
             color = if (selected) palette.Accent else palette.TextPrimary,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
         )
     }
 }

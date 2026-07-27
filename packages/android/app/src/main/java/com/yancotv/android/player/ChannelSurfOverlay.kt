@@ -134,7 +134,7 @@ fun ChannelSurfOverlay(
         Text(
             text = "Channels",
             color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 15.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         )
@@ -178,7 +178,7 @@ fun ChannelSurfOverlay(
         Text(
             text = "BACK to close",
             color = LocalYancoPalette.current.TextMuted,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         )
     }
@@ -260,14 +260,14 @@ private fun SurfRow(
                     Text(
                         text = channelNumberPrefix,
                         color = LocalYancoPalette.current.TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
                 }
                 Text(
                     text = title,
                     color = LocalYancoPalette.current.TextPrimary,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = if (playing) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -277,7 +277,7 @@ private fun SurfRow(
                 Text(
                     text = nowTitle,
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

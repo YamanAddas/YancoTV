@@ -178,7 +178,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     Text(
                         text = healthSummary(status),
                         color = status.subColor(palette),
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
@@ -275,7 +275,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                         Text(
                             text = current.filePath?.takeLast(40) ?: "—",
                             color = palette.TextSecondary,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -445,7 +445,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                 Text(
                     text = "Save failed: $err",
                     color = palette.Error,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
@@ -483,8 +483,8 @@ private fun DetailHero(source: Source, palette: YancoPalette, onBack: () -> Unit
             Text(
                 text = source.name.ifBlank { "Untitled source" },
                 color = palette.TextPrimary,
-                fontSize = 24.sp,
-                lineHeight = 28.sp,
+                fontSize = 23.sp,
+                lineHeight = 29.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.4).sp,
                 maxLines = 1,
@@ -506,7 +506,7 @@ private fun ValueText(value: String) {
     Text(
         text = value,
         color = LocalYancoPalette.current.TextPrimary,
-        fontSize = 13.sp,
+        fontSize = 14.sp,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

@@ -175,7 +175,7 @@ private fun ThemeRow(id: ThemeId, selected: Boolean, palette: YancoPalette, onCl
             Text(
                 text = id.displayName,
                 color = pal.TextPrimary,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(

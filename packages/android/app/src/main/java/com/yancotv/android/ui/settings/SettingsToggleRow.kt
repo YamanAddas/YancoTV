@@ -175,7 +175,7 @@ internal fun SettingsToggleRow(label: String, description: String, checked: Bool
                 Text(
                     text = label,
                     color = if (enabled) palette.TextPrimary else palette.TextMuted,
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     lineHeight = 19.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -184,7 +184,7 @@ internal fun SettingsToggleRow(label: String, description: String, checked: Bool
                     text = description,
                     color = if (enabled) palette.TextMuted else palette.TextFaint,
                     fontSize = 12.sp,
-                    lineHeight = 17.sp,
+                    lineHeight = 19.sp,
                 )
             }
             VerdantSwitch(checked = checked, enabled = enabled)

@@ -143,7 +143,7 @@ fun RecordingsScreen(
             Text(
                 text = "Recordings",
                 color = palette.TextPrimary,
-                fontSize = 22.sp,
+                fontSize = 23.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -259,7 +259,7 @@ private fun SectionHeader(text: String, palette: com.yancotv.android.ui.theme.Ya
     Text(
         text = text.uppercase(Locale.getDefault()),
         color = palette.TextMuted,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.4.sp,
         modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
@@ -336,7 +336,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
             Text(
                 text = entry.metaLine(),
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -345,7 +345,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
                 Text(
                     text = "Error: $reason",
                     color = palette.Error,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -408,7 +408,7 @@ private fun StatusBadge(status: RecordingStatus, palette: com.yancotv.android.ui
         Text(
             text = label,
             color = fg,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
         )
@@ -451,7 +451,7 @@ private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> U
             Text(
                 text = entry.upcomingMetaLine(),
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -500,7 +500,7 @@ private fun HistoryScheduleRow(
             Text(
                 text = entry.historyMetaLine(),
                 color = palette.TextMuted,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -585,7 +585,7 @@ private fun ScheduleStateBadge(kind: ScheduleStateBadgeKind, palette: com.yancot
         Text(
             text = label,
             color = fg,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
         )

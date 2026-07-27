@@ -330,7 +330,7 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
             Text(
                 text = if (count > 0) "YOUR SOURCES · $count" else "YOUR SOURCES",
                 color = palette.Accent,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
                 maxLines = 1,
@@ -346,8 +346,8 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
             Text(
                 text = if (count == 0) "No sources yet" else "Playlists & providers",
                 color = palette.TextPrimary,
-                fontSize = 20.sp,
-                lineHeight = 24.sp,
+                fontSize = 19.sp,
+                lineHeight = 25.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.4).sp,
                 maxLines = 2,
@@ -391,7 +391,7 @@ private fun SyncBanner(sourceName: String, progress: SyncProgress, elapsedSec: L
             Text(
                 text = "SYNC IN PROGRESS",
                 color = palette.Accent,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
             )
@@ -399,7 +399,7 @@ private fun SyncBanner(sourceName: String, progress: SyncProgress, elapsedSec: L
             Text(
                 text = message,
                 color = palette.TextPrimary,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -438,15 +438,15 @@ private fun EmptyState(onAddClick: () -> Unit, modifier: Modifier = Modifier) {
         Text(
             text = "No sources configured",
             color = palette.TextPrimary,
-            fontSize = 18.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.3).sp,
         )
         Text(
             text = "Add an Xtream login, M3U URL, M3U file, or Stalker portal to start streaming.",
             color = palette.TextMuted,
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
+            fontSize = 14.sp,
+            lineHeight = 19.sp,
         )
         SettingsAccentButton(onClick = onAddClick) {
             Text(text = "ADD SOURCE")
@@ -534,7 +534,7 @@ private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPale
             Text(
                 text = source.name.ifBlank { "Untitled source" },
                 color = palette.TextPrimary,
-                fontSize = 18.sp,
+                fontSize = 19.sp,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.2).sp,
@@ -671,7 +671,7 @@ private fun StatusChip(text: String, accent: Color, bg: Color) {
         Text(
             text = text,
             color = accent,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 1.0.sp,
         )

@@ -251,7 +251,7 @@ private fun VodDockMetadata(data: VodDockData) {
         Text(
             text = data.kicker,
             color = palette.Accent,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 2.2.sp,
         )
@@ -267,7 +267,7 @@ private fun VodDockMetadata(data: VodDockData) {
         Text(
             text = data.title.ifBlank { "—" },
             color = palette.TextPrimary,
-            fontSize = 44.sp,
+            fontSize = 34.sp,
             fontWeight = FontWeight.Black,
             letterSpacing = (-0.8).sp,
             maxLines = 2,
@@ -303,7 +303,7 @@ private fun MetadataChip(chip: VodDockChip) {
         Text(
             text = chip.label,
             color = fg,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.4.sp,
         )
@@ -756,7 +756,7 @@ private fun HintItem(prefix: String, label: String) {
         Text(
             text = prefix,
             color = palette.Accent,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 1.4.sp,
@@ -765,7 +765,7 @@ private fun HintItem(prefix: String, label: String) {
         Text(
             text = label,
             color = palette.TextMuted,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 1.4.sp,

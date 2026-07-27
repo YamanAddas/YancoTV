@@ -76,7 +76,7 @@ private fun FlashBadge(seconds: Int) {
         Text(
             text = if (seconds > 0) "▶▶  +${seconds}s" else "◂◂  ${seconds}s",
             color = Color.White,
-            fontSize = 28.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.5.sp,
         )

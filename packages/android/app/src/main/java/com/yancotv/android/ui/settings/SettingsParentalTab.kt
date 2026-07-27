@@ -104,7 +104,7 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
         Text(
             text = "Parental controls",
             color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
@@ -180,9 +180,9 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                     }
                 }
                 if (newPin.isNotEmpty() && newPin.length !in 4..8) {
-                    Text("PIN must be 4–8 digits.", color = LocalYancoPalette.current.Error, fontSize = 11.sp)
+                    Text("PIN must be 4–8 digits.", color = LocalYancoPalette.current.Error, fontSize = 12.sp)
                 } else if (newPin.isNotEmpty() && newPin != confirmPin) {
-                    Text("PIN entries don't match.", color = LocalYancoPalette.current.Error, fontSize = 11.sp)
+                    Text("PIN entries don't match.", color = LocalYancoPalette.current.Error, fontSize = 12.sp)
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -365,18 +365,18 @@ private fun HiddenRow(item: ContentItem, onUnhide: () -> Unit) {
             Text(
                 text = item.cleanTitle?.ifBlank { null } ?: item.title,
                 color = LocalYancoPalette.current.TextPrimary,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             item.groupName?.takeIf { it.isNotBlank() }?.let {
-                Text(text = it, color = LocalYancoPalette.current.TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = it, color = LocalYancoPalette.current.TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         SettingsOutlinedButton(
             onClick = onUnhide,
         ) {
-            Text("Unhide", fontSize = 11.sp)
+            Text("Unhide", fontSize = 12.sp)
         }
     }
 }

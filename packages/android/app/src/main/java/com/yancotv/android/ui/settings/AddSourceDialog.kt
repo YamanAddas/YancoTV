@@ -197,7 +197,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 Text(
                     text = "Add source",
                     color = LocalYancoPalette.current.TextPrimary,
-                    fontSize = 22.sp,
+                    fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
@@ -207,7 +207,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     // Fire TV remote AND phone.
                     text = "Tap a field to edit it. Credentials are encrypted on-device.",
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                 )
             }
 
@@ -413,7 +413,7 @@ private fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
         color = LocalYancoPalette.current.TextMuted,
-        fontSize = 10.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.sp,
     )
@@ -475,7 +475,7 @@ private fun TypeChip(label: String, description: String, selected: Boolean, onSe
         Text(
             text = description,
             color = LocalYancoPalette.current.TextMuted,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
         )
     }
 }

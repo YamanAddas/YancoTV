@@ -159,7 +159,7 @@ private fun KeyChip(keys: String) {
         Text(
             text = keys,
             color = palette.Accent,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 0.4.sp,

@@ -181,7 +181,7 @@ fun SettingsEpgTab(
                         Text(
                             text = "ERROR",
                             color = LocalYancoPalette.current.Error,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.4.sp,
                         )
@@ -397,7 +397,7 @@ private fun ValueText(value: String) {
     Text(
         text = value,
         color = LocalYancoPalette.current.TextPrimary,
-        fontSize = 13.sp,
+        fontSize = 14.sp,
         fontWeight = FontWeight.SemiBold,
     )
 }
@@ -419,7 +419,7 @@ private fun EpgPriorityRow(source: Source, canMoveUp: Boolean, canMoveDown: Bool
                     Text(
                         text = "Only source",
                         color = LocalYancoPalette.current.TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }

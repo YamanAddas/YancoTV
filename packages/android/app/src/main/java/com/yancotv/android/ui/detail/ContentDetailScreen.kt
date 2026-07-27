@@ -597,7 +597,7 @@ private fun HeroBlock(
         ) {
             // Push the content block below the backdrop gradient so the
             // title sits in the darkest band where the scrim reads best.
-            Spacer(modifier = Modifier.height(220.dp))
+            Spacer(modifier = Modifier.height(ShellDim.detailHeroContentOffset))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xxl)) {
                 Poster(url = item.logoUrl ?: metadata.tmdbPosterUrl)
                 Column(
@@ -735,7 +735,7 @@ private fun Poster(url: String?) {
         modifier =
         Modifier
             .width(ShellDim.detailPosterWidth)
-            .aspectRatio(2f / 3f)
+            .aspectRatio(ShellDim.posterAspect)
             .clip(RoundedCornerShape(Radius.panel))
             .background(LocalYancoPalette.current.BackgroundRaised)
             .border(1.dp, LocalYancoPalette.current.PanelBorder, RoundedCornerShape(Radius.panel)),
@@ -745,7 +745,12 @@ private fun Poster(url: String?) {
             AsyncImage(
                 model = url,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                // MB-303 — Fit, matching the browse preview frame. The box is
+                // already at posterAspect, so Crop only ever trims art that
+                // ISN'T 2:3 (the providers that serve a 16:9 grab under
+                // `stream_icon`) — exactly the case that needs letterboxing,
+                // not a second crop.
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

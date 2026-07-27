@@ -37,7 +37,7 @@ private fun Chip(badge: QualityBadge) {
     Text(
         text = badge.label,
         color = fg,
-        fontSize = 10.sp,
+        fontSize = 12.sp,
         modifier =
         Modifier
             .clip(RoundedCornerShape(3.dp))

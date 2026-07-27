@@ -649,7 +649,7 @@ private fun SearchRail(title: String, items: List<ContentItem>, watchProgress: M
         Text(
             text = title.uppercase(),
             color = LocalYancoPalette.current.TextMuted,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
         LazyRow(
@@ -717,7 +717,7 @@ private fun SearchOrb(item: ContentItem, progress: WatchProgress?, onActivate: (
                 Text(
                     text = title.take(1).uppercase(),
                     color = palette.TextPrimary,
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }

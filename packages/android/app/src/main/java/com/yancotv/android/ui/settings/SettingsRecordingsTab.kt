@@ -148,7 +148,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
         Text(
             text = "Recordings",
             color = palette.TextPrimary,
-            fontSize = 20.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
         )
 
@@ -173,7 +173,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                 "Pick where new recordings save. You can change this " +
                     "any time — past recordings keep playing from wherever they were saved.",
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
 
             // Public folder (recommended)
@@ -302,7 +302,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                     "any recording you've made. New recordings show up there immediately " +
                     "as they start.",
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
         }
 
@@ -334,7 +334,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                         "Fire TV will route the picker through it. Or switch to Public folder " +
                         "above; recordings save without ever using the system picker.",
                     color = palette.TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
             }
         }
@@ -424,14 +424,14 @@ private fun ModeRow(title: String, badge: String?, subtitle: String, detail: Str
                 Text(
                     text = title,
                     color = palette.TextPrimary,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (badge != null) {
                     Text(
                         text = badge,
                         color = palette.Accent,
-                        fontSize = 9.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.6.sp,
                         modifier =
@@ -445,12 +445,12 @@ private fun ModeRow(title: String, badge: String?, subtitle: String, detail: Str
             Text(
                 text = subtitle,
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
             Text(
                 text = detail,
                 color = palette.TextMuted.copy(alpha = 0.7f),
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )

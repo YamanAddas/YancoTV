@@ -156,7 +156,7 @@ fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, o
                 Text(
                     text = "OPTIONS  ·  ◂ ▸ to switch",
                     color = palette.TextMuted,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.5.sp,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -236,7 +236,7 @@ private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusReq
             Text(
                 text = "◂ ▸",
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
         }
     }

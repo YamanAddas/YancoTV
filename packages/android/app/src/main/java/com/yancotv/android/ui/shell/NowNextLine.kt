@@ -47,7 +47,7 @@ fun NowNextLine(nowNext: NowNext?, nowSeconds: Long, modifier: Modifier = Modifi
         Text(
             text = label,
             color = if (now != null) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

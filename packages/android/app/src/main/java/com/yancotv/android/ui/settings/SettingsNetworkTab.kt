@@ -204,7 +204,7 @@ private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources:
                     Text(
                         text = result,
                         color = statusColor,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }

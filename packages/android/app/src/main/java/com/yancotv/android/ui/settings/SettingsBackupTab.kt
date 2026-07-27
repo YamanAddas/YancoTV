@@ -298,7 +298,7 @@ fun SettingsBackupTab(
         Text(
             "Backup & restore",
             color = LocalYancoPalette.current.TextPrimary,
-            fontSize = 20.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
@@ -321,7 +321,7 @@ fun SettingsBackupTab(
             Text(
                 "EXPORT",
                 color = LocalYancoPalette.current.Accent,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -331,7 +331,7 @@ fun SettingsBackupTab(
                     "Saving to: Downloads/YancoTV (default)"
                 },
                 color = LocalYancoPalette.current.TextSecondary,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
             SettingsClickToEditField(
                 label = "Label (optional)",
@@ -441,7 +441,7 @@ fun SettingsBackupTab(
                     } else {
                         LocalYancoPalette.current.TextMuted
                     },
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
             }
         }
@@ -459,13 +459,13 @@ fun SettingsBackupTab(
             Text(
                 "RESTORE (MERGE MODE)",
                 color = LocalYancoPalette.current.Accent,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 "Existing sources, favorites, and history are NOT deleted. New rows are added; conflicting source rows are skipped (your local credentials win). After restore, your sources will resync — favorites and history may take a moment to relink.",
                 color = LocalYancoPalette.current.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -536,7 +536,7 @@ fun SettingsBackupTab(
                 Text(
                     "Picked: ${importPickedUri.lastPathSegment ?: importPickedUri}",
                     color = LocalYancoPalette.current.TextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
                 SettingsClickToEditField(
                     label = "Password (only if file is encrypted)",
@@ -570,7 +570,7 @@ fun SettingsBackupTab(
                     } else {
                         LocalYancoPalette.current.TextMuted
                     },
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
                 // v1.1.0 — live pending-count + manual retry button.
                 // After import the coordinator buffers records that
@@ -583,7 +583,7 @@ fun SettingsBackupTab(
                     Text(
                         "$pending record(s) still pending source resync.",
                         color = LocalYancoPalette.current.TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                     )
                     SettingsOutlinedButton(
                         onClick = { coordinator.retryPendingLinksNow() },
@@ -636,13 +636,13 @@ fun SettingsBackupTab(
                 Text(
                     "RECENT EXPORTS",
                     color = LocalYancoPalette.current.Accent,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     "Use → load this backup as the restore source. Delete → remove the metadata row (the file on disk is left untouched).",
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                 )
                 recent.forEach { row ->
                     RecentExportRow(
@@ -707,7 +707,7 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
             Text(
                 text = row.label.ifBlank { "Untitled backup" },
                 color = palette.TextPrimary,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
@@ -722,7 +722,7 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
                     if (row.fileUri == null) append(" · file location lost")
                 },
                 color = palette.TextMuted,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
             )
         }
         SettingsOutlinedButton(

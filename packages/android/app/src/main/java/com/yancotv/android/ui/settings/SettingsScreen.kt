@@ -300,7 +300,7 @@ private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
         Text(
             text = tab.label,
             color = palette.TextPrimary,
-            fontSize = 20.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
         )
     }
@@ -672,7 +672,7 @@ private fun SearchResultsSection(results: List<SettingsSearchEntry>, onSelect: (
         Text(
             text = "MATCHING SETTINGS",
             color = palette.TextMuted,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.4.sp,
             modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 8.dp),
@@ -728,13 +728,13 @@ private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
             Text(
                 text = entry.label,
                 color = palette.TextPrimary,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = "in ${entry.tab.label}",
                 color = palette.TextMuted,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
             )
         }
         Icon(
@@ -755,14 +755,14 @@ private fun SearchEmptyState(query: String) {
         Text(
             text = "No matches for “$query”.",
             color = palette.TextMuted,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "Press BACK to clear search.",
             color = palette.TextFaint,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
         )
     }
 }
@@ -788,7 +788,7 @@ private fun SidebarFooterHint() {
         Text(
             text = "BACK",
             color = palette.Accent,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp,
             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
@@ -796,7 +796,7 @@ private fun SidebarFooterHint() {
         Text(
             text = "exit  ·  ↑↓ navigate  ·  1-9 jump",
             color = palette.TextMuted,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
         )
     }
 }
@@ -823,7 +823,7 @@ private fun SidebarHeader() {
             text = "Settings",
             color = palette.TextPrimary,
             fontSize = 26.sp,
-            lineHeight = 30.sp,
+            lineHeight = 32.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.5).sp,
         )
@@ -1002,8 +1002,8 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
             Text(
                 text = entry.label,
                 color = labelColor,
-                fontSize = 15.sp,
-                lineHeight = 18.sp,
+                fontSize = 16.sp,
+                lineHeight = 19.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.1).sp,
                 modifier = Modifier.weight(1f),
@@ -1273,7 +1273,7 @@ private fun HexChip(text: String, active: Boolean, icon: ImageVector? = null) {
         Text(
             text = text,
             color = fg,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
             letterSpacing = 1.32.sp,
             // MB-300 — a chip is a one-line element by construction. Without

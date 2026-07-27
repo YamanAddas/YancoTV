@@ -286,7 +286,7 @@ private fun GroupRow(name: String, hidden: Boolean, onToggle: (Boolean) -> Unit)
             Text(
                 text = if (hidden) "Hidden from sidebar and rails" else "Visible everywhere",
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
@@ -339,7 +339,7 @@ private fun ParentPinRow(label: String, prefixCode: String, kind: PrefixCatalog.
             Text(
                 text = "$kindLabel · $prefixCode · $childCount channel${if (childCount == 1) "" else "s"}",
                 color = palette.TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

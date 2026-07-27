@@ -38,26 +38,30 @@ import org.koin.compose.koinInject
  * overlays lands with MK.16.2 when runtime theme switching ships.
  */
 /**
- * MB-298 — TV type multiplier. The user's report was "the font size to be
- * better optimized"; on a TV that means bigger.
+ * MB-298 — retired, pinned at 1.0. **Do not reintroduce a value here.**
  *
- * Measured on the canonical Fire TV Stick (AFTMM): 1920x1080 at densityDpi
- * 320 gives a 960x540 dp viewport, so 1sp is 2 physical pixels. At a ~3 m
- * viewing distance an 11sp caption subtends roughly 10 arcmin, well under
- * the ~16 arcmin floor for comfortable sustained reading — which is why the
- * small text in Settings, the Guide and the poster rails reads as cramped
- * from the couch.
+ * The original idea was a global TV type multiplier applied at the density
+ * seam, on the reasoning that it lifts all ~209 hardcoded `fontSize` literals
+ * at once where migrating them would be days of churn. It shipped in
+ * `89b714e`, was neutralised in `040516e`, and MK.29.4 replaced it properly.
  *
- * Why here rather than in [YancoType]: only ~96 text call sites use the type
- * scale, while ~209 raw `fontSize = N.sp` literals across ~35 files bypass it
- * entirely (Settings, Guide, Recordings, Sources and the player menus are
- * essentially all hardcoded). Migrating those is days of mechanical churn
- * with a real chance of typos; multiplying `fontScale` at the density seam
- * lifts every one of them at once. It scales `sp` only — every `dp` layout
- * dimension is byte-identical, so nothing moves or re-flows.
+ * Two reasons it cannot work, both now settled:
  *
- * Phone is deliberately untouched (multiplier 1f): it is viewed at ~30 cm and
- * is already correctly sized.
+ *  1. `Density(density, fontScale x k)` grows every `sp` while freezing every
+ *     `dp`. Text grows; the containers holding it do not. That is how you get
+ *     clipped labels and zero-height controls, not better typography.
+ *  2. The gain needed to reach the readability floor is a *decreasing*
+ *     function of size — 11sp wanted x1.55, 44sp wanted x1.0 — so no single
+ *     constant is correct at both ends. The ramp needed *compressing*, which
+ *     is the one thing a scalar multiplier cannot do.
+ *
+ * MK.29.4 did the migration instead: [YancoType] carries the compressed ramp
+ * and 149 literals across 31 files were normalised onto it. The constant is
+ * kept only so the reasoning stays attached to the seam it was applied at.
+ *
+ * The user-facing 90/100/110/125% preference below is unaffected — that is a
+ * genuine accessibility preference riding on the same seam, and it composes
+ * on top of the ramp rather than substituting for it.
  */
 private const val TV_TYPE_SCALE = 1.00f
 

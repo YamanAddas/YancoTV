@@ -201,7 +201,7 @@ private fun HexBtn(label: String, primary: Boolean, onClick: () -> Unit, modifie
         Text(
             text = label,
             color = fg,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.4.sp,
         )
@@ -229,7 +229,7 @@ private fun HexChip(label: String, tone: Color, modifier: Modifier = Modifier) {
         Text(
             text = label,
             color = tone,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.6.sp,
         )
@@ -255,7 +255,7 @@ private fun DiagnosticTile(label: String, value: String, accent: Boolean, modifi
         Text(
             text = label,
             color = palette.TextMuted,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.8.sp,
         )
@@ -263,7 +263,7 @@ private fun DiagnosticTile(label: String, value: String, accent: Boolean, modifi
         Text(
             text = value,
             color = if (accent) palette.Accent else palette.TextPrimary,
-            fontSize = 18.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -322,14 +322,14 @@ private fun BufferingOverlay(data: VodChromeBuffering, onRetry: () -> Unit, onPl
             Text(
                 text = "Tuning the stream",
                 color = palette.TextPrimary,
-                fontSize = 44.sp,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "Negotiating the best bitrate for your connection. This usually takes a moment.",
                 color = palette.TextSecondary,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
             )
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -446,7 +446,7 @@ private fun ErrorOverlay(
             Text(
                 text = data.title,
                 color = palette.TextPrimary,
-                fontSize = 30.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -457,7 +457,7 @@ private fun ErrorOverlay(
                 Text(
                     text = data.description,
                     color = palette.TextSecondary,
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -508,14 +508,14 @@ private fun DiagnosticBlock(data: VodChromeError) {
                     text = "$label:",
                     color = palette.TextMuted,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     modifier = Modifier.width(96.dp),
                 )
                 Text(
                     text = value,
                     color = palette.TextPrimary,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                 )
             }
         }
