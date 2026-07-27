@@ -1915,6 +1915,130 @@ Fix sweep shipped same-day as MK.28.1–MK.28.8 (one commit each) + this registe
 
 ---
 
+## MK.29 — Browse preview redesign + pre-play subtitles + TV type ramp — 2026-07-26
+
+User-driven, three reports in one message: (1) movie/series preview art was cropped, (2) the meta
+beside it should be title → description → actions, with a subtitles dropdown that carries into
+playback, (3) "the fonts are too large and not optimized correctly to its surrounding … recalculate
+all the geometry."
+
+All measurements in this section were taken on the connected **Fire TV Stick AFTMM** via
+`uiautomator dump`, not estimated: viewport **960 x 540 dp** (1920x1080 @ densityDpi 320), device at
+**fontScale 1.0** (confirmed — 2 lines of the 40/48 sp `DisplayM` measured 190 px vs 192 predicted).
+
+### Slices
+
+| Slice | What | Register |
+|---|---|---|
+| MK.29.1 | Poster-shaped VOD preview frame (2:3, `ContentScale.Fit`, `BoxWithConstraints`-sized); LIVE keeps the wide MiniPlayer box | MB-303 |
+| MK.29.2 | Meta column restructured: title → facts line → plot → actions. Plot via `ContentDetailService` (cache-first, 450 ms dwell debounce + per-session id→metadata cache, so spinning the wheel issues zero provider calls) | — |
+| MK.29.3 | Pre-play subtitle picker (provider `subtitles[]` + OpenSubtitles), staged into `PlaybackController` and consumed by `loadCurrent` | — |
+| MK.29.4 | Compressed TV type ramp + geometry recalibration; 149 literals across 31 files normalised | MB-304 |
+| MK.29.5 | Brand marks: badge-only `ic_logo_mark`, adaptive launcher icon rebuilt transparent, TV banner regains the wordmark, `GenIcons.java` rewritten | MB-305 |
+| MK.29.6 | Player SUBTITLES panel: external subtitle as observable state (fixes the false "Off"), real track labels, viewport-derived panel height, two-line rows | MB-306 |
+
+### MK.29.3 — design notes
+
+- **Why staging, not `applyExternalSubtitle`.** That method operates on `_currentItem`, which at pick
+  time is still the *previous* title. Calling it after `play()` would prepare the stream once without
+  the subtitle and immediately re-prepare with — a visible double buffer on every subtitled start.
+  `stageExternalSubtitle(contentId, uri, mime)` parks the pick; `loadCurrent` promotes it after every
+  transition path has run its `_externalSubtitle = null` reset and *before* `buildMediaItem`, so the
+  first prepare already carries the subtitle. Consumed one-shot and id-matched, so an abandoned pick
+  can never attach to an unrelated later stream. Text tracks are un-disabled before `setMediaItem`,
+  the same ordering rule `applyExternalSubtitle` documents.
+- **Watch routing.** Movie → plays (new `onPlayNow`, parental-gated, with the hard-rule-8
+  already-playing guard). Series → opens episodes; a series container has no stream, so "which
+  episode's subtitle" has no pre-play answer. The orb's own OK press still opens detail for both.
+- **Accepted limitation, surfaced in the UI.** Subtitle tracks muxed *inside* the stream cannot be
+  enumerated before ExoPlayer opens the media. They stay in the player's SUBTITLES panel and the
+  picker's footer says so.
+- **Quota.** The anonymous OpenSubtitles key allows **5 downloads/day**. Search is unlimited;
+  only committing to a track spends one. Download happens at *pick* time so a failure (including
+  hitting that ceiling) surfaces in the sheet instead of producing a silently subtitle-less stream
+  two presses later.
+
+### MK.29.4 — the ramp is compressed, not scaled
+
+| role | before | after | after, arcmin @ 3 m / 55" |
+|---|---|---|---|
+| Caption / Overline | 11 sp | 12 sp | 17.4 |
+| Body | 13 sp | 14 sp | 20.3 |
+| BodyLong / Label | 14 sp | 15 sp | 21.8 |
+| TitleS | 15 sp | 16 sp | 23.2 |
+| TitleM | 18 sp | 19 sp | 27.6 |
+| TitleL | 22 sp | 23 sp | 33.4 |
+| DisplayS | 30 sp | 26 sp | 37.7 |
+| DisplayM | 40 sp | 30 sp | 43.5 |
+| DisplayCinematic | 44 sp | 34 sp | 49.3 |
+
+Two problems pulling opposite ways, which is why no single multiplier could fix it: the floor was
+under the readability threshold *and* the ceiling was out of proportion to its container. Ratio
+4.4x → 2.8x. This closes the item MB-300 filed as "remaining: the per-role TV type ramp".
+
+Geometry: `heroHeight` 520 → 330 dp (520 was **96% of the TV viewport**), `detailPosterWidth`
+240 → 200, detail hero content offset tokenised (`220.dp` literal → `detailHeroContentOffset`),
+`posterAspect` / `posterSlotWeight` added. Four dead tokens (`groupsWidth`, `infoWidth`,
+`rowHeight`, `rowHeightWithEpg`) documented as **not** recalibrated — they have no call sites and
+must be re-derived before first use.
+
+### MK.29.5 — the brand rule
+
+**The asset follows the shape of the slot.** Square or near-square → badge alone
+(`ic_logo_mark`). Wide → badge + wordmark (`ic_logo`). Never anisotropically scaled; every
+call site uses `ContentScale.Fit`.
+
+| Slot | Shape | Asset |
+|---|---|---|
+| Sidebar, collapsed (92dp) | square | `ic_logo_mark` |
+| Sidebar, expanded (260dp) | wide | `ic_logo` |
+| Settings header (`height(64.dp)`, free width) | wide | `ic_logo` |
+| About tab (`size(140.dp)`) | square | `ic_logo_mark` |
+| Notification `setSmallIcon` | square, alpha-only + tinted | `ic_logo_mark` |
+| Launcher (adaptive + legacy) | square, masked | badge |
+| TV banner (320x180) | wide | badge + wordmark |
+
+Source is `drawable-xhdpi/ic_logo.png`, **not** `yancotv_logo.png` at the repo root — the root
+file is larger (1536x1024) but flat-rendered on an opaque grey backdrop, so its alpha bbox is the
+whole canvas. The badge is extracted by mirroring the flourish-free left half about x=137
+(pixels, not just alpha — see MB-305 for why the alpha-only attempt was rejected).
+
+`tools/GenIcons.java` was rewritten rather than superseded by a side script: it is the documented
+generator, and its old center-crop-to-square is precisely what produced the rectangular plate.
+Left alone, the next run of it would revert this slice. Regenerating is
+`java tools/GenIcons.java` from the repo root; it was re-run from a clean `git checkout` of
+`res/` to confirm it reproduces the committed assets.
+
+**Follow-up, not done:** the notification small icon would ideally be a dedicated monochrome
+vector. `ic_logo_mark`'s alpha tints to a solid hex silhouette, which is legible and a large
+improvement on the lockup, but it is not purpose-drawn for a 24dp status-bar slot.
+
+### Verification status (honest)
+
+- `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, `:app:ktlintCheck` green. `:app:assembleRelease`
+  (R8 + resource shrink) green; installed to the AFTMM as a **signed update** — the device runs a
+  release build, so a debug APK cannot update it and uninstalling would have destroyed the user's
+  sources/history. No fatals in logcat after install.
+- **Not done by me:** on-device navigation. Driving the remote with `input keyevent` while the user
+  was on the TV escaped the app into a Fire OS page; the user stopped it and the rest is a **user
+  visual check**.
+- **Required before calling MK.29 closed:**
+  1. Movies + Series browse: whole poster visible, title/description/actions read in proportion.
+  2. Subtitles picker: opens, lists, a pick survives into playback with subtitles on screen.
+  3. Watch on a movie plays directly; OK on the orb still opens detail; Series reads "Episodes".
+  4. Cascade-nav smoke test (3 flows) — `CoverflowSectionScreen`, `BrowseSection`, `HomeScreen` all touched.
+  5. A read of Settings / Guide / Recordings at the new ramp, since 149 literals moved.
+  6. MK.29.6: pick a subtitle pre-play, open MENU → SUBTITLES **immediately**. It must show the
+     pick (with "Loading…" if the sidecar is still in flight), never "Off". Then confirm the row
+     turns into a named track, and that "Off" actually stays off across the next episode / resume.
+  7. MK.29.5: sidebar badge collapsed vs expanded, About tab, and the Fire TV home-row banner.
+     The launcher icon itself needs a **home-screen** look — it was verified as pixels
+     (rendered at 1:1 and under a simulated 72/108 circular mask) and as a packaged resource
+     (`aapt2 dump resources` lists `drawable/ic_logo_mark`, `mipmap/ic_launcher*`), but never
+     on a launcher surface.
+
+---
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
