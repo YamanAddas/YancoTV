@@ -203,6 +203,32 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                 right = { ValueText("${current.channelCount}") },
                 readOnlyFocusable = true,
             )
+            // MK.30.3 — account expiry. Only rendered when the provider
+            // actually reported one: m3u playlists carry no account metadata,
+            // so a permanent "Unknown" row there would look like a defect.
+            formatSourceExpiry(current.expiresAt, System.currentTimeMillis())?.let { expiry ->
+                SettingsRowSpacer()
+                SettingsRow(
+                    label = "Subscription",
+                    kicker = if (expiry.urgency == ExpiryUrgency.Later) null else "EXPIRES",
+                    right = {
+                        Text(
+                            text = expiry.full,
+                            color =
+                            when (expiry.urgency) {
+                                ExpiryUrgency.Expired -> palette.Error
+                                ExpiryUrgency.Soon -> palette.Premium
+                                ExpiryUrgency.Later -> palette.TextSecondary
+                            },
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    readOnlyFocusable = true,
+                )
+            }
             current.lastSyncError?.let { err ->
                 SettingsRowSpacer()
                 SettingsRow(

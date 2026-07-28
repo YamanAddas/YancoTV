@@ -46,6 +46,14 @@ data class Source(
      *  refresh for this source on every MainActivity creation. Off by
      *  default; the user opts in per-source from the Sources detail UI. */
     val autoSyncOnStart: Boolean = false,
+    /** v11 → v12 (MK.30.3) — when the provider account behind this source
+     *  stops working, in ms since epoch. NULL means "no expiry to show":
+     *  either the source type carries no account metadata (m3u_url /
+     *  m3u_file), or it hasn't synced since the column was added, or the
+     *  provider reports the account as non-expiring. Captured from the
+     *  Xtream handshake, which reports Unix *seconds* — converted on the
+     *  way in. */
+    val expiresAt: Long? = null,
     val createdAt: Long,
     val updatedAt: Long,
 )

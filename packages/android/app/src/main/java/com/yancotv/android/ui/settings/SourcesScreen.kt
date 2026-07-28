@@ -599,7 +599,13 @@ internal fun RowStatus.subLine(source: Source): String {
             RowStatus.NeverSynced -> "never synced"
             RowStatus.Error -> source.lastSyncError?.take(48) ?: "last sync failed"
         }
-    return "$type · $items · $timing"
+    // MK.30.3 — account expiry, when the provider told us one. Appended
+    // rather than replacing a segment: "when does this stop working" is
+    // orthogonal to sync health, and a source can be perfectly synced and
+    // about to lapse. Omitted entirely when unknown (every m3u source, and
+    // any xtream source not yet re-synced) so the common row stays 3 parts.
+    val expiry = formatSourceExpiry(source.expiresAt, System.currentTimeMillis())?.compact
+    return listOfNotNull(type, items, timing, expiry).joinToString(" · ")
 }
 
 internal fun computeRowStatus(source: Source, isSyncing: Boolean): RowStatus {

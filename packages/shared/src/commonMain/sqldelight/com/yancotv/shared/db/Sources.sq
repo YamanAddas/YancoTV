@@ -31,6 +31,19 @@ CREATE TABLE sources (
     -- can pick which catalogs are stable enough to warm-resync without
     -- their input.
     auto_sync_on_start INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    -- v11 → v12 (MK.30.3): when the provider account behind this source
+    -- stops working, in ms since epoch. NULL = unknown, which is the
+    -- permanent state for m3u_url / m3u_file (a playlist URL carries no
+    -- account metadata) and the state for an xtream source that hasn't
+    -- synced since the column was added.
+    --
+    -- Captured from the Xtream `player_api.php` handshake, whose
+    -- `user_info.exp_date` is Unix *seconds* as a string — converted on the
+    -- way in so this column follows the all-timestamps-are-ms rule.
+    -- Xtream also uses NULL/absent exp_date to mean "never expires", which
+    -- is indistinguishable here from "not yet known"; the UI treats both as
+    -- "no expiry to show" rather than guessing.
+    expires_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -78,6 +91,16 @@ SET name = ?,
     auto_sync_interval = ?,
     updated_at = ?
 WHERE id = ?;
+
+-- v11 → v12 (MK.30.3): account-expiry setter, written from the Xtream
+-- handshake during sync.
+--
+-- Deliberately NOT folded into `updateSyncResult`: that runs on the failure
+-- path too, where no expiry is available, so it would clobber a known expiry
+-- with NULL every time a sync errored. A stale expiry is strictly better
+-- information than none, so only a successful handshake writes here.
+setExpiresAt:
+UPDATE sources SET expires_at = ?, updated_at = ? WHERE id = ?;
 
 setPriority:
 UPDATE sources SET priority = ?, updated_at = ? WHERE id = ?;

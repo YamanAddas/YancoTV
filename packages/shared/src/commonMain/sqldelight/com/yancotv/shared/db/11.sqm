@@ -1,0 +1,17 @@
+-- v11 → v12 (MK.30.3): per-source account expiry.
+--
+-- Surfaces "when does this playlist stop working" in Settings → Sources,
+-- which previously had no answer anywhere in the app even though the data
+-- was already on the wire.
+--
+-- ms since epoch, per the all-timestamps-are-milliseconds rule. The Xtream
+-- `player_api.php` handshake reports `user_info.exp_date` as Unix *seconds*
+-- in a string, so SourceRepository converts on the way in rather than
+-- storing the provider's unit.
+--
+-- Nullable with no default: m3u_url / m3u_file sources have no account
+-- metadata at all and stay NULL forever, and an existing xtream source stays
+-- NULL until its next successful sync. Xtream itself also omits exp_date for
+-- non-expiring accounts, so NULL is genuinely "nothing to show" rather than
+-- an error state.
+ALTER TABLE sources ADD COLUMN expires_at INTEGER;

@@ -155,17 +155,28 @@ class MigrationTest {
         // pre-create recording_schedules / etc. tables here.
         YancoDb.Schema.migrate(driver, oldVersion = 9, newVersion = 10)
 
-        // Wrap and read via the v10 query API. The SQLDelight-generated
-        // `Source` row exposes `auto_sync_on_start` as a Boolean; if
-        // the migration didn't add the column, the SELECT would throw
-        // here.
-        val db = YancoDb(driver)
-        val row = db.sourcesQueries.selectById("src-v9").executeAsOne()
-        assertEquals(false, row.auto_sync_on_start, "existing v9 rows must default to auto_sync_on_start = false (DEFAULT 0)")
+        // Read with direct SQL, not the generated query API. `selectById` is
+        // `SELECT *` against the CURRENT schema, so its mapper demands every
+        // column the table has today — reading a deliberately-v10 fixture
+        // through it breaks on the next additive migration for reasons that
+        // have nothing to do with 9.sqm. (It broke on 11.sqm's `expires_at`;
+        // before that it only passed because 10.sqm added an index and no
+        // column.) Same reasoning as the v3 → v4 test above. This keeps the
+        // test measuring exactly one thing: what 9.sqm does to `sources`.
+        val autoSyncForExistingRow =
+            driver
+                .executeQuery(null, "SELECT auto_sync_on_start FROM sources WHERE id = 'src-v9'", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertEquals(0L, autoSyncForExistingRow, "existing v9 rows must default to auto_sync_on_start = false (DEFAULT 0)")
 
-        // Insert a fresh v10 row with auto_sync_on_start = true and
-        // confirm round-trip — proves the column is functional, not
-        // just declared.
+        // Insert a fresh row with auto_sync_on_start = true and confirm
+        // round-trip — proves the column is functional, not just declared.
+        // The generated `insert` names its columns explicitly, so unlike
+        // `selectById` it stays compatible with the v10 fixture.
+        val db = YancoDb(driver)
         db.sourcesQueries.insert(
             id = "src-v10",
             name = "Auto-sync source",
@@ -189,8 +200,64 @@ class MigrationTest {
             created_at = 0L,
             updated_at = 0L,
         )
-        val auto = db.sourcesQueries.selectById("src-v10").executeAsOne()
-        assertEquals(true, auto.auto_sync_on_start)
+        val autoSyncForNewRow =
+            driver
+                .executeQuery(null, "SELECT auto_sync_on_start FROM sources WHERE id = 'src-v10'", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertEquals(1L, autoSyncForNewRow, "auto_sync_on_start = true must round-trip through the new column")
+    }
+
+    /**
+     * MK.30.3 — v11 → v12 dedicated migration test.
+     *
+     * `11.sqm` adds `expires_at INTEGER` (nullable, no default) to `sources`
+     * so Settings → Sources can show when a provider account lapses.
+     *
+     * Two things must hold for existing installs. The column has to arrive
+     * NULL on pre-migration rows — a DEFAULT here would have been actively
+     * wrong, since it would render as a real expiry date for every source
+     * that has never synced. And it has to be writable, because the value is
+     * captured later from the Xtream handshake, not at insert time.
+     */
+    @Test fun migrationV11ToV12AddsNullableExpiresAtColumn() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
+
+        v11SourcesSchema().forEach { driver.execute(null, it, 0) }
+        driver.execute(null, "PRAGMA user_version = 11;", 0)
+        driver.execute(null, SEED_SOURCE_V11, 0)
+
+        // 11.sqm only touches `sources`, so no other table need exist.
+        YancoDb.Schema.migrate(driver, oldVersion = 11, newVersion = 12)
+
+        // Pre-migration row must read NULL, not 0 and not an epoch date.
+        val expiryForExistingRow =
+            driver
+                .executeQuery(null, "SELECT expires_at FROM sources WHERE id = 'src-v11'", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertNull(expiryForExistingRow, "pre-11.sqm rows must arrive with expires_at NULL — a default would render as a real expiry date")
+
+        // The sync path writes through `setExpiresAt`; prove it round-trips
+        // and that the domain mapper surfaces it.
+        val db = YancoDb(driver)
+        val expiry = 1_798_675_200_000L // 2026-12-31, ms
+        db.sourcesQueries.setExpiresAt(expires_at = expiry, updated_at = 1_700_000_001_000L, id = "src-v11")
+        val row = db.sourcesQueries.selectById("src-v11").executeAsOne()
+        assertEquals(expiry, row.expires_at, "setExpiresAt must persist ms-since-epoch")
+
+        // And NULL must be writable back — a provider switching an account to
+        // unlimited should clear the date rather than freeze the old one.
+        db.sourcesQueries.setExpiresAt(expires_at = null, updated_at = 1_700_000_002_000L, id = "src-v11")
+        assertNull(
+            db.sourcesQueries.selectById("src-v11").executeAsOne().expires_at,
+            "expires_at must be clearable back to NULL",
+        )
     }
 
     /**
@@ -797,6 +864,55 @@ class MigrationTest {
                 );
             """.trimIndent(),
         )
+
+        /**
+         * v11 `sources` schema — the v9 fixture plus `auto_sync_on_start`
+         * (9.sqm). 10.sqm only adds a `content` index, so v10 and v11 have
+         * the same `sources` shape. Used by the v11 → v12 hop test.
+         */
+        fun v11SourcesSchema(): List<String> = listOf(
+            """
+                CREATE TABLE sources (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL CHECK(type IN ('m3u_url', 'm3u_file', 'xtream', 'stalker')),
+                    url TEXT,
+                    file_path TEXT,
+                    username_encrypted BLOB,
+                    password_encrypted BLOB,
+                    mac_address_encrypted BLOB,
+                    epg_url TEXT,
+                    user_agent TEXT,
+                    referer TEXT,
+                    last_synced INTEGER,
+                    last_sync_error TEXT,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    priority INTEGER NOT NULL DEFAULT 0,
+                    channel_count INTEGER NOT NULL DEFAULT 0,
+                    auto_sync_interval INTEGER NOT NULL DEFAULT 0,
+                    epg_priority INTEGER NOT NULL DEFAULT 0,
+                    auto_sync_on_start INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+            """.trimIndent(),
+        )
+
+        const val SEED_SOURCE_V11 = """
+            INSERT INTO sources (
+                id, name, type, url, file_path,
+                username_encrypted, password_encrypted, mac_address_encrypted,
+                epg_url, user_agent, referer, last_synced, last_sync_error,
+                is_active, priority, channel_count, auto_sync_interval,
+                epg_priority, auto_sync_on_start, created_at, updated_at
+            ) VALUES (
+                'src-v11', 'Pre-11.sqm source', 'xtream', 'http://provider.example', NULL,
+                NULL, NULL, NULL,
+                NULL, NULL, NULL, NULL, NULL,
+                1, 0, 0, 0,
+                0, 0, 1700000000000, 1700000000000
+            );
+        """
 
         const val SEED_SOURCE_V9 = """
             INSERT INTO sources (

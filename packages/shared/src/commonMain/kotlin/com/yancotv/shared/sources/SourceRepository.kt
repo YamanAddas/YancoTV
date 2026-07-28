@@ -23,6 +23,7 @@ import com.yancotv.shared.types.SourceType
 import com.yancotv.shared.types.UpdateSourceInput
 import com.yancotv.shared.xtream.XtreamClient
 import com.yancotv.shared.xtream.XtreamClientOptions
+import com.yancotv.shared.xtream.parseXtreamExpiry
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -509,6 +510,16 @@ class SourceRepository(
         val auth = client.authenticate()
         if (auth is Result.Err) throw auth.error
 
+        // MK.30.3 — the handshake already carried the account expiry; before
+        // this it was parsed and then dropped on the floor. Persist it so
+        // Settings → Sources can answer "when does this playlist stop
+        // working". Only written on the success path, so a later failed sync
+        // can't wipe a known expiry (see `setExpiresAt` in Sources.sq).
+        if (auth is Result.Ok) {
+            val expiresAt = parseXtreamExpiry(auth.value.userInfo.expDate)
+            db.sourcesQueries.setExpiresAt(expires_at = expiresAt, updated_at = now, id = source.id)
+        }
+
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching categories")
         val fetchMark =
             kotlin.time.TimeSource.Monotonic
@@ -760,6 +771,7 @@ class SourceRepository(
         autoSyncInterval = auto_sync_interval.toInt(),
         epgPriority = epg_priority.toInt(),
         autoSyncOnStart = auto_sync_on_start,
+        expiresAt = expires_at,
         createdAt = created_at,
         updatedAt = updated_at,
     )
