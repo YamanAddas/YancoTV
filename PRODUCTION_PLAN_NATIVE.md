@@ -2039,6 +2039,180 @@ improvement on the lockup, but it is not purpose-drawn for a 24dp status-bar slo
 
 ---
 
+---
+
+## MK.30 — Settings scroll integrity + source expiry + update awareness — 2026-07-28
+
+User request, four items. The localization item became MK.31 (its own milestone — the
+string-extraction surface is ~613 literals, an order of magnitude past anything here).
+
+> **Numbering note (extends the MK.28 note above):** MK.30 is now canonically claimed by this
+> section. The stray `MK.30` / `MK.32` sub-slice labels in code comments predate it (session-local
+> numbering from the settings-search / tile-progress / quick-start-CTA work) and are unrelated.
+
+**User reports, verbatim:**
+
+1. *"i was in playback section of settings and when i went down in it then up again. the top of the
+   menu was cut. i think i noticed this behavior in multiple places. i want the settings section to
+   be managed well so it doesnt have these kind of problems."*
+2. *"in sources, there is no place that i found that tells us the date that the list would expire."*
+3. *"i want the user to know that there is a new update whenever i push a new update to the latest
+   release spot."*
+
+### MK.30.1 — clipped section headers in Settings (MB-307) — shipped
+
+Root cause was `rememberSafeMarginBringIntoViewSpec` in `SettingsScreen.kt`. Its `SAFETY_MARGIN_DP
+= 32` headroom is smaller than a `SettingsSection` header (title 19sp + 6dp + subtitle + 16dp
+≈ 80dp), so travelling back up parked the first row 32dp from the viewport top, declared itself
+satisfied, and stopped — with the header still clipped and nothing focusable above it to scroll to.
+Permanent until the tab remounted.
+
+Replaced by `ui/focus/FocusScrollSpec.kt`: a pure, unit-tested `focusScrollDistance` behind a
+`BringIntoViewSpec`, with three further defects fixed (a focusable taller than the viewport was
+never scrolled into view at all; a row too tall to satisfy either guard fell through both to "no
+scroll" and stayed clipped; no epsilon, so sub-pixel residue could re-trigger a scroll). Provided
+once in `SettingsScreen` rather than inside `ContentPane`, which had left the phone drilled-in body
+and tab-hosted dialogs on Compose's flush-to-edge default.
+
+**Over-requesting at the top of the content is intentional.** The scroll clamps to 0 — which is
+exactly the wanted outcome, header and container top-padding both revealed — and Compose's
+bring-into-view animation cancels itself once a step stops being consumed.
+
+### MK.30.2 — app-wide focus-scroll audit (MB-308) — shipped
+
+Surveyed all 21 focus-driven scroll containers outside Settings for the same defect. Two changes to
+the primitive first: headroom capped at 25% of the viewport (one 96dp value cannot serve both a
+~400dp Settings pane and the heightIn-capped player options menu), and `ProvideDefaultFocusScroll`
+added, because `LocalBringIntoViewSpec` is **axis-agnostic** — one spec serves the vertical scroll
+it was tuned for *and* any horizontal rail nested inside it, where leading headroom would shove the
+focused card off the leading edge.
+
+| Surface | Verdict |
+|---|---|
+| `HomeContent` | fixed — `RailHeader` above every `WheelRow` |
+| `FavoritesScreen` | fixed — 3 `SectionHeader` items |
+| `RecordingsScreen` | fixed — 3 `SectionHeader` items |
+| `SearchScreen` | fixed — per-rail titles; its rail `LazyRow` opted back out |
+| `ContentDetailScreen` | fixed — hero + `episodes_header` |
+| `PlayerOptionsMenu` | fixed — the OPTIONS caption |
+| `VodPlayerChrome` | fixed — error headline above the action buttons |
+| `WheelRow` | already immune — provides its own `CenterBringIntoViewSpec`, so nearest-provider keeps every coverflow / poster rail byte-identical |
+| `AppSidebar`, `CategoryRail`, Guide list, `ChannelSurfOverlay`, `PreviewSubtitlePicker` | no leading non-focusable content — nothing to clip |
+| `PlayerOptionsPanels` | its `PanelHeader` sits outside the scroll viewport; scrolling cannot clip it |
+| `CategoryChipBar`, coverflow `LazyRow`, Guide hScroll x2, Favorites tab strip | horizontal, and not nested under any wrapped surface |
+
+### MK.30.3 — provider account expiry in Sources (MB-309) — shipped
+
+`XtreamUserInfo.expDate` had been parsed since the client was written; `syncXtream` checked the
+handshake for errors and threw the payload away. Schema `11.sqm` (v11 → v12) adds
+`sources.expires_at`, nullable with **no default** — a default would render as a real expiry date on
+every source that has never synced. NULL legitimately covers three cases the wire format cannot
+distinguish: m3u sources have no account metadata, an xtream source has not re-synced yet, and
+Xtream omits `exp_date` for non-expiring accounts.
+
+Written via a dedicated `setExpiresAt`, not as a field on `updateSyncResult` — that runs on the
+failure path too and would clobber a known expiry with NULL on every errored sync. A stale expiry
+beats none. `parseXtreamExpiry` normalises the field (nominally Unix seconds in a string, unreliable
+in practice: `"0"`, `"Unlimited"`, ISO dates, and already-in-ms values all seen; all unparseable
+shapes map to null rather than a confidently wrong date).
+
+**Xtream only.** `StalkerAuthInfo` does not parse an expiry today (Stalker's `account_info` exposes
+`expire_billing_date` — a follow-up if wanted), and M3U URLs have no expiry concept at all.
+
+Also fixed a latent test bug this exposed: `MigrationTest`'s v9 → v10 hop read its deliberately-v10
+fixture through `selectById`, which is `SELECT *` against the *current* schema. It only ever passed
+because `10.sqm` added an index and no column; the next additive migration was always going to break
+it.
+
+### MK.30.4 — update awareness outside Settings (MB-310) — shipped
+
+The machinery was ~80% built (checker, repository, periodic worker already scheduled, installer,
+About banner). The gap was that nothing *told* the user. Added a deduped system notification from
+the worker plus a badge on the sidebar's Settings row.
+
+**Found while red-teaming:** the badge would have been blank on almost every cold start.
+`UpdateRepository.info` is in-memory by design and `schedulePeriodic` uses `KEEP`, so on an
+established install no check runs at launch — badge and banner would sit empty for up to a day after
+a release shipped. Added `enqueueStartupCheck`, throttled to once per 6h, deliberately without
+`KEY_FORCE` so opting out of auto-check opts out of this too.
+
+---
+
+## MK.31 — Localization: Arabic / French / Spanish / English + full RTL — started 2026-07-28
+
+User request: *"lets translate the app to arabic, french and spanish beside english and have the
+user be able to change the app language."* Arabic scope decided with the user: **full RTL
+mirroring**, not Arabic-text-in-LTR-layout.
+
+### Scope measured before starting
+
+There were **zero** `stringResource` calls in the app. Every UI string was a Kotlin literal:
+
+- ~613 unique literals (930 occurrences) under `ui/`
+- 11 `displayName` enums outside `ui/` feeding chip labels (`prefs/AppPreferences.kt`,
+  `ui/theme/ThemeController.kt`, `player/ExternalPlayer.kt`)
+- user-visible strings in `packages/shared/` (sync phase labels, source sub-lines, error text)
+
+### MK.31.1 — locale infrastructure + picker (MB-311) — shipped
+
+`AppCompatDelegate.setApplicationLocales` is the documented answer and is **not sufficient here**.
+Its pre-API-33 backport applies the locale through `AppCompatDelegate`, which only exists on
+AppCompat components — `MainActivity` is a `ComponentActivity` whose theme descends from
+`android:Theme.Material.NoActionBar`, and promoting it would force a Theme.AppCompat migration
+across the whole shell for an unrelated reason. **Fire TV is API 28, i.e. exactly the case the
+backport exists to cover**, so this is the normal path, not an edge case.
+
+Resolution: apply the locale directly via `LocaleController.wrap()` from `attachBaseContext` on both
+activities — base-class- and API-agnostic. `setApplicationLocales` is still called alongside, and on
+API 33+ the choice is mirrored into the platform `LocaleManager`, so AppCompat screens and the
+system per-app-language screen agree with our state.
+
+`wrap()` uses `Configuration.setLocales`, **not** `setLocale` — the latter leaves `layoutDirection`
+untouched, which is precisely what would make Arabic render LTR while claiming to be Arabic.
+
+Language is the one preference **not** in the SQLDelight settings table: `attachBaseContext` runs
+before an Activity is usable and can precede a ready Koin graph, so the read must work with nothing
+but a Context. A one-key SharedPreferences file has no initialisation order to get wrong.
+
+### MK.31.2+ — string extraction — NOT STARTED
+
+Mechanical but large. Per-surface batches, each its own commit, `values/` first then the three
+translations. The `AppLanguageTest` consistency guard already fails the build if a translation file
+drifts from `values/strings.xml`, so the extraction cannot silently half-land.
+
+### MK.31.N — RTL layout pass — NOT STARTED
+
+`supportsRtl="true"` is already set and Compose mirrors `start`/`end` padding automatically, so the
+work is **not** the text. It is that D-pad focus direction is *physical* while the layout is
+*logical*:
+
+- `SettingsScreen.kt` redirects `FocusDirection.Left` to the sidebar — in RTL the sidebar is on the
+  right, so this and every similar site inverts.
+- Grep targets: `FocusDirection.Left` / `.Right`, `Key.DirectionLeft` / `.DirectionRight`,
+  `horizontalScroll` end-detection, `Alignment.CenterStart` / `CenterEnd` vs absolute variants,
+  `offset(x = ...)` (does not mirror — `absoluteOffset` vs `offset` matters), and the MK.30.4 badge
+  offset added in `AppSidebar`.
+- Needs a real Fire TV pass: focus-direction bugs do not show up in unit tests.
+
+### Register
+
+| Slice | What | Register |
+|---|---|---|
+| MK.30.1 | Settings focus-scroll spec rewritten as a tested primitive (`ui/focus/FocusScrollSpec.kt`); header-clearing headroom, tall-focusable handling, epsilon guard; provided once for both TV and phone layouts | MB-307 |
+| MK.30.2 | App-wide audit of 21 scroll containers; 7 fixed, 1 horizontal rail opted out, rest surveyed and cleared with reasons; headroom capped proportionally so one spec serves every viewport size | MB-308 |
+| MK.30.3 | `sources.expires_at` (`11.sqm`, v11 → v12) + `parseXtreamExpiry` + expiry in the Sources list sub-line and detail screen; `MigrationTest` v9 hop de-coupled from the current schema | MB-309 |
+| MK.30.4 | Deduped update notification from the periodic worker + sidebar badge + launch-time check (the badge was otherwise blank on cold start) + deep-link into Settings → About | MB-310 |
+| MK.31.1 | `LocaleController` / `AppLanguage` / `locales_config.xml` / ar+fr+es resource sets / Settings → General picker; `attachBaseContext` wrapping because the AppCompat backport cannot reach a `ComponentActivity` | MB-311 |
+
+**Verification status:** all five slices are build-, lint- and unit-test-green (`:app:assembleDebug`,
+`ktlintCheck`, `:app:testDebugUnitTest`, `:shared:testDebugUnitTest`), and MK.31.1's locale
+resources were confirmed present in the packaged APK via `aapt2 dump`. **None has been exercised on
+Fire TV** — no device was reachable during the session (`192.168.68.56` and `192.168.68.74` both
+timed out, no phone attached). MK.30.1 / MK.30.2 change focus-scroll *behaviour*, which unit tests
+can prove the maths of but not the wiring of; both need the cascade-nav smoke test from the
+`native-android-mk` skill plus a scroll pass through every Settings tab before they can be called
+done.
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
