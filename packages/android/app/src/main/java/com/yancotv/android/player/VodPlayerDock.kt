@@ -336,6 +336,13 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
         modifier = Modifier
             .fillMaxWidth()
             .focusable()
+            // MK.31.2 — DELIBERATELY PHYSICAL, do not convert these to
+            // startward/endward like the rest of the app's LEFT/RIGHT handlers.
+            // A media timeline does not mirror under RTL: platform playback UI
+            // (and every mainstream video app in Arabic) keeps the scrubber
+            // left-to-right, and LEFT = rewind is muscle memory independent of
+            // reading direction. Mirroring this would make Arabic users seek
+            // backwards when they meant forwards.
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {

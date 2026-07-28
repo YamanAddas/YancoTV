@@ -61,10 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -82,6 +79,7 @@ import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.ResumeBadge
 import com.yancotv.android.ui.components.WatchedCheckBadge
 import com.yancotv.android.ui.components.formatResumeLabel
+import com.yancotv.android.ui.focus.onStartwardKey
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.focus.tvLongClickable
@@ -631,15 +629,18 @@ fun CoverflowSectionScreen(
                 Modifier
                     .fillMaxWidth()
                     .weight(0.38f)
-                    // D-pad LEFT at the leftmost orb pops back to the categories
-                    // rail. Inter-orb LEFT/RIGHT presses flow through to
+                    // A startward press at the leading orb pops back to the
+                    // categories rail. Inter-orb presses flow through to
                     // LazyRow's natural focus traversal — we only intercept
-                    // when there's nowhere left to scroll inside the wheel.
-                    .onPreviewKeyEvent { ev ->
-                        if (ev.type == KeyEventType.KeyDown &&
-                            ev.key == Key.DirectionLeft &&
-                            shouldExitCoverflowOnLeft(focusedIndex)
-                        ) {
+                    // when there's nowhere further to go inside the wheel,
+                    // which is why this returns false rather than consuming
+                    // unconditionally.
+                    //
+                    // MK.31.2: startward, not Key.DirectionLeft. In RTL the
+                    // LazyRow lays out right-to-left, so the leading orb is
+                    // the rightmost one and escaping it is a physical RIGHT.
+                    .onStartwardKey {
+                        if (shouldExitCoverflowOnLeft(focusedIndex)) {
                             onExitToCategories()
                             true
                         } else {
@@ -1129,15 +1130,13 @@ private fun MetaColumn(
             // path, so wrapping the whole row would swallow Favorite→Watch
             // focus-nav too. Wrapped at Watch-only level, the handler is
             // only reachable when Watch itself owns focus.
+            //
+            // MK.31.2: startward, not Key.DirectionLeft. See DirectionalNav.
             Box(
                 modifier =
-                Modifier.onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                        onExitLeft()
-                        true
-                    } else {
-                        false
-                    }
+                Modifier.onStartwardKey {
+                    onExitLeft()
+                    true
                 },
             ) {
                 HexCta(

@@ -42,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -58,6 +57,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -70,6 +70,10 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
+import com.yancotv.android.ui.focus.endwardFocus
+import com.yancotv.android.ui.focus.endwardKey
+import com.yancotv.android.ui.focus.isStartward
+import com.yancotv.android.ui.focus.startwardKey
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
@@ -334,6 +338,10 @@ private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General,
     // tab BACK and the outer sidebar BACK don't fire on the same press.
     var contentHasFocus by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    // MK.31.2 — the direction that moves from the sub-sidebar INTO the content
+    // pane. Physical RIGHT in LTR, physical LEFT in RTL: moveFocus takes a
+    // physical direction, so this has to be resolved rather than named.
+    val intoContent = endwardFocus()
     // [activeTabFocus] is bound to the currently-selected TabItem only
     // (mirrors `AppSidebar.activeRowFocus` — the canonical pattern from
     // MB-106). `requestFocus()` lands on that exact node, so we no longer
@@ -394,18 +402,18 @@ private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General,
                             it == SettingsTab.Recordings
                     withFrameNanos { }
                     if (isHeavyTab) withFrameNanos { }
-                    val moved = focusManager.moveFocus(FocusDirection.Right)
+                    val moved = focusManager.moveFocus(intoContent)
                     if (!moved && isHeavyTab) {
                         // Retry only on heavy tabs — the original "first
                         // attempt sometimes loses to LazyColumn placement"
                         // race. Cheap tabs that fail to land focus here
                         // would also fail the retry; logging once is fine.
                         withFrameNanos { }
-                        val movedRetry = focusManager.moveFocus(FocusDirection.Right)
+                        val movedRetry = focusManager.moveFocus(intoContent)
                         if (!movedRetry) {
                             Log.w(
                                 "SettingsScreen",
-                                "MB-108: moveFocus(Right) failed twice for tab=$it; focus stays on sidebar",
+                                "MB-108: moveFocus(into content) failed twice for tab=$it; focus stays on sidebar",
                             )
                         }
                     } else if (!moved) {
@@ -426,7 +434,7 @@ private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General,
         // Provide the active-tab requester to every Settings row primitive
         // beneath this point so each row's focusGroup boundary can redirect
         // a LEFT-exit back to the inner sidebar without per-call-site
-        // wiring (see [LocalActiveSettingsTabFocus] / [leftExitsTo]).
+        // wiring (see [LocalActiveSettingsTabFocus] / [startExitsTo]).
         CompositionLocalProvider(LocalActiveSettingsTabFocus provides activeTabFocus) {
             ContentPane(
                 current = tab,
@@ -453,10 +461,13 @@ private fun Sidebar(
 ) {
     val panelShape = RoundedCornerShape(28.dp)
     var sidebarHasFocus by remember { mutableStateOf(false) }
-    // MK.30 — Gate the LEFT-exits handler so the user can move the text
-    // caret inside the search field with D-pad LEFT without
-    // accidentally exiting Settings. The handler still fires for every
-    // LEFT press when focus is on a TabItem / footer / etc.
+    // MK.31.2 — startward, not physical LEFT. In RTL the settings content pane
+    // is on the left, so leaving the sidebar entirely is a physical RIGHT press.
+    val sidebarExitKey = startwardKey()
+    // MK.30 — Gate the exit handler so the user can move the text caret inside
+    // the search field with the same key without accidentally exiting
+    // Settings. The handler still fires for every startward press when focus is
+    // on a TabItem / footer / etc.
     var searchHasFocus by remember { mutableStateOf(false) }
 
     // BACK behaviour:
@@ -489,7 +500,9 @@ private fun Sidebar(
             // elsewhere on the panel.
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (event.key == Key.DirectionLeft && !searchHasFocus) {
+                // MK.31.2 — startward, not physical LEFT: in RTL leaving the
+                // settings sidebar is a physical RIGHT press.
+                if (event.key == sidebarExitKey && !searchHasFocus) {
                     onExit()
                     return@onPreviewKeyEvent true
                 }
@@ -858,10 +871,13 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
     // moves focus right after composition + layout settle.
     //
     // Intercept RIGHT only when this tab is NOT already selected.
+    // MK.31.2 — endward, not physical RIGHT. The content pane is on the left
+    // in RTL, so "select this tab and move into it" is a physical LEFT press.
+    val enterKey = endwardKey()
     val onTabKey =
         Modifier.onPreviewKeyEvent { event ->
             if (event.type == KeyEventType.KeyDown &&
-                event.key == Key.DirectionRight &&
+                event.key == enterKey &&
                 !selected
             ) {
                 onClick()
@@ -1024,6 +1040,9 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
 @Composable
 private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, modifier: Modifier = Modifier) {
     val panelShape = RoundedCornerShape(28.dp)
+    // MK.31.2 — captured for the `exit` lambda below, which receives a PHYSICAL
+    // FocusDirection and so cannot tell startward from endward on its own.
+    val paneLayoutDirection = LocalLayoutDirection.current
     Column(
         modifier =
         modifier
@@ -1044,7 +1063,9 @@ private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, mo
             .focusGroup()
             .focusProperties {
                 exit = { direction ->
-                    if (direction == FocusDirection.Left) {
+                    // MK.31.2 — startward, not physical Left. `exit` receives a
+                    // physical direction; in RTL the sub-sidebar is to the right.
+                    if (isStartward(direction, paneLayoutDirection)) {
                         activeTabFocus
                     } else {
                         FocusRequester.Default

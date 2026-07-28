@@ -382,7 +382,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .leftExitsTo(LocalActiveSettingsTabFocus.current),
+                    .startExitsTo(LocalActiveSettingsTabFocus.current),
             ) {
                 SettingsAccentButton(
                     onClick = {

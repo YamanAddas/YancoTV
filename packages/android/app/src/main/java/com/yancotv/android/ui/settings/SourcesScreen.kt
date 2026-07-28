@@ -465,7 +465,7 @@ private fun EmptyState(onAddClick: () -> Unit, modifier: Modifier = Modifier) {
  *
  * **Focus model:**
  * - The row IS focusable (Row.clickable creates the focus target).
- * - LEFT from anywhere on the row escapes via `leftExitsTo(activeTabFocus)`.
+ * - LEFT from anywhere on the row escapes via `startExitsTo(activeTabFocus)`.
  * - RIGHT / CENTER on the row activates [onClick] which navigates into
  *   the detail surface.
  */
@@ -515,7 +515,7 @@ private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPale
                 width = if (focused) 1.5.dp else 0.dp,
                 color = rowBorder,
             )
-            .leftExitsTo(activeTabFocus)
+            .startExitsTo(activeTabFocus)
             .clickable(
                 interactionSource = interaction,
                 indication = null,

@@ -118,7 +118,7 @@ internal fun SettingsToggleRow(label: String, description: String, checked: Bool
                 color = borderColor,
                 shape = shape,
             )
-            .leftExitsTo(activeTabFocus)
+            .startExitsTo(activeTabFocus)
             // MK.29.3 — Modifier.toggleable replaces .clickable + Role.Switch
             // so Compose exposes the row's ToggleableState (On / Off /
             // Indeterminate) to accessibility services. With the prior

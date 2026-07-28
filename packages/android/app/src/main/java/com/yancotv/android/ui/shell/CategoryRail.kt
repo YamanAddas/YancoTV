@@ -41,11 +41,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -53,6 +49,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.onEndwardKey
+import com.yancotv.android.ui.focus.onStartwardKey
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
@@ -186,13 +184,12 @@ fun CategoryRail(
             // onFocused having already fired — which it hadn't, after a
             // section switch (Live → Movies), so the previous section's
             // selectedGroup leaked into the new section's content panel.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                    onExitToSidebar()
-                    true
-                } else {
-                    false
-                }
+            // MK.31.2: startward, not Key.DirectionLeft — the sidebar is on
+            // the right in RTL, so backing out of the rail is a physical
+            // RIGHT press there.
+            .onStartwardKey {
+                onExitToSidebar()
+                true
             }.focusGroup(),
     ) {
         // Header label — gives the rail a "you are here" anchor; collapses
@@ -412,13 +409,10 @@ private fun HexPillRow(
             // race after a section switch (Live → Movies), where the rail
             // re-mounts with the previous section's selectedGroup until the
             // user navigates pills. Now RIGHT and CENTER share one path.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
-                    onCommitAndEnter()
-                    true
-                } else {
-                    false
-                }
+            // MK.31.2: endward, not Key.DirectionRight. See DirectionalNav.
+            .onEndwardKey {
+                onCommitAndEnter()
+                true
             }.focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Tab, onClick = onClick)
             // MK.28.8 (MB-276) — announce selected state to TalkBack, same

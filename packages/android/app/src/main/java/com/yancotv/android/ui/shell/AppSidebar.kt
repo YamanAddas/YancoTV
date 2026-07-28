@@ -45,11 +45,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -59,6 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.R
+import com.yancotv.android.ui.focus.onEndwardKey
 import com.yancotv.android.ui.nav.AppSection
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
@@ -160,17 +156,17 @@ fun AppSidebar(
             .background(brush)
             .border(1.dp, LocalYancoPalette.current.BorderSubtle.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
             .padding(horizontal = Space.md, vertical = Space.md)
-            // D-pad RIGHT exits the sidebar — for browse sections HomeScreen
+            // D-pad ENDWARD exits the sidebar — for browse sections HomeScreen
             // routes this into the categories rail; for non-browse sections
             // it lands inside the section's content. The rail is vertical
-            // so RIGHT has no in-rail meaning.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionRight) {
-                    onMoveRight()
-                    true
-                } else {
-                    false
-                }
+            // so the endward press has no in-rail meaning.
+            //
+            // MK.31.2: endward, not Key.DirectionRight. Arabic puts the
+            // sidebar on the right, so "into the content" is a physical LEFT
+            // press there — hardcoding RIGHT drove focus off the wrong edge.
+            .onEndwardKey {
+                onMoveRight()
+                true
             }
             // MB-113: focusRestorer() removed. It races with the
             // explicit `activeRowFocus` binding (MB-106): on BACK / LEFT

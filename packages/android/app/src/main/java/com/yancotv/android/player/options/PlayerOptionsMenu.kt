@@ -37,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -49,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
+import com.yancotv.android.ui.focus.endwardKey
+import com.yancotv.android.ui.focus.startwardKey
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -177,6 +178,9 @@ fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, o
 
 @Composable
 private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusRequester?) {
+    // MK.31.2 — prev/next follow reading order, so they are logical.
+    val cyclePrevKey = startwardKey()
+    val cycleNextKey = endwardKey()
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -201,15 +205,19 @@ private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusReq
             // focusable's children-side. Returns true on a successful
             // cycle so the activity's swallow guard doesn't double-
             // handle the key.
+            // MK.31.2 — prev/next follow reading order, so they are logical:
+            // in RTL a physical LEFT press advances. Unlike the seek bar in
+            // VodPlayerDock (which stays physical on purpose), there is no
+            // timeline here — just an ordered option list.
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
-                    Key.DirectionLeft -> {
+                    cyclePrevKey -> {
                         val handler = row.onCyclePrev ?: return@onPreviewKeyEvent false
                         handler()
                         true
                     }
-                    Key.DirectionRight -> {
+                    cycleNextKey -> {
                         val handler = row.onCycleNext ?: return@onPreviewKeyEvent false
                         handler()
                         true

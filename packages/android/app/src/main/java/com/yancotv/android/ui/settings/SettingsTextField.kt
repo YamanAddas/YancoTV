@@ -174,7 +174,7 @@ fun SettingsClickToEditField(
                 // sidebar tab — same boundary contract every Settings row
                 // owns. Bare mode is used inside dialogs, so it doesn't
                 // need this — the dialog owns its own focus boundary.
-                .leftExitsTo(activeTabFocus)
+                .startExitsTo(activeTabFocus)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

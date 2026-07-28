@@ -373,7 +373,7 @@ fun SettingsBackupTab(
                 // leftmost button escapes to the active inner-sidebar tab
                 // (Backup) instead of letting Compose's spatial search
                 // jump UP-LEFT to a focusable in the row above.
-                modifier = Modifier.leftExitsTo(LocalActiveSettingsTabFocus.current),
+                modifier = Modifier.startExitsTo(LocalActiveSettingsTabFocus.current),
             ) {
                 // NOTE: button stays focusable while exporting. Disabling
                 // it (`enabled = !exporting`) makes Compose drop focus the
@@ -469,7 +469,7 @@ fun SettingsBackupTab(
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.leftExitsTo(LocalActiveSettingsTabFocus.current),
+                modifier = Modifier.startExitsTo(LocalActiveSettingsTabFocus.current),
             ) {
                 SettingsOutlinedButton(
                     onClick = { importPickLauncher.launch(arrayOf("application/json", "*/*")) },

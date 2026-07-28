@@ -53,10 +53,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -76,6 +73,7 @@ import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.focus.onStartwardKey
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.catchup.CatchupService
@@ -1322,18 +1320,16 @@ private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPre
             .fillMaxHeight()
             .background(bg)
             .border(0.5.dp, border)
-            // Hole-cover: LEFT from the leftmost cell exits to the
-            // category rail. Programmes inside the timeline use
-            // their own LEFT/RIGHT for navigation between blocks;
-            // only the channel column is the "leftmost edge"
-            // where LEFT must escape the panel.
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionLeft) {
-                    onExitLeft()
-                    true
-                } else {
-                    false
-                }
+            // Hole-cover: a startward press from the leading cell exits to
+            // the category rail. Programmes inside the timeline use their own
+            // horizontal navigation between blocks; only the channel column is
+            // the leading edge where the press must escape the panel.
+            //
+            // MK.31.2: startward, not Key.DirectionLeft — in RTL the channel
+            // column is on the right and escaping it is a physical RIGHT press.
+            .onStartwardKey {
+                onExitLeft()
+                true
             }
             .focusable(interactionSource = interaction)
             .combinedClickable(

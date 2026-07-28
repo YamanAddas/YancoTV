@@ -38,18 +38,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -59,9 +58,13 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.endwardKey
+import com.yancotv.android.ui.focus.isStartward
+import com.yancotv.android.ui.focus.startwardKey
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoIcons
 
@@ -87,13 +90,22 @@ internal val LocalActiveSettingsTabFocus = compositionLocalOf { FocusRequester.D
  * '5s' in Connect-timeout presets — same content pane, different row).
  */
 @OptIn(ExperimentalComposeUiApi::class)
-internal fun Modifier.leftExitsTo(target: FocusRequester): Modifier = this
-    .focusGroup()
-    .focusProperties {
-        exit = { direction ->
-            if (direction == FocusDirection.Left) target else FocusRequester.Default
+@Composable
+internal fun Modifier.startExitsTo(target: FocusRequester): Modifier {
+    // MK.31.2 — renamed from startExitsTo and made layout-direction aware.
+    // `exit` receives a PHYSICAL direction, and `focusProperties`' RTL-aware
+    // `start` slot is not a substitute here: `start` always redirects, whereas
+    // `exit` fires only when no in-group target exists, which is exactly what
+    // lets chip rows and sliders keep their own horizontal navigation.
+    val layoutDirection = LocalLayoutDirection.current
+    return this
+        .focusGroup()
+        .focusProperties {
+            exit = { direction ->
+                if (isStartward(direction, layoutDirection)) target else FocusRequester.Default
+            }
         }
-    }
+}
 
 /**
  * Shared submenu primitives. Maps the Claude-Design "Frosted Emerald"
@@ -226,7 +238,7 @@ internal fun SettingsRow(
             // in-row LEFT navigation works (chip 2 → chip 1) but the moment
             // LEFT crosses the row boundary, focus lands on the active tab
             // in the inner sidebar — the user's "previous menu".
-            .leftExitsTo(activeTabFocus)
+            .startExitsTo(activeTabFocus)
             .let {
                 when {
                     onClick != null ->
@@ -353,6 +365,15 @@ internal fun SettingsSlider(
     val barHeight = 28.dp
     val knobSize = 22.dp
 
+    // MK.31.2 — the bar's fill is drawn from Alignment.CenterStart, which IS
+    // mirrored under RTL, so the minimum end of the track follows the layout
+    // start. Key and touch input therefore have to be logical too, or the
+    // three disagree: pressing "left" would raise the value while the fill
+    // shrank rightward, and tapping the visually-empty side would jump to max.
+    val startwardKeyForSlider = startwardKey()
+    val endwardKeyForSlider = endwardKey()
+    val sliderRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -373,15 +394,20 @@ internal fun SettingsSlider(
                     .weight(1f)
                     .height(barHeight)
                     .focusable(interactionSource = interaction)
+                    // MK.31.2 — logical, not physical. The fill below is drawn
+                    // from `Alignment.CenterStart`, which IS mirrored, so in
+                    // RTL the bar grows right-to-left and the minimum sits at
+                    // the right edge. Physical LEFT decrementing there would
+                    // have moved the knob rightward as the user pressed left.
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         when (event.key) {
-                            Key.DirectionLeft -> {
+                            startwardKeyForSlider -> {
                                 val next = (clampedValue - step).coerceAtLeast(range.first)
                                 if (next != clampedValue) onValueChange(next)
                                 true
                             }
-                            Key.DirectionRight -> {
+                            endwardKeyForSlider -> {
                                 val next = (clampedValue + step).coerceAtMost(range.last)
                                 if (next != clampedValue) onValueChange(next)
                                 true
@@ -393,28 +419,16 @@ internal fun SettingsSlider(
                     // scrub. Pre-fix the knob was a dead visual on phone and
                     // any value between the preset chips was unreachable by
                     // touch. Key-driven path above is untouched (TV).
-                    .pointerInput(range, step) {
-                        fun valueForX(x: Float): Int {
-                            val fraction = (x / size.width.toFloat()).coerceIn(0f, 1f)
-                            val raw = range.first + fraction * (range.last - range.first)
-                            val stepped = (Math.round(raw / step) * step)
-                            return stepped.coerceIn(range.first, range.last)
-                        }
+                    .pointerInput(range, step, sliderRtl) {
                         detectTapGestures { offset ->
-                            val next = valueForX(offset.x)
+                            val next = sliderValueForX(offset.x, size.width.toFloat(), range, step, sliderRtl)
                             if (next != currentValue) currentOnChange(next)
                         }
                     }
-                    .pointerInput(range, step) {
-                        fun valueForX(x: Float): Int {
-                            val fraction = (x / size.width.toFloat()).coerceIn(0f, 1f)
-                            val raw = range.first + fraction * (range.last - range.first)
-                            val stepped = (Math.round(raw / step) * step)
-                            return stepped.coerceIn(range.first, range.last)
-                        }
+                    .pointerInput(range, step, sliderRtl) {
                         detectHorizontalDragGestures { change, _ ->
                             change.consume()
-                            val next = valueForX(change.position.x)
+                            val next = sliderValueForX(change.position.x, size.width.toFloat(), range, step, sliderRtl)
                             if (next != currentValue) currentOnChange(next)
                         }
                     }
@@ -736,4 +750,24 @@ internal fun SettingsInlineSwitch(checked: Boolean) {
                 ),
         )
     }
+}
+
+/**
+ * MK.31.2 — maps a horizontal touch position on a [SettingsSlider] track to a
+ * stepped value, honouring layout direction.
+ *
+ * Under RTL the track's minimum sits at the RIGHT edge, because the fill is
+ * drawn from `Alignment.CenterStart`. The old inline `x / width` mapping was
+ * physical, so an Arabic user tapping the visually-empty end of the bar jumped
+ * to the minimum instead of the maximum.
+ *
+ * Pure so the mapping is unit-testable without a pointer-input harness.
+ */
+internal fun sliderValueForX(x: Float, width: Float, range: IntRange, step: Int, rtl: Boolean): Int {
+    if (width <= 0f) return range.first
+    val physical = (x / width).coerceIn(0f, 1f)
+    val fraction = if (rtl) 1f - physical else physical
+    val raw = range.first + fraction * (range.last - range.first)
+    val stepped = Math.round(raw / step) * step
+    return stepped.coerceIn(range.first, range.last)
 }
