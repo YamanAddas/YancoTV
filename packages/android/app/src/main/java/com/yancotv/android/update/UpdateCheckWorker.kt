@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.shared.update.UpdateCheckOutcome
 import java.util.concurrent.TimeUnit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -50,7 +51,39 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) :
         if (!force && !prefs.updatePrefsFlow.value.autoCheckEnabled) {
             return Result.success()
         }
-        return runCatching { repo.triggerCheck() }
+        // MK.30.4 — the startup run is throttled on top of the pref gate.
+        // UpdateRepository.info is in-memory by design, so after a cold start
+        // nothing knows about a pending update until a check runs — which left
+        // the sidebar badge blank for up to 24h. A launch-time check fixes
+        // that, but every launch hitting the network would be gratuitous, so
+        // it only proceeds when the last successful check is genuinely old.
+        if (inputData.getBoolean(KEY_STARTUP, false)) {
+            val lastCheck = prefs.updatePrefsFlow.value.lastCheckedAt
+            val minAgeMs = TimeUnit.HOURS.toMillis(STARTUP_MIN_AGE_HOURS)
+            if (lastCheck != null && System.currentTimeMillis() - lastCheck < minAgeMs) {
+                return Result.success()
+            }
+        }
+        return runCatching {
+            // MK.30.4 — the check has always run here; until now nothing told
+            // the user about the result unless they walked into Settings →
+            // About. notifyIfNew dedupes on versionCode, so this fires once
+            // per release rather than on every 24h tick.
+            //
+            // Uses the detailed outcome rather than triggerCheck() because
+            // that collapses "up to date" and "couldn't check" into null, and
+            // those need opposite handling: only a confirmed UpToDate means a
+            // previously-posted notification is stale (the user installed it,
+            // since notifications survive an app update). Clearing on a failed
+            // check would drop a legitimately pending notice over a network
+            // hiccup.
+            when (val outcome = repo.triggerCheckOutcome()) {
+                is UpdateCheckOutcome.Available ->
+                    UpdateNotifier.notifyIfNew(applicationContext, outcome.info, prefs)
+                is UpdateCheckOutcome.UpToDate -> UpdateNotifier.clear(applicationContext)
+                else -> Unit
+            }
+        }
             .fold(
                 onSuccess = { Result.success() },
                 onFailure = {
@@ -67,10 +100,22 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) :
 
     companion object {
         const val KEY_FORCE = "force"
+
+        /** Marks the launch-time run so [STARTUP_MIN_AGE_HOURS] applies. */
+        const val KEY_STARTUP = "startup"
         private const val MAX_RETRIES = 3
         private const val UNIQUE_PERIODIC = "update-check-periodic"
         private const val UNIQUE_ONESHOT = "update-check-oneshot"
+        private const val UNIQUE_STARTUP = "update-check-startup"
         private const val PERIODIC_HOURS = 24L
+
+        /**
+         * How stale the last check must be for a launch-time check to run.
+         * Well under the 24h periodic window so a user who opens the app daily
+         * still gets a fresh answer, but short launch-quit-launch cycles make
+         * at most one request.
+         */
+        private const val STARTUP_MIN_AGE_HOURS = 6L
 
         fun schedulePeriodic(context: Context) {
             val constraints =
@@ -94,6 +139,36 @@ class UpdateCheckWorker(appContext: Context, params: WorkerParameters) :
 
         fun cancelPeriodic(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_PERIODIC)
+        }
+
+        /**
+         * MK.30.4 — launch-time check, so the sidebar badge and the About
+         * banner reflect reality in the session the user is actually in
+         * rather than whenever the 24h periodic job next happens to fire.
+         *
+         * Does NOT carry [KEY_FORCE]: opting out of auto-check must opt out
+         * of this too. Throttled by [STARTUP_MIN_AGE_HOURS] inside `doWork`
+         * so relaunching the app repeatedly doesn't mean a request each time.
+         */
+        fun enqueueStartupCheck(context: Context) {
+            val constraints =
+                Constraints
+                    .Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            val request =
+                OneTimeWorkRequestBuilder<UpdateCheckWorker>()
+                    .setConstraints(constraints)
+                    .setInputData(androidx.work.workDataOf(KEY_STARTUP to true))
+                    .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                UNIQUE_STARTUP,
+                // KEEP — if a startup check from this launch is still pending
+                // (e.g. offline, waiting on the network constraint), don't
+                // replace it and reset its wait.
+                ExistingWorkPolicy.KEEP,
+                request,
+            )
         }
 
         /**

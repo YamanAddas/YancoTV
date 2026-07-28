@@ -199,6 +199,18 @@ fun HomeScreen(
             pendingSettingsTab = null
         }
     }
+    // MK.30.4 — external "open Settings on this tab" request, currently only
+    // raised by the update notification. Keyed on the flow so a tap while the
+    // shell is already running (onNewIntent) is honoured, not just cold start.
+    // Deliberately does NOT bypass the parental gate below: needsSettingsGate
+    // is evaluated from `section`, so a deep link into Settings still has to
+    // clear the PIN like any other entry.
+    val deepLinkTab by SettingsDeepLinkState.pendingTab.collectAsState()
+    LaunchedEffect(deepLinkTab) {
+        val tab = SettingsDeepLinkState.consume() ?: return@LaunchedEffect
+        pendingSettingsTab = tab
+        section = AppSection.Settings
+    }
     val needsSettingsGate =
         section == AppSection.Settings &&
             parentalSettings.pinSet &&

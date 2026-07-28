@@ -347,6 +347,20 @@ class AppPreferences(private val db: YancoDb) {
         }
     }
 
+    /**
+     * MK.30.4 — the versionCode we last posted an update notification for.
+     *
+     * The periodic worker re-runs every 24h and keeps finding the same
+     * release until the user actually installs it, so without this the
+     * notification would re-nag daily. Stored rather than kept in memory
+     * because the worker runs in a fresh process each time.
+     */
+    suspend fun setLastNotifiedUpdateVersion(versionCode: Int) {
+        write(KEY_LAST_NOTIFIED_UPDATE, versionCode.toString()) {
+            _updatePrefs.value = _updatePrefs.value.copy(lastNotifiedUpdateVersion = versionCode)
+        }
+    }
+
     suspend fun setLastUpdateCheckAt(millis: Long) {
         write(KEY_LAST_UPDATE_CHECK_AT, millis.toString()) {
             _updatePrefs.value = _updatePrefs.value.copy(lastCheckedAt = millis)
@@ -463,6 +477,7 @@ class AppPreferences(private val db: YancoDb) {
         // in DB) maps to enabled.
         autoCheckEnabled = readString(KEY_AUTO_UPDATE_CHECK) != "0",
         lastCheckedAt = readString(KEY_LAST_UPDATE_CHECK_AT)?.toLongOrNull(),
+        lastNotifiedUpdateVersion = readString(KEY_LAST_NOTIFIED_UPDATE)?.toIntOrNull(),
     )
 
     private fun readString(key: String): String? = db.settingsQueries.get(key).executeAsOneOrNull()
@@ -499,6 +514,7 @@ class AppPreferences(private val db: YancoDb) {
         private const val KEY_PINNED_PARENTS_SERIES = "pref_pinned_parents_series"
         private const val KEY_AUTO_UPDATE_CHECK = "pref_auto_update_check"
         private const val KEY_LAST_UPDATE_CHECK_AT = "pref_last_update_check_at"
+        private const val KEY_LAST_NOTIFIED_UPDATE = "pref_last_notified_update_version"
         private const val KEY_SMART_GROUPING = "pref_general_smart_grouping"
         private const val KEY_SPEED = "pref_playback_speed"
         private const val KEY_RECORDING_FOLDER_URI = "pref_recording_folder_uri"
@@ -797,4 +813,10 @@ data class AppearancePrefs(val fontScalePercent: Int = DEFAULT_FONT_SCALE_PCT) {
  * StateFlow + is re-fetched on next worker tick rather than persisted
  * through this class.
  */
-data class UpdatePrefs(val autoCheckEnabled: Boolean = true, val lastCheckedAt: Long? = null)
+data class UpdatePrefs(
+    val autoCheckEnabled: Boolean = true,
+    val lastCheckedAt: Long? = null,
+    /** MK.30.4 — versionCode of the release we last notified about, so the
+     *  24h worker does not re-nag about the same one. */
+    val lastNotifiedUpdateVersion: Int? = null,
+)

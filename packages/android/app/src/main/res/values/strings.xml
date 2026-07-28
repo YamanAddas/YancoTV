@@ -13,6 +13,12 @@
     <!-- MK.10.3 — voice search hint shown in the launcher's "Search YancoTV" widget. -->
     <string name="search_hint">Channels, movies, shows</string>
 
+    <!-- MK.30.4 — new-release notification, posted by UpdateCheckWorker. -->
+    <string name="update_channel_name">App updates</string>
+    <string name="update_channel_description">Notifies you when a new version of YancoTV is available</string>
+    <string name="update_notification_title">Update available</string>
+    <string name="update_notification_body">YancoTV %1$s is ready to install</string>
+
     <!-- MK.26.A.1 — LAN companion-handoff receiver foreground service. -->
     <string name="handoff_channel_name">Play on TV</string>
     <string name="handoff_channel_description">Receiving playback handed off from your phone</string>

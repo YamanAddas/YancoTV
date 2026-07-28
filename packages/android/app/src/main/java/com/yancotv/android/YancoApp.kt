@@ -116,6 +116,13 @@ class YancoApp : Application() {
         // to schedule unconditionally. cancelPeriodic() runs from the
         // Settings → About toggle when the user opts out.
         com.yancotv.android.update.UpdateCheckWorker.schedulePeriodic(this)
+        // MK.30.4 — plus a launch-time check, same reasoning as the
+        // Recommendations one-shot below. schedulePeriodic uses KEEP, so on an
+        // established install the 24h window survives restarts and no check
+        // runs at launch; since UpdateRepository.info is in-memory, the
+        // sidebar badge and About banner would then sit blank for up to a day
+        // after a release went out. Throttled to once per 6h inside the worker.
+        com.yancotv.android.update.UpdateCheckWorker.enqueueStartupCheck(this)
         // MK.10.1 — keep the launcher Recommendations channel current.
         // Periodic refresh + a one-shot so the channel exists on first
         // boot without waiting 6 hours.

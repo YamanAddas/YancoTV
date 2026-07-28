@@ -20,15 +20,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -63,6 +66,7 @@ import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoType
+import com.yancotv.android.update.UpdateRepository
 
 /**
  * Left navigation rail. Always visible — matches TiviMate's "three
@@ -89,7 +93,15 @@ fun AppSidebar(
     expanded: Boolean = true,
     onMoveRight: () -> Unit = {},
     activeRowFocus: FocusRequester? = null,
+    updateRepo: UpdateRepository = org.koin.compose.koinInject(),
 ) {
+    // MK.30.4 — a pending update badges the Settings row, so the signal is
+    // visible the moment the shell opens rather than only in a notification
+    // the user may have swiped away (or never received, on a TV where the
+    // shade is effectively invisible). Reactive off the same StateFlow that
+    // Settings -> About renders, so installing the update clears it with no
+    // extra plumbing.
+    val pendingUpdate by updateRepo.info.collectAsState()
     // Cascade-collapse: when focus moves into the categories rail or content
     // panel, the sidebar shrinks to an icon strip so the user always knows
     // exactly one panel "owns" the screen. Width animates so the layout
@@ -206,6 +218,7 @@ fun AppSidebar(
                     labelAlpha = labelAlpha,
                     onClick = { onSelect(section) },
                     focusRequester = bindActiveRowFocus(section, current, activeRowFocus),
+                    badged = badgeSection(section, pendingUpdate != null),
                 )
             }
         }
@@ -239,6 +252,19 @@ internal fun accentInsetFraction(springProgress: Float): Float = (1f - springPro
  * Pulled out of the composable so the binding contract is unit-testable
  * without spinning up the Compose runtime.
  */
+/**
+ * MK.30.4 — which sidebar row carries the pending-update dot.
+ *
+ * Only Settings, and only when an update is actually known. Settings is the
+ * right host because it owns the About tab where the install lives, so the
+ * badge points at the thing that resolves it — a dot on Home would tell the
+ * user something is up without saying where to go.
+ *
+ * Pulled out of the composable so the rule is unit-testable without the
+ * Compose runtime, matching [bindActiveRowFocus] next door.
+ */
+internal fun badgeSection(section: AppSection, updateAvailable: Boolean): Boolean = updateAvailable && section == AppSection.Settings
+
 internal fun bindActiveRowFocus(section: AppSection, current: AppSection, activeRowFocus: FocusRequester?): FocusRequester? =
     if (section == current) activeRowFocus else null
 
@@ -293,6 +319,7 @@ private fun SidebarRow(
     labelAlpha: Float,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
+    badged: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -439,12 +466,35 @@ private fun SidebarRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.md),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = if (showLabel) null else section.label,
-                tint = fg,
-                modifier = Modifier.size(22.dp),
-            )
+            // MK.30.4 — pending-update dot. Overlaid on the icon rather than
+            // placed after the label so it survives the collapsed sidebar,
+            // where there is no label to sit beside. Box wraps only the icon
+            // so the Row's spacedBy arrangement is unchanged for every
+            // un-badged row (no 1px layout shift across the rail).
+            Box {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = if (showLabel) null else section.label,
+                    tint = fg,
+                    modifier = Modifier.size(22.dp),
+                )
+                if (badged) {
+                    Box(
+                        modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            // Nudged outside the glyph box so it reads as a
+                            // badge on the icon, not part of the icon.
+                            .offset(x = 3.dp, y = (-3).dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(palette.Premium)
+                            // Ring against the row fill so the dot stays
+                            // legible when the accent gradient sits behind it.
+                            .border(1.dp, palette.BackgroundDeep, CircleShape),
+                    )
+                }
+            }
             // MK.22.A.3 (MB-221): label cross-fade was previously
             // `AnimatedVisibility(expandHorizontally + fadeIn / shrinkHorizontally
             // + fadeOut)` PER ROW — that's ~9 simultaneous layout-shifting

@@ -243,6 +243,17 @@ class MainActivity : ComponentActivity() {
 
     private fun handleSearchIntent(intent: Intent?) {
         if (intent == null) return
+        // MK.30.4 — tapped the "Update available" notification. Route to
+        // Settings → About, which owns the install flow; landing on Home
+        // would leave the user to go find it. Extra is consumed so a
+        // config-change recreate doesn't re-enter Settings on every rotation.
+        if (intent.getBooleanExtra(com.yancotv.android.update.UpdateNotifier.EXTRA_OPEN_UPDATE, false)) {
+            intent.removeExtra(com.yancotv.android.update.UpdateNotifier.EXTRA_OPEN_UPDATE)
+            com.yancotv.android.ui.shell.SettingsDeepLinkState.request(
+                com.yancotv.android.ui.settings.SettingsTab.About,
+            )
+            return
+        }
         // MK.10.1 — Recommendations card deep-link. Cards carry the
         // content id in EXTRA_DEEP_LINK_ID; if the row still exists we
         // queue + launch playback. Missing row → fall through (user
