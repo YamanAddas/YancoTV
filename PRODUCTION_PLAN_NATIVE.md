@@ -1893,7 +1893,7 @@ Fix sweep shipped same-day as MK.28.1–MK.28.8 (one commit each) + this registe
 | MB | P | What | Where it lands |
 |---|---|---|---|
 | MB-245 | P2 | Full type-ramp contrast rework (TextMuted is also below 4.5:1; MB-285 only lifted the worst tier to large-text AA). Needs an on-device visual pass with the user | Appearance polish w/ user sign-off |
-| MB-254 | P2 | RecordingScheduleReceiver main-thread schedule writes can block behind the whole-import EPG transaction (receiver ANR window). goAsync + IO refactor must preserve the MB-208 play-before-service ordering — belongs with recording-subsystem context | Next recording touch, alongside MB-212 |
+| ~~MB-254~~ | P2 | ~~RecordingScheduleReceiver main-thread schedule writes can block behind the whole-import EPG transaction~~ — **FIXED 2026-07-28 as MK.30.5.** Both schedule receivers goAsync onto IO; MB-208 ordering and the MB-214 cancellation guard preserved. Root cause (the import holding one write transaction) filed separately as **MB-315, still open** | Done |
 | — | P1 | Coverflow scroll-follows-selection on phone (snap fling + centered-item derivation — the full wheel metaphor; MB-266 tap-to-select is the shipped interim) | MK.27.B |
 | — | P2 | Double-tap seek + swipe volume/brightness in the phone player | MK.11.2 (already planned) |
 | — | P2 | Pressed-state feedback app-wide (remaining primitives: YancoButton family, SettingsChip/Row/Toggle, HexPillRow, sidebar rows, guide blocks, surf rows) | MK.27.D/E |

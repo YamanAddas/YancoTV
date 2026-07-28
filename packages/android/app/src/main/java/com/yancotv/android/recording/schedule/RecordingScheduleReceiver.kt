@@ -17,6 +17,12 @@ import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -53,11 +59,26 @@ import org.koin.core.component.inject
  * source of truth for whether bytes actually landed; the schedule's
  * state is informational ("the user's intent was honored").
  *
- * **Threading.** `BroadcastReceiver.onReceive` runs on the main thread
- * with a ~10-second budget. PlaybackController is main-thread-only
- * (so the player switch is safe to call directly). RecordingService.start
- * fires-and-forgets via `startForegroundService`. SQLDelight reads /
- * writes are fast — well within budget.
+ * **Threading (MB-254, corrected 2026-07-28).** `onReceive` runs on the main
+ * thread with a ~10-second budget, so the fire path is dispatched through
+ * `goAsync()` onto `Dispatchers.IO` instead of running there directly. The
+ * previous note here claimed "SQLDelight reads / writes are fast — well within
+ * budget"; that was true of the reads and false of the writes. See the comment
+ * in [onReceive] for why (WAL serialises writers, and the EPG import holds one
+ * transaction across a whole XMLTV feed).
+ *
+ * Two ordering guarantees survive that move and must keep surviving:
+ *   - `PlaybackController` is main-thread-only, so its reads and `play()` hop
+ *     back via `withContext(Dispatchers.Main)`.
+ *   - MB-208 requires the player switch to have been *applied* before the FGS
+ *     intent is dispatched. `withContext` suspends until it has, so the
+ *     switch-then-tee path still can't route to fresh-GET by accident.
+ *
+ * `transitionTo(FIRING)` deliberately stays BEFORE the service start: it is the
+ * concurrency guard, because `transitionTo` rejects illegal transitions, so a
+ * schedule the user cancelled a moment ago fails it and the recording correctly
+ * never starts (MB-214). Do not reorder these for robustness — starting first
+ * would record over a cancellation.
  *
  * **Foreground-service-from-receiver permission.** API 31+ restricts
  * starting foreground services from background contexts, but exact
@@ -94,14 +115,55 @@ class RecordingScheduleReceiver :
                 Log.w(TAG, "received ${intent.action} with no schedule_id — ignoring")
                 return
             }
-        when (intent.action) {
-            RecordingScheduleAlarmManager.ACTION_PRE_FIRE -> handlePreFire(context, scheduleId)
-            RecordingScheduleAlarmManager.ACTION_END -> handleEnd(context, scheduleId)
-            else -> Log.w(TAG, "unexpected action ${intent.action}")
+        val action = intent.action
+        if (action != RecordingScheduleAlarmManager.ACTION_PRE_FIRE &&
+            action != RecordingScheduleAlarmManager.ACTION_END
+        ) {
+            Log.w(TAG, "unexpected action $action")
+            return
+        }
+
+        // **MB-254 (2026-07-28).** This used to run the whole fire path
+        // synchronously on the main thread, on the reasoning that "SQLDelight
+        // reads / writes are fast — well within budget". The reads are: the DB
+        // runs in WAL mode (`enableWriteAheadLogging` in DatabaseFactory), so a
+        // reader never waits on a writer. The WRITES are not, because WAL still
+        // serialises writers — and `BulkEpgWriter.Session` holds ONE
+        // `BEGIN IMMEDIATE` transaction across an entire streaming XMLTV import
+        // to keep the replace atomic. That can be open for minutes on a large
+        // feed, and EpgSyncWorker runs it every 6 hours.
+        //
+        // So a recording whose pre-fire alarm landed during an EPG refresh hit
+        // `transitionTo(FIRING)` — the FIRST thing `startRecording` does — and
+        // blocked the main thread on the SQLite write lock until the import
+        // committed. Past the ~10 s broadcast budget that is an ANR, and the
+        // recording never starts at all. Exactly the "I scheduled it and got
+        // nothing" shape.
+        //
+        // goAsync() moves the work off the main thread while keeping the
+        // broadcast alive, so a congested write makes the recording start LATE
+        // (absorbed by the pre-padding) instead of not at all, and the UI stays
+        // responsive so the import can actually finish.
+        val pending = goAsync()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        scope.launch {
+            try {
+                when (action) {
+                    RecordingScheduleAlarmManager.ACTION_PRE_FIRE -> handlePreFire(context, scheduleId)
+                    else -> handleEnd(context, scheduleId)
+                }
+            } catch (t: Throwable) {
+                // Never let a throw strand the broadcast: without finish() the
+                // process is held until the system force-times-out the receiver.
+                Log.e(TAG, "$action for $scheduleId failed", t)
+            } finally {
+                runCatching { pending.finish() }
+                scope.cancel()
+            }
         }
     }
 
-    private fun handlePreFire(context: Context, scheduleId: String) {
+    private suspend fun handlePreFire(context: Context, scheduleId: String) {
         val schedule =
             schedules.getById(scheduleId) ?: run {
                 Log.w(TAG, "pre-fire for missing schedule $scheduleId — ignoring")
@@ -116,7 +178,9 @@ class RecordingScheduleReceiver :
             return
         }
 
-        val currentUrl = playbackController.currentItem.value?.streamUrl
+        // MB-254 — we're on IO now, and PlaybackController is main-thread-only
+        // (packages/android/CLAUDE.md hard rule #2), so hop for the read.
+        val currentUrl = withContext(Dispatchers.Main) { playbackController.currentItem.value?.streamUrl }
         val sameChannel = currentUrl != null && currentUrl == schedule.streamUrl
         val activeRecordings =
             runCatching {
@@ -197,8 +261,14 @@ class RecordingScheduleReceiver :
                 // 1-stream IPTV plans). Synchronous play() guarantees
                 // controller.currentItem is the scheduled URL by the
                 // time the FGS intent is delivered.
-                runCatching { playbackController.play(listOf(contentItem), 0) }
-                    .onFailure { Log.w(TAG, "playbackController.play failed for $scheduleId", it) }
+                // MB-254 — `withContext` suspends until the switch has been
+                // applied on the main thread, so the MB-208 ordering guarantee
+                // (currentItem is the scheduled URL before the FGS intent is
+                // delivered) survives moving this path off the main thread.
+                withContext(Dispatchers.Main) {
+                    runCatching { playbackController.play(listOf(contentItem), 0) }
+                        .onFailure { Log.w(TAG, "playbackController.play failed for $scheduleId", it) }
+                }
                 startRecording(context, schedule)
             }
         }
