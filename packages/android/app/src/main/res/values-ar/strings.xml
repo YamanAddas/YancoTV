@@ -25,4 +25,43 @@
     <string name="handoff_channel_description">استلام التشغيل المُحوَّل من هاتفك</string>
     <string name="handoff_notification_title">جاهز للتشغيل من هاتفك</string>
     <string name="handoff_notification_body">يمكن لـ YancoTV استلام التشغيل من هاتفك على هذه الشبكة</string>
+
+    <!-- MK.31.3 — Settings tab names. Also matched by the sidebar search field. -->
+    <string name="settings_tab_sources">المصادر</string>
+    <string name="settings_tab_general">عام</string>
+    <string name="settings_tab_playback">التشغيل</string>
+    <string name="settings_tab_parental">الرقابة الأبوية</string>
+    <string name="settings_tab_recordings">التسجيلات</string>
+    <string name="settings_tab_network">الشبكة</string>
+    <string name="settings_tab_groups">المجموعات</string>
+    <string name="settings_tab_epg">دليل البرامج</string>
+    <string name="settings_tab_appearance">المظهر</string>
+    <string name="settings_tab_backup">النسخ الاحتياطي</string>
+    <string name="settings_tab_shortcuts">الاختصارات</string>
+    <string name="settings_tab_about">حول</string>
+
+    <!-- Startup destination (Settings -> General). -->
+    <string name="open_on_home">الرئيسية</string>
+    <string name="open_on_live_tv">القنوات المباشرة</string>
+    <string name="open_on_last_used">آخر ما استُخدم</string>
+
+    <!-- Channel-number padding. The padded samples are numerals, not prose. -->
+    <string name="channel_number_format_none">بدون تصفير</string>
+
+    <!-- Video resize mode. The forced ratios are notation, not prose. -->
+    <string name="resize_mode_fit">ملاءمة</string>
+    <string name="resize_mode_fill">تمديد</string>
+    <string name="resize_mode_zoom">تكبير</string>
+
+    <!-- Buffer profile (Settings -> Playback). -->
+    <string name="buffer_profile_low_latency">زمن استجابة منخفض</string>
+    <string name="buffer_profile_balanced">متوازن</string>
+    <string name="buffer_profile_stable">مستقر</string>
+
+    <!-- Default player per content type. Third-party names are trademarks. -->
+    <string name="external_player_internal">داخلي</string>
+
+    <!-- User-Agent presets. Product names are trademarks. -->
+    <string name="user_agent_system">افتراضي النظام</string>
+    <string name="user_agent_custom">مخصص…</string>
 </resources>

@@ -1447,7 +1447,7 @@ class PlayerActivity : AppCompatActivity() {
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.ASPECT,
                 label = "Aspect",
-                currentValue = playback.resizeMode.displayName,
+                currentValue = getString(playback.resizeMode.labelRes),
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.ASPECT) },
                 onCyclePrev = {
                     scope.launch {

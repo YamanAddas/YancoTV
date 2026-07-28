@@ -645,7 +645,7 @@ internal fun SettingsChipRow(options: List<String>, selected: String, onSelect: 
 /** Convenience overload — caller passes any enum-like list whose stringification
  *  matches what should display. */
 @Composable
-internal fun <T> SettingsChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+internal fun <T> SettingsChipRow(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier =
         modifier

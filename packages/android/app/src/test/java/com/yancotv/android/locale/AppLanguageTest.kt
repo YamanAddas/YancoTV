@@ -91,17 +91,45 @@ class AppLanguageTest {
         // A key present in values/ but missing from values-ar/ silently renders
         // in English; a key present ONLY in a translation is dead weight that
         // reads as a missing feature.
-        val keyPattern = Regex("""<string name="([^"]+)"""")
-        val default = keyPattern.findAll(File(res, "values/strings.xml").readText()).map { it.groupValues[1] }.toSet()
+        //
+        // `translatable="false"` keys are excluded from BOTH directions. Those
+        // are numerals ("001"), aspect notation ("16:9") and third-party
+        // product names ("MX Player") — copying them into every locale is
+        // noise that hides real gaps, and aapt warns if a translation supplies
+        // one anyway.
+        val default = translatableKeys(File(res, "values/strings.xml"))
+        val untranslatable = allKeys(File(res, "values/strings.xml")) - default
         assertTrue(default.isNotEmpty(), "default strings.xml parsed as empty — check the regex")
+        assertTrue(
+            untranslatable.isNotEmpty(),
+            "expected some translatable=\"false\" entries; if the regex broke, this test would pass vacuously",
+        )
         for (language in AppLanguage.entries - AppLanguage.System - AppLanguage.English) {
             val file = File(res, "values-${language.tag}/strings.xml")
-            val keys = keyPattern.findAll(file.readText()).map { it.groupValues[1] }.toSet()
+            val keys = allKeys(file)
             // app_name is deliberately untranslated — it's a brand mark.
             val missing = default - keys - setOf("app_name")
             val extra = keys - default
             assertTrue(missing.isEmpty(), "values-${language.tag}/strings.xml is missing keys: $missing")
             assertTrue(extra.isEmpty(), "values-${language.tag}/strings.xml has keys not in the default: $extra")
+            val shouldNotBeThere = keys intersect untranslatable
+            assertTrue(
+                shouldNotBeThere.isEmpty(),
+                "values-${language.tag}/strings.xml translates keys marked translatable=\"false\": $shouldNotBeThere",
+            )
         }
     }
+
+    /** Every `<string name="…">` in [file]. */
+    private fun allKeys(file: File): Set<String> = Regex("""<string name="([^"]+)"""")
+        .findAll(file.readText())
+        .map { it.groupValues[1] }
+        .toSet()
+
+    /** Keys in [file] that are NOT marked `translatable="false"`. */
+    private fun translatableKeys(file: File): Set<String> = Regex("""<string name="([^"]+)"([^>]*)>""")
+        .findAll(file.readText())
+        .filterNot { it.groupValues[2].contains("translatable=\"false\"") }
+        .map { it.groupValues[1] }
+        .toSet()
 }

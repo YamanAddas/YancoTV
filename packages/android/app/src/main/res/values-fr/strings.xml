@@ -25,4 +25,43 @@
     <string name="handoff_channel_description">Réception de la lecture transférée depuis votre téléphone</string>
     <string name="handoff_notification_title">Prêt à lire depuis votre téléphone</string>
     <string name="handoff_notification_body">YancoTV peut recevoir la lecture depuis votre téléphone sur ce réseau</string>
+
+    <!-- MK.31.3 — Settings tab names. Also matched by the sidebar search field. -->
+    <string name="settings_tab_sources">Sources</string>
+    <string name="settings_tab_general">Général</string>
+    <string name="settings_tab_playback">Lecture</string>
+    <string name="settings_tab_parental">Contrôle parental</string>
+    <string name="settings_tab_recordings">Enregistrements</string>
+    <string name="settings_tab_network">Réseau</string>
+    <string name="settings_tab_groups">Groupes</string>
+    <string name="settings_tab_epg">Guide TV</string>
+    <string name="settings_tab_appearance">Apparence</string>
+    <string name="settings_tab_backup">Sauvegarde</string>
+    <string name="settings_tab_shortcuts">Raccourcis</string>
+    <string name="settings_tab_about">À propos</string>
+
+    <!-- Startup destination (Settings -> General). -->
+    <string name="open_on_home">Accueil</string>
+    <string name="open_on_live_tv">TV en direct</string>
+    <string name="open_on_last_used">Dernier utilisé</string>
+
+    <!-- Channel-number padding. The padded samples are numerals, not prose. -->
+    <string name="channel_number_format_none">Sans remplissage</string>
+
+    <!-- Video resize mode. The forced ratios are notation, not prose. -->
+    <string name="resize_mode_fit">Ajuster</string>
+    <string name="resize_mode_fill">Remplir</string>
+    <string name="resize_mode_zoom">Zoom</string>
+
+    <!-- Buffer profile (Settings -> Playback). -->
+    <string name="buffer_profile_low_latency">Faible latence</string>
+    <string name="buffer_profile_balanced">Équilibré</string>
+    <string name="buffer_profile_stable">Stable</string>
+
+    <!-- Default player per content type. Third-party names are trademarks. -->
+    <string name="external_player_internal">Interne</string>
+
+    <!-- User-Agent presets. Product names are trademarks. -->
+    <string name="user_agent_system">Valeur système</string>
+    <string name="user_agent_custom">Personnalisé…</string>
 </resources>

@@ -117,14 +117,14 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = listOf(
  * against label, hint, and the tab name. Empty query returns empty —
  * the UI uses that signal to fall back to the normal tab list.
  */
-internal fun searchSettings(query: String): List<SettingsSearchEntry> {
+internal fun searchSettings(query: String, tabLabelOf: (SettingsTab) -> String): List<SettingsSearchEntry> {
     val q = query.trim()
     if (q.isEmpty()) return emptyList()
     val needle = q.lowercase()
     return SettingsSearchIndex.filter { entry ->
         entry.label.lowercase().contains(needle) ||
             entry.hint.lowercase().contains(needle) ||
-            entry.tab.label.lowercase().contains(needle)
+            tabLabelOf(entry.tab).lowercase().contains(needle)
     }
 }
 
@@ -133,9 +133,9 @@ internal fun searchSettings(query: String): List<SettingsSearchEntry> {
  * filter the sidebar's tab list so a "play" search collapses the rail
  * down to Playback. Empty query → all tabs in their natural order.
  */
-internal fun searchTabs(query: String): List<SettingsTab> {
+internal fun searchTabs(query: String, tabLabelOf: (SettingsTab) -> String): List<SettingsTab> {
     val q = query.trim()
     if (q.isEmpty()) return SettingsTab.entries
     val needle = q.lowercase()
-    return SettingsTab.entries.filter { it.label.lowercase().contains(needle) }
+    return SettingsTab.entries.filter { tabLabelOf(it).lowercase().contains(needle) }
 }

@@ -1,5 +1,7 @@
 package com.yancotv.android.prefs
 
+import androidx.annotation.StringRes
+import com.yancotv.android.R
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.types.ContentType
 import java.security.SecureRandom
@@ -551,12 +553,12 @@ enum class ExternalPlayerBucket { LIVE, MOVIE, SERIES }
  * launcher falls through to INTERNAL — picking a player you uninstalled
  * later shouldn't strand playback.
  */
-enum class DefaultExternalPlayer(val key: String, val displayName: String, val app: com.yancotv.android.player.ExternalPlayerApp?) {
-    INTERNAL("internal", "Internal", null),
-    VLC("vlc", "VLC", com.yancotv.android.player.ExternalPlayerApp.VLC),
-    MX_PRO("mx_pro", "MX Player Pro", com.yancotv.android.player.ExternalPlayerApp.MX_PRO),
-    MX_FREE("mx_free", "MX Player", com.yancotv.android.player.ExternalPlayerApp.MX_FREE),
-    JUST_PLAYER("just_player", "Just Player", com.yancotv.android.player.ExternalPlayerApp.JUST_PLAYER),
+enum class DefaultExternalPlayer(val key: String, @StringRes val labelRes: Int, val app: com.yancotv.android.player.ExternalPlayerApp?) {
+    INTERNAL("internal", R.string.external_player_internal, null),
+    VLC("vlc", R.string.external_player_vlc, com.yancotv.android.player.ExternalPlayerApp.VLC),
+    MX_PRO("mx_pro", R.string.external_player_mx_pro, com.yancotv.android.player.ExternalPlayerApp.MX_PRO),
+    MX_FREE("mx_free", R.string.external_player_mx_free, com.yancotv.android.player.ExternalPlayerApp.MX_FREE),
+    JUST_PLAYER("just_player", R.string.external_player_just_player, com.yancotv.android.player.ExternalPlayerApp.JUST_PLAYER),
     ;
 
     companion object {
@@ -653,10 +655,10 @@ enum class RecordingStorageMode(val key: String) {
 }
 
 /** Default section to land on when the app opens. TiviMate defaults to last-used. */
-enum class OpenOn(val key: String, val displayName: String) {
-    HOME("home", "Home"),
-    LIVE_TV("live_tv", "Live TV"),
-    LAST_USED("last_used", "Last used"),
+enum class OpenOn(val key: String, @StringRes val labelRes: Int) {
+    HOME("home", R.string.open_on_home),
+    LIVE_TV("live_tv", R.string.open_on_live_tv),
+    LAST_USED("last_used", R.string.open_on_last_used),
     ;
 
     companion object {
@@ -682,10 +684,10 @@ data class GeneralPrefs(
  * MK.16.5 — channel-number padding presets. Applied only when the
  * "Show channel numbers" toggle is on; ignored otherwise.
  */
-enum class ChannelNumberFormat(val key: String, val displayName: String, private val pad: Int) {
-    NONE("none", "No padding", 0),
-    PAD3("pad3", "001", 3),
-    PAD4("pad4", "0001", 4),
+enum class ChannelNumberFormat(val key: String, @StringRes val labelRes: Int, private val pad: Int) {
+    NONE("none", R.string.channel_number_format_none, 0),
+    PAD3("pad3", R.string.channel_number_format_pad3, 3),
+    PAD4("pad4", R.string.channel_number_format_pad4, 4),
     ;
 
     /** Renders [number] per this format. Returns blank when [number] is null. */
@@ -701,16 +703,16 @@ enum class ChannelNumberFormat(val key: String, val displayName: String, private
     }
 }
 
-enum class ResizeMode(val key: String, val displayName: String) {
-    FIT("fit", "Fit"),
-    FILL("fill", "Fill"),
-    ZOOM("zoom", "Zoom"),
+enum class ResizeMode(val key: String, @StringRes val labelRes: Int) {
+    FIT("fit", R.string.resize_mode_fit),
+    FILL("fill", R.string.resize_mode_fill),
+    ZOOM("zoom", R.string.resize_mode_zoom),
 
     // MK.12a.5 — forced aspect ratios. These override the stream's reported
     // aspect; useful when a provider tags the stream incorrectly (SD 4:3
     // content served in a 16:9 container, letterboxed 16:9 in a 4:3 frame).
-    RATIO_16_9("16_9", "16:9"),
-    RATIO_4_3("4_3", "4:3"),
+    RATIO_16_9("16_9", R.string.resize_mode_16_9),
+    RATIO_4_3("4_3", R.string.resize_mode_4_3),
     ;
 
     companion object {
@@ -741,16 +743,16 @@ data class PlaybackPrefs(
  *  sliders are deliberately avoided; pick a profile, ship it. */
 enum class BufferProfile(
     val key: String,
-    val displayName: String,
+    @StringRes val labelRes: Int,
     val minBufferMs: Int,
     val maxBufferMs: Int,
     val playbackMs: Int,
     val rebufferMs: Int,
     val backBufferMs: Int,
 ) {
-    LOW_LATENCY("low_latency", "Low latency", 5_000, 5_000, 500, 1_000, 10_000),
-    BALANCED("balanced", "Balanced", 15_000, 15_000, 1_000, 2_500, 30_000),
-    STABLE("stable", "Stable", 30_000, 45_000, 2_000, 5_000, 60_000),
+    LOW_LATENCY("low_latency", R.string.buffer_profile_low_latency, 5_000, 5_000, 500, 1_000, 10_000),
+    BALANCED("balanced", R.string.buffer_profile_balanced, 15_000, 15_000, 1_000, 2_500, 30_000),
+    STABLE("stable", R.string.buffer_profile_stable, 30_000, 45_000, 2_000, 5_000, 60_000),
     ;
 
     companion object {
@@ -761,18 +763,18 @@ enum class BufferProfile(
 /** MK.17.1a — known-good IPTV User-Agent strings. The default
  *  ("system") leaves the network layer to pick its own; everything
  *  else writes a verbatim UA into [NetworkPrefs.userAgentOverride]. */
-enum class UserAgentPreset(val key: String, val displayName: String, val value: String?) {
-    SYSTEM("system", "System default", null),
-    VLC("vlc", "VLC", "VLC/3.0.20 LibVLC/3.0.20"),
-    EXOPLAYER("exoplayer", "ExoPlayer", "ExoPlayerLib/2.19.1"),
-    KODI("kodi", "Kodi", "Kodi/20.5 (Linux; Android 11) Mobile"),
-    SMART_TV("smart_tv", "Smart TV", "Mozilla/5.0 (SMART-TV; Linux; Tizen 7.0)"),
+enum class UserAgentPreset(val key: String, @StringRes val labelRes: Int, val value: String?) {
+    SYSTEM("system", R.string.user_agent_system, null),
+    VLC("vlc", R.string.user_agent_vlc, "VLC/3.0.20 LibVLC/3.0.20"),
+    EXOPLAYER("exoplayer", R.string.user_agent_exoplayer, "ExoPlayerLib/2.19.1"),
+    KODI("kodi", R.string.user_agent_kodi, "Kodi/20.5 (Linux; Android 11) Mobile"),
+    SMART_TV("smart_tv", R.string.user_agent_smart_tv, "Mozilla/5.0 (SMART-TV; Linux; Tizen 7.0)"),
     CHROME_ANDROID(
         "chrome_android",
-        "Chrome Android",
+        R.string.user_agent_chrome_android,
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
     ),
-    CUSTOM("custom", "Custom…", null),
+    CUSTOM("custom", R.string.user_agent_custom, null),
     ;
 
     companion object {

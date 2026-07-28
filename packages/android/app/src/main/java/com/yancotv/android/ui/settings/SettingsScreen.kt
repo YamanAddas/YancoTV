@@ -2,6 +2,7 @@ package com.yancotv.android.ui.settings
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -56,8 +57,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -68,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.endwardFocus
@@ -95,7 +99,7 @@ import kotlinx.coroutines.launch
  * only the breadcrumb + content scroll re-render. Prevents tab swaps from
  * resetting scroll state in sibling panes.
  */
-enum class SettingsTab(val label: String, val icon: ImageVector) {
+enum class SettingsTab(@StringRes val labelRes: Int, val icon: ImageVector) {
     // Subtitles, Notifications, Storage tabs are removed from the
     // sidebar (2026-04-27) — they were never more than placeholder
     // bodies. Their `Settings*Tab.kt` files stay in tree so post-v1
@@ -115,18 +119,18 @@ enum class SettingsTab(val label: String, val icon: ImageVector) {
     // initialTab still defaults to General (cold-open destination), so
     // a user landing in Settings sees a familiar home; only the list
     // order changes so Sources is the first thing to scroll past.
-    Sources("Sources", YancoIcons.Link),
-    General("General", YancoIcons.Settings),
-    Playback("Playback", YancoIcons.Play),
-    Parental("Parental", YancoIcons.Shield),
-    Recordings("Recordings", YancoIcons.Record),
-    Network("Network", YancoIcons.Signal),
-    Groups("Groups", YancoIcons.Grid),
-    Epg("EPG", YancoIcons.Guide),
-    Appearance("Appearance", YancoIcons.Theme),
-    Backup("Backup", YancoIcons.Save),
-    Shortcuts("Shortcuts", YancoIcons.Key),
-    About("About", YancoIcons.Info),
+    Sources(R.string.settings_tab_sources, YancoIcons.Link),
+    General(R.string.settings_tab_general, YancoIcons.Settings),
+    Playback(R.string.settings_tab_playback, YancoIcons.Play),
+    Parental(R.string.settings_tab_parental, YancoIcons.Shield),
+    Recordings(R.string.settings_tab_recordings, YancoIcons.Record),
+    Network(R.string.settings_tab_network, YancoIcons.Signal),
+    Groups(R.string.settings_tab_groups, YancoIcons.Grid),
+    Epg(R.string.settings_tab_epg, YancoIcons.Guide),
+    Appearance(R.string.settings_tab_appearance, YancoIcons.Theme),
+    Backup(R.string.settings_tab_backup, YancoIcons.Save),
+    Shortcuts(R.string.settings_tab_shortcuts, YancoIcons.Key),
+    About(R.string.settings_tab_about, YancoIcons.Info),
 }
 
 // Dark ink used for text/icons on top of the accent gradient fills. Matches
@@ -221,8 +225,12 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             HairlineDivider()
-            val visibleTabs = remember(query) { searchTabs(query) }
-            val results = remember(query) { searchSettings(query) }
+            // MK.31.3 — match against the LOCALIZED tab names, so an Arabic
+            // user searching in Arabic finds the tab. The per-setting index
+            // entries are still English; localizing those is MK.31.4.
+            val tabLabelOf = rememberTabLabelResolver()
+            val visibleTabs = remember(query, tabLabelOf) { searchTabs(query, tabLabelOf) }
+            val results = remember(query, tabLabelOf) { searchSettings(query, tabLabelOf) }
             Column(
                 modifier =
                 Modifier
@@ -309,7 +317,7 @@ private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
             modifier = Modifier.size(20.dp),
         )
         Text(
-            text = tab.label,
+            text = stringResource(tab.labelRes),
             color = palette.TextPrimary,
             fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
@@ -477,8 +485,9 @@ private fun Sidebar(
         if (query.isNotBlank()) onQueryChange("") else onExit()
     }
 
-    val visibleTabs = remember(query) { searchTabs(query) }
-    val results = remember(query) { searchSettings(query) }
+    val tabLabelOf = rememberTabLabelResolver()
+    val visibleTabs = remember(query, tabLabelOf) { searchTabs(query, tabLabelOf) }
+    val results = remember(query, tabLabelOf) { searchSettings(query, tabLabelOf) }
 
     Column(
         modifier =
@@ -706,6 +715,9 @@ private fun SearchResultsSection(results: List<SettingsSearchEntry>, onSelect: (
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
+    // MK.31.3 — resolved here, not inside `semantics`: that lambda is not
+    // composable, so stringResource can't be called from it.
+    val resultDescription = "${entry.label} in ${stringResource(entry.tab.labelRes)}"
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -732,7 +744,7 @@ private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) {
-                contentDescription = "${entry.label} in ${entry.tab.label}"
+                contentDescription = resultDescription
             }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -752,7 +764,7 @@ private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "in ${entry.tab.label}",
+                text = "in ${stringResource(entry.tab.labelRes)}",
                 color = palette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -859,6 +871,9 @@ private fun SidebarHeader() {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, focusRequester: FocusRequester? = null) {
+    // MK.31.3 — resolved outside the non-composable `semantics` lambda.
+    val tabLabel = stringResource(entry.labelRes)
+    val tabDescription = "$tabLabel settings tab"
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -971,7 +986,7 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
                 onClick = onClick,
             ).semantics {
                 role = Role.Tab
-                contentDescription = "${entry.label} settings tab"
+                contentDescription = tabDescription
                 // MK.28.8 (MB-276) — announce selected state to TalkBack.
                 this.selected = selected
             },
@@ -1023,7 +1038,7 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
                 )
             }
             Text(
-                text = entry.label,
+                text = tabLabel,
                 color = labelColor,
                 fontSize = 16.sp,
                 lineHeight = 19.sp,
@@ -1140,7 +1155,7 @@ private fun Breadcrumb(current: SettingsTab) {
             modifier = Modifier.size(12.dp),
         )
         HexChip(
-            text = current.label.uppercase(),
+            text = stringResource(current.labelRes).uppercase(),
             active = true,
             icon = current.icon,
         )
@@ -1249,4 +1264,20 @@ private fun HairlineDivider() {
             .height(1.dp)
             .background(LocalYancoPalette.current.BorderSubtle),
     )
+}
+
+/**
+ * MK.31.3 — resolves [SettingsTab] labels for the search matchers, which are
+ * plain functions (not composables) so they can stay unit-testable.
+ *
+ * Uses Context.getString rather than stringResource because the resolver is
+ * called from inside a `remember` block, not during composition. The Context
+ * carries the locale applied by
+ * [com.yancotv.android.locale.LocaleController.wrap], so this picks up the
+ * in-app language choice, not the device one.
+ */
+@Composable
+private fun rememberTabLabelResolver(): (SettingsTab) -> String {
+    val context = LocalContext.current
+    return remember(context) { { tab: SettingsTab -> context.getString(tab.labelRes) } }
 }

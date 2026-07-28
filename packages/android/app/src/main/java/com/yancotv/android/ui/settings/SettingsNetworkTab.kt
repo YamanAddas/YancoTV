@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,7 +68,7 @@ fun SettingsNetworkTab(
                     SettingsChipRow(
                         options = UserAgentPreset.values().toList(),
                         selected = activePreset,
-                        label = { it.displayName },
+                        label = { stringResource(it.labelRes) },
                         onSelect = { preset ->
                             scope.launch {
                                 if (preset == UserAgentPreset.SYSTEM) {

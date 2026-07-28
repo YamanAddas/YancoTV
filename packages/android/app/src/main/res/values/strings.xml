@@ -24,4 +24,56 @@
     <string name="handoff_channel_description">Receiving playback handed off from your phone</string>
     <string name="handoff_notification_title">Ready to play from your phone</string>
     <string name="handoff_notification_body">YancoTV can receive playback from your phone on this network</string>
+
+    <!-- MK.31.3 — Settings tab names. Also matched by the sidebar search field. -->
+    <string name="settings_tab_sources">Sources</string>
+    <string name="settings_tab_general">General</string>
+    <string name="settings_tab_playback">Playback</string>
+    <string name="settings_tab_parental">Parental</string>
+    <string name="settings_tab_recordings">Recordings</string>
+    <string name="settings_tab_network">Network</string>
+    <string name="settings_tab_groups">Groups</string>
+    <string name="settings_tab_epg">EPG</string>
+    <string name="settings_tab_appearance">Appearance</string>
+    <string name="settings_tab_backup">Backup</string>
+    <string name="settings_tab_shortcuts">Shortcuts</string>
+    <string name="settings_tab_about">About</string>
+
+    <!-- Startup destination (Settings -> General). -->
+    <string name="open_on_home">Home</string>
+    <string name="open_on_live_tv">Live TV</string>
+    <string name="open_on_last_used">Last used</string>
+
+    <!-- Channel-number padding. The padded samples are numerals, not prose. -->
+    <string name="channel_number_format_none">No padding</string>
+    <string name="channel_number_format_pad3" translatable="false">001</string>
+    <string name="channel_number_format_pad4" translatable="false">0001</string>
+
+    <!-- Video resize mode. The forced ratios are notation, not prose. -->
+    <string name="resize_mode_fit">Fit</string>
+    <string name="resize_mode_fill">Fill</string>
+    <string name="resize_mode_zoom">Zoom</string>
+    <string name="resize_mode_16_9" translatable="false">16:9</string>
+    <string name="resize_mode_4_3" translatable="false">4:3</string>
+
+    <!-- Buffer profile (Settings -> Playback). -->
+    <string name="buffer_profile_low_latency">Low latency</string>
+    <string name="buffer_profile_balanced">Balanced</string>
+    <string name="buffer_profile_stable">Stable</string>
+
+    <!-- Default player per content type. Third-party names are trademarks. -->
+    <string name="external_player_internal">Internal</string>
+    <string name="external_player_vlc" translatable="false">VLC</string>
+    <string name="external_player_mx_pro" translatable="false">MX Player Pro</string>
+    <string name="external_player_mx_free" translatable="false">MX Player</string>
+    <string name="external_player_just_player" translatable="false">Just Player</string>
+
+    <!-- User-Agent presets. Product names are trademarks. -->
+    <string name="user_agent_system">System default</string>
+    <string name="user_agent_vlc" translatable="false">VLC</string>
+    <string name="user_agent_exoplayer" translatable="false">ExoPlayer</string>
+    <string name="user_agent_kodi" translatable="false">Kodi</string>
+    <string name="user_agent_smart_tv" translatable="false">Smart TV</string>
+    <string name="user_agent_chrome_android" translatable="false">Chrome Android</string>
+    <string name="user_agent_custom">Custom…</string>
 </resources>

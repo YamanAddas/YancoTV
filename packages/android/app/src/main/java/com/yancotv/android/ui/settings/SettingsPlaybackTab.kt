@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.player.ExternalPlayer
@@ -56,7 +57,7 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
                     SettingsChipRow(
                         options = ResizeMode.values().toList(),
                         selected = snapshot.resizeMode,
-                        label = { it.displayName },
+                        label = { stringResource(it.labelRes) },
                         onSelect = { mode -> scope.launch { prefs.setResizeMode(mode) } },
                     )
                 },
@@ -69,7 +70,7 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
                     SettingsChipRow(
                         options = BufferProfile.values().toList(),
                         selected = snapshot.bufferProfile,
-                        label = { it.displayName },
+                        label = { stringResource(it.labelRes) },
                         onSelect = { profile -> scope.launch { prefs.setBufferProfile(profile) } },
                     )
                 },
@@ -147,13 +148,10 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
                         SettingsChipRow(
                             options = available,
                             selected = current,
-                            label = { choice ->
-                                if (choice == DefaultExternalPlayer.INTERNAL) {
-                                    "Internal"
-                                } else {
-                                    choice.displayName
-                                }
-                            },
+                            // MK.31.3 — INTERNAL used to be special-cased to a
+                            // hardcoded "Internal" that duplicated its own
+                            // displayName; one resource now serves both.
+                            label = { choice -> stringResource(choice.labelRes) },
                             onSelect = { choice ->
                                 scope.launch { prefs.setDefaultExternalPlayer(bucket, choice) }
                             },

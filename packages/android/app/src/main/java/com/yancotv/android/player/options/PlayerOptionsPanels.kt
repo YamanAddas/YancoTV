@@ -48,6 +48,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -675,7 +676,7 @@ private fun AspectPanelContent(prefs: AppPreferences, onPickOption: () -> Unit) 
 
     ResizeMode.values().forEachIndexed { idx, mode ->
         OptionRow(
-            label = mode.displayName,
+            label = stringResource(mode.labelRes),
             selected = state.resizeMode == mode,
             focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {

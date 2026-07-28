@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yancotv.android.locale.AppLanguage
 import com.yancotv.android.locale.LocaleController
@@ -93,7 +94,7 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
                     SettingsChipRow(
                         options = OpenOn.values().toList(),
                         selected = state.openOn,
-                        label = { it.displayName.uppercase() },
+                        label = { stringResource(it.labelRes).uppercase() },
                         onSelect = { section -> scope.launch { prefs.setOpenOn(section) } },
                     )
                 },
@@ -119,7 +120,7 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
                         SettingsChipRow(
                             options = ChannelNumberFormat.values().toList(),
                             selected = state.channelNumberFormat,
-                            label = { it.displayName },
+                            label = { stringResource(it.labelRes) },
                             onSelect = { format -> scope.launch { prefs.setChannelNumberFormat(format) } },
                         )
                     },
