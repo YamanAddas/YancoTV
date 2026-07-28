@@ -2174,25 +2174,104 @@ Language is the one preference **not** in the SQLDelight settings table: `attach
 before an Activity is usable and can precede a ready Koin graph, so the read must work with nothing
 but a Context. A one-key SharedPreferences file has no initialisation order to get wrong.
 
-### MK.31.2+ — string extraction — NOT STARTED
+### MK.31.2 — RTL layout + focus-direction pass (MB-312) — shipped
 
-Mechanical but large. Per-surface batches, each its own commit, `values/` first then the three
-translations. The `AppLanguageTest` consistency guard already fails the build if a translation file
-drifts from `values/strings.xml`, so the extraction cannot silently half-land.
+MK.31.1 made Arabic actually set `Configuration.layoutDirection` (via
+`setLocales`, not `setLocale`), so the shell **already mirrors**. These were live
+bugs the moment the picker shipped, not future work.
 
-### MK.31.N — RTL layout pass — NOT STARTED
+The audit's good news: the codebase already uses logical layout modifiers
+throughout. Zero hits across the whole tree for `padding(left =)`,
+`Alignment.Absolute*`, `absoluteOffset`, or `TextAlign.Left/Right`, so Compose
+mirrors the layout for free. The problem was narrowly the hardcoded D-pad
+handlers, which *cannot* mirror: `Key.DirectionLeft/Right` are hardware key
+codes, and `FocusDirection.Left/Right` are physical too.
 
-`supportsRtl="true"` is already set and Compose mirrors `start`/`end` padding automatically, so the
-work is **not** the text. It is that D-pad focus direction is *physical* while the layout is
-*logical*:
+`ui/focus/DirectionalNav.kt` introduces **startward** ("back out toward the
+sidebar") and **endward** ("go deeper"), resolved against `LocalLayoutDirection`,
+plus `Modifier.onStartwardKey` / `onEndwardKey`. The callback returns whether it
+consumed the press — a real per-site decision, since pane-escape handlers must
+consume while the coverflow must fall through to the `LazyRow` mid-wheel.
 
-- `SettingsScreen.kt` redirects `FocusDirection.Left` to the sidebar — in RTL the sidebar is on the
-  right, so this and every similar site inverts.
-- Grep targets: `FocusDirection.Left` / `.Right`, `Key.DirectionLeft` / `.DirectionRight`,
-  `horizontalScroll` end-detection, `Alignment.CenterStart` / `CenterEnd` vs absolute variants,
-  `offset(x = ...)` (does not mirror — `absoluteOffset` vs `offset` matters), and the MK.30.4 badge
-  offset added in `AppSidebar`.
-- Needs a real Fire TV pass: focus-direction bugs do not show up in unit tests.
+Converted (all previously physical): `AppSidebar` exit, `CategoryRail` exit +
+commit-and-enter, Guide channel-column escape, coverflow leading-orb escape,
+coverflow Watch CTA, Settings sidebar exit, Settings tab select-and-enter,
+`ContentPane` `focusProperties.exit`, `leftExitsTo` → `startExitsTo`, the
+`moveFocus` that lands focus in the content pane, and the player option cycler.
+
+> `focusProperties`' RTL-aware `start` / `end` slots are **not** a substitute for
+> the `exit` lambda. `start` always redirects; `exit` fires only when no in-group
+> target exists — which is exactly what lets chip rows and sliders keep their own
+> horizontal navigation.
+
+**Two deliberate non-conversions**, documented in place so a future sweep for
+`Key.DirectionLeft` doesn't "fix" them:
+
+- **`VodPlayerDock` seek stays physical.** Media timelines don't mirror under
+  RTL — platform playback UI and every mainstream video app in Arabic keep the
+  scrubber left-to-right, and LEFT = rewind is muscle memory independent of
+  reading direction. Mirroring it would make Arabic users seek backwards.
+- **The settings slider needed the opposite treatment** and was broken on all
+  three axes: its fill is drawn from `Alignment.CenterStart`, which *is*
+  mirrored, so under RTL the minimum sits at the right edge — while the keys and
+  the `x / width` touch mapping stayed physical. Pressing "left" would have
+  raised the value as the fill shrank rightward, and tapping the visually-empty
+  end jumped to the minimum. Keys are now logical; the touch mapping is extracted
+  to a pure, tested `sliderValueForX`.
+
+Tests pin that **LTR behaviour is byte-identical** to the hardcoded keys it
+replaced — the property that matters most before device verification.
+
+### MK.31.3 — enum labels + Settings tab names (MB-313) — shipped
+
+Chosen for leverage, not size: the seven `displayName` enums were the structural
+blocker for every later batch, feeding chip labels across General, Playback,
+Network and the player's option panels. Extracting tab bodies while the chips
+inside them stay hardcoded buys nothing.
+
+`SettingsTab`, `OpenOn`, `ChannelNumberFormat`, `ResizeMode`, `BufferProfile`,
+`DefaultExternalPlayer`, `UserAgentPreset` now carry `@StringRes val labelRes`.
+`displayName` is removed, not kept alongside, so nothing can keep reading the
+untranslated value.
+
+Not every value is prose. Numerals (`001`), aspect notation (`16:9`) and
+third-party product names (VLC, MX Player, Kodi, ExoPlayer) are
+`translatable="false"` and live only in `values/`. The consistency test enforces
+that in both directions and asserts some exist, so a broken regex can't make the
+check pass vacuously.
+
+Two API changes fell out of doing it properly:
+
+- `SettingsChipRow`'s `label` lambda became `@Composable (T) -> String` — it is
+  already invoked from composable scope, so this costs nothing.
+- `searchTabs` / `searchSettings` take a `tabLabelOf` resolver rather than
+  reading `tab.label`. They stay plain functions (unit-testable), but tab
+  matching now runs against the **localized** name, so an Arabic user searching
+  in Arabic finds the tab.
+
+`semantics {}` and `remember {}` are not composable, so affected TalkBack
+descriptions and resolvers are computed just above the modifier chain — the
+natural-looking inline `stringResource` does not compile there.
+
+### MK.31.4+ — remaining extraction — NOT STARTED
+
+Still English: every tab **body** (section titles, row labels, hints), the
+per-setting search index (~40 entries × 2 strings), the shell / detail / player
+surfaces, `ThemeId` / `AccentId`, and user-visible strings in
+`packages/shared/` (sync phase labels, source sub-lines, error text — these
+cannot use Android resources at all under the KMP purity rule, so they need a
+typed result the Android layer maps to a resource).
+
+### Open — MB-314: horizontal gradients do not mirror
+
+`Brush.horizontalGradient` is not layout-direction aware (15 call sites,
+including the sidebar row fill and the `SettingsSection` header hairline). Under
+RTL the directional ones point away from the accent rail.
+
+Deliberately deferred to the device pass rather than fixed blind: they are purely
+visual, need eyes to validate, and several are symmetric (transparent →
+colour → transparent) where reversing is a no-op — so a blanket fix would be
+churn. Fixing them without a screen risks making them worse with no way to check.
 
 ### Register
 
@@ -2203,8 +2282,11 @@ work is **not** the text. It is that D-pad focus direction is *physical* while t
 | MK.30.3 | `sources.expires_at` (`11.sqm`, v11 → v12) + `parseXtreamExpiry` + expiry in the Sources list sub-line and detail screen; `MigrationTest` v9 hop de-coupled from the current schema | MB-309 |
 | MK.30.4 | Deduped update notification from the periodic worker + sidebar badge + launch-time check (the badge was otherwise blank on cold start) + deep-link into Settings → About | MB-310 |
 | MK.31.1 | `LocaleController` / `AppLanguage` / `locales_config.xml` / ar+fr+es resource sets / Settings → General picker; `attachBaseContext` wrapping because the AppCompat backport cannot reach a `ComponentActivity` | MB-311 |
+| MK.31.2 | `ui/focus/DirectionalNav.kt` startward/endward primitives; 11 physical D-pad handlers converted; slider keys + touch mapping made logical; seek deliberately left physical | MB-312 |
+| MK.31.3 | 7 `displayName` enums + `SettingsTab` labels → `@StringRes`; `translatable="false"` for numerals / notation / product names; search matches localized tab names | MB-313 |
+| — | **OPEN:** `Brush.horizontalGradient` does not mirror under RTL (15 sites) — deferred to the device pass, see MK.31 above | MB-314 |
 
-**Verification status:** all five slices are build-, lint- and unit-test-green (`:app:assembleDebug`,
+**Verification status:** all eight slices are build-, lint- and unit-test-green (`:app:assembleDebug`,
 `ktlintCheck`, `:app:testDebugUnitTest`, `:shared:testDebugUnitTest`), and MK.31.1's locale
 resources were confirmed present in the packaged APK via `aapt2 dump`. **None has been exercised on
 Fire TV** — no device was reachable during the session (`192.168.68.56` and `192.168.68.74` both
