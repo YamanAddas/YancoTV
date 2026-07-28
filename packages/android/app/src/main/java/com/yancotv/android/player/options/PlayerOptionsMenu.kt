@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -134,38 +135,40 @@ fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, o
             enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
         ) {
-            Column(
-                modifier =
-                Modifier
-                    // Reduced bottom inset (96 → 24) so the menu has
-                    // room to fully render all 8 rows without
-                    // clipping the last one ("External player").
-                    // heightIn cap + verticalScroll handles short
-                    // viewports gracefully — rows scroll instead of
-                    // being silently cut off the screen.
-                    .padding(end = 32.dp, bottom = 24.dp)
-                    .width(MENU_WIDTH.dp)
-                    .heightIn(max = MENU_MAX_HEIGHT.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xEE0A1410))
-                    .border(1.dp, palette.BorderSubtle, RoundedCornerShape(12.dp))
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = "OPTIONS  ·  ◂ ▸ to switch",
-                    color = palette.TextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.5.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-                rows.forEach { row ->
-                    PlayerOptionsRowItem(
-                        row = row,
-                        focusRequester = rowFocus[row.category],
+            ProvideFocusScrollSpec {
+                Column(
+                    modifier =
+                    Modifier
+                        // Reduced bottom inset (96 → 24) so the menu has
+                        // room to fully render all 8 rows without
+                        // clipping the last one ("External player").
+                        // heightIn cap + verticalScroll handles short
+                        // viewports gracefully — rows scroll instead of
+                        // being silently cut off the screen.
+                        .padding(end = 32.dp, bottom = 24.dp)
+                        .width(MENU_WIDTH.dp)
+                        .heightIn(max = MENU_MAX_HEIGHT.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xEE0A1410))
+                        .border(1.dp, palette.BorderSubtle, RoundedCornerShape(12.dp))
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = "OPTIONS  ·  ◂ ▸ to switch",
+                        color = palette.TextMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.5.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
+                    rows.forEach { row ->
+                        PlayerOptionsRowItem(
+                            row = row,
+                            focusRequester = rowFocus[row.category],
+                        )
+                    }
                 }
             }
         }

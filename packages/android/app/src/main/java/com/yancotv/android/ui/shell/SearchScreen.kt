@@ -64,6 +64,8 @@ import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.ResumeBadge
 import com.yancotv.android.ui.components.WatchedCheckBadge
 import com.yancotv.android.ui.components.formatResumeLabel
+import com.yancotv.android.ui.focus.ProvideDefaultFocusScroll
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -291,38 +293,40 @@ fun SearchScreen(
                         }
                     }
                 }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    if (live.isNotEmpty()) {
-                        item(key = "rail-live") {
-                            SearchRail(
-                                title = "Live TV",
-                                items = live,
-                                watchProgress = watchProgress,
-                                onActivate = { onActivate(it, live) },
-                            )
+                ProvideFocusScrollSpec {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        if (live.isNotEmpty()) {
+                            item(key = "rail-live") {
+                                SearchRail(
+                                    title = "Live TV",
+                                    items = live,
+                                    watchProgress = watchProgress,
+                                    onActivate = { onActivate(it, live) },
+                                )
+                            }
                         }
-                    }
-                    if (movies.isNotEmpty()) {
-                        item(key = "rail-movies") {
-                            SearchRail(
-                                title = "Movies",
-                                items = movies,
-                                watchProgress = watchProgress,
-                                onActivate = { onActivate(it, movies) },
-                            )
+                        if (movies.isNotEmpty()) {
+                            item(key = "rail-movies") {
+                                SearchRail(
+                                    title = "Movies",
+                                    items = movies,
+                                    watchProgress = watchProgress,
+                                    onActivate = { onActivate(it, movies) },
+                                )
+                            }
                         }
-                    }
-                    if (series.isNotEmpty()) {
-                        item(key = "rail-series") {
-                            SearchRail(
-                                title = "Series",
-                                items = series,
-                                watchProgress = watchProgress,
-                                onActivate = { onActivate(it, series) },
-                            )
+                        if (series.isNotEmpty()) {
+                            item(key = "rail-series") {
+                                SearchRail(
+                                    title = "Series",
+                                    items = series,
+                                    watchProgress = watchProgress,
+                                    onActivate = { onActivate(it, series) },
+                                )
+                            }
                         }
                     }
                 }
@@ -652,13 +656,15 @@ private fun SearchRail(title: String, items: List<ContentItem>, watchProgress: M
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp),
-        ) {
-            items(items, key = { it.id }) { item ->
-                SearchOrb(item = item, progress = watchProgress[item.id], onActivate = { onActivate(item) })
+        ProvideDefaultFocusScroll {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp),
+            ) {
+                items(items, key = { it.id }) { item ->
+                    SearchOrb(item = item, progress = watchProgress[item.id], onActivate = { onActivate(item) })
+                }
             }
         }
     }

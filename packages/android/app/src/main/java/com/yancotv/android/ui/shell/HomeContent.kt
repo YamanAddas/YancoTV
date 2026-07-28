@@ -60,6 +60,7 @@ import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.ResumeBadge
 import com.yancotv.android.ui.components.WheelRow
 import com.yancotv.android.ui.components.wheelItemTransform
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.ShellDim
@@ -365,148 +366,150 @@ fun HomeContent(
             upNextItems.isEmpty() &&
             recentlyAdded.isEmpty()
 
-    Column(
-        modifier =
-        modifier
-            .fillMaxSize()
-            .background(LocalYancoPalette.current.BackgroundDeep)
-            .verticalScroll(rememberScrollState())
-            .padding(top = Space.xl, bottom = Space.section),
-        verticalArrangement = Arrangement.spacedBy(Space.xxxl),
-    ) {
-        // Audit catch — only render EmptyHome when we KNOW sources are
-        // empty. `hasSources` starts true (probe assumes populated until
-        // proven otherwise), so a returning user never sees the "Add
-        // your first source" CTA flash during the first 300ms of cold
-        // launch while LaunchedEffects fill their lists.
-        if (isTotallyEmpty && !hasSources) {
-            EmptyHome(
-                onAddSource = onAddSource,
-                modifier = Modifier.padding(horizontal = Space.section),
-            )
-            return@Column
-        }
-        // Audit catch — distinct render path for the "has sources but
-        // they all failed to sync" case. Without this, Home renders
-        // zero rails and the user thinks the app is broken / their
-        // catalogue is empty. Banner points them at the offending
-        // source via the same Settings → Sources path the Quick Start
-        // CTA uses.
-        val brokenSource = firstBrokenSource
-        if (isTotallyEmpty && hasSources && brokenSource != null) {
-            BrokenSourceBanner(
-                source = brokenSource,
-                onFix = onAddSource,
-                modifier = Modifier.padding(horizontal = Space.section),
-            )
-            return@Column
-        }
-        // MB-293 — the third empty state: sources exist, nothing failed, a
-        // sync is RUNNING, and no content has landed yet. That is a new user
-        // watching their first import, and it was the one case with no
-        // branch: every rail below renders nothing, so this Column ended up
-        // empty with no focusable child at all. `mainContentFocus.requestFocus()`
-        // in HomeScreen then finds no target and silently fails, leaving the
-        // D-pad dead until the user presses BACK — for the whole several
-        // minutes a large catalog takes to import on a Fire TV Stick. The
-        // app's first impression was a black screen ignoring the remote.
-        //
-        // Gated on an ACTIVE sync deliberately. `isTotallyEmpty` is also
-        // briefly true on every cold launch while the rail effects fill (the
-        // same window the `hasSources` probe above exists to paper over), so
-        // an ungated branch would flash "your library is empty" at returning
-        // users — precisely the "app forgot my sources" impression that
-        // comment warns about. With the gate, the worst a returning user can
-        // see is an accurate "Importing <source>" for a few frames.
-        val activeSync = syncState
-        if (isTotallyEmpty && hasSources && activeSync != null) {
-            FirstSyncCard(
-                active = activeSync,
-                onOpenSources = onAddSource,
-                modifier = Modifier.padding(horizontal = Space.section),
-            )
-            return@Column
-        }
+    ProvideFocusScrollSpec {
+        Column(
+            modifier =
+            modifier
+                .fillMaxSize()
+                .background(LocalYancoPalette.current.BackgroundDeep)
+                .verticalScroll(rememberScrollState())
+                .padding(top = Space.xl, bottom = Space.section),
+            verticalArrangement = Arrangement.spacedBy(Space.xxxl),
+        ) {
+            // Audit catch — only render EmptyHome when we KNOW sources are
+            // empty. `hasSources` starts true (probe assumes populated until
+            // proven otherwise), so a returning user never sees the "Add
+            // your first source" CTA flash during the first 300ms of cold
+            // launch while LaunchedEffects fill their lists.
+            if (isTotallyEmpty && !hasSources) {
+                EmptyHome(
+                    onAddSource = onAddSource,
+                    modifier = Modifier.padding(horizontal = Space.section),
+                )
+                return@Column
+            }
+            // Audit catch — distinct render path for the "has sources but
+            // they all failed to sync" case. Without this, Home renders
+            // zero rails and the user thinks the app is broken / their
+            // catalogue is empty. Banner points them at the offending
+            // source via the same Settings → Sources path the Quick Start
+            // CTA uses.
+            val brokenSource = firstBrokenSource
+            if (isTotallyEmpty && hasSources && brokenSource != null) {
+                BrokenSourceBanner(
+                    source = brokenSource,
+                    onFix = onAddSource,
+                    modifier = Modifier.padding(horizontal = Space.section),
+                )
+                return@Column
+            }
+            // MB-293 — the third empty state: sources exist, nothing failed, a
+            // sync is RUNNING, and no content has landed yet. That is a new user
+            // watching their first import, and it was the one case with no
+            // branch: every rail below renders nothing, so this Column ended up
+            // empty with no focusable child at all. `mainContentFocus.requestFocus()`
+            // in HomeScreen then finds no target and silently fails, leaving the
+            // D-pad dead until the user presses BACK — for the whole several
+            // minutes a large catalog takes to import on a Fire TV Stick. The
+            // app's first impression was a black screen ignoring the remote.
+            //
+            // Gated on an ACTIVE sync deliberately. `isTotallyEmpty` is also
+            // briefly true on every cold launch while the rail effects fill (the
+            // same window the `hasSources` probe above exists to paper over), so
+            // an ungated branch would flash "your library is empty" at returning
+            // users — precisely the "app forgot my sources" impression that
+            // comment warns about. With the gate, the worst a returning user can
+            // see is an accurate "Importing <source>" for a few frames.
+            val activeSync = syncState
+            if (isTotallyEmpty && hasSources && activeSync != null) {
+                FirstSyncCard(
+                    active = activeSync,
+                    onOpenSources = onAddSource,
+                    modifier = Modifier.padding(horizontal = Space.section),
+                )
+                return@Column
+            }
 
-        if (heroSlides.isNotEmpty()) {
-            HomeHero(
-                slides = heroSlides,
-                lockedIds = lockedIds,
-                onPlay = { slide ->
-                    onPlay(listOf(slide.item), 0, resumeByContent[slide.item.id]?.episodeId)
-                },
-                modifier = Modifier.padding(horizontal = Space.section),
-            )
-        }
+            if (heroSlides.isNotEmpty()) {
+                HomeHero(
+                    slides = heroSlides,
+                    lockedIds = lockedIds,
+                    onPlay = { slide ->
+                        onPlay(listOf(slide.item), 0, resumeByContent[slide.item.id]?.episodeId)
+                    },
+                    modifier = Modifier.padding(horizontal = Space.section),
+                )
+            }
 
-        if (continueWatching.isNotEmpty()) {
-            PosterRail(
-                eyebrow = "FOR YOU",
-                title = "Continue watching",
-                caption = "Jump back where you left off",
-                items = continueWatching,
-                lockedIds = lockedIds,
-                resumeByContent = resumeByContent,
-                onPlay = { item ->
-                    val snapshot = continueWatching.toList()
-                    val idx = snapshot.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
-                },
-            )
-        }
-        if (onNowItems.isNotEmpty()) {
-            OnNowRail(
-                items = onNowItems,
-                lockedIds = lockedIds,
-                nowSec = nowSec.value,
-                onPlay = { item ->
-                    val snapshot = onNowItems.toList()
-                    val list = snapshot.map { it.channel }
-                    val idx = list.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(list, idx, null)
-                },
-            )
-        }
-        if (nonLiveFavorites.isNotEmpty()) {
-            PosterRail(
-                eyebrow = "YOUR LIBRARY",
-                title = "Favorites",
-                caption = "Movies and series you starred",
-                items = nonLiveFavorites,
-                lockedIds = lockedIds,
-                resumeByContent = resumeByContent,
-                onPlay = { item ->
-                    val idx = nonLiveFavorites.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(nonLiveFavorites, idx, resumeByContent[item.id]?.episodeId)
-                },
-            )
-        }
-        if (upNextItems.isNotEmpty()) {
-            UpNextRail(
-                items = upNextItems,
-                lockedIds = lockedIds,
-                onPlay = { item ->
-                    val snapshot = upNextItems.toList()
-                    val list = snapshot.map { it.channel }
-                    val idx = list.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(list, idx, null)
-                },
-            )
-        }
-        if (recentlyAdded.isNotEmpty()) {
-            PosterRail(
-                eyebrow = "FRESH",
-                title = "Recently added",
-                caption = "New movies and series in your library",
-                items = recentlyAdded,
-                lockedIds = lockedIds,
-                resumeByContent = resumeByContent,
-                onPlay = { item ->
-                    val snapshot = recentlyAdded.toList()
-                    val idx = snapshot.indexOfFirst { it.id == item.id }
-                    if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
-                },
-            )
+            if (continueWatching.isNotEmpty()) {
+                PosterRail(
+                    eyebrow = "FOR YOU",
+                    title = "Continue watching",
+                    caption = "Jump back where you left off",
+                    items = continueWatching,
+                    lockedIds = lockedIds,
+                    resumeByContent = resumeByContent,
+                    onPlay = { item ->
+                        val snapshot = continueWatching.toList()
+                        val idx = snapshot.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
+                    },
+                )
+            }
+            if (onNowItems.isNotEmpty()) {
+                OnNowRail(
+                    items = onNowItems,
+                    lockedIds = lockedIds,
+                    nowSec = nowSec.value,
+                    onPlay = { item ->
+                        val snapshot = onNowItems.toList()
+                        val list = snapshot.map { it.channel }
+                        val idx = list.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(list, idx, null)
+                    },
+                )
+            }
+            if (nonLiveFavorites.isNotEmpty()) {
+                PosterRail(
+                    eyebrow = "YOUR LIBRARY",
+                    title = "Favorites",
+                    caption = "Movies and series you starred",
+                    items = nonLiveFavorites,
+                    lockedIds = lockedIds,
+                    resumeByContent = resumeByContent,
+                    onPlay = { item ->
+                        val idx = nonLiveFavorites.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(nonLiveFavorites, idx, resumeByContent[item.id]?.episodeId)
+                    },
+                )
+            }
+            if (upNextItems.isNotEmpty()) {
+                UpNextRail(
+                    items = upNextItems,
+                    lockedIds = lockedIds,
+                    onPlay = { item ->
+                        val snapshot = upNextItems.toList()
+                        val list = snapshot.map { it.channel }
+                        val idx = list.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(list, idx, null)
+                    },
+                )
+            }
+            if (recentlyAdded.isNotEmpty()) {
+                PosterRail(
+                    eyebrow = "FRESH",
+                    title = "Recently added",
+                    caption = "New movies and series in your library",
+                    items = recentlyAdded,
+                    lockedIds = lockedIds,
+                    resumeByContent = resumeByContent,
+                    onPlay = { item ->
+                        val snapshot = recentlyAdded.toList()
+                        val idx = snapshot.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
+                    },
+                )
+            }
         }
     }
 }

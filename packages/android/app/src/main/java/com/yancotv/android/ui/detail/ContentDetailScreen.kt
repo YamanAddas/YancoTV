@@ -73,6 +73,7 @@ import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.components.focusStyle
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -306,166 +307,168 @@ fun ContentDetailScreen(
                 .focusRequester(trapFocus)
                 .focusable(enabled = !initialFocusTransferred),
         )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = Space.section),
-        ) {
-            item(key = "hero") {
-                HeroBlock(
-                    item = rendered,
-                    metadata = metadata,
-                    episodes = episodes,
-                    playChoice = playChoice,
-                    movieResumeSeconds = movieResumeSeconds,
-                    hasHistory = hasHistory,
-                    isFavorite = isFav,
-                    onPrimaryFocusChanged = { focused -> heroPlayFocused = focused },
-                    onPlay = {
-                        // Honour the mode `computeNextEpisode` already computed:
-                        //   - RESUME      → continue from saved offset on the current episode
-                        //   - PLAY_NEXT   → next episode from 0 (current was finished)
-                        //   - PLAY_FIRST  → S1E1 (no history yet)
-                        //   - WATCH_AGAIN → S1E1 (whole series watched through)
-                        // Without this branching, every Play click went through
-                        // onPlayEpisode → controller.play(playable) with default
-                        // fromStart=false, which seeks to the stored offset. If the
-                        // chosen episode happened to be finished (PLAY_NEXT case
-                        // with stale watch_history, or the original WATCH_AGAIN
-                        // case where the first ep was already 100% watched), the
-                        // player seeks to the end and loops.
-                        when (rendered.type) {
-                            ContentType.SERIES -> {
-                                val choice = playChoice
-                                val ep = choice?.episode
-                                if (ep != null) {
-                                    when (choice.mode) {
-                                        PlayMode.RESUME -> onPlayEpisode(rendered, ep)
-                                        PlayMode.PLAY_NEXT,
-                                        PlayMode.PLAY_FIRST,
-                                        PlayMode.WATCH_AGAIN,
-                                        -> onPlayFromStart(rendered, ep)
+        ProvideFocusScrollSpec {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = Space.section),
+            ) {
+                item(key = "hero") {
+                    HeroBlock(
+                        item = rendered,
+                        metadata = metadata,
+                        episodes = episodes,
+                        playChoice = playChoice,
+                        movieResumeSeconds = movieResumeSeconds,
+                        hasHistory = hasHistory,
+                        isFavorite = isFav,
+                        onPrimaryFocusChanged = { focused -> heroPlayFocused = focused },
+                        onPlay = {
+                            // Honour the mode `computeNextEpisode` already computed:
+                            //   - RESUME      → continue from saved offset on the current episode
+                            //   - PLAY_NEXT   → next episode from 0 (current was finished)
+                            //   - PLAY_FIRST  → S1E1 (no history yet)
+                            //   - WATCH_AGAIN → S1E1 (whole series watched through)
+                            // Without this branching, every Play click went through
+                            // onPlayEpisode → controller.play(playable) with default
+                            // fromStart=false, which seeks to the stored offset. If the
+                            // chosen episode happened to be finished (PLAY_NEXT case
+                            // with stale watch_history, or the original WATCH_AGAIN
+                            // case where the first ep was already 100% watched), the
+                            // player seeks to the end and loops.
+                            when (rendered.type) {
+                                ContentType.SERIES -> {
+                                    val choice = playChoice
+                                    val ep = choice?.episode
+                                    if (ep != null) {
+                                        when (choice.mode) {
+                                            PlayMode.RESUME -> onPlayEpisode(rendered, ep)
+                                            PlayMode.PLAY_NEXT,
+                                            PlayMode.PLAY_FIRST,
+                                            PlayMode.WATCH_AGAIN,
+                                            -> onPlayFromStart(rendered, ep)
+                                        }
+                                    } else {
+                                        onPlayContent(rendered)
                                     }
-                                } else {
-                                    onPlayContent(rendered)
                                 }
+                                else -> onPlayContent(rendered)
                             }
-                            else -> onPlayContent(rendered)
-                        }
-                    },
-                    onPlayFromStart = {
-                        // Series: jump to the first sorted episode (S1E1
-                        // or the earliest available special). Movie: pass
-                        // a null EpisodeInfo so the parent invokes
-                        // controller.play(list, idx, fromStart=true) on
-                        // the movie itself.
-                        when (rendered.type) {
-                            ContentType.SERIES -> {
-                                val first = sortedEpisodes.firstOrNull()
-                                if (first != null) onPlayFromStart(rendered, first)
-                            }
-                            else -> onPlayFromStart(rendered, null)
-                        }
-                    },
-                    onReset = { resetDialogOpen = true },
-                    onFavoriteToggle = {
-                        val optimistic = !isFav
-                        isFav = optimistic
-                        scope.launch {
-                            val newState =
-                                withContext(Dispatchers.IO) {
-                                    runCatching { favorites.toggle(rendered.id) }.getOrElse { optimistic }
+                        },
+                        onPlayFromStart = {
+                            // Series: jump to the first sorted episode (S1E1
+                            // or the earliest available special). Movie: pass
+                            // a null EpisodeInfo so the parent invokes
+                            // controller.play(list, idx, fromStart=true) on
+                            // the movie itself.
+                            when (rendered.type) {
+                                ContentType.SERIES -> {
+                                    val first = sortedEpisodes.firstOrNull()
+                                    if (first != null) onPlayFromStart(rendered, first)
                                 }
-                            if (newState != optimistic) isFav = newState
-                        }
-                    },
-                    onBack = onDismiss,
-                    playAnchor = playAnchor,
-                )
-            }
-
-            if (rendered.type == ContentType.SERIES) {
-                item(key = "episodes_header") {
-                    EpisodesSectionHeader(
-                        loading = loading,
-                        episodeCount = episodes.size,
+                                else -> onPlayFromStart(rendered, null)
+                            }
+                        },
+                        onReset = { resetDialogOpen = true },
+                        onFavoriteToggle = {
+                            val optimistic = !isFav
+                            isFav = optimistic
+                            scope.launch {
+                                val newState =
+                                    withContext(Dispatchers.IO) {
+                                        runCatching { favorites.toggle(rendered.id) }.getOrElse { optimistic }
+                                    }
+                                if (newState != optimistic) isFav = newState
+                            }
+                        },
+                        onBack = onDismiss,
+                        playAnchor = playAnchor,
                     )
                 }
-                if (seasons.size > 1) {
-                    item(key = "season_selector") {
-                        SeasonSelector(
-                            seasonCount = seasons.size,
-                            selectedSeason = selectedSeason,
-                            episodeCount = seasons[selectedSeason]?.size ?: 0,
-                            open = seasonPickerOpen,
-                            onTriggerClick = { seasonPickerOpen = true },
-                            // UP from the season-trigger pill MUST land on
-                            // the Resume button. Default spatial focus
-                            // search wanders or, when the hero is scrolled
-                            // out, finds no candidate and just nudges the
-                            // page — the user reads that as "the screen
-                            // moved but the cursor didn't go anywhere."
-                            // Explicit `up = playAnchor.requester` makes
-                            // the redirect deterministic.
-                            upTarget = playAnchor.requester,
+
+                if (rendered.type == ContentType.SERIES) {
+                    item(key = "episodes_header") {
+                        EpisodesSectionHeader(
+                            loading = loading,
+                            episodeCount = episodes.size,
                         )
                     }
-                }
-                if (visibleEpisodes.isEmpty() && !loading) {
-                    item(key = "no_episodes") {
-                        Box(
-                            modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Space.page, vertical = Space.md),
-                        ) {
-                            Text(
-                                text = "No episodes available.",
-                                color = LocalYancoPalette.current.TextMuted,
-                                style = YancoType.Body,
+                    if (seasons.size > 1) {
+                        item(key = "season_selector") {
+                            SeasonSelector(
+                                seasonCount = seasons.size,
+                                selectedSeason = selectedSeason,
+                                episodeCount = seasons[selectedSeason]?.size ?: 0,
+                                open = seasonPickerOpen,
+                                onTriggerClick = { seasonPickerOpen = true },
+                                // UP from the season-trigger pill MUST land on
+                                // the Resume button. Default spatial focus
+                                // search wanders or, when the hero is scrolled
+                                // out, finds no candidate and just nudges the
+                                // page — the user reads that as "the screen
+                                // moved but the cursor didn't go anywhere."
+                                // Explicit `up = playAnchor.requester` makes
+                                // the redirect deterministic.
+                                upTarget = playAnchor.requester,
                             )
                         }
                     }
-                }
-                itemsIndexed(visibleEpisodes, key = { _, ep -> "ep:${ep.id}" }) { idx, ep ->
-                    Box(
-                        modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xxs),
-                    ) {
-                        EpisodeRow(
-                            ep = ep,
-                            progress = episodeProgress[ep.id],
-                            // Episode-tile click — smart routing per user
-                            // spec: "if the episode was not in the end then
-                            // pressing the episode acts like continue
-                            // watching, but if the episode was in the end
-                            // then pressing the episode restarts it."
-                            //
-                            // Look up THIS episode's watch_history row.
-                            // - No row, or row is finished (≥95%) → restart
-                            //   from 0 via onPlayFromStart.
-                            // - Row mid-stream → resume from offset via
-                            //   onPlayEpisode (PlaybackController.loadCurrent
-                            //   reads the saved position from history).
-                            //
-                            // Lookup runs on IO; the click lambda just
-                            // launches the coroutine. Cheap — single
-                            // SELECT keyed by episode_id.
-                            onClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    val info =
-                                        runCatching { watchHistory.episodeInfo(ep.id) }.getOrNull()
-                                    val finished = info?.isFinished() == true
-                                    withContext(Dispatchers.Main) {
-                                        if (finished || info == null) {
-                                            onPlayFromStart(rendered, ep)
-                                        } else {
-                                            onPlayEpisode(rendered, ep)
+                    if (visibleEpisodes.isEmpty() && !loading) {
+                        item(key = "no_episodes") {
+                            Box(
+                                modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Space.page, vertical = Space.md),
+                            ) {
+                                Text(
+                                    text = "No episodes available.",
+                                    color = LocalYancoPalette.current.TextMuted,
+                                    style = YancoType.Body,
+                                )
+                            }
+                        }
+                    }
+                    itemsIndexed(visibleEpisodes, key = { _, ep -> "ep:${ep.id}" }) { idx, ep ->
+                        Box(
+                            modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xxs),
+                        ) {
+                            EpisodeRow(
+                                ep = ep,
+                                progress = episodeProgress[ep.id],
+                                // Episode-tile click — smart routing per user
+                                // spec: "if the episode was not in the end then
+                                // pressing the episode acts like continue
+                                // watching, but if the episode was in the end
+                                // then pressing the episode restarts it."
+                                //
+                                // Look up THIS episode's watch_history row.
+                                // - No row, or row is finished (≥95%) → restart
+                                //   from 0 via onPlayFromStart.
+                                // - Row mid-stream → resume from offset via
+                                //   onPlayEpisode (PlaybackController.loadCurrent
+                                //   reads the saved position from history).
+                                //
+                                // Lookup runs on IO; the click lambda just
+                                // launches the coroutine. Cheap — single
+                                // SELECT keyed by episode_id.
+                                onClick = {
+                                    scope.launch(Dispatchers.IO) {
+                                        val info =
+                                            runCatching { watchHistory.episodeInfo(ep.id) }.getOrNull()
+                                        val finished = info?.isFinished() == true
+                                        withContext(Dispatchers.Main) {
+                                            if (finished || info == null) {
+                                                onPlayFromStart(rendered, ep)
+                                            } else {
+                                                onPlayEpisode(rendered, ep)
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            modifier = if (idx == 0) Modifier.placedFocus(firstEpisodeAnchor) else Modifier,
-                        )
+                                },
+                                modifier = if (idx == 0) Modifier.placedFocus(firstEpisodeAnchor) else Modifier,
+                            )
+                        }
                     }
                 }
             }

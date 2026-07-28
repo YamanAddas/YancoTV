@@ -143,6 +143,63 @@ class FocusScrollSpecTest {
         assertEquals(-100f, settle(offset = -200f, size = 500f))
     }
 
+    // ------------------------------------------------------- proportional cap
+
+    @Test
+    fun `headroom is capped at a fraction of a small viewport`() {
+        // MK.30.2: the player options menu is a couple of hundred px tall.
+        // 96px of headroom there would shove the focused row a quarter of the
+        // way down a list that barely scrolls, so the cap takes over.
+        val small = 200f
+        val cap = small * 0.25f // 50
+        assertEquals(cap, settle(offset = 0f, size = 40f, containerSize = small))
+        assertEquals(0f, distance(offset = cap, size = 40f, containerSize = small))
+    }
+
+    @Test
+    fun `the cap does not shrink headroom on a full-height pane`() {
+        // 400 * 0.25 = 100 > 96, so a Settings-sized pane still gets the full
+        // requested headroom and the section-header fix is unaffected.
+        assertEquals(96f, settle(offset = 0f))
+    }
+
+    @Test
+    fun `capped positions are still fixed points`() {
+        val sizes = listOf(0f, 20f, 60f, 150f, 199f)
+        val offsets = (-100..300 step 5).map { it.toFloat() }
+        for (size in sizes) {
+            for (offset in offsets) {
+                val settled = settle(offset, size, containerSize = 200f)
+                assertEquals(
+                    0f,
+                    distance(settled, size, containerSize = 200f),
+                    "not a fixed point: size=$size offset=$offset settled=$settled",
+                )
+            }
+        }
+    }
+
+    // ------------------------------------------------- zero-margin equivalence
+
+    @Test
+    fun `zero margins reduce to minimum-distance scrolling`() {
+        // This is what ProvideDefaultFocusScroll relies on to hand horizontal
+        // rails back Compose's default behaviour: scroll exactly far enough to
+        // make the element visible and no further.
+        fun plain(offset: Float, size: Float = 100f) = focusScrollDistance(
+            offset = offset,
+            size = size,
+            containerSize = viewport,
+            headroomPx = 0f,
+            footroomPx = 0f,
+        )
+        assertEquals(0f, plain(offset = 0f), "already flush at the leading edge")
+        assertEquals(0f, plain(offset = 150f), "fully visible")
+        assertEquals(0f, plain(offset = 300f), "flush at the trailing edge")
+        assertEquals(-40f, plain(offset = -40f), "clipped before: pull to the edge, no further")
+        assertEquals(50f, plain(offset = 350f), "clipped after: pull to the edge, no further")
+    }
+
     // --------------------------------------------------------------- degenerate
 
     @Test

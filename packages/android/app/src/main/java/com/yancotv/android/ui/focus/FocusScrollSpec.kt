@@ -68,6 +68,20 @@ object FocusScrollDefaults {
 
     /** Scroll requests smaller than this are treated as "already correct". */
     const val EPSILON_PX: Float = 0.5f
+
+    /**
+     * Hard ceiling on headroom as a fraction of the viewport, applied on top
+     * of [DEFAULT_HEADROOM].
+     *
+     * MK.30.2 — without this, one global headroom cannot serve surfaces of
+     * wildly different heights. 96dp is right for a Settings pane (~400dp
+     * tall, ~80dp section headers) but absurd inside the player options menu,
+     * which is capped at a couple of hundred dp: the focused row would be
+     * shoved a quarter of the way down a list that barely scrolls. Capping at
+     * a fraction of the viewport makes the same spec safe everywhere — small
+     * containers get proportionally small margins for free.
+     */
+    const val HEADROOM_MAX_FRACTION: Float = 0.25f
 }
 
 /**
@@ -117,8 +131,12 @@ fun focusScrollDistance(offset: Float, size: Float, containerSize: Float, headro
     // requested headroom + footroom don't both fit, headroom is honoured
     // first (seeing the section header you're arriving at matters more than
     // a gap under the row) and footroom absorbs the remainder.
+    //
+    // Headroom is additionally capped at a fraction of the viewport so one
+    // spec scales from a full-height Settings pane down to the player's
+    // options menu — see [FocusScrollDefaults.HEADROOM_MAX_FRACTION].
     val slack = containerSize - size
-    val head = minOf(headroomPx, slack)
+    val head = minOf(headroomPx, slack, containerSize * FocusScrollDefaults.HEADROOM_MAX_FRACTION)
     val foot = minOf(footroomPx, slack - head)
 
     val raw =
@@ -163,6 +181,24 @@ fun rememberFocusScrollSpec(headroom: Dp = FocusScrollDefaults.DEFAULT_HEADROOM,
  * the composition, so nested and future scroll containers inherit it and
  * cannot regress back to Compose's flush-to-edge default.
  */
+/**
+ * Opts [content] out of the ambient headroom/footroom and back to
+ * minimum-distance scrolling — which is what [focusScrollDistance] reduces to
+ * when both margins are zero.
+ *
+ * MK.30.2 — needed because [LocalBringIntoViewSpec] is **axis-agnostic**: one
+ * spec serves both the vertical scroll it was tuned for and any horizontal
+ * rail nested inside it. Leading headroom is what reveals a section header
+ * when travelling up a vertical list; applied to a coverflow or chip rail it
+ * instead shoves the focused card away from the leading edge and changes the
+ * rail's feel. Wrap shared horizontal rails in this so hosting them inside a
+ * [ProvideFocusScrollSpec] screen can't alter their scroll behaviour.
+ */
+@Composable
+fun ProvideDefaultFocusScroll(content: @Composable () -> Unit) {
+    ProvideFocusScrollSpec(headroom = 0.dp, footroom = 0.dp, content = content)
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun ProvideFocusScrollSpec(

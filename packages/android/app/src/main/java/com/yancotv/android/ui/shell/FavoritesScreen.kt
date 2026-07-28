@@ -57,6 +57,7 @@ import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.components.formatResumeLabel
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Space
@@ -288,66 +289,68 @@ private fun FavoritesListBody(
     onRemove: (ContentItem) -> Unit,
     onOpenDetail: (ContentItem) -> Unit,
 ) {
-    LazyColumn(
-        state = listState,
-        modifier =
-        Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // Keep sections in a stable order (Live first — fastest to consume).
-        if (live.isNotEmpty()) {
-            item(key = "header-live") { SectionHeader("Live channels") }
-            items(live, key = { "live:${it.id}" }) { row ->
-                FavoriteRow(
-                    item = row,
-                    progress = watchProgress[row.id],
-                    onActivate = {
-                        gatedPlay(row.id) {
-                            val action = resolveActivation(controller.currentId, row.id, isTv)
-                            if (action.shouldCallPlay) controller.play(live, live.indexOf(row))
-                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
-                        }
-                    },
-                    onRemove = { onRemove(row) },
-                )
+    ProvideFocusScrollSpec {
+        LazyColumn(
+            state = listState,
+            modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Keep sections in a stable order (Live first — fastest to consume).
+            if (live.isNotEmpty()) {
+                item(key = "header-live") { SectionHeader("Live channels") }
+                items(live, key = { "live:${it.id}" }) { row ->
+                    FavoriteRow(
+                        item = row,
+                        progress = watchProgress[row.id],
+                        onActivate = {
+                            gatedPlay(row.id) {
+                                val action = resolveActivation(controller.currentId, row.id, isTv)
+                                if (action.shouldCallPlay) controller.play(live, live.indexOf(row))
+                                if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
+                            }
+                        },
+                        onRemove = { onRemove(row) },
+                    )
+                }
             }
-        }
-        if (movies.isNotEmpty()) {
-            item(key = "header-movies") { SectionHeader("Movies") }
-            items(movies, key = { "movie:${it.id}" }) { row ->
-                FavoriteRow(
-                    item = row,
-                    progress = watchProgress[row.id],
-                    onActivate = {
-                        gatedPlay(row.id) {
-                            val action = resolveActivation(controller.currentId, row.id, isTv)
-                            if (action.shouldCallPlay) controller.play(movies, movies.indexOf(row))
-                            if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
-                        }
-                    },
-                    onRemove = { onRemove(row) },
-                )
+            if (movies.isNotEmpty()) {
+                item(key = "header-movies") { SectionHeader("Movies") }
+                items(movies, key = { "movie:${it.id}" }) { row ->
+                    FavoriteRow(
+                        item = row,
+                        progress = watchProgress[row.id],
+                        onActivate = {
+                            gatedPlay(row.id) {
+                                val action = resolveActivation(controller.currentId, row.id, isTv)
+                                if (action.shouldCallPlay) controller.play(movies, movies.indexOf(row))
+                                if (action.shouldLaunchFullscreen) PlayerLauncher.launch(context)
+                            }
+                        },
+                        onRemove = { onRemove(row) },
+                    )
+                }
             }
-        }
-        if (series.isNotEmpty()) {
-            item(key = "header-series") { SectionHeader("Series") }
-            items(series, key = { "series:${it.id}" }) { row ->
-                FavoriteRow(
-                    item = row,
-                    progress = watchProgress[row.id],
-                    onActivate = {
-                        // Series containers are not Playable — calling
-                        // controller.play would silently no-op (toPlayable
-                        // returns null) but PlayerLauncher.launch would
-                        // still open an empty fullscreen surface. Route
-                        // through the host's detail overlay instead, same
-                        // as HomeScreen.onBrowseActivate's SERIES branch.
-                        gatedPlay(row.id) { onOpenDetail(row) }
-                    },
-                    onRemove = { onRemove(row) },
-                )
+            if (series.isNotEmpty()) {
+                item(key = "header-series") { SectionHeader("Series") }
+                items(series, key = { "series:${it.id}" }) { row ->
+                    FavoriteRow(
+                        item = row,
+                        progress = watchProgress[row.id],
+                        onActivate = {
+                            // Series containers are not Playable — calling
+                            // controller.play would silently no-op (toPlayable
+                            // returns null) but PlayerLauncher.launch would
+                            // still open an empty fullscreen surface. Route
+                            // through the host's detail overlay instead, same
+                            // as HomeScreen.onBrowseActivate's SERIES branch.
+                            gatedPlay(row.id) { onOpenDetail(row) }
+                        },
+                        onRemove = { onRemove(row) },
+                    )
+                }
             }
         }
     }

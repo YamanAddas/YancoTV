@@ -40,6 +40,7 @@ import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.recording.RecordingEntry
 import com.yancotv.shared.recording.RecordingScheduleEntry
@@ -158,95 +159,97 @@ fun RecordingsScreen(
         if (rows.isEmpty() && allSchedules.isEmpty()) {
             EmptyRecordingsState(palette)
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                if (upcoming.isNotEmpty()) {
-                    item("upcoming-header") { SectionHeader("Upcoming · ${upcoming.size}", palette) }
-                    items(upcoming, key = { "upc-${it.id}" }) { schedule ->
-                        UpcomingScheduleRow(
-                            entry = schedule,
-                            onCancel = {
-                                scope.launch(Dispatchers.IO) {
-                                    runCatching { scheduler.cancel(schedule.id) }
-                                }
-                            },
-                        )
-                    }
-                    item("upcoming-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
-                }
-                if (rows.isNotEmpty()) {
-                    item("recordings-header") { SectionHeader("Recordings", palette) }
-                    items(rows, key = { "rec-${it.id}" }) { row ->
-                        RecordingRow(
-                            entry = row,
-                            onPlay = { playRecording(controller, context, row) },
-                            onStop = { RecordingService.stop(context, row.id) },
-                            onDelete = {
-                                scope.launch(Dispatchers.IO) {
-                                    runCatching { deleteRecording(context, recordings, row) }
-                                }
-                            },
-                        )
-                    }
-                }
-                if (historySchedules.isNotEmpty()) {
-                    item("history-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
-                    item("history-header") { SectionHeader("Schedule history", palette) }
-                    items(historySchedules, key = { "hist-${it.id}" }) { schedule ->
-                        // Pair the schedule with its recording row.
-                        // Note: schedule.recordingId is intentionally
-                        // never written (recordingScheduleReceiver
-                        // sidesteps an FK-timing bug by deriving the
-                        // recordId deterministically from the schedule
-                        // id — see RecordingScheduleScheduler
-                        // .recordIdForSchedule). So fall back to that
-                        // derivation when the column is null. Lookup on
-                        // the already-collected `rows` list — cheap and
-                        // keeps the row composable free of repo plumbing.
-                        val derivedRecId =
-                            remember(schedule.id, schedule.recordingId) {
-                                schedule.recordingId
-                                    ?: RecordingScheduleScheduler.recordIdForSchedule(schedule.id)
-                            }
-                        val linked =
-                            remember(derivedRecId, rows) {
-                                rows.firstOrNull { it.id == derivedRecId }
-                            }
-                        // Play only when the linked row is actually
-                        // playable. FAILED / CANCELLED rows have no usable
-                        // file (or 0 bytes) — same gating as RecordingRow.
-                        // RECORDING is in flight; not listed in history
-                        // anyway since the schedule's still firing.
-                        val playable =
-                            linked?.takeIf {
-                                it.status == com.yancotv.shared.recording.RecordingStatus.COMPLETED
-                            }
-                        HistoryScheduleRow(
-                            entry = schedule,
-                            linkedRecording = linked,
-                            onPlay =
-                            if (playable != null) {
-                                { playRecording(controller, context, playable) }
-                            } else {
-                                null
-                            },
-                            onDelete = {
-                                // Delete the schedule row; if a linked
-                                // recording exists, delete it too (file +
-                                // DB row) so "Done" entries don't strand
-                                // a phantom recording on disk. Cancelled /
-                                // failed / missed entries have no
-                                // recording to clean up.
-                                scope.launch(Dispatchers.IO) {
-                                    if (linked != null) {
-                                        runCatching { deleteRecording(context, recordings, linked) }
+            ProvideFocusScrollSpec {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (upcoming.isNotEmpty()) {
+                        item("upcoming-header") { SectionHeader("Upcoming · ${upcoming.size}", palette) }
+                        items(upcoming, key = { "upc-${it.id}" }) { schedule ->
+                            UpcomingScheduleRow(
+                                entry = schedule,
+                                onCancel = {
+                                    scope.launch(Dispatchers.IO) {
+                                        runCatching { scheduler.cancel(schedule.id) }
                                     }
-                                    runCatching { schedules.deleteById(schedule.id) }
+                                },
+                            )
+                        }
+                        item("upcoming-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
+                    }
+                    if (rows.isNotEmpty()) {
+                        item("recordings-header") { SectionHeader("Recordings", palette) }
+                        items(rows, key = { "rec-${it.id}" }) { row ->
+                            RecordingRow(
+                                entry = row,
+                                onPlay = { playRecording(controller, context, row) },
+                                onStop = { RecordingService.stop(context, row.id) },
+                                onDelete = {
+                                    scope.launch(Dispatchers.IO) {
+                                        runCatching { deleteRecording(context, recordings, row) }
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    if (historySchedules.isNotEmpty()) {
+                        item("history-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
+                        item("history-header") { SectionHeader("Schedule history", palette) }
+                        items(historySchedules, key = { "hist-${it.id}" }) { schedule ->
+                            // Pair the schedule with its recording row.
+                            // Note: schedule.recordingId is intentionally
+                            // never written (recordingScheduleReceiver
+                            // sidesteps an FK-timing bug by deriving the
+                            // recordId deterministically from the schedule
+                            // id — see RecordingScheduleScheduler
+                            // .recordIdForSchedule). So fall back to that
+                            // derivation when the column is null. Lookup on
+                            // the already-collected `rows` list — cheap and
+                            // keeps the row composable free of repo plumbing.
+                            val derivedRecId =
+                                remember(schedule.id, schedule.recordingId) {
+                                    schedule.recordingId
+                                        ?: RecordingScheduleScheduler.recordIdForSchedule(schedule.id)
                                 }
-                            },
-                        )
+                            val linked =
+                                remember(derivedRecId, rows) {
+                                    rows.firstOrNull { it.id == derivedRecId }
+                                }
+                            // Play only when the linked row is actually
+                            // playable. FAILED / CANCELLED rows have no usable
+                            // file (or 0 bytes) — same gating as RecordingRow.
+                            // RECORDING is in flight; not listed in history
+                            // anyway since the schedule's still firing.
+                            val playable =
+                                linked?.takeIf {
+                                    it.status == com.yancotv.shared.recording.RecordingStatus.COMPLETED
+                                }
+                            HistoryScheduleRow(
+                                entry = schedule,
+                                linkedRecording = linked,
+                                onPlay =
+                                if (playable != null) {
+                                    { playRecording(controller, context, playable) }
+                                } else {
+                                    null
+                                },
+                                onDelete = {
+                                    // Delete the schedule row; if a linked
+                                    // recording exists, delete it too (file +
+                                    // DB row) so "Done" entries don't strand
+                                    // a phantom recording on disk. Cancelled /
+                                    // failed / missed entries have no
+                                    // recording to clean up.
+                                    scope.launch(Dispatchers.IO) {
+                                        if (linked != null) {
+                                            runCatching { deleteRecording(context, recordings, linked) }
+                                        }
+                                        runCatching { schedules.deleteById(schedule.id) }
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }

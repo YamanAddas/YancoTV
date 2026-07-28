@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -410,70 +411,72 @@ private fun ErrorOverlay(
         // unreachable; the icon shrink (160 -> 96) and the headline
         // (48 -> 30sp) are what keep the primary actions above the fold so
         // the common case needs no scrolling at all.
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Hex icon with an X mark. Static layout; the animated error
-            // pulse from the design lands in a follow-up.
-            Box(
+        ProvideFocusScrollSpec {
+            Column(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(hexRowShape(30.dp))
-                    .background(palette.BackgroundRaised)
-                    .border(2.dp, palette.Error.copy(alpha = 0.6f), hexRowShape(30.dp)),
-                contentAlignment = Alignment.Center,
+                    .align(Alignment.Center)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                // Hex icon with an X mark. Static layout; the animated error
+                // pulse from the design lands in a follow-up.
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(hexRowShape(30.dp))
+                        .background(palette.BackgroundRaised)
+                        .border(2.dp, palette.Error.copy(alpha = 0.6f), hexRowShape(30.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "×",
+                        color = palette.Error,
+                        // MB-298 — pinned to dp, not sp. This is a decorative
+                        // glyph sized to fit its fixed-dp container, so it must
+                        // NOT grow with the font scale: at the TV multiplier plus
+                        // a user font-scale of 125% a raw 96sp becomes ~156sp and
+                        // bursts out of the box. toSp() converts a dp value
+                        // through the current density so it renders at a constant
+                        // physical size whatever the text scaling is.
+                        fontSize = with(LocalDensity.current) { 58.dp.toSp() },
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                HexChip(label = kicker, tone = palette.Error)
+                Spacer(Modifier.height(14.dp))
                 Text(
-                    text = "×",
-                    color = palette.Error,
-                    // MB-298 — pinned to dp, not sp. This is a decorative
-                    // glyph sized to fit its fixed-dp container, so it must
-                    // NOT grow with the font scale: at the TV multiplier plus
-                    // a user font-scale of 125% a raw 96sp becomes ~156sp and
-                    // bursts out of the box. toSp() converts a dp value
-                    // through the current density so it renders at a constant
-                    // physical size whatever the text scaling is.
-                    fontSize = with(LocalDensity.current) { 58.dp.toSp() },
+                    text = data.title,
+                    color = palette.TextPrimary,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                )
-            }
-            Spacer(Modifier.height(20.dp))
-            HexChip(label = kicker, tone = palette.Error)
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = data.title,
-                color = palette.TextPrimary,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (data.description.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = data.description,
-                    color = palette.TextSecondary,
-                    fontSize = 16.sp,
                     textAlign = TextAlign.Center,
-                    maxLines = 3,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (data.description.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = data.description,
+                        color = palette.TextSecondary,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+                DiagnosticBlock(data = data)
+                Spacer(Modifier.height(28.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HexBtn(label = "RETRY", primary = true, onClick = onRetry)
+                    HexBtn(label = "SWITCH TO 1080P", primary = false, onClick = onSwitchQuality)
+                    HexBtn(label = "TRY ANOTHER SOURCE", primary = false, onClick = onTrySource)
+                    HexBtn(label = "REPORT ISSUE", primary = false, onClick = onReport)
+                }
+                Spacer(Modifier.height(12.dp))
+                HexBtn(label = "BACK", primary = false, onClick = onBack)
             }
-            Spacer(Modifier.height(24.dp))
-            DiagnosticBlock(data = data)
-            Spacer(Modifier.height(28.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HexBtn(label = "RETRY", primary = true, onClick = onRetry)
-                HexBtn(label = "SWITCH TO 1080P", primary = false, onClick = onSwitchQuality)
-                HexBtn(label = "TRY ANOTHER SOURCE", primary = false, onClick = onTrySource)
-                HexBtn(label = "REPORT ISSUE", primary = false, onClick = onReport)
-            }
-            Spacer(Modifier.height(12.dp))
-            HexBtn(label = "BACK", primary = false, onClick = onBack)
         }
     }
 }
