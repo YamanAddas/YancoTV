@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MK.31.1 — French. Keep keys in sync with values/strings.xml. -->
+<resources>
+    <!-- Product name: intentionally NOT translated. It's a brand mark. -->
+
+    <!-- Stage 3.1 / MK.14.1e — recording foreground service. -->
+    <string name="recording_channel_name">Enregistrements</string>
+    <string name="recording_channel_description">État des enregistrements en arrière-plan</string>
+    <string name="recording_notification_title_one">Enregistrement d\'une chaîne</string>
+    <string name="recording_notification_title_many">Enregistrement de %1$d chaînes</string>
+    <string name="recording_notification_body">Appuyez pour gérer vos enregistrements</string>
+    <string name="recording_notification_stop_all">Tout arrêter</string>
+
+    <!-- MK.10.3 — voice search hint. -->
+    <string name="search_hint">Chaînes, films, séries</string>
+
+    <!-- MK.30.4 — new-release notification. -->
+    <string name="update_channel_name">Mises à jour de l\'application</string>
+    <string name="update_channel_description">Vous prévient lorsqu\'une nouvelle version de YancoTV est disponible</string>
+    <string name="update_notification_title">Mise à jour disponible</string>
+    <string name="update_notification_body">YancoTV %1$s est prêt à être installé</string>
+
+    <!-- MK.26.A.1 — LAN companion-handoff receiver. -->
+    <string name="handoff_channel_name">Lire sur le téléviseur</string>
+    <string name="handoff_channel_description">Réception de la lecture transférée depuis votre téléphone</string>
+    <string name="handoff_notification_title">Prêt à lire depuis votre téléphone</string>
+    <string name="handoff_notification_body">YancoTV peut recevoir la lecture depuis votre téléphone sur ce réseau</string>
+</resources>

@@ -47,6 +47,16 @@ private const val SAMPLE_VOD_NAME = "Sample movies (bundled)"
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
+    // MK.31.1 — apply the in-app language before any resource is resolved.
+    // LocaleController.wrap does the whole job rather than relying on
+    // AppCompatDelegate: its pre-API-33 backport only reaches AppCompat
+    // components, and this is a ComponentActivity (see LocaleController KDoc
+    // for why switching base class isn't free). Fire TV is API 28, so this is
+    // the normal path, not a fallback.
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.yancotv.android.locale.LocaleController.wrap(newBase))
+    }
+
     // We silently accept whatever the user chooses. Reminders still schedule
     // either way — a denied permission just means the notification drops on
     // the floor when AlarmManager fires. The Guide's "Set reminder" state

@@ -44,6 +44,10 @@ class YancoApp : Application() {
     private var startedActivities = 0
 
     override fun onCreate() {
+        // MK.31.1 — load the persisted language first: this pushes it to
+        // AppCompatDelegate and (API 33+) the platform LocaleManager before any
+        // Activity attaches, so nothing resolves resources in the wrong language.
+        com.yancotv.android.locale.LocaleController.initialize(this)
         // StrictMode FIRST — before Koin starts, before any IO. Debug-only.
         // Native-android-mk skill: "Never call a packages/shared/ repository
         // directly from a Compose lambda. SQLDelight blocks." StrictMode

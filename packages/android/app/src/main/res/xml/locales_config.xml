@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MK.31.1 — the languages YancoTV ships, declared for the platform.
+
+  On API 33+ this is what makes YancoTV appear in system Settings -> System ->
+  Languages -> App languages, and it is what LocaleManager validates a
+  requested locale against. Below API 33 it is inert; the in-app picker plus
+  LocaleController.wrap carry the whole job there (which is the Fire TV case).
+
+  Must stay in sync with the AppLanguage enum and the values-<tag> directories.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ar" />
+    <locale android:name="fr" />
+    <locale android:name="es" />
+</locale-config>

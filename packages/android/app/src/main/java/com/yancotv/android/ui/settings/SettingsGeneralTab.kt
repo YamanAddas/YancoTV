@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.settings
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -10,7 +11,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.locale.AppLanguage
+import com.yancotv.android.locale.LocaleController
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ChannelNumberFormat
 import com.yancotv.android.prefs.OpenOn
@@ -34,6 +38,11 @@ import org.koin.compose.koinInject
 fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = koinInject()) {
     val scope = rememberCoroutineScope()
     val state by prefs.generalFlow.collectAsState()
+    // MK.31.1 — language lives in LocaleController's own SharedPreferences,
+    // not AppPreferences: it must be readable from attachBaseContext, which
+    // runs before the Koin/SQLDelight graph is guaranteed ready.
+    val language by LocaleController.language.collectAsState()
+    val ctx = LocalContext.current
 
     Column(
         modifier =
@@ -42,6 +51,37 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
             .verticalScroll(rememberScrollState())
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
+        SettingsSection(
+            title = "Language",
+            sub = "The language YancoTV's own screens use. Provider channel and category names always come from your source as-is.",
+        ) {
+            SettingsRow(
+                label = "App language",
+                hint = "Changing this reloads the app so every screen picks up the new language.",
+                content = {
+                    SettingsChipRow(
+                        options = AppLanguage.selectable,
+                        selected = language,
+                        // Endonyms — "العربية", not "Arabic". This is the one
+                        // screen a user may reach while the app is in a
+                        // language they can't read, so each option has to be
+                        // legible to the person who wants it.
+                        label = { it.endonym },
+                        onSelect = { choice ->
+                            if (choice != language) {
+                                LocaleController.setLanguage(ctx, choice)
+                                // A running Activity has already resolved its
+                                // resources, so nothing on screen changes until
+                                // it is rebuilt. recreate() is the whole visible
+                                // effect of the switch.
+                                (ctx as? Activity)?.recreate()
+                            }
+                        },
+                    )
+                },
+            )
+        }
+
         SettingsSection(
             title = "Startup",
             sub = "Which screen YancoTV opens first when you launch the app.",

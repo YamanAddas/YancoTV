@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MK.31.1 — Arabic (RTL). Keep keys in sync with values/strings.xml. -->
+<resources>
+    <!-- Product name: intentionally NOT translated. It's a brand mark. -->
+
+    <!-- Stage 3.1 / MK.14.1e — recording foreground service. -->
+    <string name="recording_channel_name">التسجيلات</string>
+    <string name="recording_channel_description">حالة التسجيل في الخلفية</string>
+    <string name="recording_notification_title_one">جارٍ تسجيل قناة واحدة</string>
+    <string name="recording_notification_title_many">جارٍ تسجيل %1$d قناة</string>
+    <string name="recording_notification_body">اضغط لإدارة تسجيلاتك</string>
+    <string name="recording_notification_stop_all">إيقاف الكل</string>
+
+    <!-- MK.10.3 — voice search hint. -->
+    <string name="search_hint">قنوات، أفلام، مسلسلات</string>
+
+    <!-- MK.30.4 — new-release notification. -->
+    <string name="update_channel_name">تحديثات التطبيق</string>
+    <string name="update_channel_description">يُعلمك عند توفر إصدار جديد من YancoTV</string>
+    <string name="update_notification_title">يتوفر تحديث</string>
+    <string name="update_notification_body">‏YancoTV %1$s جاهز للتثبيت</string>
+
+    <!-- MK.26.A.1 — LAN companion-handoff receiver. -->
+    <string name="handoff_channel_name">التشغيل على التلفاز</string>
+    <string name="handoff_channel_description">استلام التشغيل المُحوَّل من هاتفك</string>
+    <string name="handoff_notification_title">جاهز للتشغيل من هاتفك</string>
+    <string name="handoff_notification_body">يمكن لـ YancoTV استلام التشغيل من هاتفك على هذه الشبكة</string>
+</resources>

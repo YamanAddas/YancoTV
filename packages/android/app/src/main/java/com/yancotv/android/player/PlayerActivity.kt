@@ -78,6 +78,14 @@ import org.koin.android.ext.android.inject
  */
 @UnstableApi
 class PlayerActivity : AppCompatActivity() {
+    // MK.31.1 — same wrap as MainActivity. AppCompatDelegate would cover this
+    // Activity on its own, but going through LocaleController keeps one source
+    // of truth: an Activity that skips the wrap renders in the device language
+    // while the rest of the app is switched.
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.yancotv.android.locale.LocaleController.wrap(newBase))
+    }
+
     companion object {
         private const val TAG = "YancoPlayerActivity"
         private const val CONTROLLER_TIMEOUT_MS = 4000
