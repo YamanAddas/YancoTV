@@ -57,7 +57,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.ui.focus.FocusableSpacer
+import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.ShellDim
 import com.yancotv.android.ui.theme.Space
@@ -152,11 +152,18 @@ fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = Sett
         (config.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
             android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
     val singlePane = config.smallestScreenWidthDp < COMPACT_SETTINGS_SW_DP && !isTv
-    Box(modifier = modifier.fillMaxSize()) {
-        if (singlePane) {
-            SettingsPhoneLayout(initialTab = initialTab, onExit = onExitToMainSidebar)
-        } else {
-            SettingsTwoPaneLayout(initialTab = initialTab, onExitToMainSidebar = onExitToMainSidebar)
+    // MK.30.1 (MB-307) — one focus-scroll spec for the whole Settings surface.
+    // It used to be provided inside ContentPane, which meant the TV two-pane
+    // body got it but the phone drilled-in body (and any dialog hosted from a
+    // tab) fell back to Compose's flush-to-viewport-edge default. Provided
+    // here it covers both layouts and every scroll container they nest.
+    ProvideFocusScrollSpec {
+        Box(modifier = modifier.fillMaxSize()) {
+            if (singlePane) {
+                SettingsPhoneLayout(initialTab = initialTab, onExit = onExitToMainSidebar)
+            } else {
+                SettingsTwoPaneLayout(initialTab = initialTab, onExitToMainSidebar = onExitToMainSidebar)
+            }
         }
     }
 }
@@ -1055,117 +1062,41 @@ private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, mo
         // swaps, so switching away from a scrolled tab and back lands at
         // top rather than keeping a stale offset.
         //
-        // Conservative BringIntoViewSpec: when MB-108's moveFocus(Right)
-        // lands focus on the first focusable inside a tab, Compose's
-        // default spec was scrolling to put that focusable AT THE TOP
-        // of the viewport — pushing the section title above it under the
-        // breadcrumb. This spec returns 0 (no scroll) whenever the
-        // requested rect is already fully in view, so the tab opens with
-        // the section title visible at the top and the focused chip a
-        // few rows down — both visible, no auto-scroll surprises.
-        @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-        val bringIntoViewSpec = rememberSafeMarginBringIntoViewSpec()
-        @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides
-                bringIntoViewSpec,
+        // The focus-scroll spec that keeps section headers from being clipped
+        // is provided once for the whole Settings surface in [SettingsScreen]
+        // (MK.30.1 / MB-307) — see [com.yancotv.android.ui.focus.ProvideFocusScrollSpec].
+        // It used to live here, which left the phone layout uncovered.
+        Box(
+            modifier =
+            Modifier
+                .weight(1f)
+                .fillMaxWidth(),
         ) {
-            Box(
-                modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            ) {
-                androidx.compose.runtime.key(current) {
-                    TabContent(tab = current)
-                }
-                // MB-109 (hoisted): single focus fallback for the entire
-                // ContentPane. moveFocus(Right) from the sub-sidebar lands
-                // on the first focusable child of the active tab body if it
-                // has any (General/Playback/Groups/Network/Parental do); if
-                // the tab is read-only (About/Shortcuts) or a placeholder,
-                // focus falls through to this 0-dp trap so the request never
-                // silently fails and the user always exits the sub-sidebar.
-                //
-                // Lives at ContentPane scope (not per-tab) so:
-                //   1. Tab swap doesn't unmount it — focus traversal sees a
-                //      stable target across the `key(current)` re-mount.
-                //   2. No per-tab Column.spacedBy gap pushes the visible
-                //      content down by 12-16dp (the regression from the
-                //      first attempt — see MB-112 commit).
-                //   3. One source of truth: future placeholder tabs inherit
-                //      the trap automatically; no per-tab boilerplate.
-                //
-                // Sibling of the keyed TabContent inside the same Box, so
-                // it's last in the focus traversal order — real tab
-                // focusables come first, the trap is only used when a tab
-                // body has no other focus targets.
-                FocusableSpacer()
+            androidx.compose.runtime.key(current) {
+                TabContent(tab = current)
             }
-        } // end CompositionLocalProvider
-    }
-}
-
-/**
- * Custom [BringIntoViewSpec] for the Settings ContentPane. Two jobs:
- *
- *  1. Suppresses the eager "snap focused element to viewport top"
- *     behaviour that was pushing section titles ('Video', 'User-Agent',
- *     'Guide window') under the breadcrumb when MB-108's
- *     moveFocus(Right) landed focus on the first focusable inside a tab.
- *
- *  2. Leaves a [SAFETY_MARGIN_DP]-wide gap between the focused row and
- *     the viewport edges so the focused last row never sits flush
- *     against the panel border. The previous spec brought the trailing
- *     edge to *exactly* `containerSize`, which made D-pad DOWN to the
- *     last row pin that row to the panel bottom — the per-tab
- *     `bottom = 80.dp` padding lives inside the scroll content but
- *     BringIntoView only positions the focused element, so the padding
- *     never scrolled into view. Reported three times before this fix.
- *
- * Behaviour rules:
- *   - Element fully in view (with margin clear) → no scroll.
- *   - Element extends below viewport (or sits within bottom margin) →
- *     scroll forward so trailing edge lands [SAFETY_MARGIN_DP] above
- *     the viewport bottom.
- *   - Element starts above viewport (or sits within top margin) →
- *     scroll backward so leading edge lands [SAFETY_MARGIN_DP] below
- *     the viewport top.
- *   - Element bigger than the viewport (e.g. the dpadVerticalScroll
- *     Column-as-focusable that About uses) → no scroll. Without this
- *     case, the spec returned a positive scroll delta on every focus
- *     event, which combined with About's animateScrollBy created a
- *     feedback loop that read as flicker on D-pad UP/DOWN.
- */
-private const val SAFETY_MARGIN_DP = 32
-
-@Composable
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-private fun rememberSafeMarginBringIntoViewSpec(): androidx.compose.foundation.gestures.BringIntoViewSpec {
-    val density = LocalDensity.current
-    return remember(density) {
-        val safetyPx = with(density) { SAFETY_MARGIN_DP.dp.toPx() }
-        object : androidx.compose.foundation.gestures.BringIntoViewSpec {
-            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-                // Element bigger than viewport — leave alone (About body case).
-                if (size >= containerSize) return 0f
-                val trailingEdge = offset + size
-                val bottomBoundary = containerSize - safetyPx
-                return when {
-                    // Element extends below the bottom safety boundary AND has
-                    // moved past the top boundary — scroll forward so trailing
-                    // edge lands at (containerSize - safetyMargin).
-                    trailingEdge > bottomBoundary && offset > safetyPx ->
-                        trailingEdge - bottomBoundary
-                    // Element sits within the top safety margin (or starts
-                    // above viewport entirely) — scroll back so leading edge
-                    // lands at safetyMargin.
-                    offset < safetyPx && trailingEdge < containerSize ->
-                        offset - safetyPx
-                    // Otherwise: fully in view with margin clear — no scroll.
-                    else -> 0f
-                }
-            }
+            // MB-109 (hoisted): single focus fallback for the entire
+            // ContentPane. moveFocus(Right) from the sub-sidebar lands
+            // on the first focusable child of the active tab body if it
+            // has any (General/Playback/Groups/Network/Parental do); if
+            // the tab is read-only (About/Shortcuts) or a placeholder,
+            // focus falls through to this 0-dp trap so the request never
+            // silently fails and the user always exits the sub-sidebar.
+            //
+            // Lives at ContentPane scope (not per-tab) so:
+            //   1. Tab swap doesn't unmount it — focus traversal sees a
+            //      stable target across the `key(current)` re-mount.
+            //   2. No per-tab Column.spacedBy gap pushes the visible
+            //      content down by 12-16dp (the regression from the
+            //      first attempt — see MB-112 commit).
+            //   3. One source of truth: future placeholder tabs inherit
+            //      the trap automatically; no per-tab boilerplate.
+            //
+            // Sibling of the keyed TabContent inside the same Box, so
+            // it's last in the focus traversal order — real tab
+            // focusables come first, the trap is only used when a tab
+            // body has no other focus targets.
+            FocusableSpacer()
         }
     }
 }
