@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.update.UpdateCheckWorker
 import com.yancotv.android.update.UpdateInstaller
@@ -104,6 +105,11 @@ fun SettingsAboutTab(
         modifier
             .fillMaxSize()
             .verticalScroll(scroll)
+            // MB-336 — the other missing MK.30.6 retrofit. First focusable
+            // (VersionRow) sits 24dp padding + the 140dp logo box down, so
+            // up-travel strands ~69dp — half the logo — permanently clipped.
+            // Font-scale independent: the offset is dp-fixed, not sp.
+            .snapToTopNearStart(scroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         // dpadVerticalScroll deliberately NOT applied here — once the
         // tab has focusable rows (Updates toggle + Check-now button +

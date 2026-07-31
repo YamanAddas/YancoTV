@@ -50,6 +50,7 @@ import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.RecordingStorageMode
 import com.yancotv.android.ui.components.YancoSecondaryButton
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -139,11 +140,19 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && !hasLegacyStoragePermission(context)
         }
 
+    // MB-336 — hoisted + snapped. This tab was one of only two
+    // verticalScroll tabs that never got the MK.30.6 retrofit, and the
+    // geometry audit measured why it mattered: the first focusable (the
+    // Public-folder ModeRow) sits ~148-172dp down, so up-travel stops at
+    // the 95dp headroom and strands 53-77dp of the "Recordings" heading
+    // and card top off-screen with nothing focusable above to recover it.
+    val tabScroll = rememberScrollState()
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

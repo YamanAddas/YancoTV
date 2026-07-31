@@ -4,16 +4,23 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 
 /**
  * MK.30.1 (MB-307) — focus-driven scroll positioning for D-pad surfaces.
@@ -192,19 +199,39 @@ fun rememberFocusScrollSpec(headroom: Dp = FocusScrollDefaults.DEFAULT_HEADROOM,
  * Sized to clear a `SettingsSection` header plus the container's top padding
  * (~80dp + 24dp), with slack.
  */
-val DEFAULT_TOP_SNAP: Dp = 140.dp
+/**
+ * MB-336 — raised from 140dp after the bug-hunt geometry audit: the Backup
+ * tab's first focusable sits ~246–276dp deep at the 125% font-scale preset, so
+ * its up-travel residue (~151–181dp) missed the old window and the header
+ * stayed cut. 200dp covers every audited tab at every shipped preset.
+ *
+ * Raising it is safe ONLY because the predicate is now direction-aware: with
+ * the old any-settle rule a 200dp window would have re-yanked downward travel
+ * through the top fifth of every tab. The safety invariant for the focused row
+ * staying visible after a snap is `threshold + headroom + rowHeight <=
+ * viewport` (200 + 95 + ~60 <= 381dp on the TV pane) — the row the user was on
+ * never leaves the screen.
+ */
+val DEFAULT_TOP_SNAP: Dp = 200.dp
 
 /**
- * True when a settled scroll position is close enough to the start that it
- * should snap to 0.
+ * True when a settled scroll position should snap to 0.
  *
- * Deliberately excludes 0 itself (already there, so snapping would be a
- * pointless animation) and anything past [thresholdPx] (genuinely mid-list —
- * yanking the user to the top there would be hostile).
+ * Three gates, all unit-tested:
+ *  - `scrollValue >= 1`: already at 0 means snapping is a pointless animation.
+ *  - `scrollValue <= thresholdPx`: genuinely mid-list — yanking the user to
+ *    the top there would be hostile.
+ *  - `scrollValue < previousSettledValue` (MB-336): the settle must be the end
+ *    of net-UPWARD travel. The old any-direction rule fired on downward travel
+ *    too: on a tab whose total overflow is inside the window, every DOWN press
+ *    settled inside 1..threshold, bounced back to 0, and pushed the focused
+ *    row below the fold — the "sometimes it scrolls weird" half of the report.
+ *    Downward settles (value > previous) never snap.
  *
  * Pure so the rule is unit-testable without a scroll container.
  */
-fun shouldSnapToTop(scrollValue: Int, thresholdPx: Int): Boolean = scrollValue in 1..thresholdPx
+fun shouldSnapToTop(scrollValue: Int, previousSettledValue: Int, thresholdPx: Int): Boolean =
+    scrollValue in 1..thresholdPx && scrollValue < previousSettledValue
 
 /**
  * Finishes an almost-complete scroll back to the start.
@@ -236,16 +263,52 @@ fun shouldSnapToTop(scrollValue: Int, thresholdPx: Int): Boolean = scrollValue i
  * Column(Modifier.verticalScroll(scroll).snapToTopNearStart(scroll).padding(…))
  * ```
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Modifier.snapToTopNearStart(scrollState: ScrollState, threshold: Dp = DEFAULT_TOP_SNAP): Modifier {
     val thresholdPx = with(LocalDensity.current) { threshold.roundToPx() }
+    // MB-336 — never snap while the keyboard is up. The IME resize re-settles
+    // the scroll, and with the old rule that settle could land inside the snap
+    // window and yank the pane to the tab top WHILE THE USER WAS TYPING — the
+    // field they pressed vanishing under the header was one confirmed mechanism
+    // behind "the screen shows a different thing than the box I pressed".
+    // rememberUpdatedState so the running collector sees the CURRENT value
+    // without restarting the effect (an IME toggle must not reset [lastSettled]).
+    val imeVisible = rememberUpdatedState(WindowInsets.isImeVisible)
     LaunchedEffect(scrollState, thresholdPx) {
+        // MB-336 — direction reference. Seeded from the current value, not 0,
+        // so a screen that restores a saved offset (SourceDetailScreen re-opens
+        // mid-scroll) still snaps on the user's first upward travel, while a
+        // fresh screen's first DOWNWARD settle can never read as "upward".
+        var lastSettled = scrollState.value
         snapshotFlow { scrollState.value to scrollState.isScrollInProgress }
             // Only act once motion has stopped. Firing mid-scroll would fight
             // both the bring-into-view animation and a touch drag.
             .collect { (value, inProgress) ->
-                if (!inProgress && shouldSnapToTop(value, thresholdPx)) {
-                    scrollState.animateScrollTo(0)
+                if (inProgress) return@collect
+                val fire = shouldSnapToTop(value, lastSettled, thresholdPx) && !imeVisible.value
+                lastSettled = value
+                if (fire) {
+                    // MB-336 — the snap used to die permanently here. Both this
+                    // animation and every focus bring-into-view drive the same
+                    // ScrollState mutex, so a D-pad press landing mid-snap
+                    // cancels animateScrollTo with a CancellationException.
+                    // Uncaught, it killed the collect loop — and the effect —
+                    // for the rest of the composition: the snap worked until
+                    // the first interrupted animation and then never again,
+                    // which is exactly the "sometimes" in the user's report.
+                    // A mutex takeover is NOT our own cancellation, so swallow
+                    // it and keep collecting; rethrow only when this coroutine
+                    // itself is being torn down.
+                    try {
+                        scrollState.animateScrollTo(0)
+                        lastSettled = 0
+                    } catch (e: CancellationException) {
+                        if (!currentCoroutineContext().isActive) throw e
+                        // Interrupted by a competing scroll: leave lastSettled
+                        // at the pre-snap value so the NEXT settle below it
+                        // still reads as upward travel and retries the snap.
+                    }
                 }
             }
     }

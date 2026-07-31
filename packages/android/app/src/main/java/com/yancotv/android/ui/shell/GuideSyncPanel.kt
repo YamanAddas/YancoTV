@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +46,7 @@ import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.EpgStats
@@ -235,11 +238,20 @@ fun GuideSyncPanel(
             .padding(32.dp),
         contentAlignment = Alignment.Center,
     ) {
+        // MB-336 — this card was a fixed-height centred Column with NO
+        // scroll: its content sums to ~400dp on a ~460dp pane, so opening
+        // the keyboard on the EPG-URL field (second-to-last block) left the
+        // field with nowhere to scroll to and no way to reach it. Scrolling
+        // the card also makes the diagnostics list reachable when a user has
+        // several broken sources listed.
+        val panelScroll = rememberScrollState()
         Column(
             modifier =
             Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(LocalYancoPalette.current.BackgroundRaised)
+                .verticalScroll(panelScroll)
+                .snapToTopNearStart(panelScroll)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

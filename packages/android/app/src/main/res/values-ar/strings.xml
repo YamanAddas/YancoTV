@@ -1110,4 +1110,6 @@
     <string name="dlg_delete_backup_body">سيؤدي هذا إلى إزالة “%1$s” من قائمة التصديرات الأخيرة. يبقى ملف النسخة الاحتياطية نفسه في مكانه.</string>
 
     <!-- MB-335 wiring (2/2) -->
+
+    <!-- MB-336 scroll retrofits -->
 </resources>

@@ -1110,4 +1110,6 @@
     <string name="dlg_delete_backup_body">Cela retire « %1$s » de la liste des exports récents. Le fichier de sauvegarde lui-même reste là où il a été enregistré.</string>
 
     <!-- MB-335 wiring (2/2) -->
+
+    <!-- MB-336 scroll retrofits -->
 </resources>
