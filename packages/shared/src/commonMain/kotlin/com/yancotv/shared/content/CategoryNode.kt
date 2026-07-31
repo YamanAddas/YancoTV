@@ -29,6 +29,25 @@ sealed interface CategoryNode {
         // returns the label so the field is never empty.
         override val groupName: String get() = label
     }
+
+    /**
+     * MK.33.1 — a playlist (source) bucketing its own groups.
+     *
+     * Distinct from [Parent] rather than a `kind` on it: [Parent] buckets by a
+     * detected language/region PREFIX inside one flat group list, and carries a
+     * [PrefixCatalog.Kind] plus a prefix code that only make sense for that.
+     * A source bucket is addressed by a real `source_id` and its children are
+     * already-scoped keys. Collapsing the two would mean a nullable kind and a
+     * meaningless prefixCode on half the instances.
+     *
+     * [children] carry SOURCE-SCOPED keys (see `encodeSourceGroup` on the
+     * Android side): the same group name can exist under two playlists, so an
+     * unscoped `group_name` is not a unique selection key once more than one
+     * playlist is loaded.
+     */
+    data class SourceParent(val sourceId: String, val label: String, val children: List<Leaf>) : CategoryNode {
+        override val groupName: String get() = label
+    }
 }
 
 object CategoryTreeBuilder {

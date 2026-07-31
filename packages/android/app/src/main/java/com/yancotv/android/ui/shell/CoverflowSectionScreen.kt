@@ -194,7 +194,10 @@ fun CoverflowSectionScreen(
     var loading by remember(type) { mutableStateOf(false) }
     var hasLoaded by remember(type, selectedGroup) { mutableStateOf(false) }
 
-    val groupFilter = resolveGroupFilter(selectedGroup)
+    // MK.33.1 — carries a playlist id as well as a group name.
+    val filter = resolveGroupFilter(selectedGroup)
+    val groupFilter = filter.groupName
+    val sourceFilter = filter.sourceId
     val isFavoritesFilter = isFavoritesFilter(selectedGroup)
 
     // Stop playback + reset anchor on category change so the new first orb's
@@ -235,14 +238,14 @@ fun CoverflowSectionScreen(
             hasLoaded = false
             total =
                 withContext(Dispatchers.IO) {
-                    runCatching { repo.count(type, groupFilter) }
+                    runCatching { repo.count(type, groupFilter, sourceFilter) }
                         .onFailure { Log.w("Yanco", "CoverflowSection.count failed: ${it.message}", it) }
                         .getOrElse { 0L }
                 }
             loaded = 0L
             val first =
                 withContext(Dispatchers.IO) {
-                    runCatching { repo.page(type, groupFilter, 0L, 100L) }
+                    runCatching { repo.page(type, groupFilter, 0L, 100L, sourceFilter) }
                         .onFailure { Log.w("Yanco", "CoverflowSection.page first failed: ${it.message}", it) }
                         .getOrElse { emptyList() }
                 }
@@ -377,7 +380,7 @@ fun CoverflowSectionScreen(
         loading = true
         val page =
             withContext(Dispatchers.IO) {
-                runCatching { repo.page(type, groupFilter, loaded, 100L) }
+                runCatching { repo.page(type, groupFilter, loaded, 100L, sourceFilter) }
                     .onFailure { Log.w("Yanco", "CoverflowSection.page tail failed: ${it.message}", it) }
                     .getOrElse { emptyList() }
             }

@@ -1,6 +1,7 @@
 package com.yancotv.android.ui.shell
 
 import com.yancotv.shared.content.CategoryNode
+import com.yancotv.shared.content.SourceScopedGroup
 
 /**
  * MK.20.3 — Visible-row representation for the category rail. Independent
@@ -42,7 +43,18 @@ sealed interface CategoryRailRow {
  * No re-sorting — input order (provider order from MK.20.1, bucketed in
  * MK.20.2) is preserved at every level.
  */
-fun flattenCategoryTree(tree: List<CategoryNode>, expandedParents: Set<String>): List<CategoryRailRow> {
+fun flattenCategoryTree(
+    tree: List<CategoryNode>,
+    expandedParents: Set<String>,
+    /**
+     * MK.33.1 — label for the leading "everything in this playlist" child of
+     * each [CategoryNode.SourceParent]. Null omits it.
+     *
+     * Passed in rather than resolved here because this is a plain function
+     * called from inside a `remember {}` block — neither is composable scope.
+     */
+    wholeSourceLabel: String? = null,
+): List<CategoryRailRow> {
     if (tree.isEmpty()) return emptyList()
     val out = mutableListOf<CategoryRailRow>()
     for (node in tree) {
@@ -57,10 +69,14 @@ fun flattenCategoryTree(tree: List<CategoryNode>, expandedParents: Set<String>):
                 )
             }
             is CategoryNode.Parent -> {
-                val isExpanded = node.label in expandedParents
+                // MK.33.1 — expansion is keyed on the ROW KEY, not the label.
+                // Two playlists can carry the same name, and keying on the
+                // visible label made expanding one expand the other.
+                val key = "__p__${node.label}"
+                val isExpanded = key in expandedParents
                 out.add(
                     CategoryRailRow.Parent(
-                        key = "__p__${node.label}",
+                        key = key,
                         label = node.label,
                         expanded = isExpanded,
                         childCount = node.children.size,
@@ -72,6 +88,50 @@ fun flattenCategoryTree(tree: List<CategoryNode>, expandedParents: Set<String>):
                             CategoryRailRow.Leaf(
                                 key = "__c__${node.label}__${child.groupName}",
                                 label = child.groupName,
+                                groupName = child.groupName,
+                                indented = true,
+                            ),
+                        )
+                    }
+                }
+            }
+            is CategoryNode.SourceParent -> {
+                // MK.33.1 — a playlist bucketing its own groups. Keyed on the
+                // source id, which is unique even when two playlists share a
+                // display name.
+                val key = "__sp__${node.sourceId}"
+                val isExpanded = key in expandedParents
+                out.add(
+                    CategoryRailRow.Parent(
+                        key = key,
+                        label = node.label,
+                        expanded = isExpanded,
+                        childCount = node.children.size,
+                    ),
+                )
+                if (isExpanded) {
+                    // Leading "All" — everything this playlist contributes to the
+                    // current type, with no group filter. The equivalent of
+                    // picking the playlist itself.
+                    if (wholeSourceLabel != null) {
+                        out.add(
+                            CategoryRailRow.Leaf(
+                                key = "__sall__${node.sourceId}",
+                                label = wholeSourceLabel,
+                                groupName = SourceScopedGroup.encodeWholeSource(node.sourceId),
+                                indented = true,
+                            ),
+                        )
+                    }
+                    for (child in node.children) {
+                        out.add(
+                            CategoryRailRow.Leaf(
+                                key = "__sc__${node.sourceId}__${child.groupName}",
+                                // child.groupName is a SCOPED SELECTION KEY, not
+                                // display text — decode it for the label, or the
+                                // rail would render "__src__<uuid>…Sports".
+                                label = SourceScopedGroup.decode(child.groupName)?.groupName
+                                    ?: child.groupName,
                                 groupName = child.groupName,
                                 indented = true,
                             ),

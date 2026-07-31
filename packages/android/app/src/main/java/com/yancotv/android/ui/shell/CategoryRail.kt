@@ -287,9 +287,11 @@ fun CategoryRail(
                                 leading = if (row.expanded) YancoIcons.ChevronDown else YancoIcons.ChevronRight,
                                 selected = false,
                                 anchor = null,
-                                onClick = { onToggleExpand?.invoke(row.label) },
+                                // MK.33.1 — row.key, not row.label: unique per
+                                // parent even when two playlists share a name.
+                                onClick = { onToggleExpand?.invoke(row.key) },
                                 onFocused = {},
-                                onCommitAndEnter = { onToggleExpand?.invoke(row.label) },
+                                onCommitAndEnter = { onToggleExpand?.invoke(row.key) },
                                 trailingText = row.childCount.toString(),
                                 indented = false,
                             )

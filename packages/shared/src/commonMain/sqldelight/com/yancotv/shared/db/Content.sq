@@ -132,6 +132,20 @@ WHERE type = ? AND group_name IS NOT NULL
 GROUP BY group_name
 ORDER BY MIN(sort_order);
 
+-- MK.33.1 — the same list, split by playlist.
+--
+-- Ordered by source then provider order WITHIN each source, not by a global
+-- MIN(sort_order): a global order interleaves two playlists' groups, and the
+-- whole point here is that each playlist's groups stay together. The caller
+-- orders the source buckets themselves (by the user's `sources` row order), so
+-- this only has to keep each bucket internally correct.
+distinctGroupsBySourceForType:
+SELECT source_id, group_name, MIN(sort_order) AS first_sort
+FROM content
+WHERE type = ? AND group_name IS NOT NULL
+GROUP BY source_id, group_name
+ORDER BY source_id, first_sort;
+
 searchFts:
 SELECT c.*
 FROM content c
@@ -228,6 +242,22 @@ SELECT COUNT(*) FROM content WHERE type = ?;
 countByTypeAndGroup:
 SELECT COUNT(*) FROM content WHERE type = ? AND group_name = ?;
 
+-- MK.33.1 — source-scoped variants of the two queries above.
+--
+-- With more than one playlist loaded, two providers routinely ship a group
+-- with the same name ("Sports"), and the unscoped queries above merge them.
+-- The category rail now offers those groups per playlist, so selecting one has
+-- to filter on the pair. Backed by idx_content_source + idx_content_group; the
+-- planner picks source_id first, which is the more selective of the two on a
+-- multi-playlist catalogue.
+countByTypeGroupAndSource:
+SELECT COUNT(*) FROM content WHERE type = ? AND group_name = ? AND source_id = ?;
+
+-- Every group of one source, no group filter — backs a source Parent row's own
+-- count in the rail (how many channels that playlist contributes to this type).
+countByTypeAndSource:
+SELECT COUNT(*) FROM content WHERE type = ? AND source_id = ?;
+
 listByTypePaged:
 SELECT * FROM content
 WHERE type = ?
@@ -237,6 +267,23 @@ LIMIT :limitCount OFFSET :offsetCount;
 listByTypeAndGroupPaged:
 SELECT * FROM content
 WHERE type = ? AND group_name = ?
+ORDER BY sort_order
+LIMIT :limitCount OFFSET :offsetCount;
+
+-- MK.33.1 — see countByTypeGroupAndSource. No source_id in ORDER BY: the rows
+-- are already from a single source, so sort_order alone is provider order.
+listByTypeGroupAndSourcePaged:
+SELECT * FROM content
+WHERE type = ? AND group_name = ? AND source_id = ?
+ORDER BY sort_order
+LIMIT :limitCount OFFSET :offsetCount;
+
+-- All rows of one source for a type, provider-ordered. Selecting a source
+-- Parent row itself (rather than one of its groups) shows everything that
+-- playlist contributes.
+listByTypeAndSourcePaged:
+SELECT * FROM content
+WHERE type = ? AND source_id = ?
 ORDER BY sort_order
 LIMIT :limitCount OFFSET :offsetCount;
 

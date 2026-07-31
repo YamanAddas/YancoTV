@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import com.yancotv.shared.content.SourceScopedGroup
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlin.test.Test
@@ -22,25 +23,57 @@ class BrowseShellLogicTest {
     // ---- resolveGroupFilter ----
 
     @Test fun resolveGroupFilterReturnsNullForAllChip() {
-        assertNull(resolveGroupFilter(ALL_GROUPS))
+        // MK.33.1 — resolveGroupFilter now returns a group + playlist pair.
+        // Both halves null means "no filter at all".
+        assertNull(resolveGroupFilter(ALL_GROUPS).groupName)
+        assertNull(resolveGroupFilter(ALL_GROUPS).sourceId)
     }
 
     @Test fun resolveGroupFilterReturnsNullForFavoritesChip() {
         // Favorites swaps the data source entirely — the SQL group filter
         // must be null so the repo sees "no filter" rather than a literal
         // "__favorites__" string that will match zero rows.
-        assertNull(resolveGroupFilter(FAVORITES_GROUP))
+        assertNull(resolveGroupFilter(FAVORITES_GROUP).groupName)
+        assertNull(resolveGroupFilter(FAVORITES_GROUP).sourceId)
     }
 
     @Test fun resolveGroupFilterPassesThroughRealGroupName() {
-        assertEquals("Kids", resolveGroupFilter("Kids"))
+        val f = resolveGroupFilter("Kids")
+        assertEquals("Kids", f.groupName)
+        // An unscoped name must NOT acquire a playlist filter — that is the
+        // single-playlist path and the pre-MK.33 behaviour.
+        assertNull(f.sourceId)
     }
 
     @Test fun resolveGroupFilterPreservesWhitespaceInRealName() {
         // Group names can contain spaces (e.g. "AL - ARKIVA 1980/2023" in
         // real user-supplied M3U playlists). Passing through verbatim is
         // critical — a trim would silently drop valid rows.
-        assertEquals("AL - ARKIVA", resolveGroupFilter("AL - ARKIVA"))
+        assertEquals("AL - ARKIVA", resolveGroupFilter("AL - ARKIVA").groupName)
+    }
+
+    // ---- MK.33.1 source-scoped keys ----
+
+    @Test fun resolveGroupFilterSplitsAScopedKeyIntoGroupAndPlaylist() {
+        val key = SourceScopedGroup.encode("src-1", "Sports")
+        val f = resolveGroupFilter(key)
+        assertEquals("Sports", f.groupName)
+        assertEquals("src-1", f.sourceId)
+    }
+
+    @Test fun resolveGroupFilterOnAWholePlaylistKeyFiltersBySourceOnly() {
+        val f = resolveGroupFilter(SourceScopedGroup.encodeWholeSource("src-1"))
+        assertNull(f.groupName, "whole-playlist selection must not carry a group filter")
+        assertEquals("src-1", f.sourceId)
+    }
+
+    @Test fun resolveGroupFilterTreatsAGroupNamedLikeOurPrefixAsAPlainName() {
+        // A provider could ship a group literally called "__src__weird". It is
+        // not a well-formed scoped key (no separator), so it must resolve as a
+        // plain group name rather than half-parsing into a bogus playlist id.
+        val f = resolveGroupFilter("__src__weird")
+        assertEquals("__src__weird", f.groupName)
+        assertNull(f.sourceId)
     }
 
     // ---- isFavoritesFilter ----

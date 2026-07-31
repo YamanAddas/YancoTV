@@ -16,10 +16,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.shared.content.ContentRepository
+import com.yancotv.shared.content.SourceCategoryTreeBuilder
+import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +85,13 @@ fun BrowseSection(
     onAddSource: (() -> Unit)? = null,
     repo: ContentRepository = koinInject(),
     prefs: AppPreferences = koinInject(),
+    /**
+     * MK.33.1 — needed only for the playlist ORDER and display names when
+     * bucketing categories per playlist. `content.source_id` gives the grouping;
+     * this gives the row order the user sees on the Sources screen, and the
+     * names (a source_id is a UUID and is never rendered).
+     */
+    sourceRepo: SourceRepository = koinInject(),
     modifier: Modifier = Modifier,
 ) {
     // coverflowFocus is owned here (not at HomeScreen) so it lives under the
@@ -154,6 +165,10 @@ fun BrowseSection(
     // silently to "no groups", in which case the rail still renders the
     // pinned Favorites / All pills.
     val groupsState = remember(type) { mutableStateListOf<String>() }
+    // MK.33.1 — per-playlist buckets. Empty when only one playlist contributes
+    // rows of this type, which is the signal to keep the flat / prefix-bucketed
+    // path below. Reloaded on `type` like `groupsState`.
+    val sourceBuckets = remember(type) { mutableStateListOf<SourceCategoryTreeBuilder.SourceGroups>() }
     LaunchedEffect(type) {
         val loaded =
             withContext(Dispatchers.IO) {
@@ -163,6 +178,26 @@ fun BrowseSection(
             }
         groupsState.clear()
         groupsState.addAll(loaded)
+
+        // Ordered by the user's `sources` rows so the rail matches the Sources
+        // screen rather than UUID order. Only active sources: an inactive
+        // playlist's groups must not appear in the rail.
+        val buckets =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val ordered = sourceRepo.getAll()
+                        .filter { it.isActive }
+                        .map { it.id to it.name }
+                    repo.groupsBySource(type, ordered)
+                }
+                    .onFailure { Log.w("Yanco", "BrowseSection.groupsBySource($type) failed: ${it.message}", it) }
+                    .getOrElse { emptyList() }
+            }
+        sourceBuckets.clear()
+        // One bucket means one playlist supplies everything of this type, so a
+        // dropdown per playlist would add a level of nesting that tells the user
+        // nothing. Degrade to the flat path in that case.
+        if (buckets.size > 1) sourceBuckets.addAll(buckets)
     }
 
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
@@ -187,6 +222,9 @@ fun BrowseSection(
     // MK.27.B scope. The MK.20.3.2 plan text is corrected alongside this
     // fix.
     val smartGroupingEnabled = general.smartGrouping
+    // MK.33.1 — resolved out here: the railRows `remember` below is not
+    // composable scope.
+    val allLabel = stringResource(R.string.cat_all)
     val pinnedParentsByType by prefs.pinnedParentsFlow.collectAsState()
     val pinnedParents = pinnedParentsByType[type] ?: emptyList()
     var expandedParents by rememberSaveable(
@@ -197,13 +235,43 @@ fun BrowseSection(
         ),
     ) { mutableStateOf(emptySet<String>()) }
     val railRows =
-        remember(groupsState.toList(), hiddenGroups, smartGroupingEnabled, expandedParents, pinnedParents) {
-            if (!smartGroupingEnabled) {
-                null
-            } else {
-                val filtered = applySmartGroupingHidden(groupsState.toList(), hiddenGroups)
-                val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered, pinnedParents)
-                flattenCategoryTree(tree, expandedParents)
+        remember(
+            groupsState.toList(),
+            sourceBuckets.toList(),
+            hiddenGroups,
+            smartGroupingEnabled,
+            expandedParents,
+            pinnedParents,
+            allLabel,
+        ) {
+            when {
+                // MK.33.1 — more than one playlist contributes rows of this
+                // type: bucket by playlist and stop there.
+                //
+                // This takes precedence over prefix bucketing rather than
+                // combining with it. Nesting both would put the rail three deep
+                // (playlist -> Arabic -> Sports), and a three-deep tree on a
+                // 380dp rail driven by a D-pad at 3m is not navigable. Prefix
+                // bucketing still applies whenever a single playlist supplies
+                // the type, which is the common case.
+                sourceBuckets.isNotEmpty() -> {
+                    // Hidden groups are filtered on the REAL group name, before
+                    // the keys get scoped — `hiddenGroups` holds bare names, and
+                    // by design a hidden group is hidden in every playlist (the
+                    // prefs table is keyed on content_type + group_key with no
+                    // source dimension).
+                    val visible = sourceBuckets.map { bucket ->
+                        bucket.copy(groups = bucket.groups.filter { it !in hiddenGroups })
+                    }
+                    val tree = SourceCategoryTreeBuilder.build(visible)
+                    flattenCategoryTree(tree, expandedParents, wholeSourceLabel = allLabel)
+                }
+                !smartGroupingEnabled -> null
+                else -> {
+                    val filtered = applySmartGroupingHidden(groupsState.toList(), hiddenGroups)
+                    val tree = com.yancotv.shared.content.CategoryTreeBuilder.build(filtered, pinnedParents)
+                    flattenCategoryTree(tree, expandedParents)
+                }
             }
         }
 

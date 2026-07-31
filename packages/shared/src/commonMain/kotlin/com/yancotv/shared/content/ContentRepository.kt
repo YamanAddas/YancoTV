@@ -11,12 +11,19 @@ import com.yancotv.shared.types.EpisodeInfo
  * the shell never touches `YancoDb` directly.
  */
 class ContentRepository(private val db: YancoDb) {
-    fun count(type: ContentType, group: String? = null): Long {
+    /**
+     * @param sourceId MK.33.1 — when non-null, restrict to one playlist. Needed
+     *   because two playlists routinely ship a group with the same name, so a
+     *   group name alone stopped being a unique filter once the category rail
+     *   started offering groups per playlist.
+     */
+    fun count(type: ContentType, group: String? = null, sourceId: String? = null): Long {
         val t = type.dbValue
-        return if (group == null) {
-            db.contentQueries.countByType(t).executeAsOne()
-        } else {
-            db.contentQueries.countByTypeAndGroup(t, group).executeAsOne()
+        return when {
+            group == null && sourceId == null -> db.contentQueries.countByType(t).executeAsOne()
+            group == null -> db.contentQueries.countByTypeAndSource(t, sourceId!!).executeAsOne()
+            sourceId == null -> db.contentQueries.countByTypeAndGroup(t, group).executeAsOne()
+            else -> db.contentQueries.countByTypeGroupAndSource(t, group, sourceId).executeAsOne()
         }
     }
 
@@ -33,13 +40,52 @@ class ContentRepository(private val db: YancoDb) {
      */
     fun groupsHierarchical(type: ContentType): List<CategoryNode> = CategoryTreeBuilder.build(groups(type))
 
-    fun page(type: ContentType, group: String? = null, offset: Long, limit: Long): List<ContentItem> {
+    /**
+     * MK.33.1 — this content type's groups, split per playlist.
+     *
+     * Returns one entry per playlist that actually contributes rows of [type],
+     * in the order [orderedSources] gives (the caller passes the user's
+     * `sources` order so the rail matches the Sources screen). Groups within a
+     * playlist stay in provider order.
+     *
+     * A playlist with no rows of this type is omitted rather than returned
+     * empty: an Xtream account with no series should not put an empty "Series"
+     * dropdown in the rail.
+     *
+     * @param orderedSources id-to-display-name pairs. Names come from the
+     *   `sources` table — a `source_id` is a UUID and is never rendered.
+     */
+    fun groupsBySource(type: ContentType, orderedSources: List<Pair<String, String>>): List<SourceCategoryTreeBuilder.SourceGroups> {
+        val rows = db.contentQueries.distinctGroupsBySourceForType(type.dbValue).executeAsList()
+        // Bucket first, then emit in the caller's order. Iterating the rows
+        // directly would emit in source_id (i.e. UUID) order, which is
+        // arbitrary from the user's point of view.
+        val bySource = LinkedHashMap<String, MutableList<String>>()
+        for (row in rows) {
+            val group = row.group_name ?: continue
+            bySource.getOrPut(row.source_id) { mutableListOf() }.add(group)
+        }
+        return orderedSources.mapNotNull { (id, name) ->
+            val groups = bySource[id] ?: return@mapNotNull null
+            SourceCategoryTreeBuilder.SourceGroups(sourceId = id, sourceName = name, groups = groups)
+        }
+    }
+
+    /** @param sourceId see [count]. */
+    fun page(type: ContentType, group: String? = null, offset: Long, limit: Long, sourceId: String? = null): List<ContentItem> {
         val t = type.dbValue
         val rows =
-            if (group == null) {
-                db.contentQueries.listByTypePaged(t, limit, offset).executeAsList()
-            } else {
-                db.contentQueries.listByTypeAndGroupPaged(t, group, limit, offset).executeAsList()
+            when {
+                group == null && sourceId == null ->
+                    db.contentQueries.listByTypePaged(t, limit, offset).executeAsList()
+                group == null ->
+                    db.contentQueries.listByTypeAndSourcePaged(t, sourceId!!, limit, offset).executeAsList()
+                sourceId == null ->
+                    db.contentQueries.listByTypeAndGroupPaged(t, group, limit, offset).executeAsList()
+                else ->
+                    db.contentQueries
+                        .listByTypeGroupAndSourcePaged(t, group, sourceId, limit, offset)
+                        .executeAsList()
             }
         return rows.map { it.toDomain() }
     }

@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import com.yancotv.shared.content.SourceScopedGroup
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
 
@@ -38,11 +39,30 @@ const val ALL_GROUPS = "__all__"
 const val FAVORITES_GROUP = "__favorites__"
 
 /**
- * Translate a chip id into the SQL `group_name` filter argument used by
- * `ContentRepository.page`. The two synthetic chips return null (no group
- * filter); a real group name passes through verbatim.
+ * Translate a chip id into the filter arguments used by `ContentRepository.page`
+ * / `count`.
+ *
+ * The two synthetic chips resolve to no filter at all; a bare group name passes
+ * through verbatim; and a MK.33.1 source-scoped key (see [SourceScopedGroup])
+ * resolves to a group + playlist pair, because two playlists routinely ship a
+ * group with the same name.
  */
-internal fun resolveGroupFilter(group: String): String? = group.takeIf { it != ALL_GROUPS && it != FAVORITES_GROUP }
+internal fun resolveGroupFilter(group: String): GroupFilter {
+    if (group == ALL_GROUPS || group == FAVORITES_GROUP) return GroupFilter(null, null)
+    val scoped = SourceScopedGroup.decode(group)
+        ?: return GroupFilter(groupName = group, sourceId = null)
+    return GroupFilter(groupName = scoped.groupName, sourceId = scoped.sourceId)
+}
+
+/**
+ * Resolved catalogue filter.
+ *
+ * @param groupName null means "every group" — either the All chip, or a whole
+ *   playlist selected via its own rail row.
+ * @param sourceId null means "every playlist", which is both the single-playlist
+ *   case and the pre-MK.33 behaviour.
+ */
+internal data class GroupFilter(val groupName: String?, val sourceId: String?)
 
 /** True when the user has the synthetic "Favorites" chip active. */
 internal fun isFavoritesFilter(group: String): Boolean = group == FAVORITES_GROUP

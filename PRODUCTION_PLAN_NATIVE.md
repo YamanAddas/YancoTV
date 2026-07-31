@@ -2389,6 +2389,96 @@ re-running lint against the committed tree, not assumed.
   were machine-generated in-session and one authoring error was already caught and
   fixed (المطهر, "the purifier", for المظهر, "Appearance"). Assume more.
 
+## MK.33 — Multi-playlist categories — started 2026-07-31
+
+User-reported, 2026-07-31: with two playlists loaded there was no way to tell
+whose channels were whose, and the ADD SOURCE button could not be reached to add
+the second one in the first place.
+
+### MK.33.0 — ADD SOURCE unreachable (MB-333) — shipped
+
+See the commit for the focus analysis. Short version: the button is a sibling of
+the LazyColumn, spatial search escalates past it to the ContentPane boundary, and
+MK.30.7's `Up -> Cancel` end-stop then pins focus on the row. Fixed with a
+two-way `onPreviewKeyEvent` bridge. `focusProperties { up = … }` does **not**
+work here in either chain position — that is written up in the commit message and
+in the parameter docs on `SourceListRow`, because it looks like the obvious fix.
+
+### MK.33.1 — categories bucketed per playlist — shipped
+
+**What TiviMate does, and what we took from it.** TiviMate keeps each playlist's
+groups separate by default and offers a *Merge* toggle (Playlist settings → Group
+channels) to unify same-named groups across playlists, plus *Hide duplicates*.
+Switching playlists is a separate "Playlists" section in its menu. The lesson
+worth taking is the mental model — with more than one playlist a user thinks
+*provider first, category second*. The lesson NOT worth copying is the
+implementation: TiviMate needs a second menu surface because its category list is
+flat. Ours is not — MK.20.3 already shipped a collapsible Parent/Leaf rail — so a
+playlist is just a `CategoryNode.SourceParent` in the rail we already have. No
+new surface, and the expand/collapse focus behaviour is already tested.
+
+YancoTV previously behaved as if Merge were permanently ON: `distinctGroupsForType`
+groups by `group_name` across the whole catalogue, so two providers' "Sports"
+collapsed into one row.
+
+**Shape.** One level deep, matching the prefix tree: playlist → its groups, in
+provider order, each dropdown leading with an "All" entry for everything that
+playlist contributes. Only engages when **more than one** playlist supplies rows
+of the current type; a single playlist keeps the existing flat / prefix-bucketed
+rail untouched.
+
+**Decisions (user, 2026-07-31):**
+
+- **Playlist bucketing replaces prefix bucketing** when >1 playlist, rather than
+  nesting inside it. Playlist → Arabic → Sports is three deep, and a three-deep
+  tree on a 380dp rail driven by a D-pad at 3m is not navigable. Prefix bucketing
+  still applies whenever one playlist supplies the type.
+- **Group preferences stay global** — hide/pin/rename remain keyed on
+  `(content_type, group_key)` with no source dimension, so hiding a junk group
+  hides it in every playlist. No migration. Revisit if it proves wrong.
+- **No Merge toggle for now.** Today's behaviour *is* the merged mode, so the
+  toggle is additive and much cheaper to add once the separated path exists.
+
+**Why the selection key is an encoded string and not a sealed type.** A category
+selection is a single `String` throughout the shell, with two reserved synthetic
+values already (`__all__`, `__favorites__`). A scoped key extends that convention
+(`SourceScopedGroup`, separator U+001F — every printable candidate including `|`,
+`:`, `/` and `-` appears in real provider group titles). The rail's `Leaf` already
+separates `label` from `groupName`, so a scoped leaf is an ordinary leaf with an
+encoded key and **the rail needed no changes at all**. A sealed type would have
+meant a custom `Saver`, new comparison paths in the rail, and a signature change
+on every screen that passes the selection down. All the risk is concentrated in
+one pure encode/decode pair, which is where the tests are.
+
+**Also fixed on the way:** rail expansion was keyed on the parent's visible
+*label*, so two playlists the user named the same would have expanded together.
+Now keyed on the row key. This changes the persisted expand-state format; a stale
+saved set matches nothing and the rail opens collapsed, which is harmless.
+
+**Register**
+
+| Slice | What | Register |
+|---|---|---|
+| MK.33.0 | ADD SOURCE reachable by remote again — two-way key bridge to row 0, UP end-stop on the button | MB-333 |
+| MK.33.1 | `SourceScopedGroup` selection keys, `CategoryNode.SourceParent`, `SourceCategoryTreeBuilder`, 5 source-scoped SQL queries, `groupsBySource`, rail expansion keyed on row key | MB-334 |
+
+**Verification status.** 958 tests green (+23 for this slice), ktlint clean,
+release APK built and installed on the Google TV. **Verified on hardware for the
+single-playlist case only** — Live TV rail still renders Favorites / All / flat
+provider-ordered groups with no spurious dropdown, and committing a group still
+filters the coverflow. The **multi-playlist path is unit-tested but NOT yet
+exercised on a device**: the test TV has one playlist, and adding a second syncs a
+full catalogue into the user's app, which is their call to make. Highest-value
+next check: add a second list, then confirm (a) two dropdowns appear labelled with
+the playlist names, (b) each expands independently, (c) a group under playlist A
+shows only A's channels, (d) the per-playlist "All" shows that playlist's whole
+type.
+
+**Known gap, deliberately not addressed.** `CategoryChipBar` — the phone twin of
+the rail — is dead code (defined, never called), so there is no phone path to keep
+in sync. If it is ever revived it will need the scoped-key handling; it cannot
+nest, so it would need a different presentation.
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
