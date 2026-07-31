@@ -35,6 +35,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -454,9 +455,23 @@ class PlayerActivity : AppCompatActivity() {
                                 android.os.SystemClock.elapsedRealtime() - lastSeekAtMs
                             val debounceMs =
                                 when {
-                                    isLive -> LIVE_BUFFER_DEBOUNCE_MS
+                                    // MB-338 — the seek grace has to be checked
+                                    // BEFORE the isLive branch, not after it.
+                                    // Ordered the other way (as it was), `isLive`
+                                    // short-circuited first and live timeshift
+                                    // seeks got the 500 ms tuner window, so
+                                    // MK.25.A.1's protection never applied to
+                                    // them at all. Harmless while a seek was one
+                                    // 10 s step; with hold-to-seek reaching
+                                    // 300 s/tick, an IPTV origin stalls past
+                                    // 500 ms routinely and the full-screen
+                                    // "Tuning the stream" scrim would come back
+                                    // mid-gesture — the exact complaint MK.25.A
+                                    // was filed for. A user-initiated seek is
+                                    // never a tuner re-lock, live or not.
                                     sinceSeek < SEEK_REBUFFER_GRACE_MS ->
                                         SEEK_REBUFFER_GRACE_MS
+                                    isLive -> LIVE_BUFFER_DEBOUNCE_MS
                                     else -> VOD_BUFFER_DEBOUNCE_MS
                                 }
                             bufferingShowJob =
@@ -782,11 +797,21 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // MB-338 — BEFORE persistResumePoint, deliberately. onPause is the only
+        // resume-point write on the fullscreen path, and an in-flight hold is by
+        // definition still moving the position being written. Ending the gesture
+        // first means what gets persisted is where the user actually stopped.
+        endSeekHold()
         controller.persistResumePoint()
     }
 
     override fun onStop() {
         super.onStop()
+        // MB-338 — belt and braces. onPause already ends it, but onStop is where
+        // the surface is surrendered (clearVideoSurfaceView below), and a hold
+        // that somehow survived to here must not reach a player whose output this
+        // activity no longer owns.
+        endSeekHold()
         progressTickerJob?.cancel()
         progressTickerJob = null
         quickInfoHideJob?.cancel()
@@ -872,6 +897,11 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        // MB-338 — PiP is the worst stranding case: entering it moves window
+        // focus, so the ACTION_UP that would have ended the hold is delivered
+        // elsewhere and lost, and onStop is not guaranteed to run while a PiP
+        // window is visible. Nothing else in this callback cancels anything.
+        endSeekHold()
         inPip = isInPictureInPictureMode
         // While in PIP, the shrunken surface only needs the video — hide
         // zap bar, quick info, program progress, live-jump bar. Media3's
@@ -1719,6 +1749,71 @@ class PlayerActivity : AppCompatActivity() {
      * Sign convention: positive for forward seek, negative for back.
      * [SeekFlashOverlay] keys the badge edge off the sign.
      */
+    /**
+     * MB-338 — true while we own a LEFT/RIGHT hold, i.e. the first press
+     * actually performed a seek rather than opening the surf overlay.
+     *
+     * Armed by [armSeekHold] at `repeatCount == 0` from inside the seek branches
+     * themselves, so the arming decision reuses the existing live-edge / mode
+     * logic instead of duplicating it. Cleared by [endSeekHold] on key release
+     * and on every teardown path.
+     */
+    private var seekHoldActive = false
+
+    /** MB-338 — arm on a first press that genuinely seeked. */
+    private fun armSeekHold() {
+        seekHoldActive = true
+    }
+
+    /**
+     * MB-338 — end the gesture.
+     *
+     * Called from ACTION_UP and from every lifecycle exit. There is deliberately
+     * no ticker to cancel: the OS already delivers auto-repeat ACTION_DOWN
+     * events, so accelerating per delivered tick needs no coroutine and cannot
+     * strand one. That matters here — `lifecycleScope` is cancelled only at
+     * ON_DESTROY (it survives onStop and PiP), and `PlaybackController` is a
+     * process-scoped singleton whose ExoPlayer outlives this activity, so a
+     * self-driven ticker could have kept seeking a player the user had already
+     * navigated away from.
+     */
+    private fun endSeekHold() {
+        seekHoldActive = false
+    }
+
+    /**
+     * MB-338 — the single commit point for every keyboard/remote seek.
+     *
+     * Replaces four near-duplicate bodies that had drifted apart in exactly the
+     * places acceleration stresses:
+     *  - live RIGHT had a `// Cap at live edge` comment and **no clamp at all**;
+     *  - VOD RIGHT clamped to `Long.MAX_VALUE` when duration was unknown, i.e.
+     *    did not clamp;
+     *  - only the two LEFT paths clamped, and only the lower bound.
+     *
+     * At 10 s a tick that was survivable. At 300 s a single tick lands in
+     * unpublished segments or past the end, which is what produces an indefinite
+     * rebuffer or a jump to the next item mid-gesture.
+     *
+     * The live forward bound is the **live edge** (`currentPosition +
+     * currentLiveOffset`), not `duration`: a progressive MPEG-TS live stream has
+     * no live window, so `duration` is `TIME_UNSET` and would clamp to nothing.
+     */
+    private fun commitSeek(deltaSec: Int) {
+        val p = controller.player
+        val isLive = controller.currentItem.value?.type == ContentType.LIVE
+        val target = p.currentPosition + deltaSec * 1_000L
+        val clamped =
+            if (isLive) {
+                val offset = p.currentLiveOffset.takeIf { it != C.TIME_UNSET } ?: 0L
+                target.coerceIn(0L, p.currentPosition + offset.coerceAtLeast(0L))
+            } else {
+                SeekAccelerator.clampTargetMs(target, p.duration)
+            }
+        p.seekTo(clamped)
+        onUserSeek(deltaSec)
+    }
+
     private fun onUserSeek(deltaSec: Int) {
         // A.1 — extend the BUFFERING debounce for the next 8 s.
         lastSeekAtMs = android.os.SystemClock.elapsedRealtime()
@@ -1936,14 +2031,13 @@ class PlayerActivity : AppCompatActivity() {
                     resetDockAutoHide()
                 },
                 onSkipBack = {
-                    val p = controller.player
-                    p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                    // MB-338 — via commitSeek so the dock button clamps, flashes
+                    // and earns the rebuffer grace exactly like a LEFT press.
+                    commitSeek(-SeekAccelerator.BASE_STEP_SEC)
                     resetDockAutoHide()
                 },
                 onSkipForward = {
-                    val p = controller.player
-                    val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
-                    p.seekTo((p.currentPosition + 10_000L).coerceAtMost(dur))
+                    commitSeek(+SeekAccelerator.BASE_STEP_SEC)
                     resetDockAutoHide()
                 },
                 onPrevious = {
@@ -2213,6 +2307,10 @@ class PlayerActivity : AppCompatActivity() {
         keyCode == KeyEvent.KEYCODE_ENTER ||
         keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
 
+    /** MB-338 — the two keys that drive the timeline. */
+    private fun isSeekKey(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+        keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // ── Long-press CENTER → options overlay (Google TV lacks MENU) ──
         // UP while we own the gesture: either perform the short-press
@@ -2241,6 +2339,46 @@ class PlayerActivity : AppCompatActivity() {
             longPressTracking
         ) {
             return true
+        }
+
+        // ── MB-338 — accelerating hold-to-seek ──
+        // Lives here, in dispatchKeyEvent, and NOT in onKeyDown, for two reasons
+        // the collision map established:
+        //   1. onKeyDown has TWO entry points for one event (this method calls it
+        //      directly for the live and controller-hidden pre-empt blocks, and
+        //      the platform calls it again if the view tree declines), so a
+        //      handler there can run twice for a single tick.
+        //   2. There is no usable onKeyUp for these keys: PlayerActivity has no
+        //      override, and Media3's PlayerView consumes D-pad ACTION_UP, so on
+        //      LIVE a release hook there would never fire. The CENTER long-press
+        //      above handles ACTION_UP right here for the same reason.
+        if (isSeekKey(event.keyCode)) {
+            if (event.action == KeyEvent.ACTION_UP) {
+                val owned = seekHoldActive
+                endSeekHold()
+                // Consume only a gesture we owned. Returning true unconditionally
+                // would swallow releases belonging to the surf overlay, the dock
+                // or the options menu.
+                if (owned) return true
+            } else if (event.action == KeyEvent.ACTION_DOWN &&
+                event.repeatCount > 0 &&
+                seekHoldActive
+            ) {
+                // Elapsed hold, not repeatCount: auto-repeat cadence differs
+                // between a Fire TV remote, a Google TV remote and a USB
+                // keyboard, so a count-derived curve would make the same gesture
+                // feel different on each device.
+                val heldMs = event.eventTime - event.downTime
+                // Physical direction on purpose. Ordered lists in this app mirror
+                // under RTL (MK.31.2) but a media timeline does not —
+                // VodPlayerDock marks its own seek "DELIBERATELY PHYSICAL".
+                // Mirroring here would rewind when an Arabic user meant forward.
+                val forward = event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                commitSeek(
+                    SeekAccelerator.deltaSecondsForTick(forward, event.repeatCount, heldMs),
+                )
+                return true
+            }
         }
 
         if (event.action == KeyEvent.ACTION_DOWN) {
@@ -2422,8 +2560,13 @@ class PlayerActivity : AppCompatActivity() {
                         // browse channels.
                         val p = controller.player
                         if (isTimeshifting(p)) {
-                            p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
-                            onUserSeek(-10)
+                            // MB-338 — arm the hold so auto-repeat ticks
+                            // accelerate. Armed only where a seek ACTUALLY
+                            // happened: at the live edge this branch opens surf
+                            // instead, and a hold there must not be treated as
+                            // a scrub gesture.
+                            armSeekHold()
+                            commitSeek(-SeekAccelerator.BASE_STEP_SEC)
                         } else {
                             showSurf()
                         }
@@ -2432,9 +2575,8 @@ class PlayerActivity : AppCompatActivity() {
                         // VOD: silent seek (stays on plain video surface so
                         // the user can press LEFT/RIGHT repeatedly without
                         // the dock auto-hide timer gating each press).
-                        val p = controller.player
-                        p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
-                        onUserSeek(-10)
+                        armSeekHold()
+                        commitSeek(-SeekAccelerator.BASE_STEP_SEC)
                         return true
                     }
                 }
@@ -2446,17 +2588,15 @@ class PlayerActivity : AppCompatActivity() {
                         // behaviour — fall through).
                         val p = controller.player
                         if (isTimeshifting(p)) {
-                            // Cap at live edge: liveOffset 0 == at edge.
-                            val target = p.currentPosition + 10_000L
-                            p.seekTo(target)
-                            onUserSeek(+10)
+                            // MB-338 — the live-edge cap this comment promised is
+                            // now actually implemented, in commitSeek.
+                            armSeekHold()
+                            commitSeek(+SeekAccelerator.BASE_STEP_SEC)
                             return true
                         }
                     } else {
-                        val p = controller.player
-                        val dur = p.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
-                        p.seekTo((p.currentPosition + 10_000L).coerceAtMost(dur))
-                        onUserSeek(+10)
+                        armSeekHold()
+                        commitSeek(+SeekAccelerator.BASE_STEP_SEC)
                         return true
                     }
                 }
