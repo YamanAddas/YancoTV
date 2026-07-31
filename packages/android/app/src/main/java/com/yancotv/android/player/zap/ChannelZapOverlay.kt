@@ -16,9 +16,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -59,7 +61,7 @@ fun ChannelZapOverlay(state: ChannelZapNumericState) {
                 ).padding(horizontal = 24.dp, vertical = 14.dp),
         ) {
             Text(
-                text = "CHANNEL",
+                text = stringResource(R.string.zap_channel),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,

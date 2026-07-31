@@ -721,4 +721,7 @@
     <!-- MK.31.13 batch P (cont.) — recording indicator + brand initial. -->
     <string name="ri_recording_in_progress">Recording in progress</string>
     <string name="brand_initial" translatable="false">Y</string>
+
+    <!-- MK.31.14 (cont.) — channel zap overlay. -->
+    <string name="zap_channel">CHANNEL</string>
 </resources>
