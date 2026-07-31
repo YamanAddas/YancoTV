@@ -114,33 +114,44 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
         }
     var validationError by remember { mutableStateOf<String?>(null) }
 
+    // MK.31.20 — resolved here in composable scope: `submit()` below is a
+    // plain local function, where `stringResource` is not available.
+    val errName = stringResource(R.string.as_err_name)
+    val errFile = stringResource(R.string.as_err_file)
+    val errHostUrl = stringResource(R.string.as_err_host_url)
+    val errM3uUrl = stringResource(R.string.as_err_m3u_url)
+    val errPortalUrl = stringResource(R.string.as_err_portal_url)
+    val errUrl = stringResource(R.string.as_err_url)
+    val errXtreamCreds = stringResource(R.string.as_err_xtream_creds)
+    val errStalkerMac = stringResource(R.string.as_err_stalker_mac)
+
     fun submit() {
         if (saving) return
         if (name.isBlank()) {
-            validationError = "Give the source a name."
+            validationError = errName
             return
         }
         if (type == SourceType.M3U_FILE) {
             if (filePath.isNullOrBlank()) {
-                validationError = "Pick an M3U file from your device."
+                validationError = errFile
                 return
             }
         } else if (url.isBlank()) {
             validationError =
                 when (type) {
-                    SourceType.XTREAM -> "Host URL is required (e.g. http://provider.tv:8080)."
-                    SourceType.M3U_URL -> "M3U URL is required."
-                    SourceType.STALKER -> "Portal URL is required (e.g. http://portal.tv/c/)."
-                    else -> "URL is required."
+                    SourceType.XTREAM -> errHostUrl
+                    SourceType.M3U_URL -> errM3uUrl
+                    SourceType.STALKER -> errPortalUrl
+                    else -> errUrl
                 }
             return
         }
         if (type == SourceType.XTREAM && (username.isBlank() || password.isBlank())) {
-            validationError = "Xtream needs both a username and a password."
+            validationError = errXtreamCreds
             return
         }
         if (type == SourceType.STALKER && macAddress.isBlank()) {
-            validationError = "Stalker needs the device MAC address (e.g. 00:1A:79:XX:XX:XX)."
+            validationError = errStalkerMac
             return
         }
         validationError = null
@@ -224,7 +235,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     .padding(horizontal = 28.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                SectionLabel("Source type")
+                SectionLabel(stringResource(R.string.as_sec_source_type))
                 // Two rows of two chips — keeps the layout readable on
                 // phone widths where 4 inline chips overflow. Audit
                 // catch: M3U_FILE + STALKER were never wired into this
@@ -276,9 +287,9 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     SettingsRow(
                         label = stringResource(R.string.add_m3u_file),
                         hint = if (fileDisplayName.isNotBlank()) {
-                            "Selected: $fileDisplayName"
+                            stringResource(R.string.as_file_selected, fileDisplayName)
                         } else {
-                            "Tap to pick a .m3u or .m3u8 file from your device."
+                            stringResource(R.string.as_file_hint)
                         },
                         onClick = {
                             filePickerLauncher.launch(
@@ -295,9 +306,9 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 } else {
                     SettingsClickToEditField(
                         label = when (type) {
-                            SourceType.XTREAM -> "Host URL"
-                            SourceType.STALKER -> "Portal URL"
-                            else -> "M3U URL"
+                            SourceType.XTREAM -> stringResource(R.string.as_host_url)
+                            SourceType.STALKER -> stringResource(R.string.as_portal_url)
+                            else -> stringResource(R.string.as_m3u_url)
                         },
                         hint = when (type) {
                             SourceType.XTREAM -> "http://host:port"
@@ -312,7 +323,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 }
 
                 if (type == SourceType.XTREAM) {
-                    SectionLabel("Credentials")
+                    SectionLabel(stringResource(R.string.as_sec_credentials))
                     SettingsClickToEditField(
                         label = stringResource(R.string.add_username),
                         hint = null,
@@ -332,7 +343,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 }
 
                 if (type == SourceType.STALKER) {
-                    SectionLabel("Device identity")
+                    SectionLabel(stringResource(R.string.as_sec_device_identity))
                     SettingsClickToEditField(
                         label = stringResource(R.string.add_mac),
                         hint = stringResource(R.string.add_mac_hint),
@@ -342,7 +353,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     )
                 }
 
-                SectionLabel("Electronic programme guide")
+                SectionLabel(stringResource(R.string.as_sec_epg))
                 SettingsClickToEditField(
                     label = stringResource(R.string.add_epg_url),
                     hint = stringResource(R.string.add_epg_url_hint),
@@ -355,7 +366,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 // MK.17.5 — advanced HTTP overrides. Most users leave
                 // these blank; providers that gate on UA / Referer will
                 // surface the requirement in their docs.
-                SectionLabel("Advanced — HTTP headers")
+                SectionLabel(stringResource(R.string.as_sec_advanced))
                 SettingsClickToEditField(
                     label = stringResource(R.string.add_ua),
                     hint = stringResource(R.string.add_ua_hint),

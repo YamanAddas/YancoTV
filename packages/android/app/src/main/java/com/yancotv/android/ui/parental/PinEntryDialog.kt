@@ -58,6 +58,10 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
     var error by remember { mutableStateOf<String?>(null) }
     var working by remember { mutableStateOf(false) }
     var lockoutSec by remember { mutableStateOf(0) }
+    // Resolved here, not at the assignment site: `error` is set from
+    // inside the verify coroutine, where `stringResource` is unavailable.
+    val lockedText = stringResource(R.string.pin_locked)
+    val incorrectText = stringResource(R.string.pin_incorrect)
 
     // Lockout ticker — polls the repo every second. Cheap (reads an in-memory
     // long inside a mutex) and keeps the UI accurate even if the lockout
@@ -92,7 +96,7 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
                     },
                     singleLine = true,
                     enabled = !working && lockoutSec <= 0,
-                    label = { Text("PIN") },
+                    label = { Text(stringResource(R.string.pin_label)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.NumberPassword,
@@ -152,18 +156,21 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
                             // show the right error rather than "incorrect".
                             val stillLocked =
                                 withContext(Dispatchers.IO) { repo.lockoutRemainingMs() > 0L }
-                            error = if (stillLocked) "Locked" else "Incorrect PIN"
+                            error = if (stillLocked) lockedText else incorrectText
                             pin = ""
                         }
                     }
                 },
             ) {
-                Text("Unlock", color = LocalYancoPalette.current.Accent)
+                Text(stringResource(R.string.pin_unlock), color = LocalYancoPalette.current.Accent)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = LocalYancoPalette.current.TextPrimary)
+                Text(
+                    stringResource(R.string.common_cancel),
+                    color = LocalYancoPalette.current.TextPrimary,
+                )
             }
         },
     )

@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 
 /** Registers the notification channel used by reminder alarms. Idempotent. */
 @UnstableApi
@@ -16,12 +17,12 @@ object ReminderNotificationChannel {
         val channel =
             NotificationChannel(
                 ReminderAlarmReceiver.CHANNEL_ID,
-                "Programme reminders",
+                context.getString(R.string.rem_channel_name),
                 // HIGH so Fire TV shows a toast overlay. Users can downgrade in
                 // system settings if they find it too intrusive.
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Notifies you when a programme you set a reminder for is starting."
+                description = context.getString(R.string.rem_channel_description)
             }
         manager.createNotificationChannel(channel)
     }

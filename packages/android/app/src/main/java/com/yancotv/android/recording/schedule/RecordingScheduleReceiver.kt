@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.recording.RecordingService
 import com.yancotv.shared.content.ContentRepository
@@ -432,11 +433,15 @@ class RecordingScheduleReceiver :
         runCatching {
             val humanReason = when {
                 reason.startsWith("service_start_failed") ->
-                    "The app couldn't start in the background. Open the app before the scheduled time."
+                    context.getString(R.string.rsf_reason_service_start)
                 reason.contains(RecordingScheduleRepository.REASON_CONCURRENT_RECORDING_ACTIVE) ->
-                    "Another recording was already in progress (1-stream limit)."
+                    context.getString(R.string.rsf_reason_concurrent)
                 reason.contains(RecordingScheduleRepository.REASON_RECORDING_NEVER_STARTED) ->
-                    "The recording service never landed bytes — check storage and source."
+                    context.getString(R.string.rsf_reason_never_started)
+                // Fallback: raw provider/system text. Untranslatable by
+                // nature — see SyncDetail.Failure (MK.31.18) for the same
+                // reasoning. Capped so a stack-trace-ish reason cannot
+                // blow out the notification.
                 else -> reason.take(120)
             }
             val nm =
@@ -451,10 +456,10 @@ class RecordingScheduleReceiver :
                     nm.createNotificationChannel(
                         android.app.NotificationChannel(
                             FAILED_CHANNEL_ID,
-                            "Recording failures",
+                            context.getString(R.string.rsf_channel_name),
                             android.app.NotificationManager.IMPORTANCE_LOW,
                         ).apply {
-                            description = "Posted when a scheduled recording can't start."
+                            description = context.getString(R.string.rsf_channel_description)
                         },
                     )
                 }
@@ -478,9 +483,12 @@ class RecordingScheduleReceiver :
                 // The mark's alpha is a single solid hex, which tints to a
                 // recognisable silhouette.
                 .setSmallIcon(com.yancotv.android.R.drawable.ic_logo_mark)
-                .setContentTitle("Recording didn't start")
-                .setContentText("\"$title\" — $humanReason")
-                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText("\"$title\" — $humanReason"))
+                .setContentTitle(context.getString(R.string.rsf_title))
+                .setContentText(context.getString(R.string.rsf_body, title, humanReason))
+                .setStyle(
+                    androidx.core.app.NotificationCompat.BigTextStyle()
+                        .bigText(context.getString(R.string.rsf_body, title, humanReason)),
+                )
                 .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
                 .setAutoCancel(true)
                 .apply { if (pi != null) setContentIntent(pi) }

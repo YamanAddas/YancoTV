@@ -88,6 +88,8 @@ fun SettingsBackupTab(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    // MK.31.20 — used inside a `getOrElse` lambda, which is not composable scope.
+    val unknownMsg = stringResource(R.string.bk_unknown)
     // MK.31.17 — resolved here; semantics{} is not composable scope.
     val backupDesc = stringResource(R.string.bk_settings_desc)
 
@@ -97,12 +99,21 @@ fun SettingsBackupTab(
     var encryptToggle by rememberSaveable { mutableStateOf(false) }
     var exportPassword by rememberSaveable { mutableStateOf("") }
     var exportStatus by rememberSaveable { mutableStateOf<String?>(null) }
+    // MK.31.20 — the colour used to be chosen with
+    // `status.startsWith("Export failed")`. Once the string is translated
+    // that match never fires, so every failure would render in the muted
+    // colour. The flag travels beside the text instead. Kept as a separate
+    // primitive rather than a data class so `rememberSaveable` still works
+    // without a custom Saver.
+    var exportStatusIsError by rememberSaveable { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
 
     var importPickedUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val importPickedUri = importPickedUriString?.let(Uri::parse)
     var importPassword by rememberSaveable { mutableStateOf("") }
     var importStatus by rememberSaveable { mutableStateOf<String?>(null) }
+    // See exportStatusIsError above.
+    var importStatusIsError by rememberSaveable { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
 
     // Persisted SAF backup folder URI (null → use MediaStore default).
@@ -188,7 +199,8 @@ fun SettingsBackupTab(
     fun runExportToCustomFolder(folder: Uri) {
         val filename = makeFilename()
         exporting = true
-        exportStatus = "Exporting to $filename…"
+        exportStatus = context.getString(R.string.bk_exporting_to, filename)
+        exportStatusIsError = false
         scope.launch {
             val result =
                 runCatching {
@@ -198,9 +210,10 @@ fun SettingsBackupTab(
                         password = exportPassword.takeIf { encryptToggle && it.isNotBlank() },
                         label = label.takeIf { it.isNotBlank() },
                     )
-                }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
+                }.getOrElse { ExportResult.Failed(it.message ?: unknownMsg) }
             exporting = false
-            exportStatus = formatExportResult(result, filename)
+            exportStatus = formatExportResult(context, result, filename)
+            exportStatusIsError = result is ExportResult.Failed
             // Re-grab focus after the picker / coroutine round-trip.
             exportFocusBump++
         }
@@ -209,7 +222,8 @@ fun SettingsBackupTab(
     fun runExportToDefault() {
         val filename = makeFilename()
         exporting = true
-        exportStatus = "Exporting $filename to Downloads/YancoTV…"
+        exportStatus = context.getString(R.string.bk_exporting_downloads, filename)
+        exportStatusIsError = false
         scope.launch {
             val result =
                 runCatching {
@@ -218,9 +232,10 @@ fun SettingsBackupTab(
                         password = exportPassword.takeIf { encryptToggle && it.isNotBlank() },
                         label = label.takeIf { it.isNotBlank() },
                     )
-                }.getOrElse { ExportResult.Failed(it.message ?: "unknown") }
+                }.getOrElse { ExportResult.Failed(it.message ?: unknownMsg) }
             exporting = false
-            exportStatus = formatExportResult(result, filename)
+            exportStatus = formatExportResult(context, result, filename)
+            exportStatusIsError = result is ExportResult.Failed
             exportFocusBump++
         }
     }
@@ -414,7 +429,14 @@ fun SettingsBackupTab(
                     // the button directly.
                     modifier = Modifier.placedFocus(exportButtonAnchor),
                 ) {
-                    Text(text = if (exporting) "Exporting…" else "Export backup", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text = stringResource(
+                            if (exporting) R.string.bk_exporting else R.string.bk_export_backup,
+                        ),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 SettingsOutlinedButton(
                     onClick = { changeFolderLauncher.launch(null) },
@@ -444,7 +466,7 @@ fun SettingsBackupTab(
                 Text(
                     status,
                     color =
-                    if (status.startsWith("Export failed")) {
+                    if (exportStatusIsError) {
                         LocalYancoPalette.current.Error
                     } else {
                         LocalYancoPalette.current.TextMuted
@@ -565,7 +587,8 @@ fun SettingsBackupTab(
                         scope.launch {
                             val result = coordinator.import(importPickedUri, password = importPassword.takeIf { it.isNotBlank() })
                             importing = false
-                            importStatus = formatImportResult(result)
+                            importStatus = formatImportResult(context, result)
+                            importStatusIsError = result !is ImportResult.Success
                             importFocusBump++
                         }
                     },
@@ -577,7 +600,7 @@ fun SettingsBackupTab(
                 Text(
                     status,
                     color =
-                    if (status.startsWith("Restore failed") || status.startsWith("Couldn't") || status.startsWith("Wrong")) {
+                    if (importStatusIsError) {
                         LocalYancoPalette.current.Error
                     } else {
                         LocalYancoPalette.current.TextMuted
@@ -593,7 +616,7 @@ fun SettingsBackupTab(
                 val pending by coordinator.pendingCount.collectAsState()
                 if (pending > 0) {
                     Text(
-                        "$pending record(s) still pending source resync.",
+                        stringResource(R.string.bk_pending_note, pending),
                         color = LocalYancoPalette.current.TextMuted,
                         fontSize = 12.sp,
                     )
@@ -715,6 +738,7 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
                 .clip(CircleShape)
                 .background(if (row.fileUri != null) palette.Accent else palette.TextMuted),
         )
+        val ctx = LocalContext.current
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = row.label.ifBlank { stringResource(R.string.bk_untitled) },
@@ -725,13 +749,15 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
             Text(
                 text =
                 buildString {
-                    append(formatBytes(row.sizeBytes))
-                    append(" · schema v")
-                    append(row.schemaVersion)
-                    append(" · sha256 ")
-                    append(row.checksum.take(8))
-                    append('…')
-                    if (row.fileUri == null) append(" · file location lost")
+                    append(
+                        stringResource(
+                            R.string.bk_row_meta,
+                            formatBytes(ctx, row.sizeBytes),
+                            row.schemaVersion,
+                            row.checksum.take(8),
+                        ),
+                    )
+                    if (row.fileUri == null) append(stringResource(R.string.bk_file_location_lost))
                 },
                 color = palette.TextMuted,
                 fontSize = 12.sp,
@@ -781,45 +807,53 @@ private data class RecentBackup(
     val fileUri: String?,
 )
 
-private fun formatBytes(b: Long): String = when {
-    b < 1024 -> "$b B"
-    b < 1024 * 1024 -> "%.1f KB".format(b / 1024.0)
-    else -> "%.1f MB".format(b / (1024.0 * 1024.0))
+// MK.31.20 — Context-taking so the unit strings come from resources. The
+// %.1f itself uses the default locale deliberately (MK.31.3): an Arabic UI
+// should render Arabic-Indic digits here, matching every other number.
+private fun formatBytes(ctx: android.content.Context, b: Long): String = when {
+    b < 1024 -> ctx.getString(R.string.bk_bytes_b, b)
+    b < 1024 * 1024 -> ctx.getString(R.string.bk_bytes_kb, "%.1f".format(b / 1024.0))
+    else -> ctx.getString(R.string.bk_bytes_mb, "%.1f".format(b / (1024.0 * 1024.0)))
 }
 
-private fun formatExportResult(r: ExportResult, filename: String): String = when (r) {
+private fun formatExportResult(ctx: android.content.Context, r: ExportResult, filename: String): String = when (r) {
     is ExportResult.Success ->
-        "Exported $filename · ${formatBytes(r.bytesWritten)} · schema v${r.file.dbSchemaVersion} · " +
-            "${r.file.recordCounts.values.sum()} records · checksum ${r.file.checksum.take(8)}…"
-    is ExportResult.Failed -> "Export failed: ${r.message}"
+        ctx.getString(
+            R.string.bk_export_ok,
+            filename,
+            formatBytes(ctx, r.bytesWritten),
+            r.file.dbSchemaVersion,
+            r.file.recordCounts.values.sum(),
+            r.file.checksum.take(8),
+        )
+    // r.message is transport/filesystem text — untranslatable by nature,
+    // same rule as SyncDetail.Failure (MK.31.18). The frame is localized.
+    is ExportResult.Failed -> ctx.getString(R.string.bk_export_failed, r.message)
 }
 
-private fun formatImportResult(r: ImportResult): String = when (r) {
+private fun formatImportResult(ctx: android.content.Context, r: ImportResult): String = when (r) {
     is ImportResult.Success -> {
         val report = r.report
         buildString {
-            append("Restored ")
-            append(report.totalRestored)
-            append(" rows")
+            append(ctx.getString(R.string.bk_restored_rows, report.totalRestored))
             if (report.totalUnlinked > 0) {
-                append(" · ")
-                append(report.totalUnlinked)
-                append(" pending source resync")
+                append(ctx.getString(R.string.bk_pending_resync, report.totalUnlinked))
             }
             if (report.totalSkipped > 0) {
-                append(" · ")
-                append(report.totalSkipped)
-                append(" already present (skipped)")
+                append(ctx.getString(R.string.bk_already_present, report.totalSkipped))
             }
+            // Warnings come from the coordinator as raw text; see the
+            // Failed branch below for why those stay untranslated.
             report.warnings.forEach { append(" · ").append(it) }
         }
     }
-    is ImportResult.ChecksumMismatch -> "Restore failed: file is corrupted (checksum mismatch)."
-    is ImportResult.SchemaTooNew -> "Restore failed: backup is for schema v${r.backupVersion} but app is at v${r.currentVersion}. Update the app first."
-    is ImportResult.DecryptFailed -> "Wrong password (or file is corrupted): ${r.message}"
-    is ImportResult.MalformedJson -> "Couldn't read the file: ${r.message}"
-    is ImportResult.IoError -> "Couldn't open the file: ${r.message}"
-    is ImportResult.UnexpectedError -> "Restore failed: ${r.message}"
+    is ImportResult.ChecksumMismatch -> ctx.getString(R.string.bk_checksum_mismatch)
+    is ImportResult.SchemaTooNew ->
+        ctx.getString(R.string.bk_schema_too_new, r.backupVersion, r.currentVersion)
+    is ImportResult.DecryptFailed -> ctx.getString(R.string.bk_decrypt_failed, r.message)
+    is ImportResult.MalformedJson -> ctx.getString(R.string.bk_malformed_json, r.message)
+    is ImportResult.IoError -> ctx.getString(R.string.bk_io_error, r.message)
+    is ImportResult.UnexpectedError -> ctx.getString(R.string.bk_restore_failed, r.message)
 }
 
 /**

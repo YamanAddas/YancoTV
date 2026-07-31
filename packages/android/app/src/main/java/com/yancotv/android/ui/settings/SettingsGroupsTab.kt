@@ -286,7 +286,7 @@ private fun GroupRow(name: String, hidden: Boolean, onToggle: (Boolean) -> Unit)
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = if (hidden) "Hidden from sidebar and rails" else "Visible everywhere",
+                text = stringResource(if (hidden) R.string.gr_hidden else R.string.gr_visible),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 2.dp),
@@ -304,8 +304,8 @@ private fun ParentPinRow(label: String, prefixCode: String, kind: PrefixCatalog.
     val rowBg = if (focused) palette.BackgroundElevated.copy(alpha = 0.6f) else Color.Transparent
     val kindLabel =
         when (kind) {
-            PrefixCatalog.Kind.Language -> "language"
-            PrefixCatalog.Kind.Region -> "region"
+            PrefixCatalog.Kind.Language -> stringResource(R.string.gr_kind_language)
+            PrefixCatalog.Kind.Region -> stringResource(R.string.gr_kind_region)
         }
     Row(
         modifier =
@@ -339,7 +339,7 @@ private fun ParentPinRow(label: String, prefixCode: String, kind: PrefixCatalog.
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "$kindLabel · $prefixCode · $childCount channel${if (childCount == 1) "" else "s"}",
+                text = stringResource(R.string.gr_row_sub, kindLabel, prefixCode, childCount),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 2.dp),

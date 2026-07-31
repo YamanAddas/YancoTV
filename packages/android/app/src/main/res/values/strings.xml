@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">YancoTV</string>
+    <string name="app_name" translatable="false">YancoTV</string>
 
     <!-- Stage 3.1 / MK.14.1e — recording foreground service. -->
     <string name="recording_channel_name">Recordings</string>
@@ -188,7 +188,7 @@
     <string name="app_sec_type">Type</string>
     <string name="app_sec_type_sub">Live-applies via LocalDensity override — sp-sized text rescales without restart, dp layouts stay put.</string>
     <string name="app_font_scale">Font scale</string>
-    <string name="app_font_scale_hint">Multiplies base body size. 100% is the default.</string>
+    <string name="app_font_scale_hint" formatted="false">Multiplies base body size. 100% is the default.</string>
     <string name="app_kicker_active">ACTIVE</string>
 
     <!-- MK.31.5 batch D — EPG + Groups tab bodies. -->
@@ -825,4 +825,182 @@
     <string name="epg_parsing">Parsing EPG %1$s</string>
     <string name="epg_writing">Writing %1$d programmes to database…</string>
     <string name="epg_writing_scan">Writing… %1$d kept / %2$d scanned</string>
+
+    <!-- MK.31.19 dialogs + notifications -->
+    <string name="rd_title">Recording broadcast content</string>
+    <string name="rd_body">Recording IPTV streams may be subject to copyright and broadcast laws in your country. By proceeding you acknowledge that you\'re responsible for ensuring your use complies with local law. YancoTV doesn\'t host or distribute content — it only plays back what you bring to it. You can review the full terms in Settings → About → Terms of service.</string>
+    <string name="rd_understand">I understand</string>
+    <string name="common_reset">Reset</string>
+    <string name="common_cancel_caps">CANCEL</string>
+    <string name="rp_title">Reset progress?</string>
+    <string name="rp_body_series">This clears your resume points and watched marks for every episode in this series. You\'ll start fresh next time.</string>
+    <string name="rp_body_single">This clears your resume point for this title. Next play will start from the beginning.</string>
+    <string name="pin_label" translatable="false">PIN</string>
+    <string name="pin_unlock">Unlock</string>
+    <string name="pin_locked">Locked</string>
+    <string name="pin_incorrect">Incorrect PIN</string>
+    <string name="rem_starting_now">Starting now on YancoTV</string>
+    <string name="rem_channel_name">Programme reminders</string>
+    <string name="rem_channel_description">Notifies you when a programme you set a reminder for is starting.</string>
+    <string name="rsf_channel_name">Recording failures</string>
+    <string name="rsf_channel_description">Posted when a scheduled recording can\'t start.</string>
+    <string name="rsf_title">Recording didn\'t start</string>
+    <string name="rsf_body" translatable="false">"%1$s" — %2$s</string>
+    <string name="rsf_reason_service_start">The app couldn\'t start in the background. Open the app before the scheduled time.</string>
+    <string name="rsf_reason_concurrent">Another recording was already in progress (1-stream limit).</string>
+    <string name="rsf_reason_never_started">The recording service never landed bytes — check storage and source.</string>
+
+    <!-- MK.31.20 settings interiors (1/2) -->
+    <string name="rel_just_now">Just now</string>
+    <string name="rel_min_ago">%1$dm ago</string>
+    <string name="rel_hour_ago">%1$dh ago</string>
+    <string name="rel_day_ago">%1$dd ago</string>
+    <string name="common_unknown_error">Unknown error</string>
+    <string name="as_err_name">Give the source a name.</string>
+    <string name="as_err_file">Pick an M3U file from your device.</string>
+    <string name="as_err_host_url">Host URL is required (e.g. http://provider.tv:8080).</string>
+    <string name="as_err_m3u_url">M3U URL is required.</string>
+    <string name="as_err_portal_url">Portal URL is required (e.g. http://portal.tv/c/).</string>
+    <string name="as_err_url">URL is required.</string>
+    <string name="as_err_xtream_creds">Xtream needs both a username and a password.</string>
+    <string name="as_err_stalker_mac">Stalker needs the device MAC address (e.g. 00:1A:79:XX:XX:XX).</string>
+    <string name="as_sec_source_type">Source type</string>
+    <string name="as_sec_credentials">Credentials</string>
+    <string name="as_sec_device_identity">Device identity</string>
+    <string name="as_sec_epg">Electronic programme guide</string>
+    <string name="as_sec_advanced">Advanced — HTTP headers</string>
+    <string name="as_file_selected">Selected: %1$s</string>
+    <string name="as_file_hint">Tap to pick a .m3u or .m3u8 file from your device.</string>
+    <string name="as_host_url">Host URL</string>
+    <string name="as_portal_url">Portal URL</string>
+    <string name="as_m3u_url" translatable="false">M3U URL</string>
+    <string name="ab_version_row" translatable="false">v %1$s</string>
+    <string name="ab_updates_on">YancoTV will tell you when a new version is ready.</string>
+    <string name="ab_updates_off">Update checks aren\'t wired for this build (no release endpoint configured).</string>
+    <string name="ab_checking">Checking…</string>
+    <string name="ab_check_now">Check now</string>
+    <string name="ab_open">Open</string>
+    <string name="ab_build_value">%1$s (build %2$d)</string>
+    <string name="ab_device_value" translatable="false">%1$s · Android %2$s</string>
+    <string name="ab_blurb">An IPTV client for Android TV, Fire TV, and phones. Bring your Xtream login, M3U URL, M3U file, or Stalker portal — YancoTV handles the EPG and recordings, remembers where you left off in every movie and series, and ships voice search, parental controls, and cast-to-TV.</string>
+    <string name="ab_privacy_sub">What leaves your device, and how to opt out. Full policy linked below.</string>
+    <string name="ab_crash_desc">If something crashes, send a stack trace + device model + OS version to our error tracker so we can fix it. No content, no playlist URLs, no credentials. Off = nothing leaves the device.</string>
+    <string name="ab_upd_unavailable">Updates unavailable</string>
+    <string name="ab_upd_unavailable_sub">This build does not have an update endpoint configured.</string>
+    <string name="ab_upd_checking">Checking for updates</string>
+    <string name="ab_upd_checking_sub">Contacting the YancoTV release feed now.</string>
+    <string name="ab_upd_latest">You\'re on the latest version</string>
+    <string name="ab_upd_latest_sub">Latest published version is %1$s (build %2$d).</string>
+    <string name="ab_upd_failed">Couldn\'t check for updates</string>
+    <string name="ab_upd_found">Update found</string>
+    <string name="ab_upd_found_sub">Version %1$s is ready to download.</string>
+    <string name="par_pin_set">PIN — set</string>
+    <string name="par_pin_not_set">PIN — not set</string>
+    <string name="par_new_pin">New PIN</string>
+    <string name="par_save_new_pin">Save new PIN</string>
+    <string name="par_set_pin">Set PIN</string>
+    <string name="par_change_pin">Change PIN</string>
+    <string name="par_remove_pin">Remove PIN</string>
+    <string name="par_pin_saved">PIN saved</string>
+    <string name="par_pin_len_err">PIN must be 4–8 digits.</string>
+    <string name="par_pin_mismatch">PIN entries don\'t match.</string>
+    <string name="par_gate_change_title">Enter current PIN</string>
+    <string name="par_gate_remove_title">Confirm with current PIN</string>
+    <string name="par_gate_change_body">To change your PIN, confirm the current one first.</string>
+    <string name="par_gate_remove_body">Removing the PIN will disable parental controls.</string>
+    <string name="par_current_ok">Current PIN OK — enter the new one.</string>
+    <string name="par_pin_removed">PIN removed — parental controls disabled.</string>
+    <string name="par_unhide_all">Unhide all</string>
+    <string name="par_unhide">Unhide</string>
+    <string name="par_none_hidden">No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it.</string>
+    <string name="par_hidden_count">%1$d channel(s) hidden. Tap Unhide to bring one back.</string>
+    <string name="par_restored_count">Restored %1$d channel(s)</string>
+    <string name="gr_kind_language">language</string>
+    <string name="gr_kind_region">region</string>
+    <string name="gr_row_sub">%1$s · %2$s · %3$d channels</string>
+    <string name="gr_hidden">Hidden from sidebar and rails</string>
+    <string name="gr_visible">Visible everywhere</string>
+    <string name="epg_with_epg_value">%1$d of %2$d</string>
+    <string name="epg_refreshing">Refreshing EPG…</string>
+    <string name="epg_resyncing">Re-syncing %1$s…</string>
+    <string name="epg_resync_generic_source">source</string>
+    <string name="epg_add_source_first">Add a source first — Settings → Sources.</string>
+    <string name="epg_refresh_vs_resync">REFRESH pulls a fresh EPG payload. RE-SYNC re-walks every active source so a rotated EPG URL is auto-adopted.</string>
+    <string name="epg_current_value">Current: %1$s</string>
+    <string name="epg_timeline_minutes">%1$d min</string>
+    <string name="ap_active">Active</string>
+    <string name="ap_tap_apply">Tap to apply</string>
+    <string name="nw_no_active_source">No active source with a URL configured.</string>
+    <string name="nw_probe_ok" translatable="false">OK · %1$s · %2$d ms</string>
+    <string name="nw_probe_failed">Failed · %1$s</string>
+    <string name="ph_later_milestone">Later milestone</string>
+    <string name="ph_notifications_title">Notifications</string>
+    <string name="ph_notifications_body">Per-event toggles for EPG reminders, source-sync completion, recording-ready alerts, and update prompts. Routes through WorkManager — unblocked once MK.14 adds the DVR event producer.</string>
+    <string name="ph_storage_body">Image cache size, EPG cache size, SQLite DB footprint, and one-tap clear actions. Waiting on a size-aggregator in the shared cache layer so the read is cheap enough to refresh on tab entry.</string>
+    <string name="ph_subtitles_title">Subtitles</string>
+    <string name="ph_subtitles_kicker" translatable="false">Milestone MK.12a.3+</string>
+    <string name="ph_subtitles_body">Default caption language, font size, font color, background opacity, and vertical position. Player-overlay picker already ships (MK.12a.3); these are the defaults persisted across restarts.</string>
+    <string name="sc_intro">Quick reference for the TV-remote and keyboard bindings YancoTV listens for. Shortcuts aren\'t user-configurable yet — let us know in the issues if any clash with your remote.</string>
+    <string name="ss_search_in_tab">in %1$s</string>
+    <string name="ss_nav_hint">exit  ·  ↑↓ navigate  ·  1-9 jump</string>
+    <string name="ss_tab_semantics">%1$s settings tab</string>
+
+    <!-- MK.31.20 settings interiors (1/2, fixups) -->
+    <string name="common_never">Never</string>
+    <string name="nw_testing">Testing…</string>
+
+    <!-- MK.31.21 backup + recordings + sources -->
+    <string name="bk_exporting_to">Exporting to %1$s…</string>
+    <string name="bk_exporting_downloads">Exporting %1$s to Downloads/YancoTV…</string>
+    <string name="bk_exporting">Exporting…</string>
+    <string name="bk_export_backup">Export backup</string>
+    <string name="bk_export_ok">Exported %1$s · %2$s · schema v%3$d · %4$d records · checksum %5$s…</string>
+    <string name="bk_export_failed">Export failed: %1$s</string>
+    <string name="bk_restored_rows">Restored %1$d rows</string>
+    <string name="bk_pending_resync"> · %1$d pending source resync</string>
+    <string name="bk_already_present"> · %1$d already present (skipped)</string>
+    <string name="bk_checksum_mismatch">Restore failed: file is corrupted (checksum mismatch).</string>
+    <string name="bk_schema_too_new">Restore failed: backup is for schema v%1$d but app is at v%2$d. Update the app first.</string>
+    <string name="bk_decrypt_failed">Wrong password (or file is corrupted): %1$s</string>
+    <string name="bk_malformed_json">Couldn\'t read the file: %1$s</string>
+    <string name="bk_io_error">Couldn\'t open the file: %1$s</string>
+    <string name="bk_restore_failed">Restore failed: %1$s</string>
+    <string name="bk_pending_note">%1$d record(s) still pending source resync.</string>
+    <string name="bk_row_meta" translatable="false">%1$s · schema v%2$d · sha256 %3$s…</string>
+    <string name="bk_file_location_lost"> · file location lost</string>
+    <string name="bk_bytes_b" translatable="false">%1$d B</string>
+    <string name="bk_bytes_kb" translatable="false">%1$s KB</string>
+    <string name="bk_bytes_mb" translatable="false">%1$s MB</string>
+    <string name="bk_unknown">unknown</string>
+    <string name="bc_downloads_insert_failed">Couldn\'t add the backup to Downloads.</string>
+    <string name="bc_no_writable_location">Could not write backup to Downloads/YancoTV or to the app-private fallback. Use the \'Change folder\' button to pick a writable location.</string>
+    <string name="bc_cant_open_folder">Couldn\'t open that folder.</string>
+    <string name="bc_cant_create_file">Couldn\'t create \'%1$s\' in that folder.</string>
+    <string name="bc_cant_open_for_writing">Couldn\'t open the file for writing.</string>
+    <string name="rt_where_sub">Pick where new recordings save. You can change this any time — past recordings keep playing from wherever they were saved.</string>
+    <string name="rt_recommended">RECOMMENDED</string>
+    <string name="rt_grant_hint">Tap to grant storage permission and switch.</string>
+    <string name="rt_permission_needed">Storage permission needed — tap to grant.</string>
+    <string name="rt_pick_folder_anytime">Pick a different folder anytime</string>
+    <string name="rt_pick_any_folder">Pick any folder using your TV\'s system picker</string>
+    <string name="rt_no_folder_picked">No folder picked yet — tap to choose.</string>
+    <string name="rt_where_to_watch">Open the Recordings tab in the sidebar to play, delete, and inspect any recording you\'ve made. New recordings show up there immediately as they start.</string>
+    <string name="rt_fire_tv_picker_note">Stock Fire TV\'s folder picker has known D-pad bugs (the Select / hamburger / tab buttons can be unreachable from the remote). It\'s a Fire OS limitation, not a YancoTV bug. Fix: install Files by Google — Fire TV will route the picker through it. Or switch to Public folder above; recordings save without ever using the system picker.</string>
+    <string name="rt_managed_by_android">%1$s (managed by Android Media)</string>
+    <string name="sr_your_sources">YOUR SOURCES</string>
+    <string name="sr_your_sources_count">YOUR SOURCES · %1$d</string>
+    <string name="sr_no_sources_yet">No sources yet</string>
+    <string name="sr_playlists_providers">Playlists &amp; providers</string>
+    <string name="sr_added_syncing">Source added — syncing %1$s…</string>
+    <string name="sr_save_timeout">Saving took too long. Restart the app and try again — if it keeps happening, the credential store may need to be reset.</string>
+    <string name="sd_not_found">Source not found. It may have been deleted.</string>
+    <string name="sd_autosync_help">When on, this source kicks off a background refresh every time you open YancoTV. Off keeps catalog reads fast on launch and only syncs when you press Sync manually or the auto-sync interval elapses.</string>
+    <string name="sd_untitled">Untitled source</string>
+    <string name="sd_moments_ago">Moments ago</string>
+    <string name="sd_min_ago">%1$d min ago</string>
+    <string name="sd_dur_hm" translatable="false">%1$dh %2$dm</string>
+    <string name="sd_dur_dh" translatable="false">%1$dd %2$dh</string>
+
+    <!-- MK.31.21 fixups + recordings tab -->
+    <string name="rt_advanced">ADVANCED</string>
 </resources>

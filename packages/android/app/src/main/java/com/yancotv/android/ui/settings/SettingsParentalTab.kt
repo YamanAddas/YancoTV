@@ -96,6 +96,12 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
     // because there's no scrollable parent. The nested hidden-items
     // LazyColumn below has bounded `heightIn(max = 280.dp)` so it
     // measures fine inside the verticalScroll.
+    // MK.31.20 — `status` is assigned from inside coroutines, which are not
+    // composable scope, so these three resolve up front.
+    val pinSavedMsg = stringResource(R.string.par_pin_saved)
+    val currentOkMsg = stringResource(R.string.par_current_ok)
+    val pinRemovedMsg = stringResource(R.string.par_pin_removed)
+
     // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
     val tabScroll = rememberScrollState()
 
@@ -131,7 +137,9 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = if (settings.pinSet) "PIN — set" else "PIN — not set",
+                text = stringResource(
+                    if (settings.pinSet) R.string.par_pin_set else R.string.par_pin_not_set,
+                ),
                 color = if (settings.pinSet) LocalYancoPalette.current.Accent else LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -144,7 +152,9 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                         newPin = it
                         status = null
                     },
-                    label = if (awaitingNewPin) "New PIN" else "PIN",
+                    label = stringResource(
+                        if (awaitingNewPin) R.string.par_new_pin else R.string.pin_label,
+                    ),
                 )
                 PinField(
                     value = confirmPin,
@@ -167,11 +177,15 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                                 newPin = ""
                                 confirmPin = ""
                                 awaitingNewPin = false
-                                status = "PIN saved"
+                                status = pinSavedMsg
                             }
                         },
                     ) {
-                        Text(if (awaitingNewPin) "Save new PIN" else "Set PIN")
+                        Text(
+                            stringResource(
+                                if (awaitingNewPin) R.string.par_save_new_pin else R.string.par_set_pin,
+                            ),
+                        )
                     }
                     if (awaitingNewPin) {
                         SettingsOutlinedButton(
@@ -182,26 +196,34 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                                 status = null
                             },
                         ) {
-                            Text("Cancel")
+                            Text(stringResource(R.string.common_cancel))
                         }
                     }
                 }
                 if (newPin.isNotEmpty() && newPin.length !in 4..8) {
-                    Text("PIN must be 4–8 digits.", color = LocalYancoPalette.current.Error, fontSize = 12.sp)
+                    Text(
+                        stringResource(R.string.par_pin_len_err),
+                        color = LocalYancoPalette.current.Error,
+                        fontSize = 12.sp,
+                    )
                 } else if (newPin.isNotEmpty() && newPin != confirmPin) {
-                    Text("PIN entries don't match.", color = LocalYancoPalette.current.Error, fontSize = 12.sp)
+                    Text(
+                        stringResource(R.string.par_pin_mismatch),
+                        color = LocalYancoPalette.current.Error,
+                        fontSize = 12.sp,
+                    )
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SettingsAccentButton(
                         onClick = { showGate = GateAction.CHANGE },
                     ) {
-                        Text("Change PIN")
+                        Text(stringResource(R.string.par_change_pin))
                     }
                     SettingsOutlinedButton(
                         onClick = { showGate = GateAction.REMOVE },
                     ) {
-                        Text("Remove PIN")
+                        Text(stringResource(R.string.par_remove_pin))
                     }
                 }
             }
@@ -267,21 +289,21 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                             // it landed.
                             android.widget.Toast.makeText(
                                 context,
-                                "Restored $count channel${if (count == 1) "" else "s"}",
+                                context.getString(R.string.par_restored_count, count),
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                         },
                     ) {
-                        Text("Unhide all", fontSize = 12.sp)
+                        Text(stringResource(R.string.par_unhide_all), fontSize = 12.sp)
                     }
                 }
             }
             Text(
                 text =
                 if (hiddenIds.isEmpty()) {
-                    "No channels are hidden. Long-press a channel in LiveTV / Movies / Series to hide it."
+                    stringResource(R.string.par_none_hidden)
                 } else {
-                    "${hiddenIds.size} channel(s) hidden. Tap Unhide to bring one back."
+                    stringResource(R.string.par_hidden_count, hiddenIds.size)
                 },
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
@@ -310,26 +332,26 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
         PinEntryDialog(
             title =
             when (action) {
-                GateAction.CHANGE -> "Enter current PIN"
-                GateAction.REMOVE -> "Confirm with current PIN"
+                GateAction.CHANGE -> stringResource(R.string.par_gate_change_title)
+                GateAction.REMOVE -> stringResource(R.string.par_gate_remove_title)
             },
             body =
             when (action) {
-                GateAction.CHANGE -> "To change your PIN, confirm the current one first."
-                GateAction.REMOVE -> "Removing the PIN will disable parental controls."
+                GateAction.CHANGE -> stringResource(R.string.par_gate_change_body)
+                GateAction.REMOVE -> stringResource(R.string.par_gate_remove_body)
             },
             repo = repo,
             onSuccess = {
                 when (action) {
                     GateAction.CHANGE -> {
                         awaitingNewPin = true
-                        status = "Current PIN OK — enter the new one."
+                        status = currentOkMsg
                     }
                     GateAction.REMOVE -> {
                         scope.launch {
                             // MB-251 — DB writes off-main (see setPin above).
                             withContext(Dispatchers.IO) { repo.removePin() }
-                            status = "PIN removed — parental controls disabled."
+                            status = pinRemovedMsg
                         }
                     }
                 }
@@ -383,7 +405,7 @@ private fun HiddenRow(item: ContentItem, onUnhide: () -> Unit) {
         SettingsOutlinedButton(
             onClick = onUnhide,
         ) {
-            Text("Unhide", fontSize = 12.sp)
+            Text(stringResource(R.string.par_unhide), fontSize = 12.sp)
         }
     }
 }

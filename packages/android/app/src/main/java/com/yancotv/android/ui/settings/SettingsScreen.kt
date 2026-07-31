@@ -771,7 +771,7 @@ private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "in ${stringResource(entry.tab.labelRes)}",
+                text = stringResource(R.string.ss_search_in_tab, stringResource(entry.tab.labelRes)),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -833,7 +833,7 @@ private fun SidebarFooterHint() {
             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
         )
         Text(
-            text = "exit  ·  ↑↓ navigate  ·  1-9 jump",
+            text = stringResource(R.string.ss_nav_hint),
             color = palette.TextMuted,
             fontSize = 12.sp,
         )

@@ -1243,25 +1243,23 @@ private fun ResetProgressDialog(isSeries: Boolean, onConfirm: () -> Unit, onDism
     val palette = LocalYancoPalette.current
     val body =
         if (isSeries) {
-            "This clears your resume points and watched marks for every " +
-                "episode in this series. You'll start fresh next time."
+            stringResource(R.string.rp_body_series)
         } else {
-            "This clears your resume point for this title. Next play will " +
-                "start from the beginning."
+            stringResource(R.string.rp_body_single)
         }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = palette.BackgroundRaised,
-        title = { Text("Reset progress?", color = palette.TextPrimary) },
+        title = { Text(stringResource(R.string.rp_title), color = palette.TextPrimary) },
         text = { Text(body, color = palette.TextSecondary) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Reset", color = palette.Accent)
+                Text(stringResource(R.string.common_reset), color = palette.Accent)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = palette.TextMuted)
+                Text(stringResource(R.string.common_cancel), color = palette.TextMuted)
             }
         },
     )

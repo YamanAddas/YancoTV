@@ -2,6 +2,8 @@ package com.yancotv.android.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.yancotv.android.R
 
 /**
  * Subtitles placeholder. The picker itself already lives in the player
@@ -13,11 +15,9 @@ import androidx.compose.ui.Modifier
 fun SettingsSubtitlesTab(modifier: Modifier = Modifier) {
     SettingsPlaceholder(
         modifier = modifier,
-        kicker = "Milestone MK.12a.3+",
-        title = "Subtitles",
+        kicker = stringResource(R.string.ph_subtitles_kicker),
+        title = stringResource(R.string.ph_subtitles_title),
         body =
-        "Default caption language, font size, font color, background opacity, " +
-            "and vertical position. Player-overlay picker already ships (MK.12a.3); " +
-            "these are the defaults persisted across restarts.",
+        stringResource(R.string.ph_subtitles_body),
     )
 }

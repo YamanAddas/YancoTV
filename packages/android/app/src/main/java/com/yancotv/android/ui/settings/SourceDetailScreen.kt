@@ -73,6 +73,9 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
     val scope = rememberCoroutineScope()
     var source by remember { mutableStateOf<Source?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
+    // MK.31.21 — assigned from suspend functions, not composable scope.
+    val notFoundMsg = stringResource(R.string.sd_not_found)
+    val unknownErrorMsg = stringResource(R.string.common_unknown_error)
 
     // Editable buffers — separate from the persisted Source so the user
     // can type freely; SAVE commits them via SourceRepository.updateSource.
@@ -100,7 +103,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     .getOrNull()
             }
         if (loaded == null) {
-            loadError = "Source not found. It may have been deleted."
+            loadError = notFoundMsg
             return
         }
         source = loaded
@@ -254,7 +257,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             SettingsToggleRow(
                 label = stringResource(R.string.sd_autosync_on_start),
                 description =
-                "When on, this source kicks off a background refresh every time you open YancoTV. Off keeps catalog reads fast on launch and only syncs when you press Sync manually or the auto-sync interval elapses.",
+                stringResource(R.string.sd_autosync_help),
                 checked = current.autoSyncOnStart,
                 onCheckedChange = { enabled ->
                     scope.launch {
@@ -426,7 +429,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                                     loadSource()
                                 }
                                 .onFailure { t ->
-                                    saveError = t.message ?: t::class.simpleName ?: "Unknown error"
+                                    saveError = t.message ?: t::class.simpleName ?: unknownErrorMsg
                                     Log.w(
                                         "Yanco",
                                         "SourceDetail.save(${current.id}) failed: ${t.message}",
@@ -514,7 +517,7 @@ private fun DetailHero(source: Source, palette: YancoPalette, onBack: () -> Unit
             SettingsKicker(text = stringResource(R.string.sd_kicker_source, typeLabel(source.type).uppercase()), accent = true)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = source.name.ifBlank { "Untitled source" },
+                text = source.name.ifBlank { stringResource(R.string.sd_untitled) },
                 color = palette.TextPrimary,
                 fontSize = 23.sp,
                 lineHeight = 29.sp,

@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -176,6 +177,12 @@ private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources:
     var status by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
     val palette = LocalYancoPalette.current
+    // MK.31.20 — the probe runs off-main with no composition, so its result
+    // strings are resolved here and passed in.
+    val ctx = LocalContext.current
+    val noSourceMsg = stringResource(R.string.nw_no_active_source)
+    val unknownFallback = stringResource(R.string.common_unknown_error)
+    val testingMsg = stringResource(R.string.nw_testing)
 
     SettingsRow(
         label = stringResource(R.string.net_test_connection),
@@ -185,9 +192,16 @@ private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources:
                 onClick = {
                     if (running) return@SettingsAccentButton
                     running = true
-                    status = "Testing…"
+                    status = testingMsg
                     scope.launch {
-                        val result = probeFirstActiveSource(sources, http)
+                        val result = probeFirstActiveSource(
+                            sources,
+                            http,
+                            noSourceMsg,
+                            unknownFallback,
+                            { name, ms -> ctx.getString(R.string.nw_probe_ok, name, ms) },
+                            { reason -> ctx.getString(R.string.nw_probe_failed, reason) },
+                        )
                         status = result
                         running = false
                     }
@@ -220,13 +234,20 @@ private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources:
     )
 }
 
-private suspend fun probeFirstActiveSource(sources: SourceRepository, http: HttpClient): String = withContext(Dispatchers.IO) {
+private suspend fun probeFirstActiveSource(
+    sources: SourceRepository,
+    http: HttpClient,
+    noSourceMsg: String,
+    unknownFallback: String,
+    okFmt: (String, Long) -> String,
+    failFmt: (String) -> String,
+): String = withContext(Dispatchers.IO) {
     runCatching {
         val target =
             sources
                 .getAll()
                 .firstOrNull { it.isActive && !it.url.isNullOrBlank() }
-                ?: return@runCatching "No active source with a URL configured."
+                ?: return@runCatching noSourceMsg
         val url = target.url!!
         val started = System.currentTimeMillis()
         http.getBytes(
@@ -234,8 +255,8 @@ private suspend fun probeFirstActiveSource(sources: SourceRepository, http: Http
             options = HttpRequestOptions(timeoutMs = 10_000L, maxResponseBytes = 1_024L),
         )
         val elapsed = System.currentTimeMillis() - started
-        "OK · ${target.name} · $elapsed ms"
+        okFmt(target.name, elapsed)
     }.getOrElse { t ->
-        "Failed · ${t.message ?: t::class.simpleName}"
+        failFmt(t.message ?: t::class.simpleName ?: unknownFallback)
     }
 }

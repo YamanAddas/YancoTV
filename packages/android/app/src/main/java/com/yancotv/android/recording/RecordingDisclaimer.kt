@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.yancotv.android.R
 
 /**
  * Stage 5.6 — first-time legal acknowledgement for recording IPTV
@@ -76,15 +78,8 @@ fun rememberRecordingDisclaimerGate(): (action: () -> Unit) -> Unit {
     if (current != null) {
         AlertDialog(
             onDismissRequest = { pending = null },
-            title = { Text("Recording broadcast content") },
-            text = {
-                Text(
-                    "Recording IPTV streams may be subject to copyright and broadcast laws in your country. " +
-                        "By proceeding you acknowledge that you're responsible for ensuring your use complies with local law. " +
-                        "YancoTV doesn't host or distribute content — it only plays back what you bring to it. " +
-                        "You can review the full terms in Settings → About → Terms of service.",
-                )
-            },
+            title = { Text(stringResource(R.string.rd_title)) },
+            text = { Text(stringResource(R.string.rd_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -93,11 +88,13 @@ fun rememberRecordingDisclaimerGate(): (action: () -> Unit) -> Unit {
                         current()
                     },
                 ) {
-                    Text("I understand")
+                    Text(stringResource(R.string.rd_understand))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pending = null }) { Text("Cancel") }
+                TextButton(onClick = { pending = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
         )
     }

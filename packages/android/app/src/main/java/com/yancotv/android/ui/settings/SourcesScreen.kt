@@ -113,6 +113,10 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
     var selectedSourceId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+    // MK.31.21 — both are assigned from inside coroutines/`onFailure`
+    // lambdas, which are not composable scope.
+    val saveTimeoutMsg = stringResource(R.string.sr_save_timeout)
+    val unknownErrorMsg = stringResource(R.string.common_unknown_error)
 
     val active by coordinator.state.collectAsState()
 
@@ -274,7 +278,7 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
                             // start appearing minutes later.
                             android.widget.Toast.makeText(
                                 context,
-                                "Source added — syncing ${saved.name}…",
+                                context.getString(R.string.sr_added_syncing, saved.name),
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                         }.onFailure { t ->
@@ -291,12 +295,11 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
                             )
                             addError =
                                 when (t) {
-                                    is TimeoutCancellationException ->
-                                        "Saving took too long. Restart the app and try again — if it keeps happening, the credential store may need to be reset."
+                                    is TimeoutCancellationException -> saveTimeoutMsg
                                     else -> {
                                         val raw = t.message?.takeIf { it.isNotBlank() }
                                             ?: t::class.simpleName
-                                            ?: "Unknown error"
+                                            ?: unknownErrorMsg
                                         com.yancotv.shared.http.redactCredentials(raw).take(140)
                                     }
                                 }
@@ -331,7 +334,11 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
             // never actually see how many sources they had. Folding it into
             // the overline both fixes that and buys the title the full width.
             Text(
-                text = if (count > 0) "YOUR SOURCES · $count" else "YOUR SOURCES",
+                text = if (count > 0) {
+                    stringResource(R.string.sr_your_sources_count, count)
+                } else {
+                    stringResource(R.string.sr_your_sources)
+                },
                 color = palette.Accent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -347,7 +354,9 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
             // 20sp + a 2-line clamp + ellipsis means it renders on one line
             // at 100% and breaks at a word boundary (never mid-glyph) at 125%.
             Text(
-                text = if (count == 0) "No sources yet" else "Playlists & providers",
+                text = stringResource(
+                    if (count == 0) R.string.sr_no_sources_yet else R.string.sr_playlists_providers,
+                ),
                 color = palette.TextPrimary,
                 fontSize = 19.sp,
                 lineHeight = 25.sp,
@@ -409,7 +418,7 @@ private fun SyncBanner(sourceName: String, progress: SyncProgress, elapsedSec: L
             )
         }
         SettingsOutlinedButton(onClick = onCancel, size = ButtonSize.Compact) {
-            Text("CANCEL")
+            Text(stringResource(R.string.common_cancel_caps))
         }
     }
 }

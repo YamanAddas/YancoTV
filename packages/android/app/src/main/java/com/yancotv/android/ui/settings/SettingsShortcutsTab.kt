@@ -61,8 +61,7 @@ fun SettingsShortcutsTab(modifier: Modifier = Modifier) {
         SettingsSection(
             title = stringResource(R.string.sc_sec_remote),
             sub =
-            "Quick reference for the TV-remote and keyboard bindings YancoTV listens for. " +
-                "Shortcuts aren't user-configurable yet — let us know in the issues if any clash with your remote.",
+            stringResource(R.string.sc_intro),
         ) {}
 
         SettingsSection(title = stringResource(R.string.sc_sec_shell)) {

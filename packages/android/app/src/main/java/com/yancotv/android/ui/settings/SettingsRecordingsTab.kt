@@ -171,9 +171,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text =
-                "Pick where new recordings save. You can change this " +
-                    "any time — past recordings keep playing from wherever they were saved.",
+                text = stringResource(R.string.rt_where_sub),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -181,13 +179,13 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             // Public folder (recommended)
             ModeRow(
                 title = stringResource(R.string.rec_public_folder),
-                badge = "RECOMMENDED",
+                badge = stringResource(R.string.rt_recommended),
                 subtitle = stringResource(R.string.rec_public_folder_sub, PUBLIC_DIR_NAME),
                 detail =
                 if (needsLegacyPermission && recordingPrefs.storageMode != RecordingStorageMode.PUBLIC_MEDIA_STORE) {
-                    "Tap to grant storage permission and switch."
+                    stringResource(R.string.rt_grant_hint)
                 } else if (needsLegacyPermission) {
-                    "Storage permission needed — tap to grant."
+                    stringResource(R.string.rt_permission_needed)
                 } else {
                     publicFolderResolvedPath()
                 },
@@ -224,12 +222,12 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             // Custom (advanced)
             ModeRow(
                 title = stringResource(R.string.rec_custom_folder),
-                badge = "ADVANCED",
+                badge = stringResource(R.string.rt_advanced),
                 subtitle =
                 if (recordingPrefs.folderUri != null) {
-                    "Pick a different folder anytime"
+                    stringResource(R.string.rt_pick_folder_anytime)
                 } else {
-                    "Pick any folder using your TV's system picker"
+                    stringResource(R.string.rt_pick_any_folder)
                 },
                 detail =
                 recordingPrefs.folderUri?.let { uriString ->
@@ -237,7 +235,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                         .getOrNull()
                         ?.let { friendlyTreeUriPath(it) }
                         ?: uriString
-                } ?: "No folder picked yet — tap to choose.",
+                } ?: stringResource(R.string.rt_no_folder_picked),
                 selected = recordingPrefs.storageMode == RecordingStorageMode.CUSTOM_SAF,
                 onSelect = {
                     // Selecting Custom always launches the system picker —
@@ -300,9 +298,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             )
             Text(
                 text =
-                "Open the Recordings tab in the sidebar to play, delete, and inspect " +
-                    "any recording you've made. New recordings show up there immediately " +
-                    "as they start.",
+                stringResource(R.string.rt_where_to_watch),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -330,11 +326,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                 )
                 Text(
                     text =
-                    "Stock Fire TV's folder picker has known D-pad bugs (the Select / " +
-                        "hamburger / tab buttons can be unreachable from the remote). It's a " +
-                        "Fire OS limitation, not a YancoTV bug. Fix: install Files by Google — " +
-                        "Fire TV will route the picker through it. Or switch to Public folder " +
-                        "above; recordings save without ever using the system picker.",
+                    stringResource(R.string.rt_fire_tv_picker_note),
                     color = palette.TextMuted,
                     fontSize = 12.sp,
                 )

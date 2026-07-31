@@ -164,7 +164,7 @@ fun SettingsEpgTab(
             SettingsRow(
                 label = stringResource(R.string.epg_last_refreshed),
                 readOnlyFocusable = true,
-                right = { ValueText(formatLastRefreshed(stats?.lastRefreshedAt)) },
+                right = { ValueText(formatLastRefreshed(ctx, stats?.lastRefreshedAt)) },
             )
             SettingsRowSpacer()
             SettingsRow(
@@ -176,7 +176,9 @@ fun SettingsEpgTab(
             SettingsRow(
                 label = stringResource(R.string.epg_channels_with_epg),
                 readOnlyFocusable = true,
-                right = { ValueText("$withEpg of ${activeSources.size}") },
+                right = {
+                    ValueText(stringResource(R.string.epg_with_epg_value, withEpg, activeSources.size))
+                },
             )
             if (displayError != null) {
                 SettingsRowSpacer()
@@ -200,10 +202,14 @@ fun SettingsEpgTab(
                 label = stringResource(R.string.epg_refresh_actions),
                 hint =
                 when {
-                    running -> "Refreshing EPG…"
-                    syncing -> "Re-syncing ${coordinatorState?.sourceName ?: "source"}…"
-                    activeSources.isEmpty() -> "Add a source first — Settings → Sources."
-                    else -> "REFRESH pulls a fresh EPG payload. RE-SYNC re-walks every active source so a rotated EPG URL is auto-adopted."
+                    running -> stringResource(R.string.epg_refreshing)
+                    syncing -> stringResource(
+                        R.string.epg_resyncing,
+                        coordinatorState?.sourceName
+                            ?: stringResource(R.string.epg_resync_generic_source),
+                    )
+                    activeSources.isEmpty() -> stringResource(R.string.epg_add_source_first)
+                    else -> stringResource(R.string.epg_refresh_vs_resync)
                 },
                 content = {
                     Row(
@@ -250,7 +256,7 @@ fun SettingsEpgTab(
         ) {
             SettingsRow(
                 label = stringResource(R.string.epg_url),
-                hint = savedGlobalUrl?.let { "Current: $it" },
+                hint = savedGlobalUrl?.let { stringResource(R.string.epg_current_value, it) },
                 content = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -435,17 +441,19 @@ private fun EpgPriorityRow(source: Source, canMoveUp: Boolean, canMoveDown: Bool
     )
 }
 
-private fun formatLastRefreshed(epochMs: Long?): String {
-    if (epochMs == null) return "Never"
+// MK.31.20 — takes a Context rather than returning English: this is a plain
+// function, so `stringResource` is unavailable inside it.
+private fun formatLastRefreshed(ctx: android.content.Context, epochMs: Long?): String {
+    if (epochMs == null) return ctx.getString(R.string.common_never)
     val diff = (System.currentTimeMillis() - epochMs).coerceAtLeast(0L)
     val min = diff / 60_000L
     val hr = diff / 3_600_000L
     val days = diff / 86_400_000L
     return when {
-        min < 1L -> "Just now"
-        min < 60L -> "${min}m ago"
-        hr < 24L -> "${hr}h ago"
-        else -> "${days}d ago"
+        min < 1L -> ctx.getString(R.string.rel_just_now)
+        min < 60L -> ctx.getString(R.string.rel_min_ago, min)
+        hr < 24L -> ctx.getString(R.string.rel_hour_ago, hr)
+        else -> ctx.getString(R.string.rel_day_ago, days)
     }
 }
 

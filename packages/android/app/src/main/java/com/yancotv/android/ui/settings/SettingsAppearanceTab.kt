@@ -186,7 +186,7 @@ private fun ThemeRow(id: ThemeId, selected: Boolean, palette: YancoPalette, onCl
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = if (selected) "Active" else "Tap to apply",
+                text = stringResource(if (selected) R.string.ap_active else R.string.ap_tap_apply),
                 color = if (selected) pal.Accent else pal.TextMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 2.dp),

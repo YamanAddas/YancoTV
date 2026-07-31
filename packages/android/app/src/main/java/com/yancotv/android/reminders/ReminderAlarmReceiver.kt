@@ -8,6 +8,7 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
+import com.yancotv.android.R
 import com.yancotv.shared.reminders.ReminderRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,7 @@ class ReminderAlarmReceiver :
                 // functional without polluting res/drawable with placeholder art.
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle(title)
-                .setContentText("Starting now on YancoTV")
+                .setContentText(context.getString(R.string.rem_starting_now))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)

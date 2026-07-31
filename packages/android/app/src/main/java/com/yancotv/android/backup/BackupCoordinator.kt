@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.yancotv.android.BuildConfig
+import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.shared.backup.BackupCanonicalJson
 import com.yancotv.shared.backup.BackupChecksumMismatchException
@@ -100,12 +101,13 @@ class BackupCoordinator(
         val (storageUriString, sizeBytes) =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 writeToMediaStoreDownloads(filename, bytes)
-                    ?: return@withContext ExportResult.Failed("MediaStore.Downloads insert failed")
+                    ?: return@withContext ExportResult.Failed(
+                        context.getString(R.string.bc_downloads_insert_failed),
+                    )
             } else {
                 writeToPublicDownloadsLegacy(filename, bytes)
                     ?: return@withContext ExportResult.Failed(
-                        "Could not write backup to Downloads/YancoTV or to the app-private fallback. " +
-                            "Use the 'Change folder' button to pick a writable location.",
+                        context.getString(R.string.bc_no_writable_location),
                     )
             }
         persistMetadata(file, storageUriString, sizeBytes, label)
@@ -220,7 +222,7 @@ class BackupCoordinator(
         // (or replace) the named file inside, write bytes.
         val tree =
             DocumentFile.fromTreeUri(context, folderUri)
-                ?: return@withContext ExportResult.Failed("Could not open folder")
+                ?: return@withContext ExportResult.Failed(context.getString(R.string.bc_cant_open_folder))
         // If a file with the same name already exists, delete it
         // first — SAF createFile silently appends "(1)" suffixes
         // otherwise, which fragments the user's backup folder.
@@ -232,7 +234,9 @@ class BackupCoordinator(
         context.contentResolver.openOutputStream(doc.uri, "w")?.use { out ->
             out.write(bytes)
             out.flush()
-        } ?: return@withContext ExportResult.Failed("Could not open file for writing")
+        } ?: return@withContext ExportResult.Failed(
+            context.getString(R.string.bc_cant_open_for_writing),
+        )
 
         persistMetadata(file, doc.uri.toString(), bytes.size.toLong(), label)
         ExportResult.Success(file = file, bytesWritten = bytes.size.toLong())

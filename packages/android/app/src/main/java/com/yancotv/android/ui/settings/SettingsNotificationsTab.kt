@@ -2,6 +2,8 @@ package com.yancotv.android.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.yancotv.android.R
 
 /**
  * Notifications placeholder. EPG reminders, sync-complete banners,
@@ -12,11 +14,9 @@ import androidx.compose.ui.Modifier
 fun SettingsNotificationsTab(modifier: Modifier = Modifier) {
     SettingsPlaceholder(
         modifier = modifier,
-        kicker = "Later milestone",
-        title = "Notifications",
+        kicker = stringResource(R.string.ph_later_milestone),
+        title = stringResource(R.string.ph_notifications_title),
         body =
-        "Per-event toggles for EPG reminders, source-sync completion, recording-ready " +
-            "alerts, and update prompts. Routes through WorkManager — unblocked once " +
-            "MK.14 adds the DVR event producer.",
+        stringResource(R.string.ph_notifications_body),
     )
 }

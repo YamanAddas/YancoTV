@@ -133,7 +133,7 @@ fun SettingsAboutTab(
         // No section header — the row IS the version. Reads the real
         // package version (same source as Diagnostics → Build) so it
         // can't drift from what's actually installed.
-        VersionRow(text = "v ${info.version}", arabesque = arabesque)
+        VersionRow(text = stringResource(R.string.ab_version_row, info.version), arabesque = arabesque)
         Text(
             text = stringResource(R.string.ab_tagline),
             color = palette.TextMuted,
@@ -151,9 +151,9 @@ fun SettingsAboutTab(
         val isConfigured = updateRepo.isConfigured
         val updatesSub =
             if (isConfigured) {
-                "YancoTV will tell you when a new version is ready."
+                stringResource(R.string.ab_updates_on)
             } else {
-                "Update checks aren't wired for this build (no release endpoint configured)."
+                stringResource(R.string.ab_updates_off)
             }
         val updatesRight: (@Composable () -> Unit)? =
             if (isConfigured) {
@@ -170,9 +170,9 @@ fun SettingsAboutTab(
                         Text(
                             text =
                             if (updateCheckOutcome == UpdateCheckOutcome.Checking) {
-                                "Checking…"
+                                stringResource(R.string.ab_checking)
                             } else {
-                                "Check now"
+                                stringResource(R.string.ab_check_now)
                             },
                         )
                     }
@@ -258,11 +258,7 @@ fun SettingsAboutTab(
         // sentence about what the app does + who it's for.
         SettingsSection(
             title = stringResource(R.string.ab_sec_about),
-            sub =
-            "An IPTV client for Android TV, Fire TV, and phones. Bring your Xtream login, M3U URL, " +
-                "M3U file, or Stalker portal — YancoTV handles the EPG and recordings, remembers " +
-                "where you left off in every movie and series, and ships voice search, parental " +
-                "controls, and cast-to-TV.",
+            sub = stringResource(R.string.ab_blurb),
         ) {}
 
         // ───── Privacy ─────
@@ -287,15 +283,11 @@ fun SettingsAboutTab(
         }
         SettingsSection(
             title = stringResource(R.string.ab_sec_privacy),
-            sub =
-            "What leaves your device, and how to opt out. Full policy linked below.",
+            sub = stringResource(R.string.ab_privacy_sub),
         ) {
             SettingsToggleRow(
                 label = stringResource(R.string.ab_crash_reports),
-                description =
-                "If something crashes, send a stack trace + device model + OS version " +
-                    "to our error tracker so we can fix it. No content, no playlist URLs, " +
-                    "no credentials. Off = nothing leaves the device.",
+                description = stringResource(R.string.ab_crash_desc),
                 checked = crashReportsEnabled,
                 onCheckedChange = { enabled ->
                     crashReportsEnabled = enabled
@@ -316,7 +308,7 @@ fun SettingsAboutTab(
                         )
                     }
                 },
-                right = { ValueText("Open") },
+                right = { ValueText(stringResource(R.string.ab_open)) },
             )
             SettingsRowSpacer()
             SettingsRow(
@@ -331,7 +323,7 @@ fun SettingsAboutTab(
                         )
                     }
                 },
-                right = { ValueText("Open") },
+                right = { ValueText(stringResource(R.string.ab_open)) },
             )
         }
 
@@ -352,13 +344,23 @@ fun SettingsAboutTab(
             SettingsRow(
                 label = stringResource(R.string.ab_build),
                 readOnlyFocusable = true,
-                right = { ValueText("${info.version} (build ${info.versionCode})") },
+                right = {
+                    ValueText(stringResource(R.string.ab_build_value, info.version, info.versionCode))
+                },
             )
             SettingsRowSpacer()
             SettingsRow(
                 label = stringResource(R.string.ab_device),
                 readOnlyFocusable = true,
-                right = { ValueText("${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}") },
+                right = {
+                    ValueText(
+                        stringResource(
+                            R.string.ab_device_value,
+                            android.os.Build.MODEL,
+                            android.os.Build.VERSION.RELEASE,
+                        ),
+                    )
+                },
             )
         }
     }
@@ -369,15 +371,25 @@ private fun UpdateCheckFeedbackRow(outcome: UpdateCheckOutcome) {
     val (label, hint) =
         when (outcome) {
             UpdateCheckOutcome.Disabled ->
-                "Updates unavailable" to "This build does not have an update endpoint configured."
+                stringResource(R.string.ab_upd_unavailable) to
+                    stringResource(R.string.ab_upd_unavailable_sub)
             UpdateCheckOutcome.Checking ->
-                "Checking for updates" to "Contacting the YancoTV release feed now."
+                stringResource(R.string.ab_upd_checking) to
+                    stringResource(R.string.ab_upd_checking_sub)
             is UpdateCheckOutcome.UpToDate ->
-                "You're on the latest version" to "Latest published version is ${outcome.versionName} (build ${outcome.versionCode})."
+                stringResource(R.string.ab_upd_latest) to
+                    stringResource(
+                        R.string.ab_upd_latest_sub,
+                        outcome.versionName,
+                        outcome.versionCode,
+                    )
+            // `outcome.reason` is provider/transport text — untranslatable
+            // by nature, same rule as SyncDetail.Failure (MK.31.18).
             is UpdateCheckOutcome.Failed ->
-                "Couldn't check for updates" to outcome.reason
+                stringResource(R.string.ab_upd_failed) to outcome.reason
             is UpdateCheckOutcome.Available ->
-                "Update found" to "Version ${outcome.info.versionName} is ready to download."
+                stringResource(R.string.ab_upd_found) to
+                    stringResource(R.string.ab_upd_found_sub, outcome.info.versionName)
         }
     SettingsRow(
         label = label,

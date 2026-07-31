@@ -366,7 +366,10 @@ private fun TextEntryDialog(title: String, body: String, initial: String, confir
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                Text(
+                    stringResource(R.string.common_cancel),
+                    color = LocalYancoPalette.current.TextMuted,
+                )
             }
         },
     )

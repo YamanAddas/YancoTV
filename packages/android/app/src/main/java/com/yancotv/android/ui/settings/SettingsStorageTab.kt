@@ -2,6 +2,8 @@ package com.yancotv.android.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.yancotv.android.R
 
 /**
  * Storage placeholder. Image/EPG cache sizes, a "clear cache" action,
@@ -13,11 +15,9 @@ import androidx.compose.ui.Modifier
 fun SettingsStorageTab(modifier: Modifier = Modifier) {
     SettingsPlaceholder(
         modifier = modifier,
-        kicker = "Later milestone",
+        kicker = stringResource(R.string.ph_later_milestone),
         title = "Storage",
         body =
-        "Image cache size, EPG cache size, SQLite DB footprint, and one-tap " +
-            "clear actions. Waiting on a size-aggregator in the shared cache layer " +
-            "so the read is cheap enough to refresh on tab entry.",
+        stringResource(R.string.ph_storage_body),
     )
 }
