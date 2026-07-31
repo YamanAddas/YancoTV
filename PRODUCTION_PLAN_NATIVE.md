@@ -2253,14 +2253,64 @@ Two API changes fell out of doing it properly:
 descriptions and resolvers are computed just above the modifier chain — the
 natural-looking inline `stringResource` does not compile there.
 
-### MK.31.4+ — remaining extraction — NOT STARTED
+### MK.31.4–31.17 — full string extraction — shipped
 
-Still English: every tab **body** (section titles, row labels, hints), the
-per-setting search index (~40 entries × 2 strings), the shell / detail / player
-surfaces, `ThemeId` / `AccentId`, and user-visible strings in
-`packages/shared/` (sync phase labels, source sub-lines, error text — these
-cannot use Android resources at all under the KMP purity rule, so they need a
-typed result the Android layer maps to a resource).
+Settings chrome and bodies, the per-setting search index, the shell, the player,
+detail, and dialogs. 21 → ~710 keys across all four locales.
+
+### MK.31.18 — `packages/shared` strings via a typed result (MB-331) — shipped
+
+`SyncProgress.message: String?` → `detail: SyncDetail?`, a sealed interface of 11
+cases. `commonMain` cannot reach `R.string` (AGENTS.md hard rule #1 — `androidx`
+there breaks the iOS target), so the shared module reports *what happened* and
+`android/sources/SyncDetailText.kt` decides *how to say it*. iOS maps the same
+sealed type to its own `Localizable.strings` when that target lands.
+
+`SyncDetail.Failure` keeps a `String` deliberately: provider HTTP bodies and
+exception messages are not a closed set. Both mapper overloads funnel it through
+`redactCredentials` (MB-292) rather than trusting call sites. `describeFailure` is
+injected into `SourceSyncCoordinator` so that class needs no `Context` and its JVM
+test needs no Android runtime. `packages/core` has no `SyncProgress`, so AGENTS.md
+rule #8 does not apply.
+
+### MK.31.19–31.25 — corrective sweep (MB-332) — shipped
+
+The per-area passes above reported clean but were verified with ad-hoc greps that
+silently dropped long strings and anything containing an em-dash. A proper
+detector (over-report, then hand-triage) found **~190 user-visible strings still
+hardcoded across 30 files** — dialog interiors, error/status text, and the bodies
+of the "later milestone" placeholder tabs. Final count: 1024 keys in `values/`,
+967 in each of ar/fr/es.
+
+**The lesson worth keeping:** a sweep driven by reading the top of each file finds
+section headers and primary labels and misses everything else. Anything that
+claims to be exhaustive needs a detector whose output you can diff against the
+code, and the detector needs testing against a string you *know* is there.
+
+Six real bugs surfaced, none of them translations:
+
+| Bug | Why it mattered |
+|---|---|
+| `SettingsBackupTab` picked its error colour with `status.startsWith("Export failed")` | Translating the string makes the match never fire — every failure would render in the muted colour in ar/fr/es. Error-ness now travels as a boolean beside the text |
+| `hc_watched_of_total` declared `%1$d` but was fed `formatMmSs()` output | `IllegalFormatConversionException` on the home screen's continue-watching tile, in every locale. Caught by lint's `StringFormatMatches`; `assembleRelease` and 933 unit tests both passed |
+| `app_font_scale_hint` carries a literal "100 %" | Correct fr/es typography, but lint reads `% e` as a malformed conversion. `formatted="false"` now states the no-args contract |
+| `RecordingsScreen.metaLine` pinned `Locale.US` | Arabic UI rendered "Mar 3" in Latin digits beside sibling lines using the app locale |
+| `HomeContent.formatClock` hand-rolled a 12-hour clock with literal "AM"/"PM" + `Locale.ROOT` | English meridiem markers and Latin digits in an Arabic UI. Replaced with `SimpleDateFormat("h:mm a")` on the default locale |
+| `HomeContent.secondaryLine` fell back to `item.type.name.lowercase()` | Raw enum name — "Live"/"Movie"/"Series" read as English in every locale |
+
+Deliberately left literal, each checked individually: the player's monospace
+diagnostic readouts (`res`/`codec`/`bitrate`/`buffer`, and the VOD error panel's
+`source`/`stream`/`remote`/`attempt`) — technical identifiers a user matches
+against provider docs; animation `label =` arguments, which Compose never renders;
+`ExternalPlayerApp.displayName` (VLC / MX Player / Just Player are product names);
+`"—"` placeholders, which are notation; **endonyms in the language picker** —
+"العربية", never "Arabic", because that screen is the one place a user may land
+while the app is in a language they cannot read; and provider/transport error
+text, where only the frame around it is localized.
+
+`ThemeId` / `AccentId` moved to `@StringRes`. The persistence contract is
+untouched: `fromKey` has always matched `it.name`, the Kotlin identifier, so a
+translated label cannot corrupt a stored preference.
 
 ### Open — MB-314: horizontal gradients do not mirror
 
@@ -2284,16 +2334,60 @@ churn. Fixing them without a screen risks making them worse with no way to check
 | MK.31.1 | `LocaleController` / `AppLanguage` / `locales_config.xml` / ar+fr+es resource sets / Settings → General picker; `attachBaseContext` wrapping because the AppCompat backport cannot reach a `ComponentActivity` | MB-311 |
 | MK.31.2 | `ui/focus/DirectionalNav.kt` startward/endward primitives; 11 physical D-pad handlers converted; slider keys + touch mapping made logical; seek deliberately left physical | MB-312 |
 | MK.31.3 | 7 `displayName` enums + `SettingsTab` labels → `@StringRes`; `translatable="false"` for numerals / notation / product names; search matches localized tab names | MB-313 |
+| MK.31.4–.17 | Settings chrome + bodies, search index, shell, player, detail, dialogs — 21 → ~710 keys | MB-313 |
+| MK.31.18 | `SyncDetail` sealed type replaces `SyncProgress.message`; Android maps it to resources, iOS will map the same cases; `Failure` stays free-text and always redacted; `describeFailure` injected so the coordinator needs no `Context` | MB-331 |
+| MK.31.19–.25 | Corrective sweep after the ad-hoc greps proved unreliable: ~190 strings across 30 files, → 1024 keys / 967 per locale. Six non-translation bugs fixed (prefix-match error colouring, a `%1$d`-fed-a-String crash, `formatted="false"`, two `Locale.US`/`Locale.ROOT` leaks, a raw-enum fallback) | MB-332 |
 | — | **OPEN:** `Brush.horizontalGradient` does not mirror under RTL (15 sites) — deferred to the device pass, see MK.31 above | MB-314 |
 
-**Verification status:** all eight slices are build-, lint- and unit-test-green (`:app:assembleDebug`,
-`ktlintCheck`, `:app:testDebugUnitTest`, `:shared:testDebugUnitTest`), and MK.31.1's locale
-resources were confirmed present in the packaged APK via `aapt2 dump`. **None has been exercised on
-Fire TV** — no device was reachable during the session (`192.168.68.56` and `192.168.68.74` both
-timed out, no phone attached). MK.30.1 / MK.30.2 change focus-scroll *behaviour*, which unit tests
-can prove the maths of but not the wiring of; both need the cascade-nav smoke test from the
-`native-android-mk` skill plus a scroll pass through every Settings tab before they can be called
-done.
+**Verification status (updated 2026-07-31).** Every slice is build-, lint- and
+unit-test-green: 933 tests, `ktlintCheck` clean, `:app:assembleRelease` (R8 +
+resource shrinking) green, and Android lint at zero
+`MissingTranslation` / `ExtraTranslation` / `StringFormat` / `MissingQuantity`
+findings. Locale key parity is checked programmatically, not by eye: 1024 keys in
+`values/`, 967 in each of ar/fr/es, with the delta accounted for exactly by the 57
+`translatable="false"` entries plus `app_name`, and no missing or extra keys in any
+locale.
+
+Lint's remaining **18 errors are pre-existing** — 10 `RestrictedApi` in
+`RecommendationsSync.kt`, 4 `UnsafeOptInUsageError`, 4
+`ProduceStateDoesNotAssignValue`. Confirmed by stashing the working tree and
+re-running lint against the committed tree, not assumed.
+
+**Exercised on a Google TV (Chromecast, `192.168.50.129:45723`, API 34):**
+
+- Release APK installs over the release-signed build and launches with no
+  `FATAL EXCEPTION`, no `Resources$NotFoundException`, no format-conversion
+  exception.
+- `aapt2 dump resources` on the shrunk release APK confirms all four locales
+  survive R8 + resource shrinking across a sample of the new keys.
+- **Arabic end-to-end.** Switching the app language in Settings → General flips
+  the *whole shell*, not just Settings: sidebar (`الرئيسية` / `القنوات المباشرة`
+  / `دليل البرامج` / …), rails (`متابعة المشاهدة`, `لك`), and CTAs
+  (`شاهد الآن`). Numbers render Arabic-Indic (`بقي ٤٣ د`), which is the runtime
+  proof that `%1$d` resolves through the app locale. Provider-supplied strings
+  correctly stay untouched ("FRANCE NETFLIX", "Virgin River").
+- **RTL mirroring.** The sidebar is reached with D-pad **RIGHT** under Arabic and
+  LEFT moves away from it — MK.31.2's logical-direction work behaving correctly
+  on hardware.
+
+**Still unverified anywhere, and why:**
+
+- **Fire TV (API 28) has not been touched.** It is the only target where the
+  AppCompat locale-backport gap and the software-decoder limits appear; the API-34
+  Chromecast cannot stand in for it.
+- MK.30.1 / .2 / .6 focus-scroll behaviour needs a scroll pass through every
+  Settings tab plus the `native-android-mk` cascade-nav smoke test, run twice —
+  English for regression, Arabic for mirroring.
+- **Source expiry** (MK.30.3) needs a live Xtream re-sync to populate
+  `expires_at`; no synced Xtream source was available.
+- **Update notification + sidebar badge** (MK.30.4) needs a release actually
+  published to the releases repo.
+- **MK.30.5 recording fix** needs a scheduled recording that fires *during* an EPG
+  refresh — that collision is the bug, so a recording that merely fires proves
+  nothing.
+- **Native-speaker review of `values-ar/strings.xml`.** ~2,800 translation strings
+  were machine-generated in-session and one authoring error was already caught and
+  fixed (المطهر, "the purifier", for المظهر, "Appearance"). Assume more.
 
 ## Timeline
 
