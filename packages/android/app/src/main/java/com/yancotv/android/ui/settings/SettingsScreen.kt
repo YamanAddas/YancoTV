@@ -77,6 +77,7 @@ import com.yancotv.android.ui.focus.FocusableSpacer
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.endwardFocus
 import com.yancotv.android.ui.focus.endwardKey
+import com.yancotv.android.ui.focus.isEndward
 import com.yancotv.android.ui.focus.isStartward
 import com.yancotv.android.ui.focus.startwardKey
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -1086,16 +1087,23 @@ private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, mo
                         isStartward(direction, paneLayoutDirection) -> activeTabFocus
                         // MK.30.7 (MB-317) — observed on a Chromecast with Google
                         // TV: pressing UP on the pane's first row left NOTHING
-                        // focused. There is no focusable above (the breadcrumb is
-                        // plain text) so Compose's spatial search escaped the
-                        // group, found no candidate, and cleared focus — leaving
-                        // the TV with no cursor until the user guessed a direction
-                        // to recover. Cancel refuses the exit and keeps focus put,
-                        // which is the correct end-stop: the pane is full height,
-                        // so there is genuinely nothing above it or below it to
-                        // move to.
-                        direction == FocusDirection.Up || direction == FocusDirection.Down ->
-                            FocusRequester.Cancel
+                        // focused, and pressing ENDWARD from anywhere in the pane
+                        // did the same. In both cases there is no focusable that
+                        // way — the breadcrumb is plain text, and the content pane
+                        // is the last pane in the row — so Compose's spatial search
+                        // escaped the focus group, found no candidate anywhere, and
+                        // cleared focus. That leaves the TV with no cursor until the
+                        // user guesses a direction to recover.
+                        //
+                        // Cancel refuses the exit and keeps focus put, which is the
+                        // correct end-stop: startward (toward the tab rail) is the
+                        // ONLY direction that legitimately leaves this pane.
+                        //
+                        // Next/Previous deliberately fall through to Default so
+                        // keyboard TAB traversal on a phone still works.
+                        isEndward(direction, paneLayoutDirection) ||
+                            direction == FocusDirection.Up ||
+                            direction == FocusDirection.Down -> FocusRequester.Cancel
                         else -> FocusRequester.Default
                     }
                 }
