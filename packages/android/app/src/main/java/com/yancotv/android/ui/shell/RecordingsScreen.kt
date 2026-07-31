@@ -27,12 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.recording.RecordingService
@@ -142,7 +144,7 @@ fun RecordingsScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Recordings",
+                text = stringResource(R.string.rec_title),
                 color = palette.TextPrimary,
                 fontSize = 23.sp,
                 fontWeight = FontWeight.Bold,
@@ -165,7 +167,7 @@ fun RecordingsScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     if (upcoming.isNotEmpty()) {
-                        item("upcoming-header") { SectionHeader("Upcoming · ${upcoming.size}", palette) }
+                        item("upcoming-header") { SectionHeader(stringResource(R.string.rc_hdr_upcoming, upcoming.size), palette) }
                         items(upcoming, key = { "upc-${it.id}" }) { schedule ->
                             UpcomingScheduleRow(
                                 entry = schedule,
@@ -179,7 +181,7 @@ fun RecordingsScreen(
                         item("upcoming-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
                     }
                     if (rows.isNotEmpty()) {
-                        item("recordings-header") { SectionHeader("Recordings", palette) }
+                        item("recordings-header") { SectionHeader(stringResource(R.string.rec_title), palette) }
                         items(rows, key = { "rec-${it.id}" }) { row ->
                             RecordingRow(
                                 entry = row,
@@ -195,7 +197,7 @@ fun RecordingsScreen(
                     }
                     if (historySchedules.isNotEmpty()) {
                         item("history-spacer") { Spacer(modifier = Modifier.height(12.dp)) }
-                        item("history-header") { SectionHeader("Schedule history", palette) }
+                        item("history-header") { SectionHeader(stringResource(R.string.rc_hdr_history), palette) }
                         items(historySchedules, key = { "hist-${it.id}" }) { schedule ->
                             // Pair the schedule with its recording row.
                             // Note: schedule.recordingId is intentionally
@@ -280,7 +282,7 @@ private fun EmptyRecordingsState(palette: com.yancotv.android.ui.theme.YancoPale
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "No recordings yet",
+                text = stringResource(R.string.rc_none_yet),
                 color = palette.TextPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -288,8 +290,7 @@ private fun EmptyRecordingsState(palette: com.yancotv.android.ui.theme.YancoPale
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text =
-                "Open any live channel, press MENU, and pick \"Record this channel\" " +
-                    "to start. Recordings appear here as soon as they begin.",
+                stringResource(R.string.rc_none_yet_body),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
             )
@@ -346,7 +347,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
             entry.error?.takeIf { it.isNotBlank() }?.let { reason ->
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Error: $reason",
+                    text = stringResource(R.string.rc_error, reason),
                     color = palette.Error,
                     fontSize = 12.sp,
                     maxLines = 2,
@@ -360,11 +361,11 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
         when (entry.status) {
             RecordingStatus.RECORDING -> {
                 YancoPrimaryButton(onClick = onStop, size = ButtonSize.Compact, translucent = true) {
-                    Text(text = "Stop")
+                    Text(text = stringResource(R.string.common_stop))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
-                    Text(text = "Delete")
+                    Text(text = stringResource(R.string.common_delete))
                 }
             }
             RecordingStatus.COMPLETED, RecordingStatus.CANCELLED -> {
@@ -376,16 +377,16 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
                 // killed mid-write isn't something we want to surface as
                 // playable.
                 YancoPrimaryButton(onClick = onPlay, size = ButtonSize.Compact, translucent = true) {
-                    Text(text = "Play")
+                    Text(text = stringResource(R.string.common_play))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
-                    Text(text = "Delete")
+                    Text(text = stringResource(R.string.common_delete))
                 }
             }
             RecordingStatus.FAILED -> {
                 YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
-                    Text(text = "Delete")
+                    Text(text = stringResource(R.string.common_delete))
                 }
             }
         }
@@ -396,10 +397,10 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
 private fun StatusBadge(status: RecordingStatus, palette: com.yancotv.android.ui.theme.YancoPalette) {
     val (label, fg, bg) =
         when (status) {
-            RecordingStatus.RECORDING -> Triple("REC", palette.BackgroundDeep, palette.Live)
-            RecordingStatus.COMPLETED -> Triple("Saved", palette.BackgroundDeep, palette.Accent)
-            RecordingStatus.FAILED -> Triple("Failed", palette.BackgroundDeep, palette.Error)
-            RecordingStatus.CANCELLED -> Triple("Stopped", palette.TextMuted, palette.BackgroundElevated)
+            RecordingStatus.RECORDING -> Triple(stringResource(R.string.rc_st_rec), palette.BackgroundDeep, palette.Live)
+            RecordingStatus.COMPLETED -> Triple(stringResource(R.string.rc_st_saved), palette.BackgroundDeep, palette.Accent)
+            RecordingStatus.FAILED -> Triple(stringResource(R.string.rc_st_failed), palette.BackgroundDeep, palette.Error)
+            RecordingStatus.CANCELLED -> Triple(stringResource(R.string.rc_st_stopped), palette.TextMuted, palette.BackgroundElevated)
         }
     Box(
         modifier =
@@ -464,7 +465,7 @@ private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> U
         Spacer(modifier = Modifier.width(12.dp))
         YancoSecondaryButton(onClick = onCancel, size = ButtonSize.Compact) {
             Text(
-                text = if (entry.state == RecordingScheduleState.FIRING) "Stop" else "Cancel",
+                text = if (entry.state == RecordingScheduleState.FIRING) stringResource(R.string.common_stop) else stringResource(R.string.common_cancel),
             )
         }
     }
@@ -525,12 +526,12 @@ private fun HistoryScheduleRow(
         if (onPlay != null && linkedRecording != null) {
             Spacer(modifier = Modifier.width(8.dp))
             YancoPrimaryButton(onClick = onPlay, size = ButtonSize.Compact, translucent = true) {
-                Text(text = "Play")
+                Text(text = stringResource(R.string.common_play))
             }
         }
         Spacer(modifier = Modifier.width(8.dp))
         YancoSecondaryButton(onClick = onDelete, size = ButtonSize.Compact) {
-            Text(text = "Delete")
+            Text(text = stringResource(R.string.common_delete))
         }
     }
 }
@@ -564,19 +565,19 @@ private fun ScheduleStateBadge(kind: ScheduleStateBadgeKind, palette: com.yancot
     val (label, fg, bg) =
         when (kind) {
             ScheduleStateBadgeKind.SCHEDULED ->
-                Triple("Scheduled", palette.BackgroundDeep, palette.Accent)
+                Triple(stringResource(R.string.rc_st_scheduled), palette.BackgroundDeep, palette.Accent)
             ScheduleStateBadgeKind.FIRING ->
-                Triple("REC", palette.BackgroundDeep, palette.Live)
+                Triple(stringResource(R.string.rc_st_rec), palette.BackgroundDeep, palette.Live)
             ScheduleStateBadgeKind.COMPLETED ->
-                Triple("Done", palette.BackgroundDeep, palette.Accent)
+                Triple(stringResource(R.string.rc_st_done), palette.BackgroundDeep, palette.Accent)
             ScheduleStateBadgeKind.NO_FILE ->
-                Triple("No file", palette.BackgroundDeep, palette.Error)
+                Triple(stringResource(R.string.rc_st_no_file), palette.BackgroundDeep, palette.Error)
             ScheduleStateBadgeKind.FAILED ->
-                Triple("Failed", palette.BackgroundDeep, palette.Error)
+                Triple(stringResource(R.string.rc_st_failed), palette.BackgroundDeep, palette.Error)
             ScheduleStateBadgeKind.CANCELLED ->
-                Triple("Cancelled", palette.TextMuted, palette.BackgroundElevated)
+                Triple(stringResource(R.string.rc_st_cancelled), palette.TextMuted, palette.BackgroundElevated)
             ScheduleStateBadgeKind.MISSED ->
-                Triple("Missed", palette.BackgroundDeep, palette.Error)
+                Triple(stringResource(R.string.rc_st_missed), palette.BackgroundDeep, palette.Error)
         }
     Box(
         modifier =

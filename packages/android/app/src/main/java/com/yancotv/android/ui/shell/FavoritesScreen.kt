@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.components.ButtonSize
@@ -227,8 +229,8 @@ fun FavoritesScreen(
     // runs it on success.
     pendingPlay?.let { action ->
         PinEntryDialog(
-            title = "Channel locked",
-            body = "Enter your PIN to watch this channel.",
+            title = stringResource(R.string.fav_channel_locked),
+            body = stringResource(R.string.fav_channel_locked_body),
             repo = parental,
             onSuccess = {
                 action()
@@ -240,10 +242,10 @@ fun FavoritesScreen(
 
     if (showCreateList) {
         TextEntryDialog(
-            title = "New favorites list",
-            body = "Name your list (e.g. Sports, News, Kids).",
+            title = stringResource(R.string.fav_new_list),
+            body = stringResource(R.string.fav_new_list_body),
             initial = "",
-            confirmLabel = "Create",
+            confirmLabel = stringResource(R.string.common_create),
             onConfirm = { name ->
                 if (name.isNotBlank()) {
                     scope.launch(Dispatchers.IO) {
@@ -300,7 +302,7 @@ private fun FavoritesListBody(
         ) {
             // Keep sections in a stable order (Live first — fastest to consume).
             if (live.isNotEmpty()) {
-                item(key = "header-live") { SectionHeader("Live channels") }
+                item(key = "header-live") { SectionHeader(stringResource(R.string.fav_hdr_live)) }
                 items(live, key = { "live:${it.id}" }) { row ->
                     FavoriteRow(
                         item = row,
@@ -317,7 +319,7 @@ private fun FavoritesListBody(
                 }
             }
             if (movies.isNotEmpty()) {
-                item(key = "header-movies") { SectionHeader("Movies") }
+                item(key = "header-movies") { SectionHeader(stringResource(R.string.fav_hdr_movies)) }
                 items(movies, key = { "movie:${it.id}" }) { row ->
                     FavoriteRow(
                         item = row,
@@ -334,7 +336,7 @@ private fun FavoritesListBody(
                 }
             }
             if (series.isNotEmpty()) {
-                item(key = "header-series") { SectionHeader("Series") }
+                item(key = "header-series") { SectionHeader(stringResource(R.string.fav_hdr_series)) }
                 items(series, key = { "series:${it.id}" }) { row ->
                     FavoriteRow(
                         item = row,
@@ -376,7 +378,7 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = "YOUR LIBRARY",
+                    text = stringResource(R.string.home_eyebrow_your_library),
                     color = palette.Accent,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -384,7 +386,7 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "No favorites yet",
+                    text = stringResource(R.string.fav_none_yet),
                     color = palette.TextPrimary,
                     fontSize = 23.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -392,7 +394,7 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "Browse Live TV, Movies, or Series, focus a tile, then long-press OK and pick \"Add to favorites\".",
+                    text = stringResource(R.string.fav_none_yet_body),
                     color = palette.TextMuted,
                     fontSize = 14.sp,
                     lineHeight = 19.sp,
@@ -493,10 +495,10 @@ private fun ListManageDialog(list: FavoriteList, onRename: (String) -> Unit, onD
     when (mode) {
         "rename" ->
             TextEntryDialog(
-                title = "Rename list",
-                body = "Pick a new name for this favorites list.",
+                title = stringResource(R.string.fav_rename_list),
+                body = stringResource(R.string.fav_rename_list_body),
                 initial = list.name,
-                confirmLabel = "Save",
+                confirmLabel = stringResource(R.string.common_save),
                 onConfirm = { onRename(it) },
                 onDismiss = onDismiss,
             )
@@ -504,21 +506,21 @@ private fun ListManageDialog(list: FavoriteList, onRename: (String) -> Unit, onD
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = onDismiss,
                 containerColor = LocalYancoPalette.current.BackgroundRaised,
-                title = { Text("Delete '${list.name}'?", color = LocalYancoPalette.current.TextPrimary) },
+                title = { Text(stringResource(R.string.fav_delete_list_q, list.name), color = LocalYancoPalette.current.TextPrimary) },
                 text = {
                     Text(
-                        "All favorites pinned to this list will be removed (they remain available in other lists).",
+                        stringResource(R.string.fav_delete_list_body),
                         color = LocalYancoPalette.current.TextMuted,
                     )
                 },
                 confirmButton = {
                     androidx.compose.material3.TextButton(onClick = onDelete) {
-                        Text("Delete", color = LocalYancoPalette.current.Accent)
+                        Text(stringResource(R.string.common_delete), color = LocalYancoPalette.current.Accent)
                     }
                 },
                 dismissButton = {
                     androidx.compose.material3.TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                        Text(stringResource(R.string.common_cancel), color = LocalYancoPalette.current.TextMuted)
                     }
                 },
             )
@@ -530,17 +532,17 @@ private fun ListManageDialog(list: FavoriteList, onRename: (String) -> Unit, onD
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         androidx.compose.material3.TextButton(onClick = { mode = "rename" }) {
-                            Text("Rename", color = LocalYancoPalette.current.TextPrimary)
+                            Text(stringResource(R.string.common_rename), color = LocalYancoPalette.current.TextPrimary)
                         }
                         androidx.compose.material3.TextButton(onClick = { mode = "confirm-delete" }) {
-                            Text("Delete list", color = LocalYancoPalette.current.Accent)
+                            Text(stringResource(R.string.fav_delete_list), color = LocalYancoPalette.current.Accent)
                         }
                     }
                 },
                 confirmButton = {},
                 dismissButton = {
                     androidx.compose.material3.TextButton(onClick = onDismiss) {
-                        Text("Close", color = LocalYancoPalette.current.TextMuted)
+                        Text(stringResource(R.string.common_close), color = LocalYancoPalette.current.TextMuted)
                     }
                 },
             )
@@ -577,7 +579,7 @@ private fun TextEntryDialog(title: String, body: String, initial: String, confir
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                Text(stringResource(R.string.common_cancel), color = LocalYancoPalette.current.TextMuted)
             }
         },
     )
@@ -687,10 +689,10 @@ private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate:
                     size = ButtonSize.Compact,
                     translucent = true,
                 ) {
-                    Text(text = "Play")
+                    Text(text = stringResource(R.string.common_play))
                 }
                 YancoSecondaryButton(onClick = onRemove, size = ButtonSize.Compact) {
-                    Text(text = "Remove")
+                    Text(text = stringResource(R.string.common_remove))
                 }
             }
             // MK.28.4 — ProgressStripe across the bottom edge of the row.

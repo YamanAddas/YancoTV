@@ -468,4 +468,71 @@
 
     <!-- MK.31.8 batch J (cont.) — stragglers. -->
     <string name="sd_name_hint">p. ej. «TV del salón»</string>
+
+    <!-- MK.31.9 batch K — Favorites + Recordings screens. -->
+    <string name="common_play">Reproducir</string>
+    <string name="common_delete">Eliminar</string>
+    <string name="common_remove">Quitar</string>
+    <string name="common_stop">Detener</string>
+    <string name="common_close">Cerrar</string>
+    <string name="common_save">Guardar</string>
+    <string name="common_create">Crear</string>
+    <string name="common_rename">Cambiar nombre</string>
+    <string name="fav_channel_locked">Canal bloqueado</string>
+    <string name="fav_channel_locked_body">Introduce tu PIN para ver este canal.</string>
+    <string name="fav_new_list">Nueva lista de favoritos</string>
+    <string name="fav_new_list_body">Nombra tu lista (p. ej. Deportes, Noticias, Infantil).</string>
+    <string name="fav_hdr_live">Canales en directo</string>
+    <string name="fav_hdr_movies">Películas</string>
+    <string name="fav_hdr_series">Series</string>
+    <string name="fav_none_yet">Aún no hay favoritos</string>
+    <string name="fav_none_yet_body">Explora TV en directo, películas o series, enfoca una miniatura, mantén pulsado OK y elige «Añadir a favoritos».</string>
+    <string name="fav_rename_list">Cambiar nombre de la lista</string>
+    <string name="fav_rename_list_body">Elige un nuevo nombre para esta lista de favoritos.</string>
+    <string name="fav_delete_list_q">¿Eliminar «%1$s»?</string>
+    <string name="fav_delete_list_body">Se quitarán todos los favoritos de esta lista (siguen disponibles en otras listas).</string>
+    <string name="fav_delete_list">Eliminar lista</string>
+    <string name="rc_none_yet">Aún no hay grabaciones</string>
+    <string name="rc_none_yet_body">Abre cualquier canal en directo, pulsa MENU y elige «Grabar este canal» para empezar. Las grabaciones aparecen aquí en cuanto comienzan.</string>
+    <string name="rc_hdr_upcoming">Próximas · %1$d</string>
+    <string name="rc_hdr_history">Historial de programaciones</string>
+    <string name="rc_error">Error: %1$s</string>
+    <string name="rc_st_saved">Guardado</string>
+    <string name="rc_st_failed">Fallida</string>
+    <string name="rc_st_stopped">Detenida</string>
+    <string name="rc_st_scheduled">Programada</string>
+    <string name="rc_st_done">Hecha</string>
+    <string name="rc_st_no_file">Sin archivo</string>
+    <string name="rc_st_cancelled">Cancelada</string>
+
+    <!-- MK.31.9 batch K (cont.) — recording status badges. -->
+    <string name="rc_st_missed">Perdida</string>
+
+    <!-- MK.31.9 batch L — Search + Guide screens. -->
+    <string name="se_sync_running">La sincronización sigue en curso — inténtalo de nuevo en un momento.</string>
+    <string name="se_failed">La búsqueda falló. Inténtalo de nuevo.</string>
+    <string name="se_empty_title">Busca en tu biblioteca</string>
+    <string name="se_empty_sub">Escribe el nombre de un canal, película o serie para empezar.</string>
+    <string name="se_searching">Buscando…</string>
+    <string name="se_searching_for">Buscando «%1$s»…</string>
+    <string name="se_unavailable">Búsqueda no disponible</string>
+    <string name="se_no_matches">Sin resultados</string>
+    <string name="se_no_matches_sub">Prueba una palabra más corta o otra ortografía.</string>
+    <string name="se_rail_live">TV en directo</string>
+    <string name="se_rail_movies">Películas</string>
+    <string name="se_rail_series">Series</string>
+    <string name="se_field_desc">Buscar canales, películas y series</string>
+    <string name="se_field_hint">Buscar canales, películas, series…</string>
+    <string name="se_field_desc_press">Buscar canales, películas y series. Pulsa para escribir.</string>
+    <string name="se_field_desc_edit">Búsqueda: %1$s. Pulsa para editar.</string>
+    <string name="se_syncing_banner">Sincronizando «%1$s» — los resultados pueden estar incompletos o ser lentos hasta que termine.</string>
+    <string name="gd_loading">Cargando la guía…</string>
+    <string name="gd_showing_loading">Mostrando %1$d de %2$d canales · cargando más…</string>
+    <string name="gd_showing">Mostrando %1$d de %2$d canales</string>
+    <string name="gd_no_info_desc">Sin información de programa, %1$s. Pulsa para ver este canal en directo.</string>
+    <string name="gd_no_info">Sin datos</string>
+    <string name="gd_watch_channel">Ver el canal</string>
+    <string name="gd_play_catchup">Reproducir en diferido</string>
+
+    <!-- MK.31.9 batch L (cont.) — search field descriptions. -->
 </resources>

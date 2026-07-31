@@ -57,6 +57,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
@@ -618,7 +620,7 @@ fun GuideScreen(
         ) {
             if (guideEmpty) {
                 if (loading) {
-                    GuideEmptyState(text = "Loading guide…", modifier = Modifier.fillMaxSize())
+                    GuideEmptyState(text = stringResource(R.string.gd_loading), modifier = Modifier.fillMaxSize())
                 } else {
                     // Diagnostics panel for stuck/empty guides. Carries the
                     // refresh + re-sync actions so users don't have to dig
@@ -950,9 +952,9 @@ private fun GuideGrid(
                 androidx.compose.material3.Text(
                     text =
                     if (loadingMore) {
-                        "Showing ${guide.channels.size} of $totalCount channels · loading more…"
+                        stringResource(R.string.gd_showing_loading, guide.channels.size, totalCount)
                     } else {
-                        "Showing ${guide.channels.size} of $totalCount channels"
+                        stringResource(R.string.gd_showing, guide.channels.size, totalCount)
                     },
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
@@ -1462,7 +1464,7 @@ private fun NoEpgCell(startTime: Long, endTime: Long, widthDp: androidx.compose.
     val border = if (focused) palette.FocusRing else palette.BorderSubtle
 
     val rangeLabel = "${formatHourMinute(startTime)} – ${formatHourMinute(endTime)}"
-    val description = "No programme info, $rangeLabel. Press to watch this channel live."
+    val description = stringResource(R.string.gd_no_info_desc, rangeLabel)
 
     Column(
         modifier =
@@ -1491,7 +1493,7 @@ private fun NoEpgCell(startTime: Long, endTime: Long, widthDp: androidx.compose.
         // very low timeline density.
         if (widthDp >= 60.dp) {
             Text(
-                text = if (focused) "No info" else "—",
+                text = if (focused) stringResource(R.string.gd_no_info) else "—",
                 color = if (focused) palette.TextPrimary else palette.TextMuted,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
@@ -1597,12 +1599,12 @@ private fun ProgrammeActionDialog(
             when {
                 !isPast && !isFuture -> {
                     TextButton(onClick = onWatch) {
-                        Text(text = "Watch channel", color = LocalYancoPalette.current.Accent)
+                        Text(text = stringResource(R.string.gd_watch_channel), color = LocalYancoPalette.current.Accent)
                     }
                 }
                 isPast && catchupItem != null -> {
                     TextButton(onClick = { onPlayCatchup(catchupItem) }) {
-                        Text(text = "Play catch-up", color = LocalYancoPalette.current.Accent)
+                        Text(text = stringResource(R.string.gd_play_catchup), color = LocalYancoPalette.current.Accent)
                     }
                 }
                 else -> Unit

@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.ui.components.ProgressStripe
@@ -197,15 +199,18 @@ fun SearchScreen(
             .onSuccess { matches ->
                 results.clear()
                 results.addAll(matches)
+                // MK.31.9 — Context.getString, not stringResource: this runs
+                // inside the search coroutine's result callback, which is not
+                // composable scope.
                 searchError = if (matches.isEmpty() && syncActive != null) {
-                    "Sync still running — try again in a moment."
+                    context.getString(R.string.se_sync_running)
                 } else {
                     null
                 }
             }.onFailure { t ->
                 Log.w("Yanco", "SearchScreen search failed: ${t.message}", t)
                 results.clear()
-                searchError = "Search failed. Try again."
+                searchError = context.getString(R.string.se_failed)
             }
     }
 
@@ -230,23 +235,23 @@ fun SearchScreen(
         when {
             query.isBlank() ->
                 EmptyState(
-                    title = "Search your library",
-                    subtitle = "Type a channel name, movie, or show to begin.",
+                    title = stringResource(R.string.se_empty_title),
+                    subtitle = stringResource(R.string.se_empty_sub),
                 )
             searching && results.isEmpty() ->
                 EmptyState(
-                    title = "Searching…",
-                    subtitle = "Searching for \"${query.trim()}\"…",
+                    title = stringResource(R.string.se_searching),
+                    subtitle = stringResource(R.string.se_searching_for, query.trim()),
                 )
             searchError != null && results.isEmpty() ->
                 EmptyState(
-                    title = "Search unavailable",
+                    title = stringResource(R.string.se_unavailable),
                     subtitle = searchError ?: "",
                 )
             results.isEmpty() ->
                 EmptyState(
-                    title = "No matches",
-                    subtitle = "Try a shorter word or a different spelling.",
+                    title = stringResource(R.string.se_no_matches),
+                    subtitle = stringResource(R.string.se_no_matches_sub),
                 )
             else -> {
                 // MK.search.rails — partition results by content type and
@@ -301,7 +306,7 @@ fun SearchScreen(
                         if (live.isNotEmpty()) {
                             item(key = "rail-live") {
                                 SearchRail(
-                                    title = "Live TV",
+                                    title = stringResource(R.string.se_rail_live),
                                     items = live,
                                     watchProgress = watchProgress,
                                     onActivate = { onActivate(it, live) },
@@ -311,7 +316,7 @@ fun SearchScreen(
                         if (movies.isNotEmpty()) {
                             item(key = "rail-movies") {
                                 SearchRail(
-                                    title = "Movies",
+                                    title = stringResource(R.string.se_rail_movies),
                                     items = movies,
                                     watchProgress = watchProgress,
                                     onActivate = { onActivate(it, movies) },
@@ -321,7 +326,7 @@ fun SearchScreen(
                         if (series.isNotEmpty()) {
                             item(key = "rail-series") {
                                 SearchRail(
-                                    title = "Series",
+                                    title = stringResource(R.string.se_rail_series),
                                     items = series,
                                     watchProgress = watchProgress,
                                     onActivate = { onActivate(it, series) },
@@ -336,8 +341,8 @@ fun SearchScreen(
 
     pendingPlay?.let { action ->
         com.yancotv.android.ui.parental.PinEntryDialog(
-            title = "Channel locked",
-            body = "Enter your PIN to watch this channel.",
+            title = stringResource(R.string.fav_channel_locked),
+            body = stringResource(R.string.fav_channel_locked_body),
             repo = parental,
             onSuccess = {
                 action()
@@ -350,6 +355,15 @@ fun SearchScreen(
 
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit) {
+    // MK.31.9 — resolved here; the semantics{} lambdas below are not
+    // composable, so stringResource cannot be called from them.
+    val searchFieldDesc = stringResource(R.string.se_field_desc)
+    val collapsedDesc =
+        if (value.isBlank()) {
+            stringResource(R.string.se_field_desc_press)
+        } else {
+            stringResource(R.string.se_field_desc_edit, value)
+        }
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val fieldAnchor = rememberPlacedFocusAnchor()
@@ -474,11 +488,11 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                             editing = false
                         }
                     }
-                    .semantics { contentDescription = "Search channels, movies, and series" },
+                    .semantics { contentDescription = searchFieldDesc },
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
                         Text(
-                            text = "Search channels, movies, series…",
+                            text = stringResource(R.string.se_field_hint),
                             color = LocalYancoPalette.current.TextMuted,
                         )
                     }
@@ -489,7 +503,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             // Browse state: a plain focusable row. No text field is composed,
             // so nothing can summon the IME until the user asks for it.
             Text(
-                text = value.ifBlank { "Search channels, movies, series…" },
+                text = value.ifBlank { stringResource(R.string.se_field_hint) },
                 color =
                 if (value.isBlank()) {
                     LocalYancoPalette.current.TextMuted
@@ -509,14 +523,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                         indication = null,
                         role = Role.Button,
                         onClick = { editing = true },
-                    ).semantics {
-                        contentDescription =
-                            if (value.isBlank()) {
-                                "Search channels, movies, and series. Press to type."
-                            } else {
-                                "Search: $value. Press to edit."
-                            }
-                    },
+                    ).semantics { contentDescription = collapsedDesc },
             )
         }
         // Audit catch — VoiceInputButton.kt was built but never wired.
@@ -559,7 +566,7 @@ private fun SyncBanner(sourceName: String) {
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Text(
-            text = "Syncing \"$sourceName\" — search results may be incomplete or slow until it finishes.",
+            text = stringResource(R.string.se_syncing_banner, sourceName),
             color = LocalYancoPalette.current.Accent,
             fontSize = 12.sp,
         )

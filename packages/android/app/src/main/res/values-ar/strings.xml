@@ -468,4 +468,71 @@
 
     <!-- MK.31.8 batch J (cont.) — stragglers. -->
     <string name="sd_name_hint">مثال: "تلفاز الصالة"</string>
+
+    <!-- MK.31.9 batch K — Favorites + Recordings screens. -->
+    <string name="common_play">تشغيل</string>
+    <string name="common_delete">حذف</string>
+    <string name="common_remove">إزالة</string>
+    <string name="common_stop">إيقاف</string>
+    <string name="common_close">إغلاق</string>
+    <string name="common_save">حفظ</string>
+    <string name="common_create">إنشاء</string>
+    <string name="common_rename">إعادة تسمية</string>
+    <string name="fav_channel_locked">القناة مقفلة</string>
+    <string name="fav_channel_locked_body">أدخل رمز PIN لمشاهدة هذه القناة.</string>
+    <string name="fav_new_list">قائمة مفضلة جديدة</string>
+    <string name="fav_new_list_body">سمِّ قائمتك (مثل: رياضة، أخبار، أطفال).</string>
+    <string name="fav_hdr_live">القنوات المباشرة</string>
+    <string name="fav_hdr_movies">الأفلام</string>
+    <string name="fav_hdr_series">المسلسلات</string>
+    <string name="fav_none_yet">لا توجد مفضلات بعد</string>
+    <string name="fav_none_yet_body">تصفّح القنوات المباشرة أو الأفلام أو المسلسلات، ركّز على عنصر، ثم اضغط مطولاً على OK واختر \"إضافة إلى المفضلة\".</string>
+    <string name="fav_rename_list">إعادة تسمية القائمة</string>
+    <string name="fav_rename_list_body">اختر اسماً جديداً لقائمة المفضلة هذه.</string>
+    <string name="fav_delete_list_q">حذف \'%1$s\'؟</string>
+    <string name="fav_delete_list_body">ستُزال كل المفضلات المثبَّتة في هذه القائمة (تبقى متاحة في القوائم الأخرى).</string>
+    <string name="fav_delete_list">حذف القائمة</string>
+    <string name="rc_none_yet">لا توجد تسجيلات بعد</string>
+    <string name="rc_none_yet_body">افتح أي قناة مباشرة، اضغط MENU، واختر \"تسجيل هذه القناة\" للبدء. تظهر التسجيلات هنا بمجرد بدئها.</string>
+    <string name="rc_hdr_upcoming">القادمة · %1$d</string>
+    <string name="rc_hdr_history">سجل الجدولة</string>
+    <string name="rc_error">خطأ: %1$s</string>
+    <string name="rc_st_saved">محفوظ</string>
+    <string name="rc_st_failed">فشل</string>
+    <string name="rc_st_stopped">مُوقف</string>
+    <string name="rc_st_scheduled">مُجدول</string>
+    <string name="rc_st_done">مكتمل</string>
+    <string name="rc_st_no_file">لا يوجد ملف</string>
+    <string name="rc_st_cancelled">مُلغى</string>
+
+    <!-- MK.31.9 batch K (cont.) — recording status badges. -->
+    <string name="rc_st_missed">فائت</string>
+
+    <!-- MK.31.9 batch L — Search + Guide screens. -->
+    <string name="se_sync_running">المزامنة ما زالت جارية — أعد المحاولة بعد لحظات.</string>
+    <string name="se_failed">فشل البحث. أعد المحاولة.</string>
+    <string name="se_empty_title">ابحث في مكتبتك</string>
+    <string name="se_empty_sub">اكتب اسم قناة أو فيلم أو مسلسل للبدء.</string>
+    <string name="se_searching">جارٍ البحث…</string>
+    <string name="se_searching_for">جارٍ البحث عن \"%1$s\"…</string>
+    <string name="se_unavailable">البحث غير متاح</string>
+    <string name="se_no_matches">لا نتائج</string>
+    <string name="se_no_matches_sub">جرّب كلمة أقصر أو تهجئة مختلفة.</string>
+    <string name="se_rail_live">القنوات المباشرة</string>
+    <string name="se_rail_movies">الأفلام</string>
+    <string name="se_rail_series">المسلسلات</string>
+    <string name="se_field_desc">ابحث في القنوات والأفلام والمسلسلات</string>
+    <string name="se_field_hint">ابحث في القنوات والأفلام والمسلسلات…</string>
+    <string name="se_field_desc_press">ابحث في القنوات والأفلام والمسلسلات. اضغط للكتابة.</string>
+    <string name="se_field_desc_edit">البحث: %1$s. اضغط للتعديل.</string>
+    <string name="se_syncing_banner">جارٍ مزامنة \"%1$s\" — قد تكون نتائج البحث ناقصة أو بطيئة حتى تنتهي.</string>
+    <string name="gd_loading">جارٍ تحميل الدليل…</string>
+    <string name="gd_showing_loading">عرض %1$d من %2$d قناة · جارٍ تحميل المزيد…</string>
+    <string name="gd_showing">عرض %1$d من %2$d قناة</string>
+    <string name="gd_no_info_desc">لا توجد معلومات برامج، %1$s. اضغط لمشاهدة هذه القناة مباشرة.</string>
+    <string name="gd_no_info">لا معلومات</string>
+    <string name="gd_watch_channel">مشاهدة القناة</string>
+    <string name="gd_play_catchup">تشغيل المحتوى السابق</string>
+
+    <!-- MK.31.9 batch L (cont.) — search field descriptions. -->
 </resources>

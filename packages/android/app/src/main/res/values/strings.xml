@@ -489,4 +489,72 @@
 
     <!-- MK.31.8 batch J (cont.) — stragglers. -->
     <string name="sd_name_hint">e.g. "Living-room TV"</string>
+
+    <!-- MK.31.9 batch K — Favorites + Recordings screens. -->
+    <string name="common_play">Play</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_remove">Remove</string>
+    <string name="common_stop">Stop</string>
+    <string name="common_close">Close</string>
+    <string name="common_save">Save</string>
+    <string name="common_create">Create</string>
+    <string name="common_rename">Rename</string>
+    <string name="fav_channel_locked">Channel locked</string>
+    <string name="fav_channel_locked_body">Enter your PIN to watch this channel.</string>
+    <string name="fav_new_list">New favorites list</string>
+    <string name="fav_new_list_body">Name your list (e.g. Sports, News, Kids).</string>
+    <string name="fav_hdr_live">Live channels</string>
+    <string name="fav_hdr_movies">Movies</string>
+    <string name="fav_hdr_series">Series</string>
+    <string name="fav_none_yet">No favorites yet</string>
+    <string name="fav_none_yet_body">Browse Live TV, Movies, or Series, focus a tile, then long-press OK and pick \"Add to favorites\".</string>
+    <string name="fav_rename_list">Rename list</string>
+    <string name="fav_rename_list_body">Pick a new name for this favorites list.</string>
+    <string name="fav_delete_list_q">Delete \'%1$s\'?</string>
+    <string name="fav_delete_list_body">All favorites pinned to this list will be removed (they remain available in other lists).</string>
+    <string name="fav_delete_list">Delete list</string>
+    <string name="rc_none_yet">No recordings yet</string>
+    <string name="rc_none_yet_body">Open any live channel, press MENU, and pick \"Record this channel\" to start. Recordings appear here as soon as they begin.</string>
+    <string name="rc_hdr_upcoming">Upcoming · %1$d</string>
+    <string name="rc_hdr_history">Schedule history</string>
+    <string name="rc_error">Error: %1$s</string>
+    <string name="rc_st_saved">Saved</string>
+    <string name="rc_st_failed">Failed</string>
+    <string name="rc_st_stopped">Stopped</string>
+    <string name="rc_st_scheduled">Scheduled</string>
+    <string name="rc_st_done">Done</string>
+    <string name="rc_st_no_file">No file</string>
+    <string name="rc_st_cancelled">Cancelled</string>
+
+    <!-- MK.31.9 batch K (cont.) — recording status badges. -->
+    <string name="rc_st_missed">Missed</string>
+    <string name="rc_st_rec" translatable="false">REC</string>
+
+    <!-- MK.31.9 batch L — Search + Guide screens. -->
+    <string name="se_sync_running">Sync still running — try again in a moment.</string>
+    <string name="se_failed">Search failed. Try again.</string>
+    <string name="se_empty_title">Search your library</string>
+    <string name="se_empty_sub">Type a channel name, movie, or show to begin.</string>
+    <string name="se_searching">Searching…</string>
+    <string name="se_searching_for">Searching for \"%1$s\"…</string>
+    <string name="se_unavailable">Search unavailable</string>
+    <string name="se_no_matches">No matches</string>
+    <string name="se_no_matches_sub">Try a shorter word or a different spelling.</string>
+    <string name="se_rail_live">Live TV</string>
+    <string name="se_rail_movies">Movies</string>
+    <string name="se_rail_series">Series</string>
+    <string name="se_field_desc">Search channels, movies, and series</string>
+    <string name="se_field_hint">Search channels, movies, series…</string>
+    <string name="se_field_desc_press">Search channels, movies, and series. Press to type.</string>
+    <string name="se_field_desc_edit">Search: %1$s. Press to edit.</string>
+    <string name="se_syncing_banner">Syncing \"%1$s\" — search results may be incomplete or slow until it finishes.</string>
+    <string name="gd_loading">Loading guide…</string>
+    <string name="gd_showing_loading">Showing %1$d of %2$d channels · loading more…</string>
+    <string name="gd_showing">Showing %1$d of %2$d channels</string>
+    <string name="gd_no_info_desc">No programme info, %1$s. Press to watch this channel live.</string>
+    <string name="gd_no_info">No info</string>
+    <string name="gd_watch_channel">Watch channel</string>
+    <string name="gd_play_catchup">Play catch-up</string>
+
+    <!-- MK.31.9 batch L (cont.) — search field descriptions. -->
 </resources>
