@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -38,8 +39,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -150,6 +158,28 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
 
     val palette = LocalYancoPalette.current
 
+    // MB-333 — explicit two-way bridge between the header's ADD SOURCE button
+    // and the first row of the list.
+    //
+    // Symptom: with any source already added, ADD SOURCE was unreachable by
+    // remote — RIGHT from the tab rail lands on the first row and UP did
+    // nothing. Verified on a Chromecast with Google TV by walking focus and
+    // reading `uiautomator dump`: focus stayed on the row, and CENTER still
+    // opened the detail screen, proving it had never moved.
+    //
+    // Cause: the button is a sibling of the LazyColumn, not a member of it, so
+    // Compose's spatial search has to leave the list to reach it. That search
+    // escalates past the button to the ContentPane boundary, where MK.30.7's
+    // `Up -> FocusRequester.Cancel` end-stop (MB-317) correctly refuses to
+    // leave the pane — and pins focus on the row. The end-stop is right; what
+    // was missing is a target inside the pane for UP to land on.
+    //
+    // BOTH directions are wired on purpose. The pane cancels a downward exit
+    // too, so bridging only UP would move the trap from the row onto the
+    // button instead of removing it.
+    val addFocus = remember { FocusRequester() }
+    val firstRowFocus = remember { FocusRequester() }
+
     // Detail mode: replace the list view with the per-source detail
     // surface. BACK / LEFT inside SourceDetailScreen calls onBack() to
     // close the detail and return here.
@@ -216,6 +246,8 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
             ListHeader(
                 count = sources.size,
                 onAddClick = { showAdd = true },
+                addFocus = addFocus,
+                firstRowFocus = firstRowFocus.takeIf { sources.isNotEmpty() },
             )
             HairLine(palette = palette)
 
@@ -229,15 +261,19 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 ) {
                     val last = sources.size - 1
-                    items(sources, key = { it.id }) { source ->
+                    itemsIndexed(sources, key = { _, s -> s.id }) { index, source ->
                         val isSyncing = active?.sourceId == source.id
                         SourceListRow(
                             source = source,
                             isSyncing = isSyncing,
                             palette = palette,
                             onClick = { selectedSourceId = source.id },
+                            // MB-333 — only row 0 overrides UP; deeper rows must
+                            // keep UP meaning "previous row".
+                            rowFocus = firstRowFocus.takeIf { index == 0 },
+                            upTarget = addFocus.takeIf { index == 0 },
                         )
-                        if (sources.indexOf(source) != last) {
+                        if (index != last) {
                             HairLine(palette = palette, indent = 24.dp)
                         }
                     }
@@ -317,7 +353,18 @@ fun SourcesScreen(repo: SourceRepository = koinInject(), coordinator: SourceSync
  * one identity" instead of stacking multiple framed sections.
  */
 @Composable
-private fun ListHeader(count: Int, onAddClick: () -> Unit) {
+private fun ListHeader(
+    count: Int,
+    onAddClick: () -> Unit,
+    addFocus: FocusRequester,
+    /**
+     * MB-333 — the first list row, or null when the list is empty (the empty
+     * state owns its own button and needs no bridge). Wiring DOWN as well as UP
+     * matters: the pane cancels a downward exit too, so a one-way bridge would
+     * just move the trap onto the button instead of the row.
+     */
+    firstRowFocus: FocusRequester?,
+) {
     val palette = LocalYancoPalette.current
     Row(
         modifier =
@@ -367,7 +414,37 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        SettingsAccentButton(onClick = onAddClick) {
+        SettingsAccentButton(
+            onClick = onAddClick,
+            modifier = Modifier
+                .focusRequester(addFocus)
+                // MB-333 — key handlers for the same reason as the row's (see
+                // SourceListRow): the declarative `focusProperties` route had no
+                // effect here either, and both of these were observed failing on
+                // device before they were added.
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) {
+                        false
+                    } else {
+                        when (event.key) {
+                            // DOWN back into the list. Without this the button
+                            // became the new trap: spatial search does not enter
+                            // the LazyColumn from here, so DOWN did nothing.
+                            Key.DirectionDown ->
+                                firstRowFocus != null &&
+                                    runCatching { firstRowFocus.requestFocus() }.isSuccess
+                            // UP is an end-stop. This button is the topmost
+                            // focusable in the pane, and letting the press through
+                            // left NOTHING focused — the TV had no cursor at all
+                            // until the user guessed a direction. Same failure
+                            // shape as MB-317, which the ContentPane's
+                            // `Up -> Cancel` did not catch from here.
+                            Key.DirectionUp -> true
+                            else -> false
+                        }
+                    }
+                },
+        ) {
             Text(text = stringResource(R.string.src_add_source_btn))
         }
     }
@@ -483,7 +560,28 @@ private fun EmptyState(onAddClick: () -> Unit, modifier: Modifier = Modifier) {
  *   the detail surface.
  */
 @Composable
-private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPalette, onClick: () -> Unit) {
+private fun SourceListRow(
+    source: Source,
+    isSyncing: Boolean,
+    palette: YancoPalette,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * MB-333 — bound to the row's own focusable, and NOT via [modifier].
+     *
+     * [startExitsTo] inserts a `focusGroup()` into the chain below. A
+     * requester or `focusProperties` supplied through [modifier] sits BEFORE
+     * that group and therefore binds to the group node, not to the
+     * `clickable` focusable inside it — so an `up` override there is never
+     * consulted when focus moves off the row. That was the first attempt at
+     * this fix and it changed nothing on device. These two land after the
+     * group, immediately before `clickable`, which is the node that actually
+     * holds focus.
+     */
+    rowFocus: FocusRequester? = null,
+    /** Where UP goes from this row. Null keeps Compose's own search. */
+    upTarget: FocusRequester? = null,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val activeTabFocus = LocalActiveSettingsTabFocus.current
@@ -511,7 +609,7 @@ private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPale
 
     Row(
         modifier =
-        Modifier
+        modifier
             .fillMaxWidth()
             .graphicsLayer {
                 scaleX = scale
@@ -529,6 +627,31 @@ private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPale
                 color = rowBorder,
             )
             .startExitsTo(activeTabFocus)
+            .then(if (rowFocus != null) Modifier.focusRequester(rowFocus) else Modifier)
+            // MB-333 — a KEY handler, not `focusProperties { up = ... }`.
+            // The declarative override was tried in both chain positions
+            // (before and after startExitsTo's focusGroup) and changed
+            // nothing on device: the UP press never reaches Compose's focus
+            // search from inside a LazyColumn, so there is no search for a
+            // custom destination to influence. Consuming the key directly is
+            // what the rest of this codebase already does for cross-container
+            // D-pad hops — see ui/focus/DirectionalNav.kt.
+            .then(
+                if (upTarget != null) {
+                    Modifier.onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                            // requestFocus() throws when the requester is not
+                            // attached; falling through on failure keeps the
+                            // old behaviour rather than swallowing the press.
+                            runCatching { upTarget.requestFocus() }.isSuccess
+                        } else {
+                            false
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
