@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.locale.AppLanguage
 import com.yancotv.android.locale.LocaleController
 import com.yancotv.android.prefs.AppPreferences
@@ -58,12 +59,12 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "Language",
-            sub = "The language YancoTV's own screens use. Provider channel and category names always come from your source as-is.",
+            title = stringResource(R.string.gen_sec_language),
+            sub = stringResource(R.string.gen_sec_language_sub),
         ) {
             SettingsRow(
-                label = "App language",
-                hint = "Changing this reloads the app so every screen picks up the new language.",
+                label = stringResource(R.string.gen_app_language),
+                hint = stringResource(R.string.gen_app_language_hint),
                 content = {
                     SettingsChipRow(
                         options = AppLanguage.selectable,
@@ -89,12 +90,12 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
         }
 
         SettingsSection(
-            title = "Startup",
-            sub = "Which screen YancoTV opens first when you launch the app.",
+            title = stringResource(R.string.gen_sec_startup),
+            sub = stringResource(R.string.gen_sec_startup_sub),
         ) {
             SettingsRow(
-                label = "Open app on",
-                hint = "Skip the launcher and jump straight into your most-used surface.",
+                label = stringResource(R.string.gen_open_on),
+                hint = stringResource(R.string.gen_open_on_hint),
                 content = {
                     SettingsChipRow(
                         options = OpenOn.values().toList(),
@@ -107,20 +108,20 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
         }
 
         SettingsSection(
-            title = "Channels",
-            sub = "How channel rows render across the guide and Live TV.",
+            title = stringResource(R.string.gen_sec_channels),
+            sub = stringResource(R.string.gen_sec_channels_sub),
         ) {
             SettingsToggleRow(
-                label = "Show channel numbers",
-                description = "Prepends the channel's position number before its title — helpful if you remember channels by number.",
+                label = stringResource(R.string.gen_show_channel_numbers),
+                description = stringResource(R.string.gen_show_channel_numbers_desc),
                 checked = state.showChannelNumbers,
                 onCheckedChange = { scope.launch { prefs.setShowChannelNumbers(it) } },
             )
             if (state.showChannelNumbers) {
                 SettingsRowSpacer()
                 SettingsRow(
-                    label = "Number format",
-                    hint = "Padding applied to short channel numbers (1 → 001).",
+                    label = stringResource(R.string.gen_number_format),
+                    hint = stringResource(R.string.gen_number_format_hint),
                     content = {
                         SettingsChipRow(
                             options = ChannelNumberFormat.values().toList(),
@@ -134,14 +135,12 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
         }
 
         SettingsSection(
-            title = "Categories",
-            sub = "How the provider's category list is grouped on the home and browse rails.",
+            title = stringResource(R.string.gen_sec_categories),
+            sub = stringResource(R.string.gen_sec_categories_sub),
         ) {
             SettingsToggleRow(
-                label = "Smart category grouping",
-                description =
-                "Bucket categories by detected language / region prefix into collapsible Arabic / English / USA parents. " +
-                    "Off shows the provider's flat list as-is.",
+                label = stringResource(R.string.gen_smart_grouping),
+                description = stringResource(R.string.gen_smart_grouping_desc),
                 checked = state.smartGrouping,
                 onCheckedChange = { scope.launch { prefs.setSmartGrouping(it) } },
             )

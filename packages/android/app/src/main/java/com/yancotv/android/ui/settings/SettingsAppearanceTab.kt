@@ -28,12 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.AppearancePrefs
 import com.yancotv.android.ui.focus.snapToTopNearStart
@@ -71,8 +73,8 @@ fun SettingsAppearanceTab(modifier: Modifier = Modifier, themeController: ThemeC
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "Theme",
-            sub = "Pick a palette. Changes apply instantly across the app — no restart.",
+            title = stringResource(R.string.app_sec_theme),
+            sub = stringResource(R.string.app_sec_theme_sub),
         ) {
             ThemeId.values().forEachIndexed { idx, id ->
                 if (idx > 0) SettingsRowSpacer()
@@ -89,12 +91,12 @@ fun SettingsAppearanceTab(modifier: Modifier = Modifier, themeController: ThemeC
         }
 
         SettingsSection(
-            title = "Accent",
-            sub = "Tint applied to focus rings, progress bars, chips and other interactive accents.",
+            title = stringResource(R.string.app_sec_accent),
+            sub = stringResource(R.string.app_sec_accent_sub),
         ) {
             SettingsRow(
-                label = "Accent colour",
-                hint = "Independent of the theme palette — any base theme can carry any accent.",
+                label = stringResource(R.string.app_accent_colour),
+                hint = stringResource(R.string.app_accent_colour_hint),
                 content = {
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -117,12 +119,12 @@ fun SettingsAppearanceTab(modifier: Modifier = Modifier, themeController: ThemeC
         }
 
         SettingsSection(
-            title = "Type",
-            sub = "Live-applies via LocalDensity override — sp-sized text rescales without restart, dp layouts stay put.",
+            title = stringResource(R.string.app_sec_type),
+            sub = stringResource(R.string.app_sec_type_sub),
         ) {
             SettingsRow(
-                label = "Font scale",
-                hint = "Multiplies base body size. 100% is the default.",
+                label = stringResource(R.string.app_font_scale),
+                hint = stringResource(R.string.app_font_scale_hint),
                 content = {
                     SettingsChipRow(
                         options = AppearancePrefs.FONT_SCALE_PRESETS.map { "$it%" },
@@ -191,7 +193,7 @@ private fun ThemeRow(id: ThemeId, selected: Boolean, palette: YancoPalette, onCl
             )
         }
         if (selected) {
-            SettingsKicker(text = "ACTIVE", accent = true)
+            SettingsKicker(text = stringResource(R.string.app_kicker_active), accent = true)
         }
     }
 }

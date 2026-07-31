@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.BufferProfile
@@ -52,12 +53,12 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "Video",
-            sub = "Aspect-ratio handling and decoder behaviour. Picks apply on the next stream load.",
+            title = stringResource(R.string.pb_sec_video),
+            sub = stringResource(R.string.pb_sec_video_sub),
         ) {
             SettingsRow(
-                label = "Resize mode",
-                hint = "Fit preserves aspect ratio with letterboxing; Fill stretches to the screen edges; Zoom crops to fill without letterboxing.",
+                label = stringResource(R.string.pb_resize_mode),
+                hint = stringResource(R.string.pb_resize_mode_hint),
                 content = {
                     SettingsChipRow(
                         options = ResizeMode.values().toList(),
@@ -69,8 +70,8 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Buffer profile",
-                hint = "Trades startup speed against rebuffer resilience. Restart playback to apply.",
+                label = stringResource(R.string.pb_buffer_profile),
+                hint = stringResource(R.string.pb_buffer_profile_hint),
                 content = {
                     SettingsChipRow(
                         options = BufferProfile.values().toList(),
@@ -82,34 +83,32 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
             )
             SettingsRowSpacer()
             SettingsToggleRow(
-                label = "Enable decoder fallback",
-                description =
-                "If a hardware decoder fails to start, retry on the software decoder. " +
-                    "Turn off to surface decoder errors directly (debugging only).",
+                label = stringResource(R.string.pb_decoder_fallback),
+                description = stringResource(R.string.pb_decoder_fallback_desc),
                 checked = snapshot.enableDecoderFallback,
                 onCheckedChange = { scope.launch { prefs.setDecoderFallback(it) } },
             )
         }
 
         SettingsSection(
-            title = "Continuity",
-            sub = "What YancoTV does between two pieces of content.",
+            title = stringResource(R.string.pb_sec_continuity),
+            sub = stringResource(R.string.pb_sec_continuity_sub),
         ) {
             SettingsToggleRow(
-                label = "Auto-play next episode",
-                description = "When a series episode ends, automatically continue to the next episode in the same season.",
+                label = stringResource(R.string.pb_autoplay_next),
+                description = stringResource(R.string.pb_autoplay_next_desc),
                 checked = snapshot.autoPlayNext,
                 onCheckedChange = { scope.launch { prefs.setAutoPlayNext(it) } },
             )
         }
 
         SettingsSection(
-            title = "Languages",
-            sub = "Defaults applied when a stream ships multiple audio or subtitle tracks.",
+            title = stringResource(R.string.pb_sec_languages),
+            sub = stringResource(R.string.pb_sec_languages_sub),
         ) {
             SettingsClickToEditField(
-                label = "Preferred audio language",
-                description = "Two- or three-letter ISO 639 code (e.g. en, eng, fre).",
+                label = stringResource(R.string.pb_audio_language),
+                description = stringResource(R.string.pb_audio_language_desc),
                 value = snapshot.audioLanguage,
                 onValueChange = { scope.launch { prefs.setAudioLanguage(it.take(6).lowercase()) } },
                 keyboardType = KeyboardType.Ascii,
@@ -117,8 +116,8 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
             )
             SettingsRowSpacer()
             SettingsClickToEditField(
-                label = "Preferred subtitle language",
-                description = "ISO 639 code. Blank = subtitles off by default.",
+                label = stringResource(R.string.pb_subtitle_language),
+                description = stringResource(R.string.pb_subtitle_language_desc),
                 value = snapshot.subtitleLanguage,
                 onValueChange = { scope.launch { prefs.setSubtitleLanguage(it.take(6).lowercase()) } },
                 keyboardType = KeyboardType.Ascii,
@@ -127,8 +126,8 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
         }
 
         SettingsSection(
-            title = "Default player",
-            sub = "Hand off playback to a third-party app per content type. Internal keeps the in-app player; only installed apps appear in the picker.",
+            title = stringResource(R.string.pb_sec_default_player),
+            sub = stringResource(R.string.pb_sec_default_player_sub),
         ) {
             ExternalPlayerBucket.values().forEachIndexed { idx, bucket ->
                 if (idx > 0) SettingsRowSpacer()
@@ -168,14 +167,16 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
     }
 }
 
+@Composable
 private fun bucketLabel(bucket: ExternalPlayerBucket): String = when (bucket) {
-    ExternalPlayerBucket.LIVE -> "Live TV"
-    ExternalPlayerBucket.MOVIE -> "Movies"
-    ExternalPlayerBucket.SERIES -> "Series & episodes"
+    ExternalPlayerBucket.LIVE -> stringResource(R.string.pb_bucket_live)
+    ExternalPlayerBucket.MOVIE -> stringResource(R.string.pb_bucket_movie)
+    ExternalPlayerBucket.SERIES -> stringResource(R.string.pb_bucket_series)
 }
 
+@Composable
 private fun bucketKicker(bucket: ExternalPlayerBucket): String = when (bucket) {
-    ExternalPlayerBucket.LIVE -> "LIVE"
-    ExternalPlayerBucket.MOVIE -> "VOD"
-    ExternalPlayerBucket.SERIES -> "EPISODES"
+    ExternalPlayerBucket.LIVE -> stringResource(R.string.pb_kicker_live)
+    ExternalPlayerBucket.MOVIE -> stringResource(R.string.pb_kicker_vod)
+    ExternalPlayerBucket.SERIES -> stringResource(R.string.pb_kicker_episodes)
 }

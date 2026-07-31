@@ -108,4 +108,143 @@
     <!-- MK.31.4 batch A (cont.) — hero slide labels. -->
     <string name="home_resume_playback">Resume playback</string>
     <string name="home_minutes_left">%1$dm left • pick up where you stopped</string>
+
+    <!-- MK.31.5 batch B — General + Playback tab bodies. -->
+    <string name="gen_sec_language">Language</string>
+    <string name="gen_sec_language_sub">The language YancoTV\'s own screens use. Provider channel and category names always come from your source as-is.</string>
+    <string name="gen_app_language">App language</string>
+    <string name="gen_app_language_hint">Changing this reloads the app so every screen picks up the new language.</string>
+    <string name="gen_sec_startup">Startup</string>
+    <string name="gen_sec_startup_sub">Which screen YancoTV opens first when you launch the app.</string>
+    <string name="gen_open_on">Open app on</string>
+    <string name="gen_open_on_hint">Skip the launcher and jump straight into your most-used surface.</string>
+    <string name="gen_sec_channels">Channels</string>
+    <string name="gen_sec_channels_sub">How channel rows render across the guide and Live TV.</string>
+    <string name="gen_show_channel_numbers">Show channel numbers</string>
+    <string name="gen_show_channel_numbers_desc">Prepends the channel\'s position number before its title — helpful if you remember channels by number.</string>
+    <string name="gen_number_format">Number format</string>
+    <string name="gen_number_format_hint">Padding applied to short channel numbers (1 → 001).</string>
+    <string name="gen_sec_categories">Categories</string>
+    <string name="gen_sec_categories_sub">How the provider\'s category list is grouped on the home and browse rails.</string>
+    <string name="gen_smart_grouping">Smart category grouping</string>
+    <string name="gen_smart_grouping_desc">Bucket categories by detected language / region prefix into collapsible Arabic / English / USA parents. Off shows the provider\'s flat list as-is.</string>
+    <string name="pb_sec_video">Video</string>
+    <string name="pb_sec_video_sub">Aspect-ratio handling and decoder behaviour. Picks apply on the next stream load.</string>
+    <string name="pb_resize_mode">Resize mode</string>
+    <string name="pb_resize_mode_hint">Fit preserves aspect ratio with letterboxing; Fill stretches to the screen edges; Zoom crops to fill without letterboxing.</string>
+    <string name="pb_buffer_profile">Buffer profile</string>
+    <string name="pb_buffer_profile_hint">Trades startup speed against rebuffer resilience. Restart playback to apply.</string>
+    <string name="pb_decoder_fallback">Enable decoder fallback</string>
+    <string name="pb_decoder_fallback_desc">If a hardware decoder fails to start, retry on the software decoder. Turn off to surface decoder errors directly (debugging only).</string>
+    <string name="pb_sec_continuity">Continuity</string>
+    <string name="pb_sec_continuity_sub">What YancoTV does between two pieces of content.</string>
+    <string name="pb_autoplay_next">Auto-play next episode</string>
+    <string name="pb_autoplay_next_desc">When a series episode ends, automatically continue to the next episode in the same season.</string>
+    <string name="pb_sec_languages">Languages</string>
+    <string name="pb_sec_languages_sub">Defaults applied when a stream ships multiple audio or subtitle tracks.</string>
+    <string name="pb_audio_language">Preferred audio language</string>
+    <string name="pb_audio_language_desc">Two- or three-letter ISO 639 code (e.g. en, eng, fre).</string>
+    <string name="pb_subtitle_language">Preferred subtitle language</string>
+    <string name="pb_subtitle_language_desc">ISO 639 code. Blank = subtitles off by default.</string>
+    <string name="pb_sec_default_player">Default player</string>
+    <string name="pb_sec_default_player_sub">Hand off playback to a third-party app per content type. Internal keeps the in-app player; only installed apps appear in the picker.</string>
+    <string name="pb_bucket_live">Live TV</string>
+    <string name="pb_bucket_movie">Movies</string>
+    <string name="pb_bucket_series">Series &amp; episodes</string>
+    <string name="pb_kicker_live" translatable="false">LIVE</string>
+    <string name="pb_kicker_vod" translatable="false">VOD</string>
+    <string name="pb_kicker_episodes">EPISODES</string>
+
+    <!-- MK.31.5 batch C — Network + Appearance tab bodies. -->
+    <string name="net_sec_ua" translatable="false">User-Agent</string>
+    <string name="net_sec_ua_sub">Some IPTV providers gate playlist or stream access by the request\'s User-Agent. Pick a known-good preset, or paste a custom string.</string>
+    <string name="net_preset">Preset</string>
+    <string name="net_preset_hint">Applied to every outgoing HTTP request from YancoTV. Switching is instant for new connections.</string>
+    <string name="net_custom_ua">Custom User-Agent</string>
+    <string name="net_custom_ua_desc">Verbatim string. Some providers require an exact match.</string>
+    <string name="net_sec_timeouts">Timeouts</string>
+    <string name="net_sec_timeouts_sub">How long YancoTV waits before giving up on a slow source. Applied to playlists, EPG fetches and stream probes.</string>
+    <string name="net_connect_timeout">Connect timeout</string>
+    <string name="net_connect_timeout_hint">How long to wait for the TCP connection to open before retrying.</string>
+    <string name="net_read_timeout">Read timeout</string>
+    <string name="net_read_timeout_hint">Max idle time on an open connection before reconnecting.</string>
+    <string name="net_sec_diagnostics">Diagnostics</string>
+    <string name="net_sec_diagnostics_sub">Probe a source URL to confirm credentials and reachability.</string>
+    <string name="net_sec_play_on_tv">Play on TV</string>
+    <string name="net_sec_play_on_tv_sub">Send playback to your TVs. On a TV this shows its pairing code; on a phone, set the TV\'s address and code below.</string>
+    <string name="net_paired_tv">Paired TV address</string>
+    <string name="net_paired_tv_desc">Your TV\'s IPv4 address or hostname. Leave blank to unpair. Port 8731 is fixed.</string>
+    <string name="net_pairing_code">Pairing code</string>
+    <string name="net_pairing_code_desc">On a TV: the code to type into your phone. On a phone: enter your TV\'s code here.</string>
+    <string name="net_test_connection">Test connection</string>
+    <string name="net_test_connection_hint">Sends a small GET to your first active source. The credentials, URL and timeouts above are all exercised.</string>
+    <string name="net_kicker_status">STATUS</string>
+    <string name="app_sec_theme">Theme</string>
+    <string name="app_sec_theme_sub">Pick a palette. Changes apply instantly across the app — no restart.</string>
+    <string name="app_sec_accent">Accent</string>
+    <string name="app_sec_accent_sub">Tint applied to focus rings, progress bars, chips and other interactive accents.</string>
+    <string name="app_accent_colour">Accent colour</string>
+    <string name="app_accent_colour_hint">Independent of the theme palette — any base theme can carry any accent.</string>
+    <string name="app_sec_type">Type</string>
+    <string name="app_sec_type_sub">Live-applies via LocalDensity override — sp-sized text rescales without restart, dp layouts stay put.</string>
+    <string name="app_font_scale">Font scale</string>
+    <string name="app_font_scale_hint">Multiplies base body size. 100% is the default.</string>
+    <string name="app_kicker_active">ACTIVE</string>
+
+    <!-- MK.31.5 batch D — EPG + Groups tab bodies. -->
+    <string name="epg_sec_diag">Guide diagnostics</string>
+    <string name="epg_sec_diag_sub">Programme + channel counts pulled from the EPG cache. Refresh to pull fresh schedule data from your active sources.</string>
+    <string name="epg_last_refreshed">Last refreshed</string>
+    <string name="epg_programmes_loaded">Programmes loaded</string>
+    <string name="epg_channels_with_epg">Channels with EPG</string>
+    <string name="epg_last_error">Last error</string>
+    <string name="epg_kicker_error">ERROR</string>
+    <string name="epg_refresh_actions">Refresh actions</string>
+    <string name="epg_btn_refresh">REFRESH EPG</string>
+    <string name="epg_btn_resync">RE-SYNC SOURCES</string>
+    <string name="epg_sec_override">Override EPG URL</string>
+    <string name="epg_sec_override_sub">Optional XMLTV URL loaded in addition to per-source URLs — useful when a provider\'s feed is broken or you want a better schedule.</string>
+    <string name="epg_url">EPG URL</string>
+    <string name="epg_sec_window">Guide window</string>
+    <string name="epg_sec_window_sub">How far back catch-up is fetched and how far forward upcoming programmes load.</string>
+    <string name="epg_days_back">Days back</string>
+    <string name="epg_days_back_hint">Catch-up window. Higher values increase the EPG payload pulled at every refresh.</string>
+    <string name="epg_days_forward">Days forward</string>
+    <string name="epg_days_forward_hint">Upcoming-programme window — applies to the guide and reminders.</string>
+    <string name="epg_sec_density">Timeline density</string>
+    <string name="epg_sec_density_sub">How many minutes of the timeline are visible at once in the guide grid.</string>
+    <string name="epg_visible_window">Visible window</string>
+    <string name="epg_sec_priority">Source priority</string>
+    <string name="epg_sec_priority_sub">When two sources provide programmes for the same channel, the higher-priority source wins. Reorder with the arrows.</string>
+    <string name="epg_priority_kicker">PRIORITY %1$d</string>
+    <string name="epg_only_source">Only source</string>
+    <string name="grp_sec_groups">Groups</string>
+    <string name="grp_sec_groups_sub">Hide categories you never watch — keeps the channel sidebar short. Changes take effect immediately.</string>
+    <string name="grp_show_all">Show all (%1$d)</string>
+    <string name="grp_content_type">Content type</string>
+    <string name="grp_content_type_hint">Toggling switches the group list below to that catalog\'s category set.</string>
+    <string name="grp_sec_pinned">Pinned categories</string>
+    <string name="grp_sec_pinned_sub">Pin language / region buckets to the top of the rail. Order follows the sequence you pin them in.</string>
+    <string name="grp_unpin_all">Unpin all (%1$d)</string>
+    <string name="grp_no_groups">No groups found for %1$s. Sync a source first.</string>
+
+    <!-- MK.31.5 batch E — Parental + Recordings tab bodies. -->
+    <string name="par_title">Parental controls</string>
+    <string name="par_intro">Protect sensitive content behind a numeric PIN. Set once, changed later from this screen.</string>
+    <string name="par_confirm_pin">Confirm PIN</string>
+    <string name="par_hide_adult">Hide adult-tagged content</string>
+    <string name="par_hide_adult_desc">Filter channels / movies / series that a provider marks as adult.</string>
+    <string name="par_require_pin">Require PIN to open Settings</string>
+    <string name="par_require_pin_desc">Gate this Settings screen behind the PIN so kids can\'t change policy.</string>
+    <string name="par_hidden_channels">Hidden channels</string>
+    <string name="rec_title">Recordings</string>
+    <string name="rec_storage_location">Storage location</string>
+    <string name="rec_public_folder">Public folder</string>
+    <string name="rec_public_folder_sub">Movies/%1$s/ — survives uninstall</string>
+    <string name="rec_app_private">App-private</string>
+    <string name="rec_app_private_sub">Inside YancoTV — wiped on uninstall</string>
+    <string name="rec_custom_folder">Custom folder</string>
+    <string name="rec_release_folder">Release this folder</string>
+    <string name="rec_browse">Browse your recordings</string>
+    <string name="rec_picker_hint">If the system picker won\'t navigate</string>
 </resources>

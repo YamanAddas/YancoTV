@@ -30,10 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.CategoryNode
@@ -94,22 +96,22 @@ fun SettingsGroupsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koi
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "Groups",
-            sub = "Hide categories you never watch — keeps the channel sidebar short. Changes take effect immediately.",
+            title = stringResource(R.string.grp_sec_groups),
+            sub = stringResource(R.string.grp_sec_groups_sub),
             right = {
                 if (hidden.isNotEmpty()) {
                     SettingsOutlinedButton(
                         onClick = { scope.launch { prefs.clearHiddenGroups() } },
                         size = ButtonSize.Compact,
                     ) {
-                        Text(text = "Show all (${hidden.size})")
+                        Text(text = stringResource(R.string.grp_show_all, hidden.size))
                     }
                 }
             },
         ) {
             SettingsRow(
-                label = "Content type",
-                hint = "Toggling switches the group list below to that catalog's category set.",
+                label = stringResource(R.string.grp_content_type),
+                hint = stringResource(R.string.grp_content_type_hint),
                 content = {
                     SettingsChipRow(
                         options = ContentType.values().toList(),
@@ -130,15 +132,15 @@ fun SettingsGroupsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koi
         // to AppPreferences.setParentPinned in pin-list order.
         if (general.smartGrouping && availableParents.isNotEmpty()) {
             SettingsSection(
-                title = "Pinned categories",
-                sub = "Pin language / region buckets to the top of the rail. Order follows the sequence you pin them in.",
+                title = stringResource(R.string.grp_sec_pinned),
+                sub = stringResource(R.string.grp_sec_pinned_sub),
                 right = {
                     if (pinnedForType.isNotEmpty()) {
                         SettingsOutlinedButton(
                             onClick = { scope.launch { prefs.clearPinnedParents(selectedType) } },
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Unpin all (${pinnedForType.size})")
+                            Text(text = stringResource(R.string.grp_unpin_all, pinnedForType.size))
                         }
                     }
                 },
@@ -192,7 +194,7 @@ fun SettingsGroupsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koi
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No groups found for ${typeChipLabel(selectedType).lowercase()}. Sync a source first.",
+                    text = stringResource(R.string.grp_no_groups, typeChipLabel(selectedType).lowercase()),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )

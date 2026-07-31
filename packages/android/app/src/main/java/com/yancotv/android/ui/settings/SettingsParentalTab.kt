@@ -27,12 +27,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -107,13 +109,13 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Parental controls",
+            text = stringResource(R.string.par_title),
             color = LocalYancoPalette.current.TextPrimary,
             fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Protect sensitive content behind a numeric PIN. Set once, changed later from this screen.",
+            text = stringResource(R.string.par_intro),
             color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
@@ -150,7 +152,7 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                         confirmPin = it
                         status = null
                     },
-                    label = "Confirm PIN",
+                    label = stringResource(R.string.par_confirm_pin),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SettingsAccentButton(
@@ -215,8 +217,8 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
         // TV, so users couldn't tell which toggle had focus. The shared
         // composable owns a row-level accent border instead.
         SettingsToggleRow(
-            label = "Hide adult-tagged content",
-            description = "Filter channels / movies / series that a provider marks as adult.",
+            label = stringResource(R.string.par_hide_adult),
+            description = stringResource(R.string.par_hide_adult_desc),
             checked = settings.hideAdultContent,
             // MK.8 threading: setHideAdultContent is non-suspend and runs
             // a SQLDelight upsert + StateFlow mutation on the caller
@@ -224,8 +226,8 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
             onCheckedChange = { scope.launch(Dispatchers.IO) { repo.setHideAdultContent(it) } },
         )
         SettingsToggleRow(
-            label = "Require PIN to open Settings",
-            description = "Gate this Settings screen behind the PIN so kids can't change policy.",
+            label = stringResource(R.string.par_require_pin),
+            description = stringResource(R.string.par_require_pin_desc),
             enabled = settings.pinSet,
             checked = settings.requirePinForSettings,
             // MK.8 threading: same as above.
@@ -245,7 +247,7 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Hidden channels",
+                    text = stringResource(R.string.par_hidden_channels),
                     color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,

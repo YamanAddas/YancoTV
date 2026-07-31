@@ -39,12 +39,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.RecordingStorageMode
 import com.yancotv.android.ui.components.YancoSecondaryButton
@@ -146,7 +148,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Recordings",
+            text = stringResource(R.string.rec_title),
             color = palette.TextPrimary,
             fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
@@ -163,7 +165,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "Storage location",
+                text = stringResource(R.string.rec_storage_location),
                 color = palette.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -178,9 +180,9 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
 
             // Public folder (recommended)
             ModeRow(
-                title = "Public folder",
+                title = stringResource(R.string.rec_public_folder),
                 badge = "RECOMMENDED",
-                subtitle = "Movies/${PUBLIC_DIR_NAME}/ — survives uninstall",
+                subtitle = stringResource(R.string.rec_public_folder_sub, PUBLIC_DIR_NAME),
                 detail =
                 if (needsLegacyPermission && recordingPrefs.storageMode != RecordingStorageMode.PUBLIC_MEDIA_STORE) {
                     "Tap to grant storage permission and switch."
@@ -207,9 +209,9 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
 
             // App-private
             ModeRow(
-                title = "App-private",
+                title = stringResource(R.string.rec_app_private),
                 badge = null,
-                subtitle = "Inside YancoTV — wiped on uninstall",
+                subtitle = stringResource(R.string.rec_app_private_sub),
                 detail = appPrivateResolvedPath(context),
                 selected = recordingPrefs.storageMode == RecordingStorageMode.APP_PRIVATE,
                 onSelect = {
@@ -221,7 +223,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
 
             // Custom (advanced)
             ModeRow(
-                title = "Custom folder",
+                title = stringResource(R.string.rec_custom_folder),
                 badge = "ADVANCED",
                 subtitle =
                 if (recordingPrefs.folderUri != null) {
@@ -275,7 +277,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                         }
                     },
                 ) {
-                    Text(text = "Release this folder")
+                    Text(text = stringResource(R.string.rec_release_folder))
                 }
             }
         }
@@ -291,7 +293,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = "Browse your recordings",
+                text = stringResource(R.string.rec_browse),
                 color = palette.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -321,7 +323,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "If the system picker won't navigate",
+                    text = stringResource(R.string.rec_picker_hint),
                     color = palette.TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,

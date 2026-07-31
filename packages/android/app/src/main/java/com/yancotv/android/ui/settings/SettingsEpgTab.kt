@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.sources.SourceSyncCoordinator
@@ -156,35 +158,35 @@ fun SettingsEpgTab(
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "Guide diagnostics",
-            sub = "Programme + channel counts pulled from the EPG cache. Refresh to pull fresh schedule data from your active sources.",
+            title = stringResource(R.string.epg_sec_diag),
+            sub = stringResource(R.string.epg_sec_diag_sub),
         ) {
             SettingsRow(
-                label = "Last refreshed",
+                label = stringResource(R.string.epg_last_refreshed),
                 readOnlyFocusable = true,
                 right = { ValueText(formatLastRefreshed(stats?.lastRefreshedAt)) },
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Programmes loaded",
+                label = stringResource(R.string.epg_programmes_loaded),
                 readOnlyFocusable = true,
                 right = { ValueText(formatCount(stats?.programmeCount ?: 0L)) },
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Channels with EPG",
+                label = stringResource(R.string.epg_channels_with_epg),
                 readOnlyFocusable = true,
                 right = { ValueText("$withEpg of ${activeSources.size}") },
             )
             if (displayError != null) {
                 SettingsRowSpacer()
                 SettingsRow(
-                    label = "Last error",
+                    label = stringResource(R.string.epg_last_error),
                     hint = displayError,
                     readOnlyFocusable = true,
                     right = {
                         Text(
-                            text = "ERROR",
+                            text = stringResource(R.string.epg_kicker_error),
                             color = LocalYancoPalette.current.Error,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -195,7 +197,7 @@ fun SettingsEpgTab(
             }
             SettingsRowSpacer()
             SettingsRow(
-                label = "Refresh actions",
+                label = stringResource(R.string.epg_refresh_actions),
                 hint =
                 when {
                     running -> "Refreshing EPG…"
@@ -214,7 +216,7 @@ fun SettingsEpgTab(
                             size = ButtonSize.Compact,
                             translucent = true,
                         ) {
-                            Text(text = "REFRESH EPG", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                            Text(text = stringResource(R.string.epg_btn_refresh), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         }
                         SettingsOutlinedButton(
                             onClick = {
@@ -228,7 +230,7 @@ fun SettingsEpgTab(
                             enabled = !running && !syncing && activeSources.isNotEmpty(),
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "RE-SYNC SOURCES", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                            Text(text = stringResource(R.string.epg_btn_resync), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         }
                         if (running || syncing) {
                             CircularProgressIndicator(
@@ -243,11 +245,11 @@ fun SettingsEpgTab(
         }
 
         SettingsSection(
-            title = "Override EPG URL",
-            sub = "Optional XMLTV URL loaded in addition to per-source URLs — useful when a provider's feed is broken or you want a better schedule.",
+            title = stringResource(R.string.epg_sec_override),
+            sub = stringResource(R.string.epg_sec_override_sub),
         ) {
             SettingsRow(
-                label = "EPG URL",
+                label = stringResource(R.string.epg_url),
                 hint = savedGlobalUrl?.let { "Current: $it" },
                 content = {
                     Row(
@@ -306,12 +308,12 @@ fun SettingsEpgTab(
         }
 
         SettingsSection(
-            title = "Guide window",
-            sub = "How far back catch-up is fetched and how far forward upcoming programmes load.",
+            title = stringResource(R.string.epg_sec_window),
+            sub = stringResource(R.string.epg_sec_window_sub),
         ) {
             SettingsRow(
-                label = "Days back",
-                hint = "Catch-up window. Higher values increase the EPG payload pulled at every refresh.",
+                label = stringResource(R.string.epg_days_back),
+                hint = stringResource(R.string.epg_days_back_hint),
                 content = {
                     SettingsSlider(
                         value = epgState.daysBack,
@@ -324,8 +326,8 @@ fun SettingsEpgTab(
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Days forward",
-                hint = "Upcoming-programme window — applies to the guide and reminders.",
+                label = stringResource(R.string.epg_days_forward),
+                hint = stringResource(R.string.epg_days_forward_hint),
                 content = {
                     SettingsSlider(
                         value = epgState.daysForward,
@@ -339,11 +341,11 @@ fun SettingsEpgTab(
         }
 
         SettingsSection(
-            title = "Timeline density",
-            sub = "How many minutes of the timeline are visible at once in the guide grid.",
+            title = stringResource(R.string.epg_sec_density),
+            sub = stringResource(R.string.epg_sec_density_sub),
         ) {
             SettingsRow(
-                label = "Visible window",
+                label = stringResource(R.string.epg_visible_window),
                 content = {
                     SettingsChipRow(
                         options = EpgPrefs.TIMELINE_PRESETS.map { "$it min" },
@@ -359,8 +361,8 @@ fun SettingsEpgTab(
 
         if (orderedSources.isNotEmpty()) {
             SettingsSection(
-                title = "Source priority",
-                sub = "When two sources provide programmes for the same channel, the higher-priority source wins. Reorder with the arrows.",
+                title = stringResource(R.string.epg_sec_priority),
+                sub = stringResource(R.string.epg_sec_priority_sub),
             ) {
                 orderedSources.forEachIndexed { idx, src ->
                     if (idx > 0) SettingsRowSpacer()
@@ -411,7 +413,7 @@ private fun ValueText(value: String) {
 private fun EpgPriorityRow(source: Source, canMoveUp: Boolean, canMoveDown: Boolean, onMoveUp: () -> Unit, onMoveDown: () -> Unit) {
     SettingsRow(
         label = source.name,
-        kicker = "PRIORITY ${source.epgPriority}",
+        kicker = stringResource(R.string.epg_priority_kicker, source.epgPriority),
         right = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canMoveUp) {
@@ -422,7 +424,7 @@ private fun EpgPriorityRow(source: Source, canMoveUp: Boolean, canMoveDown: Bool
                 }
                 if (!canMoveUp && !canMoveDown) {
                     Text(
-                        text = "Only source",
+                        text = stringResource(R.string.epg_only_source),
                         color = LocalYancoPalette.current.TextMuted,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,

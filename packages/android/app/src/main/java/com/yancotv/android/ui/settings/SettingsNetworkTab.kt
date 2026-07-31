@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.UserAgentPreset
 import com.yancotv.android.ui.focus.snapToTopNearStart
@@ -63,12 +64,12 @@ fun SettingsNetworkTab(
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(
-            title = "User-Agent",
-            sub = "Some IPTV providers gate playlist or stream access by the request's User-Agent. Pick a known-good preset, or paste a custom string.",
+            title = stringResource(R.string.net_sec_ua),
+            sub = stringResource(R.string.net_sec_ua_sub),
         ) {
             SettingsRow(
-                label = "Preset",
-                hint = "Applied to every outgoing HTTP request from YancoTV. Switching is instant for new connections.",
+                label = stringResource(R.string.net_preset),
+                hint = stringResource(R.string.net_preset_hint),
                 content = {
                     SettingsChipRow(
                         options = UserAgentPreset.values().toList(),
@@ -89,8 +90,8 @@ fun SettingsNetworkTab(
             if (activePreset == UserAgentPreset.CUSTOM) {
                 SettingsRowSpacer()
                 SettingsClickToEditField(
-                    label = "Custom User-Agent",
-                    description = "Verbatim string. Some providers require an exact match.",
+                    label = stringResource(R.string.net_custom_ua),
+                    description = stringResource(R.string.net_custom_ua_desc),
                     value = state.userAgentOverride.orEmpty(),
                     onValueChange = { input -> scope.launch { prefs.setUserAgent(input.take(256)) } },
                     hint = "VLC/3.0.20 LibVLC/3.0.20",
@@ -99,12 +100,12 @@ fun SettingsNetworkTab(
         }
 
         SettingsSection(
-            title = "Timeouts",
-            sub = "How long YancoTV waits before giving up on a slow source. Applied to playlists, EPG fetches and stream probes.",
+            title = stringResource(R.string.net_sec_timeouts),
+            sub = stringResource(R.string.net_sec_timeouts_sub),
         ) {
             SettingsRow(
-                label = "Connect timeout",
-                hint = "How long to wait for the TCP connection to open before retrying.",
+                label = stringResource(R.string.net_connect_timeout),
+                hint = stringResource(R.string.net_connect_timeout_hint),
                 content = {
                     SettingsSlider(
                         value = state.connectTimeoutSec,
@@ -119,8 +120,8 @@ fun SettingsNetworkTab(
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Read timeout",
-                hint = "Max idle time on an open connection before reconnecting.",
+                label = stringResource(R.string.net_read_timeout),
+                hint = stringResource(R.string.net_read_timeout_hint),
                 content = {
                     SettingsSlider(
                         value = state.readTimeoutSec,
@@ -136,8 +137,8 @@ fun SettingsNetworkTab(
         }
 
         SettingsSection(
-            title = "Diagnostics",
-            sub = "Probe a source URL to confirm credentials and reachability.",
+            title = stringResource(R.string.net_sec_diagnostics),
+            sub = stringResource(R.string.net_sec_diagnostics_sub),
         ) {
             TestConnectionRow(scope = scope, sources = sources, http = http)
         }
@@ -146,22 +147,22 @@ fun SettingsNetworkTab(
         // Automatic discovery is MK.26.A.2; until then the user enters the
         // TV's LAN address here. Port is fixed at HandoffServer.DEFAULT_PORT.
         SettingsSection(
-            title = "Play on TV",
-            sub = "Send playback to your TVs. On a TV this shows its pairing code; on a phone, set the TV's address and code below.",
+            title = stringResource(R.string.net_sec_play_on_tv),
+            sub = stringResource(R.string.net_sec_play_on_tv_sub),
         ) {
             val pairedHost by prefs.pairedTvHostFlow.collectAsState()
             val pairingCode by prefs.handoffPairingCodeFlow.collectAsState()
             SettingsClickToEditField(
-                label = "Paired TV address",
-                description = "Your TV's IPv4 address or hostname. Leave blank to unpair. Port 8731 is fixed.",
+                label = stringResource(R.string.net_paired_tv),
+                description = stringResource(R.string.net_paired_tv_desc),
                 value = pairedHost.orEmpty(),
                 onValueChange = { input -> scope.launch { prefs.setPairedTvHost(input.trim().take(64)) } },
                 hint = "192.168.68.56",
             )
             SettingsRowSpacer()
             SettingsClickToEditField(
-                label = "Pairing code",
-                description = "On a TV: the code to type into your phone. On a phone: enter your TV's code here.",
+                label = stringResource(R.string.net_pairing_code),
+                description = stringResource(R.string.net_pairing_code_desc),
                 value = pairingCode.orEmpty(),
                 onValueChange = { input -> scope.launch { prefs.setHandoffPairingCode(input.trim().uppercase().take(12)) } },
                 hint = "K7P2QX",
@@ -177,8 +178,8 @@ private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources:
     val palette = LocalYancoPalette.current
 
     SettingsRow(
-        label = "Test connection",
-        hint = "Sends a small GET to your first active source. The credentials, URL and timeouts above are all exercised.",
+        label = stringResource(R.string.net_test_connection),
+        hint = stringResource(R.string.net_test_connection_hint),
         right = {
             SettingsAccentButton(
                 onClick = {
@@ -206,7 +207,7 @@ private fun TestConnectionRow(scope: kotlinx.coroutines.CoroutineScope, sources:
                         else -> palette.TextSecondary
                     }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SettingsKicker(text = "STATUS")
+                    SettingsKicker(text = stringResource(R.string.net_kicker_status))
                     Text(
                         text = result,
                         color = statusColor,
