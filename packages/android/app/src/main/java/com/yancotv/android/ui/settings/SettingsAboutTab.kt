@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -134,7 +135,7 @@ fun SettingsAboutTab(
         // can't drift from what's actually installed.
         VersionRow(text = "v ${info.version}", arabesque = arabesque)
         Text(
-            text = "IPTV for Android TV, Fire TV, and phone.",
+            text = stringResource(R.string.ab_tagline),
             color = palette.TextMuted,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
@@ -180,7 +181,7 @@ fun SettingsAboutTab(
                 null
             }
         SettingsSection(
-            title = "Updates",
+            title = stringResource(R.string.ab_sec_updates),
             sub = updatesSub,
             right = updatesRight,
         ) {
@@ -193,8 +194,8 @@ fun SettingsAboutTab(
                 return@SettingsSection
             }
             SettingsToggleRow(
-                label = "Check for updates automatically",
-                description = "Once a day, quietly in the background.",
+                label = stringResource(R.string.ab_auto_check),
+                description = stringResource(R.string.ab_auto_check_desc),
                 checked = updatePrefs.autoCheckEnabled,
                 onCheckedChange = { enabled ->
                     scope.launch {
@@ -209,7 +210,7 @@ fun SettingsAboutTab(
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Last checked",
+                label = stringResource(R.string.ab_last_checked),
                 right = { ValueText(formatLastChecked(updatePrefs.lastCheckedAt)) },
             )
             updateCheckOutcome
@@ -256,7 +257,7 @@ fun SettingsAboutTab(
         // codes, etc — none of which mean anything to users). One human
         // sentence about what the app does + who it's for.
         SettingsSection(
-            title = "About YancoTV",
+            title = stringResource(R.string.ab_sec_about),
             sub =
             "An IPTV client for Android TV, Fire TV, and phones. Bring your Xtream login, M3U URL, " +
                 "M3U file, or Stalker portal — YancoTV handles the EPG and recordings, remembers " +
@@ -285,12 +286,12 @@ fun SettingsAboutTab(
             )
         }
         SettingsSection(
-            title = "Privacy",
+            title = stringResource(R.string.ab_sec_privacy),
             sub =
             "What leaves your device, and how to opt out. Full policy linked below.",
         ) {
             SettingsToggleRow(
-                label = "Send crash reports",
+                label = stringResource(R.string.ab_crash_reports),
                 description =
                 "If something crashes, send a stack trace + device model + OS version " +
                     "to our error tracker so we can fix it. No content, no playlist URLs, " +
@@ -303,7 +304,7 @@ fun SettingsAboutTab(
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Privacy policy",
+                label = stringResource(R.string.ab_privacy_policy),
                 readOnlyFocusable = false,
                 onClick = {
                     runCatching {
@@ -319,7 +320,7 @@ fun SettingsAboutTab(
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Terms of service",
+                label = stringResource(R.string.ab_terms),
                 onClick = {
                     runCatching {
                         ctx.startActivity(
@@ -345,17 +346,17 @@ fun SettingsAboutTab(
         // SettingsScreen (MK.21.8) — focus + scroll integrated, not
         // bolted together.
         SettingsSection(
-            title = "Diagnostics",
-            sub = "Useful when reporting a bug.",
+            title = stringResource(R.string.ab_sec_diagnostics),
+            sub = stringResource(R.string.ab_sec_diagnostics_sub),
         ) {
             SettingsRow(
-                label = "Build",
+                label = stringResource(R.string.ab_build),
                 readOnlyFocusable = true,
                 right = { ValueText("${info.version} (build ${info.versionCode})") },
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Device",
+                label = stringResource(R.string.ab_device),
                 readOnlyFocusable = true,
                 right = { ValueText("${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}") },
             )
@@ -470,7 +471,7 @@ private fun UpdateAvailableBanner(
     ) {
         Column {
             Text(
-                text = "New version available: ${info.versionName}",
+                text = stringResource(R.string.ab_new_version, info.versionName),
                 color = palette.Accent,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -488,7 +489,7 @@ private fun UpdateAvailableBanner(
             when (val s = installerState) {
                 UpdateInstaller.State.Idle -> {
                     Text(
-                        text = "Download and install in place, or open the release page in a browser.",
+                        text = stringResource(R.string.ab_update_choice),
                         color = palette.TextMuted,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
@@ -498,20 +499,20 @@ private fun UpdateAvailableBanner(
                             onClick = onDownload,
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Download update")
+                            Text(text = stringResource(R.string.ab_download_update))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         SettingsOutlinedButton(
                             onClick = onOpenReleasePage,
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Open release page")
+                            Text(text = stringResource(R.string.ab_open_release))
                         }
                     }
                 }
                 is UpdateInstaller.State.Downloading -> {
                     Text(
-                        text = "Downloading… ${s.percent}%",
+                        text = stringResource(R.string.ab_downloading, s.percent),
                         color = palette.TextSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
@@ -522,12 +523,12 @@ private fun UpdateAvailableBanner(
                         onClick = onCancel,
                         size = ButtonSize.Compact,
                     ) {
-                        Text(text = "Cancel")
+                        Text(text = stringResource(R.string.common_cancel))
                     }
                 }
                 is UpdateInstaller.State.ReadyToInstall -> {
                     Text(
-                        text = "Download complete. Tap Install to apply the update — Android may ask you to allow installs from this app the first time.",
+                        text = stringResource(R.string.ab_download_done),
                         color = palette.TextMuted,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
@@ -537,20 +538,20 @@ private fun UpdateAvailableBanner(
                             onClick = { onInstall(s.apkFile) },
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Install now")
+                            Text(text = stringResource(R.string.ab_install_now))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         SettingsOutlinedButton(
                             onClick = onOpenReleasePage,
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Open release page")
+                            Text(text = stringResource(R.string.ab_open_release))
                         }
                     }
                 }
                 is UpdateInstaller.State.Failed -> {
                     Text(
-                        text = "Download failed: ${s.reason}",
+                        text = stringResource(R.string.ab_download_failed, s.reason),
                         color = palette.TextSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
@@ -560,14 +561,14 @@ private fun UpdateAvailableBanner(
                             onClick = onRetry,
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Retry")
+                            Text(text = stringResource(R.string.ab_retry))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         SettingsOutlinedButton(
                             onClick = onOpenReleasePage,
                             size = ButtonSize.Compact,
                         ) {
-                            Text(text = "Open release page")
+                            Text(text = stringResource(R.string.ab_open_release))
                         }
                     }
                 }
@@ -599,16 +600,22 @@ private fun LinearProgressBar(percent: Int) {
     }
 }
 
+// MK.31.7 — @Composable so the buckets can resolve resources. Only caller is
+// the "Last checked" row, which is already in composable scope. The
+// bucket boundaries stay pure arithmetic; only the rendering is localized.
+@Composable
 private fun formatLastChecked(millis: Long?): String {
-    if (millis == null) return "Never"
+    if (millis == null) return stringResource(R.string.time_never)
     val deltaMs = System.currentTimeMillis() - millis
-    if (deltaMs < 0L) return "Just now"
+    // A negative delta means the clock moved backwards (NTP correction,
+    // manual change) — report it as "just now" rather than a huge value.
+    if (deltaMs < 0L) return stringResource(R.string.time_just_now)
     val mins = deltaMs / 60_000L
     return when {
-        mins < 1L -> "Just now"
-        mins < 60L -> "$mins min ago"
-        mins < 24L * 60L -> "${mins / 60L} hr ago"
-        else -> "${mins / (24L * 60L)} d ago"
+        mins < 1L -> stringResource(R.string.time_just_now)
+        mins < 60L -> stringResource(R.string.time_min_ago, mins)
+        mins < 24L * 60L -> stringResource(R.string.time_hr_ago, mins / 60L)
+        else -> stringResource(R.string.time_d_ago, mins / (24L * 60L))
     }
 }
 

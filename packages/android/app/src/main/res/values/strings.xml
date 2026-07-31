@@ -333,4 +333,98 @@
 
     <!-- MK.31.6 batch G (cont.) — server field label. -->
     <string name="sd_playlist_url">Playlist URL</string>
+
+    <!-- MK.31.7 batch H — Shortcuts + About tabs. -->
+    <string name="sc_sec_remote">Remote &amp; keyboard</string>
+    <string name="sc_sec_shell">Shell</string>
+    <string name="sc_sec_settings">Settings</string>
+    <string name="sc_sec_playback">Playback</string>
+    <string name="sc_sec_guide">Guide + channel lists</string>
+    <string name="sc_sec_parental">Parental gate</string>
+    <string name="sc_open_search">Open search</string>
+    <string name="sc_sidebar_updown">Sidebar up / down</string>
+    <string name="sc_enter_section">Enter a section</string>
+    <string name="sc_back_out">Back out</string>
+    <string name="sc_jump_tab">Jump to Settings tab</string>
+    <string name="sc_play_pause">Play / Pause</string>
+    <string name="sc_next_channel">Next channel</string>
+    <string name="sc_prev_channel">Previous channel</string>
+    <string name="sc_options_menu">Open options menu</string>
+    <string name="sc_stream_info">Stream info overlay</string>
+    <string name="sc_live_edge">Jump to live edge</string>
+    <string name="sc_exit_fullscreen">Exit fullscreen</string>
+    <string name="sc_channel_actions">Open channel actions</string>
+    <string name="sc_lock_hide">Lock or hide a channel</string>
+    <string name="sc_prog_details">Open programme details</string>
+    <string name="sc_set_reminder">Set reminder</string>
+    <string name="sc_play_catchup">Play catch-up</string>
+    <string name="sc_unlock_channel">Unlock a locked channel</string>
+    <string name="sc_dismiss_pin">Dismiss PIN prompt</string>
+    <string name="ab_tagline">IPTV for Android TV, Fire TV, and phone.</string>
+    <string name="ab_sec_updates">Updates</string>
+    <string name="ab_auto_check">Check for updates automatically</string>
+    <string name="ab_auto_check_desc">Once a day, quietly in the background.</string>
+    <string name="ab_last_checked">Last checked</string>
+    <string name="ab_sec_about">About YancoTV</string>
+    <string name="ab_sec_privacy">Privacy</string>
+    <string name="ab_crash_reports">Send crash reports</string>
+    <string name="ab_privacy_policy">Privacy policy</string>
+    <string name="ab_terms">Terms of service</string>
+    <string name="ab_sec_diagnostics">Diagnostics</string>
+    <string name="ab_sec_diagnostics_sub">Useful when reporting a bug.</string>
+    <string name="ab_build">Build</string>
+    <string name="ab_device">Device</string>
+    <string name="ab_new_version">New version available: %1$s</string>
+    <string name="ab_update_choice">Download and install in place, or open the release page in a browser.</string>
+    <string name="ab_download_update">Download update</string>
+    <string name="ab_open_release">Open release page</string>
+    <string name="ab_downloading">Downloading… %1$d%%</string>
+    <string name="ab_download_done">Download complete. Tap Install to apply the update — Android may ask you to allow installs from this app the first time.</string>
+    <string name="ab_install_now">Install now</string>
+    <string name="ab_download_failed">Download failed: %1$s</string>
+    <string name="ab_retry">Retry</string>
+    <string name="time_just_now">Just now</string>
+    <string name="time_min_ago">%1$d min ago</string>
+    <string name="time_hr_ago">%1$d hr ago</string>
+    <string name="time_d_ago">%1$d d ago</string>
+
+    <!-- MK.31.7 batch H (cont.) — last-checked relative time. -->
+    <string name="time_never">Never</string>
+
+    <!-- MK.31.7 batch I — Backup & restore tab. -->
+    <string name="bk_title">Backup &amp; restore</string>
+    <string name="bk_intro">Export sources, favorites, history, recordings, and settings to a single JSON file. Restore on this device or another. Credentials are saved in plaintext unless you enable password encryption.</string>
+    <string name="bk_export">EXPORT</string>
+    <string name="bk_saving_to">Saving to: %1$s</string>
+    <string name="bk_saving_to_default">Saving to: Downloads/YancoTV (default)</string>
+    <string name="bk_label_optional">Label (optional)</string>
+    <string name="bk_label_hint">e.g. \"Before reinstall\" or \"Living-room TV\"</string>
+    <string name="bk_encrypt">Encrypt with password</string>
+    <string name="bk_encrypt_on">Source credentials will be re-encrypted under your password (PBKDF2 + AES/GCM). You\'ll need this password to restore.</string>
+    <string name="bk_encrypt_off">Source credentials will be in PLAINTEXT in the file. Don\'t share or upload this file.</string>
+    <string name="bk_password">Password</string>
+    <string name="bk_password_hint">8+ characters</string>
+    <string name="bk_reset_default">Reset to default</string>
+    <string name="bk_change_folder">Change folder…</string>
+    <string name="bk_pick_folder">Pick folder…</string>
+    <string name="bk_restore_merge">RESTORE (MERGE MODE)</string>
+    <string name="bk_restore_merge_sub">Existing sources, favorites, and history are NOT deleted. New rows are added; conflicting source rows are skipped (your local credentials win). After restore, your sources will resync — favorites and history may take a moment to relink.</string>
+    <string name="bk_choose_file">Choose backup file…</string>
+    <string name="bk_choose_another">Choose another file…</string>
+    <string name="bk_restore_latest">Restore latest from Downloads</string>
+    <string name="bk_no_backups">No backups in your Downloads/YancoTV folder. Use Export above to make your first one.</string>
+    <string name="bk_picked">Picked: %1$s</string>
+    <string name="bk_password_if_encrypted">Password (only if file is encrypted)</string>
+    <string name="bk_retry_pending">Retry pending now</string>
+    <string name="bk_recent_exports">RECENT EXPORTS</string>
+    <string name="bk_recent_exports_sub">Use → load this backup as the restore source. Delete → remove the metadata row (the file on disk is left untouched).</string>
+    <string name="bk_untitled">Untitled backup</string>
+    <string name="bk_use">USE</string>
+    <string name="bk_delete">DELETE</string>
+
+    <!-- MK.31.7 batch I (cont.) — backup status messages. -->
+    <string name="bk_picked_short">Picked %1$s</string>
+    <string name="bk_picked_latest">Picked latest: %1$s</string>
+    <string name="bk_restoring">Restoring…</string>
+    <string name="bk_selected">Selected: %1$s</string>
 </resources>

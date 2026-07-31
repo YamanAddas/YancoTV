@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.backup.BackupCoordinator
 import com.yancotv.android.backup.ExportResult
 import com.yancotv.android.backup.ImportResult
@@ -279,7 +281,7 @@ fun SettingsBackupTab(
                 return@rememberLauncherForActivityResult
             }
             importPickedUriString = uri.toString()
-            importStatus = "Picked ${uri.lastPathSegment ?: uri}"
+            importStatus = context.getString(R.string.bk_picked_short, uri.lastPathSegment ?: uri)
             importFocusBump++
         }
 
@@ -301,14 +303,13 @@ fun SettingsBackupTab(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            "Backup & restore",
+            stringResource(R.string.bk_title),
             color = LocalYancoPalette.current.TextPrimary,
             fontSize = 19.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            "Export sources, favorites, history, recordings, and settings to a single JSON file. " +
-                "Restore on this device or another. Credentials are saved in plaintext unless you enable password encryption.",
+            stringResource(R.string.bk_intro),
             color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )
@@ -324,25 +325,25 @@ fun SettingsBackupTab(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "EXPORT",
+                stringResource(R.string.bk_export),
                 color = LocalYancoPalette.current.Accent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 if (customFolder != null) {
-                    "Saving to: ${customFolder.lastPathSegment ?: customFolder}"
+                    stringResource(R.string.bk_saving_to, customFolder.lastPathSegment ?: customFolder)
                 } else {
-                    "Saving to: Downloads/YancoTV (default)"
+                    stringResource(R.string.bk_saving_to_default)
                 },
                 color = LocalYancoPalette.current.TextSecondary,
                 fontSize = 12.sp,
             )
             SettingsClickToEditField(
-                label = "Label (optional)",
+                label = stringResource(R.string.bk_label_optional),
                 value = label,
                 onValueChange = { label = it },
-                hint = "e.g. \"Before reinstall\" or \"Living-room TV\"",
+                hint = stringResource(R.string.bk_label_hint),
                 bare = true,
             )
             // Replaced Material3 Switch with SettingsToggleRow — Material3
@@ -352,22 +353,22 @@ fun SettingsBackupTab(
             // paints a 1.5dp focus ring around the entire row, so the
             // selector is unmistakable.
             SettingsToggleRow(
-                label = "Encrypt with password",
+                label = stringResource(R.string.bk_encrypt),
                 description =
                 if (encryptToggle) {
-                    "Source credentials will be re-encrypted under your password (PBKDF2 + AES/GCM). You'll need this password to restore."
+                    stringResource(R.string.bk_encrypt_on)
                 } else {
-                    "Source credentials will be in PLAINTEXT in the file. Don't share or upload this file."
+                    stringResource(R.string.bk_encrypt_off)
                 },
                 checked = encryptToggle,
                 onCheckedChange = { encryptToggle = it },
             )
             if (encryptToggle) {
                 SettingsClickToEditField(
-                    label = "Password",
+                    label = stringResource(R.string.bk_password),
                     value = exportPassword,
                     onValueChange = { exportPassword = it },
-                    hint = "8+ characters",
+                    hint = stringResource(R.string.bk_password_hint),
                     transformation = PasswordVisualTransformation(),
                     bare = true,
                 )
@@ -417,7 +418,7 @@ fun SettingsBackupTab(
                     onClick = { changeFolderLauncher.launch(null) },
                 ) {
                     Text(
-                        text = if (customFolder != null) "Change folder…" else "Pick folder…",
+                        text = if (customFolder != null) stringResource(R.string.bk_change_folder) else stringResource(R.string.bk_pick_folder),
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis,
@@ -433,7 +434,7 @@ fun SettingsBackupTab(
                             }
                         },
                     ) {
-                        Text(text = "Reset to default", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                        Text(text = stringResource(R.string.bk_reset_default), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -462,13 +463,13 @@ fun SettingsBackupTab(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "RESTORE (MERGE MODE)",
+                stringResource(R.string.bk_restore_merge),
                 color = LocalYancoPalette.current.Accent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "Existing sources, favorites, and history are NOT deleted. New rows are added; conflicting source rows are skipped (your local credentials win). After restore, your sources will resync — favorites and history may take a moment to relink.",
+                stringResource(R.string.bk_restore_merge_sub),
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
             )
@@ -485,7 +486,7 @@ fun SettingsBackupTab(
                     modifier = Modifier.placedFocus(importButtonAnchor),
                 ) {
                     Text(
-                        text = if (importPickedUri == null) "Choose backup file…" else "Choose another file…",
+                        text = if (importPickedUri == null) stringResource(R.string.bk_choose_file) else stringResource(R.string.bk_choose_another),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         softWrap = false,
@@ -514,15 +515,19 @@ fun SettingsBackupTab(
                             withContext(Dispatchers.Main) {
                                 if (picked != null) {
                                     importPickedUriString = Uri.fromFile(picked).toString()
-                                    importStatus = "Picked latest: ${picked.name}"
+                                    importStatus = context.getString(R.string.bk_picked_latest, picked.name)
                                 } else {
                                     // MK.32.3 — Friendlier copy. The
                                     // file path was relevant only to a
                                     // developer reading the toast; the
                                     // user just wants to know "nothing
                                     // to restore + how to get one".
+                                    // MK.31.7 — Context.getString, not
+                                    // stringResource: this runs inside a
+                                    // coroutine launched from onClick, which
+                                    // is not composable scope.
                                     importStatus =
-                                        "No backups in your Downloads/YancoTV folder. Use Export above to make your first one."
+                                        context.getString(R.string.bk_no_backups)
                                 }
                                 importFocusBump++
                             }
@@ -530,7 +535,7 @@ fun SettingsBackupTab(
                     },
                 ) {
                     Text(
-                        text = "Restore latest from Downloads",
+                        text = stringResource(R.string.bk_restore_latest),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         softWrap = false,
@@ -539,12 +544,12 @@ fun SettingsBackupTab(
             }
             if (importPickedUri != null) {
                 Text(
-                    "Picked: ${importPickedUri.lastPathSegment ?: importPickedUri}",
+                    stringResource(R.string.bk_picked, importPickedUri.lastPathSegment ?: importPickedUri),
                     color = LocalYancoPalette.current.TextSecondary,
                     fontSize = 12.sp,
                 )
                 SettingsClickToEditField(
-                    label = "Password (only if file is encrypted)",
+                    label = stringResource(R.string.bk_password_if_encrypted),
                     value = importPassword,
                     onValueChange = { importPassword = it },
                     transformation = PasswordVisualTransformation(),
@@ -554,7 +559,7 @@ fun SettingsBackupTab(
                     onClick = {
                         if (importing) return@SettingsAccentButton
                         importing = true
-                        importStatus = "Restoring…"
+                        importStatus = context.getString(R.string.bk_restoring)
                         scope.launch {
                             val result = coordinator.import(importPickedUri, password = importPassword.takeIf { it.isNotBlank() })
                             importing = false
@@ -594,7 +599,7 @@ fun SettingsBackupTab(
                         onClick = { coordinator.retryPendingLinksNow() },
                     ) {
                         Text(
-                            text = "Retry pending now",
+                            text = stringResource(R.string.bk_retry_pending),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             softWrap = false,
@@ -639,13 +644,13 @@ fun SettingsBackupTab(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    "RECENT EXPORTS",
+                    stringResource(R.string.bk_recent_exports),
                     color = LocalYancoPalette.current.Accent,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "Use → load this backup as the restore source. Delete → remove the metadata row (the file on disk is left untouched).",
+                    stringResource(R.string.bk_recent_exports_sub),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
@@ -655,7 +660,7 @@ fun SettingsBackupTab(
                         onUse = {
                             val rowUri = row.fileUri ?: return@RecentExportRow
                             importPickedUriString = rowUri
-                            importStatus = "Selected: ${row.label}"
+                            importStatus = context.getString(R.string.bk_selected, row.label)
                             importFocusBump++
                         },
                         onDelete = {
@@ -710,7 +715,7 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = row.label.ifBlank { "Untitled backup" },
+                text = row.label.ifBlank { stringResource(R.string.bk_untitled) },
                 color = palette.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -735,10 +740,10 @@ private fun RecentExportRow(row: RecentBackup, onUse: () -> Unit, onDelete: () -
             enabled = row.fileUri != null,
             size = ButtonSize.Compact,
         ) {
-            Text(text = "USE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+            Text(text = stringResource(R.string.bk_use), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
         SettingsDangerButton(onClick = onDelete, size = ButtonSize.Compact) {
-            Text(text = "DELETE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+            Text(text = stringResource(R.string.bk_delete), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }

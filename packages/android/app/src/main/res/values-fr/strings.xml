@@ -313,4 +313,98 @@
 
     <!-- MK.31.6 batch G (cont.) — server field label. -->
     <string name="sd_playlist_url">URL de la playlist</string>
+
+    <!-- MK.31.7 batch H — Shortcuts + About tabs. -->
+    <string name="sc_sec_remote">Télécommande et clavier</string>
+    <string name="sc_sec_shell">Interface</string>
+    <string name="sc_sec_settings">Paramètres</string>
+    <string name="sc_sec_playback">Lecture</string>
+    <string name="sc_sec_guide">Guide et listes de chaînes</string>
+    <string name="sc_sec_parental">Verrou parental</string>
+    <string name="sc_open_search">Ouvrir la recherche</string>
+    <string name="sc_sidebar_updown">Barre latérale haut / bas</string>
+    <string name="sc_enter_section">Entrer dans une section</string>
+    <string name="sc_back_out">Revenir en arrière</string>
+    <string name="sc_jump_tab">Aller à un onglet des paramètres</string>
+    <string name="sc_play_pause">Lecture / Pause</string>
+    <string name="sc_next_channel">Chaîne suivante</string>
+    <string name="sc_prev_channel">Chaîne précédente</string>
+    <string name="sc_options_menu">Ouvrir le menu des options</string>
+    <string name="sc_stream_info">Infos sur le flux</string>
+    <string name="sc_live_edge">Revenir au direct</string>
+    <string name="sc_exit_fullscreen">Quitter le plein écran</string>
+    <string name="sc_channel_actions">Ouvrir les actions de la chaîne</string>
+    <string name="sc_lock_hide">Verrouiller ou masquer une chaîne</string>
+    <string name="sc_prog_details">Ouvrir les détails du programme</string>
+    <string name="sc_set_reminder">Définir un rappel</string>
+    <string name="sc_play_catchup">Lire en replay</string>
+    <string name="sc_unlock_channel">Déverrouiller une chaîne</string>
+    <string name="sc_dismiss_pin">Fermer la demande de PIN</string>
+    <string name="ab_tagline">IPTV pour Android TV, Fire TV et mobile.</string>
+    <string name="ab_sec_updates">Mises à jour</string>
+    <string name="ab_auto_check">Rechercher les mises à jour automatiquement</string>
+    <string name="ab_auto_check_desc">Une fois par jour, discrètement en arrière-plan.</string>
+    <string name="ab_last_checked">Dernière vérification</string>
+    <string name="ab_sec_about">À propos de YancoTV</string>
+    <string name="ab_sec_privacy">Confidentialité</string>
+    <string name="ab_crash_reports">Envoyer les rapports de plantage</string>
+    <string name="ab_privacy_policy">Politique de confidentialité</string>
+    <string name="ab_terms">Conditions d\'utilisation</string>
+    <string name="ab_sec_diagnostics">Diagnostics</string>
+    <string name="ab_sec_diagnostics_sub">Utile pour signaler un bug.</string>
+    <string name="ab_build">Build</string>
+    <string name="ab_device">Appareil</string>
+    <string name="ab_new_version">Nouvelle version disponible : %1$s</string>
+    <string name="ab_update_choice">Téléchargez et installez directement, ou ouvrez la page de la version dans un navigateur.</string>
+    <string name="ab_download_update">Télécharger la mise à jour</string>
+    <string name="ab_open_release">Ouvrir la page de la version</string>
+    <string name="ab_downloading">Téléchargement… %1$d %%</string>
+    <string name="ab_download_done">Téléchargement terminé. Appuyez sur Installer — Android peut vous demander d\'autoriser les installations depuis cette application la première fois.</string>
+    <string name="ab_install_now">Installer maintenant</string>
+    <string name="ab_download_failed">Échec du téléchargement : %1$s</string>
+    <string name="ab_retry">Réessayer</string>
+    <string name="time_just_now">À l\'instant</string>
+    <string name="time_min_ago">il y a %1$d min</string>
+    <string name="time_hr_ago">il y a %1$d h</string>
+    <string name="time_d_ago">il y a %1$d j</string>
+
+    <!-- MK.31.7 batch H (cont.) — last-checked relative time. -->
+    <string name="time_never">Jamais</string>
+
+    <!-- MK.31.7 batch I — Backup & restore tab. -->
+    <string name="bk_title">Sauvegarde et restauration</string>
+    <string name="bk_intro">Exportez les sources, favoris, historique, enregistrements et paramètres dans un seul fichier JSON. Restaurez sur cet appareil ou un autre. Les identifiants sont enregistrés en clair sauf si vous activez le chiffrement par mot de passe.</string>
+    <string name="bk_export">EXPORTER</string>
+    <string name="bk_saving_to">Enregistrement dans : %1$s</string>
+    <string name="bk_saving_to_default">Enregistrement dans : Downloads/YancoTV (par défaut)</string>
+    <string name="bk_label_optional">Libellé (facultatif)</string>
+    <string name="bk_label_hint">par ex. « Avant réinstallation » ou « TV du salon »</string>
+    <string name="bk_encrypt">Chiffrer avec un mot de passe</string>
+    <string name="bk_encrypt_on">Les identifiants seront rechiffrés avec votre mot de passe (PBKDF2 + AES/GCM). Ce mot de passe sera requis pour restaurer.</string>
+    <string name="bk_encrypt_off">Les identifiants seront EN CLAIR dans le fichier. Ne le partagez pas et ne le téléversez pas.</string>
+    <string name="bk_password">Mot de passe</string>
+    <string name="bk_password_hint">8 caractères ou plus</string>
+    <string name="bk_reset_default">Réinitialiser</string>
+    <string name="bk_change_folder">Changer de dossier…</string>
+    <string name="bk_pick_folder">Choisir un dossier…</string>
+    <string name="bk_restore_merge">RESTAURER (MODE FUSION)</string>
+    <string name="bk_restore_merge_sub">Les sources, favoris et historique existants ne sont PAS supprimés. Les nouvelles entrées sont ajoutées ; les sources en conflit sont ignorées (vos identifiants locaux gagnent). Après restauration, vos sources se resynchronisent — les favoris et l\'historique peuvent prendre un moment à se relier.</string>
+    <string name="bk_choose_file">Choisir un fichier de sauvegarde…</string>
+    <string name="bk_choose_another">Choisir un autre fichier…</string>
+    <string name="bk_restore_latest">Restaurer la plus récente depuis Téléchargements</string>
+    <string name="bk_no_backups">Aucune sauvegarde dans votre dossier Downloads/YancoTV. Utilisez Exporter ci-dessus pour en créer une.</string>
+    <string name="bk_picked">Sélectionné : %1$s</string>
+    <string name="bk_password_if_encrypted">Mot de passe (uniquement si le fichier est chiffré)</string>
+    <string name="bk_retry_pending">Réessayer maintenant</string>
+    <string name="bk_recent_exports">EXPORTS RÉCENTS</string>
+    <string name="bk_recent_exports_sub">Utiliser → charger cette sauvegarde comme source de restauration. Supprimer → retirer l\'entrée de métadonnées (le fichier sur le disque est conservé).</string>
+    <string name="bk_untitled">Sauvegarde sans nom</string>
+    <string name="bk_use">UTILISER</string>
+    <string name="bk_delete">SUPPRIMER</string>
+
+    <!-- MK.31.7 batch I (cont.) — backup status messages. -->
+    <string name="bk_picked_short">Sélectionné %1$s</string>
+    <string name="bk_picked_latest">Plus récente sélectionnée : %1$s</string>
+    <string name="bk_restoring">Restauration…</string>
+    <string name="bk_selected">Sélectionné : %1$s</string>
 </resources>

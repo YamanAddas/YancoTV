@@ -313,4 +313,98 @@
 
     <!-- MK.31.6 batch G (cont.) — server field label. -->
     <string name="sd_playlist_url">URL de la lista</string>
+
+    <!-- MK.31.7 batch H — Shortcuts + About tabs. -->
+    <string name="sc_sec_remote">Mando y teclado</string>
+    <string name="sc_sec_shell">Interfaz</string>
+    <string name="sc_sec_settings">Ajustes</string>
+    <string name="sc_sec_playback">Reproducción</string>
+    <string name="sc_sec_guide">Guía y listas de canales</string>
+    <string name="sc_sec_parental">Bloqueo parental</string>
+    <string name="sc_open_search">Abrir la búsqueda</string>
+    <string name="sc_sidebar_updown">Barra lateral arriba / abajo</string>
+    <string name="sc_enter_section">Entrar en una sección</string>
+    <string name="sc_back_out">Volver atrás</string>
+    <string name="sc_jump_tab">Ir a una pestaña de ajustes</string>
+    <string name="sc_play_pause">Reproducir / Pausar</string>
+    <string name="sc_next_channel">Canal siguiente</string>
+    <string name="sc_prev_channel">Canal anterior</string>
+    <string name="sc_options_menu">Abrir el menú de opciones</string>
+    <string name="sc_stream_info">Información de la emisión</string>
+    <string name="sc_live_edge">Ir al directo</string>
+    <string name="sc_exit_fullscreen">Salir de pantalla completa</string>
+    <string name="sc_channel_actions">Abrir acciones del canal</string>
+    <string name="sc_lock_hide">Bloquear u ocultar un canal</string>
+    <string name="sc_prog_details">Abrir detalles del programa</string>
+    <string name="sc_set_reminder">Poner un recordatorio</string>
+    <string name="sc_play_catchup">Reproducir en diferido</string>
+    <string name="sc_unlock_channel">Desbloquear un canal</string>
+    <string name="sc_dismiss_pin">Cerrar la petición de PIN</string>
+    <string name="ab_tagline">IPTV para Android TV, Fire TV y móvil.</string>
+    <string name="ab_sec_updates">Actualizaciones</string>
+    <string name="ab_auto_check">Buscar actualizaciones automáticamente</string>
+    <string name="ab_auto_check_desc">Una vez al día, discretamente en segundo plano.</string>
+    <string name="ab_last_checked">Última comprobación</string>
+    <string name="ab_sec_about">Acerca de YancoTV</string>
+    <string name="ab_sec_privacy">Privacidad</string>
+    <string name="ab_crash_reports">Enviar informes de errores</string>
+    <string name="ab_privacy_policy">Política de privacidad</string>
+    <string name="ab_terms">Términos del servicio</string>
+    <string name="ab_sec_diagnostics">Diagnóstico</string>
+    <string name="ab_sec_diagnostics_sub">Útil al informar de un error.</string>
+    <string name="ab_build">Compilación</string>
+    <string name="ab_device">Dispositivo</string>
+    <string name="ab_new_version">Nueva versión disponible: %1$s</string>
+    <string name="ab_update_choice">Descarga e instala directamente, o abre la página de la versión en el navegador.</string>
+    <string name="ab_download_update">Descargar actualización</string>
+    <string name="ab_open_release">Abrir la página de la versión</string>
+    <string name="ab_downloading">Descargando… %1$d %%</string>
+    <string name="ab_download_done">Descarga completa. Toca Instalar — Android puede pedirte permitir instalaciones desde esta aplicación la primera vez.</string>
+    <string name="ab_install_now">Instalar ahora</string>
+    <string name="ab_download_failed">Error en la descarga: %1$s</string>
+    <string name="ab_retry">Reintentar</string>
+    <string name="time_just_now">Ahora mismo</string>
+    <string name="time_min_ago">hace %1$d min</string>
+    <string name="time_hr_ago">hace %1$d h</string>
+    <string name="time_d_ago">hace %1$d d</string>
+
+    <!-- MK.31.7 batch H (cont.) — last-checked relative time. -->
+    <string name="time_never">Nunca</string>
+
+    <!-- MK.31.7 batch I — Backup & restore tab. -->
+    <string name="bk_title">Copia de seguridad y restauración</string>
+    <string name="bk_intro">Exporta fuentes, favoritos, historial, grabaciones y ajustes a un único archivo JSON. Restaura en este dispositivo o en otro. Las credenciales se guardan en texto plano salvo que actives el cifrado con contraseña.</string>
+    <string name="bk_export">EXPORTAR</string>
+    <string name="bk_saving_to">Guardando en: %1$s</string>
+    <string name="bk_saving_to_default">Guardando en: Downloads/YancoTV (predeterminado)</string>
+    <string name="bk_label_optional">Etiqueta (opcional)</string>
+    <string name="bk_label_hint">p. ej. «Antes de reinstalar» o «TV del salón»</string>
+    <string name="bk_encrypt">Cifrar con contraseña</string>
+    <string name="bk_encrypt_on">Las credenciales se volverán a cifrar con tu contraseña (PBKDF2 + AES/GCM). Necesitarás esta contraseña para restaurar.</string>
+    <string name="bk_encrypt_off">Las credenciales estarán EN TEXTO PLANO en el archivo. No compartas ni subas este archivo.</string>
+    <string name="bk_password">Contraseña</string>
+    <string name="bk_password_hint">8 caracteres o más</string>
+    <string name="bk_reset_default">Restablecer</string>
+    <string name="bk_change_folder">Cambiar carpeta…</string>
+    <string name="bk_pick_folder">Elegir carpeta…</string>
+    <string name="bk_restore_merge">RESTAURAR (MODO FUSIÓN)</string>
+    <string name="bk_restore_merge_sub">Las fuentes, favoritos e historial existentes NO se eliminan. Se añaden filas nuevas; las fuentes en conflicto se omiten (ganan tus credenciales locales). Tras restaurar, tus fuentes se resincronizarán — los favoritos y el historial pueden tardar un momento en revincularse.</string>
+    <string name="bk_choose_file">Elegir archivo de copia…</string>
+    <string name="bk_choose_another">Elegir otro archivo…</string>
+    <string name="bk_restore_latest">Restaurar la más reciente de Descargas</string>
+    <string name="bk_no_backups">No hay copias en tu carpeta Downloads/YancoTV. Usa Exportar arriba para crear la primera.</string>
+    <string name="bk_picked">Seleccionado: %1$s</string>
+    <string name="bk_password_if_encrypted">Contraseña (solo si el archivo está cifrado)</string>
+    <string name="bk_retry_pending">Reintentar pendientes ahora</string>
+    <string name="bk_recent_exports">EXPORTACIONES RECIENTES</string>
+    <string name="bk_recent_exports_sub">Usar → cargar esta copia como origen de restauración. Eliminar → quitar la fila de metadatos (el archivo del disco no se toca).</string>
+    <string name="bk_untitled">Copia sin nombre</string>
+    <string name="bk_use">USAR</string>
+    <string name="bk_delete">ELIMINAR</string>
+
+    <!-- MK.31.7 batch I (cont.) — backup status messages. -->
+    <string name="bk_picked_short">Seleccionado %1$s</string>
+    <string name="bk_picked_latest">Más reciente seleccionada: %1$s</string>
+    <string name="bk_restoring">Restaurando…</string>
+    <string name="bk_selected">Seleccionado: %1$s</string>
 </resources>

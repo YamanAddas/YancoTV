@@ -313,4 +313,98 @@
 
     <!-- MK.31.6 batch G (cont.) — server field label. -->
     <string name="sd_playlist_url">عنوان القائمة</string>
+
+    <!-- MK.31.7 batch H — Shortcuts + About tabs. -->
+    <string name="sc_sec_remote">جهاز التحكم ولوحة المفاتيح</string>
+    <string name="sc_sec_shell">الواجهة</string>
+    <string name="sc_sec_settings">الإعدادات</string>
+    <string name="sc_sec_playback">التشغيل</string>
+    <string name="sc_sec_guide">الدليل وقوائم القنوات</string>
+    <string name="sc_sec_parental">بوابة الرقابة الأبوية</string>
+    <string name="sc_open_search">فتح البحث</string>
+    <string name="sc_sidebar_updown">التنقل في الشريط الجانبي</string>
+    <string name="sc_enter_section">الدخول إلى قسم</string>
+    <string name="sc_back_out">الرجوع</string>
+    <string name="sc_jump_tab">الانتقال إلى تبويب الإعدادات</string>
+    <string name="sc_play_pause">تشغيل / إيقاف مؤقت</string>
+    <string name="sc_next_channel">القناة التالية</string>
+    <string name="sc_prev_channel">القناة السابقة</string>
+    <string name="sc_options_menu">فتح قائمة الخيارات</string>
+    <string name="sc_stream_info">معلومات البث</string>
+    <string name="sc_live_edge">الانتقال إلى البث الحالي</string>
+    <string name="sc_exit_fullscreen">إنهاء ملء الشاشة</string>
+    <string name="sc_channel_actions">فتح إجراءات القناة</string>
+    <string name="sc_lock_hide">قفل قناة أو إخفاؤها</string>
+    <string name="sc_prog_details">فتح تفاصيل البرنامج</string>
+    <string name="sc_set_reminder">تعيين تنبيه</string>
+    <string name="sc_play_catchup">تشغيل المحتوى السابق</string>
+    <string name="sc_unlock_channel">فتح قناة مقفلة</string>
+    <string name="sc_dismiss_pin">إغلاق نافذة رمز PIN</string>
+    <string name="ab_tagline">تطبيق IPTV لأجهزة Android TV و Fire TV والهاتف.</string>
+    <string name="ab_sec_updates">التحديثات</string>
+    <string name="ab_auto_check">التحقق من التحديثات تلقائياً</string>
+    <string name="ab_auto_check_desc">مرة يومياً بهدوء في الخلفية.</string>
+    <string name="ab_last_checked">آخر تحقق</string>
+    <string name="ab_sec_about">حول YancoTV</string>
+    <string name="ab_sec_privacy">الخصوصية</string>
+    <string name="ab_crash_reports">إرسال تقارير الأعطال</string>
+    <string name="ab_privacy_policy">سياسة الخصوصية</string>
+    <string name="ab_terms">شروط الخدمة</string>
+    <string name="ab_sec_diagnostics">التشخيص</string>
+    <string name="ab_sec_diagnostics_sub">مفيد عند الإبلاغ عن خطأ.</string>
+    <string name="ab_build">الإصدار</string>
+    <string name="ab_device">الجهاز</string>
+    <string name="ab_new_version">يتوفر إصدار جديد: %1$s</string>
+    <string name="ab_update_choice">نزّل وثبّت مباشرة، أو افتح صفحة الإصدار في المتصفح.</string>
+    <string name="ab_download_update">تنزيل التحديث</string>
+    <string name="ab_open_release">فتح صفحة الإصدار</string>
+    <string name="ab_downloading">جارٍ التنزيل… %1$d%%</string>
+    <string name="ab_download_done">تم التنزيل. اضغط تثبيت لتطبيق التحديث — قد يطلب Android السماح بالتثبيت من هذا التطبيق في المرة الأولى.</string>
+    <string name="ab_install_now">تثبيت الآن</string>
+    <string name="ab_download_failed">فشل التنزيل: %1$s</string>
+    <string name="ab_retry">إعادة المحاولة</string>
+    <string name="time_just_now">الآن</string>
+    <string name="time_min_ago">قبل %1$d دقيقة</string>
+    <string name="time_hr_ago">قبل %1$d ساعة</string>
+    <string name="time_d_ago">قبل %1$d يوم</string>
+
+    <!-- MK.31.7 batch H (cont.) — last-checked relative time. -->
+    <string name="time_never">أبداً</string>
+
+    <!-- MK.31.7 batch I — Backup & restore tab. -->
+    <string name="bk_title">النسخ الاحتياطي والاستعادة</string>
+    <string name="bk_intro">صدّر المصادر والمفضلة والسجل والتسجيلات والإعدادات إلى ملف JSON واحد. استعدها على هذا الجهاز أو على جهاز آخر. تُحفظ بيانات الدخول كنص عادي إلا إذا فعّلت التشفير بكلمة مرور.</string>
+    <string name="bk_export">تصدير</string>
+    <string name="bk_saving_to">الحفظ إلى: %1$s</string>
+    <string name="bk_saving_to_default">الحفظ إلى: Downloads/YancoTV (افتراضي)</string>
+    <string name="bk_label_optional">التسمية (اختياري)</string>
+    <string name="bk_label_hint">مثال: \"قبل إعادة التثبيت\" أو \"تلفاز الصالة\"</string>
+    <string name="bk_encrypt">التشفير بكلمة مرور</string>
+    <string name="bk_encrypt_on">ستُعاد تشفير بيانات دخول المصادر بكلمة مرورك (PBKDF2 + AES/GCM). ستحتاج هذه الكلمة للاستعادة.</string>
+    <string name="bk_encrypt_off">ستكون بيانات دخول المصادر بنص عادي في الملف. لا تشارك هذا الملف أو ترفعه.</string>
+    <string name="bk_password">كلمة المرور</string>
+    <string name="bk_password_hint">8 أحرف أو أكثر</string>
+    <string name="bk_reset_default">إعادة التعيين للافتراضي</string>
+    <string name="bk_change_folder">تغيير المجلد…</string>
+    <string name="bk_pick_folder">اختيار مجلد…</string>
+    <string name="bk_restore_merge">الاستعادة (وضع الدمج)</string>
+    <string name="bk_restore_merge_sub">لا تُحذف المصادر والمفضلة والسجل الحالية. تُضاف السجلات الجديدة؛ وتُتجاهل المصادر المتعارضة (تفوز بيانات دخولك المحلية). بعد الاستعادة ستُعاد مزامنة مصادرك — وقد تستغرق المفضلة والسجل لحظة لإعادة الربط.</string>
+    <string name="bk_choose_file">اختيار ملف النسخة…</string>
+    <string name="bk_choose_another">اختيار ملف آخر…</string>
+    <string name="bk_restore_latest">استعادة الأحدث من التنزيلات</string>
+    <string name="bk_no_backups">لا توجد نسخ احتياطية في مجلد Downloads/YancoTV. استخدم التصدير أعلاه لإنشاء أول نسخة.</string>
+    <string name="bk_picked">المُختار: %1$s</string>
+    <string name="bk_password_if_encrypted">كلمة المرور (فقط إذا كان الملف مشفَّراً)</string>
+    <string name="bk_retry_pending">إعادة محاولة المعلَّق الآن</string>
+    <string name="bk_recent_exports">التصديرات الأخيرة</string>
+    <string name="bk_recent_exports_sub">استخدام → تحميل هذه النسخة كمصدر للاستعادة. حذف → إزالة سجل البيانات الوصفية (الملف على القرص يبقى كما هو).</string>
+    <string name="bk_untitled">نسخة بلا اسم</string>
+    <string name="bk_use">استخدام</string>
+    <string name="bk_delete">حذف</string>
+
+    <!-- MK.31.7 batch I (cont.) — backup status messages. -->
+    <string name="bk_picked_short">تم اختيار %1$s</string>
+    <string name="bk_picked_latest">تم اختيار الأحدث: %1$s</string>
+    <string name="bk_restoring">جارٍ الاستعادة…</string>
+    <string name="bk_selected">المختار: %1$s</string>
 </resources>
