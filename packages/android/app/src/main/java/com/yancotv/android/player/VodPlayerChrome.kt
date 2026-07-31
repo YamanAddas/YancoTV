@@ -312,7 +312,7 @@ private fun BufferingOverlay(data: VodChromeBuffering, onRetry: () -> Unit, onPl
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Y",
+                        text = stringResource(R.string.brand_initial),
                         color = Color.Black,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,

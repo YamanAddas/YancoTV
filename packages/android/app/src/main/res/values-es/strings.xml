@@ -693,4 +693,7 @@
     <string name="cs_channels">Canales</string>
     <string name="cs_none">Aún no hay canales. Añade una fuente en Ajustes.</string>
     <string name="cs_back_to_close">ATRÁS para cerrar</string>
+
+    <!-- MK.31.13 batch P (cont.) — recording indicator + brand initial. -->
+    <string name="ri_recording_in_progress">Grabación en curso</string>
 </resources>

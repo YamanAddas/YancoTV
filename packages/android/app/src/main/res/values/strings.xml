@@ -717,4 +717,8 @@
     <string name="cs_channels">Channels</string>
     <string name="cs_none">No channels yet. Add a source in Settings.</string>
     <string name="cs_back_to_close">BACK to close</string>
+
+    <!-- MK.31.13 batch P (cont.) — recording indicator + brand initial. -->
+    <string name="ri_recording_in_progress">Recording in progress</string>
+    <string name="brand_initial" translatable="false">Y</string>
 </resources>

@@ -693,4 +693,7 @@
     <string name="cs_channels">Chaînes</string>
     <string name="cs_none">Aucune chaîne. Ajoutez une source dans les paramètres.</string>
     <string name="cs_back_to_close">RETOUR pour fermer</string>
+
+    <!-- MK.31.13 batch P (cont.) — recording indicator + brand initial. -->
+    <string name="ri_recording_in_progress">Enregistrement en cours</string>
 </resources>

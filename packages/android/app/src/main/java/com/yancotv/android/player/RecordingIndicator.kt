@@ -24,11 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.shared.recording.RecordingStatus
 import com.yancotv.shared.recording.RecordingsRepository
 
@@ -77,13 +79,16 @@ fun RecordingIndicator(controller: PlaybackController, recordings: RecordingsRep
         label = "recording-pulse-alpha",
     )
 
+    val recordingDesc = stringResource(R.string.ri_recording_in_progress)
+
     Row(
         modifier =
         Modifier
             .clip(RoundedCornerShape(percent = 50))
             .background(Color(0xCC000000))
             .padding(horizontal = 14.dp, vertical = 8.dp)
-            .semantics { contentDescription = "Recording in progress" },
+            // MK.31.13 — resolved above the chain; semantics{} is not composable scope.
+            .semantics { contentDescription = recordingDesc },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(
@@ -96,7 +101,7 @@ fun RecordingIndicator(controller: PlaybackController, recordings: RecordingsRep
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "REC",
+            text = stringResource(R.string.rc_st_rec),
             color = Color.White,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,

@@ -693,4 +693,7 @@
     <string name="cs_channels">القنوات</string>
     <string name="cs_none">لا توجد قنوات بعد. أضف مصدراً من الإعدادات.</string>
     <string name="cs_back_to_close">اضغط رجوع للإغلاق</string>
+
+    <!-- MK.31.13 batch P (cont.) — recording indicator + brand initial. -->
+    <string name="ri_recording_in_progress">التسجيل جارٍ</string>
 </resources>
