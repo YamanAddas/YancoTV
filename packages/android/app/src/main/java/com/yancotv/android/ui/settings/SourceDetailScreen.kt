@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.ui.components.ConfirmDangerDialog
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.focus.snapToTopNearStart
@@ -78,6 +79,9 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
     // MK.31.21 — assigned from suspend functions, not composable scope.
     val notFoundMsg = stringResource(R.string.sd_not_found)
     val unknownErrorMsg = stringResource(R.string.common_unknown_error)
+    // MB-335 — DELETE must never fire on a single press. See
+    // ConfirmDangerDialog for the incident that mandated this.
+    var confirmDelete by remember { mutableStateOf(false) }
 
     // Editable buffers — separate from the persisted Source so the user
     // can type freely; SAVE commits them via SourceRepository.updateSource.
@@ -462,7 +466,19 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     Text(text = stringResource(R.string.sd_btn_sync), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
                 SettingsDangerButton(
-                    onClick = {
+                    onClick = { confirmDelete = true },
+                    size = ButtonSize.Compact,
+                ) {
+                    Text(text = stringResource(R.string.sd_btn_delete), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (confirmDelete) {
+                ConfirmDangerDialog(
+                    title = stringResource(R.string.dlg_delete_source_title, current.name),
+                    body = stringResource(R.string.dlg_delete_source_body),
+                    confirmLabel = stringResource(R.string.dlg_delete_cta),
+                    onConfirm = {
+                        confirmDelete = false
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 runCatching { repo.removeSource(current.id) }
@@ -477,10 +493,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                             onBack()
                         }
                     },
-                    size = ButtonSize.Compact,
-                ) {
-                    Text(text = stringResource(R.string.sd_btn_delete), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
-                }
+                    onDismiss = { confirmDelete = false },
+                )
             }
             saveError?.let { err ->
                 SettingsRowSpacer()

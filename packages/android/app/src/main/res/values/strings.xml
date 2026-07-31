@@ -1152,4 +1152,17 @@
 
     <!-- MK.31.25 fixups -->
     <string name="sd_due_now">Due now</string>
+
+    <!-- MB-335 destructive-action confirmations -->
+    <string name="dlg_delete_cta">DELETE</string>
+    <string name="dlg_delete_source_title">Delete %1$s?</string>
+    <string name="dlg_delete_source_body">This removes the source and everything it provides — channels, movies, series, and their favorites and watch history. There is no undo.</string>
+    <string name="dlg_delete_recording_title">Delete recording?</string>
+    <string name="dlg_delete_recording_body">This deletes “%1$s” and its file from storage. There is no undo.</string>
+    <string name="dlg_delete_history_title">Delete this entry?</string>
+    <string name="dlg_delete_history_body">This removes the history entry and, if a recording was saved, deletes its file too. There is no undo.</string>
+    <string name="dlg_delete_backup_title">Remove backup entry?</string>
+    <string name="dlg_delete_backup_body">This removes “%1$s” from the recent-exports list. The backup file itself stays where it was saved.</string>
+
+    <!-- MB-335 wiring (2/2) -->
 </resources>

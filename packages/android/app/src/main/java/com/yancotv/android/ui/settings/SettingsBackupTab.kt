@@ -51,6 +51,7 @@ import com.yancotv.android.backup.BackupCoordinator
 import com.yancotv.android.backup.ExportResult
 import com.yancotv.android.backup.ImportResult
 import com.yancotv.android.prefs.AppPreferences
+import com.yancotv.android.ui.components.ConfirmDangerDialog
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.focus.snapToTopNearStart
@@ -115,6 +116,8 @@ fun SettingsBackupTab(
     // See exportStatusIsError above.
     var importStatusIsError by rememberSaveable { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    // MB-335 — the registry delete stages here and fires from the dialog.
+    var pendingBackupDelete by remember { mutableStateOf<RecentBackup?>(null) }
 
     // Persisted SAF backup folder URI (null → use MediaStore default).
     var customFolderString by rememberSaveable { mutableStateOf(prefs.readBackupFolderUri()) }
@@ -636,6 +639,35 @@ fun SettingsBackupTab(
 
         // ───── Recent backups (MK.19.8.5) ─────
         val recent = remember { mutableStateListOf<RecentBackup>() }
+
+        pendingBackupDelete?.let { row ->
+            ConfirmDangerDialog(
+                title = stringResource(R.string.dlg_delete_backup_title),
+                body = stringResource(
+                    R.string.dlg_delete_backup_body,
+                    row.label.ifBlank { stringResource(R.string.bk_untitled) },
+                ),
+                confirmLabel = stringResource(R.string.dlg_delete_cta),
+                onConfirm = {
+                    pendingBackupDelete = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { db.backupMetadataQueries.deleteById(row.id) }
+                        }
+                        recent.remove(row)
+                        // If the user had this entry pre-selected for
+                        // restore, drop it so the Restore button
+                        // doesn't point at a stale id.
+                        if (importPickedUriString == row.fileUri) {
+                            importPickedUriString = null
+                            importStatus = null
+                        }
+                    }
+                },
+                onDismiss = { pendingBackupDelete = null },
+            )
+        }
+
         LaunchedEffect(exportStatus) {
             withContext(Dispatchers.IO) {
                 val rows =
@@ -688,21 +720,8 @@ fun SettingsBackupTab(
                             importStatus = context.getString(R.string.bk_selected, row.label)
                             importFocusBump++
                         },
-                        onDelete = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    runCatching { db.backupMetadataQueries.deleteById(row.id) }
-                                }
-                                recent.remove(row)
-                                // If the user had this entry pre-selected for
-                                // restore, drop it so the Restore button
-                                // doesn't point at a stale id.
-                                if (importPickedUriString == row.fileUri) {
-                                    importPickedUriString = null
-                                    importStatus = null
-                                }
-                            }
-                        },
+                        // MB-335 — stage, never fire on one press.
+                        onDelete = { pendingBackupDelete = row },
                     )
                 }
             }

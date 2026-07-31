@@ -1097,4 +1097,17 @@
 
     <!-- MK.31.25 fixups -->
     <string name="sd_due_now">Pendiente ahora</string>
+
+    <!-- MB-335 destructive-action confirmations -->
+    <string name="dlg_delete_cta">ELIMINAR</string>
+    <string name="dlg_delete_source_title">¿Eliminar %1$s?</string>
+    <string name="dlg_delete_source_body">Esto elimina la fuente y todo lo que proporciona: canales, películas, series, y sus favoritos e historial. No se puede deshacer.</string>
+    <string name="dlg_delete_recording_title">¿Eliminar la grabación?</string>
+    <string name="dlg_delete_recording_body">Esto elimina “%1$s” y su archivo del almacenamiento. No se puede deshacer.</string>
+    <string name="dlg_delete_history_title">¿Eliminar esta entrada?</string>
+    <string name="dlg_delete_history_body">Esto elimina la entrada del historial y, si se guardó una grabación, también su archivo. No se puede deshacer.</string>
+    <string name="dlg_delete_backup_title">¿Quitar la entrada de copia?</string>
+    <string name="dlg_delete_backup_body">Esto quita “%1$s” de la lista de exportaciones recientes. El archivo de copia en sí permanece donde se guardó.</string>
+
+    <!-- MB-335 wiring (2/2) -->
 </resources>

@@ -1097,4 +1097,17 @@
 
     <!-- MK.31.25 fixups -->
     <string name="sd_due_now">مستحق الآن</string>
+
+    <!-- MB-335 destructive-action confirmations -->
+    <string name="dlg_delete_cta">حذف</string>
+    <string name="dlg_delete_source_title">حذف %1$s؟</string>
+    <string name="dlg_delete_source_body">سيؤدي هذا إلى إزالة المصدر وكل ما يوفّره — القنوات والأفلام والمسلسلات وما يرتبط بها من مفضلة وسجلّ مشاهدة. لا يمكن التراجع.</string>
+    <string name="dlg_delete_recording_title">حذف التسجيل؟</string>
+    <string name="dlg_delete_recording_body">سيؤدي هذا إلى حذف “%1$s” وملفه من التخزين. لا يمكن التراجع.</string>
+    <string name="dlg_delete_history_title">حذف هذا السجل؟</string>
+    <string name="dlg_delete_history_body">سيؤدي هذا إلى إزالة السجل، وإن كان هناك تسجيل محفوظ فسيُحذف ملفه أيضاً. لا يمكن التراجع.</string>
+    <string name="dlg_delete_backup_title">إزالة سجل النسخة الاحتياطية؟</string>
+    <string name="dlg_delete_backup_body">سيؤدي هذا إلى إزالة “%1$s” من قائمة التصديرات الأخيرة. يبقى ملف النسخة الاحتياطية نفسه في مكانه.</string>
+
+    <!-- MB-335 wiring (2/2) -->
 </resources>

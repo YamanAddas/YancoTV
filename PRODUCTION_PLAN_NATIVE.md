@@ -2463,16 +2463,13 @@ saved set matches nothing and the rail opens collapsed, which is harmless.
 | MK.33.1 | `SourceScopedGroup` selection keys, `CategoryNode.SourceParent`, `SourceCategoryTreeBuilder`, 5 source-scoped SQL queries, `groupsBySource`, rail expansion keyed on row key | MB-334 |
 
 **Verification status.** 958 tests green (+23 for this slice), ktlint clean,
-release APK built and installed on the Google TV. **Verified on hardware for the
-single-playlist case only** — Live TV rail still renders Favorites / All / flat
-provider-ordered groups with no spurious dropdown, and committing a group still
-filters the coverflow. The **multi-playlist path is unit-tested but NOT yet
-exercised on a device**: the test TV has one playlist, and adding a second syncs a
-full catalogue into the user's app, which is their call to make. Highest-value
-next check: add a second list, then confirm (a) two dropdowns appear labelled with
-the playlist names, (b) each expands independently, (c) a group under playlist A
-shows only A's channels, (d) the per-playlist "All" shows that playlist's whole
-type.
+release APK built and installed on the Google TV. Verified on hardware for the
+single-playlist case in-session (Live TV rail unchanged: Favorites / All / flat
+provider-ordered groups, group commit still filters the coverflow).
+**Multi-playlist path verified by the user on device, 2026-07-31:** a second
+list was added (the MB-333 fix unblocked reaching ADD SOURCE), synced, and the
+rail bucketed the categories per playlist as designed — user's words: "it worked
+and sorted the way i want."
 
 **Known gap, deliberately not addressed.** `CategoryChipBar` — the phone twin of
 the rail — is dead code (defined, never called), so there is no phone path to keep

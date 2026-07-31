@@ -1097,4 +1097,17 @@
 
     <!-- MK.31.25 fixups -->
     <string name="sd_due_now">Dû maintenant</string>
+
+    <!-- MB-335 destructive-action confirmations -->
+    <string name="dlg_delete_cta">SUPPRIMER</string>
+    <string name="dlg_delete_source_title">Supprimer %1$s ?</string>
+    <string name="dlg_delete_source_body">Cela supprime la source et tout ce qu\'elle fournit — chaînes, films, séries, ainsi que leurs favoris et leur historique. Aucune annulation possible.</string>
+    <string name="dlg_delete_recording_title">Supprimer l\'enregistrement ?</string>
+    <string name="dlg_delete_recording_body">Cela supprime « %1$s » et son fichier du stockage. Aucune annulation possible.</string>
+    <string name="dlg_delete_history_title">Supprimer cette entrée ?</string>
+    <string name="dlg_delete_history_body">Cela supprime l\'entrée de l\'historique et, si un enregistrement a été sauvegardé, son fichier aussi. Aucune annulation possible.</string>
+    <string name="dlg_delete_backup_title">Retirer l\'entrée de sauvegarde ?</string>
+    <string name="dlg_delete_backup_body">Cela retire « %1$s » de la liste des exports récents. Le fichier de sauvegarde lui-même reste là où il a été enregistré.</string>
+
+    <!-- MB-335 wiring (2/2) -->
 </resources>

@@ -21,8 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +42,7 @@ import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.recording.RecordingService
 import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.ui.components.ButtonSize
+import com.yancotv.android.ui.components.ConfirmDangerDialog
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
@@ -95,6 +98,24 @@ fun RecordingsScreen(
     val palette = LocalYancoPalette.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // MB-335 — deletes stage into this and fire only from the dialog.
+    var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
+    pendingDelete?.let { p ->
+        ConfirmDangerDialog(
+            title = stringResource(p.titleRes),
+            body = if (p.bodyArg != null) {
+                stringResource(p.bodyRes, p.bodyArg)
+            } else {
+                stringResource(p.bodyRes)
+            },
+            confirmLabel = stringResource(R.string.dlg_delete_cta),
+            onConfirm = {
+                pendingDelete = null
+                p.action()
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
 
     // Reactive lists — flip immediately when a recording or schedule
     // changes from any surface (RecordingService writes, schedule
@@ -188,8 +209,14 @@ fun RecordingsScreen(
                                 onPlay = { playRecording(controller, context, row) },
                                 onStop = { RecordingService.stop(context, row.id) },
                                 onDelete = {
-                                    scope.launch(Dispatchers.IO) {
-                                        runCatching { deleteRecording(context, recordings, row) }
+                                    pendingDelete = PendingDelete(
+                                        titleRes = R.string.dlg_delete_recording_title,
+                                        bodyArg = row.title,
+                                        bodyRes = R.string.dlg_delete_recording_body,
+                                    ) {
+                                        scope.launch(Dispatchers.IO) {
+                                            runCatching { deleteRecording(context, recordings, row) }
+                                        }
                                     }
                                 },
                             )
@@ -243,11 +270,17 @@ fun RecordingsScreen(
                                     // a phantom recording on disk. Cancelled /
                                     // failed / missed entries have no
                                     // recording to clean up.
-                                    scope.launch(Dispatchers.IO) {
-                                        if (linked != null) {
-                                            runCatching { deleteRecording(context, recordings, linked) }
+                                    pendingDelete = PendingDelete(
+                                        titleRes = R.string.dlg_delete_history_title,
+                                        bodyArg = null,
+                                        bodyRes = R.string.dlg_delete_history_body,
+                                    ) {
+                                        scope.launch(Dispatchers.IO) {
+                                            if (linked != null) {
+                                                runCatching { deleteRecording(context, recordings, linked) }
+                                            }
+                                            runCatching { schedules.deleteById(schedule.id) }
                                         }
-                                        runCatching { schedules.deleteById(schedule.id) }
                                     }
                                 },
                             )
@@ -737,3 +770,17 @@ private fun friendlyReason(ctx: android.content.Context, rawReason: String): Str
     "channel_deleted" -> ctx.getString(R.string.rs_reason_channel_deleted)
     else -> rawReason.replace('_', ' ')
 }
+
+/**
+ * MB-335 — a staged deletion awaiting the user's confirmation.
+ *
+ * [bodyArg] is the recording title interpolated into [bodyRes]; null for the
+ * history variant, whose body takes no argument. [action] is the exact block
+ * that used to run directly in the row's onDelete.
+ */
+private data class PendingDelete(
+    @androidx.annotation.StringRes val titleRes: Int,
+    val bodyArg: String?,
+    @androidx.annotation.StringRes val bodyRes: Int,
+    val action: () -> Unit,
+)
