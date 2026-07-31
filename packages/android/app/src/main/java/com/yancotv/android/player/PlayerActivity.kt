@@ -1396,7 +1396,7 @@ class PlayerActivity : AppCompatActivity() {
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.AUDIO,
-                label = "Audio",
+                label = getString(R.string.po_audio),
                 currentValue =
                 playback.audioLanguage.takeIf { it.isNotBlank() }
                     ?.uppercase(java.util.Locale.ROOT) ?: "Auto",
@@ -1421,7 +1421,7 @@ class PlayerActivity : AppCompatActivity() {
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES,
-                label = "Subtitles",
+                label = getString(R.string.cf_subtitles),
                 currentValue =
                 playback.subtitleLanguage.takeIf { it.isNotBlank() }
                     ?.uppercase(java.util.Locale.ROOT) ?: "Off",
@@ -1446,7 +1446,7 @@ class PlayerActivity : AppCompatActivity() {
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.ASPECT,
-                label = "Aspect",
+                label = getString(R.string.po_aspect),
                 currentValue = getString(playback.resizeMode.labelRes),
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.ASPECT) },
                 onCyclePrev = {
@@ -1464,7 +1464,7 @@ class PlayerActivity : AppCompatActivity() {
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SPEED,
-                label = "Speed",
+                label = getString(R.string.po_speed),
                 currentValue = "${playback.speed}×",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.SPEED) },
                 onCyclePrev = {
@@ -1482,10 +1482,10 @@ class PlayerActivity : AppCompatActivity() {
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.SLEEP,
-                label = "Sleep",
+                label = getString(R.string.po_sleep),
                 currentValue =
                 when (val s = sleepState) {
-                    is com.yancotv.android.player.SleepTimerState.Off -> "Off"
+                    is com.yancotv.android.player.SleepTimerState.Off -> getString(R.string.ps_off)
                     is com.yancotv.android.player.SleepTimerState.Active ->
                         sleepRowLabel(s.option)
                 },
@@ -1513,7 +1513,7 @@ class PlayerActivity : AppCompatActivity() {
             rows +=
                 com.yancotv.android.player.options.PlayerOptionsRow(
                     category = com.yancotv.android.player.options.PlayerOptionCategory.RECORD,
-                    label = "Record",
+                    label = getString(R.string.po_record),
                     currentValue = if (isRecordingNow) "Recording" else "—",
                     onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.RECORD) },
                 )
@@ -1533,14 +1533,14 @@ class PlayerActivity : AppCompatActivity() {
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES,
-                label = "Favorites",
+                label = getString(R.string.cat_favorites),
                 currentValue = if (isFav) "Saved" else "—",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES) },
             )
         rows +=
             com.yancotv.android.player.options.PlayerOptionsRow(
                 category = com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL,
-                label = "External player",
+                label = getString(R.string.po_external),
                 currentValue = "—",
                 onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL) },
             )
@@ -1552,7 +1552,7 @@ class PlayerActivity : AppCompatActivity() {
             rows +=
                 com.yancotv.android.player.options.PlayerOptionsRow(
                     category = com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV,
-                    label = "Play on TV",
+                    label = getString(R.string.po_play_on_tv),
                     currentValue = "—",
                     onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.PLAY_ON_TV) },
                 )
@@ -1606,7 +1606,7 @@ class PlayerActivity : AppCompatActivity() {
         SleepTimerOption.MIN_30 -> "30 min"
         SleepTimerOption.MIN_45 -> "45 min"
         SleepTimerOption.MIN_60 -> "60 min"
-        SleepTimerOption.END_OF_PROGRAM -> "End of programme"
+        SleepTimerOption.END_OF_PROGRAM -> getString(R.string.po_end_of_programme)
     }
 
     /**
@@ -1844,20 +1844,20 @@ class PlayerActivity : AppCompatActivity() {
                     error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
                 )
         val title = when {
-            isCatchup404 -> "This catch-up has expired"
+            isCatchup404 -> getString(R.string.pe_catchup_expired)
             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                 error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
-                "Can't reach the stream"
+                getString(R.string.pe_cant_reach)
             error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-                "Server refused the request"
+                getString(R.string.pe_server_refused)
             error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
                 error.errorCode == PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ->
-                "Stream not found"
+                getString(R.string.pe_not_found)
             error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
                 error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ||
                 error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
-                "This device can't decode the stream"
-            else -> "Couldn't open this stream"
+                getString(R.string.pe_cant_decode)
+            else -> getString(R.string.pe_cant_open)
         }
         // Audit catch — ExoPlayer's localizedMessage wraps OkHttp's
         // exception text, which routinely echoes the request URL. For
@@ -1868,7 +1868,7 @@ class PlayerActivity : AppCompatActivity() {
         // For catch-up 404 we replace the OkHttp text entirely with a
         // friendlier explanation pointing at the Guide.
         val description = if (isCatchup404) {
-            "Your provider only keeps catch-up for a limited time. Pick a more recent programme in the Guide."
+            getString(R.string.pe_catchup_expired_desc)
         } else {
             error.localizedMessage?.let(::redactCredentials)
                 ?: "Check your connection or try another source."

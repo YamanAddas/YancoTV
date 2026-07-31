@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
@@ -321,39 +323,39 @@ private fun BufferingOverlay(data: VodChromeBuffering, onRetry: () -> Unit, onPl
             HexChip(label = data.progressLabel, tone = palette.Accent)
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "Tuning the stream",
+                text = stringResource(R.string.vc_tuning),
                 color = palette.TextPrimary,
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Negotiating the best bitrate for your connection. This usually takes a moment.",
+                text = stringResource(R.string.vc_tuning_body),
                 color = palette.TextSecondary,
                 fontSize = 16.sp,
             )
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 DiagnosticTile(
-                    label = "BITRATE",
+                    label = stringResource(R.string.vc_bitrate),
                     value = data.bitrate,
                     accent = true,
                     modifier = Modifier.width(148.dp),
                 )
                 DiagnosticTile(
-                    label = "BUFFER",
+                    label = stringResource(R.string.vc_buffer),
                     value = data.bufferFill,
                     accent = false,
                     modifier = Modifier.width(148.dp),
                 )
                 DiagnosticTile(
-                    label = "LATENCY",
+                    label = stringResource(R.string.vc_latency),
                     value = data.latency,
                     accent = false,
                     modifier = Modifier.width(148.dp),
                 )
                 DiagnosticTile(
-                    label = "RES.",
+                    label = stringResource(R.string.vc_resolution),
                     value = data.resolution,
                     accent = false,
                     modifier = Modifier.width(148.dp),
@@ -361,9 +363,9 @@ private fun BufferingOverlay(data: VodChromeBuffering, onRetry: () -> Unit, onPl
             }
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HexBtn(label = "RETRY", primary = true, onClick = onRetry)
-                HexBtn(label = "PLAYBACK OPTIONS", primary = false, onClick = onPlaybackOptions)
-                HexBtn(label = "CANCEL", primary = false, onClick = onBack)
+                HexBtn(label = stringResource(R.string.vc_retry), primary = true, onClick = onRetry)
+                HexBtn(label = stringResource(R.string.vc_playback_options), primary = false, onClick = onPlaybackOptions)
+                HexBtn(label = stringResource(R.string.vc_cancel), primary = false, onClick = onBack)
             }
         }
     }
@@ -469,13 +471,13 @@ private fun ErrorOverlay(
                 DiagnosticBlock(data = data)
                 Spacer(Modifier.height(28.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HexBtn(label = "RETRY", primary = true, onClick = onRetry)
-                    HexBtn(label = "SWITCH TO 1080P", primary = false, onClick = onSwitchQuality)
-                    HexBtn(label = "TRY ANOTHER SOURCE", primary = false, onClick = onTrySource)
-                    HexBtn(label = "REPORT ISSUE", primary = false, onClick = onReport)
+                    HexBtn(label = stringResource(R.string.vc_retry), primary = true, onClick = onRetry)
+                    HexBtn(label = stringResource(R.string.vc_switch_1080), primary = false, onClick = onSwitchQuality)
+                    HexBtn(label = stringResource(R.string.vc_try_source), primary = false, onClick = onTrySource)
+                    HexBtn(label = stringResource(R.string.vc_report), primary = false, onClick = onReport)
                 }
                 Spacer(Modifier.height(12.dp))
-                HexBtn(label = "BACK", primary = false, onClick = onBack)
+                HexBtn(label = stringResource(R.string.vc_back), primary = false, onClick = onBack)
             }
         }
     }

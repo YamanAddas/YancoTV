@@ -684,4 +684,37 @@
     <string name="po_remove_favorite">Remove from favorites</string>
     <string name="po_add_favorite">Add to favorites</string>
     <string name="po_tv_refused">TV refused the request (%1$s)</string>
+
+    <!-- MK.31.13 batch P — player surfaces + playback error copy. -->
+    <string name="pe_catchup_expired">This catch-up has expired</string>
+    <string name="pe_catchup_expired_desc">Your provider only keeps catch-up for a limited time. Pick a more recent programme in the Guide.</string>
+    <string name="pe_cant_reach">Can\'t reach the stream</string>
+    <string name="pe_server_refused">Server refused the request</string>
+    <string name="pe_not_found">Stream not found</string>
+    <string name="pe_cant_decode">This device can\'t decode the stream</string>
+    <string name="pe_cant_open">Couldn\'t open this stream</string>
+    <string name="vc_tuning">Tuning the stream</string>
+    <string name="vc_tuning_body">Negotiating the best bitrate for your connection. This usually takes a moment.</string>
+    <string name="vc_bitrate">BITRATE</string>
+    <string name="vc_buffer">BUFFER</string>
+    <string name="vc_latency">LATENCY</string>
+    <string name="vc_resolution">RES.</string>
+    <string name="vc_retry">RETRY</string>
+    <string name="vc_playback_options">PLAYBACK OPTIONS</string>
+    <string name="vc_cancel">CANCEL</string>
+    <string name="vc_switch_1080">SWITCH TO 1080P</string>
+    <string name="vc_try_source">TRY ANOTHER SOURCE</string>
+    <string name="vc_report">REPORT ISSUE</string>
+    <string name="vc_back">BACK</string>
+    <string name="vd_cc" translatable="false">CC</string>
+    <string name="vd_audio">AUDIO</string>
+    <string name="vd_speed">SPEED</string>
+    <string name="vd_fit">FIT</string>
+    <string name="vd_fav">FAV</string>
+    <string name="vd_menu">MENU</string>
+    <string name="vd_hint_seek">SEEK</string>
+    <string name="vd_hint_hide">HIDE</string>
+    <string name="cs_channels">Channels</string>
+    <string name="cs_none">No channels yet. Add a source in Settings.</string>
+    <string name="cs_back_to_close">BACK to close</string>
 </resources>

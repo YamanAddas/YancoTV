@@ -37,12 +37,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
@@ -132,7 +134,7 @@ fun ChannelSurfOverlay(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = "Channels",
+            text = stringResource(R.string.cs_channels),
             color = LocalYancoPalette.current.TextPrimary,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
@@ -140,7 +142,7 @@ fun ChannelSurfOverlay(
         )
         if (items.isEmpty()) {
             Text(
-                text = "No channels yet. Add a source in Settings.",
+                text = stringResource(R.string.cs_none),
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -176,7 +178,7 @@ fun ChannelSurfOverlay(
             }
         }
         Text(
-            text = "BACK to close",
+            text = stringResource(R.string.cs_back_to_close),
             color = LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),

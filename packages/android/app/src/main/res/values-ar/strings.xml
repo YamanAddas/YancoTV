@@ -661,4 +661,36 @@
     <string name="po_remove_favorite">إزالة من المفضلة</string>
     <string name="po_add_favorite">إضافة إلى المفضلة</string>
     <string name="po_tv_refused">رفض التلفاز الطلب (%1$s)</string>
+
+    <!-- MK.31.13 batch P — player surfaces + playback error copy. -->
+    <string name="pe_catchup_expired">انتهت صلاحية هذا المحتوى السابق</string>
+    <string name="pe_catchup_expired_desc">يحتفظ مزوّدك بالمحتوى السابق لفترة محدودة فقط. اختر برنامجاً أحدث من الدليل.</string>
+    <string name="pe_cant_reach">تعذّر الوصول إلى البث</string>
+    <string name="pe_server_refused">رفض السيرفر الطلب</string>
+    <string name="pe_not_found">لم يتم العثور على البث</string>
+    <string name="pe_cant_decode">لا يستطيع هذا الجهاز فك ترميز البث</string>
+    <string name="pe_cant_open">تعذّر تشغيل هذا البث</string>
+    <string name="vc_tuning">جارٍ ضبط البث</string>
+    <string name="vc_tuning_body">يجري تحديد أفضل معدل بت لاتصالك. عادةً يستغرق هذا لحظة.</string>
+    <string name="vc_bitrate">معدل البت</string>
+    <string name="vc_buffer">المخزن المؤقت</string>
+    <string name="vc_latency">زمن الاستجابة</string>
+    <string name="vc_resolution">الدقة</string>
+    <string name="vc_retry">إعادة المحاولة</string>
+    <string name="vc_playback_options">خيارات التشغيل</string>
+    <string name="vc_cancel">إلغاء</string>
+    <string name="vc_switch_1080">التبديل إلى 1080p</string>
+    <string name="vc_try_source">تجربة مصدر آخر</string>
+    <string name="vc_report">الإبلاغ عن مشكلة</string>
+    <string name="vc_back">رجوع</string>
+    <string name="vd_audio">الصوت</string>
+    <string name="vd_speed">السرعة</string>
+    <string name="vd_fit">الملاءمة</string>
+    <string name="vd_fav">المفضلة</string>
+    <string name="vd_menu">القائمة</string>
+    <string name="vd_hint_seek">تقديم/تأخير</string>
+    <string name="vd_hint_hide">إخفاء</string>
+    <string name="cs_channels">القنوات</string>
+    <string name="cs_none">لا توجد قنوات بعد. أضف مصدراً من الإعدادات.</string>
+    <string name="cs_back_to_close">اضغط رجوع للإغلاق</string>
 </resources>

@@ -661,4 +661,36 @@
     <string name="po_remove_favorite">Quitar de favoritos</string>
     <string name="po_add_favorite">Añadir a favoritos</string>
     <string name="po_tv_refused">El televisor rechazó la petición (%1$s)</string>
+
+    <!-- MK.31.13 batch P — player surfaces + playback error copy. -->
+    <string name="pe_catchup_expired">Este contenido en diferido ha caducado</string>
+    <string name="pe_catchup_expired_desc">Tu proveedor solo conserva el contenido en diferido un tiempo limitado. Elige un programa más reciente en la guía.</string>
+    <string name="pe_cant_reach">No se puede acceder a la emisión</string>
+    <string name="pe_server_refused">El servidor rechazó la petición</string>
+    <string name="pe_not_found">Emisión no encontrada</string>
+    <string name="pe_cant_decode">Este dispositivo no puede decodificar la emisión</string>
+    <string name="pe_cant_open">No se pudo abrir esta emisión</string>
+    <string name="vc_tuning">Ajustando la emisión</string>
+    <string name="vc_tuning_body">Negociando la mejor tasa de bits para tu conexión. Suele tardar un momento.</string>
+    <string name="vc_bitrate">TASA DE BITS</string>
+    <string name="vc_buffer">BÚFER</string>
+    <string name="vc_latency">LATENCIA</string>
+    <string name="vc_resolution">RES.</string>
+    <string name="vc_retry">REINTENTAR</string>
+    <string name="vc_playback_options">OPCIONES DE REPRODUCCIÓN</string>
+    <string name="vc_cancel">CANCELAR</string>
+    <string name="vc_switch_1080">CAMBIAR A 1080P</string>
+    <string name="vc_try_source">PROBAR OTRA FUENTE</string>
+    <string name="vc_report">INFORMAR DEL PROBLEMA</string>
+    <string name="vc_back">ATRÁS</string>
+    <string name="vd_audio">AUDIO</string>
+    <string name="vd_speed">VELOCIDAD</string>
+    <string name="vd_fit">AJUSTE</string>
+    <string name="vd_fav">FAV</string>
+    <string name="vd_menu">MENÚ</string>
+    <string name="vd_hint_seek">BUSCAR</string>
+    <string name="vd_hint_hide">OCULTAR</string>
+    <string name="cs_channels">Canales</string>
+    <string name="cs_none">Aún no hay canales. Añade una fuente en Ajustes.</string>
+    <string name="cs_back_to_close">ATRÁS para cerrar</string>
 </resources>

@@ -47,6 +47,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 import java.util.Locale
@@ -538,32 +540,32 @@ private fun VodDockTransportRow(
         // because the enum name is SUBS but the user-facing vocab is CC on
         // remotes. MENU opens on AUDIO as the default landing, matching
         // the MENU key behaviour elsewhere.
-        SecondaryChip(label = "CC", onClick = {
+        SecondaryChip(label = stringResource(R.string.vd_cc), onClick = {
             onUserInteraction()
             onOpenSheet(SheetMode.SUBS)
         })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "AUDIO", onClick = {
+        SecondaryChip(label = stringResource(R.string.vd_audio), onClick = {
             onUserInteraction()
             onOpenSheet(SheetMode.AUDIO)
         })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "SPEED", onClick = {
+        SecondaryChip(label = stringResource(R.string.vd_speed), onClick = {
             onUserInteraction()
             onOpenSheet(SheetMode.SPEED)
         })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "FIT", onClick = {
+        SecondaryChip(label = stringResource(R.string.vd_fit), onClick = {
             onUserInteraction()
             onOpenSheet(SheetMode.ASPECT)
         })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "FAV", onClick = {
+        SecondaryChip(label = stringResource(R.string.vd_fav), onClick = {
             onUserInteraction()
             onOpenSheet(SheetMode.FAV)
         })
         Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = "MENU", onClick = {
+        SecondaryChip(label = stringResource(R.string.vd_menu), onClick = {
             onUserInteraction()
             onOpenSheet(SheetMode.AUDIO)
         })
@@ -749,10 +751,10 @@ private fun VodDockHintRow() {
         horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        HintItem(prefix = "◂▸", label = "SEEK")
-        HintItem(prefix = "▾", label = "MENU")
-        HintItem(prefix = "OK", label = "HIDE")
-        HintItem(prefix = "◀", label = "BACK")
+        HintItem(prefix = "◂▸", label = stringResource(R.string.vd_hint_seek))
+        HintItem(prefix = "▾", label = stringResource(R.string.vd_menu))
+        HintItem(prefix = "OK", label = stringResource(R.string.vd_hint_hide))
+        HintItem(prefix = "◀", label = stringResource(R.string.vc_back))
     }
 }
 

@@ -661,4 +661,36 @@
     <string name="po_remove_favorite">Retirer des favoris</string>
     <string name="po_add_favorite">Ajouter aux favoris</string>
     <string name="po_tv_refused">Le téléviseur a refusé la requête (%1$s)</string>
+
+    <!-- MK.31.13 batch P — player surfaces + playback error copy. -->
+    <string name="pe_catchup_expired">Ce replay a expiré</string>
+    <string name="pe_catchup_expired_desc">Votre fournisseur ne conserve le replay que pour une durée limitée. Choisissez un programme plus récent dans le guide.</string>
+    <string name="pe_cant_reach">Impossible d\'atteindre le flux</string>
+    <string name="pe_server_refused">Le serveur a refusé la requête</string>
+    <string name="pe_not_found">Flux introuvable</string>
+    <string name="pe_cant_decode">Cet appareil ne peut pas décoder ce flux</string>
+    <string name="pe_cant_open">Impossible d\'ouvrir ce flux</string>
+    <string name="vc_tuning">Réglage du flux</string>
+    <string name="vc_tuning_body">Négociation du meilleur débit pour votre connexion. Cela prend généralement un instant.</string>
+    <string name="vc_bitrate">DÉBIT</string>
+    <string name="vc_buffer">TAMPON</string>
+    <string name="vc_latency">LATENCE</string>
+    <string name="vc_resolution">RÉS.</string>
+    <string name="vc_retry">RÉESSAYER</string>
+    <string name="vc_playback_options">OPTIONS DE LECTURE</string>
+    <string name="vc_cancel">ANNULER</string>
+    <string name="vc_switch_1080">PASSER EN 1080P</string>
+    <string name="vc_try_source">ESSAYER UNE AUTRE SOURCE</string>
+    <string name="vc_report">SIGNALER UN PROBLÈME</string>
+    <string name="vc_back">RETOUR</string>
+    <string name="vd_audio">AUDIO</string>
+    <string name="vd_speed">VITESSE</string>
+    <string name="vd_fit">FORMAT</string>
+    <string name="vd_fav">FAV</string>
+    <string name="vd_menu">MENU</string>
+    <string name="vd_hint_seek">NAVIGUER</string>
+    <string name="vd_hint_hide">MASQUER</string>
+    <string name="cs_channels">Chaînes</string>
+    <string name="cs_none">Aucune chaîne. Ajoutez une source dans les paramètres.</string>
+    <string name="cs_back_to_close">RETOUR pour fermer</string>
 </resources>
