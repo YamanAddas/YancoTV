@@ -1112,4 +1112,8 @@
     <!-- MB-335 wiring (2/2) -->
 
     <!-- MB-336 scroll retrofits -->
+
+    <!-- MB-337 fail-closed notification text -->
+    <string name="rsf_reason_state_unreadable">YancoTV no pudo comprobar si ya había otra grabación en curso, así que omitió esta en lugar de arriesgarse a dañar ambas. Vuelve a intentarlo.</string>
+    <string name="rs_reason_state_unreadable">no se pudo comprobar otras grabaciones</string>
 </resources>

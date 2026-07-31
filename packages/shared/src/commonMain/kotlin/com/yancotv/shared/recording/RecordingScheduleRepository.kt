@@ -365,6 +365,18 @@ class RecordingScheduleRepository(private val db: YancoDb, private val clock: ()
         const val REASON_DEVICE_OFFLINE = "device_offline"
         const val REASON_ORPHANED_BY_APP_KILL = "orphaned_by_app_kill"
         const val REASON_CONCURRENT_RECORDING_ACTIVE = "concurrent_recording_active"
+
+        /**
+         * MB-337 — the in-flight recording query failed, so whether a recording
+         * was already running could not be determined.
+         *
+         * Distinct from [REASON_CONCURRENT_RECORDING_ACTIVE] on purpose: that
+         * one means "we know another recording is running", this one means "we
+         * could not find out". Same outcome (skip), very different diagnosis —
+         * collapsing them would hide a broken database behind what looks like
+         * ordinary cap contention.
+         */
+        const val REASON_RECORDING_STATE_UNREADABLE = "recording_state_unreadable"
         const val REASON_CHANNEL_DELETED = "channel_deleted"
         const val REASON_FRESH_GET_FAILED_NO_FALLBACK = "fresh_get_failed_no_fallback"
 

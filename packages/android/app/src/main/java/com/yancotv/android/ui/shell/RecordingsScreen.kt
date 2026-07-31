@@ -766,6 +766,9 @@ private fun RecordingScheduleEntry.historyMetaLine(ctx: android.content.Context)
 private fun friendlyReason(ctx: android.content.Context, rawReason: String): String = when (rawReason) {
     "device_offline" -> ctx.getString(R.string.rs_reason_device_offline)
     "concurrent_recording_active" -> ctx.getString(R.string.rs_reason_concurrent)
+    // MB-337 — the fail-closed skip. Kept distinct from the concurrent case
+    // so a broken database is not disguised as ordinary cap contention.
+    "recording_state_unreadable" -> ctx.getString(R.string.rs_reason_state_unreadable)
     "orphaned_by_app_kill" -> ctx.getString(R.string.rs_reason_orphaned)
     "channel_deleted" -> ctx.getString(R.string.rs_reason_channel_deleted)
     else -> rawReason.replace('_', ' ')

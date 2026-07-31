@@ -42,18 +42,29 @@ import org.koin.core.component.inject
  *
  *   playerCurrentUrl = controller.currentItem?.streamUrl
  *   sameChannel = playerCurrentUrl == schedule.streamUrl
+ *   activeCount  = recordings.getByStatus(RECORDING).size, or NULL if that read failed
  *
- *   if sameChannel:
- *     → tee path. RecordingService.handleStart's URL match auto-routes to live-tee.
+ *   → [preFireRoute] (pure, table-tested in PreFireRouteTest)
  *
- *   else if any recording is currently RECORDING (1-stream cap):
- *     → MISSED, reason=concurrent_recording_active.
- *
- *   else:
- *     → switch player to scheduled channel (PlaybackController.play),
- *       then start RecordingService (live-tee path takes over once the
- *       player attaches).
+ *   TEE_SAME_CHANNEL        : RecordingService.handleStart's URL match auto-routes to live-tee.
+ *   MISSED_STATE_UNREADABLE : MB-337 — activeCount was null. Fail CLOSED + notify.
+ *   MISSED_CONCURRENT       : 1-stream cap already spent. MISSED + notify.
+ *   HEADLESS_FRESH_GET      : MB-209 — nothing playing; let the service open its own connection.
+ *   SWITCH_THEN_TEE         : switch the player, then start the service.
  * ```
+ *
+ * **MB-337 — the guard fails CLOSED, and that is a deliberate trade.** The
+ * active-recording read used to be `.getOrDefault(emptyList())`, so a DB read
+ * failure was indistinguishable from an idle recorder and the receiver went down
+ * SWITCH_THEN_TEE: player yanked off the channel being recorded, a second
+ * connection opened against a 1-stream provider, corrupt file plus a rejected
+ * connection, silently. `RecordingService` never re-checks the cap, so this read
+ * is the only concurrency guard in the system.
+ *
+ * The cost of failing closed is real and was accepted by the user (2026-07-31): a
+ * transient DB error now SKIPS a recording. That is only acceptable because the
+ * skip is announced — see [markMissedAndNotify]. Both MISSED paths notify; the
+ * concurrent one used to be silent too.
  *
  * **End path (`ACTION_END`):** stops the linked recording and transitions
  * the schedule to COMPLETED. The recording row's terminal status is the
@@ -183,13 +194,20 @@ class RecordingScheduleReceiver :
         // (packages/android/CLAUDE.md hard rule #2), so hop for the read.
         val currentUrl = withContext(Dispatchers.Main) { playbackController.currentItem.value?.streamUrl }
         val sameChannel = currentUrl != null && currentUrl == schedule.streamUrl
+        // MB-337 — null means UNREADABLE, and that is the whole point. This used
+        // to be `.getOrDefault(emptyList())`, which made a failed read
+        // indistinguishable from an idle recorder and sent the receiver down the
+        // switch-then-tee path: player yanked off the channel being recorded, a
+        // second connection opened against a 1-stream provider, corrupt file and
+        // a rejected connection, silently. RecordingService never re-checks the
+        // cap, so this read is the only guard there is.
         val activeRecordings =
-            runCatching {
-                recordings.getByStatus(RecordingStatus.RECORDING)
-            }.getOrDefault(emptyList())
+            runCatching { recordings.getByStatus(RecordingStatus.RECORDING) }
+                .onFailure { Log.e(TAG, "fire[$scheduleId] active-recording read FAILED", it) }
+                .getOrNull()
 
-        when {
-            sameChannel -> {
+        when (preFireRoute(sameChannel, activeRecordings?.size, currentUrl != null)) {
+            PreFireRoute.TEE_SAME_CHANNEL -> {
                 // Player is on the scheduled channel. Tee — no second connection,
                 // no player switch, no user interruption. RecordingService.handleStart's
                 // URL-match check auto-routes to handleStartLiveTee.
@@ -197,7 +215,26 @@ class RecordingScheduleReceiver :
                 startRecording(context, schedule)
             }
 
-            activeRecordings.isNotEmpty() -> {
+            PreFireRoute.MISSED_STATE_UNREADABLE -> {
+                // MB-337 — fail CLOSED, by explicit user decision (2026-07-31).
+                // We cannot tell whether a recording is in flight, so we refuse
+                // to open a connection that might be the second one. The trade
+                // is deliberate and was chosen with the cost understood: a
+                // transient DB error now costs a SKIPPED recording rather than
+                // risking a corrupted one plus a provider rejection.
+                //
+                // The notification is not optional garnish — it is the half that
+                // makes the trade acceptable. A skipped recording the user is
+                // told about beats a corrupt one they discover hours later.
+                Log.w(TAG, "fire[$scheduleId] path=missed reason=state_unreadable (failing closed)")
+                markMissedAndNotify(
+                    context = context,
+                    schedule = schedule,
+                    reason = RecordingScheduleRepository.REASON_RECORDING_STATE_UNREADABLE,
+                )
+            }
+
+            PreFireRoute.MISSED_CONCURRENT -> {
                 // 1-stream IPTV cap exhausted: another channel's recording is
                 // already in flight. Don't try to add a second connection — would
                 // either fail or kick the existing one. Mark MISSED so the
@@ -205,18 +242,21 @@ class RecordingScheduleReceiver :
                 Log.w(
                     TAG,
                     "fire[$scheduleId] path=missed reason=concurrent " +
-                        "(${activeRecordings.size} active recordings)",
+                        "(${activeRecordings?.size} active recordings)",
                 )
-                runCatching {
-                    schedules.transitionTo(
-                        scheduleId,
-                        RecordingScheduleState.MISSED,
-                        errorReason = RecordingScheduleRepository.REASON_CONCURRENT_RECORDING_ACTIVE,
-                    )
-                }
+                // MB-337 — this path used to mark MISSED silently. It is the same
+                // class of harm as the unreadable case above (a recording the
+                // user expected did not happen), so it gets the same
+                // notification. Previously the user found out by opening the
+                // Recordings tab, typically hours later.
+                markMissedAndNotify(
+                    context = context,
+                    schedule = schedule,
+                    reason = RecordingScheduleRepository.REASON_CONCURRENT_RECORDING_ACTIVE,
+                )
             }
 
-            currentUrl == null -> {
+            PreFireRoute.HEADLESS_FRESH_GET -> {
                 // **MB-209 (2026-04-27) — headless / standby path.**
                 // No active playback. Don't kick ExoPlayer here: in a
                 // fresh process (app was closed when the alarm fired)
@@ -237,7 +277,7 @@ class RecordingScheduleReceiver :
                 startRecording(context, schedule)
             }
 
-            else -> {
+            PreFireRoute.SWITCH_THEN_TEE -> {
                 // Player is on a different channel (and active). Switch
                 // the player to the scheduled channel; once it attaches,
                 // RecordingService.handleStart's URL match routes to
@@ -420,6 +460,35 @@ class RecordingScheduleReceiver :
     }
 
     /**
+     * MB-337 — mark a schedule MISSED and tell the user why.
+     *
+     * Both callers are cases where a recording the user asked for did not
+     * happen and nothing was wrong with the schedule itself, so silence is the
+     * worst possible outcome: the previous behaviour wrote the DB row and let
+     * them discover it whenever they next opened the Recordings tab.
+     *
+     * The transition is wrapped because a failing transition must not prevent
+     * the notification — if the DB is the thing that is broken (which is
+     * precisely the [RecordingScheduleRepository.REASON_RECORDING_STATE_UNREADABLE]
+     * case) then the notification is the ONLY channel left to reach the user.
+     */
+    private fun markMissedAndNotify(context: Context, schedule: RecordingScheduleEntry, reason: String) {
+        runCatching {
+            schedules.transitionTo(
+                schedule.id,
+                RecordingScheduleState.MISSED,
+                errorReason = reason,
+            )
+        }.onFailure { Log.e(TAG, "markMissed[${schedule.id}] transition failed", it) }
+        postScheduleFailedNotification(
+            context = context,
+            scheduleId = schedule.id,
+            title = schedule.title,
+            reason = reason,
+        )
+    }
+
+    /**
      * Audit catch — post a low-importance, dismissible notification when
      * a scheduled recording fails to start. Re-uses the existing
      * RecordingService.CHANNEL_ID ("yanco_recordings") so the channel
@@ -436,6 +505,11 @@ class RecordingScheduleReceiver :
                     context.getString(R.string.rsf_reason_service_start)
                 reason.contains(RecordingScheduleRepository.REASON_CONCURRENT_RECORDING_ACTIVE) ->
                     context.getString(R.string.rsf_reason_concurrent)
+                // MB-337 — deliberately its own message, not folded into the
+                // concurrent one. "We could not check" and "another recording
+                // was running" call for different user actions.
+                reason.contains(RecordingScheduleRepository.REASON_RECORDING_STATE_UNREADABLE) ->
+                    context.getString(R.string.rsf_reason_state_unreadable)
                 reason.contains(RecordingScheduleRepository.REASON_RECORDING_NEVER_STARTED) ->
                     context.getString(R.string.rsf_reason_never_started)
                 // Fallback: raw provider/system text. Untranslatable by
