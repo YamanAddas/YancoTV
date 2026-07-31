@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -317,6 +318,9 @@ private fun SidebarRow(
     focusRequester: FocusRequester? = null,
     badged: Boolean = false,
 ) {
+    // MK.31.4 — resolved here because the semantics{} lambda below is not
+    // composable, so stringResource cannot be called inside it.
+    val sectionLabel = stringResource(section.labelRes)
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -455,7 +459,7 @@ private fun SidebarRow(
                 // MK.28.8 (MB-276) — announce selected state to TalkBack so
                 // the current section is distinguishable from the rest.
                 .semantics {
-                    contentDescription = section.label
+                    contentDescription = sectionLabel
                     this.selected = selected
                 }
                 .padding(horizontal = Space.md, vertical = Space.sm),
@@ -470,7 +474,7 @@ private fun SidebarRow(
             Box {
                 Icon(
                     imageVector = icon,
-                    contentDescription = if (showLabel) null else section.label,
+                    contentDescription = if (showLabel) null else sectionLabel,
                     tint = fg,
                     modifier = Modifier.size(22.dp),
                 )
@@ -502,7 +506,7 @@ private fun SidebarRow(
             // (alpha > 0) so the collapsed state has no Text in the layout.
             if (showLabel || labelAlpha > 0f) {
                 Text(
-                    text = section.label,
+                    text = sectionLabel,
                     color = fg,
                     style = if (selected || focused) YancoType.LabelStrong else YancoType.Label,
                     maxLines = 1,

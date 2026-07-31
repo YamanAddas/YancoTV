@@ -64,4 +64,36 @@
     <!-- User-Agent presets. Product names are trademarks. -->
     <string name="user_agent_system">افتراضي النظام</string>
     <string name="user_agent_custom">مخصص…</string>
+
+    <!-- MK.31.4 batch A — main navigation sections + Home rails. -->
+    <string name="section_home">الرئيسية</string>
+    <string name="section_live_tv">القنوات المباشرة</string>
+    <string name="section_guide">دليل البرامج</string>
+    <string name="section_movies">الأفلام</string>
+    <string name="section_series">المسلسلات</string>
+    <string name="section_favorites">المفضلة</string>
+    <string name="section_recordings">التسجيلات</string>
+    <string name="section_search">البحث</string>
+    <string name="section_settings">الإعدادات</string>
+    <string name="section_placeholder">%1$s — قادم في مرحلة لاحقة.</string>
+    <string name="home_eyebrow_for_you">لك</string>
+    <string name="home_continue_title">متابعة المشاهدة</string>
+    <string name="home_continue_caption">تابع من حيث توقفت</string>
+    <string name="home_eyebrow_your_library">مكتبتك</string>
+    <string name="home_favorites_caption">الأفلام والمسلسلات التي أضفتها للمفضلة</string>
+    <string name="home_eyebrow_fresh">جديد</string>
+    <string name="home_recent_title">أُضيف حديثاً</string>
+    <string name="home_recent_caption">أفلام ومسلسلات جديدة في مكتبتك</string>
+    <string name="home_eyebrow_continue_watching">متابعة المشاهدة</string>
+    <string name="home_eyebrow_on_air_now">يُبث الآن</string>
+    <string name="home_eyebrow_on_air">على الهواء</string>
+    <string name="home_on_now_title">يُبث الآن</string>
+    <string name="home_on_now_caption">يُبث الآن على قنواتك المفضلة</string>
+    <string name="home_eyebrow_tonight">الليلة</string>
+    <string name="home_up_next_title">التالي</string>
+    <string name="home_up_next_caption">يبدأ قريباً على قنواتك المفضلة</string>
+
+    <!-- MK.31.4 batch A (cont.) — hero slide labels. -->
+    <string name="home_resume_playback">متابعة التشغيل</string>
+    <string name="home_minutes_left">بقي %1$d د • تابع من حيث توقفت</string>
 </resources>

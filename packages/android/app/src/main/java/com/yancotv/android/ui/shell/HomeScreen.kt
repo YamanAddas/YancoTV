@@ -33,7 +33,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.PlayerLauncher
 import com.yancotv.android.prefs.AppPreferences
@@ -858,7 +860,7 @@ private fun PlaceholderArea(section: AppSection) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "${section.label} — coming in a later milestone.",
+            text = stringResource(R.string.section_placeholder, stringResource(section.labelRes)),
             color = LocalYancoPalette.current.TextMuted,
         )
     }

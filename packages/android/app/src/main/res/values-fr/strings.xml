@@ -64,4 +64,36 @@
     <!-- User-Agent presets. Product names are trademarks. -->
     <string name="user_agent_system">Valeur système</string>
     <string name="user_agent_custom">Personnalisé…</string>
+
+    <!-- MK.31.4 batch A — main navigation sections + Home rails. -->
+    <string name="section_home">Accueil</string>
+    <string name="section_live_tv">TV en direct</string>
+    <string name="section_guide">Guide TV</string>
+    <string name="section_movies">Films</string>
+    <string name="section_series">Séries</string>
+    <string name="section_favorites">Favoris</string>
+    <string name="section_recordings">Enregistrements</string>
+    <string name="section_search">Recherche</string>
+    <string name="section_settings">Paramètres</string>
+    <string name="section_placeholder">%1$s — arrive dans une prochaine version.</string>
+    <string name="home_eyebrow_for_you">POUR VOUS</string>
+    <string name="home_continue_title">Reprendre la lecture</string>
+    <string name="home_continue_caption">Reprenez où vous vous êtes arrêté</string>
+    <string name="home_eyebrow_your_library">VOTRE BIBLIOTHÈQUE</string>
+    <string name="home_favorites_caption">Films et séries que vous avez ajoutés aux favoris</string>
+    <string name="home_eyebrow_fresh">NOUVEAUTÉS</string>
+    <string name="home_recent_title">Ajouts récents</string>
+    <string name="home_recent_caption">Nouveaux films et séries dans votre bibliothèque</string>
+    <string name="home_eyebrow_continue_watching">REPRENDRE</string>
+    <string name="home_eyebrow_on_air_now">EN DIRECT</string>
+    <string name="home_eyebrow_on_air">EN DIRECT</string>
+    <string name="home_on_now_title">En ce moment</string>
+    <string name="home_on_now_caption">En direct à l\'instant sur vos chaînes favorites</string>
+    <string name="home_eyebrow_tonight">CE SOIR</string>
+    <string name="home_up_next_title">À suivre</string>
+    <string name="home_up_next_caption">Bientôt sur vos chaînes favorites</string>
+
+    <!-- MK.31.4 batch A (cont.) — hero slide labels. -->
+    <string name="home_resume_playback">Reprendre la lecture</string>
+    <string name="home_minutes_left">%1$d min restantes • reprenez où vous en étiez</string>
 </resources>

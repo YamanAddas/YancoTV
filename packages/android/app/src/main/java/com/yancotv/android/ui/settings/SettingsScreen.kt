@@ -838,34 +838,29 @@ private fun SidebarFooterHint() {
 @Composable
 private fun SidebarHeader() {
     val palette = LocalYancoPalette.current
-    // 'Settings' wordmark on the left, shipped raster logo pinned to the
-    // far right via SpaceBetween. The user's preferred order — title
-    // reads as the screen's title, the logo sits as a brand sign-off in
-    // the corner instead of leading the row.
+    // MK.31.4 — the brand logo that used to sit at the far right of this row was
+    // removed at the user's request; "Settings" is the screen title and the mark
+    // beside it was redundant with the sidebar's own branding.
     //
-    // The logo height (64dp) drives the row height — calibrated to read
-    // at 3 m on Fire TV without crowding the divider.
+    // The logo's 64dp height used to drive the row height, so the total is
+    // pinned explicitly here — 64dp of content + 22dp top + 22dp bottom = 108dp.
+    // Otherwise dropping the Image would shrink the header and shift every tab
+    // row up, which is a layout change nobody asked for.
     Row(
         modifier =
         Modifier
             .fillMaxWidth()
+            .height(108.dp)
             .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text = "Settings",
+            text = stringResource(R.string.section_settings),
             color = palette.TextPrimary,
             fontSize = 26.sp,
             lineHeight = 32.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.5).sp,
-        )
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(id = com.yancotv.android.R.drawable.ic_logo),
-            contentDescription = "YancoTV",
-            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-            modifier = Modifier.height(64.dp),
         )
     }
 }

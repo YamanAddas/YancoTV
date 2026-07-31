@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.ResumeBadge
@@ -350,12 +352,27 @@ fun HomeContent(
             )
         }
     }
+    // MK.31.4 — resolved via Context.getString rather than stringResource
+    // because they are consumed inside remember{}, which is not composable.
+    // Keyed on the Context so a locale change (which recreates the Activity)
+    // rebuilds them.
+    val heroCtx = androidx.compose.ui.platform.LocalContext.current
+    val heroLabels =
+        remember(heroCtx) {
+            HeroLabels(
+                eyebrowContinueWatching = heroCtx.getString(R.string.home_eyebrow_continue_watching),
+                eyebrowOnAirNow = heroCtx.getString(R.string.home_eyebrow_on_air_now),
+                resumePlayback = heroCtx.getString(R.string.home_resume_playback),
+                minutesLeft = { minutes -> heroCtx.getString(R.string.home_minutes_left, minutes) },
+            )
+        }
     val heroSlides =
-        remember(heroSlidesKey) {
+        remember(heroSlidesKey, heroLabels) {
             buildHeroSlides(
                 continueWatching = continueWatching.toList(),
                 resumeByContent = resumeByContent,
                 onNow = onNowItems.toList(),
+                labels = heroLabels,
             )
         }
 
@@ -443,9 +460,9 @@ fun HomeContent(
 
             if (continueWatching.isNotEmpty()) {
                 PosterRail(
-                    eyebrow = "FOR YOU",
-                    title = "Continue watching",
-                    caption = "Jump back where you left off",
+                    eyebrow = stringResource(R.string.home_eyebrow_for_you),
+                    title = stringResource(R.string.home_continue_title),
+                    caption = stringResource(R.string.home_continue_caption),
                     items = continueWatching,
                     lockedIds = lockedIds,
                     resumeByContent = resumeByContent,
@@ -471,9 +488,9 @@ fun HomeContent(
             }
             if (nonLiveFavorites.isNotEmpty()) {
                 PosterRail(
-                    eyebrow = "YOUR LIBRARY",
-                    title = "Favorites",
-                    caption = "Movies and series you starred",
+                    eyebrow = stringResource(R.string.home_eyebrow_your_library),
+                    title = stringResource(R.string.section_favorites),
+                    caption = stringResource(R.string.home_favorites_caption),
                     items = nonLiveFavorites,
                     lockedIds = lockedIds,
                     resumeByContent = resumeByContent,
@@ -497,9 +514,9 @@ fun HomeContent(
             }
             if (recentlyAdded.isNotEmpty()) {
                 PosterRail(
-                    eyebrow = "FRESH",
-                    title = "Recently added",
-                    caption = "New movies and series in your library",
+                    eyebrow = stringResource(R.string.home_eyebrow_fresh),
+                    title = stringResource(R.string.home_recent_title),
+                    caption = stringResource(R.string.home_recent_caption),
                     items = recentlyAdded,
                     lockedIds = lockedIds,
                     resumeByContent = resumeByContent,
@@ -518,7 +535,22 @@ fun HomeContent(
 
 private data class HeroSlide(val item: ContentItem, val eyebrow: String, val accentIcon: ImageVector, val headline: String, val subhead: String)
 
-private fun buildHeroSlides(continueWatching: List<ContentItem>, resumeByContent: Map<String, HistoryEntry>, onNow: List<NowPairing>): List<HeroSlide> {
+/**
+ * MK.31.4 — pre-resolved strings for [buildHeroSlides].
+ *
+ * The builder runs inside a `remember {}` block, so it cannot be
+ * `@Composable` and cannot call `stringResource`. Passing the resolved text in
+ * keeps it a pure function of its inputs rather than forcing the caller to
+ * hoist the whole hero list out of `remember` just to localise three strings.
+ */
+private class HeroLabels(val eyebrowContinueWatching: String, val eyebrowOnAirNow: String, val resumePlayback: String, val minutesLeft: (Int) -> String)
+
+private fun buildHeroSlides(
+    continueWatching: List<ContentItem>,
+    resumeByContent: Map<String, HistoryEntry>,
+    onNow: List<NowPairing>,
+    labels: HeroLabels,
+): List<HeroSlide> {
     val slides = mutableListOf<HeroSlide>()
     continueWatching.firstOrNull()?.let { item ->
         val resume = resumeByContent[item.id]
@@ -528,15 +560,15 @@ private fun buildHeroSlides(continueWatching: List<ContentItem>, resumeByContent
                 if (dur != null && dur > 0) {
                     val remainingSec = (dur - r.positionSeconds).coerceAtLeast(0.0).roundToInt()
                     val minutes = (remainingSec / 60).coerceAtLeast(1)
-                    "${minutes}m left • pick up where you stopped"
+                    labels.minutesLeft(minutes)
                 } else {
-                    "Resume playback"
+                    labels.resumePlayback
                 }
-            } ?: "Resume playback"
+            } ?: labels.resumePlayback
         slides.add(
             HeroSlide(
                 item = item,
-                eyebrow = "CONTINUE WATCHING",
+                eyebrow = labels.eyebrowContinueWatching,
                 accentIcon = YancoIcons.Play,
                 headline = item.cleanTitle?.ifBlank { null } ?: item.title,
                 subhead = sub,
@@ -547,7 +579,7 @@ private fun buildHeroSlides(continueWatching: List<ContentItem>, resumeByContent
         slides.add(
             HeroSlide(
                 item = pair.channel,
-                eyebrow = "ON AIR NOW",
+                eyebrow = labels.eyebrowOnAirNow,
                 accentIcon = YancoIcons.Live,
                 headline = pair.programme.title,
                 subhead =
@@ -871,9 +903,9 @@ private fun OnNowRail(items: List<NowPairing>, lockedIds: Set<String>, nowSec: L
     val listState = rememberLazyListState()
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
         RailHeader(
-            eyebrow = "ON AIR",
-            title = "On now",
-            caption = "Live right this second on your favorite channels",
+            eyebrow = stringResource(R.string.home_eyebrow_on_air),
+            title = stringResource(R.string.home_on_now_title),
+            caption = stringResource(R.string.home_on_now_caption),
         )
         WheelRow(
             itemWidth = ShellDim.posterTile,
@@ -903,9 +935,9 @@ private fun UpNextRail(items: List<NowPairing>, lockedIds: Set<String>, onPlay: 
     val listState = rememberLazyListState()
     Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
         RailHeader(
-            eyebrow = "TONIGHT",
-            title = "Up next",
-            caption = "Starting soon on your favorite channels",
+            eyebrow = stringResource(R.string.home_eyebrow_tonight),
+            title = stringResource(R.string.home_up_next_title),
+            caption = stringResource(R.string.home_up_next_caption),
         )
         WheelRow(
             itemWidth = ShellDim.posterTile,
