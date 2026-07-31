@@ -36,6 +36,7 @@ import com.yancotv.android.prefs.EpgPrefs
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.EpgStats
@@ -143,11 +144,15 @@ fun SettingsEpgTab(
         }
     }
 
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(

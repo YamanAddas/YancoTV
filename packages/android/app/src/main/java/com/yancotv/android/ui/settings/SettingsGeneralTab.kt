@@ -19,6 +19,7 @@ import com.yancotv.android.locale.LocaleController
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ChannelNumberFormat
 import com.yancotv.android.prefs.OpenOn
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -45,11 +46,15 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
     val language by LocaleController.language.collectAsState()
     val ctx = LocalContext.current
 
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(

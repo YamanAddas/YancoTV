@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.parental.PinEntryDialog
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
@@ -93,11 +94,15 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
     // because there's no scrollable parent. The nested hidden-items
     // LazyColumn below has bounded `heightIn(max = 280.dp)` so it
     // measures fine inside the verticalScroll.
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

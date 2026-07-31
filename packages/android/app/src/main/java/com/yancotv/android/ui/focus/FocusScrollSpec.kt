@@ -1,11 +1,15 @@
 package com.yancotv.android.ui.focus
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -181,6 +185,73 @@ fun rememberFocusScrollSpec(headroom: Dp = FocusScrollDefaults.DEFAULT_HEADROOM,
  * the composition, so nested and future scroll containers inherit it and
  * cannot regress back to Compose's flush-to-edge default.
  */
+/**
+ * MK.30.6 (MB-316) — how close to the content start a focus-driven scroll has
+ * to settle before [snapToTopNearStart] finishes the job and goes to 0.
+ *
+ * Sized to clear a `SettingsSection` header plus the container's top padding
+ * (~80dp + 24dp), with slack.
+ */
+val DEFAULT_TOP_SNAP: Dp = 140.dp
+
+/**
+ * True when a settled scroll position is close enough to the start that it
+ * should snap to 0.
+ *
+ * Deliberately excludes 0 itself (already there, so snapping would be a
+ * pointless animation) and anything past [thresholdPx] (genuinely mid-list —
+ * yanking the user to the top there would be hostile).
+ *
+ * Pure so the rule is unit-testable without a scroll container.
+ */
+fun shouldSnapToTop(scrollValue: Int, thresholdPx: Int): Boolean = scrollValue in 1..thresholdPx
+
+/**
+ * Finishes an almost-complete scroll back to the start.
+ *
+ * ### Why [ProvideFocusScrollSpec] isn't enough on its own
+ *
+ * Found on-device (Chromecast with Google TV, 2026-07-31) after MK.30.1
+ * shipped: the Playback tab still opened with its "Video" header clipped.
+ *
+ * A [BringIntoViewSpec] only ever sees the *focused element's* rect. Leading
+ * headroom therefore measures from the focused element — but the thing the user
+ * needs on screen is the section header, and the focusable is a chip sitting
+ * ~290px below its section's top (title, subtitle, row label, row hint all come
+ * first). No sane headroom reaches that far: 96dp capped at a quarter of the
+ * viewport is ~190px, so travelling up unwound the scroll to ~163px and stopped
+ * — header still off-screen, and nothing focusable above it to scroll further.
+ *
+ * The scroll container knows the one thing the spec cannot: how much scroll is
+ * actually left. When that remainder is smaller than a section header, there is
+ * no reason to keep it — so this closes the gap.
+ *
+ * Mid-list behaviour is completely unchanged: the remainder there is far past
+ * [DEFAULT_TOP_SNAP], so the predicate never fires and focus positioning stays
+ * exactly as [focusScrollDistance] left it.
+ *
+ * Usage — the ScrollState has to be hoisted so both can see it:
+ * ```
+ * val scroll = rememberScrollState()
+ * Column(Modifier.verticalScroll(scroll).snapToTopNearStart(scroll).padding(…))
+ * ```
+ */
+@Composable
+fun Modifier.snapToTopNearStart(scrollState: ScrollState, threshold: Dp = DEFAULT_TOP_SNAP): Modifier {
+    val thresholdPx = with(LocalDensity.current) { threshold.roundToPx() }
+    LaunchedEffect(scrollState, thresholdPx) {
+        snapshotFlow { scrollState.value to scrollState.isScrollInProgress }
+            // Only act once motion has stopped. Firing mid-scroll would fight
+            // both the bring-into-view animation and a touch drag.
+            .collect { (value, inProgress) ->
+                if (!inProgress && shouldSnapToTop(value, thresholdPx)) {
+                    scrollState.animateScrollTo(0)
+                }
+            }
+    }
+    return this
+}
+
 /**
  * Opts [content] out of the ambient headroom/footroom and back to
  * minimum-distance scrolling — which is what [focusScrollDistance] reduces to

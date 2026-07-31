@@ -21,6 +21,7 @@ import com.yancotv.android.prefs.BufferProfile
 import com.yancotv.android.prefs.DefaultExternalPlayer
 import com.yancotv.android.prefs.ExternalPlayerBucket
 import com.yancotv.android.prefs.ResizeMode
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -39,11 +40,15 @@ fun SettingsPlaybackTab(modifier: Modifier = Modifier, prefs: AppPreferences = k
     val ctx = LocalContext.current
     val installed = remember(ctx) { ExternalPlayer.installed(ctx) }
 
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(

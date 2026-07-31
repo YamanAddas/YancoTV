@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.AppearancePrefs
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.AccentId
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.ThemeController
@@ -58,11 +59,15 @@ fun SettingsAppearanceTab(modifier: Modifier = Modifier, themeController: ThemeC
     val appearance by prefs.appearanceFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         SettingsSection(

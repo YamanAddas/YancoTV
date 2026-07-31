@@ -51,6 +51,7 @@ import com.yancotv.android.backup.ImportResult
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.db.YancoDb
 import java.io.File
@@ -282,11 +283,15 @@ fun SettingsBackupTab(
             importFocusBump++
         }
 
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll)
             // Same outer padding as the SettingsSection-based tabs:
             // 32dp horizontal aligns with the breadcrumb's optical
             // edge; 24dp top + 80dp bottom give safety margin so the

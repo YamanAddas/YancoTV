@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
+import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoPalette
 import com.yancotv.shared.sources.SourceRepository
@@ -146,11 +147,15 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
     }
     val current = source ?: return
 
+    // MK.30.6 — hoisted so snapToTopNearStart can see the same state.
+    val tabScroll = rememberScrollState()
+
     Column(
         modifier =
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(tabScroll)
+            .snapToTopNearStart(tabScroll),
     ) {
         DetailHero(
             source = current,
