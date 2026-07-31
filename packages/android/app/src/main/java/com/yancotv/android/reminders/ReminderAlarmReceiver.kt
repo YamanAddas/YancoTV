@@ -36,7 +36,7 @@ class ReminderAlarmReceiver :
         if (intent.action != ReminderScheduler.ACTION_FIRE) return
         val reminderId = intent.getStringExtra(ReminderScheduler.EXTRA_REMINDER_ID) ?: return
         val programmeId = intent.getStringExtra(ReminderScheduler.EXTRA_PROGRAMME_ID)
-        val title = intent.getStringExtra(ReminderScheduler.EXTRA_TITLE) ?: "Upcoming programme"
+        val title = intent.getStringExtra(ReminderScheduler.EXTRA_TITLE) ?: context.getString(R.string.rem_upcoming_programme)
 
         // MK.28.3 (MB-252) — markFired is a blocking DB write. If an EPG
         // import's whole-parse transaction holds the writer connection when

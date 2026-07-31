@@ -438,7 +438,7 @@ private fun FavoriteListsTabBar(lists: List<FavoriteList>, selectedId: String, o
             )
         }
         ListTabChip(
-            label = "+ New",
+            label = stringResource(R.string.fv_new_list),
             selected = false,
             onClick = onCreate,
             onLongPress = null,
@@ -604,6 +604,7 @@ private fun SectionHeader(text: String) {
  */
 @Composable
 private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate: () -> Unit, onRemove: () -> Unit) {
+    val ctx = LocalContext.current
     val badges = remember(item.id) { QualityBadge.parse(item.title) }
     val displayTitle = remember(item.id) { item.cleanTitle?.ifBlank { null } ?: item.title }
 
@@ -666,7 +667,7 @@ private fun FavoriteRow(item: ContentItem, progress: WatchProgress?, onActivate:
                         // carry the meaning).
                         if (progress != null) {
                             Text(
-                                text = formatResumeLabel(progress),
+                                text = formatResumeLabel(ctx, progress),
                                 color = LocalYancoPalette.current.Accent,
                                 style = YancoType.Caption,
                                 maxLines = 1,
@@ -721,7 +722,7 @@ private fun UnstarButton_unused_(onClick: () -> Unit) {
     // tapping it will make the row "no longer favorited". The filled \u2605
     // is reserved for "currently starred" state in InfoPanel.
     Text(
-        text = "\u2606 Remove",
+        text = stringResource(R.string.fv_remove),
         color = LocalYancoPalette.current.Accent,
         modifier =
         Modifier

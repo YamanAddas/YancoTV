@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -621,7 +622,12 @@ internal fun RowStatus.subLine(source: Source): String {
     // orthogonal to sync health, and a source can be perfectly synced and
     // about to lapse. Omitted entirely when unknown (every m3u source, and
     // any xtream source not yet re-synced) so the common row stays 3 parts.
-    val expiry = formatSourceExpiry(source.expiresAt, System.currentTimeMillis())?.compact
+    val expiry =
+        formatSourceExpiry(
+            source.expiresAt,
+            System.currentTimeMillis(),
+            expiryStrings(LocalContext.current),
+        )?.compact
     return listOfNotNull(type, items, timing, expiry).joinToString(" · ")
 }
 

@@ -148,7 +148,11 @@ class AndroidEpgImporter(
                 }
 
                 if (downloaded.isEmpty()) {
-                    val detail = if (errors.isEmpty()) "All EPG sources produced no rows" else errors.joinToString(" | ")
+                    val detail = if (errors.isEmpty()) {
+                        context.getString(R.string.ei_no_rows)
+                    } else {
+                        errors.joinToString(" | ")
+                    }
                     recordError(detail)
                     return@withContext EpgRefreshResult(ok = false, error = detail)
                 }
@@ -186,7 +190,11 @@ class AndroidEpgImporter(
 
                     if (!anySucceeded) {
                         session.rollback()
-                        val detail = if (errors.isEmpty()) "All EPG sources produced no rows" else errors.joinToString(" | ")
+                        val detail = if (errors.isEmpty()) {
+                            context.getString(R.string.ei_no_rows)
+                        } else {
+                            errors.joinToString(" | ")
+                        }
                         recordError(detail)
                         return@withContext EpgRefreshResult(ok = false, error = detail)
                     }
@@ -196,7 +204,7 @@ class AndroidEpgImporter(
                     if (errors.isEmpty()) {
                         recordError(null)
                     } else {
-                        recordError("Partial: " + errors.joinToString(" | "))
+                        recordError(context.getString(R.string.ei_partial, errors.joinToString(" | ")))
                     }
 
                     logger.info("EPG stream: total ${session.rowsWritten} rows across ${session.channelCount} channels committed")

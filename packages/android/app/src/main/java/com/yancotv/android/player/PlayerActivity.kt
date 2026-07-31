@@ -361,7 +361,7 @@ class PlayerActivity : AppCompatActivity() {
                     player.prepare()
                     android.widget.Toast.makeText(
                         this@PlayerActivity,
-                        "Reconnecting to live…",
+                        getString(R.string.pa_reconnecting_live),
                         android.widget.Toast.LENGTH_SHORT,
                     ).show()
                     return
@@ -382,7 +382,7 @@ class PlayerActivity : AppCompatActivity() {
                     Log.i(TAG, "Transient network error — queuing auto-retry in 1500ms")
                     android.widget.Toast.makeText(
                         this@PlayerActivity,
-                        "Reconnecting…",
+                        getString(R.string.pa_reconnecting),
                         android.widget.Toast.LENGTH_SHORT,
                     ).show()
                     networkRetryJob?.cancel()
@@ -1131,7 +1131,7 @@ class PlayerActivity : AppCompatActivity() {
         val totalMin = ((total + 59L) / 60L).toInt()
         val pct = ((elapsed.toDouble() / total) * 1000.0).roundToInt().coerceIn(0, 1000)
         ppTitle.text = prog.title
-        ppTime.text = "$remainingMin min left • $totalMin min"
+        ppTime.text = getString(R.string.pa_programme_time, remainingMin, totalMin)
         ppBar.progress = pct
         if (nowSec >= prog.endTime) {
             // Programme rolled over — clear so next poll or next/next refresh
@@ -1514,7 +1514,7 @@ class PlayerActivity : AppCompatActivity() {
                 com.yancotv.android.player.options.PlayerOptionsRow(
                     category = com.yancotv.android.player.options.PlayerOptionCategory.RECORD,
                     label = getString(R.string.po_record),
-                    currentValue = if (isRecordingNow) "Recording" else "—",
+                    currentValue = if (isRecordingNow) getString(R.string.pa_recording_now) else "—",
                     onPick = { optionsV2State.openPanel(com.yancotv.android.player.options.PlayerOptionCategory.RECORD) },
                 )
         }
@@ -1818,7 +1818,7 @@ class PlayerActivity : AppCompatActivity() {
             bufferFill = bufferLabel,
             latency = "—",
             resolution = resLabel,
-            progressLabel = "BUFFERING",
+            progressLabel = getString(R.string.pa_buffering),
         )
     }
 
@@ -1871,7 +1871,7 @@ class PlayerActivity : AppCompatActivity() {
             getString(R.string.pe_catchup_expired_desc)
         } else {
             error.localizedMessage?.let(::redactCredentials)
-                ?: "Check your connection or try another source."
+                ?: getString(R.string.pa_check_connection)
         }
         return VodChromeError(
             codeName = error.errorCodeName,

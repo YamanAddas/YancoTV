@@ -156,17 +156,18 @@ fun WatchedCheckBadge(modifier: Modifier = Modifier) {
  * Returns "Watched" for finished rows so callers that wrap in a single
  * badge slot (no separate WatchedCheckBadge) get sensible copy.
  */
-fun formatResumeLabel(progress: WatchProgress): String {
-    if (progress.isFinished()) return "Watched"
-    val remaining = progress.remainingSeconds() ?: return "Resume"
+fun formatResumeLabel(ctx: android.content.Context, progress: WatchProgress): String {
+    if (progress.isFinished()) return ctx.getString(R.string.wi_watched)
+    val remaining = progress.remainingSeconds() ?: return ctx.getString(R.string.wi_resume)
     val totalMinutes = (remaining / 60).toInt().coerceAtLeast(1)
     // Audit catch — movie tiles previously read "85m left". Roll into
     // hours past the 60-minute mark so longer titles read as e.g.
     // "1h 25m left" or "2h left" — consistent with how the rest of
     // the app already rolls "X hr ago" / "X d ago".
     return when {
-        totalMinutes < 60 -> "${totalMinutes}m left"
-        totalMinutes % 60 == 0 -> "${totalMinutes / 60}h left"
-        else -> "${totalMinutes / 60}h ${totalMinutes % 60}m left"
+        totalMinutes < 60 -> ctx.getString(R.string.wi_min_left, totalMinutes)
+        totalMinutes % 60 == 0 -> ctx.getString(R.string.wi_hour_left, totalMinutes / 60)
+        else ->
+            ctx.getString(R.string.wi_hour_min_left, totalMinutes / 60, totalMinutes % 60)
     }
 }

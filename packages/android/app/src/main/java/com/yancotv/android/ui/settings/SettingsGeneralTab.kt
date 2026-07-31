@@ -58,6 +58,7 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
             .snapToTopNearStart(tabScroll)
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
+        val systemLangLabel = stringResource(R.string.lang_system)
         SettingsSection(
             title = stringResource(R.string.gen_sec_language),
             sub = stringResource(R.string.gen_sec_language_sub),
@@ -73,7 +74,12 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
                         // screen a user may reach while the app is in a
                         // language they can't read, so each option has to be
                         // legible to the person who wants it.
-                        label = { it.endonym },
+                        // MK.31.24 — endonyms are never translated; that is the
+                        // point of an endonym. Only the "System" row, which is
+                        // not a language, gets a localized label.
+                        label = {
+                            if (it == AppLanguage.System) systemLangLabel else it.endonym
+                        },
                         onSelect = { choice ->
                             if (choice != language) {
                                 LocaleController.setLanguage(ctx, choice)

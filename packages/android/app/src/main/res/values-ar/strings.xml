@@ -965,4 +965,127 @@
 
     <!-- MK.31.21 fixups + recordings tab -->
     <string name="rt_advanced">متقدّم</string>
+
+    <!-- MK.31.22 shell screens -->
+    <string name="gs_refreshing">جارٍ تحديث دليل البرامج…</string>
+    <string name="gs_resyncing">جارٍ إعادة مزامنة %1$s…</string>
+    <string name="gs_generic_source">مصدر</string>
+    <string name="gs_counts">%1$d برنامج · %2$d قناة</string>
+    <string name="gs_refresh_epg">تحديث الدليل</string>
+    <string name="gs_refresh_epg_now">حدّث الدليل الآن</string>
+    <string name="gs_resync_sources">إعادة مزامنة المصادر</string>
+    <string name="gs_no_guide_data">لا توجد بيانات دليل بعد</string>
+    <string name="gs_diagnostics">تشخيص الدليل</string>
+    <string name="gs_src_line">• %1$s  ·  %2$d قناة  ·  </string>
+    <string name="gs_epg_url_set">عنوان الدليل مضبوط</string>
+    <string name="gs_no_epg_url">لا يوجد عنوان دليل</string>
+    <string name="gs_src_err">  ·  خطأ: %1$s</string>
+    <string name="gs_broken_sources">%1$d مصدر فشل آخر مرة. أعد مزامنتها للمحاولة مجدداً.</string>
+    <string name="gs_override_help">الصق عنوان XMLTV لتحميل دليل البرامج منه. يُستخدم إضافةً إلى عناوين كل مصدر — مفيد عندما تكون خلاصة المزوّد معطّلة أو عندما تريد جدولاً أفضل.</string>
+    <string name="gs_never_refreshed">لم يُحدَّث أبداً</string>
+    <string name="gs_last_refreshed">آخر تحديث %1$s</string>
+    <string name="gs_no_active_sources">لا توجد مصادر نشطة</string>
+    <string name="gs_sources_with_epg">%1$d من %2$d مصدر لديه عنوان دليل</string>
+    <string name="gs_last_error"> · آخر خطأ: %1$s</string>
+    <string name="rel_just_now_lower">الآن</string>
+    <string name="rs_recording_ends">جارٍ التسجيل · ينتهي %1$s</string>
+    <string name="rs_starting_now">يبدأ الآن</string>
+    <string name="rs_in_min">بعد %1$d د</string>
+    <string name="rs_in_hours">بعد %1$d س</string>
+    <string name="rs_in_days">بعد %1$d يوم</string>
+    <string name="rs_reason_device_offline">كان الجهاز مُطفأً</string>
+    <string name="rs_reason_concurrent">كان هناك تسجيل آخر جارٍ</string>
+    <string name="rs_reason_orphaned">قُطع بسبب إعادة التشغيل</string>
+    <string name="rs_reason_channel_deleted">تمت إزالة القناة</string>
+    <string name="cd_episode_total">%1$d بالمجموع</string>
+    <string name="cd_episodes_count">%1$d حلقة</string>
+    <string name="cd_episode_n">الحلقة %1$d</string>
+    <string name="cd_minutes_left">بقي %1$d د</string>
+    <string name="wi_min_left">بقي %1$d د</string>
+    <string name="wi_hour_left">بقي %1$d س</string>
+    <string name="wi_hour_min_left">بقي %1$d س %2$d د</string>
+    <string name="wi_resume">متابعة</string>
+    <string name="fh_feature">فيلم</string>
+    <string name="fh_series">مسلسل</string>
+    <string name="fh_open_fullscreen">فتح بملء الشاشة</string>
+    <string name="fh_in_favorites">في المفضلة</string>
+    <string name="fh_favorite">أضف للمفضلة</string>
+    <string name="fh_min_left">بقي %1$d د</string>
+    <string name="fh_ending_now">ينتهي الآن</string>
+    <string name="fh_live_channel">قناة مباشرة</string>
+    <string name="cf_episodes_count">%1$d حلقة</string>
+    <string name="cf_no_series">لا توجد مسلسلات</string>
+    <string name="cf_favorites_empty">ضع نجمة على شيء من لوحة المعاينة وسيظهر هنا.</string>
+    <string name="cf_add_source">أضف مصدر IPTV لبدء المشاهدة.</string>
+    <string name="cf_in_progress">، قيد المشاهدة</string>
+    <string name="fv_new_list">+ جديد</string>
+    <string name="fv_remove">\u2606 إزالة</string>
+    <string name="gd_programme_semantics">%1$s، يبدأ %2$s</string>
+    <string name="hc_programme_on_channel">%1$s على %2$s</string>
+    <string name="nn_next">التالي: %1$s</string>
+    <string name="ps_service_unreachable">تعذّر الوصول إلى خدمة الترجمات</string>
+    <string name="ps_download_failed">فشل التنزيل</string>
+    <string name="ps_selected_suffix">، مُختار</string>
+
+    <!-- MK.31.22 shell screens (edits) -->
+    <string name="cf_locked_suffix">، مقفل</string>
+    <string name="cf_watched_suffix">، تمّت المشاهدة</string>
+    <string name="type_live">مباشر</string>
+    <string name="type_movie">فيلم</string>
+    <string name="type_series">مسلسل</string>
+
+    <!-- MK.31.22 shell (fixups) -->
+
+    <!-- MK.31.23 player + cast + infra -->
+    <string name="ep_open_in">افتح في %1$s</string>
+    <string name="ep_open_with">افتح باستخدام</string>
+    <string name="pa_reconnecting_live">جارٍ إعادة الاتصال بالبث المباشر…</string>
+    <string name="pa_reconnecting">جارٍ إعادة الاتصال…</string>
+    <string name="pa_recording_now">جارٍ التسجيل</string>
+    <string name="pa_check_connection">تحقّق من اتصالك أو جرّب مصدراً آخر.</string>
+    <string name="pa_programme_time">بقي %1$d د • %2$d د</string>
+    <string name="pa_buffering">جارٍ التخزين</string>
+    <string name="vc_cant_open_stream">تعذّر فتح هذا البث</string>
+    <string name="vd_rewind_10">أرجع 10 ثوانٍ</string>
+    <string name="vd_forward_10">تقدّم 10 ثوانٍ</string>
+    <string name="pc_external_subtitle">ترجمة خارجية</string>
+    <string name="cc_same_wifi">تعذّر البث — تأكّد أن الهاتف على نفس شبكة Wi-Fi مع التلفاز.</string>
+    <string name="cc_unsupported_format">تعذّر تحضير هذا الفيديو للبث — قد يكون بتنسيق غير مدعوم (مثل HEVC).</string>
+    <string name="cc_cast_failed">تعذّر بثّ هذا المحتوى إلى %1$s.</string>
+    <string name="ei_no_rows">لم تُنتج أي من مصادر دليل البرامج أي صفوف</string>
+    <string name="ei_partial">جزئي: %1$s</string>
+    <string name="ma_sample_movies">أفلام تجريبية (مضمّنة)</string>
+    <string name="ma_sample_news">أخبار iptv-org (تجريبي)</string>
+    <string name="rc_recently_watched">YancoTV — شوهد حديثاً</string>
+    <string name="rem_upcoming_programme">برنامج قادم</string>
+
+    <!-- MK.31.23 fixups -->
+
+    <!-- MK.31.24 theme, expiry, tail -->
+    <string name="th_frosted_emerald">زمرّدي مُثلَج</string>
+    <string name="th_midnight_sapphire">ياقوت منتصف الليل</string>
+    <string name="th_warm_amber">كهرماني دافئ</string>
+    <string name="th_monochrome">أحادي اللون</string>
+    <string name="ac_match_theme">مطابقة السمة</string>
+    <string name="ac_emerald">زمرّدي</string>
+    <string name="ac_sapphire">ياقوتي</string>
+    <string name="ac_amber">كهرماني</string>
+    <string name="ac_red">أحمر</string>
+    <string name="lang_system">النظام</string>
+    <string name="se_expired_compact">منتهي</string>
+    <string name="se_expired_full">انتهى في %1$s</string>
+    <string name="se_today_compact">ينتهي اليوم</string>
+    <string name="se_today_full">%1$s · بقي أقل من يوم</string>
+    <string name="se_soon_compact">ينتهي بعد %1$d ي</string>
+    <string name="se_soon_full_one">%1$s · بقي يوم واحد</string>
+    <string name="se_soon_full_many">%1$s · بقي %2$d يوم</string>
+    <string name="se_later_compact">ينتهي %1$s</string>
+    <string name="epg_minutes_value">%1$d د</string>
+    <string name="ca_default_suffix"> (افتراضي)</string>
+    <string name="bc_no_label">(بلا تسمية)</string>
+    <string name="sc_sync_failed_for">فشلت مزامنة %1$s: %2$s</string>
+
+    <!-- MK.31.24 fixups -->
+
+    <!-- MK.31.24 fixups (2) -->
 </resources>

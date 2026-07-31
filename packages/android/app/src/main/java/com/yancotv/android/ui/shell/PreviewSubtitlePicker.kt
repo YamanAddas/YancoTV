@@ -40,6 +40,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -133,6 +134,9 @@ internal fun PreviewSubtitleOverlay(
     // Non-null while a pick is being downloaded — blocks a second concurrent
     // pick and drives the row's "Downloading…" label.
     var resolving by remember { mutableStateOf<String?>(null) }
+    // MK.31.22 — the two error strings below are assigned inside a
+    // LaunchedEffect / onFailure lambda, neither of which is composable scope.
+    val ctx = LocalContext.current
 
     LaunchedEffect(item.id, preferredLanguage) {
         searching = true
@@ -157,7 +161,7 @@ internal fun PreviewSubtitleOverlay(
                 }.getOrNull()
             }
         if (found == null) {
-            error = "Couldn't reach the subtitle service"
+            error = ctx.getString(R.string.ps_service_unreachable)
         } else {
             online = found
         }
@@ -289,7 +293,7 @@ internal fun PreviewSubtitleOverlay(
                                         // a day, and "nothing happened" is the
                                         // worst possible way to communicate
                                         // hitting that ceiling.
-                                        error = t.message ?: "Download failed"
+                                        error = t.message ?: ctx.getString(R.string.ps_download_failed)
                                     }
                             }
                         },
@@ -331,6 +335,7 @@ private fun SubtitleStatusRow(text: String) {
 
 @Composable
 private fun SubtitleOptionRow(label: String, detail: String?, selected: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -358,8 +363,8 @@ private fun SubtitleOptionRow(label: String, detail: String?, selected: Boolean,
                 // selection either.
                 contentDescription = buildString {
                     append(label)
-                    detail?.let { append(", $it") }
-                    if (selected) append(", selected")
+                    detail?.let { append(ctx.getString(R.string.ps_detail_suffix, it)) }
+                    if (selected) append(ctx.getString(R.string.ps_selected_suffix))
                 }
             }.padding(horizontal = Space.lg, vertical = Space.md),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),

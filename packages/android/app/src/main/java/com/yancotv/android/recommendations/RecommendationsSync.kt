@@ -10,6 +10,7 @@ import androidx.tvprovider.media.tv.Channel
 import androidx.tvprovider.media.tv.PreviewProgram
 import androidx.tvprovider.media.tv.TvContractCompat
 import com.yancotv.android.MainActivity
+import com.yancotv.android.R
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.types.ContentType
 
@@ -119,7 +120,7 @@ class RecommendationsSync(private val context: Context, private val history: Wat
             Channel
                 .Builder()
                 .setType(TvContractCompat.Channels.TYPE_PREVIEW)
-                .setDisplayName(CHANNEL_DISPLAY_NAME)
+                .setDisplayName(context.getString(CHANNEL_DISPLAY_NAME_RES))
                 .setAppLinkIntentUri(deepLinkFor(itemId = null))
                 .setInternalProviderId(INTERNAL_PROVIDER_ID)
                 .build()
@@ -175,8 +176,12 @@ class RecommendationsSync(private val context: Context, private val history: Wat
         /** Stable id distinguishing our channel from any other publisher's. */
         private const val INTERNAL_PROVIDER_ID = "yancotv.recommendations.v1"
 
-        /** Display name shown on the launcher row header. */
-        private const val CHANNEL_DISPLAY_NAME = "YancoTV — Recently watched"
+        /**
+         * Display name shown on the launcher row header. A resource id rather
+         * than a string: this is a companion const, which cannot reach a
+         * Context. Resolved in [ensureChannel].
+         */
+        private val CHANNEL_DISPLAY_NAME_RES = R.string.rc_recently_watched
 
         /** Cards per refresh. 10 keeps the row scannable; user can launch
          *  the app for the full library. */

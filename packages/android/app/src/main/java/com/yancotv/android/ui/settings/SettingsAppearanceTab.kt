@@ -180,7 +180,7 @@ private fun ThemeRow(id: ThemeId, selected: Boolean, palette: YancoPalette, onCl
         SwatchTriple(palette = palette)
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = id.displayName,
+                text = stringResource(id.labelRes),
                 color = pal.TextPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -247,7 +247,7 @@ private fun AccentChip(id: AccentId, selected: Boolean, swatch: Color, onClick: 
     ) {
         Swatch(swatch, size = 22.dp)
         Text(
-            text = id.displayName,
+            text = stringResource(id.labelRes),
             color = if (selected || focused) pal.TextPrimary else pal.TextSecondary,
             fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,

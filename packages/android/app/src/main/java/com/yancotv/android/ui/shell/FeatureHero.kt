@@ -227,9 +227,9 @@ private fun HeroCopy(
 ) {
     val eyebrow =
         when (focused.type) {
-            ContentType.LIVE -> "LIVE CHANNEL"
-            ContentType.MOVIE -> "FEATURE"
-            ContentType.SERIES -> "SERIES"
+            ContentType.LIVE -> stringResource(R.string.fh_live_channel)
+            ContentType.MOVIE -> stringResource(R.string.fh_feature)
+            ContentType.SERIES -> stringResource(R.string.fh_series)
         }
     val title = focused.cleanTitle?.ifBlank { null } ?: focused.title
     val nowProg = nowNext?.now
@@ -296,15 +296,17 @@ private fun HeroCopy(
                 // opens the detail overlay, which owns the real Play CTA.
                 label =
                 when {
-                    focused.type == ContentType.LIVE -> "Open fullscreen"
-                    isCurrentlyPlaying -> "Open fullscreen"
+                    focused.type == ContentType.LIVE -> stringResource(R.string.fh_open_fullscreen)
+                    isCurrentlyPlaying -> stringResource(R.string.fh_open_fullscreen)
                     else -> "Play now"
                 },
                 icon = YancoIcons.Play,
                 onClick = onPlay,
             )
             TonalCta(
-                label = if (isFavorite) "In favorites" else "Favorite",
+                label = stringResource(
+                    if (isFavorite) R.string.fh_in_favorites else R.string.fh_favorite,
+                ),
                 icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
                 highlighted = isFavorite,
                 onClick = onToggleFavorite,
@@ -429,7 +431,11 @@ private fun HeroProgress(start: Long, end: Long, now: Long) {
             )
         }
         Text(
-            text = if (remainingMin > 0) "$remainingMin min left" else "Ending now",
+            text = if (remainingMin > 0) {
+                stringResource(R.string.fh_min_left, remainingMin)
+            } else {
+                stringResource(R.string.fh_ending_now)
+            },
             color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Caption,
         )

@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.settings
 
+import com.yancotv.android.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -46,7 +47,38 @@ internal const val EXPIRY_SOON_DAYS = 14L
  * not midnight boundaries. "3 days left" derived from elapsed time can't
  * disagree with itself across a DST shift the way a midnight-diff can.
  */
-internal fun formatSourceExpiry(expiresAt: Long?, nowMs: Long, locale: Locale = Locale.getDefault()): SourceExpiryInfo? {
+/**
+ * MK.31.24 — the wording, supplied by the caller.
+ *
+ * [formatSourceExpiry] stays a pure function with a plain JVM unit test, which
+ * is worth keeping: the interesting behaviour is the day-count and urgency
+ * classification, not the copy. Production passes Context-backed lambdas; the
+ * test passes English ones and keeps asserting exact output.
+ */
+internal data class ExpiryStrings(
+    val expiredCompact: String,
+    val expiredFull: (String) -> String,
+    val todayCompact: String,
+    val todayFull: (String) -> String,
+    val soonCompact: (Long) -> String,
+    val soonFullOne: (String) -> String,
+    val soonFullMany: (String, Long) -> String,
+    val laterCompact: (String) -> String,
+)
+
+/** The production wording, read from resources. */
+internal fun expiryStrings(ctx: android.content.Context) = ExpiryStrings(
+    expiredCompact = ctx.getString(R.string.se_expired_compact),
+    expiredFull = { d -> ctx.getString(R.string.se_expired_full, d) },
+    todayCompact = ctx.getString(R.string.se_today_compact),
+    todayFull = { d -> ctx.getString(R.string.se_today_full, d) },
+    soonCompact = { n -> ctx.getString(R.string.se_soon_compact, n) },
+    soonFullOne = { d -> ctx.getString(R.string.se_soon_full_one, d) },
+    soonFullMany = { d, n -> ctx.getString(R.string.se_soon_full_many, d, n) },
+    laterCompact = { d -> ctx.getString(R.string.se_later_compact, d) },
+)
+
+internal fun formatSourceExpiry(expiresAt: Long?, nowMs: Long, strings: ExpiryStrings, locale: Locale = Locale.getDefault()): SourceExpiryInfo? {
     if (expiresAt == null) return null
     val remainingMs = expiresAt - nowMs
     val days = TimeUnit.MILLISECONDS.toDays(remainingMs)
@@ -56,8 +88,8 @@ internal fun formatSourceExpiry(expiresAt: Long?, nowMs: Long, locale: Locale = 
     return when {
         remainingMs <= 0L ->
             SourceExpiryInfo(
-                compact = "expired",
-                full = "Expired $date",
+                compact = strings.expiredCompact,
+                full = strings.expiredFull(date),
                 urgency = ExpiryUrgency.Expired,
                 daysRemaining = 0L,
             )
@@ -65,21 +97,25 @@ internal fun formatSourceExpiry(expiresAt: Long?, nowMs: Long, locale: Locale = 
         // completely useless, so this case gets its own wording.
         days < 1L ->
             SourceExpiryInfo(
-                compact = "expires today",
-                full = "$date · less than a day left",
+                compact = strings.todayCompact,
+                full = strings.todayFull(date),
                 urgency = ExpiryUrgency.Soon,
                 daysRemaining = 0L,
             )
         days <= EXPIRY_SOON_DAYS ->
             SourceExpiryInfo(
-                compact = "expires in ${days}d",
-                full = "$date · $days ${if (days == 1L) "day" else "days"} left",
+                compact = strings.soonCompact(days),
+                full = if (days == 1L) {
+                    strings.soonFullOne(date)
+                } else {
+                    strings.soonFullMany(date, days)
+                },
                 urgency = ExpiryUrgency.Soon,
                 daysRemaining = days,
             )
         else ->
             SourceExpiryInfo(
-                compact = "expires $shortDate",
+                compact = strings.laterCompact(shortDate),
                 full = date,
                 urgency = ExpiryUrgency.Later,
                 daysRemaining = days,

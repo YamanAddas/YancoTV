@@ -875,7 +875,7 @@ private fun SidebarHeader() {
 private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, focusRequester: FocusRequester? = null) {
     // MK.31.3 — resolved outside the non-composable `semantics` lambda.
     val tabLabel = stringResource(entry.labelRes)
-    val tabDescription = "$tabLabel settings tab"
+    val tabDescription = stringResource(R.string.ss_tab_semantics, tabLabel)
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current

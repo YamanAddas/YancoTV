@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.yancotv.android.BuildConfig
+import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.recording.RecordingDataSink
 import com.yancotv.android.recording.TeeingDataSourceFactory
@@ -588,7 +589,7 @@ class PlaybackController(
         ?.substringBeforeLast('.')
         ?.replace(Regex("^\\d+-"), "")
         ?.takeIf { it.isNotBlank() }
-        ?: "External subtitle"
+        ?: context.getString(R.string.pc_external_subtitle)
 
     // MK.12b.1 — sleep timer. Coroutine job lives on `scope`; cancellation
     // happens via [cancelSleepTimer], lifecycle [release], or — for the

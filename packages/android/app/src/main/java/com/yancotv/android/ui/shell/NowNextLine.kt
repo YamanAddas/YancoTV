@@ -12,10 +12,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.types.NowNext
 
@@ -39,7 +41,7 @@ fun NowNextLine(nowNext: NowNext?, nowSeconds: Long, modifier: Modifier = Modifi
                 val elapsed = (nowSeconds - now.startTime).coerceIn(0L, dur)
                 now.title to elapsed.toFloat() / dur.toFloat()
             }
-            next != null -> "Next: ${next.title}" to 0f
+            next != null -> stringResource(R.string.nn_next, next.title) to 0f
             else -> return
         }
 

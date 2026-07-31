@@ -17,6 +17,7 @@ import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.images.WebImage
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.shared.logger.Logger
@@ -268,14 +269,14 @@ class CastController(
                         CastProxyOutcome.NoNetwork -> {
                             logger.warn("Cast: no Wi-Fi address to serve ${item.id}")
                             withContext(Dispatchers.Main) {
-                                failCast("Couldn't cast — make sure the phone is on the same Wi-Fi as the TV.")
+                                failCast(appContext.getString(R.string.cc_same_wifi))
                             }
                             return@launch
                         }
                         CastProxyOutcome.NotReady -> {
                             logger.warn("Cast: proxy couldn't prepare ${item.id} for casting")
                             withContext(Dispatchers.Main) {
-                                failCast("Couldn't prepare this video for casting — it may be an unsupported format (e.g. HEVC).")
+                                failCast(appContext.getString(R.string.cc_unsupported_format))
                             }
                             return@launch
                         }
@@ -328,7 +329,7 @@ class CastController(
         return path.endsWith(".mp4") || path.endsWith(".m4v")
     }
 
-    private fun castFailedMessage(deviceName: String): String = "Couldn't cast this stream to $deviceName."
+    private fun castFailedMessage(deviceName: String): String = appContext.getString(R.string.cc_cast_failed, deviceName)
 
     /**
      * Main-thread only. A cast attempt didn't take — tell the user AND resume the

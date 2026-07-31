@@ -162,8 +162,11 @@ fun GuideSyncPanel(
     val syncing = coordinatorState != null
     val busyLabel =
         when {
-            running -> "Refreshing EPG…"
-            syncing -> "Re-syncing ${coordinatorState?.sourceName ?: "source"}…"
+            running -> stringResource(R.string.gs_refreshing)
+            syncing -> stringResource(
+                R.string.gs_resyncing,
+                coordinatorState?.sourceName ?: stringResource(R.string.gs_generic_source),
+            )
             else -> null
         }
 
@@ -190,13 +193,14 @@ fun GuideSyncPanel(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "$programmes programmes · $channels channels",
+                    text = stringResource(R.string.gs_counts, programmes, channels),
                     color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = busyLabel ?: subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
+                    text = busyLabel
+                        ?: subtitleFor(context, lastRefreshed, activeSources.size, withEpg, displayError),
                     color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                     // MK.28.8 (MB-279) — live region so TalkBack announces
@@ -217,7 +221,7 @@ fun GuideSyncPanel(
                 enabled = !running && !syncing,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.Accent),
             ) {
-                Text("Refresh EPG", fontSize = 12.sp)
+                Text(stringResource(R.string.gs_refresh_epg), fontSize = 12.sp)
             }
         }
         return
@@ -240,13 +244,15 @@ fun GuideSyncPanel(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = if (programmes == 0L) "No guide data yet" else "Guide diagnostics",
+                text = stringResource(
+                    if (programmes == 0L) R.string.gs_no_guide_data else R.string.gs_diagnostics,
+                ),
                 color = LocalYancoPalette.current.TextPrimary,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = subtitleFor(lastRefreshed, activeSources.size, withEpg, displayError),
+                text = subtitleFor(context, lastRefreshed, activeSources.size, withEpg, displayError),
                 color = if (displayError != null && !running) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                 fontSize = 14.sp,
                 // MK.28.8 (MB-279) — live region so TalkBack announces
@@ -278,9 +284,16 @@ fun GuideSyncPanel(
                         Text(
                             text =
                             buildString {
-                                append("• ${src.name}  ·  ${src.channelCount} channels  ·  ")
-                                append(if (hasEpg) "EPG URL set" else "no EPG URL")
-                                if (!err.isNullOrBlank()) append("  ·  err: $err")
+                                append(stringResource(R.string.gs_src_line, src.name, src.channelCount))
+                                append(
+                                    stringResource(
+                                        if (hasEpg) R.string.gs_epg_url_set else R.string.gs_no_epg_url,
+                                    ),
+                                )
+                                // err is provider text; only the label is localized.
+                                if (!err.isNullOrBlank()) {
+                                    append(stringResource(R.string.gs_src_err, err))
+                                }
                             },
                             color = if (!err.isNullOrBlank() || !hasEpg) LocalYancoPalette.current.Error else LocalYancoPalette.current.TextMuted,
                             fontSize = 12.sp,
@@ -295,19 +308,19 @@ fun GuideSyncPanel(
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
-                    Text("Refresh EPG now")
+                    Text(stringResource(R.string.gs_refresh_epg_now))
                 }
                 OutlinedButton(
                     onClick = { doResyncSources() },
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
-                    Text("Re-sync sources")
+                    Text(stringResource(R.string.gs_resync_sources))
                 }
             }
             if (brokenSources.isNotEmpty() && !running && !syncing) {
                 Text(
-                    text = "${brokenSources.size} source(s) last failed. Re-sync them to retry.",
+                    text = stringResource(R.string.gs_broken_sources, brokenSources.size),
                     color = LocalYancoPalette.current.Error,
                     fontSize = 12.sp,
                 )
@@ -322,8 +335,7 @@ fun GuideSyncPanel(
             )
             Text(
                 text =
-                "Paste an XMLTV URL to load EPG from. Used in addition to per-source URLs — " +
-                    "useful when a provider's feed is broken or you want a better schedule.",
+                stringResource(R.string.gs_override_help),
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
             )
@@ -395,31 +407,34 @@ fun GuideSyncPanel(
 
 private data class Snapshot(val stats: EpgStats?, val sources: List<Source>, val globalUrl: String?, val lastError: String?)
 
-private fun subtitleFor(lastRefreshedMs: Long?, totalSources: Int, withEpg: Int, lastError: String?): String {
+// MK.31.22 — takes a Context: plain function, so stringResource is unavailable.
+private fun subtitleFor(ctx: android.content.Context, lastRefreshedMs: Long?, totalSources: Int, withEpg: Int, lastError: String?): String {
     val refreshed =
         when (lastRefreshedMs) {
-            null -> "never refreshed"
-            else -> "last refreshed ${formatRelative(lastRefreshedMs)}"
+            null -> ctx.getString(R.string.gs_never_refreshed)
+            else ->
+                ctx.getString(R.string.gs_last_refreshed, formatRelative(ctx, lastRefreshedMs))
         }
     val srcPart =
         when (totalSources) {
-            0 -> "no active sources"
-            else -> "$withEpg of $totalSources source(s) have an EPG URL"
+            0 -> ctx.getString(R.string.gs_no_active_sources)
+            else -> ctx.getString(R.string.gs_sources_with_epg, withEpg, totalSources)
         }
-    val tail = if (lastError != null) " · last error: $lastError" else ""
-    return "$refreshed · $srcPart$tail"
+    // lastError is provider text; only the label around it is localized.
+    val tail = if (lastError != null) ctx.getString(R.string.gs_last_error, lastError) else ""
+    return ctx.getString(R.string.gs_subtitle, refreshed, srcPart, tail)
 }
 
-private fun formatRelative(epochMs: Long): String {
+private fun formatRelative(ctx: android.content.Context, epochMs: Long): String {
     val diff = (System.currentTimeMillis() - epochMs).coerceAtLeast(0L)
     val min = diff / 60_000L
     val hr = diff / 3_600_000L
     val days = diff / 86_400_000L
     return when {
-        min < 1L -> "just now"
-        min < 60L -> "${min}m ago"
-        hr < 24L -> "${hr}h ago"
-        else -> "${days}d ago"
+        min < 1L -> ctx.getString(R.string.rel_just_now_lower)
+        min < 60L -> ctx.getString(R.string.rel_min_ago, min)
+        hr < 24L -> ctx.getString(R.string.rel_hour_ago, hr)
+        else -> ctx.getString(R.string.rel_day_ago, days)
     }
 }
 

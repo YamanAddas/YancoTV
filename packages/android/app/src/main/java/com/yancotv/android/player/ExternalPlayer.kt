@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import com.yancotv.android.R
 
 /**
  * MK.18.1 — known external video player apps. The `packageName` must
@@ -11,11 +12,17 @@ import android.net.Uri
  * Android 11+ visibility, otherwise [PackageManager.getPackageInfo]
  * always reports "not installed".
  */
-enum class ExternalPlayerApp(val packageName: String, val displayName: String, val sub: String) {
-    VLC("org.videolan.vlc", "VLC", "Open in VLC"),
-    MX_PRO("com.mxtech.videoplayer.pro", "MX Player Pro", "Open in MX Player Pro"),
-    MX_FREE("com.mxtech.videoplayer.ad", "MX Player", "Open in MX Player"),
-    JUST_PLAYER("com.brouken.player", "Just Player", "Open in Just Player"),
+// MK.31.23 — `displayName` stays a literal: VLC / MX Player / Just Player are
+// product names, not copy. The "Open in X" line around it is localized, so
+// `sub` became a helper rather than a stored string.
+enum class ExternalPlayerApp(val packageName: String, val displayName: String) {
+    VLC("org.videolan.vlc", "VLC"),
+    MX_PRO("com.mxtech.videoplayer.pro", "MX Player Pro"),
+    MX_FREE("com.mxtech.videoplayer.ad", "MX Player"),
+    JUST_PLAYER("com.brouken.player", "Just Player"),
+    ;
+
+    fun sub(ctx: Context): String = ctx.getString(R.string.ep_open_in, displayName)
 }
 
 /**
@@ -81,7 +88,7 @@ object ExternalPlayer {
         val intent = buildIntent(streamUrl, positionMs, app)
         val toStart =
             if (app == null) {
-                Intent.createChooser(intent, "Open with").apply {
+                Intent.createChooser(intent, context.getString(R.string.ep_open_with)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             } else {

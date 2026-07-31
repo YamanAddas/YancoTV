@@ -72,6 +72,8 @@ data class VodChromeBuffering(
     val bufferFill: String = "—",
     val latency: String = "—",
     val resolution: String = "—",
+    // Default only — PlayerActivity passes the localized string. Kept as a
+    // literal because a data-class default cannot reach a Context.
     val progressLabel: String = "BUFFERING",
 )
 
@@ -84,6 +86,7 @@ data class VodChromeBuffering(
 data class VodChromeError(
     val codeName: String = "E_PLAYBACK",
     val codeNumeric: String = "",
+    // Same as progressLabel above: PlayerActivity supplies the localized title.
     val title: String = "Couldn't open this stream",
     val description: String = "",
     val sourceName: String = "",

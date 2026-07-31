@@ -1381,6 +1381,13 @@ private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPre
 
 @Composable
 private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui.unit.Dp, onActivate: () -> Unit) {
+    // MK.31.22 — resolved here: `semantics {}` is not composable scope.
+    val programmeSemantics =
+        stringResource(
+            R.string.gd_programme_semantics,
+            programme.title,
+            formatHourMinute(programme.startTime),
+        )
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundDeep
@@ -1407,7 +1414,7 @@ private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui
             // cells per visible EPG window this is the highest-volume
             // silent-button site in the app.
             .semantics(mergeDescendants = true) {
-                contentDescription = "${programme.title}, starts ${formatHourMinute(programme.startTime)}"
+                contentDescription = programmeSemantics
             }
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.SpaceBetween,

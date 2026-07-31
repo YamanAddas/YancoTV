@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -966,6 +967,7 @@ private fun UpNextRail(items: List<NowPairing>, lockedIds: Set<String>, onPlay: 
 
 @Composable
 private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val progressPct =
@@ -1053,7 +1055,7 @@ private fun PosterTile(item: ContentItem, locked: Boolean, resume: HistoryEntry?
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = secondaryLine(item, resume),
+                    text = secondaryLine(ctx, item, resume),
                     color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
@@ -1441,17 +1443,23 @@ private fun matchesPreferredLanguage(item: ContentItem): Boolean {
     return title.isNotEmpty() && asciiCount.toFloat() / title.length >= 0.7f
 }
 
-private fun secondaryLine(item: ContentItem, resume: HistoryEntry?): String = when {
+private fun secondaryLine(ctx: android.content.Context, item: ContentItem, resume: HistoryEntry?): String = when {
     resume != null && resume.durationSeconds != null -> {
         val watched = formatMmSs(resume.positionSeconds.roundToInt())
         val total = formatMmSs(resume.durationSeconds!!.roundToInt())
-        "$watched / $total"
+        ctx.getString(R.string.hc_watched_of_total, watched, total)
     }
     !item.groupName.isNullOrBlank() -> item.groupName!!
+    // Was `item.type.name.lowercase().replaceFirstChar(uppercase)`, which
+    // rendered the raw enum name. Reads as English in every locale.
     else ->
-        item.type.name
-            .lowercase()
-            .replaceFirstChar(Char::uppercase)
+        ctx.getString(
+            when (item.type) {
+                ContentType.LIVE -> R.string.type_live
+                ContentType.MOVIE -> R.string.type_movie
+                ContentType.SERIES -> R.string.type_series
+            },
+        )
 }
 
 private fun formatMmSs(sec: Int): String {

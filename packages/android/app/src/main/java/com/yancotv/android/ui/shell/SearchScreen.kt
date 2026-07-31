@@ -686,6 +686,7 @@ private fun SearchRail(title: String, items: List<ContentItem>, watchProgress: M
  */
 @Composable
 private fun SearchOrb(item: ContentItem, progress: WatchProgress?, onActivate: () -> Unit) {
+    val ctx = LocalContext.current
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -743,7 +744,7 @@ private fun SearchOrb(item: ContentItem, progress: WatchProgress?, onActivate: (
                     )
                 } else {
                     ResumeBadge(
-                        label = formatResumeLabel(progress),
+                        label = formatResumeLabel(ctx, progress),
                         modifier = Modifier.align(Alignment.TopStart).padding(Space.xs),
                     )
                     if (progress.ratio > 0f) {

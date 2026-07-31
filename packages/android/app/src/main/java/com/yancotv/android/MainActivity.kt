@@ -43,7 +43,11 @@ import org.koin.android.ext.android.inject
 // iptv-org news category is publicly-available free-to-air broadcaster streams
 // (legal, daily-validated); used only so the app is testable without a provider.
 private const val SAMPLE_M3U_URL = "https://iptv-org.github.io/iptv/categories/news.m3u"
-private const val SAMPLE_VOD_NAME = "Sample movies (bundled)"
+
+// Resolved at the call site (see below) rather than here: a top-level const
+// cannot reach a Context. The value doubles as the dedupe key for the
+// already-seeded check, so both uses must read the same string.
+private val SAMPLE_VOD_NAME_RES = R.string.ma_sample_movies
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
@@ -193,7 +197,7 @@ class MainActivity : ComponentActivity() {
                                 val news =
                                     sourceRepo.addSource(
                                         com.yancotv.shared.types.AddSourceInput(
-                                            name = "iptv-org news (sample)",
+                                            name = getString(R.string.ma_sample_news),
                                             type = com.yancotv.shared.types.SourceType.M3U_URL,
                                             url = SAMPLE_M3U_URL,
                                         ),
@@ -207,11 +211,12 @@ class MainActivity : ComponentActivity() {
                             // — no network, no HttpClient. Added independently of
                             // the live seed so it shows up even when the user
                             // already has the news source.
-                            if (existing.none { it.name == SAMPLE_VOD_NAME }) {
+                            val sampleVodName = getString(SAMPLE_VOD_NAME_RES)
+                            if (existing.none { it.name == sampleVodName }) {
                                 val vod =
                                     sourceRepo.addSource(
                                         com.yancotv.shared.types.AddSourceInput(
-                                            name = SAMPLE_VOD_NAME,
+                                            name = sampleVodName,
                                             type = com.yancotv.shared.types.SourceType.M3U_FILE,
                                             filePath = "android.resource://$packageName/raw/sample_catalog",
                                         ),

@@ -355,7 +355,7 @@ fun SettingsEpgTab(
                 content = {
                     SettingsChipRow(
                         options = EpgPrefs.TIMELINE_PRESETS.map { "$it min" },
-                        selected = "${epgState.timelineMinutes} min",
+                        selected = stringResource(R.string.epg_minutes_value, epgState.timelineMinutes),
                         onSelect = { selection ->
                             val minutes = selection.removeSuffix(" min").toIntOrNull() ?: return@SettingsChipRow
                             scope.launch { prefs.setEpgTimelineMinutes(minutes) }

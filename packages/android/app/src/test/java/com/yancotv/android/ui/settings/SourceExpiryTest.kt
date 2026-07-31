@@ -31,14 +31,34 @@ class SourceExpiryTest {
         saved?.let { TimeZone.setDefault(it) }
     }
 
-    private fun at(nowMs: Long) = formatSourceExpiry(expiry, nowMs, uk)
+    /**
+     * MK.31.24 — the English wording, mirroring `values/strings.xml`.
+     *
+     * The formatter now takes its copy as a parameter block instead of building
+     * English inline, so it can be localized without giving up the plain JVM
+     * test. Restating the English here is the point: these assertions pin the
+     * SHAPE of each case (which date, which count, no zero-day count), and they
+     * would still catch a logic regression if the copy were reworded.
+     */
+    private val en = ExpiryStrings(
+        expiredCompact = "expired",
+        expiredFull = { d -> "Expired $d" },
+        todayCompact = "expires today",
+        todayFull = { d -> "$d · less than a day left" },
+        soonCompact = { n -> "expires in ${n}d" },
+        soonFullOne = { d -> "$d · 1 day left" },
+        soonFullMany = { d, n -> "$d · $n days left" },
+        laterCompact = { d -> "expires $d" },
+    )
+
+    private fun at(nowMs: Long) = formatSourceExpiry(expiry, nowMs, en, uk)
 
     @Test
     fun `no recorded expiry renders nothing at all`() {
         // Every m3u source, and any xtream source not yet re-synced. Must be
         // omitted rather than shown as "Unknown", which would read as a fault
         // on the majority of rows.
-        assertNull(formatSourceExpiry(null, expiry, uk))
+        assertNull(formatSourceExpiry(null, expiry, en, uk))
     }
 
     @Test
@@ -104,7 +124,7 @@ class SourceExpiryTest {
     fun `an implausibly distant expiry still formats`() {
         // parseXtreamExpiry caps input at year 2100, but a backup restore or a
         // hand-edited DB could carry anything; this must not overflow or throw.
-        val far = formatSourceExpiry(4_102_444_800_000L, 0L, uk)!!
+        val far = formatSourceExpiry(4_102_444_800_000L, 0L, en, uk)!!
         assertEquals(ExpiryUrgency.Later, far.urgency)
         assertTrue(far.daysRemaining > 0, "expected a positive day count, got ${far.daysRemaining}")
     }

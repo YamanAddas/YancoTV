@@ -154,8 +154,14 @@ class SourceSyncCoordinator(
                     // Toast that ends up in support screenshots.
                     val redacted = redactErrorMessage(t)
                     logger.error("syncCoordinator crashed id=$sourceId: $redacted")
-                    val reason = redacted.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "unknown error"
-                    _errors.tryEmit("Sync failed for $sourceName: $reason")
+                    // MK.31.24 — routed through the same injected formatter as
+                    // the SyncDetail.Failure path so one place decides how a
+                    // sync failure reads. `redacted` is already credential-safe
+                    // (MB-292); wrapping it in Failure only carries it.
+                    val reason = redacted.takeIf { it.isNotBlank() } ?: t::class.simpleName
+                    _errors.tryEmit(
+                        describeFailure(sourceName, reason?.let(SyncDetail::Failure)),
+                    )
                 } finally {
                     // MK.28.3 (MB-253) — clear the job ref BEFORE _state (the
                     // start() gate), and only when it still points at THIS

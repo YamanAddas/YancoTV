@@ -1,5 +1,7 @@
 package com.yancotv.android.ui.theme
 
+import androidx.annotation.StringRes
+import com.yancotv.android.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -9,11 +11,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * string so renaming an entry is an explicit migration, not silent
  * corruption. Order here is the order the picker renders.
  */
-enum class ThemeId(val displayName: String) {
-    FrostedEmerald("Frosted Emerald"),
-    MidnightSapphire("Midnight Sapphire"),
-    WarmAmber("Warm Amber"),
-    Monochrome("Monochrome"),
+enum class ThemeId(@StringRes val labelRes: Int) {
+    FrostedEmerald(R.string.th_frosted_emerald),
+    MidnightSapphire(R.string.th_midnight_sapphire),
+    WarmAmber(R.string.th_warm_amber),
+    Monochrome(R.string.th_monochrome),
     ;
 
     companion object {
@@ -26,12 +28,12 @@ enum class ThemeId(val displayName: String) {
  * own accent (the previous behaviour); the rest swap the accent block
  * onto whatever base theme is active.
  */
-enum class AccentId(val displayName: String) {
-    MATCH_THEME("Match theme"),
-    EMERALD("Emerald"),
-    SAPPHIRE("Sapphire"),
-    AMBER("Amber"),
-    RED("Red"),
+enum class AccentId(@StringRes val labelRes: Int) {
+    MATCH_THEME(R.string.ac_match_theme),
+    EMERALD(R.string.ac_emerald),
+    SAPPHIRE(R.string.ac_sapphire),
+    AMBER(R.string.ac_amber),
+    RED(R.string.ac_red),
     ;
 
     companion object {

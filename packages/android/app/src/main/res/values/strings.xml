@@ -1003,4 +1003,143 @@
 
     <!-- MK.31.21 fixups + recordings tab -->
     <string name="rt_advanced">ADVANCED</string>
+
+    <!-- MK.31.22 shell screens -->
+    <string name="gs_refreshing">Refreshing EPG…</string>
+    <string name="gs_resyncing">Re-syncing %1$s…</string>
+    <string name="gs_generic_source">source</string>
+    <string name="gs_counts">%1$d programmes · %2$d channels</string>
+    <string name="gs_refresh_epg">Refresh EPG</string>
+    <string name="gs_refresh_epg_now">Refresh EPG now</string>
+    <string name="gs_resync_sources">Re-sync sources</string>
+    <string name="gs_no_guide_data">No guide data yet</string>
+    <string name="gs_diagnostics">Guide diagnostics</string>
+    <string name="gs_src_line">• %1$s  ·  %2$d channels  ·  </string>
+    <string name="gs_epg_url_set">EPG URL set</string>
+    <string name="gs_no_epg_url">no EPG URL</string>
+    <string name="gs_src_err">  ·  err: %1$s</string>
+    <string name="gs_broken_sources">%1$d source(s) last failed. Re-sync them to retry.</string>
+    <string name="gs_override_help">Paste an XMLTV URL to load EPG from. Used in addition to per-source URLs — useful when a provider\'s feed is broken or you want a better schedule.</string>
+    <string name="gs_never_refreshed">never refreshed</string>
+    <string name="gs_last_refreshed">last refreshed %1$s</string>
+    <string name="gs_no_active_sources">no active sources</string>
+    <string name="gs_sources_with_epg">%1$d of %2$d source(s) have an EPG URL</string>
+    <string name="gs_last_error"> · last error: %1$s</string>
+    <string name="gs_subtitle" translatable="false">%1$s · %2$s%3$s</string>
+    <string name="rel_just_now_lower">just now</string>
+    <string name="rs_count_suffix" translatable="false">· %1$d</string>
+    <string name="rs_dur_hm" translatable="false">%1$dh %2$dm</string>
+    <string name="rs_dur_m" translatable="false">%1$dm</string>
+    <string name="rs_size_gb" translatable="false">%1$s GB</string>
+    <string name="rs_size_mb" translatable="false">%1$d MB</string>
+    <string name="rs_size_kb" translatable="false">%1$d KB</string>
+    <string name="rs_recording_ends">Recording · ends %1$s</string>
+    <string name="rs_starting_now">starting now</string>
+    <string name="rs_in_min">in %1$d min</string>
+    <string name="rs_in_hours">in %1$d h</string>
+    <string name="rs_in_days">in %1$d days</string>
+    <string name="rs_meta_join" translatable="false">%1$s · %2$s</string>
+    <string name="rs_reason_device_offline">device was off</string>
+    <string name="rs_reason_concurrent">another recording was running</string>
+    <string name="rs_reason_orphaned">interrupted by reboot</string>
+    <string name="rs_reason_channel_deleted">channel removed</string>
+    <string name="cd_episode_total">%1$d total</string>
+    <string name="cd_episodes_count">%1$d episodes</string>
+    <string name="cd_episode_n">Episode %1$d</string>
+    <string name="cd_minutes_left">%1$dm left</string>
+    <string name="wi_min_left">%1$dm left</string>
+    <string name="wi_hour_left">%1$dh left</string>
+    <string name="wi_hour_min_left">%1$dh %2$dm left</string>
+    <string name="wi_resume">Resume</string>
+    <string name="fh_feature">FEATURE</string>
+    <string name="fh_series">SERIES</string>
+    <string name="fh_open_fullscreen">Open fullscreen</string>
+    <string name="fh_in_favorites">In favorites</string>
+    <string name="fh_favorite">Favorite</string>
+    <string name="fh_min_left">%1$d min left</string>
+    <string name="fh_ending_now">Ending now</string>
+    <string name="fh_live_channel">LIVE CHANNEL</string>
+    <string name="cf_episodes_count">%1$d episodes</string>
+    <string name="cf_no_series">No series</string>
+    <string name="cf_favorites_empty">Star something from the preview pane and it\'ll land here.</string>
+    <string name="cf_add_source">Add an IPTV source to start watching.</string>
+    <string name="cf_in_progress">, in progress</string>
+    <string name="fv_new_list">+ New</string>
+    <string name="fv_remove">\u2606 Remove</string>
+    <string name="gd_programme_semantics">%1$s, starts %2$s</string>
+    <string name="hc_watched_of_total" translatable="false">%1$s / %2$s</string>
+    <string name="hc_programme_on_channel">%1$s on %2$s</string>
+    <string name="nn_next">Next: %1$s</string>
+    <string name="ps_service_unreachable">Couldn\'t reach the subtitle service</string>
+    <string name="ps_download_failed">Download failed</string>
+    <string name="ps_selected_suffix">, selected</string>
+
+    <!-- MK.31.22 shell screens (edits) -->
+    <string name="cf_locked_suffix">, locked</string>
+    <string name="cf_watched_suffix">, watched</string>
+    <string name="ps_detail_suffix" translatable="false">, %1$s</string>
+    <string name="type_live">Live</string>
+    <string name="type_movie">Movie</string>
+    <string name="type_series">Series</string>
+
+    <!-- MK.31.22 shell (fixups) -->
+
+    <!-- MK.31.23 player + cast + infra -->
+    <string name="ep_open_in">Open in %1$s</string>
+    <string name="ep_open_with">Open with</string>
+    <string name="pa_reconnecting_live">Reconnecting to live…</string>
+    <string name="pa_reconnecting">Reconnecting…</string>
+    <string name="pa_recording_now">Recording</string>
+    <string name="pa_check_connection">Check your connection or try another source.</string>
+    <string name="pa_programme_time">%1$d min left • %2$d min</string>
+    <string name="pa_buffering">BUFFERING</string>
+    <string name="pa_ahead_seconds" translatable="false">%1$ds</string>
+    <string name="vc_cant_open_stream">Couldn\'t open this stream</string>
+    <string name="vd_now_playing" translatable="false">NOW PLAYING · YANCO.VOD</string>
+    <string name="vd_rewind_10">Rewind 10 seconds</string>
+    <string name="vd_forward_10">Forward 10 seconds</string>
+    <string name="pc_external_subtitle">External subtitle</string>
+    <string name="sf_forward" translatable="false">▶▶  +%1$ds</string>
+    <string name="sf_back" translatable="false">◂◂  %1$ds</string>
+    <string name="cc_same_wifi">Couldn\'t cast — make sure the phone is on the same Wi-Fi as the TV.</string>
+    <string name="cc_unsupported_format">Couldn\'t prepare this video for casting — it may be an unsupported format (e.g. HEVC).</string>
+    <string name="cc_cast_failed">Couldn\'t cast this stream to %1$s.</string>
+    <string name="ei_no_rows">All EPG sources produced no rows</string>
+    <string name="ei_partial">Partial: %1$s</string>
+    <string name="ma_sample_movies">Sample movies (bundled)</string>
+    <string name="ma_sample_news">iptv-org news (sample)</string>
+    <string name="rc_recently_watched">YancoTV — Recently watched</string>
+    <string name="rem_upcoming_programme">Upcoming programme</string>
+
+    <!-- MK.31.23 fixups -->
+
+    <!-- MK.31.24 theme, expiry, tail -->
+    <string name="th_frosted_emerald">Frosted Emerald</string>
+    <string name="th_midnight_sapphire">Midnight Sapphire</string>
+    <string name="th_warm_amber">Warm Amber</string>
+    <string name="th_monochrome">Monochrome</string>
+    <string name="ac_match_theme">Match theme</string>
+    <string name="ac_emerald">Emerald</string>
+    <string name="ac_sapphire">Sapphire</string>
+    <string name="ac_amber">Amber</string>
+    <string name="ac_red">Red</string>
+    <string name="lang_system">System</string>
+    <string name="se_expired_compact">expired</string>
+    <string name="se_expired_full">Expired %1$s</string>
+    <string name="se_today_compact">expires today</string>
+    <string name="se_today_full">%1$s · less than a day left</string>
+    <string name="se_soon_compact">expires in %1$dd</string>
+    <string name="se_soon_full_one">%1$s · 1 day left</string>
+    <string name="se_soon_full_many">%1$s · %2$d days left</string>
+    <string name="se_later_compact">expires %1$s</string>
+    <string name="time_range" translatable="false">%1$s – %2$s</string>
+    <string name="epg_minutes_value">%1$d min</string>
+    <string name="count_thousands" translatable="false">%1$dk</string>
+    <string name="ca_default_suffix"> (default)</string>
+    <string name="bc_no_label">(no label)</string>
+    <string name="sc_sync_failed_for">Sync failed for %1$s: %2$s</string>
+
+    <!-- MK.31.24 fixups -->
+
+    <!-- MK.31.24 fixups (2) -->
 </resources>

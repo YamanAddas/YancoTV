@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -1180,6 +1181,8 @@ private fun MetaColumn(
 @Composable
 private fun PreviewFactsLine(item: ContentItem, meta: ContentMetadata?, type: ContentType) {
     val palette = LocalYancoPalette.current
+    // MK.31.22 — captured outside `remember`, which is not composable scope.
+    val ctx = LocalContext.current
     val facts =
         remember(item.id, meta, type) {
             buildList {
@@ -1187,7 +1190,9 @@ private fun PreviewFactsLine(item: ContentItem, meta: ContentMetadata?, type: Co
                 meta?.rating?.takeIf { it.isNotBlank() }?.let { add("★ $it") }
                 meta?.genre?.takeIf { it.isNotBlank() }?.let { add(it) }
                 if (type == ContentType.SERIES) {
-                    meta?.episodes?.size?.takeIf { it > 0 }?.let { add("$it episodes") }
+                    meta?.episodes?.size?.takeIf { it > 0 }?.let {
+                        add(ctx.getString(R.string.cf_episodes_count, it))
+                    }
                 } else {
                     meta?.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
                 }
@@ -1486,6 +1491,8 @@ private fun ContentOrb(
     onActivate: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    // MK.31.22 — the semantics builder below is not composable scope.
+    val ctx = LocalContext.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     // MK.28.6 (MB-270) — pressed-state feedback: a touch press dips the orb
@@ -1587,10 +1594,12 @@ private fun ContentOrb(
                     contentDescription =
                         buildString {
                             append(title)
-                            if (isLocked) append(", locked")
+                            if (isLocked) append(ctx.getString(R.string.cf_locked_suffix))
                             when {
-                                progress?.isFinished() == true -> append(", watched")
-                                progress != null -> append(", in progress")
+                                progress?.isFinished() == true ->
+                                    append(ctx.getString(R.string.cf_watched_suffix))
+                                progress != null ->
+                                    append(ctx.getString(R.string.cf_in_progress))
                             }
                         }
                 },
@@ -1661,7 +1670,7 @@ private fun ContentOrb(
                     )
                 } else {
                     ResumeBadge(
-                        label = formatResumeLabel(progress),
+                        label = formatResumeLabel(ctx, progress),
                         modifier =
                         Modifier
                             .align(Alignment.TopStart)
@@ -1717,13 +1726,13 @@ private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean, onA
                 when (type) {
                     ContentType.LIVE -> stringResource(R.string.cf_no_channels)
                     ContentType.MOVIE -> stringResource(R.string.cf_no_movies)
-                    ContentType.SERIES -> "No series"
+                    ContentType.SERIES -> stringResource(R.string.cf_no_series)
                 }
         }
     val body =
         when {
-            favoritesFilter -> "Star something from the preview pane and it'll land here."
-            else -> "Add an IPTV source to start watching."
+            favoritesFilter -> stringResource(R.string.cf_favorites_empty)
+            else -> stringResource(R.string.cf_add_source)
         }
     Column(
         modifier =

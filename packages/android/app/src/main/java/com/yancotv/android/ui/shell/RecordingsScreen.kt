@@ -151,7 +151,7 @@ fun RecordingsScreen(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = if (rows.isEmpty()) "" else "· ${rows.size}",
+                text = if (rows.isEmpty()) "" else stringResource(R.string.rs_count_suffix, rows.size),
                 color = palette.TextMuted,
                 fontSize = 14.sp,
             )
@@ -338,7 +338,7 @@ private fun RecordingRow(entry: RecordingEntry, onPlay: () -> Unit, onStop: () -
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = entry.metaLine(),
+                text = entry.metaLine(LocalContext.current),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -453,7 +453,7 @@ private fun UpcomingScheduleRow(entry: RecordingScheduleEntry, onCancel: () -> U
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = entry.upcomingMetaLine(),
+                text = entry.upcomingMetaLine(LocalContext.current),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -502,7 +502,7 @@ private fun HistoryScheduleRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = entry.historyMetaLine(),
+                text = entry.historyMetaLine(LocalContext.current),
                 color = palette.TextMuted,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -596,20 +596,31 @@ private fun ScheduleStateBadge(kind: ScheduleStateBadgeKind, palette: com.yancot
     }
 }
 
-private fun RecordingEntry.metaLine(): String {
-    val date = SimpleDateFormat("MMM d · HH:mm", Locale.US).format(Date(startedAt))
+// MK.31.22 — Context for the unit strings, and Locale.getDefault() for the
+// date: Locale.US meant an Arabic UI still rendered "Mar 3" with Latin digits
+// while every sibling line on the same screen used the app locale.
+private fun RecordingEntry.metaLine(ctx: android.content.Context): String {
+    val date = SimpleDateFormat("MMM d · HH:mm", Locale.getDefault()).format(Date(startedAt))
     val durationStr =
         durationSeconds?.let { secs ->
             val h = secs / 3600
             val m = (secs % 3600) / 60
-            if (h > 0) "${h}h ${m}m" else "${m}m"
+            if (h > 0) {
+                ctx.getString(R.string.rs_dur_hm, h, m)
+            } else {
+                ctx.getString(R.string.rs_dur_m, m)
+            }
         }
     val sizeStr =
         fileSizeBytes?.let { bytes ->
             when {
-                bytes >= 1024L * 1024L * 1024L -> "%.1f GB".format(Locale.US, bytes / 1024.0 / 1024.0 / 1024.0)
-                bytes >= 1024L * 1024L -> "${bytes / 1024L / 1024L} MB"
-                else -> "${bytes / 1024L} KB"
+                bytes >= 1024L * 1024L * 1024L ->
+                    ctx.getString(
+                        R.string.rs_size_gb,
+                        "%.1f".format(Locale.getDefault(), bytes / 1024.0 / 1024.0 / 1024.0),
+                    )
+                bytes >= 1024L * 1024L -> ctx.getString(R.string.rs_size_mb, bytes / 1024L / 1024L)
+                else -> ctx.getString(R.string.rs_size_kb, bytes / 1024L)
             }
         }
     val parts = listOfNotNull(date, durationStr, sizeStr, format?.name)
@@ -678,25 +689,28 @@ private suspend fun deleteRecording(context: Context, recordings: RecordingsRepo
  * MK.14.3 — meta line for an upcoming/active schedule:
  * "Tonight 8:00 PM · in 3 hours" / "Recording · ends 9:45 PM" / etc.
  */
-private fun RecordingScheduleEntry.upcomingMetaLine(): String {
+private fun RecordingScheduleEntry.upcomingMetaLine(ctx: android.content.Context): String {
     val nowMs = System.currentTimeMillis()
     val timeFmt = SimpleDateFormat("EEE, MMM d · h:mm a", Locale.getDefault())
     val startStr = timeFmt.format(Date(scheduledStart))
     return when (state) {
         RecordingScheduleState.FIRING -> {
             val endTimeFmt = SimpleDateFormat("h:mm a", Locale.getDefault())
-            "Recording · ends ${endTimeFmt.format(Date(scheduledEnd))}"
+            ctx.getString(R.string.rs_recording_ends, endTimeFmt.format(Date(scheduledEnd)))
         }
         else -> {
             val deltaMs = scheduledStart - nowMs
             val relative =
                 when {
-                    deltaMs < 0L -> "starting now"
-                    deltaMs < 60L * 60_000L -> "in ${deltaMs / 60_000L} min"
-                    deltaMs < 24L * 60L * 60_000L -> "in ${deltaMs / (60L * 60_000L)} h"
-                    else -> "in ${deltaMs / (24L * 60L * 60_000L)} days"
+                    deltaMs < 0L -> ctx.getString(R.string.rs_starting_now)
+                    deltaMs < 60L * 60_000L ->
+                        ctx.getString(R.string.rs_in_min, deltaMs / 60_000L)
+                    deltaMs < 24L * 60L * 60_000L ->
+                        ctx.getString(R.string.rs_in_hours, deltaMs / (60L * 60_000L))
+                    else ->
+                        ctx.getString(R.string.rs_in_days, deltaMs / (24L * 60L * 60_000L))
                 }
-            "$startStr · $relative"
+            ctx.getString(R.string.rs_meta_join, startStr, relative)
         }
     }
 }
@@ -705,18 +719,21 @@ private fun RecordingScheduleEntry.upcomingMetaLine(): String {
  * MK.14.3 — meta line for a terminal-state schedule:
  * "Yesterday 8:00 PM · device was off" / "Tomorrow 9 PM · cancelled" / etc.
  */
-private fun RecordingScheduleEntry.historyMetaLine(): String {
+private fun RecordingScheduleEntry.historyMetaLine(ctx: android.content.Context): String {
     val timeFmt = SimpleDateFormat("MMM d · h:mm a", Locale.getDefault())
     val startStr = timeFmt.format(Date(scheduledStart))
     val reason =
-        error?.takeIf { it.isNotBlank() }?.let { friendlyReason(it) }
-    return if (reason != null) "$startStr · $reason" else startStr
+        error?.takeIf { it.isNotBlank() }?.let { friendlyReason(ctx, it) }
+    return if (reason != null) ctx.getString(R.string.rs_meta_join, startStr, reason) else startStr
 }
 
-private fun friendlyReason(rawReason: String): String = when (rawReason) {
-    "device_offline" -> "device was off"
-    "concurrent_recording_active" -> "another recording was running"
-    "orphaned_by_app_kill" -> "interrupted by reboot"
-    "channel_deleted" -> "channel removed"
+// The four keys are the DB's own reason codes, not display text — they must
+// stay literal. Only the right-hand side is localized; the else branch
+// prettifies an unrecognised code and cannot be.
+private fun friendlyReason(ctx: android.content.Context, rawReason: String): String = when (rawReason) {
+    "device_offline" -> ctx.getString(R.string.rs_reason_device_offline)
+    "concurrent_recording_active" -> ctx.getString(R.string.rs_reason_concurrent)
+    "orphaned_by_app_kill" -> ctx.getString(R.string.rs_reason_orphaned)
+    "channel_deleted" -> ctx.getString(R.string.rs_reason_channel_deleted)
     else -> rawReason.replace('_', ' ')
 }

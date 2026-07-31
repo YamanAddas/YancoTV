@@ -978,7 +978,7 @@ private fun EpisodesSectionHeader(loading: Boolean, episodeCount: Int) {
             )
         } else {
             Text(
-                text = "$episodeCount total",
+                text = stringResource(R.string.cd_episode_total, episodeCount),
                 color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
             )
@@ -1049,7 +1049,7 @@ private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () 
                 .padding(horizontal = Space.sm, vertical = 2.dp),
         ) {
             Text(
-                text = "$count episodes",
+                text = stringResource(R.string.cd_episodes_count, count),
                 color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.Caption,
             )
@@ -1096,7 +1096,7 @@ private fun SeasonOption(label: String, count: Int, selected: Boolean, onClick: 
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = "$count episodes",
+            text = stringResource(R.string.cd_episodes_count, count),
             color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Caption,
         )
@@ -1162,7 +1162,7 @@ private fun EpisodeRow(ep: EpisodeInfo, progress: WatchProgress?, onClick: () ->
                     horizontalArrangement = Arrangement.spacedBy(Space.sm),
                 ) {
                     Text(
-                        text = ep.title.takeIf { it.isNotBlank() } ?: "Episode ${ep.episodeNumber}",
+                        text = ep.title.takeIf { it.isNotBlank() } ?: stringResource(R.string.cd_episode_n, ep.episodeNumber),
                         color = LocalYancoPalette.current.TextPrimary,
                         style = YancoType.TitleS,
                         maxLines = 1,
@@ -1212,7 +1212,7 @@ private fun EpisodeRow(ep: EpisodeInfo, progress: WatchProgress?, onClick: () ->
                             )
                             val minutes = (rem / 60).toInt().coerceAtLeast(1)
                             Text(
-                                text = "${minutes}m left",
+                                text = stringResource(R.string.cd_minutes_left, minutes),
                                 color = LocalYancoPalette.current.Accent,
                                 style = YancoType.Caption,
                             )

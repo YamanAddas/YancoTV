@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,6 +74,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
     val scope = rememberCoroutineScope()
     var source by remember { mutableStateOf<Source?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
+    val ctx = LocalContext.current
     // MK.31.21 — assigned from suspend functions, not composable scope.
     val notFoundMsg = stringResource(R.string.sd_not_found)
     val unknownErrorMsg = stringResource(R.string.common_unknown_error)
@@ -204,7 +206,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             SettingsRowSpacer()
             SettingsRow(
                 label = stringResource(R.string.sd_last_synced),
-                right = { ValueText(formatLastSynced(current.lastSynced)) },
+                right = { ValueText(formatLastSynced(ctx, current.lastSynced)) },
                 readOnlyFocusable = true,
             )
             SettingsRowSpacer()
@@ -216,7 +218,11 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             // MK.30.3 — account expiry. Only rendered when the provider
             // actually reported one: m3u playlists carry no account metadata,
             // so a permanent "Unknown" row there would look like a defect.
-            formatSourceExpiry(current.expiresAt, System.currentTimeMillis())?.let { expiry ->
+            formatSourceExpiry(
+                current.expiresAt,
+                System.currentTimeMillis(),
+                expiryStrings(ctx),
+            )?.let { expiry ->
                 SettingsRowSpacer()
                 SettingsRow(
                     label = stringResource(R.string.sd_subscription),
@@ -616,20 +622,14 @@ private fun serverFieldLabel(type: SourceType): String = when (type) {
     SourceType.M3U_FILE -> stringResource(R.string.sd_file_path)
 }
 
-private fun formatLastSynced(ms: Long?): String {
-    if (ms == null) return "Never"
+private fun formatLastSynced(ctx: android.content.Context, ms: Long?): String {
+    if (ms == null) return ctx.getString(R.string.common_never)
     val ageMs = System.currentTimeMillis() - ms
     val totalMin = ageMs / 60_000L
     return when {
-        totalMin < 1 -> "Moments ago"
-        totalMin < 60 -> "$totalMin min ago"
-        totalMin < 24 * 60 -> {
-            val h = totalMin / 60
-            "$h h ago"
-        }
-        else -> {
-            val d = totalMin / (24 * 60)
-            "$d d ago"
-        }
+        totalMin < 1 -> ctx.getString(R.string.sd_moments_ago)
+        totalMin < 60 -> ctx.getString(R.string.sd_min_ago, totalMin)
+        totalMin < 24 * 60 -> ctx.getString(R.string.rel_hour_ago, totalMin / 60)
+        else -> ctx.getString(R.string.rel_day_ago, totalMin / (24 * 60))
     }
 }

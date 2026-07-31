@@ -965,4 +965,127 @@
 
     <!-- MK.31.21 fixups + recordings tab -->
     <string name="rt_advanced">AVANZADO</string>
+
+    <!-- MK.31.22 shell screens -->
+    <string name="gs_refreshing">Actualizando el EPG…</string>
+    <string name="gs_resyncing">Resincronizando %1$s…</string>
+    <string name="gs_generic_source">fuente</string>
+    <string name="gs_counts">%1$d programas · %2$d canales</string>
+    <string name="gs_refresh_epg">Actualizar EPG</string>
+    <string name="gs_refresh_epg_now">Actualizar el EPG ahora</string>
+    <string name="gs_resync_sources">Resincronizar fuentes</string>
+    <string name="gs_no_guide_data">Aún no hay datos de guía</string>
+    <string name="gs_diagnostics">Diagnóstico de la guía</string>
+    <string name="gs_src_line">• %1$s  ·  %2$d canales  ·  </string>
+    <string name="gs_epg_url_set">URL de EPG establecida</string>
+    <string name="gs_no_epg_url">sin URL de EPG</string>
+    <string name="gs_src_err">  ·  error: %1$s</string>
+    <string name="gs_broken_sources">%1$d fuente(s) fallaron la última vez. Resincronízalas para reintentar.</string>
+    <string name="gs_override_help">Pega una URL XMLTV para cargar el EPG. Se usa además de las URL de cada fuente: útil cuando el canal de un proveedor está roto o quieres una programación mejor.</string>
+    <string name="gs_never_refreshed">nunca actualizado</string>
+    <string name="gs_last_refreshed">última actualización %1$s</string>
+    <string name="gs_no_active_sources">sin fuentes activas</string>
+    <string name="gs_sources_with_epg">%1$d de %2$d fuente(s) tienen URL de EPG</string>
+    <string name="gs_last_error"> · último error: %1$s</string>
+    <string name="rel_just_now_lower">ahora mismo</string>
+    <string name="rs_recording_ends">Grabando · termina %1$s</string>
+    <string name="rs_starting_now">empieza ahora</string>
+    <string name="rs_in_min">en %1$d min</string>
+    <string name="rs_in_hours">en %1$d h</string>
+    <string name="rs_in_days">en %1$d días</string>
+    <string name="rs_reason_device_offline">el dispositivo estaba apagado</string>
+    <string name="rs_reason_concurrent">había otra grabación en curso</string>
+    <string name="rs_reason_orphaned">interrumpida por un reinicio</string>
+    <string name="rs_reason_channel_deleted">canal eliminado</string>
+    <string name="cd_episode_total">%1$d en total</string>
+    <string name="cd_episodes_count">%1$d episodios</string>
+    <string name="cd_episode_n">Episodio %1$d</string>
+    <string name="cd_minutes_left">quedan %1$d min</string>
+    <string name="wi_min_left">quedan %1$d min</string>
+    <string name="wi_hour_left">quedan %1$d h</string>
+    <string name="wi_hour_min_left">quedan %1$d h %2$d min</string>
+    <string name="wi_resume">Reanudar</string>
+    <string name="fh_feature">PELÍCULA</string>
+    <string name="fh_series">SERIE</string>
+    <string name="fh_open_fullscreen">Abrir a pantalla completa</string>
+    <string name="fh_in_favorites">En favoritos</string>
+    <string name="fh_favorite">Favorito</string>
+    <string name="fh_min_left">quedan %1$d min</string>
+    <string name="fh_ending_now">Termina ahora</string>
+    <string name="fh_live_channel">CANAL EN DIRECTO</string>
+    <string name="cf_episodes_count">%1$d episodios</string>
+    <string name="cf_no_series">Sin series</string>
+    <string name="cf_favorites_empty">Marca algo con una estrella desde el panel de vista previa y aparecerá aquí.</string>
+    <string name="cf_add_source">Añade una fuente IPTV para empezar a ver.</string>
+    <string name="cf_in_progress">, en curso</string>
+    <string name="fv_new_list">+ Nueva</string>
+    <string name="fv_remove">\u2606 Quitar</string>
+    <string name="gd_programme_semantics">%1$s, empieza a las %2$s</string>
+    <string name="hc_programme_on_channel">%1$s en %2$s</string>
+    <string name="nn_next">Siguiente: %1$s</string>
+    <string name="ps_service_unreachable">No se pudo contactar con el servicio de subtítulos</string>
+    <string name="ps_download_failed">Error de descarga</string>
+    <string name="ps_selected_suffix">, seleccionado</string>
+
+    <!-- MK.31.22 shell screens (edits) -->
+    <string name="cf_locked_suffix">, bloqueado</string>
+    <string name="cf_watched_suffix">, visto</string>
+    <string name="type_live">En directo</string>
+    <string name="type_movie">Película</string>
+    <string name="type_series">Serie</string>
+
+    <!-- MK.31.22 shell (fixups) -->
+
+    <!-- MK.31.23 player + cast + infra -->
+    <string name="ep_open_in">Abrir en %1$s</string>
+    <string name="ep_open_with">Abrir con</string>
+    <string name="pa_reconnecting_live">Reconectando al directo…</string>
+    <string name="pa_reconnecting">Reconectando…</string>
+    <string name="pa_recording_now">Grabando</string>
+    <string name="pa_check_connection">Comprueba tu conexión o prueba otra fuente.</string>
+    <string name="pa_programme_time">quedan %1$d min • %2$d min</string>
+    <string name="pa_buffering">CARGANDO</string>
+    <string name="vc_cant_open_stream">No se pudo abrir este flujo</string>
+    <string name="vd_rewind_10">Retroceder 10 segundos</string>
+    <string name="vd_forward_10">Avanzar 10 segundos</string>
+    <string name="pc_external_subtitle">Subtítulo externo</string>
+    <string name="cc_same_wifi">No se pudo enviar: asegúrate de que el teléfono esté en la misma red Wi-Fi que la TV.</string>
+    <string name="cc_unsupported_format">No se pudo preparar este vídeo para enviarlo: puede tener un formato no compatible (p. ej. HEVC).</string>
+    <string name="cc_cast_failed">No se pudo enviar este flujo a %1$s.</string>
+    <string name="ei_no_rows">Ninguna fuente de EPG produjo filas</string>
+    <string name="ei_partial">Parcial: %1$s</string>
+    <string name="ma_sample_movies">Películas de muestra (incluidas)</string>
+    <string name="ma_sample_news">Noticias de iptv-org (muestra)</string>
+    <string name="rc_recently_watched">YancoTV — Vistos recientemente</string>
+    <string name="rem_upcoming_programme">Programa próximo</string>
+
+    <!-- MK.31.23 fixups -->
+
+    <!-- MK.31.24 theme, expiry, tail -->
+    <string name="th_frosted_emerald">Esmeralda escarchada</string>
+    <string name="th_midnight_sapphire">Zafiro medianoche</string>
+    <string name="th_warm_amber">Ámbar cálido</string>
+    <string name="th_monochrome">Monocromo</string>
+    <string name="ac_match_theme">Igual que el tema</string>
+    <string name="ac_emerald">Esmeralda</string>
+    <string name="ac_sapphire">Zafiro</string>
+    <string name="ac_amber">Ámbar</string>
+    <string name="ac_red">Rojo</string>
+    <string name="lang_system">Sistema</string>
+    <string name="se_expired_compact">caducada</string>
+    <string name="se_expired_full">Caducó el %1$s</string>
+    <string name="se_today_compact">caduca hoy</string>
+    <string name="se_today_full">%1$s · queda menos de un día</string>
+    <string name="se_soon_compact">caduca en %1$d d</string>
+    <string name="se_soon_full_one">%1$s · queda 1 día</string>
+    <string name="se_soon_full_many">%1$s · quedan %2$d días</string>
+    <string name="se_later_compact">caduca el %1$s</string>
+    <string name="epg_minutes_value">%1$d min</string>
+    <string name="ca_default_suffix"> (predeterminado)</string>
+    <string name="bc_no_label">(sin nombre)</string>
+    <string name="sc_sync_failed_for">Error al sincronizar %1$s: %2$s</string>
+
+    <!-- MK.31.24 fixups -->
+
+    <!-- MK.31.24 fixups (2) -->
 </resources>

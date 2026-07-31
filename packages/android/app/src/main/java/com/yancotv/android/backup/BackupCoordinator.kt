@@ -229,7 +229,7 @@ class BackupCoordinator(
         tree.findFile(filename)?.delete()
         val doc =
             tree.createFile("application/json", filename)
-                ?: return@withContext ExportResult.Failed("Could not create file '$filename' in folder")
+                ?: return@withContext ExportResult.Failed(context.getString(R.string.bc_cant_create_file, filename))
 
         context.contentResolver.openOutputStream(doc.uri, "w")?.use { out ->
             out.write(bytes)
@@ -267,7 +267,7 @@ class BackupCoordinator(
         db.backupMetadataQueries.insert(
             id = "bk-${file.createdAt}",
             file_uri = fileUri,
-            label = label?.takeIf { it.isNotBlank() } ?: "(no label)",
+            label = label?.takeIf { it.isNotBlank() } ?: context.getString(R.string.bc_no_label),
             schema_version = file.dbSchemaVersion.toLong(),
             checksum = onDiskChecksum,
             size_bytes = sizeBytes,

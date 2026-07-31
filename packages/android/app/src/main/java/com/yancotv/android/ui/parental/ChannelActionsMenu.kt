@@ -65,6 +65,7 @@ import org.koin.compose.koinInject
  */
 @Composable
 fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: () -> Unit) {
+    val defaultSuffix = stringResource(R.string.ca_default_suffix)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val content: ContentRepository = koinInject()
@@ -259,7 +260,8 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = list.name + if (list.isDefault) "  (default)" else "",
+                                text = list.name +
+                                    if (list.isDefault) defaultSuffix else "",
                                 color = LocalYancoPalette.current.TextPrimary,
                                 modifier = Modifier.fillMaxWidth(),
                             )

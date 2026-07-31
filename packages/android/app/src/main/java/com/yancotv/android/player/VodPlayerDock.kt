@@ -95,7 +95,10 @@ enum class VodDockVisibility {
  * play-pause button's icon swap inside the transport row.
  */
 data class VodDockData(
-    val kicker: String = "NOW PLAYING · YANCO.VOD",
+    // MK.31.24 — null means "use the standard NOW PLAYING kicker", resolved
+    // in the metadata block below. A data-class default cannot reach a
+    // Context, and PlayerActivity constructs this off-composition.
+    val kicker: String? = null,
     val title: String = "",
     val chips: List<VodDockChip> = emptyList(),
     val isPlaying: Boolean = true,
@@ -251,7 +254,7 @@ private fun VodDockMetadata(data: VodDockData) {
     val palette = LocalYancoPalette.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = data.kicker,
+            text = data.kicker ?: stringResource(R.string.vd_now_playing),
             color = palette.Accent,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
@@ -494,7 +497,7 @@ private fun VodDockTransportRow(
         }
         TransportButton(
             label = "-10",
-            contentLabel = "Rewind 10 seconds",
+            contentLabel = stringResource(R.string.vd_rewind_10),
             size = 58.dp,
             onClick = {
                 onUserInteraction()
@@ -516,7 +519,7 @@ private fun VodDockTransportRow(
         Spacer(Modifier.width(14.dp))
         TransportButton(
             label = "+10",
-            contentLabel = "Forward 10 seconds",
+            contentLabel = stringResource(R.string.vd_forward_10),
             size = 58.dp,
             onClick = {
                 onUserInteraction()
