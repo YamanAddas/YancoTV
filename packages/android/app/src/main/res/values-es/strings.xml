@@ -763,4 +763,20 @@
     <string name="sp_error">%1$s — error: %2$s</string>
     <string name="sp_unknown">desconocido</string>
     <string name="sp_elapsed"> (%1$d s)</string>
+
+    <!-- MK.31.17 batch T — stragglers from a full-tree sweep. -->
+    <string name="st_back_to_list">Volver a la lista de ajustes</string>
+    <string name="st_search_desc">Buscar en los ajustes</string>
+    <string name="st_search_hint">Buscar en los ajustes…</string>
+    <string name="st_clear_search">Borrar la búsqueda</string>
+    <string name="st_matching">AJUSTES COINCIDENTES</string>
+    <string name="st_no_matches">Sin resultados para «%1$s».</string>
+    <string name="st_back_clears">Pulsa ATRÁS para borrar la búsqueda.</string>
+    <string name="st_breadcrumb">AJUSTES</string>
+    <string name="bk_settings_desc">Ajustes de copia de seguridad</string>
+    <string name="ab_logo_desc">Logotipo de %1$s</string>
+    <string name="voice_input">VOZ</string>
+    <string name="ps_from_provider">Del proveedor</string>
+    <string name="tv_options">Opciones</string>
+    <string name="placeholder_pending">Pendiente de implementación</string>
 </resources>

@@ -763,4 +763,20 @@
     <string name="sp_error">%1$s — خطأ: %2$s</string>
     <string name="sp_unknown">غير معروف</string>
     <string name="sp_elapsed"> (%1$d ث)</string>
+
+    <!-- MK.31.17 batch T — stragglers from a full-tree sweep. -->
+    <string name="st_back_to_list">العودة إلى قائمة الإعدادات</string>
+    <string name="st_search_desc">البحث في الإعدادات</string>
+    <string name="st_search_hint">البحث في الإعدادات…</string>
+    <string name="st_clear_search">مسح البحث</string>
+    <string name="st_matching">الإعدادات المطابقة</string>
+    <string name="st_no_matches">لا نتائج لـ “%1$s”.</string>
+    <string name="st_back_clears">اضغط رجوع لمسح البحث.</string>
+    <string name="st_breadcrumb">الإعدادات</string>
+    <string name="bk_settings_desc">إعدادات النسخ الاحتياطي</string>
+    <string name="ab_logo_desc">شعار %1$s</string>
+    <string name="voice_input">الصوت</string>
+    <string name="ps_from_provider">من المزوّد</string>
+    <string name="tv_options">الخيارات</string>
+    <string name="placeholder_pending">قيد التنفيذ</string>
 </resources>

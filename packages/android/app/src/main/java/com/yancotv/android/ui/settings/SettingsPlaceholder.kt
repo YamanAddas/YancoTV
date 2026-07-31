@@ -17,7 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.ui.focus.dpadVerticalScroll
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Space
@@ -88,7 +90,7 @@ fun SettingsPlaceholder(kicker: String, title: String, body: String, modifier: M
                 .padding(horizontal = Space.xxl, vertical = Space.lg),
         ) {
             Text(
-                text = "Pending implementation",
+                text = stringResource(R.string.placeholder_pending),
                 color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.LabelStrong,
             )

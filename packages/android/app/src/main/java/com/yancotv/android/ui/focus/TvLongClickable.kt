@@ -7,8 +7,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import com.yancotv.android.R
 
 /**
  * MB-98 — register `onLongPress` as the active context-menu action while
@@ -48,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
  */
 @Composable
 fun Modifier.tvLongClickable(onLongPress: () -> Unit): Modifier {
+    val optionsLabel = stringResource(R.string.tv_options)
     val token = remember { Any() }
     val current by rememberUpdatedState(onLongPress)
     // MB-287 (contributes to MB-230) — release the slot on disposal, not
@@ -75,7 +78,7 @@ fun Modifier.tvLongClickable(onLongPress: () -> Unit): Modifier {
         // invisible to accessibility services, so without this the primitive
         // contributes nothing TalkBack can surface or invoke.
         .semantics {
-            onLongClick(label = "Options") {
+            onLongClick(label = optionsLabel) {
                 current()
                 true
             }

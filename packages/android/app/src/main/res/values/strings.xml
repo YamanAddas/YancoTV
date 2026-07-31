@@ -788,4 +788,20 @@
     <string name="sp_error">%1$s — error: %2$s</string>
     <string name="sp_unknown">unknown</string>
     <string name="sp_elapsed"> (%1$ds)</string>
+
+    <!-- MK.31.17 batch T — stragglers from a full-tree sweep. -->
+    <string name="st_back_to_list">Back to settings list</string>
+    <string name="st_search_desc">Search settings</string>
+    <string name="st_search_hint">Search settings…</string>
+    <string name="st_clear_search">Clear search</string>
+    <string name="st_matching">MATCHING SETTINGS</string>
+    <string name="st_no_matches">No matches for “%1$s”.</string>
+    <string name="st_back_clears">Press BACK to clear search.</string>
+    <string name="st_breadcrumb">SETTINGS</string>
+    <string name="bk_settings_desc">Backup settings</string>
+    <string name="ab_logo_desc">%1$s logo</string>
+    <string name="voice_input">VOICE</string>
+    <string name="ps_from_provider">From provider</string>
+    <string name="tv_options">Options</string>
+    <string name="placeholder_pending">Pending implementation</string>
 </resources>

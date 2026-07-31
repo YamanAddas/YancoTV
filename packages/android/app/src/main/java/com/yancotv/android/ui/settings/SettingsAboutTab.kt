@@ -119,7 +119,7 @@ fun SettingsAboutTab(
         // 44% of the box was empty and the badge was ~35dp wide.
         Image(
             painter = painterResource(id = R.drawable.ic_logo_mark),
-            contentDescription = "YancoTV logo",
+            contentDescription = stringResource(R.string.ab_logo_desc, stringResource(R.string.app_name)),
             contentScale = ContentScale.Fit,
             modifier =
             Modifier

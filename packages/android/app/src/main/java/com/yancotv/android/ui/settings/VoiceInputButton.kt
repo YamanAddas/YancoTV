@@ -23,9 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
@@ -93,7 +95,7 @@ fun VoiceInputButton(modifier: Modifier = Modifier, onResult: (String) -> Unit) 
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "VOICE",
+            text = stringResource(R.string.voice_input),
             color = if (focused) LocalYancoPalette.current.TextPrimary else LocalYancoPalette.current.TextMuted,
             fontSize = 12.sp,
         )

@@ -88,6 +88,8 @@ fun SettingsBackupTab(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    // MK.31.17 — resolved here; semantics{} is not composable scope.
+    val backupDesc = stringResource(R.string.bk_settings_desc)
 
     // Survives configuration changes + process death — picker round-
     // trips don't clear the user's typed label or toggle.
@@ -299,7 +301,7 @@ fun SettingsBackupTab(
             // edge; 24dp top + 80dp bottom give safety margin so the
             // last row doesn't hug the panel edge when scrolled.
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp)
-            .semantics { contentDescription = "Backup settings" },
+            .semantics { contentDescription = backupDesc },
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(

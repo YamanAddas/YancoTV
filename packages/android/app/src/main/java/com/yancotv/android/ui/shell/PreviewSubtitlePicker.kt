@@ -216,7 +216,7 @@ internal fun PreviewSubtitleOverlay(
                     val label = languageLabel(track.language)
                     SubtitleOptionRow(
                         label = label,
-                        detail = "From provider",
+                        detail = stringResource(R.string.ps_from_provider),
                         selected = selected?.uri?.toString() == track.url,
                         enabled = resolving == null,
                         onClick = {

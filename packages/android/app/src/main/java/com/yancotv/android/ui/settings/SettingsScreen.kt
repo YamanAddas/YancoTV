@@ -287,6 +287,8 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
 /** Top bar for a drilled-in phone tab: a touch Back + the tab's icon + label. */
 @Composable
 private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
+    // MK.31.17 — resolved here; semantics{} is not composable scope.
+    val backToListDesc = stringResource(R.string.st_back_to_list)
     val palette = LocalYancoPalette.current
     Row(
         modifier =
@@ -302,7 +304,7 @@ private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
                 .size(44.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .clickable(role = Role.Button, onClick = onBack)
-                .semantics { contentDescription = "Back to settings list" },
+                .semantics { contentDescription = backToListDesc },
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -602,6 +604,9 @@ private fun Sidebar(
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    // MK.31.17 — resolved here; semantics{} is not composable scope.
+    val searchDesc = stringResource(R.string.st_search_desc)
+    val clearSearchDesc = stringResource(R.string.st_clear_search)
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -637,11 +642,11 @@ private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit, 
             interactionSource = interaction,
             modifier = Modifier
                 .weight(1f)
-                .semantics { contentDescription = "Search settings" },
+                .semantics { contentDescription = searchDesc },
             decorationBox = { inner ->
                 if (value.isEmpty()) {
                     Text(
-                        text = "Search settings…",
+                        text = stringResource(R.string.st_search_hint),
                         color = palette.TextFaint,
                         fontSize = 14.sp,
                     )
@@ -671,7 +676,7 @@ private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit, 
                         role = Role.Button,
                         onClick = { onValueChange("") },
                     )
-                    .semantics { contentDescription = "Clear search" },
+                    .semantics { contentDescription = clearSearchDesc },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -701,7 +706,7 @@ private fun SearchResultsSection(results: List<SettingsSearchEntry>, onSelect: (
     val palette = LocalYancoPalette.current
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Text(
-            text = "MATCHING SETTINGS",
+            text = stringResource(R.string.st_matching),
             color = palette.TextMuted,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -787,14 +792,14 @@ private fun SearchEmptyState(query: String) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
     ) {
         Text(
-            text = "No matches for “$query”.",
+            text = stringResource(R.string.st_no_matches, query),
             color = palette.TextMuted,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Press BACK to clear search.",
+            text = stringResource(R.string.st_back_clears),
             color = palette.TextFaint,
             fontSize = 12.sp,
         )
@@ -820,7 +825,7 @@ private fun SidebarFooterHint() {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
-            text = "BACK",
+            text = stringResource(R.string.vc_back),
             color = palette.Accent,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -1163,7 +1168,7 @@ private fun Breadcrumb(current: SettingsTab) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        HexChip(text = "SETTINGS", active = false)
+        HexChip(text = stringResource(R.string.st_breadcrumb), active = false)
         Icon(
             imageVector = YancoIcons.ChevronRight,
             contentDescription = null,

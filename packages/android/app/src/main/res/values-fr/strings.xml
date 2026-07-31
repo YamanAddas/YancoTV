@@ -763,4 +763,20 @@
     <string name="sp_error">%1$s — erreur : %2$s</string>
     <string name="sp_unknown">inconnu</string>
     <string name="sp_elapsed"> (%1$d s)</string>
+
+    <!-- MK.31.17 batch T — stragglers from a full-tree sweep. -->
+    <string name="st_back_to_list">Retour à la liste des paramètres</string>
+    <string name="st_search_desc">Rechercher dans les paramètres</string>
+    <string name="st_search_hint">Rechercher dans les paramètres…</string>
+    <string name="st_clear_search">Effacer la recherche</string>
+    <string name="st_matching">PARAMÈTRES CORRESPONDANTS</string>
+    <string name="st_no_matches">Aucun résultat pour « %1$s ».</string>
+    <string name="st_back_clears">Appuyez sur RETOUR pour effacer la recherche.</string>
+    <string name="st_breadcrumb">PARAMÈTRES</string>
+    <string name="bk_settings_desc">Paramètres de sauvegarde</string>
+    <string name="ab_logo_desc">Logo %1$s</string>
+    <string name="voice_input">VOIX</string>
+    <string name="ps_from_provider">Du fournisseur</string>
+    <string name="tv_options">Options</string>
+    <string name="placeholder_pending">Implémentation à venir</string>
 </resources>
