@@ -170,7 +170,7 @@ fun SettingsEpgTab(
             SettingsRow(
                 label = stringResource(R.string.epg_programmes_loaded),
                 readOnlyFocusable = true,
-                right = { ValueText(formatCount(stats?.programmeCount ?: 0L)) },
+                right = { ValueText(formatCount(ctx, stats?.programmeCount ?: 0L)) },
             )
             SettingsRowSpacer()
             SettingsRow(
@@ -457,10 +457,16 @@ private fun formatLastRefreshed(ctx: android.content.Context, epochMs: Long?): S
     }
 }
 
-private fun formatCount(n: Long): String = when {
+private fun formatCount(ctx: android.content.Context, n: Long): String = when {
     n < 1_000L -> n.toString()
-    n < 10_000L -> String.format(java.util.Locale.US, "%.1fk", n / 1000.0)
-    else -> "${n / 1000L}k"
+    // MK.31.25 — was Locale.US, so an Arabic UI rendered "1.2k" in Latin
+    // digits next to Arabic-Indic counts elsewhere on the same screen.
+    n < 10_000L ->
+        ctx.getString(
+            R.string.count_thousands_decimal,
+            String.format(java.util.Locale.getDefault(), "%.1f", n / 1000.0),
+        )
+    else -> ctx.getString(R.string.count_thousands, n / 1000L)
 }
 
 @Composable

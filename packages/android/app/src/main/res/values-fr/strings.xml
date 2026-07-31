@@ -1088,4 +1088,13 @@
     <!-- MK.31.24 fixups -->
 
     <!-- MK.31.24 fixups (2) -->
+
+    <!-- MK.31.25 wire-up + clock locale -->
+    <string name="cd_specials">Épisodes spéciaux</string>
+    <string name="dur_m">%1$d min</string>
+    <string name="dur_h">%1$d h</string>
+    <string name="dur_d">%1$d j</string>
+
+    <!-- MK.31.25 fixups -->
+    <string name="sd_due_now">Dû maintenant</string>
 </resources>

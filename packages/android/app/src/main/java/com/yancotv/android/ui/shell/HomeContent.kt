@@ -371,6 +371,7 @@ fun HomeContent(
     val heroSlides =
         remember(heroSlidesKey, heroLabels) {
             buildHeroSlides(
+                heroCtx,
                 continueWatching = continueWatching.toList(),
                 resumeByContent = resumeByContent,
                 onNow = onNowItems.toList(),
@@ -548,6 +549,7 @@ private data class HeroSlide(val item: ContentItem, val eyebrow: String, val acc
 private class HeroLabels(val eyebrowContinueWatching: String, val eyebrowOnAirNow: String, val resumePlayback: String, val minutesLeft: (Int) -> String)
 
 private fun buildHeroSlides(
+    ctx: android.content.Context,
     continueWatching: List<ContentItem>,
     resumeByContent: Map<String, HistoryEntry>,
     onNow: List<NowPairing>,
@@ -586,7 +588,7 @@ private fun buildHeroSlides(
                 headline = pair.programme.title,
                 subhead =
                 (pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title) +
-                    "  •  " + formatTimeWindow(pair.programme),
+                    "  •  " + formatTimeWindow(ctx, pair.programme),
             ),
         )
     }
@@ -1079,7 +1081,12 @@ private fun OnNowTile(pair: NowPairing, locked: Boolean, nowSec: Long, onClick: 
     val dur = (pair.programme.endTime - pair.programme.startTime).coerceAtLeast(1)
     val elapsed = (nowSec - pair.programme.startTime).coerceIn(0, dur)
     val progressPct = (elapsed.toFloat() / dur.toFloat()).coerceIn(0f, 1f)
-    val onNowDesc = "${pair.programme.title} on ${pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title}"
+    val onNowDesc =
+        stringResource(
+            R.string.hc_programme_on_channel,
+            pair.programme.title,
+            pair.channel.cleanTitle?.ifBlank { null } ?: pair.channel.title,
+        )
 
     HexSurface(
         shape = YancoShapes.CutCornerCardSmall,
@@ -1481,14 +1488,19 @@ private fun formatClock(unixSeconds: Long): String {
         java.util.Calendar
             .getInstance()
             .apply { timeInMillis = millis }
-    val hour24 = cal.get(java.util.Calendar.HOUR_OF_DAY)
-    val minute = cal.get(java.util.Calendar.MINUTE)
-    val hour12 = ((hour24 + 11) % 12) + 1
-    val suffix = if (hour24 < 12) "AM" else "PM"
-    return String.format(Locale.ROOT, "%d:%02d %s", hour12, minute, suffix)
+    // MK.31.25 — was a hand-rolled 12-hour clock with literal "AM"/"PM" and
+    // Locale.ROOT, which put English meridiem markers and Latin digits into
+    // an Arabic UI. SimpleDateFormat("h:mm a") with the default locale gets
+    // the right markers, the right digits, and the right ordering for free.
+    return java.text.SimpleDateFormat("h:mm a", Locale.getDefault())
+        .format(java.util.Date(cal.timeInMillis))
 }
 
-private fun formatTimeWindow(programme: EpgProgramme): String = "${formatClock(programme.startTime)} – ${formatClock(programme.endTime)}"
+private fun formatTimeWindow(ctx: android.content.Context, programme: EpgProgramme): String = ctx.getString(
+    R.string.time_range,
+    formatClock(programme.startTime),
+    formatClock(programme.endTime),
+)
 
 /**
  * Audit catch — inline error card surfaced when the user has at least

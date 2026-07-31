@@ -1142,4 +1142,14 @@
     <!-- MK.31.24 fixups -->
 
     <!-- MK.31.24 fixups (2) -->
+
+    <!-- MK.31.25 wire-up + clock locale -->
+    <string name="cd_specials">Specials</string>
+    <string name="dur_m">%1$dm</string>
+    <string name="dur_h">%1$dh</string>
+    <string name="dur_d">%1$dd</string>
+    <string name="count_thousands_decimal" translatable="false">%1$sk</string>
+
+    <!-- MK.31.25 fixups -->
+    <string name="sd_due_now">Due now</string>
 </resources>

@@ -20,9 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -74,7 +76,11 @@ private fun FlashBadge(seconds: Int) {
         horizontalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = if (seconds > 0) "▶▶  +${seconds}s" else "◂◂  ${seconds}s",
+            text = if (seconds > 0) {
+                stringResource(R.string.sf_forward, seconds)
+            } else {
+                stringResource(R.string.sf_back, seconds)
+            },
             color = Color.White,
             fontSize = 26.sp,
             fontWeight = FontWeight.SemiBold,

@@ -1002,7 +1002,11 @@ private fun SeasonSelector(
             .padding(horizontal = Space.page, vertical = Space.xs),
     ) {
         SeasonTrigger(
-            label = if (selectedSeason == 0) "Specials" else "Season $selectedSeason",
+            label = if (selectedSeason == 0) {
+                stringResource(R.string.cd_specials)
+            } else {
+                stringResource(R.string.cd_season_n, selectedSeason)
+            },
             count = episodeCount,
             open = open,
             onClick = onTriggerClick,
@@ -1399,7 +1403,11 @@ private fun SeasonPickerOverlay(
                             )
                         }
                         SeasonOption(
-                            label = if (season == 0) "Specials" else "Season $season",
+                            label = if (season == 0) {
+                                stringResource(R.string.cd_specials)
+                            } else {
+                                stringResource(R.string.cd_season_n, season)
+                            },
                             count = seasons[season]?.size ?: 0,
                             selected = season == selectedSeason,
                             onClick = { onSeasonSelect(season) },

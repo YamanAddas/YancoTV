@@ -200,7 +200,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             SettingsRow(
                 label = stringResource(R.string.sd_refresh_in),
                 kicker = stringResource(R.string.sd_kicker_autosync),
-                right = { ValueText(formatRefreshIn(current)) },
+                right = { ValueText(formatRefreshIn(ctx, current)) },
                 readOnlyFocusable = true,
             )
             SettingsRowSpacer()
@@ -592,24 +592,33 @@ private fun healthSummary(status: RowStatus): String = when (status) {
     RowStatus.Error -> stringResource(R.string.st_last_sync_failed)
 }
 
-private fun formatRefreshIn(source: Source): String {
+private fun formatRefreshIn(ctx: android.content.Context, source: Source): String {
+    // The em-dash placeholders stay literal — they are notation, not copy.
     if (source.lastSyncError != null) return "—"
     val last = source.lastSynced ?: return "—"
     val intervalMs = source.autoSyncInterval.coerceAtLeast(1) * 60L * 60L * 1000L
     val remaining = (last + intervalMs) - System.currentTimeMillis()
-    if (remaining <= 0L) return "Due now"
+    if (remaining <= 0L) return ctx.getString(R.string.sd_due_now)
     val totalMin = remaining / 60_000L
     return when {
-        totalMin < 60 -> "${totalMin}m"
+        totalMin < 60 -> ctx.getString(R.string.dur_m, totalMin)
         totalMin < 24 * 60 -> {
             val h = totalMin / 60
             val m = totalMin % 60
-            if (m == 0L) "${h}h" else "${h}h ${m}m"
+            if (m == 0L) {
+                ctx.getString(R.string.dur_h, h)
+            } else {
+                ctx.getString(R.string.sd_dur_hm, h, m)
+            }
         }
         else -> {
             val d = totalMin / (24 * 60)
             val h = (totalMin % (24 * 60)) / 60
-            if (h == 0L) "${d}d" else "${d}d ${h}h"
+            if (h == 0L) {
+                ctx.getString(R.string.dur_d, d)
+            } else {
+                ctx.getString(R.string.sd_dur_dh, d, h)
+            }
         }
     }
 }

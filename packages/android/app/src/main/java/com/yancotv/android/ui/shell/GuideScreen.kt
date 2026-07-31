@@ -1470,7 +1470,8 @@ private fun NoEpgCell(startTime: Long, endTime: Long, widthDp: androidx.compose.
     val bg = if (focused) palette.BackgroundHover else palette.BackgroundRaised
     val border = if (focused) palette.FocusRing else palette.BorderSubtle
 
-    val rangeLabel = "${formatHourMinute(startTime)} – ${formatHourMinute(endTime)}"
+    val rangeLabel =
+        stringResource(R.string.time_range, formatHourMinute(startTime), formatHourMinute(endTime))
     val description = stringResource(R.string.gd_no_info_desc, rangeLabel)
 
     Column(
@@ -1569,7 +1570,11 @@ private fun ProgrammeActionDialog(
                     fontSize = 14.sp,
                 )
                 Text(
-                    text = "${formatHourMinute(programme.startTime)} – ${formatHourMinute(programme.endTime)}",
+                    text = stringResource(
+                        R.string.time_range,
+                        formatHourMinute(programme.startTime),
+                        formatHourMinute(programme.endTime),
+                    ),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )

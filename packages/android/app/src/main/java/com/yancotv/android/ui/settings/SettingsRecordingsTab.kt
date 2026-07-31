@@ -187,7 +187,7 @@ fun SettingsRecordingsTab(modifier: Modifier = Modifier, prefs: AppPreferences =
                 } else if (needsLegacyPermission) {
                     stringResource(R.string.rt_permission_needed)
                 } else {
-                    publicFolderResolvedPath()
+                    publicFolderResolvedPath(context)
                 },
                 selected = recordingPrefs.storageMode == RecordingStorageMode.PUBLIC_MEDIA_STORE,
                 onSelect = {
@@ -492,10 +492,12 @@ private fun friendlyTreeUriPath(uri: Uri): String {
  * API 29+ (zero permission, MediaStore-managed) vs API ≤28 (legacy
  * direct path requiring `WRITE_EXTERNAL_STORAGE`).
  */
-private fun publicFolderResolvedPath(): String {
+private fun publicFolderResolvedPath(ctx: android.content.Context): String {
     val moviesPart = "${Environment.DIRECTORY_MOVIES}/$PUBLIC_DIR_NAME"
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        "/storage/emulated/0/$moviesPart (managed by Android Media)"
+        // The path itself is a filesystem path and stays literal; only the
+        // parenthetical explaining who owns it is copy.
+        ctx.getString(R.string.rt_managed_by_android, "/storage/emulated/0/$moviesPart")
     } else {
         "/storage/emulated/0/$moviesPart"
     }
