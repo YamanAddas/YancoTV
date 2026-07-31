@@ -557,4 +557,51 @@
     <string name="gd_play_catchup">Play catch-up</string>
 
     <!-- MK.31.9 batch L (cont.) — search field descriptions. -->
+
+    <!-- MK.31.10 batch M — Coverflow browse pane + Home remainder. -->
+    <string name="brand_plus" translatable="false">YANCOTV+</string>
+    <string name="cf_kicker_live_channel">LIVE CHANNEL</string>
+    <string name="cf_open_fullscreen">Open fullscreen</string>
+    <string name="cf_watch">Watch</string>
+    <string name="cf_episodes">Episodes</string>
+    <string name="cf_now">Now: %1$s</string>
+    <string name="cf_up_next">Up next: %1$s</string>
+    <string name="cf_in_favorites">In favorites</string>
+    <string name="cf_favorite">Favorite</string>
+    <string name="cf_subtitles">Subtitles</string>
+    <string name="cf_empty_live_kicker">LIVE TV</string>
+    <string name="cf_empty_live_title">Pick a channel from the wheel</string>
+    <string name="cf_empty_live_body">The focused channel previews here. Press OK to go fullscreen.</string>
+    <string name="cf_empty_movies_kicker">MOVIES</string>
+    <string name="cf_empty_movies_title">Pick a movie from the wheel</string>
+    <string name="cf_empty_movies_body">The focused movie shows here. Press OK to open details.</string>
+    <string name="cf_empty_series_kicker">SERIES</string>
+    <string name="cf_empty_series_title">Pick a series from the wheel</string>
+    <string name="cf_empty_series_body">The focused series shows here. Press OK to open episodes.</string>
+    <string name="cf_min_left">%1$d min left</string>
+    <string name="cf_ending_now">Ending now</string>
+    <string name="badge_live">LIVE</string>
+    <string name="badge_locked">LOCKED</string>
+    <string name="cf_no_fav_channels">No favorite channels</string>
+    <string name="cf_no_fav_movies">No favorite movies</string>
+    <string name="cf_no_fav_series">No favorite series</string>
+    <string name="cf_no_channels">No channels</string>
+    <string name="cf_no_movies">No movies</string>
+    <string name="hm_enter_pin">Enter PIN</string>
+    <string name="hm_watch_now">Watch now</string>
+    <string name="hm_locked">Locked</string>
+    <string name="hm_resume">Resume</string>
+    <string name="hm_unknown_sync_error">Unknown sync error</string>
+    <string name="hm_sync_failed">SYNC FAILED</string>
+    <string name="hm_sync_failed_body">Couldn\'t sync “%1$s”</string>
+    <string name="hm_open_sources">Open Sources</string>
+    <string name="hm_setting_up">SETTING UP</string>
+    <string name="hm_importing">Importing “%1$s”</string>
+    <string name="hm_import_slow">This can take a few minutes on a large playlist.</string>
+    <string name="hm_empty_tagline">Your cinematic IPTV suite</string>
+    <string name="hm_empty_body">Add a source, star a few channels, and this dashboard lights up with what to watch right now.</string>
+    <string name="hm_add_first_source">Add your first source</string>
+
+    <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
+    <string name="hm_m_left">%1$dm left</string>
 </resources>

@@ -535,4 +535,50 @@
     <string name="gd_play_catchup">Lire en replay</string>
 
     <!-- MK.31.9 batch L (cont.) — search field descriptions. -->
+
+    <!-- MK.31.10 batch M — Coverflow browse pane + Home remainder. -->
+    <string name="cf_kicker_live_channel">CHAÎNE EN DIRECT</string>
+    <string name="cf_open_fullscreen">Ouvrir en plein écran</string>
+    <string name="cf_watch">Regarder</string>
+    <string name="cf_episodes">Épisodes</string>
+    <string name="cf_now">En ce moment : %1$s</string>
+    <string name="cf_up_next">À suivre : %1$s</string>
+    <string name="cf_in_favorites">Dans les favoris</string>
+    <string name="cf_favorite">Favori</string>
+    <string name="cf_subtitles">Sous-titres</string>
+    <string name="cf_empty_live_kicker">TV EN DIRECT</string>
+    <string name="cf_empty_live_title">Choisissez une chaîne dans la roue</string>
+    <string name="cf_empty_live_body">La chaîne sélectionnée s\'affiche ici en aperçu. Appuyez sur OK pour le plein écran.</string>
+    <string name="cf_empty_movies_kicker">FILMS</string>
+    <string name="cf_empty_movies_title">Choisissez un film dans la roue</string>
+    <string name="cf_empty_movies_body">Le film sélectionné s\'affiche ici. Appuyez sur OK pour les détails.</string>
+    <string name="cf_empty_series_kicker">SÉRIES</string>
+    <string name="cf_empty_series_title">Choisissez une série dans la roue</string>
+    <string name="cf_empty_series_body">La série sélectionnée s\'affiche ici. Appuyez sur OK pour les épisodes.</string>
+    <string name="cf_min_left">%1$d min restantes</string>
+    <string name="cf_ending_now">Se termine</string>
+    <string name="badge_live">DIRECT</string>
+    <string name="badge_locked">VERROUILLÉ</string>
+    <string name="cf_no_fav_channels">Aucune chaîne favorite</string>
+    <string name="cf_no_fav_movies">Aucun film favori</string>
+    <string name="cf_no_fav_series">Aucune série favorite</string>
+    <string name="cf_no_channels">Aucune chaîne</string>
+    <string name="cf_no_movies">Aucun film</string>
+    <string name="hm_enter_pin">Saisir le PIN</string>
+    <string name="hm_watch_now">Regarder</string>
+    <string name="hm_locked">Verrouillé</string>
+    <string name="hm_resume">Reprendre</string>
+    <string name="hm_unknown_sync_error">Erreur de synchronisation inconnue</string>
+    <string name="hm_sync_failed">SYNCHRONISATION ÉCHOUÉE</string>
+    <string name="hm_sync_failed_body">Impossible de synchroniser « %1$s »</string>
+    <string name="hm_open_sources">Ouvrir les sources</string>
+    <string name="hm_setting_up">CONFIGURATION</string>
+    <string name="hm_importing">Importation de « %1$s »</string>
+    <string name="hm_import_slow">Cela peut prendre quelques minutes sur une grande playlist.</string>
+    <string name="hm_empty_tagline">Votre suite IPTV cinématographique</string>
+    <string name="hm_empty_body">Ajoutez une source, mettez quelques chaînes en favori, et ce tableau de bord s\'anime avec ce qu\'il y a à regarder.</string>
+    <string name="hm_add_first_source">Ajouter votre première source</string>
+
+    <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
+    <string name="hm_m_left">%1$d min restantes</string>
 </resources>

@@ -804,7 +804,7 @@ private fun HeroFrame(slide: HeroSlide, interaction: MutableInteractionSource, l
 @Composable
 private fun HeroCta(interaction: MutableInteractionSource, locked: Boolean) {
     val focused by interaction.collectIsFocusedAsState()
-    val label = if (locked) "Enter PIN" else "Watch now"
+    val label = if (locked) stringResource(R.string.hm_enter_pin) else stringResource(R.string.hm_watch_now)
     val icon = if (locked) YancoIcons.Lock else YancoIcons.Play
     Row(
         modifier =
@@ -1288,7 +1288,7 @@ private fun LockBadge(modifier: Modifier = Modifier) {
     ) {
         Icon(
             imageVector = YancoIcons.Lock,
-            contentDescription = "Locked",
+            contentDescription = stringResource(R.string.hm_locked),
             tint = LocalYancoPalette.current.Live,
             modifier = Modifier.size(14.dp),
         )
@@ -1304,14 +1304,17 @@ private fun LockBadge(modifier: Modifier = Modifier) {
  * can use the shared [com.yancotv.android.ui.components.formatResumeLabel]
  * instead.
  */
+// MK.31.10 — @Composable so both branches can resolve resources. The only
+// caller is a PosterTile label, already in composable scope.
+@Composable
 private fun resumeLabelFor(resume: HistoryEntry): String {
     val dur = resume.durationSeconds
     return if (dur != null && dur > 0) {
         val remainingSec = (dur - resume.positionSeconds).toDouble().coerceAtLeast(0.0).roundToInt()
         val minutes = (remainingSec / 60).coerceAtLeast(1)
-        "${minutes}m left"
+        stringResource(R.string.hm_m_left, minutes)
     } else {
-        "Resume"
+        stringResource(R.string.hm_resume)
     }
 }
 
@@ -1334,7 +1337,7 @@ private fun LiveBadge(modifier: Modifier = Modifier) {
                 .background(LocalYancoPalette.current.TextPrimary),
         )
         Text(
-            text = "LIVE",
+            text = stringResource(R.string.badge_live),
             color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.Overline,
         )
@@ -1487,11 +1490,13 @@ private fun formatTimeWindow(programme: EpgProgramme): String = "${formatClock(p
 @Composable
 private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (() -> Unit)?, modifier: Modifier = Modifier) {
     val palette = LocalYancoPalette.current
-    val redactedError = remember(source.lastSyncError) {
+    // MK.31.10 — resolved outside remember{}, which is not composable scope.
+    val unknownSyncError = stringResource(R.string.hm_unknown_sync_error)
+    val redactedError = remember(source.lastSyncError, unknownSyncError) {
         source.lastSyncError
             ?.let(::redactCredentials)
             ?.take(120)
-            ?: "Unknown sync error"
+            ?: unknownSyncError
     }
     HexSurface(
         shape = YancoShapes.CutCornerCard,
@@ -1510,12 +1515,12 @@ private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                 Text(
-                    text = "SYNC FAILED",
+                    text = stringResource(R.string.hm_sync_failed),
                     color = LocalYancoPalette.current.Live,
                     style = YancoType.Overline,
                 )
                 Text(
-                    text = "Couldn't sync “${source.name}”",
+                    text = stringResource(R.string.hm_sync_failed_body, source.name),
                     color = palette.TextPrimary,
                     style = YancoType.TitleL,
                     maxLines = 2,
@@ -1540,7 +1545,7 @@ private fun BrokenSourceBanner(source: com.yancotv.shared.types.Source, onFix: (
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                         )
-                        Text(text = "Open Sources")
+                        Text(text = stringResource(R.string.hm_open_sources))
                     }
                 }
             }
@@ -1581,12 +1586,12 @@ private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordina
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                 Text(
-                    text = "SETTING UP",
+                    text = stringResource(R.string.hm_setting_up),
                     color = palette.Accent,
                     style = YancoType.Overline,
                 )
                 Text(
-                    text = "Importing “${active.sourceName}”",
+                    text = stringResource(R.string.hm_importing, active.sourceName),
                     color = palette.TextPrimary,
                     style = YancoType.TitleL,
                     maxLines = 2,
@@ -1596,7 +1601,7 @@ private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordina
                 Text(
                     text =
                     active.progress.message?.takeIf { it.isNotBlank() }
-                        ?: "This can take a few minutes on a large playlist.",
+                        ?: stringResource(R.string.hm_import_slow),
                     color = palette.TextSecondary,
                     style = YancoType.Body,
                     maxLines = 3,
@@ -1613,7 +1618,7 @@ private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordina
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                         )
-                        Text(text = "Open Sources")
+                        Text(text = stringResource(R.string.hm_open_sources))
                     }
                 }
             }
@@ -1660,18 +1665,18 @@ private fun EmptyHome(onAddSource: (() -> Unit)?, modifier: Modifier) {
                 verticalArrangement = Arrangement.spacedBy(Space.sm),
             ) {
                 Text(
-                    text = "YANCOTV+",
+                    text = stringResource(R.string.brand_plus),
                     color = LocalYancoPalette.current.Accent,
                     style = YancoType.Overline,
                 )
                 Text(
-                    text = "Your cinematic IPTV suite",
+                    text = stringResource(R.string.hm_empty_tagline),
                     color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.DisplayS,
                 )
                 Spacer(Modifier.height(Space.xs))
                 Text(
-                    text = "Add a source, star a few channels, and this dashboard lights up with what to watch right now.",
+                    text = stringResource(R.string.hm_empty_body),
                     color = LocalYancoPalette.current.TextSecondary,
                     style = YancoType.BodyLong,
                 )
@@ -1686,7 +1691,7 @@ private fun EmptyHome(onAddSource: (() -> Unit)?, modifier: Modifier) {
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                         )
-                        Text(text = "Add your first source")
+                        Text(text = stringResource(R.string.hm_add_first_source))
                     }
                 }
             }

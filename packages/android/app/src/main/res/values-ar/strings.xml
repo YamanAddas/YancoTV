@@ -535,4 +535,50 @@
     <string name="gd_play_catchup">تشغيل المحتوى السابق</string>
 
     <!-- MK.31.9 batch L (cont.) — search field descriptions. -->
+
+    <!-- MK.31.10 batch M — Coverflow browse pane + Home remainder. -->
+    <string name="cf_kicker_live_channel">قناة مباشرة</string>
+    <string name="cf_open_fullscreen">فتح ملء الشاشة</string>
+    <string name="cf_watch">مشاهدة</string>
+    <string name="cf_episodes">الحلقات</string>
+    <string name="cf_now">الآن: %1$s</string>
+    <string name="cf_up_next">التالي: %1$s</string>
+    <string name="cf_in_favorites">في المفضلة</string>
+    <string name="cf_favorite">إضافة للمفضلة</string>
+    <string name="cf_subtitles">الترجمة</string>
+    <string name="cf_empty_live_kicker">القنوات المباشرة</string>
+    <string name="cf_empty_live_title">اختر قناة من العجلة</string>
+    <string name="cf_empty_live_body">تظهر معاينة القناة المحددة هنا. اضغط OK لملء الشاشة.</string>
+    <string name="cf_empty_movies_kicker">الأفلام</string>
+    <string name="cf_empty_movies_title">اختر فيلماً من العجلة</string>
+    <string name="cf_empty_movies_body">يظهر الفيلم المحدد هنا. اضغط OK لعرض التفاصيل.</string>
+    <string name="cf_empty_series_kicker">المسلسلات</string>
+    <string name="cf_empty_series_title">اختر مسلسلاً من العجلة</string>
+    <string name="cf_empty_series_body">يظهر المسلسل المحدد هنا. اضغط OK لعرض الحلقات.</string>
+    <string name="cf_min_left">بقي %1$d دقيقة</string>
+    <string name="cf_ending_now">ينتهي الآن</string>
+    <string name="badge_live">مباشر</string>
+    <string name="badge_locked">مقفل</string>
+    <string name="cf_no_fav_channels">لا قنوات مفضلة</string>
+    <string name="cf_no_fav_movies">لا أفلام مفضلة</string>
+    <string name="cf_no_fav_series">لا مسلسلات مفضلة</string>
+    <string name="cf_no_channels">لا قنوات</string>
+    <string name="cf_no_movies">لا أفلام</string>
+    <string name="hm_enter_pin">أدخل رمز PIN</string>
+    <string name="hm_watch_now">شاهد الآن</string>
+    <string name="hm_locked">مقفل</string>
+    <string name="hm_resume">متابعة</string>
+    <string name="hm_unknown_sync_error">خطأ مزامنة غير معروف</string>
+    <string name="hm_sync_failed">فشلت المزامنة</string>
+    <string name="hm_sync_failed_body">تعذّرت مزامنة “%1$s”</string>
+    <string name="hm_open_sources">فتح المصادر</string>
+    <string name="hm_setting_up">جارٍ الإعداد</string>
+    <string name="hm_importing">جارٍ استيراد “%1$s”</string>
+    <string name="hm_import_slow">قد يستغرق هذا بضع دقائق مع قائمة كبيرة.</string>
+    <string name="hm_empty_tagline">مجموعتك السينمائية لبث IPTV</string>
+    <string name="hm_empty_body">أضف مصدراً، وضع بعض القنوات في المفضلة، وستضيء هذه اللوحة بما يمكنك مشاهدته الآن.</string>
+    <string name="hm_add_first_source">أضف مصدرك الأول</string>
+
+    <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
+    <string name="hm_m_left">بقي %1$d د</string>
 </resources>

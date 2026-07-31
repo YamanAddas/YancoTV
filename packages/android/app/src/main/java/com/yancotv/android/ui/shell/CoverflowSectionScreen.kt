@@ -66,6 +66,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.ui.components.ProgressStripe
@@ -958,7 +960,7 @@ private fun PreviewScrim() {
 private fun PreviewIdleArtwork(type: ContentType) {
     val brand =
         when (type) {
-            ContentType.LIVE -> "YANCOTV+"
+            ContentType.LIVE -> stringResource(R.string.brand_plus)
             ContentType.MOVIE -> "MOVIES"
             ContentType.SERIES -> "SERIES"
         }
@@ -1015,7 +1017,7 @@ private fun MetaColumn(
     val nextProg = nowNext?.next
     val overline =
         when (type) {
-            ContentType.LIVE -> "LIVE CHANNEL"
+            ContentType.LIVE -> stringResource(R.string.cf_kicker_live_channel)
             ContentType.MOVIE -> "MOVIE"
             ContentType.SERIES -> "SERIES"
         }
@@ -1023,10 +1025,10 @@ private fun MetaColumn(
     // action opens the episode list rather than starting playback.
     val watchLabel =
         when {
-            type == ContentType.LIVE && isPlaying -> "Open fullscreen"
-            type == ContentType.LIVE -> "Watch"
-            type == ContentType.MOVIE -> "Watch"
-            else -> "Episodes"
+            type == ContentType.LIVE && isPlaying -> stringResource(R.string.cf_open_fullscreen)
+            type == ContentType.LIVE -> stringResource(R.string.cf_watch)
+            type == ContentType.MOVIE -> stringResource(R.string.cf_watch)
+            else -> stringResource(R.string.cf_episodes)
         }
     // No widthIn cap here — the column needs to use whatever horizontal
     // space the meta side of the preview row has, otherwise a 520dp cap
@@ -1054,7 +1056,7 @@ private fun MetaColumn(
         if (type == ContentType.LIVE) {
             if (nowProg != null) {
                 Text(
-                    text = "Now: ${nowProg.title}",
+                    text = stringResource(R.string.cf_now, nowProg.title),
                     color = LocalYancoPalette.current.TextPrimary,
                     style = YancoType.TitleM,
                     maxLines = 2,
@@ -1076,7 +1078,7 @@ private fun MetaColumn(
             }
             if (nextProg != null) {
                 Text(
-                    text = "Up next: ${nextProg.title}",
+                    text = stringResource(R.string.cf_up_next, nextProg.title),
                     color = LocalYancoPalette.current.TextMuted,
                     style = YancoType.Caption,
                     maxLines = 1,
@@ -1147,7 +1149,7 @@ private fun MetaColumn(
                 )
             }
             HexCta(
-                label = if (isFavorite) "In favorites" else "Favorite",
+                label = if (isFavorite) stringResource(R.string.cf_in_favorites) else stringResource(R.string.cf_favorite),
                 icon = if (isFavorite) YancoIcons.StarFilled else YancoIcons.StarOutline,
                 primary = false,
                 highlighted = isFavorite,
@@ -1158,7 +1160,7 @@ private fun MetaColumn(
             // own subtitle menu covers episodes once one is playing.
             if (type == ContentType.MOVIE) {
                 HexCta(
-                    label = subtitle?.label ?: "Subtitles",
+                    label = subtitle?.label ?: stringResource(R.string.cf_subtitles),
                     icon = YancoIcons.Subtitles,
                     primary = false,
                     highlighted = subtitle != null,
@@ -1210,21 +1212,21 @@ private fun EmptyMetaPrompt(type: ContentType, modifier: Modifier) {
         when (type) {
             ContentType.LIVE ->
                 Triple(
-                    "LIVE TV",
-                    "Pick a channel from the wheel",
-                    "The focused channel previews here. Press OK to go fullscreen.",
+                    stringResource(R.string.cf_empty_live_kicker),
+                    stringResource(R.string.cf_empty_live_title),
+                    stringResource(R.string.cf_empty_live_body),
                 )
             ContentType.MOVIE ->
                 Triple(
-                    "MOVIES",
-                    "Pick a movie from the wheel",
-                    "The focused movie shows here. Press OK to open details.",
+                    stringResource(R.string.cf_empty_movies_kicker),
+                    stringResource(R.string.cf_empty_movies_title),
+                    stringResource(R.string.cf_empty_movies_body),
                 )
             ContentType.SERIES ->
                 Triple(
-                    "SERIES",
-                    "Pick a series from the wheel",
-                    "The focused series shows here. Press OK to open episodes.",
+                    stringResource(R.string.cf_empty_series_kicker),
+                    stringResource(R.string.cf_empty_series_title),
+                    stringResource(R.string.cf_empty_series_body),
                 )
         }
     Column(modifier = modifier, verticalArrangement = Arrangement.Center) {
@@ -1279,7 +1281,7 @@ private fun ProgressLine(start: Long, end: Long, now: Long) {
             )
         }
         Text(
-            text = if (remainingMin > 0) "$remainingMin min left" else "Ending now",
+            text = if (remainingMin > 0) stringResource(R.string.cf_min_left, remainingMin) else stringResource(R.string.cf_ending_now),
             color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Caption,
         )
@@ -1367,7 +1369,7 @@ private fun MetaLivePill() {
                 .clip(RoundedCornerShape(Radius.pill))
                 .background(Color.White),
         )
-        Text(text = "LIVE", color = Color.White, style = YancoType.Overline)
+        Text(text = stringResource(R.string.badge_live), color = Color.White, style = YancoType.Overline)
     }
 }
 
@@ -1389,7 +1391,7 @@ private fun MetaLockChip() {
             tint = LocalYancoPalette.current.Accent,
             modifier = Modifier.size(10.dp),
         )
-        Text(text = "LOCKED", color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
+        Text(text = stringResource(R.string.badge_locked), color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
     }
 }
 
@@ -1707,14 +1709,14 @@ private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean, onA
         when {
             favoritesFilter ->
                 when (type) {
-                    ContentType.LIVE -> "No favorite channels"
-                    ContentType.MOVIE -> "No favorite movies"
-                    ContentType.SERIES -> "No favorite series"
+                    ContentType.LIVE -> stringResource(R.string.cf_no_fav_channels)
+                    ContentType.MOVIE -> stringResource(R.string.cf_no_fav_movies)
+                    ContentType.SERIES -> stringResource(R.string.cf_no_fav_series)
                 }
             else ->
                 when (type) {
-                    ContentType.LIVE -> "No channels"
-                    ContentType.MOVIE -> "No movies"
+                    ContentType.LIVE -> stringResource(R.string.cf_no_channels)
+                    ContentType.MOVIE -> stringResource(R.string.cf_no_movies)
                     ContentType.SERIES -> "No series"
                 }
         }
