@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.parental.ParentalRepository
 import kotlinx.coroutines.Dispatchers
@@ -116,7 +118,7 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
                 // field clears and the Unlock button disables in silence.
                 if (lockoutSec > 0) {
                     Text(
-                        text = "Too many attempts. Try again in ${lockoutSec}s.",
+                        text = stringResource(R.string.pin_too_many, lockoutSec),
                         color = LocalYancoPalette.current.Error,
                         fontSize = 12.sp,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },

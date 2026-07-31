@@ -699,4 +699,68 @@
 
     <!-- MK.31.14 (cont.) — channel zap overlay. -->
     <string name="zap_channel">قناة</string>
+
+    <!-- MK.31.15 batch Q — content detail + watch indicator. -->
+    <string name="cd_no_episodes">لا توجد حلقات متاحة.</string>
+    <string name="cd_continue">متابعة</string>
+    <string name="cd_director">المخرج</string>
+    <string name="cd_cast">طاقم التمثيل</string>
+    <string name="cd_no_artwork">لا يوجد غلاف</string>
+    <string name="cd_from_start">من البداية</string>
+    <string name="cd_reset">إعادة تعيين</string>
+    <string name="cd_in_favorites">في المفضلة</string>
+    <string name="cd_favorite">المفضلة</string>
+    <string name="cd_back">رجوع</string>
+    <string name="cd_episodes">الحلقات</string>
+    <string name="cd_season_n">الموسم %1$d</string>
+    <string name="cd_select_season">اختر الموسم</string>
+    <string name="cd_resume_ep">متابعة %1$s</string>
+    <string name="cd_play_ep">تشغيل %1$s</string>
+    <string name="cd_watch_again_ep">إعادة مشاهدة %1$s</string>
+    <string name="wi_watched">تمت المشاهدة</string>
+
+    <!-- MK.31.15 batch R — channel actions menu + PIN dialog. -->
+    <string name="ca_custom_logo">شعار مخصص</string>
+    <string name="ca_unlock_pin">إلغاء القفل (PIN)</string>
+    <string name="ca_lock">قفل</string>
+    <string name="ca_hide">إخفاء من القوائم</string>
+    <string name="ca_hidden_toast">تم إخفاء القناة — يمكن إدارتها من الإعدادات → الرقابة الأبوية</string>
+    <string name="ca_share_url">مشاركة رابط البث</string>
+    <string name="ca_unlock_title">أدخل رمز PIN لإلغاء القفل</string>
+    <string name="ca_unlock_body">هذه القناة مقفلة. أكّد رمز PIN لإزالة القفل.</string>
+    <string name="ca_rename_title">إعادة تسمية القناة</string>
+    <string name="ca_rename_body">اتركه فارغاً للعودة إلى عنوان M3U.</string>
+    <string name="ca_logo_title">عنوان الشعار المخصص</string>
+    <string name="ca_logo_body">الصق عنوان صورة لتجاوز شعار M3U. اتركه فارغاً للعودة.</string>
+    <string name="ca_add_to_list">إلى أي قائمة تريد الإضافة؟</string>
+    <string name="pin_too_many">محاولات كثيرة. أعد المحاولة بعد %1$d ثانية.</string>
+
+    <!-- MK.31.16 batch S — Sources sub-line + sync banner. -->
+    <string name="sl_syncing_now">تتم المزامنة الآن</string>
+    <string name="sl_stale">قديم · قم بالمزامنة للتحديث</string>
+    <string name="sl_never_synced">لم تتم المزامنة أبداً</string>
+    <string name="sl_last_sync_failed">فشلت آخر مزامنة</string>
+    <string name="sl_due_now">مستحق الآن</string>
+    <string name="sl_refresh_in_m">التحديث بعد %1$d د</string>
+    <string name="sl_refresh_in_h">التحديث بعد %1$d س</string>
+    <string name="sl_refresh_in_hm">التحديث بعد %1$d س %2$d د</string>
+    <string name="sl_refresh_in_d">التحديث بعد %1$d ي</string>
+    <string name="sl_refresh_in_dh">التحديث بعد %1$d ي %2$d س</string>
+    <string name="sl_no_items">لا عناصر بعد</string>
+    <string name="sl_one_item">عنصر واحد</string>
+    <string name="sl_n_items">%1$d عنصر</string>
+    <string name="sl_k_items">%1$s ألف عنصر</string>
+    <string name="sl_m_items">%1$s مليون عنصر</string>
+    <string name="sp_fetching">%1$s — جارٍ الجلب…%2$s</string>
+    <string name="sp_message">%1$s — %2$s…%3$s</string>
+    <string name="sp_parsing">%1$s — جارٍ التحليل…%2$s</string>
+    <string name="sp_classifying">%1$s — جارٍ التصنيف…%2$s</string>
+    <string name="sp_writing">%1$s — جارٍ الكتابة</string>
+    <string name="sp_writing_msg">%1$s — %2$s</string>
+    <string name="sp_progress">%1$s %2$d/%3$d%4$s</string>
+    <string name="sp_progress_open">%1$s (%2$d)%3$s</string>
+    <string name="sp_done">%1$s — تمت المزامنة (%2$d)</string>
+    <string name="sp_error">%1$s — خطأ: %2$s</string>
+    <string name="sp_unknown">غير معروف</string>
+    <string name="sp_elapsed"> (%1$d ث)</string>
 </resources>

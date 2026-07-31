@@ -18,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
@@ -137,7 +139,7 @@ fun WatchedCheckBadge(modifier: Modifier = Modifier) {
             modifier = Modifier.size(10.dp),
         )
         Text(
-            text = "Watched",
+            text = stringResource(R.string.wi_watched),
             color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.Caption,
         )

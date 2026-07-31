@@ -724,4 +724,68 @@
 
     <!-- MK.31.14 (cont.) — channel zap overlay. -->
     <string name="zap_channel">CHANNEL</string>
+
+    <!-- MK.31.15 batch Q — content detail + watch indicator. -->
+    <string name="cd_no_episodes">No episodes available.</string>
+    <string name="cd_continue">Continue</string>
+    <string name="cd_director">Director</string>
+    <string name="cd_cast">Cast</string>
+    <string name="cd_no_artwork">No artwork</string>
+    <string name="cd_from_start">From start</string>
+    <string name="cd_reset">Reset</string>
+    <string name="cd_in_favorites">In favorites</string>
+    <string name="cd_favorite">Favorite</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_episodes">EPISODES</string>
+    <string name="cd_season_n">Season %1$d</string>
+    <string name="cd_select_season">Select season</string>
+    <string name="cd_resume_ep">Resume %1$s</string>
+    <string name="cd_play_ep">Play %1$s</string>
+    <string name="cd_watch_again_ep">Watch again %1$s</string>
+    <string name="wi_watched">Watched</string>
+
+    <!-- MK.31.15 batch R — channel actions menu + PIN dialog. -->
+    <string name="ca_custom_logo">Custom logo</string>
+    <string name="ca_unlock_pin">Unlock (PIN)</string>
+    <string name="ca_lock">Lock</string>
+    <string name="ca_hide">Hide from lists</string>
+    <string name="ca_hidden_toast">Channel hidden — manage in Settings → Parental</string>
+    <string name="ca_share_url">Share stream URL</string>
+    <string name="ca_unlock_title">Enter PIN to unlock</string>
+    <string name="ca_unlock_body">This channel is locked. Confirm your PIN to remove the lock.</string>
+    <string name="ca_rename_title">Rename channel</string>
+    <string name="ca_rename_body">Leave blank to revert to the M3U title.</string>
+    <string name="ca_logo_title">Custom logo URL</string>
+    <string name="ca_logo_body">Paste an image URL to override the M3U logo. Leave blank to revert.</string>
+    <string name="ca_add_to_list">Add to which list?</string>
+    <string name="pin_too_many">Too many attempts. Try again in %1$ds.</string>
+
+    <!-- MK.31.16 batch S — Sources sub-line + sync banner. -->
+    <string name="sl_syncing_now">syncing now</string>
+    <string name="sl_stale">stale · sync to refresh</string>
+    <string name="sl_never_synced">never synced</string>
+    <string name="sl_last_sync_failed">last sync failed</string>
+    <string name="sl_due_now">due now</string>
+    <string name="sl_refresh_in_m">refresh in %1$dm</string>
+    <string name="sl_refresh_in_h">refresh in %1$dh</string>
+    <string name="sl_refresh_in_hm">refresh in %1$dh %2$dm</string>
+    <string name="sl_refresh_in_d">refresh in %1$dd</string>
+    <string name="sl_refresh_in_dh">refresh in %1$dd %2$dh</string>
+    <string name="sl_no_items">no items yet</string>
+    <string name="sl_one_item">1 item</string>
+    <string name="sl_n_items">%1$d items</string>
+    <string name="sl_k_items">%1$sk items</string>
+    <string name="sl_m_items">%1$sM items</string>
+    <string name="sp_fetching">%1$s — fetching…%2$s</string>
+    <string name="sp_message">%1$s — %2$s…%3$s</string>
+    <string name="sp_parsing">%1$s — parsing…%2$s</string>
+    <string name="sp_classifying">%1$s — classifying…%2$s</string>
+    <string name="sp_writing">%1$s — writing</string>
+    <string name="sp_writing_msg">%1$s — %2$s</string>
+    <string name="sp_progress">%1$s %2$d/%3$d%4$s</string>
+    <string name="sp_progress_open">%1$s (%2$d)%3$s</string>
+    <string name="sp_done">%1$s — synced (%2$d)</string>
+    <string name="sp_error">%1$s — error: %2$s</string>
+    <string name="sp_unknown">unknown</string>
+    <string name="sp_elapsed"> (%1$ds)</string>
 </resources>

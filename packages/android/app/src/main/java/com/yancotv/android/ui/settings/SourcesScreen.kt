@@ -590,16 +590,21 @@ internal fun RowStatus.subColor(palette: YancoPalette): Color = when (this) {
     else -> palette.TextMuted
 }
 
+// MK.31.16 — @Composable. Flagged as outstanding in MK.31.6 and MK.31.9: the
+// whole sub-line cluster was plain functions, so extracting the strings needed
+// this conversion first. Every caller is already in composable scope (the row's
+// Text, and the detail screen's kicker for typeLabel), so this costs nothing.
+@Composable
 internal fun RowStatus.subLine(source: Source): String {
     val type = typeLabel(source.type)
     val items = formatItemCount(source.channelCount)
     val timing =
         when (this) {
-            RowStatus.Syncing -> "syncing now"
+            RowStatus.Syncing -> stringResource(R.string.sl_syncing_now)
             RowStatus.Ready -> nextSyncSuffix(source)
-            RowStatus.Stale -> "stale · sync to refresh"
-            RowStatus.NeverSynced -> "never synced"
-            RowStatus.Error -> source.lastSyncError?.take(48) ?: "last sync failed"
+            RowStatus.Stale -> stringResource(R.string.sl_stale)
+            RowStatus.NeverSynced -> stringResource(R.string.sl_never_synced)
+            RowStatus.Error -> source.lastSyncError?.take(48) ?: stringResource(R.string.sl_last_sync_failed)
         }
     // MK.30.3 — account expiry, when the provider told us one. Appended
     // rather than replacing a segment: "when does this stop working" is
@@ -619,24 +624,33 @@ internal fun computeRowStatus(source: Source, isSyncing: Boolean): RowStatus {
     return if (ageMs > intervalMs) RowStatus.Stale else RowStatus.Ready
 }
 
+@Composable
 private fun nextSyncSuffix(source: Source): String {
-    val last = source.lastSynced ?: return "never synced"
+    val last = source.lastSynced ?: return stringResource(R.string.sl_never_synced)
     val intervalMs = source.autoSyncInterval.coerceAtLeast(1) * 60L * 60L * 1000L
     val nextMs = last + intervalMs
     val remaining = nextMs - System.currentTimeMillis()
-    if (remaining <= 0L) return "due now"
+    if (remaining <= 0L) return stringResource(R.string.sl_due_now)
     val totalMin = remaining / 60_000L
     return when {
-        totalMin < 60 -> "refresh in ${totalMin}m"
+        totalMin < 60 -> stringResource(R.string.sl_refresh_in_m, totalMin)
         totalMin < 24 * 60 -> {
             val h = totalMin / 60
             val m = totalMin % 60
-            if (m == 0L) "refresh in ${h}h" else "refresh in ${h}h ${m}m"
+            if (m == 0L) {
+                stringResource(R.string.sl_refresh_in_h, h)
+            } else {
+                stringResource(R.string.sl_refresh_in_hm, h, m)
+            }
         }
         else -> {
             val d = totalMin / (24 * 60)
             val h = (totalMin % (24 * 60)) / 60
-            if (h == 0L) "refresh in ${d}d" else "refresh in ${d}d ${h}h"
+            if (h == 0L) {
+                stringResource(R.string.sl_refresh_in_d, d)
+            } else {
+                stringResource(R.string.sl_refresh_in_dh, d, h)
+            }
         }
     }
 }
@@ -698,34 +712,61 @@ private fun HairLine(palette: YancoPalette, indent: androidx.compose.ui.unit.Dp 
     )
 }
 
+// Reuses the add-source dialog keys rather than duplicating them — one
+// spelling of each provider type across the app.
+@Composable
 internal fun typeLabel(type: SourceType): String = when (type) {
-    SourceType.XTREAM -> "Xtream"
-    SourceType.M3U_URL -> "M3U URL"
-    SourceType.M3U_FILE -> "M3U File"
-    SourceType.STALKER -> "Stalker"
+    SourceType.XTREAM -> stringResource(R.string.add_type_xtream)
+    SourceType.M3U_URL -> stringResource(R.string.add_type_m3u_url)
+    SourceType.M3U_FILE -> stringResource(R.string.add_type_m3u_file)
+    SourceType.STALKER -> stringResource(R.string.add_type_stalker)
 }
 
+// The k / M abbreviations pass the already-formatted number as a string arg:
+// the decimal separator is locale-dependent (1.2k vs 1,2k) and %.1f inside a
+// translated resource would not get one per language.
+@Composable
 private fun formatItemCount(n: Int): String = when {
-    n == 0 -> "no items yet"
-    n == 1 -> "1 item"
-    n < 1_000 -> "$n items"
-    n < 1_000_000 -> "%.1fk items".format(n / 1000.0)
-    else -> "%.1fM items".format(n / 1_000_000.0)
+    n == 0 -> stringResource(R.string.sl_no_items)
+    n == 1 -> stringResource(R.string.sl_one_item)
+    n < 1_000 -> stringResource(R.string.sl_n_items, n)
+    n < 1_000_000 -> stringResource(R.string.sl_k_items, "%.1f".format(n / 1000.0))
+    else -> stringResource(R.string.sl_m_items, "%.1f".format(n / 1_000_000.0))
 }
 
+// MK.31.16 — the sync banner. `p.message` comes from packages/shared and is
+// still English (KMP cannot reach Android resources); the FRAME around it is
+// localized here, so an Arabic user sees Arabic phase text and an English
+// provider detail rather than an entirely English line. Localizing the shared
+// messages themselves needs a typed progress result and is tracked separately.
+@Composable
 private fun phaseLabel(name: String, p: SyncProgress, elapsedSec: Long = 0): String {
     val suffix = p.message?.takeIf { it.isNotBlank() }
-    val elapsed = if (elapsedSec > 0) " (${elapsedSec}s)" else ""
+    val elapsed = if (elapsedSec > 0) stringResource(R.string.sp_elapsed, elapsedSec) else ""
     return when (p.phase) {
         SyncProgress.Phase.FETCHING ->
-            if (suffix != null) "$name — $suffix…$elapsed" else "$name — fetching…$elapsed"
-        SyncProgress.Phase.PARSING -> "$name — parsing…$elapsed"
-        SyncProgress.Phase.CLASSIFYING -> "$name — classifying…$elapsed"
+            if (suffix != null) {
+                stringResource(R.string.sp_message, name, suffix, elapsed)
+            } else {
+                stringResource(R.string.sp_fetching, name, elapsed)
+            }
+        SyncProgress.Phase.PARSING -> stringResource(R.string.sp_parsing, name, elapsed)
+        SyncProgress.Phase.CLASSIFYING -> stringResource(R.string.sp_classifying, name, elapsed)
         SyncProgress.Phase.WRITING -> {
-            val base = if (suffix != null) "$name — $suffix" else "$name — writing"
-            if (p.total > 0) "$base ${p.current}/${p.total}$elapsed" else "$base (${p.current})$elapsed"
+            val base =
+                if (suffix != null) {
+                    stringResource(R.string.sp_writing_msg, name, suffix)
+                } else {
+                    stringResource(R.string.sp_writing, name)
+                }
+            if (p.total > 0) {
+                stringResource(R.string.sp_progress, base, p.current, p.total, elapsed)
+            } else {
+                stringResource(R.string.sp_progress_open, base, p.current, elapsed)
+            }
         }
-        SyncProgress.Phase.DONE -> "$name — synced (${p.total})"
-        SyncProgress.Phase.ERROR -> "$name — error: ${p.message ?: "unknown"}"
+        SyncProgress.Phase.DONE -> stringResource(R.string.sp_done, name, p.total)
+        SyncProgress.Phase.ERROR ->
+            stringResource(R.string.sp_error, name, p.message ?: stringResource(R.string.sp_unknown))
     }
 }

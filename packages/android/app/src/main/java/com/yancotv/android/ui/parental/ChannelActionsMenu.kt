@@ -24,12 +24,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.favorites.FavoritesRepository
@@ -100,7 +102,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
                 ActionRow(
-                    label = if (isFav) "Remove from favorites" else "Add to favorites",
+                    label = if (isFav) stringResource(R.string.po_remove_favorite) else stringResource(R.string.po_add_favorite),
                     onClick = {
                         // MK.13.4 — when multiple lists exist, picking
                         // "Add to favourites" should let the user choose
@@ -117,15 +119,15 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                     },
                 )
                 ActionRow(
-                    label = "Rename",
+                    label = stringResource(R.string.common_rename),
                     onClick = { showRename = true },
                 )
                 ActionRow(
-                    label = "Custom logo",
+                    label = stringResource(R.string.ca_custom_logo),
                     onClick = { showLogoUrl = true },
                 )
                 ActionRow(
-                    label = if (locked) "Unlock (PIN)" else "Lock",
+                    label = if (locked) stringResource(R.string.ca_unlock_pin) else stringResource(R.string.ca_lock),
                     accent = true,
                     onClick = {
                         if (locked) {
@@ -143,7 +145,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                     },
                 )
                 ActionRow(
-                    label = "Hide from lists",
+                    label = stringResource(R.string.ca_hide),
                     onClick = {
                         // MB-104: same shape as Lock above. The original synchronous
                         // call combined with hide actually filtering the focused orb
@@ -156,7 +158,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                         // at the un-hide surface.
                         android.widget.Toast.makeText(
                             context,
-                            "Channel hidden — manage in Settings → Parental",
+                            context.getString(R.string.ca_hidden_toast),
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                         scope.launch(Dispatchers.IO) {
@@ -165,7 +167,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                     },
                 )
                 ActionRow(
-                    label = "Share stream URL",
+                    label = stringResource(R.string.ca_share_url),
                     onClick = {
                         val intent =
                             Intent(Intent.ACTION_SEND).apply {
@@ -176,7 +178,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
                             }
                         runCatching {
                             context.startActivity(
-                                Intent.createChooser(intent, "Share stream URL").apply {
+                                Intent.createChooser(intent, context.getString(R.string.ca_share_url)).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 },
                             )
@@ -190,8 +192,8 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
 
     if (gateForUnlock) {
         PinEntryDialog(
-            title = "Enter PIN to unlock",
-            body = "This channel is locked. Confirm your PIN to remove the lock.",
+            title = stringResource(R.string.ca_unlock_title),
+            body = stringResource(R.string.ca_unlock_body),
             repo = repo,
             onSuccess = {
                 // MK.8 threading: unlockChannel is non-suspend and runs a
@@ -215,10 +217,10 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
 
     if (showRename) {
         TextEntryDialog(
-            title = "Rename channel",
-            body = "Leave blank to revert to the M3U title.",
+            title = stringResource(R.string.ca_rename_title),
+            body = stringResource(R.string.ca_rename_body),
             initial = item.nameOverride.orEmpty(),
-            confirmLabel = "Save",
+            confirmLabel = stringResource(R.string.common_save),
             onConfirm = { entered ->
                 // Carry the existing logo override through — repo doesn't have a
                 // single-field setter, so we pass both values per its contract.
@@ -242,7 +244,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
         AlertDialog(
             onDismissRequest = { showListPicker = false },
             containerColor = LocalYancoPalette.current.BackgroundRaised,
-            title = { Text("Add to which list?", color = LocalYancoPalette.current.TextPrimary) },
+            title = { Text(stringResource(R.string.ca_add_to_list), color = LocalYancoPalette.current.TextPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     lists.forEach { list ->
@@ -268,7 +270,7 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showListPicker = false }) {
-                    Text("Cancel", color = LocalYancoPalette.current.TextMuted)
+                    Text(stringResource(R.string.common_cancel), color = LocalYancoPalette.current.TextMuted)
                 }
             },
         )
@@ -276,10 +278,10 @@ fun ChannelActionsMenu(item: ContentItem, repo: ParentalRepository, onDismiss: (
 
     if (showLogoUrl) {
         TextEntryDialog(
-            title = "Custom logo URL",
-            body = "Paste an image URL to override the M3U logo. Leave blank to revert.",
+            title = stringResource(R.string.ca_logo_title),
+            body = stringResource(R.string.ca_logo_body),
             initial = item.logoOverride.orEmpty(),
-            confirmLabel = "Save",
+            confirmLabel = stringResource(R.string.common_save),
             onConfirm = { entered ->
                 scope.launch(Dispatchers.IO) {
                     runCatching {

@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.WatchedCheckBadge
@@ -422,7 +424,7 @@ fun ContentDetailScreen(
                                     .padding(horizontal = Space.page, vertical = Space.md),
                             ) {
                                 Text(
-                                    text = "No episodes available.",
+                                    text = stringResource(R.string.cd_no_episodes),
                                     color = LocalYancoPalette.current.TextMuted,
                                     style = YancoType.Body,
                                 )
@@ -641,9 +643,9 @@ private fun HeroBlock(
                     ActionRow(
                         primaryLabel =
                         when (item.type) {
-                            ContentType.SERIES -> playChoice?.let(::resumeButtonLabel) ?: "Play"
-                            ContentType.MOVIE -> if (movieResumeSeconds != null) "Continue" else "Play"
-                            else -> "Play"
+                            ContentType.SERIES -> playChoice?.let { resumeButtonLabel(it) } ?: stringResource(R.string.common_play)
+                            ContentType.MOVIE -> if (movieResumeSeconds != null) stringResource(R.string.cd_continue) else stringResource(R.string.common_play)
+                            else -> stringResource(R.string.common_play)
                         },
                         // "Play from beginning" makes sense for movies and
                         // for series with at least one cached episode; series
@@ -665,8 +667,8 @@ private fun HeroBlock(
                     val director = metadata.director?.takeIf { it.isNotBlank() }
                     if (cast != null || director != null) {
                         Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
-                            director?.let { CreditRow(label = "Director", value = it) }
-                            cast?.let { CreditRow(label = "Cast", value = it) }
+                            director?.let { CreditRow(label = stringResource(R.string.cd_director), value = it) }
+                            cast?.let { CreditRow(label = stringResource(R.string.cd_cast), value = it) }
                         }
                     }
                 }
@@ -758,7 +760,7 @@ private fun Poster(url: String?) {
             )
         } else {
             Text(
-                text = "No artwork",
+                text = stringResource(R.string.cd_no_artwork),
                 color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
             )
@@ -831,6 +833,9 @@ private fun ActionRow(
     playAnchor: PlacedFocusAnchor,
     onPrimaryFocusChanged: (Boolean) -> Unit,
 ) {
+    // MK.31.15 — resolved here; the semantics{} lambdas below are not composable.
+    val inFavDesc = stringResource(R.string.cd_in_favorites)
+    val favDesc = stringResource(R.string.cd_favorite)
     // Compact size across the whole row. The hero column already has the
     // detail poster taking ~280dp on its left, which leaves the action
     // row a fairly tight horizontal slot — Standard (48dp tall, 22dp pad,
@@ -874,7 +879,7 @@ private fun ActionRow(
         if (showPlayFromStart) {
             YancoSecondaryButton(onClick = onPlayFromStart, size = buttonSize) {
                 Text(
-                    text = "From start",
+                    text = stringResource(R.string.cd_from_start),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
@@ -884,7 +889,7 @@ private fun ActionRow(
         if (showReset) {
             YancoSecondaryButton(onClick = onReset, size = buttonSize) {
                 Text(
-                    text = "Reset",
+                    text = stringResource(R.string.cd_reset),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
@@ -906,7 +911,7 @@ private fun ActionRow(
                 onClick = onFavoriteToggle,
                 size = buttonSize,
                 translucent = true,
-                modifier = Modifier.semantics { contentDescription = "In favorites" },
+                modifier = Modifier.semantics { contentDescription = inFavDesc },
             ) {
                 Icon(
                     imageVector = YancoIcons.StarFilled,
@@ -914,7 +919,7 @@ private fun ActionRow(
                     modifier = Modifier.size(12.dp),
                 )
                 Text(
-                    text = "Favorite",
+                    text = stringResource(R.string.cd_favorite),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
@@ -924,7 +929,7 @@ private fun ActionRow(
             YancoSecondaryButton(
                 onClick = onFavoriteToggle,
                 size = buttonSize,
-                modifier = Modifier.semantics { contentDescription = "Favorite" },
+                modifier = Modifier.semantics { contentDescription = favDesc },
             ) {
                 Icon(
                     imageVector = YancoIcons.StarOutline,
@@ -932,7 +937,7 @@ private fun ActionRow(
                     modifier = Modifier.size(12.dp),
                 )
                 Text(
-                    text = "Favorite",
+                    text = stringResource(R.string.cd_favorite),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
@@ -941,7 +946,7 @@ private fun ActionRow(
         }
         YancoSecondaryButton(onClick = onBack, size = buttonSize) {
             Text(
-                text = "Back",
+                text = stringResource(R.string.cd_back),
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Ellipsis,
@@ -961,7 +966,7 @@ private fun EpisodesSectionHeader(loading: Boolean, episodeCount: Int) {
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         Text(
-            text = "EPISODES",
+            text = stringResource(R.string.cd_episodes),
             color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
@@ -1177,7 +1182,7 @@ private fun EpisodeRow(ep: EpisodeInfo, progress: WatchProgress?, onClick: () ->
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Season ${ep.seasonNumber}",
+                        text = stringResource(R.string.cd_season_n, ep.seasonNumber),
                         color = LocalYancoPalette.current.TextMuted,
                         style = YancoType.Caption,
                     )
@@ -1310,14 +1315,18 @@ private fun computeNextEpisode(episodes: List<EpisodeInfo>, resumeInfo: EpisodeR
     }
 }
 
+// MK.31.15 — @Composable; the only caller is the hero play button, already in
+// composable scope. The SxxEyy code is passed as a format arg so each language
+// can put the verb and the episode code in its own order.
+@Composable
 private fun resumeButtonLabel(choice: NextEpisodeChoice): String {
     val ep = choice.episode
     val sxe = "S${ep.seasonNumber}E${ep.episodeNumber}"
     return when (choice.mode) {
-        PlayMode.RESUME -> "Resume $sxe"
-        PlayMode.PLAY_NEXT -> "Play $sxe"
-        PlayMode.PLAY_FIRST -> "Play $sxe"
-        PlayMode.WATCH_AGAIN -> "Watch again $sxe"
+        PlayMode.RESUME -> stringResource(R.string.cd_resume_ep, sxe)
+        PlayMode.PLAY_NEXT -> stringResource(R.string.cd_play_ep, sxe)
+        PlayMode.PLAY_FIRST -> stringResource(R.string.cd_play_ep, sxe)
+        PlayMode.WATCH_AGAIN -> stringResource(R.string.cd_watch_again_ep, sxe)
     }
 }
 
@@ -1367,7 +1376,7 @@ private fun SeasonPickerOverlay(
                 .pointerInput(Unit) { detectTapGestures { } },
         ) {
             Text(
-                text = "Select season",
+                text = stringResource(R.string.cd_select_season),
                 color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.LabelStrong,
                 modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.md),

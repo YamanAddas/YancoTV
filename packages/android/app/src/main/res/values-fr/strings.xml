@@ -699,4 +699,68 @@
 
     <!-- MK.31.14 (cont.) — channel zap overlay. -->
     <string name="zap_channel">CHAÎNE</string>
+
+    <!-- MK.31.15 batch Q — content detail + watch indicator. -->
+    <string name="cd_no_episodes">Aucun épisode disponible.</string>
+    <string name="cd_continue">Continuer</string>
+    <string name="cd_director">Réalisateur</string>
+    <string name="cd_cast">Distribution</string>
+    <string name="cd_no_artwork">Aucune image</string>
+    <string name="cd_from_start">Depuis le début</string>
+    <string name="cd_reset">Réinitialiser</string>
+    <string name="cd_in_favorites">Dans les favoris</string>
+    <string name="cd_favorite">Favori</string>
+    <string name="cd_back">Retour</string>
+    <string name="cd_episodes">ÉPISODES</string>
+    <string name="cd_season_n">Saison %1$d</string>
+    <string name="cd_select_season">Choisir la saison</string>
+    <string name="cd_resume_ep">Reprendre %1$s</string>
+    <string name="cd_play_ep">Lire %1$s</string>
+    <string name="cd_watch_again_ep">Revoir %1$s</string>
+    <string name="wi_watched">Vu</string>
+
+    <!-- MK.31.15 batch R — channel actions menu + PIN dialog. -->
+    <string name="ca_custom_logo">Logo personnalisé</string>
+    <string name="ca_unlock_pin">Déverrouiller (PIN)</string>
+    <string name="ca_lock">Verrouiller</string>
+    <string name="ca_hide">Masquer des listes</string>
+    <string name="ca_hidden_toast">Chaîne masquée — gérez-la dans Paramètres → Contrôle parental</string>
+    <string name="ca_share_url">Partager l\'URL du flux</string>
+    <string name="ca_unlock_title">Saisissez le PIN pour déverrouiller</string>
+    <string name="ca_unlock_body">Cette chaîne est verrouillée. Confirmez votre PIN pour retirer le verrou.</string>
+    <string name="ca_rename_title">Renommer la chaîne</string>
+    <string name="ca_rename_body">Laissez vide pour revenir au titre M3U.</string>
+    <string name="ca_logo_title">URL du logo personnalisé</string>
+    <string name="ca_logo_body">Collez l\'URL d\'une image pour remplacer le logo M3U. Laissez vide pour revenir.</string>
+    <string name="ca_add_to_list">Ajouter à quelle liste ?</string>
+    <string name="pin_too_many">Trop de tentatives. Réessayez dans %1$d s.</string>
+
+    <!-- MK.31.16 batch S — Sources sub-line + sync banner. -->
+    <string name="sl_syncing_now">synchronisation en cours</string>
+    <string name="sl_stale">périmé · synchronisez pour actualiser</string>
+    <string name="sl_never_synced">jamais synchronisé</string>
+    <string name="sl_last_sync_failed">dernière synchronisation échouée</string>
+    <string name="sl_due_now">dû maintenant</string>
+    <string name="sl_refresh_in_m">actualisation dans %1$d min</string>
+    <string name="sl_refresh_in_h">actualisation dans %1$d h</string>
+    <string name="sl_refresh_in_hm">actualisation dans %1$d h %2$d min</string>
+    <string name="sl_refresh_in_d">actualisation dans %1$d j</string>
+    <string name="sl_refresh_in_dh">actualisation dans %1$d j %2$d h</string>
+    <string name="sl_no_items">aucun élément</string>
+    <string name="sl_one_item">1 élément</string>
+    <string name="sl_n_items">%1$d éléments</string>
+    <string name="sl_k_items">%1$sk éléments</string>
+    <string name="sl_m_items">%1$sM éléments</string>
+    <string name="sp_fetching">%1$s — récupération…%2$s</string>
+    <string name="sp_message">%1$s — %2$s…%3$s</string>
+    <string name="sp_parsing">%1$s — analyse…%2$s</string>
+    <string name="sp_classifying">%1$s — classement…%2$s</string>
+    <string name="sp_writing">%1$s — écriture</string>
+    <string name="sp_writing_msg">%1$s — %2$s</string>
+    <string name="sp_progress">%1$s %2$d/%3$d%4$s</string>
+    <string name="sp_progress_open">%1$s (%2$d)%3$s</string>
+    <string name="sp_done">%1$s — synchronisé (%2$d)</string>
+    <string name="sp_error">%1$s — erreur : %2$s</string>
+    <string name="sp_unknown">inconnu</string>
+    <string name="sp_elapsed"> (%1$d s)</string>
 </resources>
