@@ -271,13 +271,13 @@ class SourceRepository(
         val source =
             getById(id) ?: run {
                 logger.warn("syncSource[$id] not found")
-                send(SyncProgress(SyncProgress.Phase.ERROR, message = "Source not found: $id"))
+                send(SyncProgress(SyncProgress.Phase.ERROR, detail = SyncDetail.SourceNotFound(id)))
                 return@channelFlow
             }
 
         logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
         try {
-            send(SyncProgress(SyncProgress.Phase.FETCHING, message = "Connecting"))
+            send(SyncProgress(SyncProgress.Phase.FETCHING, detail = SyncDetail.Connecting))
             val writer = ContentWriter(db)
             val now = clock()
             val inserted =
@@ -368,7 +368,7 @@ class SourceRepository(
                 updated_at = clock(),
                 id = id,
             )
-            send(SyncProgress(SyncProgress.Phase.ERROR, message = msg))
+            send(SyncProgress(SyncProgress.Phase.ERROR, detail = SyncDetail.Failure(msg)))
         }
     }
 
@@ -498,7 +498,7 @@ class SourceRepository(
         source: Source,
         @Suppress("UNUSED_PARAMETER") legacyWriter: ContentWriter,
         now: Long,
-        onProgress: suspend (SyncProgress.Phase, Int, Int, String?) -> Unit,
+        onProgress: suspend (SyncProgress.Phase, Int, Int, SyncDetail?) -> Unit,
     ): Int {
         val url = source.url ?: error("xtream source missing url")
         val username = source.usernameOrThrow()
@@ -506,7 +506,7 @@ class SourceRepository(
         val client = XtreamClient(url, username, password, XtreamClientOptions(http, logger))
         val bulk = BulkContentWriter(driver, logger)
 
-        onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Authenticating")
+        onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.Authenticating)
         val auth = client.authenticate()
         if (auth is Result.Err) throw auth.error
 
@@ -520,7 +520,7 @@ class SourceRepository(
             db.sourcesQueries.setExpiresAt(expires_at = expiresAt, updated_at = now, id = source.id)
         }
 
-        onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching categories")
+        onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.FetchingCategories)
         val fetchMark =
             kotlin.time.TimeSource.Monotonic
                 .markNow()
@@ -549,7 +549,7 @@ class SourceRepository(
 
         try {
             coroutineScope {
-                onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
+                onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.FetchingCatalog)
 
                 val liveJob =
                     async {
@@ -564,7 +564,7 @@ class SourceRepository(
                                     sort += wrote
                                     liveWritten += wrote
                                     total += wrote
-                                    onProgress(SyncProgress.Phase.WRITING, total, 0, "Live $liveWritten")
+                                    onProgress(SyncProgress.Phase.WRITING, total, 0, SyncDetail.WritingLive(liveWritten))
                                 }
                             }
                         if (res is Result.Err) throw res.error
@@ -583,7 +583,7 @@ class SourceRepository(
                                     sort += wrote
                                     vodWritten += wrote
                                     total += wrote
-                                    onProgress(SyncProgress.Phase.WRITING, total, 0, "Movies $vodWritten")
+                                    onProgress(SyncProgress.Phase.WRITING, total, 0, SyncDetail.WritingMovies(vodWritten))
                                 }
                             }
                         if (res is Result.Err) throw res.error
@@ -602,7 +602,7 @@ class SourceRepository(
                                     sort += wrote
                                     seriesWritten += wrote
                                     total += wrote
-                                    onProgress(SyncProgress.Phase.WRITING, total, 0, "Series $seriesWritten")
+                                    onProgress(SyncProgress.Phase.WRITING, total, 0, SyncDetail.WritingSeries(seriesWritten))
                                 }
                             }
                         if (res is Result.Err) throw res.error
@@ -611,7 +611,7 @@ class SourceRepository(
                 awaitAll(liveJob, vodJob, seriesJob)
             }
 
-            onProgress(SyncProgress.Phase.WRITING, total, total, "Finalizing")
+            onProgress(SyncProgress.Phase.WRITING, total, total, SyncDetail.Finalizing)
             withContext(ioCtx) { bulk.finishSource(source.id) }
 
             val elapsedMs = fetchMark.elapsedNow().inWholeMilliseconds
@@ -645,18 +645,18 @@ class SourceRepository(
         source: Source,
         @Suppress("UNUSED_PARAMETER") legacyWriter: ContentWriter,
         now: Long,
-        onProgress: suspend (SyncProgress.Phase, Int, Int, String?) -> Unit,
+        onProgress: suspend (SyncProgress.Phase, Int, Int, SyncDetail?) -> Unit,
     ): Int {
         val url = source.url ?: error("stalker source missing url")
         val mac = source.macOrThrow()
         val client = StalkerClient(url, mac, StalkerClientOptions(http, logger))
         val bulk = BulkContentWriter(driver, logger)
 
-        onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Authenticating")
+        onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.Authenticating)
         val auth = client.authenticate()
         if (auth is Result.Err) throw auth.error
 
-        onProgress(SyncProgress.Phase.FETCHING, 0, 0, "Fetching catalog")
+        onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.FetchingCatalog)
 
         val (liveCats, vodCats, seriesCats, live, vod, series) =
             coroutineScope {
@@ -685,7 +685,7 @@ class SourceRepository(
                     }
                 sort += wrote
                 written += wrote
-                onProgress(SyncProgress.Phase.WRITING, written, total, "Live $written")
+                onProgress(SyncProgress.Phase.WRITING, written, total, SyncDetail.WritingLive(written))
                 i = end
             }
             i = 0
@@ -697,7 +697,7 @@ class SourceRepository(
                     }
                 sort += wrote
                 written += wrote
-                onProgress(SyncProgress.Phase.WRITING, written, total, "Movies $written")
+                onProgress(SyncProgress.Phase.WRITING, written, total, SyncDetail.WritingMovies(written))
                 i = end
             }
             i = 0
@@ -709,7 +709,7 @@ class SourceRepository(
                     }
                 sort += wrote
                 written += wrote
-                onProgress(SyncProgress.Phase.WRITING, written, total, "Series $written")
+                onProgress(SyncProgress.Phase.WRITING, written, total, SyncDetail.WritingSeries(written))
                 i = end
             }
             withContext(ioCtx) { bulk.finishSource(source.id) }

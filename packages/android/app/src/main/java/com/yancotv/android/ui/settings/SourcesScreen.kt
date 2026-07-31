@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
+import com.yancotv.android.sources.syncDetailText
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoPalette
@@ -741,7 +742,7 @@ private fun formatItemCount(n: Int): String = when {
 // messages themselves needs a typed progress result and is tracked separately.
 @Composable
 private fun phaseLabel(name: String, p: SyncProgress, elapsedSec: Long = 0): String {
-    val suffix = p.message?.takeIf { it.isNotBlank() }
+    val suffix = syncDetailText(p.detail)?.takeIf { it.isNotBlank() }
     val elapsed = if (elapsedSec > 0) stringResource(R.string.sp_elapsed, elapsedSec) else ""
     return when (p.phase) {
         SyncProgress.Phase.FETCHING ->
@@ -767,6 +768,6 @@ private fun phaseLabel(name: String, p: SyncProgress, elapsedSec: Long = 0): Str
         }
         SyncProgress.Phase.DONE -> stringResource(R.string.sp_done, name, p.total)
         SyncProgress.Phase.ERROR ->
-            stringResource(R.string.sp_error, name, p.message ?: stringResource(R.string.sp_unknown))
+            stringResource(R.string.sp_error, name, suffix ?: stringResource(R.string.sp_unknown))
     }
 }

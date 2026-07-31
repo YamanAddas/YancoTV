@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.yancotv.shared.sources.SourceRepository
+import com.yancotv.shared.sources.SyncDetail
 import com.yancotv.shared.sources.SyncProgress
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.lastOrNull
@@ -48,7 +49,17 @@ class SourceSyncWorker(appContext: Context, params: WorkerParameters) :
                 if (runAttemptCount < MAX_RETRIES) {
                     Result.retry()
                 } else {
-                    Result.failure(workDataOf(KEY_ERROR to (terminal.message ?: "sync failed")))
+                    // MK.31.18 — KEY_ERROR is WorkManager diagnostic output read by logs and
+                    // tests, never rendered, so it stays untranslated and keeps the
+                    // raw provider text rather than a localized string.
+                    Result.failure(
+                        workDataOf(
+                            KEY_ERROR to (
+                                (terminal.detail as? SyncDetail.Failure)?.text
+                                    ?: "sync failed"
+                                ),
+                        ),
+                    )
                 }
             else -> Result.failure(workDataOf(KEY_ERROR to "sync produced no terminal event"))
         }

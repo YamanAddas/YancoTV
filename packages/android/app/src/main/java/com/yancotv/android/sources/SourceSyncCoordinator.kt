@@ -1,8 +1,8 @@
 package com.yancotv.android.sources
 
-import com.yancotv.shared.http.redactCredentials
 import com.yancotv.shared.http.redactErrorMessage
 import com.yancotv.shared.logger.Logger
+import com.yancotv.shared.sources.SyncDetail
 import com.yancotv.shared.sources.SyncProgress
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
@@ -50,6 +50,13 @@ class SourceSyncCoordinator(
     private val syncSource: (String) -> Flow<SyncProgress>,
     private val logger: Logger,
     private val kickEpgRefresh: () -> Unit,
+    /**
+     * MK.31.18 — formats the error-bus message. Injected rather than resolved
+     * here so this class needs no Context and its JVM test needs no Android
+     * runtime; the DI module supplies the localized implementation.
+     */
+    private val describeFailure: (sourceName: String, detail: SyncDetail?) -> String =
+        { name, detail -> "Sync failed for $name: ${(detail as? SyncDetail.Failure)?.text ?: "unknown error"}" },
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher),
 ) {
@@ -92,7 +99,7 @@ class SourceSyncCoordinator(
             Active(
                 sourceId = sourceId,
                 sourceName = sourceName,
-                progress = SyncProgress(SyncProgress.Phase.FETCHING, message = "Starting"),
+                progress = SyncProgress(SyncProgress.Phase.FETCHING, detail = SyncDetail.Starting),
                 startedAtMs = startedAt,
             )
         logger.info("syncCoordinator start id=$sourceId name=$sourceName")
@@ -116,10 +123,11 @@ class SourceSyncCoordinator(
                                 // Provider failures echo the request URL, and
                                 // Xtream playback URLs carry the username and
                                 // password as PATH segments.
-                                val reason =
-                                    p.message?.takeIf { it.isNotBlank() }?.let(::redactCredentials)
-                                        ?: "unknown error"
-                                _errors.tryEmit("Sync failed for $sourceName: $reason")
+                                // MK.31.18 — the frame and the fallback are
+                                // localized by the injected formatter; redaction
+                                // happens inside it, at the single point where
+                                // provider text becomes user-visible.
+                                _errors.tryEmit(describeFailure(sourceName, p.detail))
                             }
                             else -> Unit
                         }

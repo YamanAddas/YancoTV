@@ -804,4 +804,25 @@
     <string name="ps_from_provider">From provider</string>
     <string name="tv_options">Options</string>
     <string name="placeholder_pending">Pending implementation</string>
+
+    <!-- MK.31.18 — shared sync detail, mapped from SyncDetail. -->
+    <string name="sd_connecting">Connecting</string>
+    <string name="sd_authenticating">Authenticating</string>
+    <string name="sd_fetching_categories">Fetching categories</string>
+    <string name="sd_fetching_catalog">Fetching catalog</string>
+    <string name="sd_finalizing">Finalizing</string>
+    <string name="sd_writing_live">Live %1$d</string>
+    <string name="sd_writing_movies">Movies %1$d</string>
+    <string name="sd_writing_series">Series %1$d</string>
+    <string name="sd_source_not_found">Source not found: %1$s</string>
+    <string name="sync_failed_for">Sync failed for %1$s: %2$s</string>
+    <string name="sync_unknown_error">unknown error</string>
+    <string name="sd_starting">Starting</string>
+
+    <!-- MK.31.18 — Android EPG importer progress. -->
+    <string name="epg_no_urls">No EPG URLs configured</string>
+    <string name="epg_downloading">Downloading EPG %1$s</string>
+    <string name="epg_parsing">Parsing EPG %1$s</string>
+    <string name="epg_writing">Writing %1$d programmes to database…</string>
+    <string name="epg_writing_scan">Writing… %1$d kept / %2$d scanned</string>
 </resources>

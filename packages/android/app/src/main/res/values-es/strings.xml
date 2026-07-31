@@ -779,4 +779,25 @@
     <string name="ps_from_provider">Del proveedor</string>
     <string name="tv_options">Opciones</string>
     <string name="placeholder_pending">Pendiente de implementación</string>
+
+    <!-- MK.31.18 — shared sync detail, mapped from SyncDetail. -->
+    <string name="sd_connecting">Conectando</string>
+    <string name="sd_authenticating">Autenticando</string>
+    <string name="sd_fetching_categories">Obteniendo categorías</string>
+    <string name="sd_fetching_catalog">Obteniendo el catálogo</string>
+    <string name="sd_finalizing">Finalizando</string>
+    <string name="sd_writing_live">Directo %1$d</string>
+    <string name="sd_writing_movies">Películas %1$d</string>
+    <string name="sd_writing_series">Series %1$d</string>
+    <string name="sd_source_not_found">Fuente no encontrada: %1$s</string>
+    <string name="sync_failed_for">Falló la sincronización de %1$s: %2$s</string>
+    <string name="sync_unknown_error">error desconocido</string>
+    <string name="sd_starting">Iniciando</string>
+
+    <!-- MK.31.18 — Android EPG importer progress. -->
+    <string name="epg_no_urls">No hay URL de guía configuradas</string>
+    <string name="epg_downloading">Descargando la guía %1$s</string>
+    <string name="epg_parsing">Analizando la guía %1$s</string>
+    <string name="epg_writing">Escribiendo %1$d programas en la base de datos…</string>
+    <string name="epg_writing_scan">Escribiendo… %1$d guardados / %2$d analizados</string>
 </resources>

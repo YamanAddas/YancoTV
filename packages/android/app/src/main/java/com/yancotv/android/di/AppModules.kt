@@ -180,6 +180,19 @@ val appModule =
             SourceSyncCoordinator(
                 syncSource = sourceRepo::syncSource,
                 logger = get(),
+                // MK.31.18 — supplies the localized error-bus text. The
+                // coordinator takes this as a lambda so it needs no Context and
+                // its JVM test needs no Android runtime; redaction happens inside
+                // syncDetailText, at the point the text becomes user-visible.
+                describeFailure = { name, detail ->
+                    val ctx = androidContext()
+                    ctx.getString(
+                        com.yancotv.android.R.string.sync_failed_for,
+                        name,
+                        com.yancotv.android.sources.syncDetailText(ctx, detail)
+                            ?: ctx.getString(com.yancotv.android.R.string.sync_unknown_error),
+                    )
+                },
                 kickEpgRefresh = {
                     // MB-299 — POST_SYNC bypasses the active-sync guard. The
                     // coordinator fires this from inside its try block, before

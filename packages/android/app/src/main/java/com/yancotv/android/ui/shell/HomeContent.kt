@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.yancotv.android.R
+import com.yancotv.android.sources.syncDetailText
 import com.yancotv.android.ui.components.HexSurface
 import com.yancotv.android.ui.components.ProgressStripe
 import com.yancotv.android.ui.components.ResumeBadge
@@ -1600,7 +1601,7 @@ private fun FirstSyncCard(active: com.yancotv.android.sources.SourceSyncCoordina
                 Spacer(Modifier.height(Space.xs))
                 Text(
                     text =
-                    active.progress.message?.takeIf { it.isNotBlank() }
+                    syncDetailText(active.progress.detail)?.takeIf { it.isNotBlank() }
                         ?: stringResource(R.string.hm_import_slow),
                     color = palette.TextSecondary,
                     style = YancoType.Body,

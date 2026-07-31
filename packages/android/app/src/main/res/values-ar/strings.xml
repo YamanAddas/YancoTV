@@ -779,4 +779,25 @@
     <string name="ps_from_provider">من المزوّد</string>
     <string name="tv_options">الخيارات</string>
     <string name="placeholder_pending">قيد التنفيذ</string>
+
+    <!-- MK.31.18 — shared sync detail, mapped from SyncDetail. -->
+    <string name="sd_connecting">جارٍ الاتصال</string>
+    <string name="sd_authenticating">جارٍ التحقق</string>
+    <string name="sd_fetching_categories">جارٍ جلب الفئات</string>
+    <string name="sd_fetching_catalog">جارٍ جلب الكتالوج</string>
+    <string name="sd_finalizing">جارٍ الإنهاء</string>
+    <string name="sd_writing_live">مباشر %1$d</string>
+    <string name="sd_writing_movies">أفلام %1$d</string>
+    <string name="sd_writing_series">مسلسلات %1$d</string>
+    <string name="sd_source_not_found">لم يتم العثور على المصدر: %1$s</string>
+    <string name="sync_failed_for">فشلت مزامنة %1$s: %2$s</string>
+    <string name="sync_unknown_error">خطأ غير معروف</string>
+    <string name="sd_starting">جارٍ البدء</string>
+
+    <!-- MK.31.18 — Android EPG importer progress. -->
+    <string name="epg_no_urls">لا توجد عناوين دليل مُعدّة</string>
+    <string name="epg_downloading">جارٍ تنزيل الدليل %1$s</string>
+    <string name="epg_parsing">جارٍ تحليل الدليل %1$s</string>
+    <string name="epg_writing">جارٍ كتابة %1$d برنامج في قاعدة البيانات…</string>
+    <string name="epg_writing_scan">جارٍ الكتابة… %1$d محفوظ / %2$d ممسوح</string>
 </resources>

@@ -2,6 +2,7 @@ package com.yancotv.android.sync
 
 import android.content.Context
 import android.util.Xml
+import com.yancotv.android.R
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.epg.BulkEpgWriter
 import com.yancotv.shared.epg.EpgRepository
@@ -110,7 +111,7 @@ class AndroidEpgImporter(
         withContext(Dispatchers.IO) {
             val targets = collectTargets()
             if (targets.isEmpty()) {
-                onProgress.report("No EPG URLs configured")
+                onProgress.report(context.getString(R.string.epg_no_urls))
                 return@withContext EpgRefreshResult(ok = true, programmeCount = 0, channelCount = 0)
             }
 
@@ -131,7 +132,7 @@ class AndroidEpgImporter(
                 // ───── Phase 1: downloads (NO transaction held) ─────
                 for ((idx, target) in targets.withIndex()) {
                     val label = "${idx + 1}/${targets.size} (${target.sourceKey})"
-                    onProgress.report("Downloading EPG $label")
+                    onProgress.report(context.getString(R.string.epg_downloading, label))
                     val tempFile = File(context.cacheDir, "epg-${UUID.randomUUID()}.bin")
                     try {
                         val dlStart = System.currentTimeMillis()
@@ -159,7 +160,7 @@ class AndroidEpgImporter(
                     session.begin()
                     for ((idx, df) in downloaded.withIndex()) {
                         val label = "${idx + 1}/${downloaded.size} (${df.target.sourceKey})"
-                        onProgress.report("Parsing EPG $label")
+                        onProgress.report(context.getString(R.string.epg_parsing, label))
                         val parseStart = System.currentTimeMillis()
                         val beforeRows = session.rowsWritten
                         try {
@@ -190,7 +191,7 @@ class AndroidEpgImporter(
                         return@withContext EpgRefreshResult(ok = false, error = detail)
                     }
 
-                    onProgress.report("Writing ${session.rowsWritten} programmes to database…")
+                    onProgress.report(context.getString(R.string.epg_writing, session.rowsWritten))
                     session.commit(lastRefreshedMs = System.currentTimeMillis())
                     if (errors.isEmpty()) {
                         recordError(null)
@@ -313,7 +314,7 @@ class AndroidEpgImporter(
                             if (now - lastTick >= PROGRESS_TICK_MS) {
                                 lastTick = now
                                 val totalKept = keptExact + keptNormalised
-                                onProgress.report("Writing… $totalKept kept / $seen scanned")
+                                onProgress.report(context.getString(R.string.epg_writing_scan, totalKept, seen))
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 package com.yancotv.android.sources
 
 import com.yancotv.shared.logger.Logger
+import com.yancotv.shared.sources.SyncDetail
 import com.yancotv.shared.sources.SyncProgress
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
@@ -43,7 +44,7 @@ class SourceSyncCoordinatorTest {
         // start would see an empty `_state` and fire syncSource
         // again.
         val openFlow = MutableSharedFlow<SyncProgress>(replay = 1)
-        openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, message = "go"))
+        openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, detail = SyncDetail.Connecting))
 
         val coordinator =
             SourceSyncCoordinator(
@@ -102,7 +103,7 @@ class SourceSyncCoordinatorTest {
                     invocations.incrementAndGet()
                     // Finite flow that terminates after DONE so the
                     // launch's collect returns and finally fires.
-                    flowOf(SyncProgress(SyncProgress.Phase.DONE, message = "ok"))
+                    flowOf(SyncProgress(SyncProgress.Phase.DONE))
                 },
                 logger = NoopLogger,
                 kickEpgRefresh = {},
@@ -171,7 +172,7 @@ class SourceSyncCoordinatorTest {
 
     @Test fun `cancel sets activeJob to null but state observable until launch finally fires`() = runTest {
         val openFlow = MutableSharedFlow<SyncProgress>(replay = 1)
-        openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, message = "go"))
+        openFlow.tryEmit(SyncProgress(SyncProgress.Phase.FETCHING, detail = SyncDetail.Connecting))
 
         val coordinator =
             SourceSyncCoordinator(
