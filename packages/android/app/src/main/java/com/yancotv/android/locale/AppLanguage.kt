@@ -12,8 +12,8 @@ import java.util.Locale
  * [endonym] is the language's name *in that language* — "العربية", not
  * "Arabic". A language picker is the one screen a user might reach while the
  * app is in a language they can't read, so every option has to be legible to
- * the person who wants it. The English gloss is carried separately in
- * [englishName] for accessibility labels and logs.
+ * the person who wants it. [accessibleName] carries the spoken form for
+ * TalkBack, and [englishName] is its deterministic fallback.
  */
 enum class AppLanguage(val tag: String, val endonym: String, val englishName: String, val rtl: Boolean = false) {
     /**
@@ -31,6 +31,34 @@ enum class AppLanguage(val tag: String, val endonym: String, val englishName: St
     /** Null for [System], which defers to the platform's resolution. */
     val locale: Locale?
         get() = if (tag.isEmpty()) null else Locale.forLanguageTag(tag)
+
+    /**
+     * MK.31.26 — the spoken name for TalkBack, in [inLocale].
+     *
+     * The visible label is deliberately the [endonym], which a TTS voice set to
+     * the UI language cannot pronounce: an English or French engine handed
+     * "العربية" either says nothing or mangles it. So the accessibility label
+     * carries the language's name *as spoken in the current UI language* —
+     * "Arabic" in English, "arabe" in French, "árabe" in Spanish.
+     *
+     * Delegates to [Locale.getDisplayLanguage] rather than a 4×4 resource table
+     * because the platform already ships those names for every locale pair, and
+     * a hand-maintained table would be four more strings to get wrong per
+     * language added.
+     *
+     * Falls back to [englishName] when ICU has nothing useful — a missing entry
+     * makes `getDisplayLanguage` echo the bare tag ("ar"), which TalkBack would
+     * spell out letter by letter. Guarding on that is cheap and the reason
+     * [englishName] still exists.
+     *
+     * Null for [System], which is not a language; callers substitute the
+     * localized "System" label they already render.
+     */
+    fun accessibleName(inLocale: Locale): String? = locale?.let { own ->
+        own.getDisplayLanguage(inLocale)
+            .takeIf { it.isNotBlank() && !it.equals(own.language, ignoreCase = true) }
+            ?: englishName
+    }
 
     companion object {
         /**

@@ -645,7 +645,18 @@ internal fun SettingsChipRow(options: List<String>, selected: String, onSelect: 
 /** Convenience overload — caller passes any enum-like list whose stringification
  *  matches what should display. */
 @Composable
-internal fun <T> SettingsChipRow(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+internal fun <T> SettingsChipRow(
+    options: List<T>,
+    selected: T,
+    label: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * MK.31.26 — spoken label per option, when it must differ from the visible
+     * one. Defaults to [label]; see [SettingsChip] for the one case that needs it.
+     */
+    contentDescription: @Composable (T) -> String = label,
+) {
     Row(
         modifier =
         modifier
@@ -657,6 +668,7 @@ internal fun <T> SettingsChipRow(options: List<T>, selected: T, label: @Composab
                 label = label(option),
                 selected = option == selected,
                 onClick = { onSelect(option) },
+                contentDescription = contentDescription(option),
             )
         }
     }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -59,6 +60,12 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
             .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 80.dp),
     ) {
         val systemLangLabel = stringResource(R.string.lang_system)
+        // The locale the UI is actually resolved in — read from the configuration
+        // rather than from the stored AppLanguage, because `System` defers to the
+        // platform and has no locale of its own.
+        val uiLocale = androidx.core.os.ConfigurationCompat
+            .getLocales(LocalConfiguration.current)[0]
+            ?: java.util.Locale.getDefault()
         SettingsSection(
             title = stringResource(R.string.gen_sec_language),
             sub = stringResource(R.string.gen_sec_language_sub),
@@ -79,6 +86,13 @@ fun SettingsGeneralTab(modifier: Modifier = Modifier, prefs: AppPreferences = ko
                         // not a language, gets a localized label.
                         label = {
                             if (it == AppLanguage.System) systemLangLabel else it.endonym
+                        },
+                        // MK.31.26 — TalkBack gets the language's name in the
+                        // CURRENT UI language ("Arabic" / "arabe" / "árabe"),
+                        // because the visible endonym is by definition in a
+                        // language the active TTS voice cannot pronounce.
+                        contentDescription = {
+                            it.accessibleName(uiLocale) ?: systemLangLabel
                         },
                         onSelect = { choice ->
                             if (choice != language) {

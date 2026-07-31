@@ -58,7 +58,20 @@ import com.yancotv.android.ui.theme.YancoPalette
  * Compose runtime — see `SettingsChipColorsTest` (MB-110).
  */
 @Composable
-internal fun SettingsChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SettingsChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * MK.31.26 — spoken label, when it has to differ from the visible one.
+     *
+     * Defaults to [label], which is right for every chip whose text a TTS voice
+     * can read. The exception is the language picker: its labels are endonyms
+     * ("العربية"), unpronounceable by an engine set to the current UI language.
+     */
+    contentDescription: String = label,
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -102,7 +115,12 @@ internal fun SettingsChip(label: String, selected: Boolean, onClick: () -> Unit,
             // no name and no selected/unselected announcement (audit
             // finding).
             .semantics(mergeDescendants = true) {
-                contentDescription = label
+                // MK.31.26 — `this.` is required: an unqualified
+                // `contentDescription` binds to this function's PARAMETER of the
+                // same name, not the semantics receiver, and the compiler then
+                // reports "'val' cannot be reassigned". Same reason `selected`
+                // below is qualified.
+                this.contentDescription = contentDescription
                 this.selected = selected
             }
             .padding(horizontal = 14.dp, vertical = 8.dp),

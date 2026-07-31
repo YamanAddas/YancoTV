@@ -1,6 +1,7 @@
 package com.yancotv.android.locale
 
 import java.io.File
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -65,6 +66,64 @@ class AppLanguageTest {
             assertTrue(
                 File(dir, "strings.xml").isFile,
                 "${dir.name}/strings.xml missing",
+            )
+        }
+    }
+
+    @Test
+    fun `accessibleName is the language name in the asking locale, not the endonym`() {
+        // MK.31.26 — the point of the property. The visible label is an endonym,
+        // which a TTS voice set to the UI language cannot pronounce; the spoken
+        // label has to be in the UI language instead.
+        assertEquals("Arabic", AppLanguage.Arabic.accessibleName(Locale.ENGLISH))
+        assertEquals("French", AppLanguage.French.accessibleName(Locale.ENGLISH))
+
+        // Same language asked in French and Spanish must give something DIFFERENT
+        // from the English name — that difference is the whole locale-awareness
+        // claim. Deliberately not pinning "arabe" / "árabe": those spellings come
+        // from CLDR via the platform, so asserting them would make this test fail
+        // on a JDK or ICU bump for a reason that has nothing to do with our code.
+        val inEnglish = AppLanguage.Arabic.accessibleName(Locale.ENGLISH)
+        for (asking in listOf(Locale.FRENCH, Locale.forLanguageTag("es"))) {
+            val spoken = AppLanguage.Arabic.accessibleName(asking)
+            assertTrue(
+                spoken != null && spoken != inEnglish,
+                "Arabic asked in $asking gave '$spoken', same as English — not locale-aware",
+            )
+        }
+
+        // Every shipped language must have a non-blank spoken name, and it must
+        // not be the endonym — that is the failure this whole property prevents.
+        // English is exempt from the second half: its endonym IS its English name.
+        for (language in AppLanguage.entries - AppLanguage.System) {
+            val spoken = AppLanguage.of(language.tag).accessibleName(Locale.ENGLISH)
+            assertTrue(spoken != null && spoken.isNotBlank(), "${language.tag}: no spoken name")
+            if (language != AppLanguage.English) {
+                assertTrue(
+                    spoken != language.endonym,
+                    "${language.tag}: spoken name is still the endonym ($spoken) — TalkBack cannot pronounce it",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `accessibleName is null for system and never leaks a bare tag`() {
+        // System is not a language — the picker substitutes its own localized
+        // "System" label, so null is the contract rather than a placeholder.
+        assertEquals(null, AppLanguage.System.accessibleName(Locale.ENGLISH))
+
+        // The guard that matters on a device with thin ICU data: when
+        // getDisplayLanguage has no entry it echoes the tag ("ar"), which
+        // TalkBack would spell out letter by letter. Asking in a locale the
+        // platform is unlikely to have names for exercises that path; whatever
+        // comes back must never be the bare two-letter tag.
+        val obscure = Locale.forLanguageTag("cy-GB")
+        for (language in AppLanguage.entries - AppLanguage.System) {
+            val spoken = AppLanguage.of(language.tag).accessibleName(obscure)
+            assertTrue(
+                spoken != null && !spoken.equals(language.tag, ignoreCase = true),
+                "${language.tag} asked in $obscure returned the bare tag: $spoken",
             )
         }
     }
