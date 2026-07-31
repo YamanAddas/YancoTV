@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
@@ -264,7 +266,7 @@ fun GuideSyncPanel(
             }
             if (activeSources.isEmpty()) {
                 Text(
-                    text = "Add a source in Settings → Sources to get started.",
+                    text = stringResource(R.string.gs_add_source_hint),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
@@ -313,7 +315,7 @@ fun GuideSyncPanel(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "ADD / OVERRIDE EPG URL",
+                text = stringResource(R.string.gs_add_override_epg),
                 color = LocalYancoPalette.current.Accent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -339,7 +341,7 @@ fun GuideSyncPanel(
                 // making the input feel small and boxy next to the wide
                 // Save button.
                 com.yancotv.android.ui.settings.SettingsClickToEditField(
-                    label = "EPG URL",
+                    label = stringResource(R.string.epg_url),
                     value = globalUrlDraft,
                     onValueChange = { globalUrlDraft = it },
                     hint = "https://example.com/xmltv.xml",
@@ -367,12 +369,22 @@ fun GuideSyncPanel(
                     enabled = globalUrlDraft.trim() != (savedGlobalUrl ?: ""),
                     colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
-                    Text(if (globalUrlDraft.isBlank() && savedGlobalUrl != null) "Clear" else "Save")
+                    Text(
+                        if (globalUrlDraft.isBlank() && savedGlobalUrl != null) {
+                            stringResource(R.string.common_clear)
+                        } else {
+                            stringResource(R.string.common_save)
+                        },
+                    )
                 }
             }
-            if (savedGlobalUrl != null) {
+            // MK.31.11 — captured into a local because savedGlobalUrl is a
+            // delegated property, so it cannot smart-cast to the non-null Any
+            // that stringResource's vararg wants.
+            val currentGlobalUrl = savedGlobalUrl
+            if (currentGlobalUrl != null) {
                 Text(
-                    text = "Current: $savedGlobalUrl",
+                    text = stringResource(R.string.gs_current, currentGlobalUrl),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )

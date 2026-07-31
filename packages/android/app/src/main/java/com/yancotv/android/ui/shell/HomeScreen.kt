@@ -787,8 +787,8 @@ fun HomeScreen(
 
         pendingPlay?.let { action ->
             PinEntryDialog(
-                title = "Channel locked",
-                body = "Enter your PIN to watch this channel.",
+                title = stringResource(R.string.fav_channel_locked),
+                body = stringResource(R.string.fav_channel_locked_body),
                 repo = parental,
                 onSuccess = {
                     action()
@@ -800,8 +800,8 @@ fun HomeScreen(
 
         if (needsSettingsGate) {
             PinEntryDialog(
-                title = "PIN required",
-                body = "Enter your PIN to open Settings.",
+                title = stringResource(R.string.pin_required),
+                body = stringResource(R.string.pin_required_settings),
                 repo = parental,
                 onSuccess = { settingsUnlocked = true },
                 onDismiss = { section = AppSection.LiveTv },
@@ -820,7 +820,7 @@ private fun SettingsLockedPlaceholder() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "Enter PIN to access Settings.",
+            text = stringResource(R.string.pin_gate_settings),
             color = LocalYancoPalette.current.TextMuted,
         )
     }

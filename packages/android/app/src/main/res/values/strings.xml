@@ -604,4 +604,37 @@
 
     <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
     <string name="hm_m_left">%1$dm left</string>
+
+    <!-- MK.31.11 batch N — remaining shell surfaces. -->
+    <string name="cat_kicker">CATEGORIES</string>
+    <string name="cat_favorites">Favorites</string>
+    <string name="cat_all">All</string>
+    <string name="cat_desc">Category: %1$s</string>
+    <string name="common_add_a_source">Add a source</string>
+    <string name="fh_move_rail">Move through the rail to preview</string>
+    <string name="fh_body">The focused title becomes the hero — browse, then press OK to watch.</string>
+    <string name="gd_now">Now</string>
+    <string name="gd_cancel_reminder">Cancel reminder</string>
+    <string name="gd_set_reminder">Set reminder</string>
+    <string name="gd_cancel_recording">Cancel recording</string>
+    <string name="gd_record">Record</string>
+    <string name="gd_cancel_series">Cancel series</string>
+    <string name="gd_record_series">Record series</string>
+    <string name="gs_add_source_hint">Add a source in Settings → Sources to get started.</string>
+    <string name="gs_add_override_epg">ADD / OVERRIDE EPG URL</string>
+    <string name="gs_current">Current: %1$s</string>
+    <string name="pin_required">PIN required</string>
+    <string name="pin_required_settings">Enter your PIN to open Settings.</string>
+    <string name="pin_gate_settings">Enter PIN to access Settings.</string>
+    <string name="ps_off">Off</string>
+    <string name="ps_searching">Searching OpenSubtitles…</string>
+    <string name="ps_none_found">No subtitles found for this title</string>
+    <string name="ps_embedded_note">Tracks built into the stream appear in the player\'s own subtitle menu once playback starts.</string>
+
+    <!-- MK.31.11 batch N (cont.) — category accessibility labels. -->
+
+    <!-- MK.31.11 batch N (cont.) — EPG panel save/clear. -->
+    <string name="common_clear">Clear</string>
+
+    <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
 </resources>

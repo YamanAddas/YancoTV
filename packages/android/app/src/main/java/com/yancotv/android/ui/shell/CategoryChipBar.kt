@@ -38,12 +38,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
 import com.yancotv.android.ui.theme.Space
@@ -121,7 +123,7 @@ fun CategoryChipBar(
             item(key = "__fav__") {
                 val isSelected = selected == FAVORITES_GROUP
                 Chip(
-                    label = "Favorites",
+                    label = stringResource(R.string.cat_favorites),
                     selected = isSelected,
                     leading = YancoIcons.StarFilled,
                     focusRequester = if (isSelected) firstItemFocus else null,
@@ -132,7 +134,7 @@ fun CategoryChipBar(
         item(key = "__all__") {
             val isSelected = selected == ALL_GROUPS
             Chip(
-                label = "All",
+                label = stringResource(R.string.cat_all),
                 selected = isSelected,
                 leading = YancoIcons.Guide,
                 focusRequester = if (isSelected) firstItemFocus else null,
@@ -181,6 +183,9 @@ private fun Chip(
     focusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
+    // MK.31.11 — resolved here; the semantics{} lambda below is not
+    // composable, so stringResource cannot be called inside it.
+    val chipDesc = stringResource(R.string.cat_desc, label)
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     // MB-73: self-request focus the moment this chip becomes selected so the
@@ -251,7 +256,7 @@ private fun Chip(
             // announces "<label>, Tab, selected/not selected" instead
             // of just "Tab".
             .semantics(mergeDescendants = true) {
-                contentDescription = "Category: $label"
+                contentDescription = chipDesc
                 this.selected = selected
             }
             .padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.sm),

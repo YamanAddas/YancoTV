@@ -581,4 +581,37 @@
 
     <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
     <string name="hm_m_left">%1$d min restantes</string>
+
+    <!-- MK.31.11 batch N — remaining shell surfaces. -->
+    <string name="cat_kicker">CATEGORÍAS</string>
+    <string name="cat_favorites">Favoritos</string>
+    <string name="cat_all">Todo</string>
+    <string name="cat_desc">Categoría: %1$s</string>
+    <string name="common_add_a_source">Añadir una fuente</string>
+    <string name="fh_move_rail">Recorre el carrusel para previsualizar</string>
+    <string name="fh_body">El título enfocado se convierte en el destacado — explora y pulsa OK para ver.</string>
+    <string name="gd_now">Ahora</string>
+    <string name="gd_cancel_reminder">Cancelar recordatorio</string>
+    <string name="gd_set_reminder">Poner recordatorio</string>
+    <string name="gd_cancel_recording">Cancelar grabación</string>
+    <string name="gd_record">Grabar</string>
+    <string name="gd_cancel_series">Cancelar la serie</string>
+    <string name="gd_record_series">Grabar la serie</string>
+    <string name="gs_add_source_hint">Añade una fuente en Ajustes → Fuentes para empezar.</string>
+    <string name="gs_add_override_epg">AÑADIR / SUSTITUIR URL DE LA GUÍA</string>
+    <string name="gs_current">Actual: %1$s</string>
+    <string name="pin_required">Se requiere PIN</string>
+    <string name="pin_required_settings">Introduce tu PIN para abrir los ajustes.</string>
+    <string name="pin_gate_settings">Introduce el PIN para acceder a los ajustes.</string>
+    <string name="ps_off">Desactivado</string>
+    <string name="ps_searching">Buscando en OpenSubtitles…</string>
+    <string name="ps_none_found">No se encontraron subtítulos para este título</string>
+    <string name="ps_embedded_note">Las pistas integradas en la emisión aparecen en el menú de subtítulos del reproductor al iniciar.</string>
+
+    <!-- MK.31.11 batch N (cont.) — category accessibility labels. -->
+
+    <!-- MK.31.11 batch N (cont.) — EPG panel save/clear. -->
+    <string name="common_clear">Borrar</string>
+
+    <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
 </resources>

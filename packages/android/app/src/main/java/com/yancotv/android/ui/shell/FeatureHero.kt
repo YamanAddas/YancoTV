@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.yancotv.android.R
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.Radius
@@ -316,7 +318,7 @@ private fun LiveHeroMeta(nowProg: com.yancotv.shared.types.EpgProgramme?, nextPr
     Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
         if (nowProg != null) {
             Text(
-                text = "Now: ${nowProg.title}",
+                text = stringResource(R.string.cf_now, nowProg.title),
                 color = LocalYancoPalette.current.TextPrimary,
                 style = YancoType.TitleM,
                 maxLines = 2,
@@ -332,7 +334,7 @@ private fun LiveHeroMeta(nowProg: com.yancotv.shared.types.EpgProgramme?, nextPr
         }
         if (nextProg != null) {
             Text(
-                text = "Up next: ${nextProg.title}",
+                text = stringResource(R.string.cf_up_next, nextProg.title),
                 color = LocalYancoPalette.current.TextMuted,
                 style = YancoType.Caption,
                 maxLines = 1,
@@ -538,7 +540,7 @@ private fun HeroLivePill() {
                 .clip(RoundedCornerShape(Radius.pill))
                 .background(Color.White),
         )
-        Text(text = "LIVE", color = Color.White, style = YancoType.Overline)
+        Text(text = stringResource(R.string.badge_live), color = Color.White, style = YancoType.Overline)
     }
 }
 
@@ -560,7 +562,7 @@ private fun HeroLockChip() {
             tint = LocalYancoPalette.current.Accent,
             modifier = Modifier.size(10.dp),
         )
-        Text(text = "LOCKED", color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
+        Text(text = stringResource(R.string.badge_locked), color = LocalYancoPalette.current.Accent, style = YancoType.Overline)
     }
 }
 
@@ -574,17 +576,17 @@ private fun HeroIdlePlaceholder(modifier: Modifier) {
         verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         Text(
-            text = "YANCOTV+",
+            text = stringResource(R.string.brand_plus),
             color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
         )
         Text(
-            text = "Move through the rail to preview",
+            text = stringResource(R.string.fh_move_rail),
             color = LocalYancoPalette.current.TextPrimary,
             style = YancoType.DisplayS,
         )
         Text(
-            text = "The focused title becomes the hero — browse, then press OK to watch.",
+            text = stringResource(R.string.fh_body),
             color = LocalYancoPalette.current.TextSecondary,
             style = YancoType.BodyLong,
         )

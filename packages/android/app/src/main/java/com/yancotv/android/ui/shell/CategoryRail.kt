@@ -42,12 +42,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.onEndwardKey
 import com.yancotv.android.ui.focus.onStartwardKey
@@ -195,7 +197,7 @@ fun CategoryRail(
         // Header label — gives the rail a "you are here" anchor; collapses
         // out of focus traversal because it isn't focusable.
         Text(
-            text = "CATEGORIES",
+            text = stringResource(R.string.cat_kicker),
             color = LocalYancoPalette.current.Accent,
             style = YancoType.Overline,
             modifier = Modifier.padding(start = Space.lg, end = Space.lg, bottom = Space.sm),
@@ -216,7 +218,7 @@ fun CategoryRail(
                 item(key = "__fav__") {
                     val isSelected = selected == FAVORITES_GROUP
                     HexPillRow(
-                        label = "Favorites",
+                        label = stringResource(R.string.cat_favorites),
                         leading = YancoIcons.StarFilled,
                         selected = isSelected,
                         anchor = if (isSelected) selectedAnchor else null,
@@ -235,7 +237,7 @@ fun CategoryRail(
             item(key = "__all__") {
                 val isSelected = selected == ALL_GROUPS
                 HexPillRow(
-                    label = "All",
+                    label = stringResource(R.string.cat_all),
                     leading = YancoIcons.Guide,
                     selected = isSelected,
                     anchor = if (isSelected) selectedAnchor else null,
@@ -338,6 +340,9 @@ private fun HexPillRow(
     trailingText: String? = null,
     indented: Boolean = false,
 ) {
+    // MK.31.11 — resolved here; the semantics{} lambda below is not
+    // composable, so stringResource cannot be called inside it.
+    val pillDesc = stringResource(R.string.cat_desc, label)
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     // MK.22.B.5: 100 ms debounce so D-pad arrow-spam scrolling pills
@@ -418,7 +423,7 @@ private fun HexPillRow(
             // MK.28.8 (MB-276) — announce selected state to TalkBack, same
             // as the phone twin CategoryChipBar.
             .semantics(mergeDescendants = true) {
-                contentDescription = "Category: $label"
+                contentDescription = pillDesc
                 this.selected = selected
             }
             .padding(

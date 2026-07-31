@@ -1076,7 +1076,7 @@ private fun TimeHeader(
                 size = ButtonSize.Compact,
                 translucent = true,
             ) {
-                Text(text = "Now")
+                Text(text = stringResource(R.string.gd_now))
             }
         }
         Row(
@@ -1620,21 +1620,21 @@ private fun ProgrammeActionDialog(
                     isFuture -> {
                         if (isReminderSet) {
                             TextButton(onClick = onCancelReminder) {
-                                Text(text = "Cancel reminder", color = LocalYancoPalette.current.TextPrimary)
+                                Text(text = stringResource(R.string.gd_cancel_reminder), color = LocalYancoPalette.current.TextPrimary)
                             }
                         } else {
                             TextButton(onClick = onSetReminder) {
-                                Text(text = "Set reminder", color = LocalYancoPalette.current.TextPrimary)
+                                Text(text = stringResource(R.string.gd_set_reminder), color = LocalYancoPalette.current.TextPrimary)
                             }
                         }
                         if (canRecord) {
                             if (isRecordScheduled) {
                                 TextButton(onClick = onCancelRecord) {
-                                    Text(text = "Cancel recording", color = LocalYancoPalette.current.TextPrimary)
+                                    Text(text = stringResource(R.string.gd_cancel_recording), color = LocalYancoPalette.current.TextPrimary)
                                 }
                             } else {
                                 TextButton(onClick = onScheduleRecord) {
-                                    Text(text = "Record", color = LocalYancoPalette.current.TextPrimary)
+                                    Text(text = stringResource(R.string.gd_record), color = LocalYancoPalette.current.TextPrimary)
                                 }
                             }
                             // MK.14.6 — series binding. "Record series" arms
@@ -1642,11 +1642,11 @@ private fun ProgrammeActionDialog(
                             // the current title within the 7-day EPG window.
                             if (isSeriesBound) {
                                 TextButton(onClick = onCancelSeries) {
-                                    Text(text = "Cancel series", color = LocalYancoPalette.current.TextPrimary)
+                                    Text(text = stringResource(R.string.gd_cancel_series), color = LocalYancoPalette.current.TextPrimary)
                                 }
                             } else {
                                 TextButton(onClick = onScheduleSeries) {
-                                    Text(text = "Record series", color = LocalYancoPalette.current.TextPrimary)
+                                    Text(text = stringResource(R.string.gd_record_series), color = LocalYancoPalette.current.TextPrimary)
                                 }
                             }
                         }

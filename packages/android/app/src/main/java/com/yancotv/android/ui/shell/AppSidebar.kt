@@ -292,6 +292,9 @@ private fun BrandMark(showWordmark: Boolean) {
     // Collapsed now draws `ic_logo_mark`: the badge alone, square, on real
     // alpha, so it fills the slot at ~56dp instead of a quarter of it.
     // Fit (never FillBounds) on both, so neither asset is stretched.
+    // MK.31.11 — app_name, not a literal. Deliberately NOT translated (it is a
+    // brand mark) but sourced from resources so there is one spelling of it.
+    val brandName = stringResource(R.string.app_name)
     Image(
         painter = painterResource(
             id = if (showWordmark) R.drawable.ic_logo else R.drawable.ic_logo_mark,
@@ -303,7 +306,7 @@ private fun BrandMark(showWordmark: Boolean) {
             .fillMaxWidth()
             .height(if (showWordmark) 96.dp else 56.dp)
             .padding(horizontal = Space.xs, vertical = Space.xs)
-            .semantics { contentDescription = "YancoTV" },
+            .semantics { contentDescription = brandName },
     )
 }
 

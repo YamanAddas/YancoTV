@@ -581,4 +581,37 @@
 
     <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
     <string name="hm_m_left">بقي %1$d د</string>
+
+    <!-- MK.31.11 batch N — remaining shell surfaces. -->
+    <string name="cat_kicker">الفئات</string>
+    <string name="cat_favorites">المفضلة</string>
+    <string name="cat_all">الكل</string>
+    <string name="cat_desc">الفئة: %1$s</string>
+    <string name="common_add_a_source">إضافة مصدر</string>
+    <string name="fh_move_rail">تنقّل في الشريط للمعاينة</string>
+    <string name="fh_body">يصبح العنوان المحدد هو العنوان الرئيسي — تصفّح، ثم اضغط OK للمشاهدة.</string>
+    <string name="gd_now">الآن</string>
+    <string name="gd_cancel_reminder">إلغاء التنبيه</string>
+    <string name="gd_set_reminder">تعيين تنبيه</string>
+    <string name="gd_cancel_recording">إلغاء التسجيل</string>
+    <string name="gd_record">تسجيل</string>
+    <string name="gd_cancel_series">إلغاء تسجيل المسلسل</string>
+    <string name="gd_record_series">تسجيل المسلسل</string>
+    <string name="gs_add_source_hint">أضف مصدراً من الإعدادات → المصادر للبدء.</string>
+    <string name="gs_add_override_epg">إضافة / تجاوز عنوان الدليل</string>
+    <string name="gs_current">الحالي: %1$s</string>
+    <string name="pin_required">رمز PIN مطلوب</string>
+    <string name="pin_required_settings">أدخل رمز PIN لفتح الإعدادات.</string>
+    <string name="pin_gate_settings">أدخل رمز PIN للوصول إلى الإعدادات.</string>
+    <string name="ps_off">إيقاف</string>
+    <string name="ps_searching">جارٍ البحث في OpenSubtitles…</string>
+    <string name="ps_none_found">لم يتم العثور على ترجمات لهذا العنوان</string>
+    <string name="ps_embedded_note">تظهر المسارات المدمجة في البث في قائمة الترجمة الخاصة بالمشغّل بعد بدء التشغيل.</string>
+
+    <!-- MK.31.11 batch N (cont.) — category accessibility labels. -->
+
+    <!-- MK.31.11 batch N (cont.) — EPG panel save/clear. -->
+    <string name="common_clear">مسح</string>
+
+    <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
 </resources>

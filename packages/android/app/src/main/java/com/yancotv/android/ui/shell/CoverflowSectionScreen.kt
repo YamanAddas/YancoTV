@@ -1761,7 +1761,7 @@ private fun CoverflowEmptyState(type: ContentType, favoritesFilter: Boolean, onA
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
                 )
-                Text(text = "Add a source")
+                Text(text = stringResource(R.string.common_add_a_source))
             }
         }
     }

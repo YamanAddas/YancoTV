@@ -40,11 +40,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.R
 import com.yancotv.android.player.subtitles.OpenSubtitlesClient
 import com.yancotv.android.player.subtitles.SubtitleResult
 import com.yancotv.android.player.subtitles.buildSubtitleQuery
@@ -189,7 +191,7 @@ internal fun PreviewSubtitleOverlay(
                 .pointerInput(Unit) { detectTapGestures { } },
         ) {
             Text(
-                text = "Subtitles",
+                text = stringResource(R.string.cf_subtitles),
                 color = palette.TextPrimary,
                 style = YancoType.LabelStrong,
                 modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.md),
@@ -199,7 +201,7 @@ internal fun PreviewSubtitleOverlay(
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
                 item(key = "sub:off") {
                     SubtitleOptionRow(
-                        label = "Off",
+                        label = stringResource(R.string.ps_off),
                         detail = null,
                         selected = selected == null,
                         enabled = resolving == null,
@@ -233,7 +235,7 @@ internal fun PreviewSubtitleOverlay(
                 }
                 if (searching) {
                     item(key = "sub:searching") {
-                        SubtitleStatusRow(text = "Searching OpenSubtitles…")
+                        SubtitleStatusRow(text = stringResource(R.string.ps_searching))
                     }
                 }
                 error?.let { message ->
@@ -241,7 +243,7 @@ internal fun PreviewSubtitleOverlay(
                 }
                 if (!searching && error == null && online.isEmpty() && providerTracks.isEmpty()) {
                     item(key = "sub:none") {
-                        SubtitleStatusRow(text = "No subtitles found for this title")
+                        SubtitleStatusRow(text = stringResource(R.string.ps_none_found))
                     }
                 }
                 itemsIndexed(online, key = { _, r -> "os:${r.fileId}" }) { _, result ->
@@ -297,7 +299,7 @@ internal fun PreviewSubtitleOverlay(
 
             PanelDivider()
             Text(
-                text = "Tracks built into the stream appear in the player's own subtitle menu once playback starts.",
+                text = stringResource(R.string.ps_embedded_note),
                 color = palette.TextMuted,
                 style = YancoType.Caption,
                 modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.sm),

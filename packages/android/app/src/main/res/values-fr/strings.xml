@@ -581,4 +581,37 @@
 
     <!-- MK.31.10 batch M (cont.) — resume label + sync-error fallback. -->
     <string name="hm_m_left">%1$d min restantes</string>
+
+    <!-- MK.31.11 batch N — remaining shell surfaces. -->
+    <string name="cat_kicker">CATÉGORIES</string>
+    <string name="cat_favorites">Favoris</string>
+    <string name="cat_all">Tout</string>
+    <string name="cat_desc">Catégorie : %1$s</string>
+    <string name="common_add_a_source">Ajouter une source</string>
+    <string name="fh_move_rail">Parcourez le rail pour prévisualiser</string>
+    <string name="fh_body">Le titre sélectionné devient la vedette — parcourez, puis appuyez sur OK pour regarder.</string>
+    <string name="gd_now">Maintenant</string>
+    <string name="gd_cancel_reminder">Annuler le rappel</string>
+    <string name="gd_set_reminder">Définir un rappel</string>
+    <string name="gd_cancel_recording">Annuler l\'enregistrement</string>
+    <string name="gd_record">Enregistrer</string>
+    <string name="gd_cancel_series">Annuler la série</string>
+    <string name="gd_record_series">Enregistrer la série</string>
+    <string name="gs_add_source_hint">Ajoutez une source dans Paramètres → Sources pour commencer.</string>
+    <string name="gs_add_override_epg">AJOUTER / REMPLACER L\'URL DU GUIDE</string>
+    <string name="gs_current">Actuel : %1$s</string>
+    <string name="pin_required">PIN requis</string>
+    <string name="pin_required_settings">Saisissez votre PIN pour ouvrir les paramètres.</string>
+    <string name="pin_gate_settings">Saisissez le PIN pour accéder aux paramètres.</string>
+    <string name="ps_off">Désactivé</string>
+    <string name="ps_searching">Recherche sur OpenSubtitles…</string>
+    <string name="ps_none_found">Aucun sous-titre trouvé pour ce titre</string>
+    <string name="ps_embedded_note">Les pistes intégrées au flux apparaissent dans le menu de sous-titres du lecteur après le démarrage.</string>
+
+    <!-- MK.31.11 batch N (cont.) — category accessibility labels. -->
+
+    <!-- MK.31.11 batch N (cont.) — EPG panel save/clear. -->
+    <string name="common_clear">Effacer</string>
+
+    <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
 </resources>
