@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -1078,12 +1079,24 @@ private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, mo
             .focusGroup()
             .focusProperties {
                 exit = { direction ->
-                    // MK.31.2 — startward, not physical Left. `exit` receives a
-                    // physical direction; in RTL the sub-sidebar is to the right.
-                    if (isStartward(direction, paneLayoutDirection)) {
-                        activeTabFocus
-                    } else {
-                        FocusRequester.Default
+                    when {
+                        // MK.31.2 — startward, not physical Left. `exit` receives
+                        // a physical direction; in RTL the sub-sidebar is to the
+                        // right.
+                        isStartward(direction, paneLayoutDirection) -> activeTabFocus
+                        // MK.30.7 (MB-317) — observed on a Chromecast with Google
+                        // TV: pressing UP on the pane's first row left NOTHING
+                        // focused. There is no focusable above (the breadcrumb is
+                        // plain text) so Compose's spatial search escaped the
+                        // group, found no candidate, and cleared focus — leaving
+                        // the TV with no cursor until the user guessed a direction
+                        // to recover. Cancel refuses the exit and keeps focus put,
+                        // which is the correct end-stop: the pane is full height,
+                        // so there is genuinely nothing above it or below it to
+                        // move to.
+                        direction == FocusDirection.Up || direction == FocusDirection.Down ->
+                            FocusRequester.Cancel
+                        else -> FocusRequester.Default
                     }
                 }
             },
