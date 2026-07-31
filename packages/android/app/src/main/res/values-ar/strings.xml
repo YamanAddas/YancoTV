@@ -232,4 +232,85 @@
     <string name="rec_release_folder">تحرير هذا المجلد</string>
     <string name="rec_browse">استعرض تسجيلاتك</string>
     <string name="rec_picker_hint">إذا لم يتنقّل منتقي النظام</string>
+
+    <!-- MK.31.6 batch F — Sources list + Add-source dialog. -->
+    <string name="src_add_source_btn">إضافة مصدر</string>
+    <string name="src_sync_in_progress">المزامنة جارية</string>
+    <string name="src_none_configured">لا توجد مصادر مُعدّة</string>
+    <string name="src_none_configured_sub">أضف حساب Xtream أو عنوان M3U أو ملف M3U أو بوابة Stalker لبدء المشاهدة.</string>
+    <string name="src_syncing">جارٍ المزامنة</string>
+    <string name="src_untitled">مصدر بلا اسم</string>
+    <string name="add_title">إضافة مصدر</string>
+    <string name="add_intro">اضغط على أي حقل لتعديله. بيانات الدخول مشفَّرة على الجهاز.</string>
+    <string name="add_type_xtream_desc">واجهة تسجيل الدخول (Codes / Xtream). المضيف والمستخدم وكلمة المرور.</string>
+    <string name="add_type_m3u_url_desc">رابط قائمة مستضافة (ينتهي بـ .m3u أو .m3u8).</string>
+    <string name="add_type_m3u_file">ملف M3U</string>
+    <string name="add_type_m3u_file_desc">اختر ملف .m3u موجوداً على جهازك.</string>
+    <string name="add_type_stalker_desc">بوابة بنمط MAG — عنوان البوابة وعنوان MAC.</string>
+    <string name="add_name">الاسم</string>
+    <string name="add_name_hint">مثال: قنواتي</string>
+    <string name="add_m3u_file">ملف M3U</string>
+    <string name="add_username">اسم المستخدم</string>
+    <string name="add_password">كلمة المرور</string>
+    <string name="add_mac">عنوان MAC</string>
+    <string name="add_mac_hint">00:1A:79:XX:XX:XX — مطبوع عادةً على ظهر جهاز MAG.</string>
+    <string name="add_epg_url">عنوان الدليل</string>
+    <string name="add_epg_url_hint">اختياري — اتركه فارغاً لاستخدام دليل المزوّد المدمج</string>
+    <string name="add_ua_hint">اختياري — يتجاوز User-Agent العام للتطبيق لبثوث هذا المصدر</string>
+    <string name="add_referer_hint">اختياري — يُرسل فقط عند تعيينه (مطلوب لمضيفي TikiLive / OkLivetv)</string>
+    <string name="add_save_failed">تعذّر الحفظ: %1$s</string>
+    <string name="common_cancel">إلغاء</string>
+
+    <!-- MK.31.6 batch G — Source detail + shared status vocabulary. -->
+    <string name="sd_sec_status">الحالة</string>
+    <string name="sd_sec_status_sub">نتيجة آخر مزامنة وموعد التحديث التالي لهذا المصدر.</string>
+    <string name="sd_health">السلامة</string>
+    <string name="sd_refresh_in">التحديث بعد</string>
+    <string name="sd_kicker_autosync">مزامنة تلقائية</string>
+    <string name="sd_last_synced">آخر مزامنة</string>
+    <string name="sd_live_channels">القنوات المباشرة</string>
+    <string name="sd_subscription">الاشتراك</string>
+    <string name="sd_last_error">آخر خطأ</string>
+    <string name="sd_kicker_error">خطأ</string>
+    <string name="sd_sec_sync">المزامنة</string>
+    <string name="sd_sec_sync_sub">مدى تكرار تحديث هذا المصدر لكتالوجه.</string>
+    <string name="sd_autosync_on_start">مزامنة تلقائية عند بدء التطبيق</string>
+    <string name="sd_sec_connection">الاتصال</string>
+    <string name="sd_sec_connection_sub">قابل للتعديل. احفظ التغييرات عند الانتهاء؛ ستستخدم المزامنة التالية القيم الجديدة.</string>
+    <string name="sd_display_name">الاسم المعروض</string>
+    <string name="sd_url_desc">العنوان الأساسي الذي تُقدَّم منه القائمة أو اللوحة. أدرج البادئة http(s)://.</string>
+    <string name="sd_file_path">مسار الملف</string>
+    <string name="sd_file_path_hint">لا يمكن تعديل ملفات M3U المحلية من هنا. أعد إضافة الملف من القرص لتبديله.</string>
+    <string name="sd_username_hint">اسم مستخدم Xtream الخاص بك</string>
+    <string name="sd_password_desc">مُخزَّنة مشفَّرة في Android Keystore. اتركها فارغة للإبقاء على كلمة المرور الحالية.</string>
+    <string name="sd_password_hint">اضغط لإدخال كلمة مرور جديدة</string>
+    <string name="sd_epg_url">عنوان الدليل (اختياري)</string>
+    <string name="sd_epg_url_desc">استبدل دليل المصدر المضمَّن بعنوان XMLTV مخصص.</string>
+    <string name="sd_ua">User-Agent (اختياري)</string>
+    <string name="sd_ua_desc">تجاوز خاص بالمصدر. يعود إلى الافتراضي العام في إعدادات الشبكة.</string>
+    <string name="sd_referer">Referer (اختياري)</string>
+    <string name="sd_referer_desc">بعض المزوّدين يقيّدون البث حسب ترويسة HTTP Referer.</string>
+    <string name="sd_sec_actions">الإجراءات</string>
+    <string name="sd_sec_actions_sub">المزامنة تفرض تحديثاً؛ الحذف يزيل هذا المصدر وكتالوجه من التخزين المحلي.</string>
+    <string name="sd_btn_sync">مزامنة</string>
+    <string name="sd_btn_delete">حذف</string>
+    <string name="sd_save_failed">فشل الحفظ: %1$s</string>
+    <string name="sd_kicker_source">%1$s · مصدر</string>
+    <string name="sd_btn_back">رجوع</string>
+    <string name="sd_back_to_list">العودة إلى القائمة</string>
+    <string name="sd_server_url">عنوان السيرفر</string>
+    <string name="sd_portal_url">عنوان البوابة</string>
+    <string name="st_kicker_syncing">جارٍ المزامنة</string>
+    <string name="st_kicker_ready">جاهز</string>
+    <string name="st_kicker_stale">قديم</string>
+    <string name="st_kicker_new">جديد</string>
+    <string name="st_kicker_error">خطأ</string>
+    <string name="st_syncing_now">تتم المزامنة الآن</string>
+    <string name="st_healthy">سليم</string>
+    <string name="st_stale_sync">قديم — قم بالمزامنة للتحديث</string>
+    <string name="st_never_synced">لم تتم المزامنة أبداً</string>
+    <string name="st_last_sync_failed">فشلت آخر مزامنة</string>
+
+    <!-- MK.31.6 batch G (cont.) — server field label. -->
+    <string name="sd_playlist_url">عنوان القائمة</string>
 </resources>

@@ -247,4 +247,90 @@
     <string name="rec_release_folder">Release this folder</string>
     <string name="rec_browse">Browse your recordings</string>
     <string name="rec_picker_hint">If the system picker won\'t navigate</string>
+
+    <!-- MK.31.6 batch F — Sources list + Add-source dialog. -->
+    <string name="src_add_source_btn">ADD SOURCE</string>
+    <string name="src_sync_in_progress">SYNC IN PROGRESS</string>
+    <string name="src_none_configured">No sources configured</string>
+    <string name="src_none_configured_sub">Add an Xtream login, M3U URL, M3U file, or Stalker portal to start streaming.</string>
+    <string name="src_syncing">SYNCING</string>
+    <string name="src_untitled">Untitled source</string>
+    <string name="add_title">Add source</string>
+    <string name="add_intro">Tap a field to edit it. Credentials are encrypted on-device.</string>
+    <string name="add_type_xtream" translatable="false">Xtream</string>
+    <string name="add_type_xtream_desc">Login API (Codes / Xtream). Host + user + pass.</string>
+    <string name="add_type_m3u_url" translatable="false">M3U URL</string>
+    <string name="add_type_m3u_url_desc">Hosted playlist link (ends in .m3u or .m3u8).</string>
+    <string name="add_type_m3u_file">M3U File</string>
+    <string name="add_type_m3u_file_desc">Pick a .m3u file already on your device.</string>
+    <string name="add_type_stalker" translatable="false">Stalker</string>
+    <string name="add_type_stalker_desc">MAG-style portal — portal URL + MAC address.</string>
+    <string name="add_name">Name</string>
+    <string name="add_name_hint">e.g. My IPTV</string>
+    <string name="add_m3u_file">M3U file</string>
+    <string name="add_username">Username</string>
+    <string name="add_password">Password</string>
+    <string name="add_mac">MAC address</string>
+    <string name="add_mac_hint">00:1A:79:XX:XX:XX — usually printed on the back of your MAG box.</string>
+    <string name="add_epg_url">EPG URL</string>
+    <string name="add_epg_url_hint">Optional — leave blank for the provider\'s built-in guide</string>
+    <string name="add_ua" translatable="false">User-Agent</string>
+    <string name="add_ua_hint">Optional — overrides the app-wide UA for this source\'s streams</string>
+    <string name="add_referer" translatable="false">Referer</string>
+    <string name="add_referer_hint">Optional — sent only when set (required by TikiLive / OkLivetv-class hosts)</string>
+    <string name="add_save_failed">Couldn\'t save: %1$s</string>
+    <string name="common_cancel">Cancel</string>
+
+    <!-- MK.31.6 batch G — Source detail + shared status vocabulary. -->
+    <string name="sd_sec_status">Status</string>
+    <string name="sd_sec_status_sub">Last sync result + when this source will refresh next.</string>
+    <string name="sd_health">Health</string>
+    <string name="sd_refresh_in">Refresh in</string>
+    <string name="sd_kicker_autosync">AUTO-SYNC</string>
+    <string name="sd_last_synced">Last synced</string>
+    <string name="sd_live_channels">Live channels</string>
+    <string name="sd_subscription">Subscription</string>
+    <string name="sd_last_error">Last error</string>
+    <string name="sd_kicker_error">ERROR</string>
+    <string name="sd_sec_sync">Sync</string>
+    <string name="sd_sec_sync_sub">How aggressively this source refreshes its catalog.</string>
+    <string name="sd_autosync_on_start">Auto-sync on app start</string>
+    <string name="sd_sec_connection">Connection</string>
+    <string name="sd_sec_connection_sub">Editable. Save changes when you\'re done; the next sync uses the new values.</string>
+    <string name="sd_display_name">Display name</string>
+    <string name="sd_url_desc">Base URL the playlist or panel is served from. Include the http(s):// scheme.</string>
+    <string name="sd_file_path">File path</string>
+    <string name="sd_file_path_hint">Local M3U files can\'t be edited from here. Re-add the file from disk to swap it.</string>
+    <string name="sd_username_hint">your Xtream username</string>
+    <string name="sd_password_desc">Stored encrypted in the Android Keystore. Leave blank to keep the existing password.</string>
+    <string name="sd_password_hint">tap to enter a new password</string>
+    <string name="sd_epg_url">EPG URL (optional)</string>
+    <string name="sd_epg_url_desc">Override the source\'s bundled EPG with a custom XMLTV URL.</string>
+    <string name="sd_ua">User-Agent (optional)</string>
+    <string name="sd_ua_desc">Per-source override. Falls back to the global default in Network settings.</string>
+    <string name="sd_referer">Referer (optional)</string>
+    <string name="sd_referer_desc">Some providers gate streams by HTTP Referer.</string>
+    <string name="sd_sec_actions">Actions</string>
+    <string name="sd_sec_actions_sub">Sync forces a refresh; Delete removes this source and its catalog from local storage.</string>
+    <string name="sd_btn_sync">SYNC</string>
+    <string name="sd_btn_delete">DELETE</string>
+    <string name="sd_save_failed">Save failed: %1$s</string>
+    <string name="sd_kicker_source">%1$s · SOURCE</string>
+    <string name="sd_btn_back">BACK</string>
+    <string name="sd_back_to_list">Back to list</string>
+    <string name="sd_server_url">Server URL</string>
+    <string name="sd_portal_url">Portal URL</string>
+    <string name="st_kicker_syncing">SYNCING</string>
+    <string name="st_kicker_ready">READY</string>
+    <string name="st_kicker_stale">STALE</string>
+    <string name="st_kicker_new">NEW</string>
+    <string name="st_kicker_error">ERROR</string>
+    <string name="st_syncing_now">Syncing now</string>
+    <string name="st_healthy">Healthy</string>
+    <string name="st_stale_sync">Stale — sync to refresh</string>
+    <string name="st_never_synced">Never synced</string>
+    <string name="st_last_sync_failed">Last sync failed</string>
+
+    <!-- MK.31.6 batch G (cont.) — server field label. -->
+    <string name="sd_playlist_url">Playlist URL</string>
 </resources>

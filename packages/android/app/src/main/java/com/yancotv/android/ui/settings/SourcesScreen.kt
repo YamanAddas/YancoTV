@@ -40,11 +40,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoIcons
@@ -355,7 +357,7 @@ private fun ListHeader(count: Int, onAddClick: () -> Unit) {
             )
         }
         SettingsAccentButton(onClick = onAddClick) {
-            Text(text = "ADD SOURCE")
+            Text(text = stringResource(R.string.src_add_source_btn))
         }
     }
 }
@@ -389,7 +391,7 @@ private fun SyncBanner(sourceName: String, progress: SyncProgress, elapsedSec: L
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "SYNC IN PROGRESS",
+                text = stringResource(R.string.src_sync_in_progress),
                 color = palette.Accent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -436,20 +438,20 @@ private fun EmptyState(onAddClick: () -> Unit, modifier: Modifier = Modifier) {
             )
         }
         Text(
-            text = "No sources configured",
+            text = stringResource(R.string.src_none_configured),
             color = palette.TextPrimary,
             fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.3).sp,
         )
         Text(
-            text = "Add an Xtream login, M3U URL, M3U file, or Stalker portal to start streaming.",
+            text = stringResource(R.string.src_none_configured_sub),
             color = palette.TextMuted,
             fontSize = 14.sp,
             lineHeight = 19.sp,
         )
         SettingsAccentButton(onClick = onAddClick) {
-            Text(text = "ADD SOURCE")
+            Text(text = stringResource(R.string.src_add_source_btn))
         }
     }
 }
@@ -532,7 +534,7 @@ private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPale
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = source.name.ifBlank { "Untitled source" },
+                text = source.name.ifBlank { stringResource(R.string.src_untitled) },
                 color = palette.TextPrimary,
                 fontSize = 19.sp,
                 lineHeight = 22.sp,
@@ -553,7 +555,7 @@ private fun SourceListRow(source: Source, isSyncing: Boolean, palette: YancoPale
         }
         if (isSyncing) {
             StatusChip(
-                text = "SYNCING",
+                text = stringResource(R.string.src_syncing),
                 accent = palette.Accent,
                 bg = palette.Accent.copy(alpha = 0.18f),
             )

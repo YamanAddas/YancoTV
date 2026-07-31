@@ -232,4 +232,85 @@
     <string name="rec_release_folder">Libérer ce dossier</string>
     <string name="rec_browse">Parcourir vos enregistrements</string>
     <string name="rec_picker_hint">Si le sélecteur système ne s\'ouvre pas</string>
+
+    <!-- MK.31.6 batch F — Sources list + Add-source dialog. -->
+    <string name="src_add_source_btn">AJOUTER UNE SOURCE</string>
+    <string name="src_sync_in_progress">SYNCHRONISATION EN COURS</string>
+    <string name="src_none_configured">Aucune source configurée</string>
+    <string name="src_none_configured_sub">Ajoutez un compte Xtream, une URL M3U, un fichier M3U ou un portail Stalker pour commencer.</string>
+    <string name="src_syncing">SYNCHRONISATION</string>
+    <string name="src_untitled">Source sans nom</string>
+    <string name="add_title">Ajouter une source</string>
+    <string name="add_intro">Appuyez sur un champ pour le modifier. Les identifiants sont chiffrés sur l\'appareil.</string>
+    <string name="add_type_xtream_desc">API de connexion (Codes / Xtream). Hôte + utilisateur + mot de passe.</string>
+    <string name="add_type_m3u_url_desc">Lien de playlist hébergée (se termine par .m3u ou .m3u8).</string>
+    <string name="add_type_m3u_file">Fichier M3U</string>
+    <string name="add_type_m3u_file_desc">Choisissez un fichier .m3u déjà présent sur votre appareil.</string>
+    <string name="add_type_stalker_desc">Portail de type MAG — URL du portail + adresse MAC.</string>
+    <string name="add_name">Nom</string>
+    <string name="add_name_hint">par ex. Mon IPTV</string>
+    <string name="add_m3u_file">Fichier M3U</string>
+    <string name="add_username">Nom d\'utilisateur</string>
+    <string name="add_password">Mot de passe</string>
+    <string name="add_mac">Adresse MAC</string>
+    <string name="add_mac_hint">00:1A:79:XX:XX:XX — généralement imprimé au dos de votre boîtier MAG.</string>
+    <string name="add_epg_url">URL du guide</string>
+    <string name="add_epg_url_hint">Facultatif — laissez vide pour le guide intégré du fournisseur</string>
+    <string name="add_ua_hint">Facultatif — remplace le User-Agent global pour les flux de cette source</string>
+    <string name="add_referer_hint">Facultatif — envoyé uniquement s\'il est défini (requis par les hôtes de type TikiLive / OkLivetv)</string>
+    <string name="add_save_failed">Échec de l\'enregistrement : %1$s</string>
+    <string name="common_cancel">Annuler</string>
+
+    <!-- MK.31.6 batch G — Source detail + shared status vocabulary. -->
+    <string name="sd_sec_status">Statut</string>
+    <string name="sd_sec_status_sub">Résultat de la dernière synchronisation et prochaine actualisation.</string>
+    <string name="sd_health">État</string>
+    <string name="sd_refresh_in">Actualisation dans</string>
+    <string name="sd_kicker_autosync">SYNCHRO AUTO</string>
+    <string name="sd_last_synced">Dernière synchronisation</string>
+    <string name="sd_live_channels">Chaînes en direct</string>
+    <string name="sd_subscription">Abonnement</string>
+    <string name="sd_last_error">Dernière erreur</string>
+    <string name="sd_kicker_error">ERREUR</string>
+    <string name="sd_sec_sync">Synchronisation</string>
+    <string name="sd_sec_sync_sub">La fréquence à laquelle cette source actualise son catalogue.</string>
+    <string name="sd_autosync_on_start">Synchroniser au démarrage de l\'application</string>
+    <string name="sd_sec_connection">Connexion</string>
+    <string name="sd_sec_connection_sub">Modifiable. Enregistrez vos changements ; la prochaine synchronisation utilisera les nouvelles valeurs.</string>
+    <string name="sd_display_name">Nom affiché</string>
+    <string name="sd_url_desc">URL de base servant la playlist ou le panneau. Incluez le schéma http(s)://.</string>
+    <string name="sd_file_path">Chemin du fichier</string>
+    <string name="sd_file_path_hint">Les fichiers M3U locaux ne sont pas modifiables ici. Ré-ajoutez le fichier depuis le disque pour le remplacer.</string>
+    <string name="sd_username_hint">votre nom d\'utilisateur Xtream</string>
+    <string name="sd_password_desc">Stocké chiffré dans le Keystore Android. Laissez vide pour conserver le mot de passe actuel.</string>
+    <string name="sd_password_hint">appuyez pour saisir un nouveau mot de passe</string>
+    <string name="sd_epg_url">URL du guide (facultatif)</string>
+    <string name="sd_epg_url_desc">Remplacer le guide fourni par la source par une URL XMLTV personnalisée.</string>
+    <string name="sd_ua">User-Agent (facultatif)</string>
+    <string name="sd_ua_desc">Remplacement par source. Revient à la valeur globale des paramètres réseau.</string>
+    <string name="sd_referer">Referer (facultatif)</string>
+    <string name="sd_referer_desc">Certains fournisseurs filtrent les flux via l\'en-tête HTTP Referer.</string>
+    <string name="sd_sec_actions">Actions</string>
+    <string name="sd_sec_actions_sub">Synchroniser force une actualisation ; Supprimer retire cette source et son catalogue du stockage local.</string>
+    <string name="sd_btn_sync">SYNCHRONISER</string>
+    <string name="sd_btn_delete">SUPPRIMER</string>
+    <string name="sd_save_failed">Échec de l\'enregistrement : %1$s</string>
+    <string name="sd_kicker_source">%1$s · SOURCE</string>
+    <string name="sd_btn_back">RETOUR</string>
+    <string name="sd_back_to_list">Retour à la liste</string>
+    <string name="sd_server_url">URL du serveur</string>
+    <string name="sd_portal_url">URL du portail</string>
+    <string name="st_kicker_syncing">SYNCHRO</string>
+    <string name="st_kicker_ready">PRÊT</string>
+    <string name="st_kicker_stale">PÉRIMÉ</string>
+    <string name="st_kicker_new">NOUVEAU</string>
+    <string name="st_kicker_error">ERREUR</string>
+    <string name="st_syncing_now">Synchronisation en cours</string>
+    <string name="st_healthy">Bon</string>
+    <string name="st_stale_sync">Périmé — synchronisez pour actualiser</string>
+    <string name="st_never_synced">Jamais synchronisé</string>
+    <string name="st_last_sync_failed">Dernière synchronisation échouée</string>
+
+    <!-- MK.31.6 batch G (cont.) — server field label. -->
+    <string name="sd_playlist_url">URL de la playlist</string>
 </resources>

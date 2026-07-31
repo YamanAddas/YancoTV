@@ -30,12 +30,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
@@ -167,8 +169,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
         Spacer(modifier = Modifier.height(8.dp))
 
         SettingsSection(
-            title = "Status",
-            sub = "Last sync result + when this source will refresh next.",
+            title = stringResource(R.string.sd_sec_status),
+            sub = stringResource(R.string.sd_sec_status_sub),
         ) {
             val status = remember(current) { computeRowStatus(current, isSyncing = false) }
             // Every row in this section is read-only but [readOnlyFocusable]
@@ -177,7 +179,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             // the Connection form's first text field, never scrolling these
             // facts into view.
             SettingsRow(
-                label = "Health",
+                label = stringResource(R.string.sd_health),
                 kicker = statusKicker(status),
                 right = {
                     Text(
@@ -191,20 +193,20 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Refresh in",
-                kicker = "AUTO-SYNC",
+                label = stringResource(R.string.sd_refresh_in),
+                kicker = stringResource(R.string.sd_kicker_autosync),
                 right = { ValueText(formatRefreshIn(current)) },
                 readOnlyFocusable = true,
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Last synced",
+                label = stringResource(R.string.sd_last_synced),
                 right = { ValueText(formatLastSynced(current.lastSynced)) },
                 readOnlyFocusable = true,
             )
             SettingsRowSpacer()
             SettingsRow(
-                label = "Live channels",
+                label = stringResource(R.string.sd_live_channels),
                 right = { ValueText("${current.channelCount}") },
                 readOnlyFocusable = true,
             )
@@ -214,7 +216,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             formatSourceExpiry(current.expiresAt, System.currentTimeMillis())?.let { expiry ->
                 SettingsRowSpacer()
                 SettingsRow(
-                    label = "Subscription",
+                    label = stringResource(R.string.sd_subscription),
                     kicker = if (expiry.urgency == ExpiryUrgency.Later) null else "EXPIRES",
                     right = {
                         Text(
@@ -237,8 +239,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             current.lastSyncError?.let { err ->
                 SettingsRowSpacer()
                 SettingsRow(
-                    label = "Last error",
-                    kicker = "ERROR",
+                    label = stringResource(R.string.sd_last_error),
+                    kicker = stringResource(R.string.sd_kicker_error),
                     hint = err,
                     readOnlyFocusable = true,
                 )
@@ -246,11 +248,11 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
         }
 
         SettingsSection(
-            title = "Sync",
-            sub = "How aggressively this source refreshes its catalog.",
+            title = stringResource(R.string.sd_sec_sync),
+            sub = stringResource(R.string.sd_sec_sync_sub),
         ) {
             SettingsToggleRow(
-                label = "Auto-sync on app start",
+                label = stringResource(R.string.sd_autosync_on_start),
                 description =
                 "When on, this source kicks off a background refresh every time you open YancoTV. Off keeps catalog reads fast on launch and only syncs when you press Sync manually or the auto-sync interval elapses.",
                 checked = current.autoSyncOnStart,
@@ -273,11 +275,11 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
         }
 
         SettingsSection(
-            title = "Connection",
-            sub = "Editable. Save changes when you're done; the next sync uses the new values.",
+            title = stringResource(R.string.sd_sec_connection),
+            sub = stringResource(R.string.sd_sec_connection_sub),
         ) {
             SettingsClickToEditField(
-                label = "Display name",
+                label = stringResource(R.string.sd_display_name),
                 value = nameField,
                 onValueChange = {
                     nameField = it
@@ -289,7 +291,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                 SettingsRowSpacer()
                 SettingsClickToEditField(
                     label = serverFieldLabel(current.type),
-                    description = "Base URL the playlist or panel is served from. Include the http(s):// scheme.",
+                    description = stringResource(R.string.sd_url_desc),
                     value = urlField,
                     onValueChange = {
                         urlField = it
@@ -300,8 +302,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             } else {
                 SettingsRowSpacer()
                 SettingsRow(
-                    label = "File path",
-                    hint = "Local M3U files can't be edited from here. Re-add the file from disk to swap it.",
+                    label = stringResource(R.string.sd_file_path),
+                    hint = stringResource(R.string.sd_file_path_hint),
                     right = {
                         Text(
                             text = current.filePath?.takeLast(40) ?: "—",
@@ -322,27 +324,27 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                         usernameField = it
                         dirty = true
                     },
-                    hint = "your Xtream username",
+                    hint = stringResource(R.string.sd_username_hint),
                     keyboardType = KeyboardType.Ascii,
                 )
                 SettingsRowSpacer()
                 SettingsClickToEditField(
                     label = "Password",
-                    description = "Stored encrypted in the Android Keystore. Leave blank to keep the existing password.",
+                    description = stringResource(R.string.sd_password_desc),
                     value = passwordField,
                     onValueChange = {
                         passwordField = it
                         dirty = true
                     },
-                    hint = "tap to enter a new password",
+                    hint = stringResource(R.string.sd_password_hint),
                     transformation = PasswordVisualTransformation(),
                     keyboardType = KeyboardType.Password,
                 )
             }
             SettingsRowSpacer()
             SettingsClickToEditField(
-                label = "EPG URL (optional)",
-                description = "Override the source's bundled EPG with a custom XMLTV URL.",
+                label = stringResource(R.string.sd_epg_url),
+                description = stringResource(R.string.sd_epg_url_desc),
                 value = epgUrlField,
                 onValueChange = {
                     epgUrlField = it
@@ -352,8 +354,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             )
             SettingsRowSpacer()
             SettingsClickToEditField(
-                label = "User-Agent (optional)",
-                description = "Per-source override. Falls back to the global default in Network settings.",
+                label = stringResource(R.string.sd_ua),
+                description = stringResource(R.string.sd_ua_desc),
                 value = userAgentField,
                 onValueChange = {
                     userAgentField = it
@@ -363,8 +365,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             )
             SettingsRowSpacer()
             SettingsClickToEditField(
-                label = "Referer (optional)",
-                description = "Some providers gate streams by HTTP Referer.",
+                label = stringResource(R.string.sd_referer),
+                description = stringResource(R.string.sd_referer_desc),
                 value = referrerField,
                 onValueChange = {
                     referrerField = it
@@ -375,8 +377,8 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
         }
 
         SettingsSection(
-            title = "Actions",
-            sub = "Sync forces a refresh; Delete removes this source and its catalog from local storage.",
+            title = stringResource(R.string.sd_sec_actions),
+            sub = stringResource(R.string.sd_sec_actions_sub),
         ) {
             // Action buttons are Compact size with short labels (SAVE /
             // SYNC / DELETE) so all three fit in a single row at every
@@ -448,7 +450,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     },
                     size = ButtonSize.Compact,
                 ) {
-                    Text(text = "SYNC", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                    Text(text = stringResource(R.string.sd_btn_sync), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
                 SettingsDangerButton(
                     onClick = {
@@ -468,13 +470,13 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     },
                     size = ButtonSize.Compact,
                 ) {
-                    Text(text = "DELETE", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                    Text(text = stringResource(R.string.sd_btn_delete), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
             }
             saveError?.let { err ->
                 SettingsRowSpacer()
                 Text(
-                    text = "Save failed: $err",
+                    text = stringResource(R.string.sd_save_failed, err),
                     color = palette.Error,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(horizontal = 4.dp),
@@ -509,7 +511,7 @@ private fun DetailHero(source: Source, palette: YancoPalette, onBack: () -> Unit
                 .background(status.dotColor(palette)),
         )
         Column(modifier = Modifier.weight(1f)) {
-            SettingsKicker(text = "${typeLabel(source.type).uppercase()} · SOURCE", accent = true)
+            SettingsKicker(text = stringResource(R.string.sd_kicker_source, typeLabel(source.type).uppercase()), accent = true)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = source.name.ifBlank { "Untitled source" },
@@ -527,7 +529,7 @@ private fun DetailHero(source: Source, palette: YancoPalette, onBack: () -> Unit
             size = ButtonSize.Compact,
             modifier = backAnchorModifier,
         ) {
-            Text(text = "BACK", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+            Text(text = stringResource(R.string.sd_btn_back), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -558,25 +560,27 @@ private fun ErrorPane(message: String, onBack: () -> Unit) {
             fontSize = 14.sp,
         )
         SettingsOutlinedButton(onClick = onBack) {
-            Text(text = "Back to list", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+            Text(text = stringResource(R.string.sd_back_to_list), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
+@Composable
 private fun statusKicker(status: RowStatus): String = when (status) {
-    RowStatus.Syncing -> "SYNCING"
-    RowStatus.Ready -> "READY"
-    RowStatus.Stale -> "STALE"
-    RowStatus.NeverSynced -> "NEW"
-    RowStatus.Error -> "ERROR"
+    RowStatus.Syncing -> stringResource(R.string.st_kicker_syncing)
+    RowStatus.Ready -> stringResource(R.string.st_kicker_ready)
+    RowStatus.Stale -> stringResource(R.string.st_kicker_stale)
+    RowStatus.NeverSynced -> stringResource(R.string.st_kicker_new)
+    RowStatus.Error -> stringResource(R.string.st_kicker_error)
 }
 
+@Composable
 private fun healthSummary(status: RowStatus): String = when (status) {
-    RowStatus.Syncing -> "Syncing now"
-    RowStatus.Ready -> "Healthy"
-    RowStatus.Stale -> "Stale — sync to refresh"
-    RowStatus.NeverSynced -> "Never synced"
-    RowStatus.Error -> "Last sync failed"
+    RowStatus.Syncing -> stringResource(R.string.st_syncing_now)
+    RowStatus.Ready -> stringResource(R.string.st_healthy)
+    RowStatus.Stale -> stringResource(R.string.st_stale_sync)
+    RowStatus.NeverSynced -> stringResource(R.string.st_never_synced)
+    RowStatus.Error -> stringResource(R.string.st_last_sync_failed)
 }
 
 private fun formatRefreshIn(source: Source): String {
@@ -601,11 +605,12 @@ private fun formatRefreshIn(source: Source): String {
     }
 }
 
+@Composable
 private fun serverFieldLabel(type: SourceType): String = when (type) {
-    SourceType.XTREAM -> "Server URL"
-    SourceType.M3U_URL -> "Playlist URL"
-    SourceType.STALKER -> "Portal URL"
-    SourceType.M3U_FILE -> "File path"
+    SourceType.XTREAM -> stringResource(R.string.sd_server_url)
+    SourceType.M3U_URL -> stringResource(R.string.sd_playlist_url)
+    SourceType.STALKER -> stringResource(R.string.sd_portal_url)
+    SourceType.M3U_FILE -> stringResource(R.string.sd_file_path)
 }
 
 private fun formatLastSynced(ms: Long?): String {

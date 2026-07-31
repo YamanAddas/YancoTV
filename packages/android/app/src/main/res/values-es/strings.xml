@@ -232,4 +232,85 @@
     <string name="rec_release_folder">Liberar esta carpeta</string>
     <string name="rec_browse">Explora tus grabaciones</string>
     <string name="rec_picker_hint">Si el selector del sistema no navega</string>
+
+    <!-- MK.31.6 batch F — Sources list + Add-source dialog. -->
+    <string name="src_add_source_btn">AÑADIR FUENTE</string>
+    <string name="src_sync_in_progress">SINCRONIZACIÓN EN CURSO</string>
+    <string name="src_none_configured">No hay fuentes configuradas</string>
+    <string name="src_none_configured_sub">Añade una cuenta Xtream, una URL M3U, un archivo M3U o un portal Stalker para empezar.</string>
+    <string name="src_syncing">SINCRONIZANDO</string>
+    <string name="src_untitled">Fuente sin nombre</string>
+    <string name="add_title">Añadir fuente</string>
+    <string name="add_intro">Toca un campo para editarlo. Las credenciales se cifran en el dispositivo.</string>
+    <string name="add_type_xtream_desc">API de inicio de sesión (Codes / Xtream). Host + usuario + contraseña.</string>
+    <string name="add_type_m3u_url_desc">Enlace de lista alojada (termina en .m3u o .m3u8).</string>
+    <string name="add_type_m3u_file">Archivo M3U</string>
+    <string name="add_type_m3u_file_desc">Elige un archivo .m3u que ya esté en tu dispositivo.</string>
+    <string name="add_type_stalker_desc">Portal tipo MAG — URL del portal + dirección MAC.</string>
+    <string name="add_name">Nombre</string>
+    <string name="add_name_hint">p. ej. Mi IPTV</string>
+    <string name="add_m3u_file">Archivo M3U</string>
+    <string name="add_username">Usuario</string>
+    <string name="add_password">Contraseña</string>
+    <string name="add_mac">Dirección MAC</string>
+    <string name="add_mac_hint">00:1A:79:XX:XX:XX — normalmente impreso en la parte trasera de tu MAG.</string>
+    <string name="add_epg_url">URL de la guía</string>
+    <string name="add_epg_url_hint">Opcional — déjalo vacío para usar la guía integrada del proveedor</string>
+    <string name="add_ua_hint">Opcional — reemplaza el User-Agent global para las emisiones de esta fuente</string>
+    <string name="add_referer_hint">Opcional — se envía solo si se define (necesario para hosts tipo TikiLive / OkLivetv)</string>
+    <string name="add_save_failed">No se pudo guardar: %1$s</string>
+    <string name="common_cancel">Cancelar</string>
+
+    <!-- MK.31.6 batch G — Source detail + shared status vocabulary. -->
+    <string name="sd_sec_status">Estado</string>
+    <string name="sd_sec_status_sub">Resultado de la última sincronización y próxima actualización.</string>
+    <string name="sd_health">Estado de salud</string>
+    <string name="sd_refresh_in">Actualización en</string>
+    <string name="sd_kicker_autosync">AUTO-SINCRONIZACIÓN</string>
+    <string name="sd_last_synced">Última sincronización</string>
+    <string name="sd_live_channels">Canales en directo</string>
+    <string name="sd_subscription">Suscripción</string>
+    <string name="sd_last_error">Último error</string>
+    <string name="sd_kicker_error">ERROR</string>
+    <string name="sd_sec_sync">Sincronización</string>
+    <string name="sd_sec_sync_sub">Con qué frecuencia esta fuente actualiza su catálogo.</string>
+    <string name="sd_autosync_on_start">Sincronizar al iniciar la app</string>
+    <string name="sd_sec_connection">Conexión</string>
+    <string name="sd_sec_connection_sub">Editable. Guarda los cambios al terminar; la próxima sincronización usará los nuevos valores.</string>
+    <string name="sd_display_name">Nombre visible</string>
+    <string name="sd_url_desc">URL base desde la que se sirve la lista o el panel. Incluye el esquema http(s)://.</string>
+    <string name="sd_file_path">Ruta del archivo</string>
+    <string name="sd_file_path_hint">Los archivos M3U locales no se editan aquí. Vuelve a añadir el archivo desde el disco para cambiarlo.</string>
+    <string name="sd_username_hint">tu usuario de Xtream</string>
+    <string name="sd_password_desc">Se guarda cifrada en el Keystore de Android. Déjalo vacío para mantener la contraseña actual.</string>
+    <string name="sd_password_hint">toca para introducir una nueva contraseña</string>
+    <string name="sd_epg_url">URL de la guía (opcional)</string>
+    <string name="sd_epg_url_desc">Sustituye la guía incluida en la fuente por una URL XMLTV personalizada.</string>
+    <string name="sd_ua">User-Agent (opcional)</string>
+    <string name="sd_ua_desc">Anulación por fuente. Recurre al valor global de los ajustes de red.</string>
+    <string name="sd_referer">Referer (opcional)</string>
+    <string name="sd_referer_desc">Algunos proveedores restringen las emisiones según el Referer HTTP.</string>
+    <string name="sd_sec_actions">Acciones</string>
+    <string name="sd_sec_actions_sub">Sincronizar fuerza una actualización; Eliminar quita esta fuente y su catálogo del almacenamiento local.</string>
+    <string name="sd_btn_sync">SINCRONIZAR</string>
+    <string name="sd_btn_delete">ELIMINAR</string>
+    <string name="sd_save_failed">Error al guardar: %1$s</string>
+    <string name="sd_kicker_source">%1$s · FUENTE</string>
+    <string name="sd_btn_back">ATRÁS</string>
+    <string name="sd_back_to_list">Volver a la lista</string>
+    <string name="sd_server_url">URL del servidor</string>
+    <string name="sd_portal_url">URL del portal</string>
+    <string name="st_kicker_syncing">SINCRONIZANDO</string>
+    <string name="st_kicker_ready">LISTO</string>
+    <string name="st_kicker_stale">DESACTUALIZADO</string>
+    <string name="st_kicker_new">NUEVO</string>
+    <string name="st_kicker_error">ERROR</string>
+    <string name="st_syncing_now">Sincronizando ahora</string>
+    <string name="st_healthy">Correcto</string>
+    <string name="st_stale_sync">Desactualizado — sincroniza para refrescar</string>
+    <string name="st_never_synced">Nunca sincronizado</string>
+    <string name="st_last_sync_failed">La última sincronización falló</string>
+
+    <!-- MK.31.6 batch G (cont.) — server field label. -->
+    <string name="sd_playlist_url">URL de la lista</string>
 </resources>

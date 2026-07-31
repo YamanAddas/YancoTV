@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.yancotv.android.R
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -195,7 +197,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "Add source",
+                    text = stringResource(R.string.add_title),
                     color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -205,7 +207,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     // a field to type." which is wrong on touch. Rewritten
                     // form-factor-agnostic so the same string works on
                     // Fire TV remote AND phone.
-                    text = "Tap a field to edit it. Credentials are encrypted on-device.",
+                    text = stringResource(R.string.add_intro),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 14.sp,
                 )
@@ -230,28 +232,28 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         TypeChip(
-                            label = "Xtream",
-                            description = "Login API (Codes / Xtream). Host + user + pass.",
+                            label = stringResource(R.string.add_type_xtream),
+                            description = stringResource(R.string.add_type_xtream_desc),
                             selected = type == SourceType.XTREAM,
                             onSelect = { type = SourceType.XTREAM },
                         )
                         TypeChip(
-                            label = "M3U URL",
-                            description = "Hosted playlist link (ends in .m3u or .m3u8).",
+                            label = stringResource(R.string.add_type_m3u_url),
+                            description = stringResource(R.string.add_type_m3u_url_desc),
                             selected = type == SourceType.M3U_URL,
                             onSelect = { type = SourceType.M3U_URL },
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         TypeChip(
-                            label = "M3U File",
-                            description = "Pick a .m3u file already on your device.",
+                            label = stringResource(R.string.add_type_m3u_file),
+                            description = stringResource(R.string.add_type_m3u_file_desc),
                             selected = type == SourceType.M3U_FILE,
                             onSelect = { type = SourceType.M3U_FILE },
                         )
                         TypeChip(
-                            label = "Stalker",
-                            description = "MAG-style portal — portal URL + MAC address.",
+                            label = stringResource(R.string.add_type_stalker),
+                            description = stringResource(R.string.add_type_stalker_desc),
                             selected = type == SourceType.STALKER,
                             onSelect = { type = SourceType.STALKER },
                         )
@@ -260,8 +262,8 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
 
                 SectionLabel("Details")
                 SettingsClickToEditField(
-                    label = "Name",
-                    hint = "e.g. My IPTV",
+                    label = stringResource(R.string.add_name),
+                    hint = stringResource(R.string.add_name_hint),
                     value = name,
                     onValueChange = { name = it },
                     bare = true,
@@ -272,7 +274,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                     // and we take persistent read permission so the
                     // source survives process restarts.
                     SettingsRow(
-                        label = "M3U file",
+                        label = stringResource(R.string.add_m3u_file),
                         hint = if (fileDisplayName.isNotBlank()) {
                             "Selected: $fileDisplayName"
                         } else {
@@ -312,14 +314,14 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 if (type == SourceType.XTREAM) {
                     SectionLabel("Credentials")
                     SettingsClickToEditField(
-                        label = "Username",
+                        label = stringResource(R.string.add_username),
                         hint = null,
                         value = username,
                         onValueChange = { username = it },
                         bare = true,
                     )
                     SettingsClickToEditField(
-                        label = "Password",
+                        label = stringResource(R.string.add_password),
                         hint = null,
                         value = password,
                         onValueChange = { password = it },
@@ -332,8 +334,8 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 if (type == SourceType.STALKER) {
                     SectionLabel("Device identity")
                     SettingsClickToEditField(
-                        label = "MAC address",
-                        hint = "00:1A:79:XX:XX:XX — usually printed on the back of your MAG box.",
+                        label = stringResource(R.string.add_mac),
+                        hint = stringResource(R.string.add_mac_hint),
                         value = macAddress,
                         onValueChange = { macAddress = it },
                         bare = true,
@@ -342,8 +344,8 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
 
                 SectionLabel("Electronic programme guide")
                 SettingsClickToEditField(
-                    label = "EPG URL",
-                    hint = "Optional — leave blank for the provider's built-in guide",
+                    label = stringResource(R.string.add_epg_url),
+                    hint = stringResource(R.string.add_epg_url_hint),
                     value = epgUrl,
                     onValueChange = { epgUrl = it },
                     keyboardType = KeyboardType.Uri,
@@ -355,15 +357,15 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 // surface the requirement in their docs.
                 SectionLabel("Advanced — HTTP headers")
                 SettingsClickToEditField(
-                    label = "User-Agent",
-                    hint = "Optional — overrides the app-wide UA for this source's streams",
+                    label = stringResource(R.string.add_ua),
+                    hint = stringResource(R.string.add_ua_hint),
                     value = userAgent,
                     onValueChange = { userAgent = it },
                     bare = true,
                 )
                 SettingsClickToEditField(
-                    label = "Referer",
-                    hint = "Optional — sent only when set (required by TikiLive / OkLivetv-class hosts)",
+                    label = stringResource(R.string.add_referer),
+                    hint = stringResource(R.string.add_referer_hint),
                     value = referer,
                     onValueChange = { referer = it },
                     keyboardType = KeyboardType.Uri,
@@ -371,7 +373,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 )
 
                 validationError?.let { ErrorBanner(text = it) }
-                saveError?.let { ErrorBanner(text = "Couldn't save: $it") }
+                saveError?.let { ErrorBanner(text = stringResource(R.string.add_save_failed, it)) }
             }
 
             Divider()
@@ -385,7 +387,7 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 YancoSecondaryButton(onClick = onDismiss, enabled = !saving) {
-                    Text(text = "Cancel")
+                    Text(text = stringResource(R.string.common_cancel))
                 }
                 YancoPrimaryButton(onClick = { submit() }, enabled = !saving) {
                     Text(text = if (saving) "Saving…" else "Save")
