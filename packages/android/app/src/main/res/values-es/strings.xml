@@ -614,4 +614,51 @@
     <string name="common_clear">Borrar</string>
 
     <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
+
+    <!-- MK.31.12 batch O — player options menu + panels. -->
+    <string name="po_header">OPCIONES  ·  ◂ ▸ para cambiar</string>
+    <string name="po_audio">Audio</string>
+    <string name="po_aspect">Formato</string>
+    <string name="po_speed">Velocidad</string>
+    <string name="po_sleep">Apagado</string>
+    <string name="po_record">Grabar</string>
+    <string name="po_external">Reproductor externo</string>
+    <string name="po_play_on_tv">Reproducir en el televisor</string>
+    <string name="po_search_subs">Buscar subtítulos</string>
+    <string name="po_no_audio">Aún no se han detectado pistas de audio.</string>
+    <string name="po_track_n">Pista %1$d</string>
+    <string name="po_loading">Cargando…</string>
+    <string name="po_load_external">Cargar archivo externo…</string>
+    <string name="po_search_online">Buscar en línea…</string>
+    <string name="po_no_title">No hay título disponible</string>
+    <string name="po_no_subs_found">No se encontraron subtítulos</string>
+    <string name="po_search_failed">La búsqueda falló</string>
+    <string name="po_searching_q">Buscando «%1$s»…</string>
+    <string name="po_downloading">Descargando…</string>
+    <string name="po_download_failed">Error en la descarga</string>
+    <string name="po_end_of_programme">Fin del programa</string>
+    <string name="po_nothing_record">Nada en reproducción — inicia una emisión para grabarla.</string>
+    <string name="po_stop_recording">Detener la grabación</string>
+    <string name="po_record_channel">Grabar este canal</string>
+    <string name="po_nothing_favorite">Nada en reproducción — inicia una emisión para añadirla a favoritos.</string>
+    <string name="po_nothing_handoff">Nada en reproducción — inicia una emisión para transferirla.</string>
+    <string name="po_choose_player">Elegir otro reproductor…</string>
+    <string name="po_nothing_send_tv">Nada en reproducción — inicia una emisión para enviarla a tu televisor.</string>
+    <string name="po_paired">Emparejado: %1$s</string>
+    <string name="po_enter_pairing_code">Introduce el código de emparejamiento de tu televisor en Ajustes, en Red.</string>
+    <string name="po_playing_on_tv">Reproduciendo en tu televisor</string>
+    <string name="po_tv_unreachable">No se pudo contactar con el televisor en %1$s (%2$s)</string>
+    <string name="po_searching_tv">Buscando tu televisor… abre YancoTV en él, o indica su dirección en Ajustes, en Red.</string>
+    <string name="po_cast_chromecast">Enviar a Chromecast</string>
+
+    <!-- MK.31.12 batch O (cont.) — track name fallback. -->
+
+    <!-- MK.31.12 batch O (cont.) — sleep timer labels. -->
+    <string name="po_minutes">%1$d minutos</string>
+
+    <!-- MK.31.12 batch O (cont.) — panel toasts and handoff messages. -->
+    <string name="po_recording_started">Grabación iniciada — abre Grabaciones para gestionarla.</string>
+    <string name="po_remove_favorite">Quitar de favoritos</string>
+    <string name="po_add_favorite">Añadir a favoritos</string>
+    <string name="po_tv_refused">El televisor rechazó la petición (%1$s)</string>
 </resources>

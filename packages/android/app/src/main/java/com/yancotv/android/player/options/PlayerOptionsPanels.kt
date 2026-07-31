@@ -59,6 +59,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import com.yancotv.android.R
 import com.yancotv.android.player.ExternalPlayer
 import com.yancotv.android.player.PlaybackController
 import com.yancotv.android.player.SleepTimerOption
@@ -215,17 +216,18 @@ private fun PanelHeader(label: String) {
     )
 }
 
+@Composable
 private fun labelFor(c: PlayerOptionCategory): String = when (c) {
-    PlayerOptionCategory.AUDIO -> "Audio"
-    PlayerOptionCategory.SUBTITLES -> "Subtitles"
-    PlayerOptionCategory.ASPECT -> "Aspect"
-    PlayerOptionCategory.SPEED -> "Speed"
-    PlayerOptionCategory.SLEEP -> "Sleep"
-    PlayerOptionCategory.RECORD -> "Record"
-    PlayerOptionCategory.FAVORITES -> "Favorites"
-    PlayerOptionCategory.EXTERNAL -> "External player"
-    PlayerOptionCategory.PLAY_ON_TV -> "Play on TV"
-    PlayerOptionCategory.SUBTITLE_SEARCH -> "Search subtitles"
+    PlayerOptionCategory.AUDIO -> stringResource(R.string.po_audio)
+    PlayerOptionCategory.SUBTITLES -> stringResource(R.string.cf_subtitles)
+    PlayerOptionCategory.ASPECT -> stringResource(R.string.po_aspect)
+    PlayerOptionCategory.SPEED -> stringResource(R.string.po_speed)
+    PlayerOptionCategory.SLEEP -> stringResource(R.string.po_sleep)
+    PlayerOptionCategory.RECORD -> stringResource(R.string.po_record)
+    PlayerOptionCategory.FAVORITES -> stringResource(R.string.cat_favorites)
+    PlayerOptionCategory.EXTERNAL -> stringResource(R.string.po_external)
+    PlayerOptionCategory.PLAY_ON_TV -> stringResource(R.string.po_play_on_tv)
+    PlayerOptionCategory.SUBTITLE_SEARCH -> stringResource(R.string.po_search_subs)
 }
 
 // ───── Audio ─────
@@ -240,7 +242,7 @@ private fun AudioPanelContent(controller: PlaybackController, prefs: AppPreferen
         if (tracks.isNotEmpty()) firstRowAnchor.awaitAndRequest()
     }
     if (tracks.isEmpty()) {
-        EmptyLine("No audio tracks reported yet.")
+        EmptyLine(stringResource(R.string.po_no_audio))
         return
     }
     tracks.forEachIndexed { idx, t ->
@@ -264,12 +266,14 @@ private data class AudioTrack(val group: Tracks.Group, val trackIndex: Int, val 
 @UnstableApi
 @Composable
 private fun rememberAudioTracks(player: Player): List<AudioTrack> {
-    var t by remember { mutableStateOf(readAudioTracks(player)) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val fallback: (Int) -> String = remember(ctx) { { n -> ctx.getString(R.string.po_track_n, n) } }
+    var t by remember { mutableStateOf(readAudioTracks(player, fallback)) }
     DisposableEffect(player) {
         val l =
             object : Player.Listener {
                 override fun onTracksChanged(tracks: Tracks) {
-                    t = readAudioTracks(player)
+                    t = readAudioTracks(player, fallback)
                 }
             }
         player.addListener(l)
@@ -278,8 +282,21 @@ private fun rememberAudioTracks(player: Player): List<AudioTrack> {
     return t
 }
 
+/**
+ * MK.31.12 — [fallbackName] names a track that reports neither a label nor a
+ * language. It is a parameter rather than a `stringResource` call because this
+ * runs from `remember {}` and from an `onTracksChanged` listener, neither of
+ * which is composable scope.
+ *
+ * The default is English on purpose: the public `cycleAudioTrack` /
+ * `cycleTextTrack` entry points are called from PlayerActivity's key handler
+ * and have no Context to resolve with, and threading one through them for a
+ * fallback that only appears on an unnamed, language-less track is not worth
+ * the API churn. The panels — where the user actually reads a track list —
+ * pass the localized version.
+ */
 @UnstableApi
-private fun readAudioTracks(player: Player): List<AudioTrack> {
+private fun readAudioTracks(player: Player, fallbackName: (Int) -> String = { "Track $it" }): List<AudioTrack> {
     val out = mutableListOf<AudioTrack>()
     for (group in player.currentTracks.groups) {
         if (group.type != C.TRACK_TYPE_AUDIO) continue
@@ -292,7 +309,7 @@ private fun readAudioTracks(player: Player): List<AudioTrack> {
                 fmt.label?.takeIf { it.isNotBlank() }
                     ?: lang?.let { Locale(it).getDisplayLanguage(Locale.getDefault()) }
                     ?: codec
-                    ?: "Track ${out.size + 1}"
+                    ?: fallbackName(out.size + 1)
             out +=
                 AudioTrack(
                     group = group,
@@ -376,7 +393,7 @@ private fun SubtitlesPanelContent(
     val externalPending = external != null && tracks.none { it.selected }
     val offSelected = disabled || (tracks.none { it.selected } && !externalPending)
     OptionRow(
-        label = "Off",
+        label = stringResource(R.string.ps_off),
         selected = offSelected,
         focusAnchor = firstRowAnchor,
         onPick = {
@@ -401,7 +418,7 @@ private fun SubtitlesPanelContent(
     if (pendingExternal != null) {
         OptionRow(
             label = pendingExternal.label,
-            detail = "Loading…",
+            detail = stringResource(R.string.po_loading),
             selected = true,
             onPick = onPickOption,
         )
@@ -420,7 +437,7 @@ private fun SubtitlesPanelContent(
         )
     }
     OptionRow(
-        label = "Load external file…",
+        label = stringResource(R.string.po_load_external),
         selected = false,
         onPick = {
             onPickExternal()
@@ -429,7 +446,7 @@ private fun SubtitlesPanelContent(
     )
     Box(modifier = Modifier.bringIntoViewRequester(searchRowBringIntoView)) {
         OptionRow(
-            label = "Search online…",
+            label = stringResource(R.string.po_search_online),
             selected = false,
             focusAnchor = searchRowAnchor,
             onPick = { state.openPanel(PlayerOptionCategory.SUBTITLE_SEARCH) },
@@ -446,12 +463,14 @@ private fun rememberTextTracks(player: Player): List<TextTrack> {
     // stands a new one up. Unkeyed, the seed value survived that swap and the
     // panel showed the OLD player's tracks until the new one happened to emit
     // onTracksChanged — which it may already have done before this composed.
-    var t by remember(player) { mutableStateOf(readTextTracks(player)) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val fallback: (Int) -> String = remember(ctx) { { n -> ctx.getString(R.string.po_track_n, n) } }
+    var t by remember(player) { mutableStateOf(readTextTracks(player, fallback)) }
     DisposableEffect(player) {
         val l =
             object : Player.Listener {
                 override fun onTracksChanged(tracks: Tracks) {
-                    t = readTextTracks(player)
+                    t = readTextTracks(player, fallback)
                 }
             }
         player.addListener(l)
@@ -480,8 +499,9 @@ private fun rememberTextDisabled(player: Player): Boolean {
     return d
 }
 
+/** See [readAudioTracks] for why [fallbackName] is a parameter. */
 @UnstableApi
-private fun readTextTracks(player: Player): List<TextTrack> {
+private fun readTextTracks(player: Player, fallbackName: (Int) -> String = { "Track $it" }): List<TextTrack> {
     val out = mutableListOf<TextTrack>()
     for (group in player.currentTracks.groups) {
         if (group.type != C.TRACK_TYPE_TEXT) continue
@@ -492,7 +512,7 @@ private fun readTextTracks(player: Player): List<TextTrack> {
             val name =
                 fmt.label?.takeIf { it.isNotBlank() }
                     ?: lang?.let { Locale(it).getDisplayLanguage(Locale.getDefault()) }
-                    ?: "Track ${out.size + 1}"
+                    ?: fallbackName(out.size + 1)
             out +=
                 TextTrack(
                     group = group,
@@ -525,6 +545,9 @@ private fun applyTextTrack(player: Player, track: TextTrack) {
 @UnstableApi
 @Composable
 private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
+    // MK.31.12 — the search coroutine below assigns error text, and a coroutine
+    // is not composable scope, so those resolve through a Context.
+    val subCtx = androidx.compose.ui.platform.LocalContext.current
     val client: OpenSubtitlesClient = org.koin.compose.koinInject()
     val http: OkHttpClient = org.koin.compose.koinInject()
     val scope = rememberCoroutineScope()
@@ -543,7 +566,7 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
         val bundle = q
         if (bundle == null || bundle.query.isBlank()) {
             searching = false
-            error = "No title available"
+            error = subCtx.getString(R.string.po_no_title)
             return@LaunchedEffect
         }
         searching = true
@@ -584,9 +607,9 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
                     )
                 }
             results = found
-            if (found.isEmpty()) error = "No subtitles found"
+            if (found.isEmpty()) error = subCtx.getString(R.string.po_no_subs_found)
         } catch (e: Exception) {
-            error = e.message ?: "Search failed"
+            error = e.message ?: subCtx.getString(R.string.po_search_failed)
         }
         searching = false
     }
@@ -602,7 +625,7 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
 
     if (searching) {
         OptionRow(
-            label = "Searching \"${q?.query.orEmpty()}\"…",
+            label = stringResource(R.string.po_searching_q, q?.query.orEmpty()),
             selected = false,
             focusAnchor = firstRowAnchor,
             onPick = {},
@@ -633,7 +656,7 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
             // into the label with an em dash, which pushed the language (the
             // only part most picks turn on) off the end of a 380dp panel.
             label = label,
-            detail = if (busy) "Downloading…" else detail,
+            detail = if (busy) stringResource(R.string.po_downloading) else detail,
             selected = false,
             focusAnchor = if (idx == 0) firstRowAnchor else null,
             onPick = {
@@ -649,7 +672,7 @@ private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOpt
                         controller.applyExternalSubtitle(uri, mime, label)
                         onPickOption()
                     } catch (e: Exception) {
-                        error = e.message ?: "Download failed"
+                        error = e.message ?: subCtx.getString(R.string.po_download_failed)
                         downloading = null
                     }
                 }
@@ -761,7 +784,7 @@ private fun SleepPanelContent(controller: PlaybackController, onPickOption: () -
     val activeOption = (sleep as? SleepTimerState.Active)?.option
 
     OptionRow(
-        label = "Off",
+        label = stringResource(R.string.ps_off),
         selected = !isActive,
         focusAnchor = firstRowAnchor,
         onPick = {
@@ -782,12 +805,16 @@ private fun SleepPanelContent(controller: PlaybackController, onPickOption: () -
     }
 }
 
+// MK.31.12 — @Composable; only caller is the sleep-timer option row. The
+// minute values go through one format string rather than four literals, so
+// Arabic gets its plural agreement from one place.
+@Composable
 private fun sleepLabel(opt: SleepTimerOption): String = when (opt) {
-    SleepTimerOption.MIN_15 -> "15 minutes"
-    SleepTimerOption.MIN_30 -> "30 minutes"
-    SleepTimerOption.MIN_45 -> "45 minutes"
-    SleepTimerOption.MIN_60 -> "60 minutes"
-    SleepTimerOption.END_OF_PROGRAM -> "End of programme"
+    SleepTimerOption.MIN_15 -> stringResource(R.string.po_minutes, 15)
+    SleepTimerOption.MIN_30 -> stringResource(R.string.po_minutes, 30)
+    SleepTimerOption.MIN_45 -> stringResource(R.string.po_minutes, 45)
+    SleepTimerOption.MIN_60 -> stringResource(R.string.po_minutes, 60)
+    SleepTimerOption.END_OF_PROGRAM -> stringResource(R.string.po_end_of_programme)
 }
 
 // ───── Audio / Subs cycle helpers ─────
@@ -999,14 +1026,14 @@ private fun RecordPanelContent(controller: PlaybackController, onPickOption: () 
     }
     val item = currentItem
     if (item == null) {
-        EmptyLine("Nothing playing — start a stream to record it.")
+        EmptyLine(stringResource(R.string.po_nothing_record))
         return
     }
     val displayTitle = item.cleanTitle?.takeIf { it.isNotBlank() } ?: item.title
 
     if (active != null) {
         OptionRow(
-            label = "Stop recording",
+            label = stringResource(R.string.po_stop_recording),
             selected = true,
             focusAnchor = stopAnchor,
             onPick = {
@@ -1025,7 +1052,7 @@ private fun RecordPanelContent(controller: PlaybackController, onPickOption: () 
 
     val format = detectRecordingFormat(item.streamUrl)
     OptionRow(
-        label = "Record this channel",
+        label = stringResource(R.string.po_record_channel),
         selected = false,
         focusAnchor = recordAnchor,
         onPick = {
@@ -1043,7 +1070,7 @@ private fun RecordPanelContent(controller: PlaybackController, onPickOption: () 
                 )
                 android.widget.Toast.makeText(
                     context,
-                    "Recording started — open Recordings to manage.",
+                    context.getString(R.string.po_recording_started),
                     android.widget.Toast.LENGTH_SHORT,
                 ).show()
                 onPickOption()
@@ -1085,12 +1112,12 @@ private fun FavoritesPanelContent(controller: PlaybackController, onPickOption: 
     }
 
     if (favoriteId == null) {
-        EmptyLine("Nothing playing — start a stream to favorite it.")
+        EmptyLine(stringResource(R.string.po_nothing_favorite))
         return
     }
 
     OptionRow(
-        label = if (isFav) "Remove from favorites" else "Add to favorites",
+        label = if (isFav) stringResource(R.string.po_remove_favorite) else stringResource(R.string.po_add_favorite),
         selected = isFav,
         focusAnchor = firstRowAnchor,
         onPick = {
@@ -1115,7 +1142,7 @@ private fun ExternalPanelContent(controller: PlaybackController, onPickOption: (
         if (streamUrl != null) firstRowAnchor.awaitAndRequest()
     }
     if (streamUrl == null) {
-        EmptyLine("Nothing playing — start a stream to hand off.")
+        EmptyLine(stringResource(R.string.po_nothing_handoff))
         return
     }
 
@@ -1141,7 +1168,7 @@ private fun ExternalPanelContent(controller: PlaybackController, onPickOption: (
         )
     }
     OptionRow(
-        label = "Choose another player…",
+        label = stringResource(R.string.po_choose_player),
         selected = false,
         focusAnchor = if (installed.isEmpty()) firstRowAnchor else null,
         onPick = {
@@ -1192,7 +1219,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
         if (playable != null) firstRowAnchor.awaitAndRequest()
     }
     if (playable == null) {
-        EmptyLine("Nothing playing — start a stream to send to your TV.")
+        EmptyLine(stringResource(R.string.po_nothing_send_tv))
         return
     }
 
@@ -1208,7 +1235,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
             discovered.forEach { add(TvTarget(it.name, it.host, it.port)) }
             val manual = pairedHost
             if (manual != null && none { it.host == manual }) {
-                add(TvTarget("Paired: $manual", manual, com.yancotv.android.handoff.HandoffServer.DEFAULT_PORT))
+                add(TvTarget(context.getString(R.string.po_paired, manual), manual, com.yancotv.android.handoff.HandoffServer.DEFAULT_PORT))
             }
         }
 
@@ -1227,7 +1254,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
                     android.widget.Toast
                         .makeText(
                             context,
-                            "Enter your TV's pairing code in Settings, under Network.",
+                            context.getString(R.string.po_enter_pairing_code),
                             android.widget.Toast.LENGTH_LONG,
                         ).show()
                     onDismissAll()
@@ -1251,11 +1278,11 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
             val message =
                 when (result) {
                     is com.yancotv.shared.handoff.HandoffSendResult.Accepted ->
-                        "Playing on your TV"
+                        context.getString(R.string.po_playing_on_tv)
                     is com.yancotv.shared.handoff.HandoffSendResult.Rejected ->
-                        "TV refused the request (${result.reason})"
+                        context.getString(R.string.po_tv_refused, result.reason)
                     is com.yancotv.shared.handoff.HandoffSendResult.Unreachable ->
-                        "Couldn't reach the TV at $host (${result.message})"
+                        context.getString(R.string.po_tv_unreachable, host, result.message)
                 }
             withContext(Dispatchers.Main) {
                 android.widget.Toast
@@ -1273,7 +1300,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
 
     if (targets.isEmpty() && !castAvailable) {
         EmptyLine(
-            "Searching for your TV… open YancoTV on it, or set its address in Settings, under Network.",
+            stringResource(R.string.po_searching_tv),
         )
         return
     }
@@ -1292,7 +1319,7 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
     // default receiver plays the VOD subset; failures surface on the TV.
     if (castAvailable) {
         OptionRow(
-            label = "Cast to Chromecast",
+            label = stringResource(R.string.po_cast_chromecast),
             selected = false,
             focusAnchor = if (targets.isEmpty()) firstRowAnchor else null,
             onPick = {

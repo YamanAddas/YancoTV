@@ -614,4 +614,51 @@
     <string name="common_clear">Effacer</string>
 
     <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
+
+    <!-- MK.31.12 batch O — player options menu + panels. -->
+    <string name="po_header">OPTIONS  ·  ◂ ▸ pour changer</string>
+    <string name="po_audio">Audio</string>
+    <string name="po_aspect">Format</string>
+    <string name="po_speed">Vitesse</string>
+    <string name="po_sleep">Veille</string>
+    <string name="po_record">Enregistrer</string>
+    <string name="po_external">Lecteur externe</string>
+    <string name="po_play_on_tv">Lire sur le téléviseur</string>
+    <string name="po_search_subs">Rechercher des sous-titres</string>
+    <string name="po_no_audio">Aucune piste audio signalée pour le moment.</string>
+    <string name="po_track_n">Piste %1$d</string>
+    <string name="po_loading">Chargement…</string>
+    <string name="po_load_external">Charger un fichier externe…</string>
+    <string name="po_search_online">Rechercher en ligne…</string>
+    <string name="po_no_title">Aucun titre disponible</string>
+    <string name="po_no_subs_found">Aucun sous-titre trouvé</string>
+    <string name="po_search_failed">Recherche échouée</string>
+    <string name="po_searching_q">Recherche de « %1$s »…</string>
+    <string name="po_downloading">Téléchargement…</string>
+    <string name="po_download_failed">Téléchargement échoué</string>
+    <string name="po_end_of_programme">Fin du programme</string>
+    <string name="po_nothing_record">Rien en lecture — démarrez un flux pour l\'enregistrer.</string>
+    <string name="po_stop_recording">Arrêter l\'enregistrement</string>
+    <string name="po_record_channel">Enregistrer cette chaîne</string>
+    <string name="po_nothing_favorite">Rien en lecture — démarrez un flux pour l\'ajouter aux favoris.</string>
+    <string name="po_nothing_handoff">Rien en lecture — démarrez un flux pour le transférer.</string>
+    <string name="po_choose_player">Choisir un autre lecteur…</string>
+    <string name="po_nothing_send_tv">Rien en lecture — démarrez un flux pour l\'envoyer vers votre téléviseur.</string>
+    <string name="po_paired">Associé : %1$s</string>
+    <string name="po_enter_pairing_code">Saisissez le code d\'association de votre téléviseur dans Paramètres, sous Réseau.</string>
+    <string name="po_playing_on_tv">Lecture sur votre téléviseur</string>
+    <string name="po_tv_unreachable">Impossible de joindre le téléviseur à %1$s (%2$s)</string>
+    <string name="po_searching_tv">Recherche de votre téléviseur… ouvrez YancoTV dessus, ou indiquez son adresse dans Paramètres, sous Réseau.</string>
+    <string name="po_cast_chromecast">Diffuser vers Chromecast</string>
+
+    <!-- MK.31.12 batch O (cont.) — track name fallback. -->
+
+    <!-- MK.31.12 batch O (cont.) — sleep timer labels. -->
+    <string name="po_minutes">%1$d minutes</string>
+
+    <!-- MK.31.12 batch O (cont.) — panel toasts and handoff messages. -->
+    <string name="po_recording_started">Enregistrement démarré — ouvrez Enregistrements pour le gérer.</string>
+    <string name="po_remove_favorite">Retirer des favoris</string>
+    <string name="po_add_favorite">Ajouter aux favoris</string>
+    <string name="po_tv_refused">Le téléviseur a refusé la requête (%1$s)</string>
 </resources>

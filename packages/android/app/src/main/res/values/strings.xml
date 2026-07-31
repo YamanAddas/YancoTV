@@ -637,4 +637,51 @@
     <string name="common_clear">Clear</string>
 
     <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
+
+    <!-- MK.31.12 batch O — player options menu + panels. -->
+    <string name="po_header">OPTIONS  ·  ◂ ▸ to switch</string>
+    <string name="po_audio">Audio</string>
+    <string name="po_aspect">Aspect</string>
+    <string name="po_speed">Speed</string>
+    <string name="po_sleep">Sleep</string>
+    <string name="po_record">Record</string>
+    <string name="po_external">External player</string>
+    <string name="po_play_on_tv">Play on TV</string>
+    <string name="po_search_subs">Search subtitles</string>
+    <string name="po_no_audio">No audio tracks reported yet.</string>
+    <string name="po_track_n">Track %1$d</string>
+    <string name="po_loading">Loading…</string>
+    <string name="po_load_external">Load external file…</string>
+    <string name="po_search_online">Search online…</string>
+    <string name="po_no_title">No title available</string>
+    <string name="po_no_subs_found">No subtitles found</string>
+    <string name="po_search_failed">Search failed</string>
+    <string name="po_searching_q">Searching \"%1$s\"…</string>
+    <string name="po_downloading">Downloading…</string>
+    <string name="po_download_failed">Download failed</string>
+    <string name="po_end_of_programme">End of programme</string>
+    <string name="po_nothing_record">Nothing playing — start a stream to record it.</string>
+    <string name="po_stop_recording">Stop recording</string>
+    <string name="po_record_channel">Record this channel</string>
+    <string name="po_nothing_favorite">Nothing playing — start a stream to favorite it.</string>
+    <string name="po_nothing_handoff">Nothing playing — start a stream to hand off.</string>
+    <string name="po_choose_player">Choose another player…</string>
+    <string name="po_nothing_send_tv">Nothing playing — start a stream to send to your TV.</string>
+    <string name="po_paired">Paired: %1$s</string>
+    <string name="po_enter_pairing_code">Enter your TV\'s pairing code in Settings, under Network.</string>
+    <string name="po_playing_on_tv">Playing on your TV</string>
+    <string name="po_tv_unreachable">Couldn\'t reach the TV at %1$s (%2$s)</string>
+    <string name="po_searching_tv">Searching for your TV… open YancoTV on it, or set its address in Settings, under Network.</string>
+    <string name="po_cast_chromecast">Cast to Chromecast</string>
+
+    <!-- MK.31.12 batch O (cont.) — track name fallback. -->
+
+    <!-- MK.31.12 batch O (cont.) — sleep timer labels. -->
+    <string name="po_minutes">%1$d minutes</string>
+
+    <!-- MK.31.12 batch O (cont.) — panel toasts and handoff messages. -->
+    <string name="po_recording_started">Recording started — open Recordings to manage.</string>
+    <string name="po_remove_favorite">Remove from favorites</string>
+    <string name="po_add_favorite">Add to favorites</string>
+    <string name="po_tv_refused">TV refused the request (%1$s)</string>
 </resources>

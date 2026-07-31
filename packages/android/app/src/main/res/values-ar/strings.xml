@@ -614,4 +614,51 @@
     <string name="common_clear">مسح</string>
 
     <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
+
+    <!-- MK.31.12 batch O — player options menu + panels. -->
+    <string name="po_header">الخيارات  ·  ◂ ▸ للتبديل</string>
+    <string name="po_audio">الصوت</string>
+    <string name="po_aspect">نسبة العرض</string>
+    <string name="po_speed">السرعة</string>
+    <string name="po_sleep">مؤقت النوم</string>
+    <string name="po_record">تسجيل</string>
+    <string name="po_external">مشغّل خارجي</string>
+    <string name="po_play_on_tv">التشغيل على التلفاز</string>
+    <string name="po_search_subs">البحث عن ترجمات</string>
+    <string name="po_no_audio">لم يتم الإبلاغ عن مسارات صوت بعد.</string>
+    <string name="po_track_n">المسار %1$d</string>
+    <string name="po_loading">جارٍ التحميل…</string>
+    <string name="po_load_external">تحميل ملف خارجي…</string>
+    <string name="po_search_online">البحث عبر الإنترنت…</string>
+    <string name="po_no_title">لا يوجد عنوان متاح</string>
+    <string name="po_no_subs_found">لم يتم العثور على ترجمات</string>
+    <string name="po_search_failed">فشل البحث</string>
+    <string name="po_searching_q">جارٍ البحث عن \"%1$s\"…</string>
+    <string name="po_downloading">جارٍ التنزيل…</string>
+    <string name="po_download_failed">فشل التنزيل</string>
+    <string name="po_end_of_programme">نهاية البرنامج</string>
+    <string name="po_nothing_record">لا شيء قيد التشغيل — ابدأ بثاً لتسجيله.</string>
+    <string name="po_stop_recording">إيقاف التسجيل</string>
+    <string name="po_record_channel">تسجيل هذه القناة</string>
+    <string name="po_nothing_favorite">لا شيء قيد التشغيل — ابدأ بثاً لإضافته إلى المفضلة.</string>
+    <string name="po_nothing_handoff">لا شيء قيد التشغيل — ابدأ بثاً لتحويله.</string>
+    <string name="po_choose_player">اختيار مشغّل آخر…</string>
+    <string name="po_nothing_send_tv">لا شيء قيد التشغيل — ابدأ بثاً لإرساله إلى تلفازك.</string>
+    <string name="po_paired">مقترن: %1$s</string>
+    <string name="po_enter_pairing_code">أدخل رمز إقران تلفازك في الإعدادات، ضمن الشبكة.</string>
+    <string name="po_playing_on_tv">يُشغَّل على تلفازك</string>
+    <string name="po_tv_unreachable">تعذّر الوصول إلى التلفاز على %1$s (%2$s)</string>
+    <string name="po_searching_tv">جارٍ البحث عن تلفازك… افتح YancoTV عليه، أو حدّد عنوانه في الإعدادات، ضمن الشبكة.</string>
+    <string name="po_cast_chromecast">البث إلى Chromecast</string>
+
+    <!-- MK.31.12 batch O (cont.) — track name fallback. -->
+
+    <!-- MK.31.12 batch O (cont.) — sleep timer labels. -->
+    <string name="po_minutes">%1$d دقيقة</string>
+
+    <!-- MK.31.12 batch O (cont.) — panel toasts and handoff messages. -->
+    <string name="po_recording_started">بدأ التسجيل — افتح التسجيلات للإدارة.</string>
+    <string name="po_remove_favorite">إزالة من المفضلة</string>
+    <string name="po_add_favorite">إضافة إلى المفضلة</string>
+    <string name="po_tv_refused">رفض التلفاز الطلب (%1$s)</string>
 </resources>
