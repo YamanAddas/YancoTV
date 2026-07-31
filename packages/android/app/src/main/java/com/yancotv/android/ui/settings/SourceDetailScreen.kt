@@ -285,7 +285,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                     nameField = it
                     dirty = true
                 },
-                hint = "e.g. \"Living-room TV\"",
+                hint = stringResource(R.string.sd_name_hint),
             )
             if (current.type != SourceType.M3U_FILE) {
                 SettingsRowSpacer()
@@ -318,7 +318,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
             if (current.type == SourceType.XTREAM) {
                 SettingsRowSpacer()
                 SettingsClickToEditField(
-                    label = "Username",
+                    label = stringResource(R.string.add_username),
                     value = usernameField,
                     onValueChange = {
                         usernameField = it
@@ -329,7 +329,7 @@ fun SourceDetailScreen(sourceId: String, repo: SourceRepository, coordinator: So
                 )
                 SettingsRowSpacer()
                 SettingsClickToEditField(
-                    label = "Password",
+                    label = stringResource(R.string.add_password),
                     description = stringResource(R.string.sd_password_desc),
                     value = passwordField,
                     onValueChange = {

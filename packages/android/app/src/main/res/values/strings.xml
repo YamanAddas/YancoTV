@@ -427,4 +427,66 @@
     <string name="bk_picked_latest">Picked latest: %1$s</string>
     <string name="bk_restoring">Restoring…</string>
     <string name="bk_selected">Selected: %1$s</string>
+
+    <!-- MK.31.8 batch J — settings search index. -->
+    <string name="si_pin" translatable="false">PIN</string>
+    <string name="si_lock_channel">Lock channel</string>
+    <string name="si_storage_folder">Storage folder</string>
+    <string name="si_storage_cap">Storage cap</string>
+    <string name="si_paired_tv">Paired TV</string>
+    <string name="si_hide_group">Hide group</string>
+    <string name="si_refresh_epg">Refresh EPG</string>
+    <string name="si_export_backup">Export backup</string>
+    <string name="si_import_backup">Import backup</string>
+    <string name="sih_open_on">Startup destination — Home, Live TV, or Last used</string>
+    <string name="sih_channel_numbers">Channel position number before title</string>
+    <string name="sih_number_format">Padding for channel numbers (1 vs 001)</string>
+    <string name="sih_smart_grouping">Bucket categories by language / region prefix</string>
+    <string name="sih_theme">Dark / light palette</string>
+    <string name="sih_accent">Highlight tint across the app</string>
+    <string name="sih_font_scale">Text size multiplier</string>
+    <string name="sih_resize">How video fits the screen — fit / fill / zoom</string>
+    <string name="sih_buffer">Network buffering aggressiveness</string>
+    <string name="sih_decoder_fallback">Drop to software decoder on hardware failure</string>
+    <string name="sih_autoplay">Continue to the next episode automatically</string>
+    <string name="sih_audio_lang">Default audio track when stream offers multiple</string>
+    <string name="sih_subtitle_lang">Default subtitle track</string>
+    <string name="sih_default_player">External player override (VLC, MX Player)</string>
+    <string name="sih_pin">Set or change the parental PIN</string>
+    <string name="sih_hide_adult">Filter adult-flagged channels / movies / series</string>
+    <string name="sih_require_pin">Gate Settings behind the PIN</string>
+    <string name="sih_hidden_channels">Manage hidden / unlocked channels</string>
+    <string name="sih_lock_channel">Channel-level lock</string>
+    <string name="sih_storage_folder">Where recordings are saved</string>
+    <string name="sih_public_folder">Save to the device\'s public Movies / Videos folder</string>
+    <string name="sih_custom_folder">Pick a specific folder for recordings</string>
+    <string name="sih_storage_cap">Maximum disk space for recordings</string>
+    <string name="sih_ua">HTTP User-Agent header — System / VLC / custom</string>
+    <string name="sih_connect_timeout">Maximum seconds to wait for TCP connect</string>
+    <string name="sih_read_timeout">Maximum seconds between bytes during playback</string>
+    <string name="sih_paired_tv">LAN handoff — send playback to another YancoTV</string>
+    <string name="sih_pairing_code">6-digit pairing code for the LAN handoff endpoint</string>
+    <string name="sih_pinned">Reorder and pin provider categories</string>
+    <string name="sih_hide_group">Hide a provider category from rails</string>
+    <string name="sih_override_epg">Use a custom XMLTV URL instead of the provider\'s</string>
+    <string name="sih_days_back">How many days of past EPG to keep</string>
+    <string name="sih_days_forward">How many days of future EPG to keep</string>
+    <string name="sih_visible_window">Hours shown in the guide grid</string>
+    <string name="sih_source_priority">Order EPG sources contend for the same channel</string>
+    <string name="sih_refresh_epg">Re-fetch the EPG now</string>
+    <string name="sih_export_backup">Save settings, sources, favorites, history to a file</string>
+    <string name="sih_import_backup">Restore from a backup file</string>
+    <string name="sih_encrypt">AES-encrypt the backup with a password</string>
+    <string name="sih_shortcuts">D-pad and remote key reference</string>
+    <string name="sih_auto_check">Background update check</string>
+    <string name="sih_crash_reports">Sentry crash reporting opt-in</string>
+    <string name="sih_privacy_policy">Open the privacy policy</string>
+    <string name="sih_terms">Open the terms of service</string>
+    <string name="sih_build">App version and build number</string>
+    <string name="sih_device">Hardware diagnostic information</string>
+    <string name="sih_add_source">Add a new IPTV provider (M3U / Xtream / Stalker)</string>
+    <string name="si_result_desc">%1$s in %2$s</string>
+
+    <!-- MK.31.8 batch J (cont.) — stragglers. -->
+    <string name="sd_name_hint">e.g. "Living-room TV"</string>
 </resources>

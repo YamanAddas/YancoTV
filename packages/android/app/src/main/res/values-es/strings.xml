@@ -407,4 +407,65 @@
     <string name="bk_picked_latest">Más reciente seleccionada: %1$s</string>
     <string name="bk_restoring">Restaurando…</string>
     <string name="bk_selected">Seleccionado: %1$s</string>
+
+    <!-- MK.31.8 batch J — settings search index. -->
+    <string name="si_lock_channel">Bloquear canal</string>
+    <string name="si_storage_folder">Carpeta de almacenamiento</string>
+    <string name="si_storage_cap">Límite de almacenamiento</string>
+    <string name="si_paired_tv">Televisor emparejado</string>
+    <string name="si_hide_group">Ocultar grupo</string>
+    <string name="si_refresh_epg">Actualizar la guía</string>
+    <string name="si_export_backup">Exportar copia</string>
+    <string name="si_import_backup">Importar copia</string>
+    <string name="sih_open_on">Pantalla de inicio — Inicio, TV en directo o Último usado</string>
+    <string name="sih_channel_numbers">Número de posición del canal antes del título</string>
+    <string name="sih_number_format">Relleno de números de canal (1 o 001)</string>
+    <string name="sih_smart_grouping">Agrupar categorías por prefijo de idioma o región</string>
+    <string name="sih_theme">Paleta oscura / clara</string>
+    <string name="sih_accent">Tinte de resalte en la aplicación</string>
+    <string name="sih_font_scale">Multiplicador del tamaño del texto</string>
+    <string name="sih_resize">Cómo encaja el vídeo — ajustar / rellenar / zoom</string>
+    <string name="sih_buffer">Intensidad del búfer de red</string>
+    <string name="sih_decoder_fallback">Pasar al decodificador de software si falla el hardware</string>
+    <string name="sih_autoplay">Continuar automáticamente al siguiente episodio</string>
+    <string name="sih_audio_lang">Pista de audio predeterminada cuando hay varias</string>
+    <string name="sih_subtitle_lang">Pista de subtítulos predeterminada</string>
+    <string name="sih_default_player">Anulación con reproductor externo (VLC, MX Player)</string>
+    <string name="sih_pin">Establecer o cambiar el PIN parental</string>
+    <string name="sih_hide_adult">Filtrar canales, películas y series marcados para adultos</string>
+    <string name="sih_require_pin">Proteger los ajustes con el PIN</string>
+    <string name="sih_hidden_channels">Gestionar canales ocultos / desbloqueados</string>
+    <string name="sih_lock_channel">Bloqueo por canal</string>
+    <string name="sih_storage_folder">Dónde se guardan las grabaciones</string>
+    <string name="sih_public_folder">Guardar en la carpeta pública Películas / Vídeos</string>
+    <string name="sih_custom_folder">Elegir una carpeta concreta para las grabaciones</string>
+    <string name="sih_storage_cap">Espacio máximo en disco para grabaciones</string>
+    <string name="sih_ua">Encabezado HTTP User-Agent — Sistema / VLC / personalizado</string>
+    <string name="sih_connect_timeout">Segundos máximos de espera de la conexión TCP</string>
+    <string name="sih_read_timeout">Segundos máximos entre bytes durante la reproducción</string>
+    <string name="sih_paired_tv">Transferencia LAN — enviar la reproducción a otro YancoTV</string>
+    <string name="sih_pairing_code">Código de emparejamiento de 6 dígitos para la transferencia LAN</string>
+    <string name="sih_pinned">Reordenar y fijar las categorías del proveedor</string>
+    <string name="sih_hide_group">Ocultar una categoría del proveedor de los carruseles</string>
+    <string name="sih_override_epg">Usar una URL XMLTV propia en lugar de la del proveedor</string>
+    <string name="sih_days_back">Cuántos días de guía pasada conservar</string>
+    <string name="sih_days_forward">Cuántos días de guía futura conservar</string>
+    <string name="sih_visible_window">Horas mostradas en la cuadrícula de la guía</string>
+    <string name="sih_source_priority">Orden en que las fuentes de guía compiten por el mismo canal</string>
+    <string name="sih_refresh_epg">Volver a obtener la guía ahora</string>
+    <string name="sih_export_backup">Guardar ajustes, fuentes, favoritos e historial en un archivo</string>
+    <string name="sih_import_backup">Restaurar desde un archivo de copia</string>
+    <string name="sih_encrypt">Cifrar la copia con AES y una contraseña</string>
+    <string name="sih_shortcuts">Referencia de teclas del D-pad y el mando</string>
+    <string name="sih_auto_check">Comprobación de actualizaciones en segundo plano</string>
+    <string name="sih_crash_reports">Aceptación de informes de errores de Sentry</string>
+    <string name="sih_privacy_policy">Abrir la política de privacidad</string>
+    <string name="sih_terms">Abrir los términos del servicio</string>
+    <string name="sih_build">Versión de la aplicación y número de compilación</string>
+    <string name="sih_device">Información de diagnóstico del hardware</string>
+    <string name="sih_add_source">Añadir un nuevo proveedor IPTV (M3U / Xtream / Stalker)</string>
+    <string name="si_result_desc">%1$s en %2$s</string>
+
+    <!-- MK.31.8 batch J (cont.) — stragglers. -->
+    <string name="sd_name_hint">p. ej. «TV del salón»</string>
 </resources>

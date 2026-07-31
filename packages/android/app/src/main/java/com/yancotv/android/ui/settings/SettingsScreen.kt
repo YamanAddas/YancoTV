@@ -230,9 +230,9 @@ private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
             // MK.31.3 — match against the LOCALIZED tab names, so an Arabic
             // user searching in Arabic finds the tab. The per-setting index
             // entries are still English; localizing those is MK.31.4.
-            val tabLabelOf = rememberTabLabelResolver()
-            val visibleTabs = remember(query, tabLabelOf) { searchTabs(query, tabLabelOf) }
-            val results = remember(query, tabLabelOf) { searchSettings(query, tabLabelOf) }
+            val resolve = rememberStringResolver()
+            val visibleTabs = remember(query, resolve) { searchTabs(query, resolve) }
+            val results = remember(query, resolve) { searchSettings(query, resolve) }
             Column(
                 modifier =
                 Modifier
@@ -487,9 +487,9 @@ private fun Sidebar(
         if (query.isNotBlank()) onQueryChange("") else onExit()
     }
 
-    val tabLabelOf = rememberTabLabelResolver()
-    val visibleTabs = remember(query, tabLabelOf) { searchTabs(query, tabLabelOf) }
-    val results = remember(query, tabLabelOf) { searchSettings(query, tabLabelOf) }
+    val resolve = rememberStringResolver()
+    val visibleTabs = remember(query, resolve) { searchTabs(query, resolve) }
+    val results = remember(query, resolve) { searchSettings(query, resolve) }
 
     Column(
         modifier =
@@ -719,7 +719,7 @@ private fun SearchResultsSection(results: List<SettingsSearchEntry>, onSelect: (
 private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
     // MK.31.3 — resolved here, not inside `semantics`: that lambda is not
     // composable, so stringResource can't be called from it.
-    val resultDescription = "${entry.label} in ${stringResource(entry.tab.labelRes)}"
+    val resultDescription = stringResource(R.string.si_result_desc, stringResource(entry.labelRes), stringResource(entry.tab.labelRes))
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val palette = LocalYancoPalette.current
@@ -760,7 +760,7 @@ private fun SearchResultRow(entry: SettingsSearchEntry, onClick: () -> Unit) {
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = entry.label,
+                text = stringResource(entry.labelRes),
                 color = palette.TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1293,7 +1293,7 @@ private fun HairlineDivider() {
  * in-app language choice, not the device one.
  */
 @Composable
-private fun rememberTabLabelResolver(): (SettingsTab) -> String {
+private fun rememberStringResolver(): (Int) -> String {
     val context = LocalContext.current
-    return remember(context) { { tab: SettingsTab -> context.getString(tab.labelRes) } }
+    return remember(context) { { id: Int -> context.getString(id) } }
 }

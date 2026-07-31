@@ -257,7 +257,7 @@ fun SettingsEpgTab(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         SettingsClickToEditField(
-                            label = "EPG URL",
+                            label = stringResource(R.string.epg_url),
                             value = globalUrlDraft,
                             onValueChange = { globalUrlDraft = it },
                             hint = "https://example.com/xmltv.xml",

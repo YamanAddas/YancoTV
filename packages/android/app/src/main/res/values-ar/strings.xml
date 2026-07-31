@@ -407,4 +407,65 @@
     <string name="bk_picked_latest">تم اختيار الأحدث: %1$s</string>
     <string name="bk_restoring">جارٍ الاستعادة…</string>
     <string name="bk_selected">المختار: %1$s</string>
+
+    <!-- MK.31.8 batch J — settings search index. -->
+    <string name="si_lock_channel">قفل القناة</string>
+    <string name="si_storage_folder">مجلد التخزين</string>
+    <string name="si_storage_cap">حد التخزين</string>
+    <string name="si_paired_tv">التلفاز المقترن</string>
+    <string name="si_hide_group">إخفاء مجموعة</string>
+    <string name="si_refresh_epg">تحديث الدليل</string>
+    <string name="si_export_backup">تصدير نسخة احتياطية</string>
+    <string name="si_import_backup">استيراد نسخة احتياطية</string>
+    <string name="sih_open_on">شاشة البدء — الرئيسية أو القنوات المباشرة أو آخر ما استُخدم</string>
+    <string name="sih_channel_numbers">رقم ترتيب القناة قبل العنوان</string>
+    <string name="sih_number_format">تصفير أرقام القنوات (1 مقابل 001)</string>
+    <string name="sih_smart_grouping">تجميع الفئات حسب بادئة اللغة أو المنطقة</string>
+    <string name="sih_theme">لوحة داكنة أو فاتحة</string>
+    <string name="sih_accent">لون التمييز في التطبيق</string>
+    <string name="sih_font_scale">مُضاعِف حجم النص</string>
+    <string name="sih_resize">كيف يلائم الفيديو الشاشة — ملاءمة أو تمديد أو تكبير</string>
+    <string name="sih_buffer">مدى قوة التخزين المؤقت للشبكة</string>
+    <string name="sih_decoder_fallback">التحويل إلى المفكك البرمجي عند فشل العتاد</string>
+    <string name="sih_autoplay">المتابعة إلى الحلقة التالية تلقائياً</string>
+    <string name="sih_audio_lang">مسار الصوت الافتراضي عند توفر عدة مسارات</string>
+    <string name="sih_subtitle_lang">مسار الترجمة الافتراضي</string>
+    <string name="sih_default_player">تجاوز بمشغّل خارجي (VLC أو MX Player)</string>
+    <string name="sih_pin">تعيين أو تغيير رمز الرقابة الأبوية</string>
+    <string name="sih_hide_adult">تصفية القنوات والأفلام والمسلسلات المصنَّفة للبالغين</string>
+    <string name="sih_require_pin">حماية الإعدادات برمز PIN</string>
+    <string name="sih_hidden_channels">إدارة القنوات المخفية والمفتوحة</string>
+    <string name="sih_lock_channel">قفل على مستوى القناة</string>
+    <string name="sih_storage_folder">مكان حفظ التسجيلات</string>
+    <string name="sih_public_folder">الحفظ في مجلد الأفلام أو الفيديو العام للجهاز</string>
+    <string name="sih_custom_folder">اختيار مجلد محدد للتسجيلات</string>
+    <string name="sih_storage_cap">أقصى مساحة قرص للتسجيلات</string>
+    <string name="sih_ua">ترويسة HTTP User-Agent — النظام أو VLC أو مخصص</string>
+    <string name="sih_connect_timeout">أقصى عدد ثوان لانتظار اتصال TCP</string>
+    <string name="sih_read_timeout">أقصى عدد ثوان بين البايتات أثناء التشغيل</string>
+    <string name="sih_paired_tv">التحويل عبر الشبكة المحلية — إرسال التشغيل إلى YancoTV آخر</string>
+    <string name="sih_pairing_code">رمز إقران من 6 أرقام لنقطة التحويل عبر الشبكة المحلية</string>
+    <string name="sih_pinned">إعادة ترتيب فئات المزوّد وتثبيتها</string>
+    <string name="sih_hide_group">إخفاء فئة من فئات المزوّد عن الأشرطة</string>
+    <string name="sih_override_epg">استخدام عنوان XMLTV مخصص بدلاً من عنوان المزوّد</string>
+    <string name="sih_days_back">عدد أيام الدليل السابقة التي تُحفظ</string>
+    <string name="sih_days_forward">عدد أيام الدليل القادمة التي تُحفظ</string>
+    <string name="sih_visible_window">عدد الساعات المعروضة في شبكة الدليل</string>
+    <string name="sih_source_priority">ترتيب تنافس مصادر الدليل على القناة نفسها</string>
+    <string name="sih_refresh_epg">إعادة جلب الدليل الآن</string>
+    <string name="sih_export_backup">حفظ الإعدادات والمصادر والمفضلة والسجل في ملف</string>
+    <string name="sih_import_backup">الاستعادة من ملف نسخة احتياطية</string>
+    <string name="sih_encrypt">تشفير النسخة الاحتياطية بـ AES بكلمة مرور</string>
+    <string name="sih_shortcuts">مرجع أزرار جهاز التحكم ولوحة الاتجاهات</string>
+    <string name="sih_auto_check">التحقق من التحديثات في الخلفية</string>
+    <string name="sih_crash_reports">الموافقة على إرسال تقارير الأعطال عبر Sentry</string>
+    <string name="sih_privacy_policy">فتح سياسة الخصوصية</string>
+    <string name="sih_terms">فتح شروط الخدمة</string>
+    <string name="sih_build">إصدار التطبيق ورقم البنية</string>
+    <string name="sih_device">معلومات تشخيص العتاد</string>
+    <string name="sih_add_source">إضافة مزوّد IPTV جديد (M3U أو Xtream أو Stalker)</string>
+    <string name="si_result_desc">%1$s في %2$s</string>
+
+    <!-- MK.31.8 batch J (cont.) — stragglers. -->
+    <string name="sd_name_hint">مثال: "تلفاز الصالة"</string>
 </resources>

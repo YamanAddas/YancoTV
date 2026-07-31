@@ -1,5 +1,8 @@
 package com.yancotv.android.ui.settings
 
+import androidx.annotation.StringRes
+import com.yancotv.android.R
+
 /**
  * MK.30 — Static search index for Settings. Lists the user-searchable
  * surfaces of every tab so the sidebar's search field can answer
@@ -20,10 +23,14 @@ package com.yancotv.android.ui.settings
 /** A single searchable settings surface. */
 internal data class SettingsSearchEntry(
     val tab: SettingsTab,
-    /** Human-readable row label as rendered in the tab. */
-    val label: String,
+    /**
+     * Row label as rendered in the tab. MK.31.8 — a resource id, and
+     * deliberately the SAME id the tab body uses, so renaming a setting
+     * keeps its search entry in step instead of silently drifting.
+     */
+    @StringRes val labelRes: Int,
     /** Short hint that helps disambiguate; also matched by query. */
-    val hint: String,
+    @StringRes val hintRes: Int,
 )
 
 /**
@@ -40,76 +47,53 @@ internal data class SettingsSearchEntry(
  *    index the static value).
  */
 internal val SettingsSearchIndex: List<SettingsSearchEntry> = listOf(
-    // ───── General ─────
-    SettingsSearchEntry(SettingsTab.General, "Open app on", "Startup destination — Home, Live TV, or Last used"),
-    SettingsSearchEntry(SettingsTab.General, "Show channel numbers", "Channel position number before title"),
-    SettingsSearchEntry(SettingsTab.General, "Number format", "Padding for channel numbers (1 vs 001)"),
-    SettingsSearchEntry(SettingsTab.General, "Smart category grouping", "Bucket categories by language / region prefix"),
-
-    // ───── Appearance ─────
-    SettingsSearchEntry(SettingsTab.Appearance, "Theme", "Dark / light palette"),
-    SettingsSearchEntry(SettingsTab.Appearance, "Accent colour", "Highlight tint across the app"),
-    SettingsSearchEntry(SettingsTab.Appearance, "Font scale", "Text size multiplier"),
-
-    // ───── Playback ─────
-    SettingsSearchEntry(SettingsTab.Playback, "Resize mode", "How video fits the screen — fit / fill / zoom"),
-    SettingsSearchEntry(SettingsTab.Playback, "Buffer profile", "Network buffering aggressiveness"),
-    SettingsSearchEntry(SettingsTab.Playback, "Enable decoder fallback", "Drop to software decoder on hardware failure"),
-    SettingsSearchEntry(SettingsTab.Playback, "Auto-play next episode", "Continue to the next episode automatically"),
-    SettingsSearchEntry(SettingsTab.Playback, "Preferred audio language", "Default audio track when stream offers multiple"),
-    SettingsSearchEntry(SettingsTab.Playback, "Preferred subtitle language", "Default subtitle track"),
-    SettingsSearchEntry(SettingsTab.Playback, "Default player", "External player override (VLC, MX Player)"),
-
-    // ───── Parental ─────
-    SettingsSearchEntry(SettingsTab.Parental, "PIN", "Set or change the parental PIN"),
-    SettingsSearchEntry(SettingsTab.Parental, "Hide adult-tagged content", "Filter adult-flagged channels / movies / series"),
-    SettingsSearchEntry(SettingsTab.Parental, "Require PIN to open Settings", "Gate Settings behind the PIN"),
-    SettingsSearchEntry(SettingsTab.Parental, "Hidden channels", "Manage hidden / unlocked channels"),
-    SettingsSearchEntry(SettingsTab.Parental, "Lock channel", "Channel-level lock"),
-
-    // ───── Recordings ─────
-    SettingsSearchEntry(SettingsTab.Recordings, "Storage folder", "Where recordings are saved"),
-    SettingsSearchEntry(SettingsTab.Recordings, "Public folder", "Save to the device's public Movies / Videos folder"),
-    SettingsSearchEntry(SettingsTab.Recordings, "Custom folder", "Pick a specific folder for recordings"),
-    SettingsSearchEntry(SettingsTab.Recordings, "Storage cap", "Maximum disk space for recordings"),
-
-    // ───── Network ─────
-    SettingsSearchEntry(SettingsTab.Network, "User-Agent", "HTTP User-Agent header — System / VLC / custom"),
-    SettingsSearchEntry(SettingsTab.Network, "Connect timeout", "Maximum seconds to wait for TCP connect"),
-    SettingsSearchEntry(SettingsTab.Network, "Read timeout", "Maximum seconds between bytes during playback"),
-    SettingsSearchEntry(SettingsTab.Network, "Paired TV", "LAN handoff — send playback to another YancoTV"),
-    SettingsSearchEntry(SettingsTab.Network, "Pairing code", "6-digit pairing code for the LAN handoff endpoint"),
-
-    // ───── Groups ─────
-    SettingsSearchEntry(SettingsTab.Groups, "Pinned categories", "Reorder and pin provider categories"),
-    SettingsSearchEntry(SettingsTab.Groups, "Hide group", "Hide a provider category from rails"),
-
-    // ───── EPG ─────
-    SettingsSearchEntry(SettingsTab.Epg, "Override EPG URL", "Use a custom XMLTV URL instead of the provider's"),
-    SettingsSearchEntry(SettingsTab.Epg, "Days back", "How many days of past EPG to keep"),
-    SettingsSearchEntry(SettingsTab.Epg, "Days forward", "How many days of future EPG to keep"),
-    SettingsSearchEntry(SettingsTab.Epg, "Visible window", "Hours shown in the guide grid"),
-    SettingsSearchEntry(SettingsTab.Epg, "Source priority", "Order EPG sources contend for the same channel"),
-    SettingsSearchEntry(SettingsTab.Epg, "Refresh EPG", "Re-fetch the EPG now"),
-
-    // ───── Backup ─────
-    SettingsSearchEntry(SettingsTab.Backup, "Export backup", "Save settings, sources, favorites, history to a file"),
-    SettingsSearchEntry(SettingsTab.Backup, "Import backup", "Restore from a backup file"),
-    SettingsSearchEntry(SettingsTab.Backup, "Encrypt with password", "AES-encrypt the backup with a password"),
-
-    // ───── Shortcuts ─────
-    SettingsSearchEntry(SettingsTab.Shortcuts, "Remote & keyboard", "D-pad and remote key reference"),
-
-    // ───── About ─────
-    SettingsSearchEntry(SettingsTab.About, "Check for updates automatically", "Background update check"),
-    SettingsSearchEntry(SettingsTab.About, "Send crash reports", "Sentry crash reporting opt-in"),
-    SettingsSearchEntry(SettingsTab.About, "Privacy policy", "Open the privacy policy"),
-    SettingsSearchEntry(SettingsTab.About, "Terms of service", "Open the terms of service"),
-    SettingsSearchEntry(SettingsTab.About, "Build", "App version and build number"),
-    SettingsSearchEntry(SettingsTab.About, "Device", "Hardware diagnostic information"),
-
-    // ───── Sources (only the actions — provider list itself isn't indexed) ─────
-    SettingsSearchEntry(SettingsTab.Sources, "Add source", "Add a new IPTV provider (M3U / Xtream / Stalker)"),
+    SettingsSearchEntry(SettingsTab.General, R.string.gen_open_on, R.string.sih_open_on),
+    SettingsSearchEntry(SettingsTab.General, R.string.gen_show_channel_numbers, R.string.sih_channel_numbers),
+    SettingsSearchEntry(SettingsTab.General, R.string.gen_number_format, R.string.sih_number_format),
+    SettingsSearchEntry(SettingsTab.General, R.string.gen_smart_grouping, R.string.sih_smart_grouping),
+    SettingsSearchEntry(SettingsTab.Appearance, R.string.app_sec_theme, R.string.sih_theme),
+    SettingsSearchEntry(SettingsTab.Appearance, R.string.app_accent_colour, R.string.sih_accent),
+    SettingsSearchEntry(SettingsTab.Appearance, R.string.app_font_scale, R.string.sih_font_scale),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_resize_mode, R.string.sih_resize),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_buffer_profile, R.string.sih_buffer),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_decoder_fallback, R.string.sih_decoder_fallback),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_autoplay_next, R.string.sih_autoplay),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_audio_language, R.string.sih_audio_lang),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_subtitle_language, R.string.sih_subtitle_lang),
+    SettingsSearchEntry(SettingsTab.Playback, R.string.pb_sec_default_player, R.string.sih_default_player),
+    SettingsSearchEntry(SettingsTab.Parental, R.string.si_pin, R.string.sih_pin),
+    SettingsSearchEntry(SettingsTab.Parental, R.string.par_hide_adult, R.string.sih_hide_adult),
+    SettingsSearchEntry(SettingsTab.Parental, R.string.par_require_pin, R.string.sih_require_pin),
+    SettingsSearchEntry(SettingsTab.Parental, R.string.par_hidden_channels, R.string.sih_hidden_channels),
+    SettingsSearchEntry(SettingsTab.Parental, R.string.si_lock_channel, R.string.sih_lock_channel),
+    SettingsSearchEntry(SettingsTab.Recordings, R.string.si_storage_folder, R.string.sih_storage_folder),
+    SettingsSearchEntry(SettingsTab.Recordings, R.string.rec_public_folder, R.string.sih_public_folder),
+    SettingsSearchEntry(SettingsTab.Recordings, R.string.rec_custom_folder, R.string.sih_custom_folder),
+    SettingsSearchEntry(SettingsTab.Recordings, R.string.si_storage_cap, R.string.sih_storage_cap),
+    SettingsSearchEntry(SettingsTab.Network, R.string.net_sec_ua, R.string.sih_ua),
+    SettingsSearchEntry(SettingsTab.Network, R.string.net_connect_timeout, R.string.sih_connect_timeout),
+    SettingsSearchEntry(SettingsTab.Network, R.string.net_read_timeout, R.string.sih_read_timeout),
+    SettingsSearchEntry(SettingsTab.Network, R.string.si_paired_tv, R.string.sih_paired_tv),
+    SettingsSearchEntry(SettingsTab.Network, R.string.net_pairing_code, R.string.sih_pairing_code),
+    SettingsSearchEntry(SettingsTab.Groups, R.string.grp_sec_pinned, R.string.sih_pinned),
+    SettingsSearchEntry(SettingsTab.Groups, R.string.si_hide_group, R.string.sih_hide_group),
+    SettingsSearchEntry(SettingsTab.Epg, R.string.epg_sec_override, R.string.sih_override_epg),
+    SettingsSearchEntry(SettingsTab.Epg, R.string.epg_days_back, R.string.sih_days_back),
+    SettingsSearchEntry(SettingsTab.Epg, R.string.epg_days_forward, R.string.sih_days_forward),
+    SettingsSearchEntry(SettingsTab.Epg, R.string.epg_visible_window, R.string.sih_visible_window),
+    SettingsSearchEntry(SettingsTab.Epg, R.string.epg_sec_priority, R.string.sih_source_priority),
+    SettingsSearchEntry(SettingsTab.Epg, R.string.si_refresh_epg, R.string.sih_refresh_epg),
+    SettingsSearchEntry(SettingsTab.Backup, R.string.si_export_backup, R.string.sih_export_backup),
+    SettingsSearchEntry(SettingsTab.Backup, R.string.si_import_backup, R.string.sih_import_backup),
+    SettingsSearchEntry(SettingsTab.Backup, R.string.bk_encrypt, R.string.sih_encrypt),
+    SettingsSearchEntry(SettingsTab.Shortcuts, R.string.sc_sec_remote, R.string.sih_shortcuts),
+    SettingsSearchEntry(SettingsTab.About, R.string.ab_auto_check, R.string.sih_auto_check),
+    SettingsSearchEntry(SettingsTab.About, R.string.ab_crash_reports, R.string.sih_crash_reports),
+    SettingsSearchEntry(SettingsTab.About, R.string.ab_privacy_policy, R.string.sih_privacy_policy),
+    SettingsSearchEntry(SettingsTab.About, R.string.ab_terms, R.string.sih_terms),
+    SettingsSearchEntry(SettingsTab.About, R.string.ab_build, R.string.sih_build),
+    SettingsSearchEntry(SettingsTab.About, R.string.ab_device, R.string.sih_device),
+    SettingsSearchEntry(SettingsTab.Sources, R.string.add_title, R.string.sih_add_source),
 )
 
 /**
@@ -117,14 +101,14 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = listOf(
  * against label, hint, and the tab name. Empty query returns empty —
  * the UI uses that signal to fall back to the normal tab list.
  */
-internal fun searchSettings(query: String, tabLabelOf: (SettingsTab) -> String): List<SettingsSearchEntry> {
+internal fun searchSettings(query: String, resolve: (Int) -> String): List<SettingsSearchEntry> {
     val q = query.trim()
     if (q.isEmpty()) return emptyList()
     val needle = q.lowercase()
     return SettingsSearchIndex.filter { entry ->
-        entry.label.lowercase().contains(needle) ||
-            entry.hint.lowercase().contains(needle) ||
-            tabLabelOf(entry.tab).lowercase().contains(needle)
+        resolve(entry.labelRes).lowercase().contains(needle) ||
+            resolve(entry.hintRes).lowercase().contains(needle) ||
+            resolve(entry.tab.labelRes).lowercase().contains(needle)
     }
 }
 
@@ -133,9 +117,9 @@ internal fun searchSettings(query: String, tabLabelOf: (SettingsTab) -> String):
  * filter the sidebar's tab list so a "play" search collapses the rail
  * down to Playback. Empty query → all tabs in their natural order.
  */
-internal fun searchTabs(query: String, tabLabelOf: (SettingsTab) -> String): List<SettingsTab> {
+internal fun searchTabs(query: String, resolve: (Int) -> String): List<SettingsTab> {
     val q = query.trim()
     if (q.isEmpty()) return SettingsTab.entries
     val needle = q.lowercase()
-    return SettingsTab.entries.filter { tabLabelOf(it).lowercase().contains(needle) }
+    return SettingsTab.entries.filter { resolve(it.labelRes).lowercase().contains(needle) }
 }
