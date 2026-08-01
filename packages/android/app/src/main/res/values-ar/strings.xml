@@ -111,7 +111,7 @@
     <string name="gen_show_channel_numbers">إظهار أرقام القنوات</string>
     <string name="gen_show_channel_numbers_desc">يضع رقم ترتيب القناة قبل عنوانها — مفيد إذا كنت تتذكر القنوات بأرقامها.</string>
     <string name="gen_number_format">تنسيق الأرقام</string>
-    <string name="gen_number_format_hint">التصفير المضاف إلى أرقام القنوات القصيرة (1 → 001).</string>
+    <string name="gen_number_format_hint">التصفير المضاف إلى أرقام القنوات القصيرة (1 ← 001).</string>
     <string name="gen_sec_categories">الفئات</string>
     <string name="gen_sec_categories_sub">كيف تُجمَّع قائمة فئات المزوّد في الشاشة الرئيسية وأشرطة التصفح.</string>
     <string name="gen_smart_grouping">تجميع ذكي للفئات</string>
@@ -120,7 +120,7 @@
     <string name="pb_sec_video_sub">التعامل مع نسبة العرض إلى الارتفاع وسلوك المفكك. تُطبَّق الاختيارات عند تحميل البث التالي.</string>
     <string name="pb_resize_mode">وضع الحجم</string>
     <string name="pb_resize_mode_hint">ملاءمة تحافظ على النسبة مع أشرطة سوداء؛ تمديد يمد الصورة إلى حدود الشاشة؛ تكبير يقتص الصورة لتغطي الشاشة بدون أشرطة.</string>
-    <string name="pb_buffer_profile">ملف التخزين المؤقت</string>
+    <string name="pb_buffer_profile">نمط التخزين المؤقت</string>
     <string name="pb_buffer_profile_hint">يوازن بين سرعة البدء ومقاومة التوقف للتحميل. أعد تشغيل البث للتطبيق.</string>
     <string name="pb_decoder_fallback">تمكين المفكك البديل</string>
     <string name="pb_decoder_fallback_desc">إذا فشل المفكك العتادي في البدء، أعد المحاولة بالمفكك البرمجي. أوقفه لإظهار أخطاء المفكك مباشرة (لتصحيح الأخطاء فقط).</string>
@@ -229,7 +229,7 @@
     <string name="rec_app_private">خاص بالتطبيق</string>
     <string name="rec_app_private_sub">داخل YancoTV — يُمحى عند إلغاء التثبيت</string>
     <string name="rec_custom_folder">مجلد مخصص</string>
-    <string name="rec_release_folder">تحرير هذا المجلد</string>
+    <string name="rec_release_folder">إلغاء الوصول إلى هذا المجلد</string>
     <string name="rec_browse">استعرض تسجيلاتك</string>
     <string name="rec_picker_hint">إذا لم يتنقّل منتقي النظام</string>
 
@@ -397,7 +397,7 @@
     <string name="bk_password_if_encrypted">كلمة المرور (فقط إذا كان الملف مشفَّراً)</string>
     <string name="bk_retry_pending">إعادة محاولة المعلَّق الآن</string>
     <string name="bk_recent_exports">التصديرات الأخيرة</string>
-    <string name="bk_recent_exports_sub">استخدام → تحميل هذه النسخة كمصدر للاستعادة. حذف → إزالة سجل البيانات الوصفية (الملف على القرص يبقى كما هو).</string>
+    <string name="bk_recent_exports_sub">استخدام ← تحميل هذه النسخة كمصدر للاستعادة. حذف ← إزالة سجل البيانات الوصفية (الملف على القرص يبقى كما هو).</string>
     <string name="bk_untitled">نسخة بلا اسم</string>
     <string name="bk_use">استخدام</string>
     <string name="bk_delete">حذف</string>
@@ -597,7 +597,7 @@
     <string name="gd_record">تسجيل</string>
     <string name="gd_cancel_series">إلغاء تسجيل المسلسل</string>
     <string name="gd_record_series">تسجيل المسلسل</string>
-    <string name="gs_add_source_hint">أضف مصدراً من الإعدادات → المصادر للبدء.</string>
+    <string name="gs_add_source_hint">أضف مصدراً من الإعدادات ← المصادر للبدء.</string>
     <string name="gs_add_override_epg">إضافة / تجاوز عنوان الدليل</string>
     <string name="gs_current">الحالي: %1$s</string>
     <string name="pin_required">رمز PIN مطلوب</string>
@@ -724,12 +724,12 @@
     <string name="ca_unlock_pin">إلغاء القفل (PIN)</string>
     <string name="ca_lock">قفل</string>
     <string name="ca_hide">إخفاء من القوائم</string>
-    <string name="ca_hidden_toast">تم إخفاء القناة — يمكن إدارتها من الإعدادات → الرقابة الأبوية</string>
+    <string name="ca_hidden_toast">تم إخفاء القناة — يمكن إدارتها من الإعدادات ← الرقابة الأبوية</string>
     <string name="ca_share_url">مشاركة رابط البث</string>
     <string name="ca_unlock_title">أدخل رمز PIN لإلغاء القفل</string>
     <string name="ca_unlock_body">هذه القناة مقفلة. أكّد رمز PIN لإزالة القفل.</string>
     <string name="ca_rename_title">إعادة تسمية القناة</string>
-    <string name="ca_rename_body">اتركه فارغاً للعودة إلى عنوان M3U.</string>
+    <string name="ca_rename_body">اتركه فارغاً للعودة إلى الاسم الأصلي من قائمة M3U.</string>
     <string name="ca_logo_title">عنوان الشعار المخصص</string>
     <string name="ca_logo_body">الصق عنوان صورة لتجاوز شعار M3U. اتركه فارغاً للعودة.</string>
     <string name="ca_add_to_list">إلى أي قائمة تريد الإضافة؟</string>
@@ -775,7 +775,7 @@
     <string name="st_breadcrumb">الإعدادات</string>
     <string name="bk_settings_desc">إعدادات النسخ الاحتياطي</string>
     <string name="ab_logo_desc">شعار %1$s</string>
-    <string name="voice_input">الصوت</string>
+    <string name="voice_input">البحث الصوتي</string>
     <string name="ps_from_provider">من المزوّد</string>
     <string name="tv_options">الخيارات</string>
     <string name="placeholder_pending">قيد التنفيذ</string>
@@ -1044,7 +1044,7 @@
     <string name="pa_recording_now">جارٍ التسجيل</string>
     <string name="pa_check_connection">تحقّق من اتصالك أو جرّب مصدراً آخر.</string>
     <string name="pa_programme_time">بقي %1$d د • %2$d د</string>
-    <string name="pa_buffering">جارٍ التخزين</string>
+    <string name="pa_buffering">جارٍ التخزين المؤقت</string>
     <string name="vc_cant_open_stream">تعذّر فتح هذا البث</string>
     <string name="vd_rewind_10">أرجع 10 ثوانٍ</string>
     <string name="vd_forward_10">تقدّم 10 ثوانٍ</string>
