@@ -629,12 +629,11 @@ class RecordingService : Service() {
                 Intent(this, RecordingService::class.java).setAction(ACTION_STOP_ALL),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
+        // MB-339 — was a hand-rolled `if (count == 1)`. That is only correct
+        // for languages whose plural rule is "1 vs everything else"; Arabic
+        // has six categories and read singular for 2-10. The resource picks.
         val title =
-            if (count == 1) {
-                getString(R.string.recording_notification_title_one)
-            } else {
-                getString(R.string.recording_notification_title_many, count)
-            }
+            resources.getQuantityString(R.plurals.recording_notification_title, count, count)
         return NotificationCompat
             .Builder(this, CHANNEL_ID)
             .setContentTitle(title)

@@ -740,8 +740,13 @@ private fun RecordingScheduleEntry.upcomingMetaLine(ctx: android.content.Context
                         ctx.getString(R.string.rs_in_min, deltaMs / 60_000L)
                     deltaMs < 24L * 60L * 60_000L ->
                         ctx.getString(R.string.rs_in_hours, deltaMs / (60L * 60_000L))
-                    else ->
-                        ctx.getString(R.string.rs_in_days, deltaMs / (24L * 60L * 60_000L))
+                    else -> {
+                        // MB-339. The selector must be an Int; the delta is
+                        // bounded by the scheduling horizon, so the narrowing
+                        // cannot overflow.
+                        val days = (deltaMs / (24L * 60L * 60_000L)).toInt()
+                        ctx.resources.getQuantityString(R.plurals.rs_in_days, days, days)
+                    }
                 }
             ctx.getString(R.string.rs_meta_join, startStr, relative)
         }

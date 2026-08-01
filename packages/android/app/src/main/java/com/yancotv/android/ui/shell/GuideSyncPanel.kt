@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -196,7 +197,19 @@ fun GuideSyncPanel(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.gs_counts, programmes, channels),
+                    // MB-339 — the one case that genuinely cannot be a single
+                    // plural: two counts governing two different nouns, and a
+                    // plural selects on one quantity. Split, then joined.
+                    text =
+                    stringResource(
+                        R.string.gs_counts_join,
+                        pluralStringResource(
+                            R.plurals.gs_counts_programmes,
+                            programmes.toInt(),
+                            programmes,
+                        ),
+                        pluralStringResource(R.plurals.gs_counts_channels, channels.toInt(), channels),
+                    ),
                     color = LocalYancoPalette.current.TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -296,7 +309,14 @@ fun GuideSyncPanel(
                         Text(
                             text =
                             buildString {
-                                append(stringResource(R.string.gs_src_line, src.name, src.channelCount))
+                                append(
+                                    pluralStringResource(
+                                        R.plurals.gs_src_line,
+                                        src.channelCount,
+                                        src.name,
+                                        src.channelCount,
+                                    ),
+                                )
                                 append(
                                     stringResource(
                                         if (hasEpg) R.string.gs_epg_url_set else R.string.gs_no_epg_url,
@@ -332,7 +352,12 @@ fun GuideSyncPanel(
             }
             if (brokenSources.isNotEmpty() && !running && !syncing) {
                 Text(
-                    text = stringResource(R.string.gs_broken_sources, brokenSources.size),
+                    text =
+                    pluralStringResource(
+                        R.plurals.gs_broken_sources,
+                        brokenSources.size,
+                        brokenSources.size,
+                    ),
                     color = LocalYancoPalette.current.Error,
                     fontSize = 12.sp,
                 )
@@ -430,7 +455,14 @@ private fun subtitleFor(ctx: android.content.Context, lastRefreshedMs: Long?, to
     val srcPart =
         when (totalSources) {
             0 -> ctx.getString(R.string.gs_no_active_sources)
-            else -> ctx.getString(R.string.gs_sources_with_epg, withEpg, totalSources)
+            // Selector is the total, which is the noun the sentence agrees with.
+            else ->
+                ctx.resources.getQuantityString(
+                    R.plurals.gs_sources_with_epg,
+                    totalSources,
+                    withEpg,
+                    totalSources,
+                )
         }
     // lastError is provider text; only the label around it is localized.
     val tail = if (lastError != null) ctx.getString(R.string.gs_last_error, lastError) else ""

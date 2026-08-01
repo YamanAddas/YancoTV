@@ -74,7 +74,14 @@ internal fun expiryStrings(ctx: android.content.Context) = ExpiryStrings(
     todayFull = { d -> ctx.getString(R.string.se_today_full, d) },
     soonCompact = { n -> ctx.getString(R.string.se_soon_compact, n) },
     soonFullOne = { d -> ctx.getString(R.string.se_soon_full_one, d) },
-    soonFullMany = { d, n -> ctx.getString(R.string.se_soon_full_many, d, n) },
+    // MB-339 — only this arm becomes a plural. `formatSourceExpiry` already
+    // branches at `days == 1L`, which is exactly CLDR `one` in all four
+    // locales, so soonFullOne stays a plain string and this arm is reached
+    // with days >= 2 — precisely the range where Arabic needed the dual and
+    // the broken plural instead of the singular it was rendering.
+    soonFullMany = { d, n ->
+        ctx.resources.getQuantityString(R.plurals.se_soon_full_many, n.toInt(), d, n)
+    },
     laterCompact = { d -> ctx.getString(R.string.se_later_compact, d) },
 )
 

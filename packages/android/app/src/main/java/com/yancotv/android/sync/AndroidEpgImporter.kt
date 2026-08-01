@@ -199,7 +199,13 @@ class AndroidEpgImporter(
                         return@withContext EpgRefreshResult(ok = false, error = detail)
                     }
 
-                    onProgress.report(context.getString(R.string.epg_writing, session.rowsWritten))
+                    onProgress.report(
+                        context.resources.getQuantityString(
+                            R.plurals.epg_writing,
+                            session.rowsWritten,
+                            session.rowsWritten,
+                        ),
+                    )
                     session.commit(lastRefreshedMs = System.currentTimeMillis())
                     if (errors.isEmpty()) {
                         recordError(null)

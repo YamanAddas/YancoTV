@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -619,7 +620,7 @@ fun SettingsBackupTab(
                 val pending by coordinator.pendingCount.collectAsState()
                 if (pending > 0) {
                     Text(
-                        stringResource(R.string.bk_pending_note, pending),
+                        pluralStringResource(R.plurals.bk_pending_note, pending, pending),
                         color = LocalYancoPalette.current.TextMuted,
                         fontSize = 12.sp,
                     )
@@ -842,7 +843,13 @@ private fun formatExportResult(ctx: android.content.Context, r: ExportResult, fi
             filename,
             formatBytes(ctx, r.bytesWritten),
             r.file.dbSchemaVersion,
-            r.file.recordCounts.values.sum(),
+            // MB-339 — the record count governs an inflected noun, so it is a
+            // plural composed in as a rendered %4$s rather than a bare %4$d.
+            // Turning the whole five-argument string into a plural would have
+            // meant six copies of it per locale.
+            r.file.recordCounts.values.sum().let { n ->
+                ctx.resources.getQuantityString(R.plurals.bk_export_records, n, n)
+            },
             r.file.checksum.take(8),
         )
     // r.message is transport/filesystem text — untranslatable by nature,
@@ -854,9 +861,21 @@ private fun formatImportResult(ctx: android.content.Context, r: ImportResult): S
     is ImportResult.Success -> {
         val report = r.report
         buildString {
-            append(ctx.getString(R.string.bk_restored_rows, report.totalRestored))
+            append(
+                ctx.resources.getQuantityString(
+                    R.plurals.bk_restored_rows,
+                    report.totalRestored,
+                    report.totalRestored,
+                ),
+            )
             if (report.totalUnlinked > 0) {
-                append(ctx.getString(R.string.bk_pending_resync, report.totalUnlinked))
+                append(
+                    ctx.resources.getQuantityString(
+                        R.plurals.bk_pending_resync,
+                        report.totalUnlinked,
+                        report.totalUnlinked,
+                    ),
+                )
             }
             if (report.totalSkipped > 0) {
                 append(ctx.getString(R.string.bk_already_present, report.totalSkipped))

@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -1053,7 +1054,7 @@ private fun SeasonTrigger(label: String, count: Int, open: Boolean, onClick: () 
                 .padding(horizontal = Space.sm, vertical = 2.dp),
         ) {
             Text(
-                text = stringResource(R.string.cd_episodes_count, count),
+                text = pluralStringResource(R.plurals.cd_episodes_count, count, count),
                 color = LocalYancoPalette.current.TextSecondary,
                 style = YancoType.Caption,
             )
@@ -1100,7 +1101,7 @@ private fun SeasonOption(label: String, count: Int, selected: Boolean, onClick: 
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = stringResource(R.string.cd_episodes_count, count),
+            text = pluralStringResource(R.plurals.cd_episodes_count, count, count),
             color = LocalYancoPalette.current.TextMuted,
             style = YancoType.Caption,
         )

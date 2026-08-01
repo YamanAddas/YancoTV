@@ -6,8 +6,6 @@
     <!-- Stage 3.1 / MK.14.1e — recording foreground service. -->
     <string name="recording_channel_name">Enregistrements</string>
     <string name="recording_channel_description">État des enregistrements en arrière-plan</string>
-    <string name="recording_notification_title_one">Enregistrement d\'une chaîne</string>
-    <string name="recording_notification_title_many">Enregistrement de %1$d chaînes</string>
     <string name="recording_notification_body">Appuyez pour gérer vos enregistrements</string>
     <string name="recording_notification_stop_all">Tout arrêter</string>
 
@@ -365,7 +363,6 @@
     <string name="ab_retry">Réessayer</string>
     <string name="time_just_now">À l\'instant</string>
     <string name="time_min_ago">il y a %1$d min</string>
-    <string name="time_hr_ago">il y a %1$d h</string>
     <string name="time_d_ago">il y a %1$d j</string>
 
     <!-- MK.31.7 batch H (cont.) — last-checked relative time. -->
@@ -527,8 +524,6 @@
     <string name="se_field_desc_edit">Recherche : %1$s. Appuyez pour modifier.</string>
     <string name="se_syncing_banner">Synchronisation de « %1$s » — les résultats peuvent être incomplets ou lents jusqu\'à la fin.</string>
     <string name="gd_loading">Chargement du guide…</string>
-    <string name="gd_showing_loading">%1$d sur %2$d chaînes · chargement…</string>
-    <string name="gd_showing">%1$d sur %2$d chaînes</string>
     <string name="gd_no_info_desc">Aucune info de programme, %1$s. Appuyez pour regarder cette chaîne en direct.</string>
     <string name="gd_no_info">Aucune info</string>
     <string name="gd_watch_channel">Regarder la chaîne</string>
@@ -654,7 +649,6 @@
     <!-- MK.31.12 batch O (cont.) — track name fallback. -->
 
     <!-- MK.31.12 batch O (cont.) — sleep timer labels. -->
-    <string name="po_minutes">%1$d minutes</string>
 
     <!-- MK.31.12 batch O (cont.) — panel toasts and handoff messages. -->
     <string name="po_recording_started">Enregistrement démarré — ouvrez Enregistrements pour le gérer.</string>
@@ -747,8 +741,6 @@
     <string name="sl_refresh_in_d">actualisation dans %1$d j</string>
     <string name="sl_refresh_in_dh">actualisation dans %1$d j %2$d h</string>
     <string name="sl_no_items">aucun élément</string>
-    <string name="sl_one_item">1 élément</string>
-    <string name="sl_n_items">%1$d éléments</string>
     <string name="sl_k_items">%1$sk éléments</string>
     <string name="sl_m_items">%1$sM éléments</string>
     <string name="sp_fetching">%1$s — récupération…%2$s</string>
@@ -798,7 +790,6 @@
     <string name="epg_no_urls">Aucune URL de guide configurée</string>
     <string name="epg_downloading">Téléchargement du guide %1$s</string>
     <string name="epg_parsing">Analyse du guide %1$s</string>
-    <string name="epg_writing">Écriture de %1$d programmes dans la base…</string>
     <string name="epg_writing_scan">Écriture… %1$d conservés / %2$d analysés</string>
 
     <!-- MK.31.19 dialogs + notifications -->
@@ -883,11 +874,8 @@
     <string name="par_unhide_all">Tout réafficher</string>
     <string name="par_unhide">Réafficher</string>
     <string name="par_none_hidden">Aucune chaîne masquée. Appuyez longuement sur une chaîne dans TV en direct / Films / Séries pour la masquer.</string>
-    <string name="par_hidden_count">%1$d chaîne(s) masquée(s). Appuyez sur Réafficher pour en restaurer une.</string>
-    <string name="par_restored_count">%1$d chaîne(s) restaurée(s)</string>
     <string name="gr_kind_language">langue</string>
     <string name="gr_kind_region">région</string>
-    <string name="gr_row_sub">%1$s · %2$s · %3$d chaînes</string>
     <string name="gr_hidden">Masqué de la barre latérale et des rangées</string>
     <string name="gr_visible">Visible partout</string>
     <string name="epg_with_epg_value">%1$d sur %2$d</string>
@@ -922,10 +910,8 @@
     <string name="bk_exporting_downloads">Exportation de %1$s vers Downloads/YancoTV…</string>
     <string name="bk_exporting">Exportation…</string>
     <string name="bk_export_backup">Exporter la sauvegarde</string>
-    <string name="bk_export_ok">%1$s exporté · %2$s · schéma v%3$d · %4$d enregistrements · somme %5$s…</string>
+    <string name="bk_export_ok">%1$s exporté · %2$s · schéma v%3$d · %4$s · somme %5$s…</string>
     <string name="bk_export_failed">Échec de l\'exportation : %1$s</string>
-    <string name="bk_restored_rows">%1$d lignes restaurées</string>
-    <string name="bk_pending_resync"> · %1$d en attente de resynchronisation</string>
     <string name="bk_already_present"> · %1$d déjà présents (ignorés)</string>
     <string name="bk_checksum_mismatch">Échec de la restauration : le fichier est corrompu (somme de contrôle invalide).</string>
     <string name="bk_schema_too_new">Échec de la restauration : la sauvegarde est au schéma v%1$d, l\'application est en v%2$d. Mettez d\'abord l\'application à jour.</string>
@@ -933,7 +919,6 @@
     <string name="bk_malformed_json">Impossible de lire le fichier : %1$s</string>
     <string name="bk_io_error">Impossible d\'ouvrir le fichier : %1$s</string>
     <string name="bk_restore_failed">Échec de la restauration : %1$s</string>
-    <string name="bk_pending_note">%1$d enregistrement(s) en attente de resynchronisation.</string>
     <string name="bk_file_location_lost"> · emplacement du fichier perdu</string>
     <string name="bk_unknown">inconnu</string>
     <string name="bc_downloads_insert_failed">Impossible d\'ajouter la sauvegarde aux téléchargements.</string>
@@ -970,35 +955,29 @@
     <string name="gs_refreshing">Actualisation de l\'EPG…</string>
     <string name="gs_resyncing">Resynchronisation de %1$s…</string>
     <string name="gs_generic_source">source</string>
-    <string name="gs_counts">%1$d programmes · %2$d chaînes</string>
     <string name="gs_refresh_epg">Actualiser l\'EPG</string>
     <string name="gs_refresh_epg_now">Actualiser l\'EPG</string>
     <string name="gs_resync_sources">Resynchroniser les sources</string>
     <string name="gs_no_guide_data">Aucune donnée de guide</string>
     <string name="gs_diagnostics">Diagnostic du guide</string>
-    <string name="gs_src_line">• %1$s  ·  %2$d chaînes  ·  </string>
     <string name="gs_epg_url_set">URL EPG définie</string>
     <string name="gs_no_epg_url">aucune URL EPG</string>
     <string name="gs_src_err">  ·  err : %1$s</string>
-    <string name="gs_broken_sources">%1$d source(s) ont échoué la dernière fois. Resynchronisez-les pour réessayer.</string>
     <string name="gs_override_help">Collez une URL XMLTV pour en charger l\'EPG. Utilisée en complément des URL par source — pratique quand le flux d\'un fournisseur est cassé ou que vous voulez un meilleur programme.</string>
     <string name="gs_never_refreshed">jamais actualisé</string>
     <string name="gs_last_refreshed">dernière actualisation %1$s</string>
     <string name="gs_no_active_sources">aucune source active</string>
-    <string name="gs_sources_with_epg">%1$d source(s) sur %2$d ont une URL EPG</string>
     <string name="gs_last_error"> · dernière erreur : %1$s</string>
     <string name="rel_just_now_lower">à l\'instant</string>
     <string name="rs_recording_ends">Enregistrement · fin %1$s</string>
     <string name="rs_starting_now">démarre maintenant</string>
     <string name="rs_in_min">dans %1$d min</string>
     <string name="rs_in_hours">dans %1$d h</string>
-    <string name="rs_in_days">dans %1$d jours</string>
     <string name="rs_reason_device_offline">l\'appareil était éteint</string>
     <string name="rs_reason_concurrent">un autre enregistrement était en cours</string>
     <string name="rs_reason_orphaned">interrompu par un redémarrage</string>
     <string name="rs_reason_channel_deleted">chaîne supprimée</string>
     <string name="cd_episode_total">%1$d au total</string>
-    <string name="cd_episodes_count">%1$d épisodes</string>
     <string name="cd_episode_n">Épisode %1$d</string>
     <string name="cd_minutes_left">%1$d min restantes</string>
     <string name="wi_min_left">%1$d min restantes</string>
@@ -1013,7 +992,6 @@
     <string name="fh_min_left">%1$d min restantes</string>
     <string name="fh_ending_now">Se termine maintenant</string>
     <string name="fh_live_channel">CHAÎNE EN DIRECT</string>
-    <string name="cf_episodes_count">%1$d épisodes</string>
     <string name="cf_no_series">Aucune série</string>
     <string name="cf_favorites_empty">Ajoutez une étoile depuis le volet d\'aperçu et l\'élément apparaîtra ici.</string>
     <string name="cf_add_source">Ajoutez une source IPTV pour commencer à regarder.</string>
@@ -1078,7 +1056,6 @@
     <string name="se_today_full">%1$s · moins d\'un jour restant</string>
     <string name="se_soon_compact">expire dans %1$d j</string>
     <string name="se_soon_full_one">%1$s · 1 jour restant</string>
-    <string name="se_soon_full_many">%1$s · %2$d jours restants</string>
     <string name="se_later_compact">expire le %1$s</string>
     <string name="epg_minutes_value">%1$d min</string>
     <string name="ca_default_suffix"> (par défaut)</string>
@@ -1119,4 +1096,114 @@
 
     <!-- MB-340 dock time + episode kicker -->
     <string name="vd_ends_at">FIN %1$s</string>
+
+    <!-- MB-339 — quantity strings.
+
+         Until now every count was a flat <string>, so Arabic rendered the
+         singular for all quantities. That is wrong for 2 (dual) and 3-10
+         (broken plural) — the commonest range in this UI. Several English
+         strings had already given up and shipped "channel(s)".
+
+         Arabic needs all six CLDR categories; en/fr/es need one/other, which
+         is their complete set. A quantity may legitimately omit a format
+         specifier the others use (Arabic's dual carries the number in the
+         noun) — getQuantityString still receives every argument, so the
+         unreferenced ones are simply ignored.
+
+         Do NOT add ordinals here (Season %d, Track %d, build %d): pluralizing
+         those turns "Season 2" into "Seasons 2". -->
+
+    <plurals name="bk_export_records">
+        <item quantity="one">%1$d enregistrement</item>
+        <item quantity="other">%1$d enregistrements</item>
+    </plurals>
+    <plurals name="bk_pending_note">
+        <item quantity="one">%1$d enregistrement en attente de resynchronisation.</item>
+        <item quantity="other">%1$d enregistrements en attente de resynchronisation.</item>
+    </plurals>
+    <plurals name="bk_pending_resync">
+        <item quantity="one"> · %1$d enregistrement en attente de resynchronisation</item>
+        <item quantity="other"> · %1$d enregistrements en attente de resynchronisation</item>
+    </plurals>
+    <plurals name="bk_restored_rows">
+        <item quantity="one">%1$d ligne restaurée</item>
+        <item quantity="other">%1$d lignes restaurées</item>
+    </plurals>
+    <plurals name="cd_episodes_count">
+        <item quantity="one">%1$d épisode</item>
+        <item quantity="other">%1$d épisodes</item>
+    </plurals>
+    <plurals name="cf_episodes_count">
+        <item quantity="one">%1$d épisode</item>
+        <item quantity="other">%1$d épisodes</item>
+    </plurals>
+    <plurals name="epg_writing">
+        <item quantity="one">Écriture de %1$d programme dans la base…</item>
+        <item quantity="other">Écriture de %1$d programmes dans la base…</item>
+    </plurals>
+    <plurals name="gd_showing">
+        <item quantity="one">%1$d sur %2$d chaîne</item>
+        <item quantity="other">%1$d sur %2$d chaînes</item>
+    </plurals>
+    <plurals name="gd_showing_loading">
+        <item quantity="one">%1$d sur %2$d chaîne · chargement…</item>
+        <item quantity="other">%1$d sur %2$d chaînes · chargement…</item>
+    </plurals>
+    <plurals name="gr_row_sub">
+        <item quantity="one">%1$s · %2$s · %3$d chaîne</item>
+        <item quantity="other">%1$s · %2$s · %3$d chaînes</item>
+    </plurals>
+    <plurals name="gs_broken_sources">
+        <item quantity="one">%1$d source a échoué la dernière fois. Resynchronisez-la pour réessayer.</item>
+        <item quantity="other">%1$d sources ont échoué la dernière fois. Resynchronisez-les pour réessayer.</item>
+    </plurals>
+    <plurals name="gs_counts_channels">
+        <item quantity="one">%1$d chaîne</item>
+        <item quantity="other">%1$d chaînes</item>
+    </plurals>
+    <plurals name="gs_counts_programmes">
+        <item quantity="one">%1$d programme</item>
+        <item quantity="other">%1$d programmes</item>
+    </plurals>
+    <plurals name="gs_sources_with_epg">
+        <item quantity="one">%1$d source sur %2$d a une URL EPG</item>
+        <item quantity="other">%1$d sources sur %2$d ont une URL EPG</item>
+    </plurals>
+    <plurals name="gs_src_line">
+        <item quantity="one">• %1$s  ·  %2$d chaîne  ·  </item>
+        <item quantity="other">• %1$s  ·  %2$d chaînes  ·  </item>
+    </plurals>
+    <plurals name="par_hidden_count">
+        <item quantity="one">%1$d chaîne masquée. Appuyez sur Réafficher pour la restaurer.</item>
+        <item quantity="other">%1$d chaînes masquées. Appuyez sur Réafficher pour en restaurer une.</item>
+    </plurals>
+    <plurals name="par_restored_count">
+        <item quantity="one">%1$d chaîne restaurée</item>
+        <item quantity="other">%1$d chaînes restaurées</item>
+    </plurals>
+    <plurals name="po_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="recording_notification_title">
+        <item quantity="one">Enregistrement de %1$d chaîne</item>
+        <item quantity="other">Enregistrement de %1$d chaînes</item>
+    </plurals>
+    <plurals name="rs_in_days">
+        <item quantity="one">dans %1$d jour</item>
+        <item quantity="other">dans %1$d jours</item>
+    </plurals>
+    <plurals name="se_soon_full_many">
+        <item quantity="one">%1$s · %2$d jour restant</item>
+        <item quantity="other">%1$s · %2$d jours restants</item>
+    </plurals>
+    <plurals name="sl_n_items">
+        <item quantity="one">%1$d élément</item>
+        <item quantity="other">%1$d éléments</item>
+    </plurals>
+    <plurals name="time_hr_ago">
+        <item quantity="one">il y a %1$d h</item>
+        <item quantity="other">il y a %1$d h</item>
+    </plurals>
+    <string name="gs_counts_join">%1$s · %2$s</string>
 </resources>

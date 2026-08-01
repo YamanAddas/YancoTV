@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -866,9 +867,16 @@ internal fun typeLabel(type: SourceType): String = when (type) {
 // translated resource would not get one per language.
 @Composable
 private fun formatItemCount(n: Int): String = when {
+    // MB-339 — the `1` branch was a hand-rolled plural rule and is gone;
+    // Arabic has six categories and the resource now selects.
+    //
+    // The `0` branch STAYS. CLDR has no `zero` category for en/fr/es, so a
+    // <item quantity="zero"> in those locales is dead text and n == 0 would
+    // select `other` — "0 items" instead of "no items yet". A friendly empty
+    // string is a UI decision, not a grammatical one, so it belongs in code
+    // where it applies to every language.
     n == 0 -> stringResource(R.string.sl_no_items)
-    n == 1 -> stringResource(R.string.sl_one_item)
-    n < 1_000 -> stringResource(R.string.sl_n_items, n)
+    n < 1_000 -> pluralStringResource(R.plurals.sl_n_items, n, n)
     n < 1_000_000 -> stringResource(R.string.sl_k_items, "%.1f".format(n / 1000.0))
     else -> stringResource(R.string.sl_m_items, "%.1f".format(n / 1_000_000.0))
 }

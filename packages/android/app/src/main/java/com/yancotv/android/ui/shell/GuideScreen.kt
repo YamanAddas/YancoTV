@@ -57,6 +57,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -949,12 +950,28 @@ private fun GuideGrid(
                     .background(LocalYancoPalette.current.BackgroundRaised)
                     .padding(horizontal = 24.dp, vertical = 4.dp),
             ) {
+                // MB-339 — the noun agrees with the TOTAL, not with the number
+                // currently shown, so totalCount is the selector.
+                // getQuantityString keeps the selector separate from the
+                // format args, so both counts still render. The selector is an
+                // Int by API; a channel count cannot exceed Int range.
+                val totalForPlural = totalCount.toInt()
                 androidx.compose.material3.Text(
                     text =
                     if (loadingMore) {
-                        stringResource(R.string.gd_showing_loading, guide.channels.size, totalCount)
+                        pluralStringResource(
+                            R.plurals.gd_showing_loading,
+                            totalForPlural,
+                            guide.channels.size,
+                            totalCount,
+                        )
                     } else {
-                        stringResource(R.string.gd_showing, guide.channels.size, totalCount)
+                        pluralStringResource(
+                            R.plurals.gd_showing,
+                            totalForPlural,
+                            guide.channels.size,
+                            totalCount,
+                        )
                     },
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,

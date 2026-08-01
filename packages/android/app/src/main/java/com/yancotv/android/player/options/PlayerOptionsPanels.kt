@@ -48,6 +48,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -810,10 +811,10 @@ private fun SleepPanelContent(controller: PlaybackController, onPickOption: () -
 // Arabic gets its plural agreement from one place.
 @Composable
 private fun sleepLabel(opt: SleepTimerOption): String = when (opt) {
-    SleepTimerOption.MIN_15 -> stringResource(R.string.po_minutes, 15)
-    SleepTimerOption.MIN_30 -> stringResource(R.string.po_minutes, 30)
-    SleepTimerOption.MIN_45 -> stringResource(R.string.po_minutes, 45)
-    SleepTimerOption.MIN_60 -> stringResource(R.string.po_minutes, 60)
+    SleepTimerOption.MIN_15 -> pluralStringResource(R.plurals.po_minutes, 15, 15)
+    SleepTimerOption.MIN_30 -> pluralStringResource(R.plurals.po_minutes, 30, 30)
+    SleepTimerOption.MIN_45 -> pluralStringResource(R.plurals.po_minutes, 45, 45)
+    SleepTimerOption.MIN_60 -> pluralStringResource(R.plurals.po_minutes, 60, 60)
     SleepTimerOption.END_OF_PROGRAM -> stringResource(R.string.po_end_of_programme)
 }
 

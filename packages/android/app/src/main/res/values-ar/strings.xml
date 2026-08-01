@@ -6,8 +6,6 @@
     <!-- Stage 3.1 / MK.14.1e — recording foreground service. -->
     <string name="recording_channel_name">التسجيلات</string>
     <string name="recording_channel_description">حالة التسجيل في الخلفية</string>
-    <string name="recording_notification_title_one">جارٍ تسجيل قناة واحدة</string>
-    <string name="recording_notification_title_many">جارٍ تسجيل %1$d قناة</string>
     <string name="recording_notification_body">اضغط لإدارة تسجيلاتك</string>
     <string name="recording_notification_stop_all">إيقاف الكل</string>
 
@@ -365,7 +363,6 @@
     <string name="ab_retry">إعادة المحاولة</string>
     <string name="time_just_now">الآن</string>
     <string name="time_min_ago">قبل %1$d دقيقة</string>
-    <string name="time_hr_ago">قبل %1$d ساعة</string>
     <string name="time_d_ago">قبل %1$d يوم</string>
 
     <!-- MK.31.7 batch H (cont.) — last-checked relative time. -->
@@ -527,8 +524,6 @@
     <string name="se_field_desc_edit">البحث: %1$s. اضغط للتعديل.</string>
     <string name="se_syncing_banner">جارٍ مزامنة \"%1$s\" — قد تكون نتائج البحث ناقصة أو بطيئة حتى تنتهي.</string>
     <string name="gd_loading">جارٍ تحميل الدليل…</string>
-    <string name="gd_showing_loading">عرض %1$d من %2$d قناة · جارٍ تحميل المزيد…</string>
-    <string name="gd_showing">عرض %1$d من %2$d قناة</string>
     <string name="gd_no_info_desc">لا توجد معلومات برامج، %1$s. اضغط لمشاهدة هذه القناة مباشرة.</string>
     <string name="gd_no_info">لا معلومات</string>
     <string name="gd_watch_channel">مشاهدة القناة</string>
@@ -654,7 +649,6 @@
     <!-- MK.31.12 batch O (cont.) — track name fallback. -->
 
     <!-- MK.31.12 batch O (cont.) — sleep timer labels. -->
-    <string name="po_minutes">%1$d دقيقة</string>
 
     <!-- MK.31.12 batch O (cont.) — panel toasts and handoff messages. -->
     <string name="po_recording_started">بدأ التسجيل — افتح التسجيلات للإدارة.</string>
@@ -747,8 +741,6 @@
     <string name="sl_refresh_in_d">التحديث بعد %1$d ي</string>
     <string name="sl_refresh_in_dh">التحديث بعد %1$d ي %2$d س</string>
     <string name="sl_no_items">لا عناصر بعد</string>
-    <string name="sl_one_item">عنصر واحد</string>
-    <string name="sl_n_items">%1$d عنصر</string>
     <string name="sl_k_items">%1$s ألف عنصر</string>
     <string name="sl_m_items">%1$s مليون عنصر</string>
     <string name="sp_fetching">%1$s — جارٍ الجلب…%2$s</string>
@@ -798,7 +790,6 @@
     <string name="epg_no_urls">لا توجد عناوين دليل مُعدّة</string>
     <string name="epg_downloading">جارٍ تنزيل الدليل %1$s</string>
     <string name="epg_parsing">جارٍ تحليل الدليل %1$s</string>
-    <string name="epg_writing">جارٍ كتابة %1$d برنامج في قاعدة البيانات…</string>
     <string name="epg_writing_scan">جارٍ الكتابة… %1$d محفوظ / %2$d ممسوح</string>
 
     <!-- MK.31.19 dialogs + notifications -->
@@ -883,11 +874,8 @@
     <string name="par_unhide_all">إظهار الكل</string>
     <string name="par_unhide">إظهار</string>
     <string name="par_none_hidden">لا توجد قنوات مخفية. اضغط مطوّلاً على قناة في البث المباشر / الأفلام / المسلسلات لإخفائها.</string>
-    <string name="par_hidden_count">%1$d قناة مخفية. انقر «إظهار» لاستعادة إحداها.</string>
-    <string name="par_restored_count">تمت استعادة %1$d قناة</string>
     <string name="gr_kind_language">لغة</string>
     <string name="gr_kind_region">منطقة</string>
-    <string name="gr_row_sub">%1$s · %2$s · %3$d قناة</string>
     <string name="gr_hidden">مخفي من الشريط الجانبي والصفوف</string>
     <string name="gr_visible">ظاهر في كل مكان</string>
     <string name="epg_with_epg_value">%1$d من %2$d</string>
@@ -922,10 +910,8 @@
     <string name="bk_exporting_downloads">جارٍ تصدير %1$s إلى Downloads/YancoTV…</string>
     <string name="bk_exporting">جارٍ التصدير…</string>
     <string name="bk_export_backup">تصدير نسخة احتياطية</string>
-    <string name="bk_export_ok">تم تصدير %1$s · %2$s · مخطط v%3$d · %4$d سجل · بصمة %5$s…</string>
+    <string name="bk_export_ok">تم تصدير %1$s · %2$s · مخطط v%3$d · %4$s · بصمة %5$s…</string>
     <string name="bk_export_failed">فشل التصدير: %1$s</string>
-    <string name="bk_restored_rows">تمت استعادة %1$d صف</string>
-    <string name="bk_pending_resync"> · %1$d بانتظار إعادة مزامنة المصدر</string>
     <string name="bk_already_present"> · %1$d موجود مسبقاً (تم تخطيه)</string>
     <string name="bk_checksum_mismatch">فشلت الاستعادة: الملف تالف (عدم تطابق البصمة).</string>
     <string name="bk_schema_too_new">فشلت الاستعادة: النسخة للمخطط v%1$d بينما التطبيق على v%2$d. حدّث التطبيق أولاً.</string>
@@ -933,7 +919,6 @@
     <string name="bk_malformed_json">تعذّر قراءة الملف: %1$s</string>
     <string name="bk_io_error">تعذّر فتح الملف: %1$s</string>
     <string name="bk_restore_failed">فشلت الاستعادة: %1$s</string>
-    <string name="bk_pending_note">%1$d سجل بانتظار إعادة مزامنة المصدر.</string>
     <string name="bk_file_location_lost"> · تعذّر تحديد موقع الملف</string>
     <string name="bk_unknown">غير معروف</string>
     <string name="bc_downloads_insert_failed">تعذّر إضافة النسخة الاحتياطية إلى Downloads.</string>
@@ -970,35 +955,29 @@
     <string name="gs_refreshing">جارٍ تحديث دليل البرامج…</string>
     <string name="gs_resyncing">جارٍ إعادة مزامنة %1$s…</string>
     <string name="gs_generic_source">مصدر</string>
-    <string name="gs_counts">%1$d برنامج · %2$d قناة</string>
     <string name="gs_refresh_epg">تحديث الدليل</string>
     <string name="gs_refresh_epg_now">حدّث الدليل الآن</string>
     <string name="gs_resync_sources">إعادة مزامنة المصادر</string>
     <string name="gs_no_guide_data">لا توجد بيانات دليل بعد</string>
     <string name="gs_diagnostics">تشخيص الدليل</string>
-    <string name="gs_src_line">• %1$s  ·  %2$d قناة  ·  </string>
     <string name="gs_epg_url_set">عنوان الدليل مضبوط</string>
     <string name="gs_no_epg_url">لا يوجد عنوان دليل</string>
     <string name="gs_src_err">  ·  خطأ: %1$s</string>
-    <string name="gs_broken_sources">%1$d مصدر فشل آخر مرة. أعد مزامنتها للمحاولة مجدداً.</string>
     <string name="gs_override_help">الصق عنوان XMLTV لتحميل دليل البرامج منه. يُستخدم إضافةً إلى عناوين كل مصدر — مفيد عندما تكون خلاصة المزوّد معطّلة أو عندما تريد جدولاً أفضل.</string>
     <string name="gs_never_refreshed">لم يُحدَّث أبداً</string>
     <string name="gs_last_refreshed">آخر تحديث %1$s</string>
     <string name="gs_no_active_sources">لا توجد مصادر نشطة</string>
-    <string name="gs_sources_with_epg">%1$d من %2$d مصدر لديه عنوان دليل</string>
     <string name="gs_last_error"> · آخر خطأ: %1$s</string>
     <string name="rel_just_now_lower">الآن</string>
     <string name="rs_recording_ends">جارٍ التسجيل · ينتهي %1$s</string>
     <string name="rs_starting_now">يبدأ الآن</string>
     <string name="rs_in_min">بعد %1$d د</string>
     <string name="rs_in_hours">بعد %1$d س</string>
-    <string name="rs_in_days">بعد %1$d يوم</string>
     <string name="rs_reason_device_offline">كان الجهاز مُطفأً</string>
     <string name="rs_reason_concurrent">كان هناك تسجيل آخر جارٍ</string>
     <string name="rs_reason_orphaned">قُطع بسبب إعادة التشغيل</string>
     <string name="rs_reason_channel_deleted">تمت إزالة القناة</string>
     <string name="cd_episode_total">%1$d بالمجموع</string>
-    <string name="cd_episodes_count">%1$d حلقة</string>
     <string name="cd_episode_n">الحلقة %1$d</string>
     <string name="cd_minutes_left">بقي %1$d د</string>
     <string name="wi_min_left">بقي %1$d د</string>
@@ -1013,7 +992,6 @@
     <string name="fh_min_left">بقي %1$d د</string>
     <string name="fh_ending_now">ينتهي الآن</string>
     <string name="fh_live_channel">قناة مباشرة</string>
-    <string name="cf_episodes_count">%1$d حلقة</string>
     <string name="cf_no_series">لا توجد مسلسلات</string>
     <string name="cf_favorites_empty">ضع نجمة على شيء من لوحة المعاينة وسيظهر هنا.</string>
     <string name="cf_add_source">أضف مصدر IPTV لبدء المشاهدة.</string>
@@ -1078,7 +1056,6 @@
     <string name="se_today_full">%1$s · بقي أقل من يوم</string>
     <string name="se_soon_compact">ينتهي بعد %1$d ي</string>
     <string name="se_soon_full_one">%1$s · بقي يوم واحد</string>
-    <string name="se_soon_full_many">%1$s · بقي %2$d يوم</string>
     <string name="se_later_compact">ينتهي %1$s</string>
     <string name="epg_minutes_value">%1$d د</string>
     <string name="ca_default_suffix"> (افتراضي)</string>
@@ -1119,4 +1096,206 @@
 
     <!-- MB-340 dock time + episode kicker -->
     <string name="vd_ends_at">ينتهي %1$s</string>
+
+    <!-- MB-339 — quantity strings.
+
+         Until now every count was a flat <string>, so Arabic rendered the
+         singular for all quantities. That is wrong for 2 (dual) and 3-10
+         (broken plural) — the commonest range in this UI. Several English
+         strings had already given up and shipped "channel(s)".
+
+         Arabic needs all six CLDR categories; en/fr/es need one/other, which
+         is their complete set. A quantity may legitimately omit a format
+         specifier the others use (Arabic's dual carries the number in the
+         noun) — getQuantityString still receives every argument, so the
+         unreferenced ones are simply ignored.
+
+         Do NOT add ordinals here (Season %d, Track %d, build %d): pluralizing
+         those turns "Season 2" into "Seasons 2". -->
+
+    <plurals name="bk_export_records">
+        <item quantity="zero">لا سجلات</item>
+        <item quantity="one">سجل واحد</item>
+        <item quantity="two">سجلان</item>
+        <item quantity="few">%1$d سجلات</item>
+        <item quantity="many">%1$d سجلاً</item>
+        <item quantity="other">%1$d سجل</item>
+    </plurals>
+    <plurals name="bk_pending_note">
+        <item quantity="zero">لا سجلات معلَّقة.</item>
+        <item quantity="one">سجل واحد بانتظار إعادة مزامنة المصدر.</item>
+        <item quantity="two">سجلان بانتظار إعادة مزامنة المصدر.</item>
+        <item quantity="few">%1$d سجلات بانتظار إعادة مزامنة المصدر.</item>
+        <item quantity="many">%1$d سجلاً بانتظار إعادة مزامنة المصدر.</item>
+        <item quantity="other">%1$d سجل بانتظار إعادة مزامنة المصدر.</item>
+    </plurals>
+    <plurals name="bk_pending_resync">
+        <item quantity="zero"> · لا سجلات معلَّقة</item>
+        <item quantity="one"> · سجل واحد بانتظار إعادة مزامنة المصدر</item>
+        <item quantity="two"> · سجلان بانتظار إعادة مزامنة المصدر</item>
+        <item quantity="few"> · %1$d سجلات بانتظار إعادة مزامنة المصدر</item>
+        <item quantity="many"> · %1$d سجلاً بانتظار إعادة مزامنة المصدر</item>
+        <item quantity="other"> · %1$d سجل بانتظار إعادة مزامنة المصدر</item>
+    </plurals>
+    <plurals name="bk_restored_rows">
+        <item quantity="zero">لم يُستعد أي صف</item>
+        <item quantity="one">تمت استعادة صف واحد</item>
+        <item quantity="two">تمت استعادة صفين</item>
+        <item quantity="few">تمت استعادة %1$d صفوف</item>
+        <item quantity="many">تمت استعادة %1$d صفاً</item>
+        <item quantity="other">تمت استعادة %1$d صف</item>
+    </plurals>
+    <plurals name="cd_episodes_count">
+        <item quantity="zero">لا حلقات</item>
+        <item quantity="one">حلقة واحدة</item>
+        <item quantity="two">حلقتان</item>
+        <item quantity="few">%1$d حلقات</item>
+        <item quantity="many">%1$d حلقةً</item>
+        <item quantity="other">%1$d حلقة</item>
+    </plurals>
+    <plurals name="cf_episodes_count">
+        <item quantity="zero">لا حلقات</item>
+        <item quantity="one">حلقة واحدة</item>
+        <item quantity="two">حلقتان</item>
+        <item quantity="few">%1$d حلقات</item>
+        <item quantity="many">%1$d حلقةً</item>
+        <item quantity="other">%1$d حلقة</item>
+    </plurals>
+    <plurals name="epg_writing">
+        <item quantity="zero">لا برامج للكتابة…</item>
+        <item quantity="one">جارٍ كتابة برنامج واحد في قاعدة البيانات…</item>
+        <item quantity="two">جارٍ كتابة برنامجين في قاعدة البيانات…</item>
+        <item quantity="few">جارٍ كتابة %1$d برامج في قاعدة البيانات…</item>
+        <item quantity="many">جارٍ كتابة %1$d برنامجاً في قاعدة البيانات…</item>
+        <item quantity="other">جارٍ كتابة %1$d برنامج في قاعدة البيانات…</item>
+    </plurals>
+    <plurals name="gd_showing">
+        <item quantity="zero">لا قنوات</item>
+        <item quantity="one">عرض قناة واحدة</item>
+        <item quantity="two">عرض %1$d من قناتين</item>
+        <item quantity="few">عرض %1$d من %2$d قنوات</item>
+        <item quantity="many">عرض %1$d من %2$d قناةً</item>
+        <item quantity="other">عرض %1$d من %2$d قناة</item>
+    </plurals>
+    <plurals name="gd_showing_loading">
+        <item quantity="zero">لا قنوات · جارٍ تحميل المزيد…</item>
+        <item quantity="one">عرض قناة واحدة · جارٍ تحميل المزيد…</item>
+        <item quantity="two">عرض %1$d من قناتين · جارٍ تحميل المزيد…</item>
+        <item quantity="few">عرض %1$d من %2$d قنوات · جارٍ تحميل المزيد…</item>
+        <item quantity="many">عرض %1$d من %2$d قناةً · جارٍ تحميل المزيد…</item>
+        <item quantity="other">عرض %1$d من %2$d قناة · جارٍ تحميل المزيد…</item>
+    </plurals>
+    <plurals name="gr_row_sub">
+        <item quantity="zero">%1$s · %2$s · لا قنوات</item>
+        <item quantity="one">%1$s · %2$s · قناة واحدة</item>
+        <item quantity="two">%1$s · %2$s · قناتان</item>
+        <item quantity="few">%1$s · %2$s · %3$d قنوات</item>
+        <item quantity="many">%1$s · %2$s · %3$d قناةً</item>
+        <item quantity="other">%1$s · %2$s · %3$d قناة</item>
+    </plurals>
+    <plurals name="gs_broken_sources">
+        <item quantity="zero">لا مصادر فاشلة.</item>
+        <item quantity="one">مصدر واحد فشل آخر مرة. أعد مزامنته للمحاولة مجدداً.</item>
+        <item quantity="two">مصدران فشلا آخر مرة. أعد مزامنتهما للمحاولة مجدداً.</item>
+        <item quantity="few">%1$d مصادر فشلت آخر مرة. أعد مزامنتها للمحاولة مجدداً.</item>
+        <item quantity="many">%1$d مصدراً فشل آخر مرة. أعد مزامنتها للمحاولة مجدداً.</item>
+        <item quantity="other">%1$d مصدر فشل آخر مرة. أعد مزامنتها للمحاولة مجدداً.</item>
+    </plurals>
+    <plurals name="gs_counts_channels">
+        <item quantity="zero">لا قنوات</item>
+        <item quantity="one">قناة واحدة</item>
+        <item quantity="two">قناتان</item>
+        <item quantity="few">%1$d قنوات</item>
+        <item quantity="many">%1$d قناةً</item>
+        <item quantity="other">%1$d قناة</item>
+    </plurals>
+    <plurals name="gs_counts_programmes">
+        <item quantity="zero">لا برامج</item>
+        <item quantity="one">برنامج واحد</item>
+        <item quantity="two">برنامجان</item>
+        <item quantity="few">%1$d برامج</item>
+        <item quantity="many">%1$d برنامجاً</item>
+        <item quantity="other">%1$d برنامج</item>
+    </plurals>
+    <plurals name="gs_sources_with_epg">
+        <item quantity="zero">لا مصادر</item>
+        <item quantity="one">مصدر واحد لديه عنوان دليل</item>
+        <item quantity="two">%1$d من مصدرين لديهما عنوان دليل</item>
+        <item quantity="few">%1$d من %2$d مصادر لديها عنوان دليل</item>
+        <item quantity="many">%1$d من %2$d مصدراً لديه عنوان دليل</item>
+        <item quantity="other">%1$d من %2$d مصدر لديه عنوان دليل</item>
+    </plurals>
+    <plurals name="gs_src_line">
+        <item quantity="zero">• %1$s  ·  لا قنوات  ·  </item>
+        <item quantity="one">• %1$s  ·  قناة واحدة  ·  </item>
+        <item quantity="two">• %1$s  ·  قناتان  ·  </item>
+        <item quantity="few">• %1$s  ·  %2$d قنوات  ·  </item>
+        <item quantity="many">• %1$s  ·  %2$d قناةً  ·  </item>
+        <item quantity="other">• %1$s  ·  %2$d قناة  ·  </item>
+    </plurals>
+    <plurals name="par_hidden_count">
+        <item quantity="zero">لا قنوات مخفية.</item>
+        <item quantity="one">قناة واحدة مخفية. انقر «إظهار» لاستعادتها.</item>
+        <item quantity="two">قناتان مخفيتان. انقر «إظهار» لاستعادة إحداهما.</item>
+        <item quantity="few">%1$d قنوات مخفية. انقر «إظهار» لاستعادة إحداها.</item>
+        <item quantity="many">%1$d قناةً مخفية. انقر «إظهار» لاستعادة إحداها.</item>
+        <item quantity="other">%1$d قناة مخفية. انقر «إظهار» لاستعادة إحداها.</item>
+    </plurals>
+    <plurals name="par_restored_count">
+        <item quantity="zero">لم تُستعد أي قناة</item>
+        <item quantity="one">تمت استعادة قناة واحدة</item>
+        <item quantity="two">تمت استعادة قناتين</item>
+        <item quantity="few">تمت استعادة %1$d قنوات</item>
+        <item quantity="many">تمت استعادة %1$d قناةً</item>
+        <item quantity="other">تمت استعادة %1$d قناة</item>
+    </plurals>
+    <plurals name="po_minutes">
+        <item quantity="zero">لا دقائق</item>
+        <item quantity="one">دقيقة واحدة</item>
+        <item quantity="two">دقيقتان</item>
+        <item quantity="few">%1$d دقائق</item>
+        <item quantity="many">%1$d دقيقةً</item>
+        <item quantity="other">%1$d دقيقة</item>
+    </plurals>
+    <plurals name="recording_notification_title">
+        <item quantity="zero">لا تسجيل جارٍ</item>
+        <item quantity="one">جارٍ تسجيل قناة واحدة</item>
+        <item quantity="two">جارٍ تسجيل قناتين</item>
+        <item quantity="few">جارٍ تسجيل %1$d قنوات</item>
+        <item quantity="many">جارٍ تسجيل %1$d قناةً</item>
+        <item quantity="other">جارٍ تسجيل %1$d قناة</item>
+    </plurals>
+    <plurals name="rs_in_days">
+        <item quantity="zero">اليوم</item>
+        <item quantity="one">بعد يوم واحد</item>
+        <item quantity="two">بعد يومين</item>
+        <item quantity="few">بعد %1$d أيام</item>
+        <item quantity="many">بعد %1$d يوماً</item>
+        <item quantity="other">بعد %1$d يوم</item>
+    </plurals>
+    <plurals name="se_soon_full_many">
+        <item quantity="zero">%1$s · لم يتبقَّ شيء</item>
+        <item quantity="one">%1$s · بقي يوم واحد</item>
+        <item quantity="two">%1$s · بقي يومان</item>
+        <item quantity="few">%1$s · بقيت %2$d أيام</item>
+        <item quantity="many">%1$s · بقي %2$d يوماً</item>
+        <item quantity="other">%1$s · بقي %2$d يوم</item>
+    </plurals>
+    <plurals name="sl_n_items">
+        <item quantity="zero">لا عناصر بعد</item>
+        <item quantity="one">عنصر واحد</item>
+        <item quantity="two">عنصران</item>
+        <item quantity="few">%1$d عناصر</item>
+        <item quantity="many">%1$d عنصراً</item>
+        <item quantity="other">%1$d عنصر</item>
+    </plurals>
+    <plurals name="time_hr_ago">
+        <item quantity="zero">الآن</item>
+        <item quantity="one">قبل ساعة واحدة</item>
+        <item quantity="two">قبل ساعتين</item>
+        <item quantity="few">قبل %1$d ساعات</item>
+        <item quantity="many">قبل %1$d ساعةً</item>
+        <item quantity="other">قبل %1$d ساعة</item>
+    </plurals>
+    <string name="gs_counts_join">%1$s · %2$s</string>
 </resources>

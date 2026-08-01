@@ -1194,7 +1194,7 @@ private fun PreviewFactsLine(item: ContentItem, meta: ContentMetadata?, type: Co
                 meta?.genre?.takeIf { it.isNotBlank() }?.let { add(it) }
                 if (type == ContentType.SERIES) {
                     meta?.episodes?.size?.takeIf { it > 0 }?.let {
-                        add(ctx.getString(R.string.cf_episodes_count, it))
+                        add(ctx.resources.getQuantityString(R.plurals.cf_episodes_count, it, it))
                     }
                 } else {
                     meta?.duration?.takeIf { it.isNotBlank() }?.let { add(it) }

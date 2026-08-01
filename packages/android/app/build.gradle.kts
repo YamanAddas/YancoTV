@@ -288,6 +288,26 @@ android {
         // already documents the placeholder state. Keeping this as a
         // blocking lint error would fail CI on every run until then.
         disable += "MissingTvBanner"
+        // MB-339 — the fr/es `many` category, demoted to informational rather
+        // than baselined or fixed. Three reasons, in order:
+        //
+        //  1. Modern CLDR gives French and Spanish a `many` category, but it
+        //     selects only for EXACT multiples of a million ("1 000 000 **de**
+        //     chaînes"). Absent it, Android falls back to `other`, which is a
+        //     numeral-led count and perfectly comprehensible.
+        //  2. For most of the 22 plurals the quantity is unreachable — a source
+        //     expiring in 1,000,000 days, a million hidden channels. Authoring
+        //     grammar for states that cannot occur is worse than the fallback.
+        //  3. Duplicating the `other` text into a `many` item would silence the
+        //     check without changing a single rendered string, which is the
+        //     cargo-cult version of fixing it.
+        //
+        // The part that DOES matter — Arabic declaring all six categories, no
+        // plural missing `other`, no dead categories, no format-argument
+        // overrun — is asserted by PluralResourceParityTest, which is locale-
+        // aware and fails on a seeded defect. `informational` rather than
+        // `disable` so the finding stays visible in the report.
+        informational += "MissingQuantity"
         // D.1a baseline (2026-04-24): captures the 113 warnings that
         // existed at commit time so NEW warnings fail the build but
         // old ones don't block. To regenerate after intentional cleanup:
@@ -671,4 +691,19 @@ sentry {
     tracingInstrumentation {
         enabled.set(false)
     }
+}
+
+// MB-339 — PluralResourceParityTest reads src/main/res/values*/strings.xml off
+// the filesystem, because the resource files ARE the artefact under test and
+// Robolectric resolves only one locale per run. Gradle has no way to know that,
+// so without this declaration the test task stays UP-TO-DATE when a translation
+// changes and silently never runs. That is not hypothetical: the first
+// negative-control of that test reported GREEN against a deliberately broken
+// Arabic plural, because the task was skipped rather than executed. Declaring
+// the directory as an input makes an edit to any strings.xml re-run the suite.
+tasks.withType<Test>().configureEach {
+    inputs
+        .dir(layout.projectDirectory.dir("src/main/res"))
+        .withPropertyName("androidStringResources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

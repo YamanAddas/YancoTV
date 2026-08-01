@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -632,7 +633,8 @@ private fun formatLastChecked(millis: Long?): String {
     return when {
         mins < 1L -> stringResource(R.string.time_just_now)
         mins < 60L -> stringResource(R.string.time_min_ago, mins)
-        mins < 24L * 60L -> stringResource(R.string.time_hr_ago, mins / 60L)
+        mins < 24L * 60L ->
+            pluralStringResource(R.plurals.time_hr_ago, (mins / 60L).toInt(), mins / 60L)
         else -> stringResource(R.string.time_d_ago, mins / (24L * 60L))
     }
 }

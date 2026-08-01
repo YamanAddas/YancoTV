@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -289,7 +290,11 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                             // it landed.
                             android.widget.Toast.makeText(
                                 context,
-                                context.getString(R.string.par_restored_count, count),
+                                context.resources.getQuantityString(
+                                    R.plurals.par_restored_count,
+                                    count,
+                                    count,
+                                ),
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                         },
@@ -303,7 +308,7 @@ fun SettingsParentalTab(modifier: Modifier = Modifier, repo: ParentalRepository 
                 if (hiddenIds.isEmpty()) {
                     stringResource(R.string.par_none_hidden)
                 } else {
-                    stringResource(R.string.par_hidden_count, hiddenIds.size)
+                    pluralStringResource(R.plurals.par_hidden_count, hiddenIds.size, hiddenIds.size)
                 },
                 color = LocalYancoPalette.current.TextMuted,
                 fontSize = 12.sp,
