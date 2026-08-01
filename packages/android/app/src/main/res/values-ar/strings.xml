@@ -1116,4 +1116,7 @@
     <!-- MB-337 fail-closed notification text -->
     <string name="rsf_reason_state_unreadable">لم يتمكن YancoTV من التحقق مما إذا كان هناك تسجيل آخر قيد التشغيل، فتجاوز هذا التسجيل بدلاً من المخاطرة بإتلاف كليهما. أعد المحاولة.</string>
     <string name="rs_reason_state_unreadable">تعذّر التحقق من التسجيلات الأخرى</string>
+
+    <!-- MB-340 dock time + episode kicker -->
+    <string name="vd_ends_at">ينتهي %1$s</string>
 </resources>

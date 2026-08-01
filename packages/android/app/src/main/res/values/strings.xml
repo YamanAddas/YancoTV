@@ -1171,4 +1171,8 @@
     <!-- MB-337 fail-closed notification text -->
     <string name="rsf_reason_state_unreadable">YancoTV couldn\'t check whether another recording was already running, so it skipped this one rather than risk breaking both. Try the recording again.</string>
     <string name="rs_reason_state_unreadable">couldn\'t check for other recordings</string>
+
+    <!-- MB-340 dock time + episode kicker -->
+    <string name="vd_ends_at">ENDS %1$s</string>
+    <string name="vd_episode_kicker" translatable="false">%1$s · %2$s</string>
 </resources>

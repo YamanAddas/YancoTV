@@ -62,7 +62,6 @@ import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
-import java.util.Locale
 
 /**
  * Concept A port of the VOD "controller visible" state. Replaces Media3's
@@ -325,8 +324,13 @@ private fun MetadataChip(chip: VodDockChip) {
 private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Unit, onUserInteraction: () -> Unit) {
     val palette = LocalYancoPalette.current
     val duration = progress.durationMs.coerceAtLeast(1L)
-    val playedPct = (progress.playedMs.toFloat() / duration).coerceIn(0f, 1f)
-    val bufferedPct = (progress.bufferedMs.toFloat() / duration).coerceIn(0f, 1f)
+    // MB-340 — with an unknown duration the old `coerceAtLeast(1L)` divisor made
+    // both fills saturate to 100% the moment position passed 1 ms, so an
+    // unprepared or duration-less stream showed a completed progress bar. Render
+    // an empty track instead: no duration means no known progress.
+    val durationKnown = progress.durationMs > 0L
+    val playedPct = if (durationKnown) (progress.playedMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
+    val bufferedPct = if (durationKnown) (progress.bufferedMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
 
     // Touch-scrub state. While the user drags the bar, render at [scrubPct] and
     // show the dragged time; commit the seek on release. null = follow playback.
@@ -334,6 +338,18 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
     var scrubPct by remember { mutableStateOf<Float?>(null) }
     val shownPct = (scrubPct ?: playedPct).coerceIn(0f, 1f)
     val shownMs = scrubPct?.let { (it * duration).toLong() } ?: progress.playedMs
+
+    // MB-340 — derived from shownMs (not progress.playedMs) so the labels track
+    // the thumb during a touch drag instead of the underlying playback position.
+    // `nowMs` is read per recomposition rather than remembered: the dock ticks at
+    // 2 Hz while visible, so the ends-at clock stays honest without its own timer.
+    val labels = DockTimeFormatter.labels(
+        playedMs = shownMs,
+        durationMs = progress.durationMs,
+        isLive = false,
+        nowMs = System.currentTimeMillis(),
+        zone = java.time.ZoneId.systemDefault(),
+    )
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -366,7 +382,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
             },
     ) {
         Text(
-            text = formatMillis(shownMs),
+            text = labels.elapsed,
             color = palette.Accent,
             fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
@@ -435,24 +451,39 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
                     .background(palette.Accent),
             )
         }
-        Text(
-            text = formatMillis(progress.durationMs),
-            color = palette.TextMuted,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(80.dp),
-        )
+        // MB-340 — was a bare duration, which is the one time fact you can work
+        // out for yourself. Remaining is the headline; the ends-at wall clock
+        // sits under it in a lighter weight.
+        //
+        // A Column, not a wider single label: the map measured both slots pinned
+        // at width(80.dp) sized for "00:00:00", and appending "· ENDS 21:47"
+        // there would wrap (the Text has no maxLines) and grow the row height —
+        // the same column that produced MB-300 at 125% font scale. Stacking keeps
+        // the row height governed by the bar, and 96dp fits "-1:59:59" with the
+        // sign at every shipped preset.
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier.width(96.dp),
+        ) {
+            Text(
+                text = labels.remaining ?: labels.elapsed,
+                color = palette.TextMuted,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            labels.endsAt?.let { endsAt ->
+                Text(
+                    text = stringResource(R.string.vd_ends_at, endsAt),
+                    color = palette.TextFaint,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                )
+            }
+        }
     }
-}
-
-private fun formatMillis(ms: Long): String {
-    if (ms <= 0L) return "00:00:00"
-    val totalSec = ms / 1000L
-    val h = totalSec / 3600L
-    val m = (totalSec % 3600L) / 60L
-    val s = totalSec % 60L
-    return String.format(Locale.ROOT, "%02d:%02d:%02d", h, m, s)
 }
 
 // ---------------------------------------------------------------------

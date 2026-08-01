@@ -793,6 +793,15 @@ class PlayerActivity : AppCompatActivity() {
         attachShared()
         startProgressTicker()
         startLiveOffsetTicker()
+        // MB-340 — onStop cancels the dock ticker but nothing restarted it, and
+        // onStop does not clear dockVisible. Returning from background with the
+        // dock up therefore left it rendered but frozen. Harmless while it only
+        // showed a stale position; with an ends-at wall clock it would state a
+        // finish time wrong by however long the app was away.
+        if (dockVisible) {
+            startDockProgressTicker()
+            resetDockAutoHide()
+        }
     }
 
     override fun onPause() {
@@ -2177,7 +2186,15 @@ class PlayerActivity : AppCompatActivity() {
         item.groupName?.takeIf { it.isNotBlank() }?.let {
             chips += VodDockChip(label = it.uppercase(Locale.ROOT))
         }
+        // MB-340 — episode context for series. Read once per dock show, which is
+        // sufficient: onItemChanged hides the dock on every item swap, so it is
+        // always rebuilt after a title change. Null for movies, and the dock is
+        // never shown for LIVE at all, so both degrade to the brand kicker.
+        val kicker = episodeKicker(controller.currentEpisode.value)?.let { k ->
+            if (k.title != null) getString(R.string.vd_episode_kicker, k.code, k.title) else k.code
+        }
         return VodDockData(
+            kicker = kicker,
             title = title,
             chips = chips,
             isPlaying = controller.player.playWhenReady,
