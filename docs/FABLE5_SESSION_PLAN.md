@@ -97,7 +97,34 @@ rollover). Author B supplies episode context.
 three distinct label nodes on a movie — `12:34`, `-32:26`, `Ends at 21:47` — and
 an `S01E02 · <title>` kicker on an episode.
 
-### W3 — Arabic counts: real `<plurals>` + the 8 mistranslations (~2.5h) · file as MK.31.4
+### W3 — Arabic counts: real `<plurals>` + the 8 mistranslations (~2.5h) · file as MK.31.4 — **SHIPPED** `d7adb85` + `9364267`
+
+> **Outcome (2026-08-01).** 23 plurals × 4 locales, 24 flat strings retired, 13
+> call sites converted, two hand-rolled `if (count == 1)` rules collapsed into
+> the resource. 5 of the listed mistranslations were confirmed and fixed; the
+> `par_restored_count` entry below turned out to be the plurals defect rather
+> than a separate wording error, and 9 breadcrumb arrows were normalised to the
+> RTL-correct `←`.
+>
+> **The plan's proof requirement caught three of my own bugs**, which is the
+> whole reason it was written that way:
+> 1. Folding `sl_no_items` into the plural killed "no items yet" in en/fr/es —
+>    CLDR has no `zero` for those languages, so `n == 0` selects `other`.
+> 2. French `one` covers **0 and 1**, so eight French `one` items with a
+>    hardcoded "1" would render "1 ligne restaurée" for zero. Lint's
+>    `ImpliedQuantity` found it; the parity test now asserts it too.
+> 3. `PluralResourceParityTest` was **green against a deliberately broken
+>    Arabic plural** — it reads `res/` off the filesystem and Gradle had no
+>    reason to re-run the task, so it was skipped as UP-TO-DATE. Fixed by
+>    declaring `src/main/res` as a test input. Without that the whole class was
+>    theatre. **Generalises: any test that reads files Gradle does not know
+>    about must declare them, or its negative control is meaningless.**
+>
+> Correction to the plan text below: two-count strings did **not** need
+> splitting. `getQuantityString` takes the selector separately from the format
+> args, so `Showing %1$d of %2$d channels` is one plural keyed on the total.
+> Only `gs_counts` and `bk_export_ok` needed it — there the counts govern two
+> different nouns.
 
 **This closes the Arabic review that was requested and interrupted.** The auditor
 compared *every* one of ~985 keys and rates the translation professional-grade
