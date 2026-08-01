@@ -1,8 +1,8 @@
 package com.yancotv.android.player
 
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
  * `an unknown duration yields no remaining and no ends-at` red.
  */
 class DockTimeLabelsTest {
-    private val utc: ZoneId = ZoneId.of("UTC")
+    private val utc: TimeZone = TimeZone.getTimeZone("UTC")
     private var saved: Locale? = null
 
     @BeforeTest fun pinLocale() {
@@ -42,7 +42,13 @@ class DockTimeLabelsTest {
         saved?.let { Locale.setDefault(it) }
     }
 
-    private fun epoch(y: Int, mo: Int, d: Int, h: Int, mi: Int, zone: ZoneId): Long = ZonedDateTime.of(y, mo, d, h, mi, 0, 0, zone).toInstant().toEpochMilli()
+    /** Wall-clock in [zone] -> epoch millis. Calendar months are 0-based. */
+    private fun epoch(y: Int, mo: Int, d: Int, h: Int, mi: Int, zone: TimeZone): Long {
+        val c = Calendar.getInstance(zone)
+        c.clear()
+        c.set(y, mo - 1, d, h, mi, 0)
+        return c.timeInMillis
+    }
 
     // ───── Elapsed formatting ─────
 
@@ -150,7 +156,7 @@ class DockTimeLabelsTest {
         // arithmetic ((now + remaining) / 3_600_000 % 24) gets this wrong twice a
         // year for everyone in a DST zone, which is why the implementation uses
         // ZonedDateTime.
-        val london = ZoneId.of("Europe/London")
+        val london = TimeZone.getTimeZone("Europe/London")
         val now = epoch(2026, 3, 29, 0, 30, london)
         val l = DockTimeFormatter.labels(0L, 90L * 60_000L, isLive = false, nowMs = now, zone = london)
         assertEquals("03:00", l.endsAt)
@@ -168,8 +174,8 @@ class DockTimeLabelsTest {
         // CET wall-clock. Naive `(epochMs / 3_600_000) % 24` renders 01:00,
         // because it ignores the zone entirely. The two answers differ, so this
         // case actually discriminates.
-        val berlin = ZoneId.of("Europe/Berlin")
-        val now = ZonedDateTime.of(2026, 10, 25, 1, 30, 0, 0, berlin).toInstant().toEpochMilli()
+        val berlin = TimeZone.getTimeZone("Europe/Berlin")
+        val now = epoch(2026, 10, 25, 1, 30, berlin)
         val l = DockTimeFormatter.labels(0L, 90L * 60_000L, isLive = false, nowMs = now, zone = berlin)
         assertEquals("02:00", l.endsAt)
     }
@@ -180,7 +186,7 @@ class DockTimeLabelsTest {
         // a hardcoded UTC would show the wrong finish time to most of the world.
         val now = epoch(2026, 8, 1, 12, 0, utc)
         val inUtc = DockTimeFormatter.labels(0L, 60L * 60_000L, false, now, utc).endsAt
-        val inRiyadh = DockTimeFormatter.labels(0L, 60L * 60_000L, false, now, ZoneId.of("Asia/Riyadh")).endsAt
+        val inRiyadh = DockTimeFormatter.labels(0L, 60L * 60_000L, false, now, TimeZone.getTimeZone("Asia/Riyadh")).endsAt
         assertEquals("13:00", inUtc)
         assertEquals("16:00", inRiyadh)
     }

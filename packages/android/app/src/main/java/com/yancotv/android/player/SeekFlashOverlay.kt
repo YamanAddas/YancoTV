@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
+import kotlin.math.abs
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -76,11 +77,16 @@ private fun FlashBadge(seconds: Int) {
         horizontalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = if (seconds > 0) {
-                stringResource(R.string.sf_forward, seconds)
-            } else {
-                stringResource(R.string.sf_back, seconds)
-            },
+            // MB-341 — a duration, not a raw second count. MB-338's accelerating
+            // hold reaches 300 s per tick, so the old "%1$ds" rendered
+            // "◂◂  -1250s" — arithmetic the viewer has to do mid-scrub. Reuses
+            // DockTimeFormatter so the badge and the dock agree on formatting and
+            // on locale-aware digits, and the sign now lives in the string
+            // resource rather than riding on the number.
+            text = stringResource(
+                if (seconds > 0) R.string.sf_forward else R.string.sf_back,
+                DockTimeFormatter.formatClock(abs(seconds) * 1_000L),
+            ),
             color = Color.White,
             fontSize = 26.sp,
             fontWeight = FontWeight.SemiBold,

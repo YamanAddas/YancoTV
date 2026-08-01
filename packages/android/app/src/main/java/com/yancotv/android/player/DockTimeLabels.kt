@@ -1,8 +1,7 @@
 package com.yancotv.android.player
 
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import java.util.Calendar
+import java.util.TimeZone
 
 /**
  * MB-340 (plan W2 / MK.25.B.1) — the three time facts the VOD dock shows.
@@ -47,7 +46,7 @@ object DockTimeFormatter {
      * @param nowMs wall clock, injected.
      * @param zone the device zone, injected.
      */
-    fun labels(playedMs: Long, durationMs: Long, isLive: Boolean, nowMs: Long, zone: ZoneId): DockTimeLabels {
+    fun labels(playedMs: Long, durationMs: Long, isLive: Boolean, nowMs: Long, zone: TimeZone): DockTimeLabels {
         val elapsed = formatClock(playedMs.coerceAtLeast(0L))
         if (isLive || durationMs <= 0L) {
             return DockTimeLabels(elapsed = elapsed, remaining = null, endsAt = null)
@@ -93,14 +92,29 @@ object DockTimeFormatter {
     /**
      * 24-hour `HH:mm` in [zone].
      *
-     * `ZonedDateTime` rather than arithmetic on the epoch: a DST transition
+     * A real calendar rather than arithmetic on the epoch: a DST transition
      * between now and the end of a film shifts the wall clock by an hour, and
      * `(nowMs + remainingMs) / 3_600_000 % 24` would silently be wrong for
-     * everyone in a DST zone twice a year. The zone does the work.
+     * everyone in a DST zone twice a year. The [TimeZone] carries the transition
+     * rules and does that work.
+     *
+     * **MB-342 — `java.util.Calendar`, NOT `java.time`.** `ZonedDateTime` /
+     * `Instant` are API 26 and this module is minSdk 24 with no core-library
+     * desugaring, so they throw `NoClassDefFoundError` on Fire OS 6. That is the
+     * same crash class as MB-241 and MB-294 (which fixed the backup-export
+     * filename exactly this way); this was its third appearance in the project,
+     * caught by lint's NewApi before it shipped. Calendar is API 1 and equally
+     * DST-correct — it is only clumsier to read.
      */
-    fun formatWallClock(epochMs: Long, zone: ZoneId): String {
-        val t: ZonedDateTime = Instant.ofEpochMilli(epochMs).atZone(zone)
-        return String.format(java.util.Locale.getDefault(), "%02d:%02d", t.hour, t.minute)
+    fun formatWallClock(epochMs: Long, zone: TimeZone): String {
+        val cal = Calendar.getInstance(zone)
+        cal.timeInMillis = epochMs
+        return String.format(
+            java.util.Locale.getDefault(),
+            "%02d:%02d",
+            cal.get(Calendar.HOUR_OF_DAY),
+            cal.get(Calendar.MINUTE),
+        )
     }
 
     /** Sentinel for callers that want to be explicit rather than passing 0. */

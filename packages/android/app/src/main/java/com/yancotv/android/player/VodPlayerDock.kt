@@ -348,7 +348,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
         durationMs = progress.durationMs,
         isLive = false,
         nowMs = System.currentTimeMillis(),
-        zone = java.time.ZoneId.systemDefault(),
+        zone = java.util.TimeZone.getDefault(),
     )
 
     Row(

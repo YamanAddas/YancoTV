@@ -816,6 +816,11 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        // MB-341 — seekFlashJob was cancelled nowhere at all (one of four such
+        // jobs in this file). Backgrounding mid-gesture left it pending.
+        seekFlashJob?.cancel()
+        seekFlashJob = null
+        seekFlashFlow.value = 0
         // MB-338 — belt and braces. onPause already ends it, but onStop is where
         // the surface is surrendered (clearVideoSurfaceView below), and a hold
         // that somehow survived to here must not reach a player whose output this
@@ -1787,7 +1792,11 @@ class PlayerActivity : AppCompatActivity() {
      * navigated away from.
      */
     private fun endSeekHold() {
+        val wasHolding = seekHoldActive
         seekHoldActive = false
+        // MB-341 — the badge stayed up for the whole gesture; start its hide now
+        // that the key is released.
+        if (wasHolding) scheduleSeekFlashHide()
     }
 
     /**
@@ -1811,16 +1820,22 @@ class PlayerActivity : AppCompatActivity() {
     private fun commitSeek(deltaSec: Int) {
         val p = controller.player
         val isLive = controller.currentItem.value?.type == ContentType.LIVE
-        val target = p.currentPosition + deltaSec * 1_000L
+        val before = p.currentPosition
+        val target = before + deltaSec * 1_000L
         val clamped =
             if (isLive) {
                 val offset = p.currentLiveOffset.takeIf { it != C.TIME_UNSET } ?: 0L
-                target.coerceIn(0L, p.currentPosition + offset.coerceAtLeast(0L))
+                target.coerceIn(0L, before + offset.coerceAtLeast(0L))
             } else {
                 SeekAccelerator.clampTargetMs(target, p.duration)
             }
+        // MB-341 — report what actually MOVED, not what was asked for. At the
+        // end of a clip (or the live edge) the clamp absorbs the request, and
+        // summing the requested delta made the badge keep counting up while the
+        // position sat still — it claimed a rewind that was not happening.
+        val appliedMs = clamped - before
         p.seekTo(clamped)
-        onUserSeek(deltaSec)
+        onUserSeek((appliedMs / 1_000L).toInt())
     }
 
     private fun onUserSeek(deltaSec: Int) {
@@ -1828,6 +1843,19 @@ class PlayerActivity : AppCompatActivity() {
         lastSeekAtMs = android.os.SystemClock.elapsedRealtime()
         // A.2 — accumulating multi-press flash.
         seekFlashFlow.value = seekFlashFlow.value + deltaSec
+        seekFlashJob?.cancel()
+        seekFlashJob = null
+        // MB-341 — while a hold is in flight the badge must NOT be on a timer.
+        // Android's auto-repeat has an initial delay (~400-500 ms) longer than
+        // the gap between subsequent repeats, so a 600 ms hide restarted per
+        // tick still expired in the window between the first press and the first
+        // repeat: the badge blinked out and came back one tick later. The hide is
+        // scheduled by endSeekHold() instead, once the key is actually released.
+        if (!seekHoldActive) scheduleSeekFlashHide()
+    }
+
+    /** MB-341 — clear the badge [SEEK_FLASH_HIDE_MS] after the last movement. */
+    private fun scheduleSeekFlashHide() {
         seekFlashJob?.cancel()
         seekFlashJob =
             lifecycleScope.launch {
