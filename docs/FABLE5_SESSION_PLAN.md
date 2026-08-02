@@ -163,7 +163,39 @@ seeded defect (drop one `ar` category → red), which also emits a rendered tabl
 every plural × {0,1,2,3,11,100} per locale as a test artifact. That printout is
 the actual check; the assertion is just the tripwire.
 
-### W4 — Up-next bumper for series (~2h) · **CUT FIRST**
+### W4 — Up-next bumper for series (~2h) · **SHIPPED** `f984bcc` (was CUT-FIRST)
+
+> **Outcome (2026-08-01).** Shipped as MB-343, and the survey changed the shape of
+> it. The plan assumed W4 was purely a UI addition; it isn't. The dock's `›` NEXT
+> transport button — shipped in MK.16.player.vod.dock precisely to go to the next
+> thing — has been **dead for every episode** since, because `play(episode)`
+> synthesises a one-item queue and the button gated on `queue.size > 1`. So the
+> "no way to jump early" half was a **bug fix**, not a feature, and wiring that
+> existing button is strictly better than the new activation surface all three
+> candidate designs proposed: already focusable, already RTL-correct, one CENTER
+> press away, and it dissolves the "which control owns CENTER" problem every
+> design struggled with.
+>
+> The card itself is deliberately inert — no focus target, no key binding, absent
+> from `noOverlay`, advances nothing — and adds **zero coroutines**, riding the
+> existing 1 Hz live-offset ticker.
+>
+> **Process note worth keeping.** A 31-agent adversarial review found 13 defects;
+> 9 survived independent refutation and were all fixed before commit. The one
+> that mattered most was invisible to me and to all three designers:
+> `autoPlayNext` **defaults to off**, so the countdown was promising an advance
+> that would never happen. Two of the review's own suggested fixes were wrong for
+> this codebase and were rejected on inspection — comparing
+> `currentMediaItem?.mediaId` to `currentId` would have silently disabled the
+> MB-VOD-LOOP protection, since nothing calls `setMediaId`. Four findings were
+> killed by refutation and correctly left alone.
+>
+> Filed rather than fixed inside the diff: **MB-344** (`autoplayInFlight` latches
+> true on the error path — widening a guard inside the commit that adds a second
+> claimant to it is how you ship two bugs) and **MB-345** (dock auto-hide not
+> reset by focus traversal; both refuters judged it a non-defect).
+>
+> **Not device-verified** — no test hardware reachable. See §6.
 
 Autoplay already fires from `STATE_ENDED` (`51f1e20`) with no warning and no way
 to jump early, so a binge either lurches into the next episode or you sit through
