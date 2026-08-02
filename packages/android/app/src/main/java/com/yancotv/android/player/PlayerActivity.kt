@@ -49,6 +49,7 @@ import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.ResizeMode
 import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.http.redactCredentials
+import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.playback.toPlayable
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentType
@@ -166,6 +167,31 @@ class PlayerActivity : AppCompatActivity() {
     // flashes — TV remotes spam keys.
     private val seekFlashFlow = kotlinx.coroutines.flow.MutableStateFlow(0)
     private var seekFlashJob: Job? = null
+
+    // ───── MB-343 (W4) — up-next card ─────
+    //
+    // The card is driven entirely off the existing 1 Hz live-offset ticker
+    // (see renderUpNext), so this feature adds NO new coroutine and therefore
+    // no new entry to onStop's hand-maintained cancel list. That list has
+    // already drifted three times — bufferingShowJob, networkRetryJob and
+    // longPressJob are all still missing from it — and MB-341 was one job
+    // cancelled nowhere at all. Not adding a tenth job is the point.
+    private val upNextFlow = kotlinx.coroutines.flow.MutableStateFlow(UpNextCardData())
+
+    // The next episode, resolved ONCE per episode load rather than per tick:
+    // nextEpisodeAfter is a blocking SQLDelight call with no LIMIT that
+    // materialises the whole series (a 300-episode anime row is real), so a
+    // per-tick lookup would be a visible jank source.
+    //
+    // Captured at resolve time and used verbatim by both consumers. Deliberately
+    // NOT re-derived from controller.currentEpisode at press time: if autoplay
+    // has already advanced _currentEpisode, a fresh lookup would return the one
+    // AFTER the target and silently skip an episode.
+    private var upNextTarget: Playable.Episode? by mutableStateOf(null)
+    private var upNextResolveJob: Job? = null
+
+    /** Episode id [upNextTarget] was resolved for — see [resolveUpNextTarget]. */
+    private var upNextResolvedFor: String? = null
 
     // MK.10.4 — numeric channel-jump state. Activity-scoped (a fresh
     // PlayerActivity gets a fresh entry buffer); not Koin since nothing
@@ -492,7 +518,24 @@ class PlayerActivity : AppCompatActivity() {
                             // also at credits → loop. Idempotent with the 95%-cap
                             // inside resumePointDecision, but covers streams with
                             // unknown duration where the % rule can't fire.
-                            controller.markCurrentCompleted()
+                            // MB-343 — guard added. markCurrentCompleted()
+                            // reads controller state, NOT the item that ended, so
+                            // a residual ENDED arriving after the queue has
+                            // already moved on marks the NEWLY STARTED episode as
+                            // fully watched. autoplayInFlight is exactly the
+                            // "an advance is in flight" signal: it is false on
+                            // the first ENDED (so the outgoing item is still
+                            // correctly completed) and true for a second ENDED
+                            // after either autoplay or a manual dock NEXT.
+                            //
+                            // Comparing player.currentMediaItem?.mediaId against
+                            // controller.currentId would look tidier and is
+                            // WRONG here: nothing in PlaybackController calls
+                            // setMediaId, so every item's mediaId is the empty
+                            // default and the comparison would never match —
+                            // silently disabling the completion write and the
+                            // MB-VOD-LOOP protection it exists for.
+                            if (!autoplayInFlight) controller.markCurrentCompleted()
                             tryAutoplayNextEpisode()
                         }
                     }
@@ -566,6 +609,19 @@ class PlayerActivity : AppCompatActivity() {
                 )
                 setThemedContent {
                     SeekFlashOverlay(seekFlashFlow = seekFlashFlow)
+                }
+            }
+
+        // MB-343 (W4) — up-next card. Eager for the same reason as seek-flash:
+        // it renders nothing while `visible` is false, and the trigger is a
+        // 1 Hz tick that must not pay a stub-inflation cost mid-countdown.
+        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.up_next)
+            .apply {
+                setViewCompositionStrategy(
+                    androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
+                setThemedContent {
+                    UpNextOverlay(flow = upNextFlow)
                 }
             }
 
@@ -821,6 +877,19 @@ class PlayerActivity : AppCompatActivity() {
         seekFlashJob?.cancel()
         seekFlashJob = null
         seekFlashFlow.value = 0
+        // MB-343 — no job to cancel (the card rides the live-offset ticker,
+        // killed below), but the VISIBLE flag must not survive backgrounding —
+        // MB-340's shape, where onStop cancelled the dock's ticker and left
+        // dockVisible set so the dock returned rendered but frozen.
+        //
+        // Clearing here is NOT sufficient on its own, and an earlier version of
+        // this comment wrongly claimed it was: onStart restarts the ticker,
+        // which re-derives the card one tick later from a position that onStop
+        // itself froze (it pauses non-live playback a few lines below, and
+        // nothing resumes it). The real fix is the `isPlaying` gate inside
+        // UpNextDecision.shouldShow — this clear only avoids one stale frame
+        // before that gate takes over.
+        upNextFlow.value = UpNextCardData()
         // MB-338 — belt and braces. onPause already ends it, but onStop is where
         // the surface is surrendered (clearVideoSurfaceView below), and a hold
         // that somehow survived to here must not reach a player whose output this
@@ -922,6 +991,11 @@ class PlayerActivity : AppCompatActivity() {
         // built-in PlayerView controller also hides itself in PIP mode
         // automatically via useController behaviour.
         if (inPip) {
+            // MB-343 — same reason as the dock/surf/options sites: the tick would
+            // otherwise leave the card drawn inside the shrunken PiP window for
+            // up to a second, and onStop is not guaranteed to run while a PiP
+            // window is visible.
+            upNextFlow.value = UpNextCardData()
             playerView.useController = false
             zapBar.visibility = View.GONE
             quickInfo.visibility = View.GONE
@@ -1023,6 +1097,10 @@ class PlayerActivity : AppCompatActivity() {
         // the right signal for the cold-start / zap case.
         hideChrome()
         hideVodDock()
+        // MB-343 — autoplay's controller.play(next) lands here too, so without
+        // this the card would survive onto the very episode it announced and
+        // advertise it as "up next" while it plays.
+        resolveUpNextTarget()
         hasBeenReady = false
         bufferingShowJob?.cancel()
         bufferingShowJob = null
@@ -1260,6 +1338,14 @@ class PlayerActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 while (isActive) {
                     renderLiveOffset()
+                    // MB-343 — the up-next card rides this ticker rather than
+                    // owning one. Both consumers want ~1 Hz, both early-return
+                    // cheaply when they have nothing to do, and this job is
+                    // already started in onStart and cancelled in onStop, so
+                    // the card inherits correct lifecycle handling for free
+                    // instead of adding a tenth entry to a cancel list that has
+                    // drifted three times.
+                    renderUpNext()
                     delay(LIVE_OFFSET_TICK_MS)
                 }
             }
@@ -1361,6 +1447,12 @@ class PlayerActivity : AppCompatActivity() {
     // ───── MK.options.redesign — new options popup + per-category panels ─────
 
     private fun showOptionsV2(initialCategory: com.yancotv.android.player.options.PlayerOptionCategory? = null) {
+        // MB-343 — clear the up-next card the instant a surface that suppresses
+        // it appears. UpNextDecision already treats these as suppressors, but it
+        // is only consulted on the 1 Hz tick, so without this the card kept
+        // drawing over the new surface for up to a second plus its exit
+        // animation.
+        upNextFlow.value = UpNextCardData()
         ensureOptionsV2()
         playerView.hideController()
         // Audit: same defense the legacy sheet uses. Block PlayerView's
@@ -1906,6 +1998,179 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ───── MB-343 (W4) — up-next card + the dock's NEXT button ─────
+
+    /**
+     * Resolve the episode that follows the one now playing, once.
+     *
+     * Feeds two consumers: the up-next card's label, and the dock's NEXT
+     * transport button (which was dead for every episode before this — see the
+     * `hasNext` KDoc in [VodPlayerDock]). Both read [upNextTarget]; neither
+     * re-queries.
+     *
+     * No-ops into a null target for movies, live, `_rec_` local recordings and
+     * the last episode of a series — [ContentRepository.nextEpisodeAfter]
+     * returns null for "end of series" and "episode not in the local DB" alike,
+     * and both correctly mean "offer nothing".
+     *
+     * Same two blocking reads as [tryAutoplayNextEpisode], on `Dispatchers.IO`
+     * for the same reason. Kept as a separate lookup rather than shared state
+     * because autoplay must resolve at ENDED against whatever is current *then*,
+     * while this resolves ahead of time for display.
+     */
+    private fun resolveUpNextTarget() {
+        val episode = controller.currentEpisode.value
+        // onItemChanged is the callback of a repeatOnLifecycle(STARTED) collector
+        // on a StateFlow, so every ON_START replays the unchanged current item.
+        // Without this guard, returning from background re-ran the whole-series
+        // blocking read and blanked a target that was already correct — undoing
+        // the "resolve once per episode" property this function exists for.
+        // [upNextResolvedFor] is only set once a lookup for that id has
+        // COMPLETED, so matching it alone means "already answered" — including
+        // the answer "there is no next episode". Also testing upNextTarget != null
+        // would re-run the whole-series read on every resume for the last episode
+        // of any series, which is exactly the case that needs it least.
+        if (episode != null && episode.id == upNextResolvedFor) return
+        upNextResolveJob?.cancel()
+        upNextResolvedFor = null
+        upNextTarget = null
+        upNextFlow.value = UpNextCardData()
+        if (episode == null) return
+        upNextResolveJob =
+            lifecycleScope.launch {
+                val next =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            val info =
+                                contentRepo.nextEpisodeAfter(
+                                    seriesId = episode.seriesId,
+                                    currentEpisodeId = episode.id,
+                                )
+                            val series = contentRepo.findById(episode.seriesId)
+                            if (info == null || series == null) null else info.toPlayable(series)
+                        }.onFailure {
+                            // A corrupted episodes row must not take the player
+                            // down; the card and the NEXT button simply stay off.
+                            Log.w(TAG, "up-next: resolve failed for series=${episode.seriesId}", it)
+                        }.getOrNull()
+                    }
+                // The item can change while the IO read is in flight (a zap, or
+                // autoplay itself). Discard a stale answer rather than
+                // advertising the wrong episode.
+                if (controller.currentEpisode.value?.id != episode.id) return@launch
+                upNextResolvedFor = episode.id
+                upNextTarget = next
+                Log.i(TAG, "up-next: target=${next?.id ?: "none"} after=${episode.id}")
+            }
+    }
+
+    /**
+     * One tick of the up-next card. Called from the existing 1 Hz ticker.
+     *
+     * Reads position and duration fresh off `controller.player` every time:
+     * that field is a `var` the MK.9.4 FFmpeg watchdog releases and replaces, so
+     * a cached reference would poll a released ExoPlayer.
+     */
+    private fun renderUpNext() {
+        val target = upNextTarget
+        if (target == null) {
+            if (upNextFlow.value.visible) upNextFlow.value = UpNextCardData()
+            return
+        }
+        val p = controller.player
+        val positionMs = p.currentPosition
+        val durationMs = p.duration
+        // isPlaying, not playWhenReady: it is false while paused, while stalled,
+        // and at STATE_ENDED. The last one is what stops the card sitting on
+        // "NEXT IN 0:00" over the end frame when autoplay is off.
+        val playing = p.isPlaying
+        // Any surface that owns the screen suppresses the card. The dock is the
+        // important one: it already shows time remaining AND the NEXT button, so
+        // two cards in the same corner is worse than either alone.
+        val suppressed =
+            dockVisible ||
+                surfVisible ||
+                inPip ||
+                chromeState != VodChromeState.NONE ||
+                (optionsV2Inflated && optionsV2State.menuVisible.value)
+        val show =
+            UpNextDecision.shouldShow(
+                hasTarget = true,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                isPlaying = playing,
+                suppressed = suppressed,
+                wasShowing = upNextFlow.value.visible,
+            )
+        if (!show) {
+            if (upNextFlow.value.visible) upNextFlow.value = UpNextCardData()
+            return
+        }
+        val kicker = episodeKicker(target)
+        val label =
+            when {
+                kicker == null -> target.title
+                kicker.title == null -> kicker.code
+                else -> getString(R.string.vd_episode_kicker, kicker.code, kicker.title)
+            }
+        upNextFlow.value =
+            UpNextCardData(
+                visible = true,
+                label = label,
+                remainingMs = UpNextDecision.remainingMs(positionMs, durationMs),
+                // The countdown is only honest when something is actually going
+                // to happen at zero. autoPlayNext is OFF by default, so without
+                // this the default configuration counts down to nothing.
+                showCountdown = prefs.playbackFlow.value.autoPlayNext,
+            )
+    }
+
+    /**
+     * The dock's NEXT button.
+     *
+     * Routes to the prefetched episode when the queue has no siblings — which
+     * for episode playback is always, because `play(episode)` synthesises a
+     * one-item queue. Falls back to the queue step for movies and live.
+     *
+     * **Deliberately does NOT call `markCurrentCompleted()`.** That would race
+     * `play()`'s own `persistResumePoint()`: both write the SAME
+     * `(seriesId, episodeId)` history row from the same process-scoped
+     * dispatcher, the raw-position write is launched second, and on a short
+     * episode the row would settle below the read-side 95% "finished" threshold
+     * — leaving the episode in Continue Watching pointing at its own credits,
+     * which is exactly the MB-VOD-LOOP shape the ENDED path was patched to kill.
+     * A manual skip should record where the user actually stopped, so the single
+     * raw-position write `play()` already performs is the correct semantics.
+     * Natural completion still gets its `markCurrentCompleted()` at STATE_ENDED.
+     */
+    private fun advanceToNextEpisode() {
+        val target = upNextTarget
+        if (target == null) {
+            controller.next()
+            return
+        }
+        // Claim the same in-flight guard autoplay uses. Without it there is a
+        // narrow episode-SKIP race: a residual STATE_ENDED for the outgoing item
+        // arriving after this play() would run tryAutoplayNextEpisode, which
+        // reads controller.currentEpisode fresh — by then already the episode we
+        // just started — and would resolve and launch the one after THAT.
+        //
+        // The reverse order is already safe without this: autoplay captures its
+        // `episode` before its IO lookup, so a press landing mid-lookup ends with
+        // both paths targeting the same id and episodeLaunchDecision returning
+        // SameTarget (a no-op, no re-prepare).
+        //
+        // Inherits the guard's pre-existing weakness: it is cleared only on
+        // STATE_READY, so a target that never prepares leaves it latched and
+        // blocks autoplay for the life of the activity. That is a real bug but
+        // it predates this slice and belongs in its own MB-* rather than being
+        // widened here — and a stuck guard is a far better failure than silently
+        // skipping an episode.
+        autoplayInFlight = true
+        Log.i(TAG, "up-next: manual advance to ${target.id}")
+        controller.play(target)
+    }
+
     /**
      * Dismiss whatever chrome is up. Returns focus to the PlayerView so
      * D-pad drives the Media3 controller again.
@@ -2060,6 +2325,11 @@ class PlayerActivity : AppCompatActivity() {
                 data = dockData,
                 progress = dockProgress,
                 hasSiblings = queueSnapshot.size > 1,
+                // MB-343 — NEXT is live whenever a next episode is prefetched,
+                // independent of the queue. Episode playback always has a
+                // one-item queue, which is why this button was dead for the
+                // entire binge case it exists to serve.
+                hasNext = queueSnapshot.size > 1 || upNextTarget != null,
                 isTv = isTvDevice(),
                 onTogglePlayPause = {
                     val p = controller.player
@@ -2084,7 +2354,7 @@ class PlayerActivity : AppCompatActivity() {
                 },
                 onNext = {
                     ZapLatencyTracer.markZapStart("DOCK_NEXT")
-                    controller.next()
+                    advanceToNextEpisode()
                     resetDockAutoHide()
                 },
                 onOpenSheet = { mode ->
@@ -2136,6 +2406,12 @@ class PlayerActivity : AppCompatActivity() {
         playerView.hideController()
         dockData = buildDockData(controller.currentItem.value)
         dockProgress = readDockProgress()
+        // MB-343 — clear the up-next card the instant a surface that suppresses
+        // it appears. UpNextDecision already treats these as suppressors, but it
+        // is only consulted on the 1 Hz tick, so without this the card kept
+        // drawing over the new surface for up to a second plus its exit
+        // animation.
+        upNextFlow.value = UpNextCardData()
         dockVisible = true
         updatePlayerChrome()
         val v = ensureVodDockOverlay()
@@ -2278,6 +2554,12 @@ class PlayerActivity : AppCompatActivity() {
         if (controllerVisible) playerView.hideController()
         playerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         playerView.isFocusable = false
+        // MB-343 — clear the up-next card the instant a surface that suppresses
+        // it appears. UpNextDecision already treats these as suppressors, but it
+        // is only consulted on the 1 Hz tick, so without this the card kept
+        // drawing over the new surface for up to a second plus its exit
+        // animation.
+        upNextFlow.value = UpNextCardData()
         surfVisible = true
         val v = ensureSurfOverlay()
         v.visibility = View.VISIBLE

@@ -339,6 +339,37 @@
         android:inflatedId="@+id/vod_dock"
         android:layout="@layout/player_vod_dock" />
 
+    <!-- MB-343 (W4) — up-next card. Names the queued episode and counts down
+         during the last 20 s of a series episode. Eager-inflated like
+         seek_flash (zero cost when idle — observes a StateFlow and renders
+         nothing while `visible` is false), and wrap_content so it can never
+         swallow a touch aimed at the player beneath it.
+
+         Placed after vod_dock_stub so it paints above the dock, but before the
+         options popup / channel-zap / chrome / cast overlays so those still
+         cover it. In practice it is suppressed while the dock is up
+         (UpNextDecision.shouldShow), so the ordering only matters for the
+         surfaces that can appear on top of it.
+
+         The 148dp bottom margin clears Media3's subtitle band. At 64dp the card
+         sat inside it and covered closing dialogue — precisely the moment the
+         card appears. The subtitle view's own bottom-padding fraction plus two
+         lines of cue text needs roughly 140dp of the Fire TV's 540dp viewport.
+
+         clickable + focusable false: the card is informational only. The
+         "play it now" affordance is the dock's NEXT transport button — see the
+         UpNextOverlay KDoc for why this deliberately owns no focus target and
+         no key binding. -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/up_next"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="48dp"
+        android:layout_marginBottom="148dp"
+        android:clickable="false"
+        android:focusable="false" />
+
     <!-- Phone player chrome (MB-231 / MK.26.A.3). The player is D-pad-first;
          on a phone it needs touch affordances. Placed ABOVE the VOD dock in
          the z-order so it also shows over movies/series (the dock is a

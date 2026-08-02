@@ -141,12 +141,24 @@ fun VodPlayerDock(
     onSeekTo: (Long) -> Unit,
     onUserInteraction: () -> Unit,
     // True when the active queue has more than one item — i.e. prev/next can
-    // actually move to a sibling. False for VOD movies (one-item queue) and
-    // for the interim episode-play path (single-episode queue, until
-    // sibling-episode loading lands as a follow-up MK). The dock hides the
-    // ‹/› transport buttons entirely when this is false so the user isn't
-    // staring at controls that no-op when pressed.
+    // actually move to a sibling. False for VOD movies (one-item queue). The
+    // dock hides the ‹ transport button entirely when this is false so the user
+    // isn't staring at a control that no-ops when pressed.
     hasSiblings: Boolean = true,
+    // MB-343 (W4) — gates › separately from ‹.
+    //
+    // This used to ride on [hasSiblings], which made the NEXT button dead for
+    // every episode: `PlaybackController.play(episode)` synthesises a ONE-item
+    // queue, so `queue.size > 1` was always false during a binge and the one
+    // control purpose-built for "go to the next episode" never rendered. That
+    // is what the old comment here meant by "until sibling-episode loading
+    // lands as a follow-up MK" — this is that follow-up.
+    //
+    // Split rather than widened because the two directions resolve differently:
+    // NEXT has a prefetched next-episode target (PlayerActivity.upNextTarget),
+    // PREVIOUS does not, so folding them together would light up a ‹ that still
+    // no-ops.
+    hasNext: Boolean = hasSiblings,
     // MK.28.7 (MB-273) — the "◂▸ SEEK · OK HIDE · ◀ BACK" hint strip
     // describes inputs a phone doesn't have; render it on TV only.
     isTv: Boolean = true,
@@ -205,6 +217,7 @@ fun VodPlayerDock(
                     onOpenSheet = onOpenSheet,
                     onUserInteraction = onUserInteraction,
                     hasSiblings = hasSiblings,
+                    hasNext = hasNext,
                 )
                 if (isTv) {
                     Spacer(Modifier.height(26.dp))
@@ -504,20 +517,22 @@ private fun VodDockTransportRow(
     onOpenSheet: (SheetMode) -> Unit,
     onUserInteraction: () -> Unit,
     hasSiblings: Boolean,
+    hasNext: Boolean,
 ) {
     Row(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        // ‹ / › only render when the queue has more than one item — otherwise
-        // they're dead controls because PlaybackController.step coerces to a
-        // valid index and no-ops when target == current. Single-item queues
-        // happen for VOD movies and (interim) the per-episode play path.
+        // ‹ renders only when the queue has more than one item — otherwise it is
+        // a dead control, because PlaybackController.step coerces to a valid
+        // index and no-ops when target == current. Single-item queues happen
+        // for VOD movies and for the per-episode play path. › is gated on
+        // [hasNext] instead, which MB-343 wires to the prefetched next episode.
         if (hasSiblings) {
             TransportButton(
                 label = "‹",
-                contentLabel = "Previous",
+                contentLabel = stringResource(R.string.vd_previous),
                 size = 52.dp,
                 onClick = {
                     onUserInteraction()
@@ -538,7 +553,11 @@ private fun VodDockTransportRow(
         Spacer(Modifier.width(14.dp))
         TransportButton(
             label = if (isPlaying) "||" else "▶",
-            contentLabel = if (isPlaying) "Pause" else "Play",
+            // MB-343 — was the hardcoded literals "Pause" / "Play", the last
+            // untranslated screen-reader label in this row after vd_previous and
+            // vd_next moved to resources. A string constant in code is invisible
+            // to lint MissingTranslation and to the MK.31 i18n sweep.
+            contentLabel = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
             size = 88.dp,
             primary = true,
             focusRequester = playPauseFocus,
@@ -557,11 +576,15 @@ private fun VodDockTransportRow(
                 onSkipForward()
             },
         )
-        if (hasSiblings) {
+        if (hasNext) {
             Spacer(Modifier.width(14.dp))
             TransportButton(
                 label = "›",
-                contentLabel = "Next",
+                // MB-343 — was the hardcoded literal "Next". A string constant
+                // in code is invisible to lint MissingTranslation and to the
+                // MK.31 i18n sweep, so this button's screen-reader label was
+                // English in all four locales.
+                contentLabel = stringResource(R.string.vd_next),
                 size = 52.dp,
                 onClick = {
                     onUserInteraction()
