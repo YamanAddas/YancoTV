@@ -41,8 +41,9 @@ name: Android tests
 #     crashes (MB-294, same class as the MB-241 Fire OS 6 startup crash), so
 #     they deserve fixing, not baselining. Enable this step once the error
 #     count is zero.
-#   * iOS targets — the shared module's KMP iOS klib compile (`:shared:allTests`
-#     once iOS source set lands) belongs in a separate macOS workflow.
+#   (was: "iOS targets belong in a separate macOS workflow" — now covered by
+#   the `ios` job below, added 2026-08-10. Keeping it in this file rather than
+#   a separate workflow so a PR shows one status check set, not two.)
 #
 # CI-environment notes:
 #   * `local.properties` is intentionally absent on CI — Sentry DSN handling
@@ -160,4 +161,87 @@ jobs:
             packages/android/app/build/reports/tests/
             packages/android/shared/build/reports/tests/
             packages/shared/build/reports/tests/
+          retention-days: 14
+
+  ios:
+    # Added 2026-08-10. The `:shared` module has declared iosX64 / iosArm64 /
+    # iosSimulatorArm64 targets since MK.0.1, but nothing ever compiled them:
+    # the Android build doesn't, and the `test` job above runs on Linux where
+    # Kotlin/Native can't build Apple targets. They rotted undetected —
+    # MK.19.8 added `BackupCipher` and `sha256Hex` as `expect` in commonMain
+    # and never wrote the iOS `actual`s, which is a hard compile error on the
+    # iOS targets alone. This job is the detector.
+    #
+    # Runs independently of `test` (no `needs:`) so an iOS-only break is
+    # distinguishable at a glance from an Android one.
+    name: iOS targets compile
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        working-directory: packages/android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        # Required even though this job never builds the Android app:
+        # `:shared` applies the `com.android.library` plugin, so Gradle
+        # cannot CONFIGURE the project without an SDK ("SDK location not
+        # found") — configuration failure would happen long before the
+        # iOS compile tasks run.
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Cache Gradle and Kotlin/Native
+        # `~/.konan` holds the Kotlin/Native toolchain + Apple platform
+        # klibs — a multi-hundred-MB download on a cold runner. Without it
+        # the job spends most of its wall-clock fetching the compiler.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: gradle-konan-${{ runner.os }}-${{ hashFiles('packages/android/gradle/wrapper/gradle-wrapper.properties', 'packages/android/**/build.gradle.kts', 'packages/android/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-konan-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Compile all iOS targets
+        # The gate. Compiles main + test klibs for all three iOS targets.
+        # A missing `actual` in iosMain fails here.
+        run: ./gradlew :shared:checkIosCompile --console=plain --stacktrace
+
+      - name: Run backup cipher parity suite on the iOS simulator
+        # Compiling proves the CommonCrypto bindings RESOLVE; it does not
+        # prove they are CORRECT. This step executes BackupCipherParityTest
+        # on a real simulator, pinning the iOS PBKDF2 / AES-GCM / SHA-256
+        # output against fixed vectors the Android actual produced. A
+        # divergence here means a password-protected backup written on one
+        # platform cannot be restored on the other.
+        #
+        # Scoped with --tests to this one class on purpose: the rest of
+        # commonTest has never run on a native target and may need its own
+        # shake-out. Widen to the full `:shared:iosSimulatorArm64Test` once
+        # that has been done.
+        run: ./gradlew :shared:iosSimulatorArm64Test --tests "com.yancotv.shared.backup.BackupCipherParityTest" --console=plain --stacktrace
+
+      - name: Upload iOS test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-reports
+          path: packages/shared/build/reports/tests/
           retention-days: 14

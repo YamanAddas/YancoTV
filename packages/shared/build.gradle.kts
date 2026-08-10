@@ -91,6 +91,21 @@ kotlin {
                 implementation(libs.sqldelight.native.driver)
             }
         }
+        // Symmetric with `iosMain` above. The default Kotlin hierarchy
+        // template is not applied to this module (the explicit
+        // `dependsOn` edges opt out of it), so the shared iOS test
+        // intermediate has to be declared by hand too — otherwise
+        // iOS-only test helpers have nowhere to live and the structure
+        // silently diverges from the main source sets.
+        val iosX64Test by getting
+        val iosArm64Test by getting
+        val iosSimulatorArm64Test by getting
+        val iosTest by creating {
+            dependsOn(commonTest)
+            iosX64Test.dependsOn(this)
+            iosArm64Test.dependsOn(this)
+            iosSimulatorArm64Test.dependsOn(this)
+        }
     }
 }
 
@@ -165,6 +180,50 @@ if (isWindowsHost) {
                 "Skipping $name on Windows — sqlite-jdbc + JBR native-link " +
                     "incompatibility (see :shared:build.gradle.kts comment). " +
                     "Migration coverage runs via :shared:testDebugUnitTest -> MigrationTest.kt.",
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// iOS compile check
+//
+// The iOS targets are declared above, but nothing in the Android build
+// or in CI ever compiled them — so they rotted silently. Between MK.19.8
+// landing `BackupCipher` + `sha256Hex` as `expect` in commonMain and
+// 2026-08-10, `iosMain` was missing both `actual`s. That is a hard
+// compile error on the iOS targets *only*, which is exactly why an
+// Android-only build and an ubuntu-latest CI never surfaced it.
+//
+// `:shared:checkIosCompile` compiles every iOS target, main and test, so
+// the next such gap fails loudly. Kotlin/Native cannot build Apple
+// targets off a macOS host, so elsewhere the task fails with an
+// explanation rather than a cryptic toolchain error.
+//
+// Deliberately NOT wired into `check` — that would break every Windows
+// dev build and the ubuntu-latest CI job. It is invoked explicitly, and
+// by the macos job in .github/workflows/android-tests.yml.
+// ---------------------------------------------------------------------
+val isMacHost = System.getProperty("os.name").lowercase().startsWith("mac")
+
+tasks.register("checkIosCompile") {
+    group = "verification"
+    description = "Compiles all iOS targets (main + test). Requires a macOS host."
+    if (isMacHost) {
+        dependsOn(
+            "compileKotlinIosX64",
+            "compileKotlinIosArm64",
+            "compileKotlinIosSimulatorArm64",
+            "compileTestKotlinIosX64",
+            "compileTestKotlinIosArm64",
+            "compileTestKotlinIosSimulatorArm64",
+        )
+    } else {
+        doFirst {
+            error(
+                "checkIosCompile requires a macOS host — Kotlin/Native cannot build Apple targets " +
+                    "on ${System.getProperty("os.name")}. Run it on a Mac, or let the " +
+                    "\"iOS targets compile\" job in .github/workflows/android-tests.yml cover it.",
             )
         }
     }

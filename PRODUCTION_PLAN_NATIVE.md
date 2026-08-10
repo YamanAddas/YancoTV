@@ -1202,6 +1202,7 @@ Scoped as a separate milestone block once Android ships. Rough shape:
 
 | Phase | Scope |
 |---|---|
+| MK.iOS.0-pre | ✅ **Shipped 2026-08-10** — unrot the declared iOS targets: write the two missing `iosMain` actuals, add a compile gate so they can't rot again. Detail below. |
 | MK.iOS.0 | Xcode project scaffold, Kotlin `shared` framework imported, SwiftUI "Hello" screen |
 | MK.iOS.1 | SwiftUI shell — adaptive for iPhone vs iPad (split view on iPad) |
 | MK.iOS.2 | Sources + credentials via iOS Keychain |
@@ -1209,6 +1210,36 @@ Scoped as a separate milestone block once Android ships. Rough shape:
 | MK.iOS.4 | EPG / catchup / favorites / search reusing shared KMP |
 | MK.iOS.5 | PIP + AirPlay + Chromecast |
 | MK.iOS.6 | App Store submission |
+
+### MK.iOS.0-pre — iOS target rot + detector (shipped 2026-08-10)
+
+**What was broken.** `:shared` has declared `iosX64` / `iosArm64` / `iosSimulatorArm64` since MK.0.1, but *nothing ever compiled them* — the Android build doesn't, and CI runs on `ubuntu-latest` where Kotlin/Native can't build Apple targets. So when MK.19.8 added `BackupCipher` and `sha256Hex` as `expect` in `commonMain`, the matching `iosMain` actuals were never written. A missing `actual` is a hard compile error **on that target only**, which is exactly why an Android-green build and a green CI never surfaced it. `iosMain` sat at 3 files / 37 lines against 6 `expect` declarations.
+
+**What shipped.**
+
+| # | Change | Notes |
+|---|---|---|
+| MK.iOS.0-pre.1 | [`Sha256.ios.kt`](packages/shared/src/iosMain/kotlin/com/yancotv/shared/backup/Sha256.ios.kt) — `CC_SHA256` | Empty input takes an explicit NULL-pointer path; `Pinned.addressOf(0)` throws on an empty `ByteArray` and empty-records backups are a real case |
+| MK.iOS.0-pre.2 | [`BackupCipher.ios.kt`](packages/shared/src/iosMain/kotlin/com/yancotv/shared/backup/BackupCipher.ios.kt) — `CCKeyDerivationPBKDF` + one-shot GCM + `SecRandomCopyBytes` | **Not CryptoKit** — it is Swift-only and Kotlin/Native imports Objective-C/C only. Uses `CCCryptorGCMOneshotEncrypt`/`Decrypt`, not the deprecated `CCCryptorGCM`/`…Final` (documented auth-tag bugs) |
+| MK.iOS.0-pre.3 | [`BackupCipherParityTest.kt`](packages/shared/src/commonTest/kotlin/com/yancotv/shared/backup/BackupCipherParityTest.kt) — 20 tests in `commonTest` | Compiling proves the bindings *resolve*, not that they're *correct*. A silent KDF divergence makes a password-protected backup unrestorable across platforms |
+| MK.iOS.0-pre.4 | `:shared:checkIosCompile` + `iosTest` source set | Compiles main + test klibs for all three targets. Not wired into `check` — that would break Windows dev builds and the ubuntu CI job. Fails with a readable message off-Mac |
+| MK.iOS.0-pre.5 | `ios` job on `macos-latest` in [android-tests.yml](.github/workflows/android-tests.yml) | The detector. Runs `checkIosCompile`, then the parity suite on a simulator |
+
+**Wire-format contract** (both platforms must agree byte for byte or cross-platform restore breaks): PBKDF2-HMAC-SHA256 over the **UTF-8** bytes of the password, 256-bit output; AES-256-GCM, 96-bit IV, 128-bit tag; hex of `iv(12) || ciphertext || tag(16)`, lowercase. Java's `Cipher.doFinal` returns `ciphertext||tag` as one blob, which is why `androidMain` writes `hex(iv) + hex(doFinal(…))` while `iosMain` concatenates three parts.
+
+**Verification status — read this before trusting it.** The iOS sources have **never been compiled**; they were written on a Windows host where Kotlin/Native cannot build Apple targets. Unverified: whether `CCCryptorGCMOneshot*` is bound in Kotlin/Native's `platform.CoreCrypto` klib at all (it may sit in a private SPI header), the exact `CValuesRef` / `size_t` parameter typing, and whether `CC_SHA256_DIGEST_LENGTH` binds as `Int`. The failure mode is a **compile error on first Mac run, not silent bad ciphertext** — which is the point of MK.iOS.0-pre.4/.5. Also unverified: `--tests` filtering on a Kotlin/Native test task, and that `macos-latest` is arm64 (so `iosSimulatorArm64Test` is the right task). Expect a nudge on the first run.
+
+What *was* verified, on JVM: 661 tests / 53 classes / 0 skipped / 0 failures on `--rerun-tasks`; a negative control (corrupt a vector → test fails → revert); `PBKDF2_C1` and `PBKDF2_C4096` match the **published** PBKDF2-HMAC-SHA256 vectors, so `androidMain` is confirmed standards-conformant rather than merely self-consistent; ktlint clean (it scans `iosMain` from Windows, so Linux CI already gates iOS style); `:shared:build` still green.
+
+**Seam checked:** `BackupImporter` wraps both calls in `runCatching`, which catches `Throwable` — so Android's `AEADBadTagException` and iOS's `IllegalStateException` are handled identically. No divergence in the wrong-password fallback path.
+
+### Correction to the 2026-04-20 sharing estimate
+
+The decision log records "KMP shares ~60% of code vs two full ports." Measured 2026-08-10: `commonMain` is **13,635 lines against 52,778 in `packages/android/`** — roughly **20%**, not 60%.
+
+Cause: hard rule 7 below says "ViewModels live in `shared/` exposing `StateFlow`." **There are zero ViewModels in the codebase.** UI state lives in `mutableStateOf` inside composables — 212 occurrences across 30 UI files, versus 7 files using `StateFlow`. That state logic is welded to Compose and cannot cross to SwiftUI.
+
+In fairness the 20% understates reusability: a chunk of `packages/android/` is TV-specific (focus engine, coverflow shell, `androidx.tv.material`) that an iPhone/iPad app wouldn't want. But it cuts both ways — it means the iOS UI is a fresh SwiftUI design, not a port. Every new screen that puts state in `mutableStateOf` instead of a shared holder adds to the eventual iOS bill. Not retro-fixing this now; flagging it so MK.iOS.1 is scoped against the real number.
 
 ---
 
