@@ -149,6 +149,16 @@ fun VodPlayerDock(
     // one-item queue made it dead for episodes anyway. › survives on this flag,
     // which is backed by PlayerActivity's prefetched next-episode target.
     hasNext: Boolean = true,
+    /**
+     * MK.34.8 — park initial focus on the three-dot control instead of
+     * play/pause.
+     *
+     * Set when the dock is being RESTORED after the options sheet closed. The
+     * brief requires closing the sheet to return focus to the menu hex, and
+     * without this the user lands back on play/pause: one BACK press silently
+     * moves the cursor eight controls away from where they were working.
+     */
+    focusMenuOnOpen: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (visibility != VodDockVisibility.VISIBLE) return
@@ -158,13 +168,14 @@ fun VodPlayerDock(
     // initial focus after layout. Don't hoist further up — the dock's own
     // visibility toggle is the right `key()` boundary for focus to reset on.
     val playPauseFocus = remember { FocusRequester() }
+    val menuFocus = remember { FocusRequester() }
 
     // Park initial focus on play-pause. LaunchedEffect ties the request to
     // this composition — re-runs any time visibility toggles from HIDDEN →
     // VISIBLE because HIDDEN-branch returns early, so this composable is
     // re-entered fresh.
     LaunchedEffect(Unit) {
-        runCatching { playPauseFocus.requestFocus() }
+        runCatching { if (focusMenuOnOpen) menuFocus.requestFocus() else playPauseFocus.requestFocus() }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -211,6 +222,7 @@ fun VodPlayerDock(
                 onOpenSheet = onOpenSheet,
                 onUserInteraction = onUserInteraction,
                 hasNext = hasNext,
+                menuFocus = menuFocus,
             )
         }
     }
@@ -590,6 +602,7 @@ private fun VodDockTransportRow(
     onOpenSheet: (SheetMode) -> Unit,
     onUserInteraction: () -> Unit,
     hasNext: Boolean,
+    menuFocus: FocusRequester,
 ) {
     val glass = glassTokens()
     val dockShape = RoundedCornerShape(18.dp)
@@ -677,9 +690,10 @@ private fun VodDockTransportRow(
         HexControl(
             variant = HexVariant.SECONDARY,
             contentDescription = stringResource(R.string.vd_menu),
+            focusRequester = menuFocus,
             onClick = {
                 onUserInteraction()
-                onOpenSheet(SheetMode.AUDIO)
+                onOpenSheet(SheetMode.MENU)
             },
         ) { tint -> DockLabel("•••", tint, 11.sp) }
     }
@@ -748,6 +762,16 @@ enum class SheetMode {
     RECORD,
     FAV,
     EXT,
+
+    /**
+     * MK.34.7 — the dock's three-dot control. Deliberately has no V2 panel, so
+     * the activity falls through to the popup ROOT.
+     *
+     * It used to send AUDIO, which opened the Audio panel directly and skipped
+     * the options sheet entirely — the popup hides itself whenever a panel is
+     * active. A three-dot menu that lands you inside one setting is not a menu.
+     */
+    MENU,
 
     /** No matching V2 panel; activity falls through to the popup root. */
     CAST,

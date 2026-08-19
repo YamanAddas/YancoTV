@@ -312,6 +312,12 @@ class PlayerActivity : AppCompatActivity() {
     // `vod_dock_stub` ViewStub on first show.
     private var vodDockOverlay: ComposeView? = null
     private var dockVisible by mutableStateOf(false)
+
+    /** MK.34.8 — was the options sheet opened from a dock control? */
+    private var optionsOpenedFromDock = false
+
+    /** MK.34.8 — park the restored dock's focus on the three-dot control. */
+    private var dockFocusMenuOnOpen by mutableStateOf(false)
     private var dockData by mutableStateOf(VodDockData())
     private var dockProgress by mutableStateOf(VodDockProgress())
     private var dockAutoHideJob: Job? = null
@@ -1478,6 +1484,19 @@ class PlayerActivity : AppCompatActivity() {
         // back into the Media3 controller / dock as expected.
         playerView.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
         playerView.isFocusable = true
+        // MK.34.8 — hand the user back to where they came from.
+        //
+        // The dock is hidden when the sheet opens, so BACK used to drop them on
+        // a bare video surface with no visible focus at all — the brief's "focus
+        // must never disappear", failed at the one moment a user is most likely
+        // to press BACK. Only restores when the sheet was opened FROM the dock:
+        // arriving via the MENU key means there was no dock to return to, and
+        // conjuring one would be a surprise rather than a restoration.
+        if (optionsOpenedFromDock) {
+            optionsOpenedFromDock = false
+            dockFocusMenuOnOpen = true
+            showVodDock()
+        }
     }
 
     private fun ensureOptionsV2() {
@@ -2333,6 +2352,7 @@ class PlayerActivity : AppCompatActivity() {
                 // they gated: PREVIOUS is gone from the reference dock, and the
                 // remote hint strip that `isTv` guarded is gone entirely.
                 hasNext = queueSnapshot.size > 1 || upNextTarget != null,
+                focusMenuOnOpen = dockFocusMenuOnOpen,
                 onTogglePlayPause = {
                     val p = controller.player
                     p.playWhenReady = !p.playWhenReady
@@ -2361,6 +2381,7 @@ class PlayerActivity : AppCompatActivity() {
                     // preserved as the chip-side enum (the dock UI
                     // didn't change), but the consumer side maps to
                     // PlayerOptionCategory and uses the V2 surface.
+                    optionsOpenedFromDock = true
                     hideVodDock()
                     val category =
                         when (mode) {
@@ -2421,6 +2442,9 @@ class PlayerActivity : AppCompatActivity() {
     private fun hideVodDock() {
         if (!dockVisible) return
         dockVisible = false
+        // One-shot: consumed by the restore above, cleared on the way out so a
+        // later ordinary open still lands on play/pause.
+        dockFocusMenuOnOpen = false
         updatePlayerChrome()
         vodDockOverlay?.visibility = View.GONE
         stopDockProgressTicker()

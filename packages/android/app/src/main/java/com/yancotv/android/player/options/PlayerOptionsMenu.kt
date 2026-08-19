@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,17 +46,22 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.R
+import com.yancotv.android.player.MidnightHex
+import com.yancotv.android.player.glassSurface
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.endwardKey
 import com.yancotv.android.ui.focus.startwardKey
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.YancoIcons
 
 /**
  * MK.options.redesign — bottom-right popup that lists the player option
@@ -139,34 +148,46 @@ fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, o
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
         ) {
             ProvideFocusScrollSpec {
+                val cfg = LocalConfiguration.current
+                // MK.34.7 — the brief's clamp(320px, 30vw, 440px) and 68vh, in
+                // PHYSICAL pixels at 1920x1080 like every other number in that
+                // document. The previous 320.dp read them as dp, which on a
+                // density-2.0 TV made the sheet 640px wide — and the 560.dp
+                // height cap was 1120px, taller than the screen it was capping.
+                // 30vw is DIMENSIONLESS — 30% of the viewport, whatever the
+                // units. Only the clamp bounds were in physical px (320-440 at
+                // 1920 = 160-220dp at density 2.0). Halving the ratio as well
+                // pinned the sheet to the clamp's floor: it rendered 320px, the
+                // minimum, when the brief's own arithmetic gives 440.
+                val sheetWidth = (cfg.screenWidthDp * 0.30f).coerceIn(160f, 220f).dp
+                val sheetMaxHeight = (cfg.screenHeightDp * 0.68f).dp
                 Column(
                     modifier =
                     Modifier
-                        // Reduced bottom inset (96 → 24) so the menu has
-                        // room to fully render all 8 rows without
-                        // clipping the last one ("External player").
-                        // heightIn cap + verticalScroll handles short
-                        // viewports gracefully — rows scroll instead of
-                        // being silently cut off the screen.
-                        .padding(end = 32.dp, bottom = 24.dp)
-                        .width(MENU_WIDTH.dp)
-                        .heightIn(max = MENU_MAX_HEIGHT.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xEE0A1410))
-                        .border(1.dp, palette.BorderSubtle, RoundedCornerShape(12.dp))
+                        .padding(end = 20.dp, bottom = 16.dp)
+                        .width(sheetWidth)
+                        .heightIn(max = sheetMaxHeight)
+                        // Glass, not the old 0xEE near-opaque fill: the brief
+                        // requires the film to stay perceptible through the
+                        // sheet, and 93% opacity is a wall with a tint.
+                        .glassSurface(RoundedCornerShape(8.dp))
                         .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                        .padding(vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
                 ) {
-                    Text(
-                        text = stringResource(R.string.po_header),
-                        color = palette.TextMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    )
-                    rows.forEach { row ->
+                    PlayerOptionsHeader()
+                    rows.forEachIndexed { index, row ->
+                        if (index > 0) {
+                            // Hairline separators instead of a card per row —
+                            // the brief calls out not boxing every row.
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(palette.BorderSubtle.copy(alpha = 0.5f)),
+                            )
+                        }
                         PlayerOptionsRowItem(
                             row = row,
                             focusRequester = rowFocus[row.category],
@@ -178,6 +199,47 @@ fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, o
     }
 }
 
+/**
+ * MK.34.7 — sheet header: a small accent-outlined hex carrying a sliders mark,
+ * then OPTIONS in near-white.
+ *
+ * The old header read "OPTIONS  ·  ◂ ▸ to switch". The brief asks for that
+ * trailing instruction to go, and it should: it described a gesture that only
+ * works on SOME rows (the ones with onCyclePrev/onCycleNext), so it was
+ * advertising a capability the row under the user's cursor might not have.
+ */
+@Composable
+private fun PlayerOptionsHeader() {
+    val palette = LocalYancoPalette.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(20.dp)
+                .clip(MidnightHex)
+                .border(1.dp, palette.Accent.copy(alpha = 0.6f), MidnightHex),
+        ) {
+            Icon(
+                imageVector = YancoIcons.Sliders,
+                contentDescription = null,
+                tint = palette.Accent,
+                modifier = Modifier.size(11.dp),
+            )
+        }
+        Text(
+            text = stringResource(R.string.po_header),
+            color = palette.TextPrimary,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.6.sp,
+        )
+    }
+}
+
 @Composable
 private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusRequester?) {
     // MK.31.2 — prev/next follow reading order, so they are logical.
@@ -186,27 +248,24 @@ private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusReq
     val palette = LocalYancoPalette.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val bg =
-        if (focused) palette.BackgroundHover else Color.Transparent
-    val border =
-        if (focused) palette.Accent else Color.Transparent
+    // Selection treatment, per the brief: a subtle translucent accent strip and
+    // a thin accent outline — NOT the old filled BackgroundHover rectangle,
+    // which read as a large glowing block at TV distance.
+    val bg = if (focused) palette.Accent.copy(alpha = 0.14f) else Color.Transparent
+    val border = if (focused) palette.Accent.copy(alpha = 0.75f) else Color.Transparent
 
     Row(
         modifier =
         Modifier
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 6.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(6.dp))
             .let { m -> if (focusRequester != null) m.focusRequester(focusRequester) else m }
             // onPreviewKeyEvent must wrap focusable so it sees the
             // event before the focusable's default arrow-key focus
-            // search runs. Earlier order (after focusable + clickable)
-            // didn't fire because Compose had already moved focus or
-            // the modifier chain didn't expose preview events on the
-            // focusable's children-side. Returns true on a successful
-            // cycle so the activity's swallow guard doesn't double-
-            // handle the key.
+            // search runs. Returns true on a successful cycle so the
+            // activity's swallow guard doesn't double-handle the key.
             // MK.31.2 — prev/next follow reading order, so they are logical:
             // in RTL a physical LEFT press advances. Unlike the seek bar in
             // VodPlayerDock (which stays physical on purpose), there is no
@@ -228,31 +287,68 @@ private fun PlayerOptionsRowItem(row: PlayerOptionsRow, focusRequester: FocusReq
                 }
             }.focusable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button) { row.onPick() }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
+        // Small outlined hex icon. Solid accent fill when this row is the
+        // current selection, which is the brief's "small solid hex selection
+        // marker" — carried by the row's own icon rather than added as a second
+        // mark competing with it.
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(20.dp)
+                .clip(MidnightHex)
+                .background(if (focused) palette.Accent else Color.Transparent)
+                .border(1.dp, if (focused) palette.Accent else palette.BorderSubtle, MidnightHex),
+        ) {
+            Icon(
+                imageVector = row.category.icon(),
+                contentDescription = null,
+                tint = if (focused) palette.BackgroundDeep else palette.TextSecondary,
+                modifier = Modifier.size(11.dp),
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = row.label,
                 color = palette.TextPrimary,
-                fontSize = 14.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = row.currentValue,
-                color = if (row.canCycle) palette.Accent else palette.TextMuted,
-                fontSize = 12.sp,
+                color = if (row.canCycle) palette.AccentSoft else palette.TextMuted,
+                fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        if (row.canCycle) {
-            Text(
-                text = "◂ ▸",
-                color = palette.TextMuted,
-                fontSize = 12.sp,
-            )
-        }
+        // Chevron at the opposite edge, replacing the "◂ ▸" hint. It points at
+        // the panel this row opens, which every row does; the old glyph pair
+        // implied left/right cycling that only some rows support.
+        Icon(
+            imageVector = YancoIcons.ChevronRight,
+            contentDescription = null,
+            tint = palette.AccentSoft.copy(alpha = 0.8f),
+            modifier = Modifier.size(12.dp),
+        )
     }
+}
+
+/** Row icon, per the brief's per-row suggestions. */
+private fun PlayerOptionCategory.icon() = when (this) {
+    PlayerOptionCategory.AUDIO -> YancoIcons.Speaker
+    PlayerOptionCategory.SUBTITLES, PlayerOptionCategory.SUBTITLE_SEARCH -> YancoIcons.Subtitles
+    PlayerOptionCategory.ASPECT -> YancoIcons.Aspect
+    PlayerOptionCategory.SPEED -> YancoIcons.Speedometer
+    PlayerOptionCategory.SLEEP -> YancoIcons.Moon
+    PlayerOptionCategory.FAVORITES -> YancoIcons.Favorites
+    PlayerOptionCategory.EXTERNAL -> YancoIcons.ExternalPlay
+    else -> YancoIcons.Settings
 }
 
 /**
@@ -270,8 +366,6 @@ data class PlayerOptionsRow(
 ) {
     val canCycle: Boolean get() = onCyclePrev != null || onCycleNext != null
 }
-
-private const val MENU_WIDTH = 320
 
 /** Cap so the popup never exceeds usable screen real estate. 560 dp
  *  fits all 8 rows + the kicker comfortably on a 720dp landscape

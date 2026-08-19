@@ -611,7 +611,7 @@
     <!-- MK.31.11 batch N (cont.) — sidebar brand label. -->
 
     <!-- MK.31.12 batch O — player options menu + panels. -->
-    <string name="po_header">OPCIONES  ·  ◂ ▸ para cambiar</string>
+    <string name="po_header">OPCIONES</string>
     <string name="po_audio">Audio</string>
     <string name="po_aspect">Formato</string>
     <string name="po_speed">Velocidad</string>

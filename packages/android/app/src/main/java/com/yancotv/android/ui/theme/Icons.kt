@@ -494,6 +494,96 @@ object YancoIcons {
             }
         }
 
+    // ─── MK.34.7 — options-sheet row icons ───────────────────────────────
+    // The design brief names one icon per settings row. Four had no existing
+    // equivalent, so they are drawn here rather than approximated with the
+    // nearest available glyph: a row whose icon does not mean what the row does
+    // is worse than no icon, and "Signal" standing in for audio output or "Grid"
+    // for aspect ratio would both have been exactly that.
+
+    /** Speaker cone + two waves — the Audio row. */
+    val Speaker: ImageVector =
+        buildLine("speaker") {
+            moveTo(4f, 9.5f)
+            lineTo(8f, 9.5f)
+            lineTo(12f, 5.5f)
+            lineTo(12f, 18.5f)
+            lineTo(8f, 14.5f)
+            lineTo(4f, 14.5f)
+            close()
+            moveTo(15.5f, 9.5f)
+            arcToRelative(4.5f, 4.5f, 0f, false, true, 0f, 5f)
+            moveTo(18.5f, 7f)
+            arcToRelative(8f, 8f, 0f, false, true, 0f, 10f)
+        }
+
+    /** Screen frame with side markers — the Aspect row. */
+    val Aspect: ImageVector =
+        buildLine("aspect") {
+            moveTo(3f, 6f)
+            lineTo(21f, 6f)
+            lineTo(21f, 18f)
+            lineTo(3f, 18f)
+            close()
+            moveTo(7f, 10f)
+            lineTo(7f, 14f)
+            moveTo(17f, 10f)
+            lineTo(17f, 14f)
+        }
+
+    /** Dial arc + needle — the Speed row. */
+    val Speedometer: ImageVector =
+        buildLine("speedometer") {
+            moveTo(4f, 17f)
+            arcToRelative(8f, 8f, 0f, true, true, 16f, 0f)
+            moveTo(12f, 17f)
+            lineTo(15.5f, 11.5f)
+        }
+
+    /** Crescent — the Sleep row. */
+    val Moon: ImageVector =
+        buildLine("moon") {
+            moveTo(19f, 14.8f)
+            arcToRelative(8f, 8f, 0f, true, true, -9.8f, -9.8f)
+            arcToRelative(6.3f, 6.3f, 0f, false, false, 9.8f, 9.8f)
+            close()
+        }
+
+    /** Box with an out-arrow — the External player row. */
+    val ExternalPlay: ImageVector =
+        buildLine("external_play") {
+            moveTo(13f, 5f)
+            lineTo(5f, 5f)
+            arcToRelative(1f, 1f, 0f, false, false, -1f, 1f)
+            lineTo(4f, 18f)
+            arcToRelative(1f, 1f, 0f, false, false, 1f, 1f)
+            lineTo(17f, 19f)
+            arcToRelative(1f, 1f, 0f, false, false, 1f, -1f)
+            lineTo(18f, 11f)
+            moveTo(14f, 4f)
+            lineTo(20f, 4f)
+            lineTo(20f, 10f)
+            moveTo(20f, 4f)
+            lineTo(12.5f, 11.5f)
+        }
+
+    /** Sliders — the sheet header mark. */
+    val Sliders: ImageVector =
+        buildLine("sliders") {
+            moveTo(5f, 6f)
+            lineTo(19f, 6f)
+            moveTo(5f, 12f)
+            lineTo(19f, 12f)
+            moveTo(5f, 18f)
+            lineTo(19f, 18f)
+            moveTo(9f, 4f)
+            lineTo(9f, 8f)
+            moveTo(15f, 10f)
+            lineTo(15f, 14f)
+            moveTo(10f, 16f)
+            lineTo(10f, 20f)
+        }
+
     private fun buildLine(name: String, autoMirror: Boolean = false, block: PathBuilder.() -> Unit): ImageVector = ImageVector
         .Builder(
             name = name,
