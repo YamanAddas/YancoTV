@@ -1169,6 +1169,9 @@
     <string name="content_type_movie">MOVIE</string>
     <string name="content_type_episode">EPISODE</string>
     <string name="content_type_live">LIVE</string>
+    <!-- MB-347 — the container, as opposed to content_type_episode which is one
+         instalment of it. Search and the coverflow overline label containers. -->
+    <string name="content_type_series">SERIES</string>
 
     <!-- MB-339 — quantity strings.
 

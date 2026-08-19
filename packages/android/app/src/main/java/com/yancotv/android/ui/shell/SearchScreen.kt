@@ -2,6 +2,7 @@ package com.yancotv.android.ui.shell
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -627,7 +628,7 @@ private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(text = typeLabel(item.type), color = LocalYancoPalette.current.Accent)
+                Text(text = stringResource(typeLabelRes(item.type)), color = LocalYancoPalette.current.Accent)
                 item.groupName?.let {
                     Text(
                         text = it,
@@ -642,10 +643,22 @@ private fun SearchRow(item: ContentItem, onActivate: () -> Unit) {
     }
 }
 
-private fun typeLabel(type: ContentType): String = when (type) {
-    ContentType.LIVE -> "LIVE"
-    ContentType.MOVIE -> "MOVIE"
-    ContentType.SERIES -> "SERIES"
+/**
+ * MB-347 — the result-row type label.
+ *
+ * Was three hardcoded English literals, so every non-English locale showed
+ * "LIVE" / "MOVIE" / "SERIES" in Latin script beside a fully translated row.
+ * String constants in code are invisible to both lint `MissingTranslation` and
+ * the MK.31 sweep, which is exactly how they survived a 1024-key pass.
+ *
+ * Returns the resource id rather than the resolved string so the mapping stays
+ * a plain function; the caller resolves it inside composition.
+ */
+@StringRes
+private fun typeLabelRes(type: ContentType): Int = when (type) {
+    ContentType.LIVE -> R.string.content_type_live
+    ContentType.MOVIE -> R.string.content_type_movie
+    ContentType.SERIES -> R.string.content_type_series
 }
 
 /**

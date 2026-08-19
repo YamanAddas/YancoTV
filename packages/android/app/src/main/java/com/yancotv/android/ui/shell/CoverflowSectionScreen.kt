@@ -1019,11 +1019,16 @@ private fun MetaColumn(
     val title = focused.displayTitle
     val nowProg = nowNext?.now
     val nextProg = nowNext?.next
+    // MB-347 — MOVIE / SERIES were hardcoded English literals sitting directly
+    // beside an already-localized LIVE arm, so a non-English coverflow showed
+    // one translated overline and two untranslated ones. LIVE keeps its own key
+    // because "LIVE CHANNEL" describes the item, where the other two arms are
+    // the bare type noun shared with search and the player dock.
     val overline =
         when (type) {
             ContentType.LIVE -> stringResource(R.string.cf_kicker_live_channel)
-            ContentType.MOVIE -> "MOVIE"
-            ContentType.SERIES -> "SERIES"
+            ContentType.MOVIE -> stringResource(R.string.content_type_movie)
+            ContentType.SERIES -> stringResource(R.string.content_type_series)
         }
     // MK.29.3 — a series container has no stream of its own, so its primary
     // action opens the episode list rather than starting playback.

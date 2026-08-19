@@ -1109,6 +1109,8 @@
     <string name="content_type_movie">فيلم</string>
     <string name="content_type_episode">حلقة</string>
     <string name="content_type_live">مباشر</string>
+    <!-- MB-347 — singular المسلسل, the container, vs حلقة for one instalment. -->
+    <string name="content_type_series">مسلسل</string>
     <string name="vd_ends_at">ينتهي %1$s</string>
 
     <!-- MB-339 — quantity strings.

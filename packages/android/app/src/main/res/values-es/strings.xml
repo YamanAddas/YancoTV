@@ -1108,6 +1108,8 @@
     <string name="content_type_movie">PELÍCULA</string>
     <string name="content_type_episode">EPISODIO</string>
     <string name="content_type_live">EN DIRECTO</string>
+    <!-- MB-347 — singular SERIE; the plural section name is Series. -->
+    <string name="content_type_series">SERIE</string>
     <string name="vd_ends_at">TERMINA %1$s</string>
 
     <!-- MB-339 — quantity strings.
