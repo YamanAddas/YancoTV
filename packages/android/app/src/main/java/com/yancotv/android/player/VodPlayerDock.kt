@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
@@ -54,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
@@ -415,154 +418,166 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
     )
 
     val dock = dockMetrics()
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(dock.horizontalPadding),
-        modifier = Modifier
-            // MK.34.5 - the brief's 70-82% of available width. A separate,
-            // narrower ribbon than the metadata block above it, so the three
-            // levels read as distinct objects rather than one stacked panel.
-            .fillMaxWidth(0.78f)
-            .glassSurface(RoundedCornerShape(percent = 50), alpha = 0.75f)
-            .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding)
-            .focusable()
-            // MK.31.2 — DELIBERATELY PHYSICAL, do not convert these to
-            // startward/endward like the rest of the app's LEFT/RIGHT handlers.
-            // A media timeline does not mirror under RTL: platform playback UI
-            // (and every mainstream video app in Arabic) keeps the scrubber
-            // left-to-right, and LEFT = rewind is muscle memory independent of
-            // reading direction. Mirroring this would make Arabic users seek
-            // backwards when they meant forwards.
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionLeft -> {
-                        onUserInteraction()
-                        onSeekTo((progress.playedMs - 10_000L).coerceAtLeast(0L))
-                        true
-                    }
-                    Key.DirectionRight -> {
-                        onUserInteraction()
-                        onSeekTo((progress.playedMs + 10_000L).coerceAtMost(progress.durationMs))
-                        true
-                    }
-                    else -> false
-                }
-            },
-    ) {
-        // Elapsed at the left, remaining at the right, and NEITHER over the
-        // track - the brief is explicit, and time text on a moving fill is
-        // unreadable at three metres anyway.
-        Text(
-            text = labels.elapsed,
-            color = glass.textPrimary,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-        )
-        // 28dp touch surface holding the 8dp visual bar + a draggable thumb.
-        // PHONE: tap jumps there; drag the thumb scrubs and commits on release.
-        // TV: the Row above is focusable and the ±10 keys/buttons still seek.
-        Box(
+    // MK.34.9 — the ribbon is pinned LTR, deliberately.
+    //
+    // MK.31.2 already decided the seek KEYS stay physical: LEFT rewinds in every
+    // locale, because that is muscle memory independent of reading direction and
+    // every mainstream player keeps a scrubber left-to-right. What was missing is
+    // that the ribbon's VISUALS were still direction-aware, so under Arabic the
+    // elapsed/remaining labels would swap sides and the played fill would grow
+    // from the right — while LEFT still rewound. Half-mirrored is worse than
+    // either choice: the user would press LEFT and watch the bar grow toward the
+    // press. Pinning the ribbon LTR makes the visuals agree with the keys.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(dock.horizontalPadding),
             modifier = Modifier
-                // Touch surface stays generous while the VISUAL track slims to
-                // 3dp: shrinking the hit area with the artwork would make the
-                // phone drag path finicky for no design gain.
-                .height(14.dp)
-                .weight(1f)
-                .onSizeChanged { barWidthPx = it.width.toFloat().coerceAtLeast(1f) }
-                .pointerInput(duration) {
-                    detectTapGestures { offset ->
-                        onUserInteraction()
-                        onSeekTo(((offset.x / barWidthPx).coerceIn(0f, 1f) * duration).toLong())
-                    }
-                }
-                .pointerInput(duration) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { offset ->
+                // MK.34.5 - the brief's 70-82% of available width. A separate,
+                // narrower ribbon than the metadata block above it, so the three
+                // levels read as distinct objects rather than one stacked panel.
+                .fillMaxWidth(0.78f)
+                .glassSurface(RoundedCornerShape(percent = 50), alpha = 0.75f)
+                .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding)
+                .focusable()
+                // MK.31.2 — DELIBERATELY PHYSICAL, do not convert these to
+                // startward/endward like the rest of the app's LEFT/RIGHT handlers.
+                // A media timeline does not mirror under RTL: platform playback UI
+                // (and every mainstream video app in Arabic) keeps the scrubber
+                // left-to-right, and LEFT = rewind is muscle memory independent of
+                // reading direction. Mirroring this would make Arabic users seek
+                // backwards when they meant forwards.
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionLeft -> {
                             onUserInteraction()
-                            scrubPct = (offset.x / barWidthPx).coerceIn(0f, 1f)
-                        },
-                        onDragEnd = {
-                            scrubPct?.let { onSeekTo((it * duration).toLong()) }
-                            scrubPct = null
-                        },
-                        onDragCancel = { scrubPct = null },
-                    ) { change, _ ->
-                        scrubPct = (change.position.x / barWidthPx).coerceIn(0f, 1f)
+                            onSeekTo((progress.playedMs - 10_000L).coerceAtLeast(0L))
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            onUserInteraction()
+                            onSeekTo((progress.playedMs + 10_000L).coerceAtMost(progress.durationMs))
+                            true
+                        }
+                        else -> false
                     }
                 },
-            contentAlignment = Alignment.CenterStart,
         ) {
-            Box(
-                modifier = Modifier
-                    .height(3.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(glass.textDim.copy(alpha = 0.35f)),
-            ) {
-                // Buffered layer - barely there, so it reads as loaded rather
-                // than competing with the played fill for attention.
-                Box(
-                    modifier = Modifier
-                        .height(3.dp)
-                        .fillMaxWidth(bufferedPct)
-                        .background(glass.textSecondary.copy(alpha = 0.3f)),
-                )
-                // Played fill - blue, per the token roles: blue is the timeline
-                // and navigation colour, champagne is reserved for selection, so
-                // a focused control never competes with the track for it.
-                Box(
-                    modifier = Modifier
-                        .height(3.dp)
-                        .fillMaxWidth(shownPct)
-                        .background(glass.accentSoft),
-                )
-            }
-            // Scrubber - a small champagne HEXAGON, not a circle, so the
-            // signature shape carries into the timeline instead of stopping at
-            // the dock. Still the drag target; only the silhouette changed.
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset((shownPct * barWidthPx - 5.dp.toPx()).toInt(), 0) }
-                    .size(10.dp)
-                    .clip(MidnightHex)
-                    .background(glass.accent),
-            )
-        }
-        // MB-340 - was a bare duration, which is the one time fact you can work
-        // out for yourself. Remaining is the headline; the ends-at wall clock
-        // trails it in a dimmer weight.
-        //
-        // MK.34.5 - these were STACKED in a Column, which made this row 58px
-        // tall and was the single biggest contributor to the overlay blowing its
-        // height budget. Inlining them spends width, which the ribbon has, rather
-        // than height, which it does not. Both stay maxLines = 1 and the group is
-        // width-capped: MB-300 was an unbounded Text in exactly this row starving
-        // its siblings at a large font scale.
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.widthIn(max = 132.dp),
-        ) {
+            // Elapsed at the left, remaining at the right, and NEITHER over the
+            // track - the brief is explicit, and time text on a moving fill is
+            // unreadable at three metres anyway.
             Text(
-                text = labels.remaining ?: labels.elapsed,
+                text = labels.elapsed,
                 color = glass.textPrimary,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
             )
-            labels.endsAt?.let { endsAt ->
-                Text(
-                    text = stringResource(R.string.vd_ends_at, endsAt),
-                    color = glass.textDim,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 8.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip,
+            // 28dp touch surface holding the 8dp visual bar + a draggable thumb.
+            // PHONE: tap jumps there; drag the thumb scrubs and commits on release.
+            // TV: the Row above is focusable and the ±10 keys/buttons still seek.
+            Box(
+                modifier = Modifier
+                    // Touch surface stays generous while the VISUAL track slims to
+                    // 3dp: shrinking the hit area with the artwork would make the
+                    // phone drag path finicky for no design gain.
+                    .height(14.dp)
+                    .weight(1f)
+                    .onSizeChanged { barWidthPx = it.width.toFloat().coerceAtLeast(1f) }
+                    .pointerInput(duration) {
+                        detectTapGestures { offset ->
+                            onUserInteraction()
+                            onSeekTo(((offset.x / barWidthPx).coerceIn(0f, 1f) * duration).toLong())
+                        }
+                    }
+                    .pointerInput(duration) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset ->
+                                onUserInteraction()
+                                scrubPct = (offset.x / barWidthPx).coerceIn(0f, 1f)
+                            },
+                            onDragEnd = {
+                                scrubPct?.let { onSeekTo((it * duration).toLong()) }
+                                scrubPct = null
+                            },
+                            onDragCancel = { scrubPct = null },
+                        ) { change, _ ->
+                            scrubPct = (change.position.x / barWidthPx).coerceIn(0f, 1f)
+                        }
+                    },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .height(3.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(glass.textDim.copy(alpha = 0.35f)),
+                ) {
+                    // Buffered layer - barely there, so it reads as loaded rather
+                    // than competing with the played fill for attention.
+                    Box(
+                        modifier = Modifier
+                            .height(3.dp)
+                            .fillMaxWidth(bufferedPct)
+                            .background(glass.textSecondary.copy(alpha = 0.3f)),
+                    )
+                    // Played fill - blue, per the token roles: blue is the timeline
+                    // and navigation colour, champagne is reserved for selection, so
+                    // a focused control never competes with the track for it.
+                    Box(
+                        modifier = Modifier
+                            .height(3.dp)
+                            .fillMaxWidth(shownPct)
+                            .background(glass.accentSoft),
+                    )
+                }
+                // Scrubber - a small champagne HEXAGON, not a circle, so the
+                // signature shape carries into the timeline instead of stopping at
+                // the dock. Still the drag target; only the silhouette changed.
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset((shownPct * barWidthPx - 5.dp.toPx()).toInt(), 0) }
+                        .size(10.dp)
+                        .clip(MidnightHex)
+                        .background(glass.accent),
                 )
+            }
+            // MB-340 - was a bare duration, which is the one time fact you can work
+            // out for yourself. Remaining is the headline; the ends-at wall clock
+            // trails it in a dimmer weight.
+            //
+            // MK.34.5 - these were STACKED in a Column, which made this row 58px
+            // tall and was the single biggest contributor to the overlay blowing its
+            // height budget. Inlining them spends width, which the ribbon has, rather
+            // than height, which it does not. Both stay maxLines = 1 and the group is
+            // width-capped: MB-300 was an unbounded Text in exactly this row starving
+            // its siblings at a large font scale.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.widthIn(max = 132.dp),
+            ) {
+                Text(
+                    text = labels.remaining ?: labels.elapsed,
+                    color = glass.textPrimary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                labels.endsAt?.let { endsAt ->
+                    Text(
+                        text = stringResource(R.string.vd_ends_at, endsAt),
+                        color = glass.textDim,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 8.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip,
+                    )
+                }
             }
         }
     }
@@ -607,95 +622,103 @@ private fun VodDockTransportRow(
     val glass = glassTokens()
     val dockShape = RoundedCornerShape(18.dp)
     val dock = dockMetrics()
-    Row(
-        modifier = Modifier
-            .glassSurface(dockShape)
-            .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding),
-        horizontalArrangement = Arrangement.spacedBy(dock.gap),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HexControl(
-            variant = HexVariant.TRANSPORT,
-            contentDescription = stringResource(R.string.vd_rewind_10),
-            onClick = {
-                onUserInteraction()
-                onSkipBack()
-            },
-        ) { tint -> DockLabel("-10", tint, 9.sp) }
-
-        HexControl(
-            variant = HexVariant.HERO,
-            contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
-            onClick = {
-                onUserInteraction()
-                onTogglePlayPause()
-            },
-            focusRequester = playPauseFocus,
-        ) { tint -> DockLabel(if (isPlaying) "II" else "▶", tint, 16.sp) }
-
-        HexControl(
-            variant = HexVariant.TRANSPORT,
-            contentDescription = stringResource(R.string.vd_forward_10),
-            onClick = {
-                onUserInteraction()
-                onSkipForward()
-            },
-        ) { tint -> DockLabel("+10", tint, 9.sp) }
-
-        if (hasNext) {
+    // MK.34.9 — pinned LTR with the ribbon above it. -10 / +10 / next are
+    // directional controls bound to a timeline that does not mirror, so
+    // reversing them would put +10 on the left of a bar that still fills
+    // rightward. The brief's rule — icons must not reverse unless their meaning
+    // is directional — cuts this way: their meaning IS directional, and the
+    // direction they refer to is the timeline's, not the text's.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Row(
+            modifier = Modifier
+                .glassSurface(dockShape)
+                .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding),
+            horizontalArrangement = Arrangement.spacedBy(dock.gap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             HexControl(
                 variant = HexVariant.TRANSPORT,
-                contentDescription = stringResource(R.string.vd_next),
+                contentDescription = stringResource(R.string.vd_rewind_10),
                 onClick = {
                     onUserInteraction()
-                    onNext()
+                    onSkipBack()
                 },
-            ) { tint -> DockLabel("›", tint, 16.sp) }
-        }
+            ) { tint -> DockLabel("-10", tint, 9.sp) }
 
-        DockDivider()
+            HexControl(
+                variant = HexVariant.HERO,
+                contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
+                onClick = {
+                    onUserInteraction()
+                    onTogglePlayPause()
+                },
+                focusRequester = playPauseFocus,
+            ) { tint -> DockLabel(if (isPlaying) "II" else "▶", tint, 16.sp) }
 
-        DockSecondary(stringResource(R.string.vd_cc)) {
-            onUserInteraction()
-            onOpenSheet(SheetMode.SUBS)
-        }
-        DockSecondary(stringResource(R.string.vd_audio)) {
-            onUserInteraction()
-            onOpenSheet(SheetMode.AUDIO)
-        }
-        DockSecondary(stringResource(R.string.vd_speed)) {
-            onUserInteraction()
-            onOpenSheet(SheetMode.SPEED)
-        }
-        DockSecondary(stringResource(R.string.vd_fit)) {
-            onUserInteraction()
-            onOpenSheet(SheetMode.ASPECT)
-        }
+            HexControl(
+                variant = HexVariant.TRANSPORT,
+                contentDescription = stringResource(R.string.vd_forward_10),
+                onClick = {
+                    onUserInteraction()
+                    onSkipForward()
+                },
+            ) { tint -> DockLabel("+10", tint, 9.sp) }
 
-        HexControl(
-            variant = HexVariant.SECONDARY,
-            contentDescription = stringResource(R.string.vd_fav),
-            onClick = {
+            if (hasNext) {
+                HexControl(
+                    variant = HexVariant.TRANSPORT,
+                    contentDescription = stringResource(R.string.vd_next),
+                    onClick = {
+                        onUserInteraction()
+                        onNext()
+                    },
+                ) { tint -> DockLabel("›", tint, 16.sp) }
+            }
+
+            DockDivider()
+
+            DockSecondary(stringResource(R.string.vd_cc)) {
                 onUserInteraction()
-                onOpenSheet(SheetMode.FAV)
-            },
-        ) { tint ->
-            Icon(
-                imageVector = YancoIcons.Favorites,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
-            )
-        }
-        HexControl(
-            variant = HexVariant.SECONDARY,
-            contentDescription = stringResource(R.string.vd_menu),
-            focusRequester = menuFocus,
-            onClick = {
+                onOpenSheet(SheetMode.SUBS)
+            }
+            DockSecondary(stringResource(R.string.vd_audio)) {
                 onUserInteraction()
-                onOpenSheet(SheetMode.MENU)
-            },
-        ) { tint -> DockLabel("•••", tint, 11.sp) }
+                onOpenSheet(SheetMode.AUDIO)
+            }
+            DockSecondary(stringResource(R.string.vd_speed)) {
+                onUserInteraction()
+                onOpenSheet(SheetMode.SPEED)
+            }
+            DockSecondary(stringResource(R.string.vd_fit)) {
+                onUserInteraction()
+                onOpenSheet(SheetMode.ASPECT)
+            }
+
+            HexControl(
+                variant = HexVariant.SECONDARY,
+                contentDescription = stringResource(R.string.vd_fav),
+                onClick = {
+                    onUserInteraction()
+                    onOpenSheet(SheetMode.FAV)
+                },
+            ) { tint ->
+                Icon(
+                    imageVector = YancoIcons.Favorites,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
+                )
+            }
+            HexControl(
+                variant = HexVariant.SECONDARY,
+                contentDescription = stringResource(R.string.vd_menu),
+                focusRequester = menuFocus,
+                onClick = {
+                    onUserInteraction()
+                    onOpenSheet(SheetMode.MENU)
+                },
+            ) { tint -> DockLabel("•••", tint, 11.sp) }
+        }
     }
 }
 
