@@ -18,8 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -39,7 +38,6 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -49,7 +47,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
@@ -186,7 +183,7 @@ fun VodPlayerDock(
                         1f to palette.BackgroundDeep.copy(alpha = 0.86f),
                     ),
                 )
-                .padding(start = 48.dp, end = 48.dp, bottom = 20.dp, top = 14.dp),
+                .padding(start = 48.dp, end = 48.dp, bottom = 10.dp, top = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Level 1 — Now Playing, pinned to the left safe area. The Box is
@@ -195,14 +192,14 @@ fun VodPlayerDock(
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 VodDockMetadata(data = data)
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
             // Level 2 — timeline ribbon.
             VodDockProgressRow(
                 progress = progress,
                 onSeekTo = onSeekTo,
                 onUserInteraction = onUserInteraction,
             )
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(6.dp))
             // Level 3 — the floating dock, centred under the timeline.
             VodDockTransportRow(
                 isPlaying = data.isPlaying,
@@ -215,29 +212,6 @@ fun VodPlayerDock(
                 onUserInteraction = onUserInteraction,
                 hasNext = hasNext,
             )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------
-// Shape helper — duplicated local copy of the `hexRowShape` used in
-// `PlayerOptionsSheet` and `VodPlayerChrome`. Tiny enough to keep local
-// per-file; no util module needed yet.
-// ---------------------------------------------------------------------
-
-@Composable
-private fun hexRowShape(corner: Dp): Shape {
-    val density = LocalDensity.current
-    return remember(corner, density) {
-        val c = with(density) { corner.toPx() }
-        GenericShape { size, _ ->
-            moveTo(c, 0f)
-            lineTo(size.width, 0f)
-            lineTo(size.width, size.height - c)
-            lineTo(size.width - c, size.height)
-            lineTo(0f, size.height)
-            lineTo(0f, c)
-            close()
         }
     }
 }
@@ -268,10 +242,10 @@ private fun VodDockMetadata(data: VodDockData) {
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.8.sp,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(3.dp))
         NowPlayingTitle(title = data.title.ifBlank { "—" }, reduceMotion = reduceMotion)
         if (data.metadataSegments.isNotEmpty()) {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 // Padded separator: at 14sp a bare "·" collides with digits.
                 text = data.metadataSegments.joinToString("  ·  "),
@@ -283,7 +257,7 @@ private fun VodDockMetadata(data: VodDockData) {
             )
         }
         data.typeLabel?.takeIf { it.isNotBlank() }?.let { label ->
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(5.dp))
             TypeBadge(label)
         }
     }
@@ -424,11 +398,17 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
         zone = java.util.TimeZone.getDefault(),
     )
 
+    val dock = dockMetrics()
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(dock.horizontalPadding),
         modifier = Modifier
-            .fillMaxWidth()
+            // MK.34.5 - the brief's 70-82% of available width. A separate,
+            // narrower ribbon than the metadata block above it, so the three
+            // levels read as distinct objects rather than one stacked panel.
+            .fillMaxWidth(0.78f)
+            .glassSurface(RoundedCornerShape(percent = 50), alpha = 0.75f)
+            .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding)
             .focusable()
             // MK.31.2 — DELIBERATELY PHYSICAL, do not convert these to
             // startward/endward like the rest of the app's LEFT/RIGHT handlers.
@@ -454,20 +434,26 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
                 }
             },
     ) {
+        // Elapsed at the left, remaining at the right, and NEITHER over the
+        // track - the brief is explicit, and time text on a moving fill is
+        // unreadable at three metres anyway.
         Text(
             text = labels.elapsed,
-            color = palette.Accent,
+            color = MidnightGlass.TextPrimary,
             fontFamily = FontFamily.Monospace,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(80.dp),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
         // 28dp touch surface holding the 8dp visual bar + a draggable thumb.
         // PHONE: tap jumps there; drag the thumb scrubs and commits on release.
         // TV: the Row above is focusable and the ±10 keys/buttons still seek.
         Box(
             modifier = Modifier
-                .height(28.dp)
+                // Touch surface stays generous while the VISUAL track slims to
+                // 3dp: shrinking the hit area with the artwork would make the
+                // phone drag path finicky for no design gain.
+                .height(14.dp)
                 .weight(1f)
                 .onSizeChanged { barWidthPx = it.width.toFloat().coerceAtLeast(1f) }
                 .pointerInput(duration) {
@@ -495,64 +481,71 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
         ) {
             Box(
                 modifier = Modifier
-                    .height(8.dp)
+                    .height(3.dp)
                     .fillMaxWidth()
-                    .clip(hexRowShape(3.dp))
-                    .background(palette.BackgroundRaised),
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(MidnightGlass.TextDim.copy(alpha = 0.35f)),
             ) {
-                // Buffered layer — pale fill up to the buffered percent.
+                // Buffered layer - barely there, so it reads as loaded rather
+                // than competing with the played fill for attention.
                 Box(
                     modifier = Modifier
-                        .height(8.dp)
+                        .height(3.dp)
                         .fillMaxWidth(bufferedPct)
-                        .background(palette.BorderSubtle.copy(alpha = 0.6f)),
+                        .background(MidnightGlass.TextSecondary.copy(alpha = 0.3f)),
                 )
-                // Played / scrub layer.
+                // Played fill - blue, per the token roles: blue is the timeline
+                // and navigation colour, champagne is reserved for selection, so
+                // a focused control never competes with the track for it.
                 Box(
                     modifier = Modifier
-                        .height(8.dp)
+                        .height(3.dp)
                         .fillMaxWidth(shownPct)
-                        .background(palette.Accent),
+                        .background(MidnightGlass.Blue),
                 )
             }
-            // Draggable thumb (the "marker"), centered on the played/scrub point.
+            // Scrubber - a small champagne HEXAGON, not a circle, so the
+            // signature shape carries into the timeline instead of stopping at
+            // the dock. Still the drag target; only the silhouette changed.
             Box(
                 modifier = Modifier
-                    .offset { IntOffset((shownPct * barWidthPx - 9.dp.toPx()).toInt(), 0) }
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(palette.Accent),
+                    .offset { IntOffset((shownPct * barWidthPx - 5.dp.toPx()).toInt(), 0) }
+                    .size(10.dp)
+                    .clip(MidnightHex)
+                    .background(MidnightGlass.Champagne),
             )
         }
-        // MB-340 — was a bare duration, which is the one time fact you can work
+        // MB-340 - was a bare duration, which is the one time fact you can work
         // out for yourself. Remaining is the headline; the ends-at wall clock
-        // sits under it in a lighter weight.
+        // trails it in a dimmer weight.
         //
-        // A Column, not a wider single label: the map measured both slots pinned
-        // at width(80.dp) sized for "00:00:00", and appending "· ENDS 21:47"
-        // there would wrap (the Text has no maxLines) and grow the row height —
-        // the same column that produced MB-300 at 125% font scale. Stacking keeps
-        // the row height governed by the bar, and 96dp fits "-1:59:59" with the
-        // sign at every shipped preset.
-        Column(
-            horizontalAlignment = Alignment.End,
-            modifier = Modifier.width(96.dp),
+        // MK.34.5 - these were STACKED in a Column, which made this row 58px
+        // tall and was the single biggest contributor to the overlay blowing its
+        // height budget. Inlining them spends width, which the ribbon has, rather
+        // than height, which it does not. Both stay maxLines = 1 and the group is
+        // width-capped: MB-300 was an unbounded Text in exactly this row starving
+        // its siblings at a large font scale.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.widthIn(max = 132.dp),
         ) {
             Text(
                 text = labels.remaining ?: labels.elapsed,
-                color = palette.TextMuted,
+                color = MidnightGlass.TextPrimary,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
             )
             labels.endsAt?.let { endsAt ->
                 Text(
                     text = stringResource(R.string.vd_ends_at, endsAt),
-                    color = palette.TextFaint,
+                    color = MidnightGlass.TextDim,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
+                    fontSize = 8.sp,
                     maxLines = 1,
+                    overflow = TextOverflow.Clip,
                 )
             }
         }
