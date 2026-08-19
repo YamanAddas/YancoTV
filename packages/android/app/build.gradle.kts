@@ -206,40 +206,17 @@ android {
             // checkout still builds. Distribution builds MUST sign with
             // release; verify with the gradle log line below before
             // uploading anywhere.
+            // MB-349 — assign a config unconditionally here and enforce the
+            // MB-295 rule from the task graph instead (see the guard below the
+            // `android { }` block). Nothing in this expression may throw: this
+            // block is evaluated when Gradle CONFIGURES :app, which happens for
+            // EVERY task in the build, so a throw here takes down ktlint, the
+            // unit tests and assembleDebug too — none of which sign anything.
             signingConfig =
                 if (releaseSigningConfigured) {
                     signingConfigs.getByName("release")
-                } else if (project.hasProperty("allowUnsignedRelease")) {
-                    // Explicit opt-in, used by CI (see .github/workflows/
-                    // android-tests.yml). The point of the release build there
-                    // is to exercise R8 / resource shrinking / ProGuard rules,
-                    // which the debug build never touches — signing is
-                    // irrelevant to that and CI holds no keystore.
-                    logger.warn(
-                        "allowUnsignedRelease set — producing a DEBUG-SIGNED release APK. " +
-                            "Valid for R8/lint validation only. This artifact CANNOT be " +
-                            "distributed: Android refuses same-package installs across " +
-                            "signing keys, so shipping it would strand every existing user.",
-                    )
-                    signingConfigs.getByName("debug")
                 } else {
-                    // MB-295 — hard failure, not a warning. This used to fall
-                    // through to debug signing with a `logger.warn` that is
-                    // invisible in normal Gradle output, so `assembleRelease`
-                    // on a machine without the keystore produced an APK that
-                    // installs fine locally and can never be updated by
-                    // anyone who already has a real build. That is a
-                    // one-way door for the whole install base, and it was
-                    // guarded by a log line.
-                    throw GradleException(
-                        "Release signing is not configured. Set release.keystore.path, " +
-                            "release.keystore.password, release.key.alias and " +
-                            "release.key.password in local.properties before cutting a " +
-                            "distribution build.\n" +
-                            "If you only need to validate R8 (CI, local minify check), " +
-                            "re-run with -PallowUnsignedRelease=true — that produces a " +
-                            "debug-signed APK which must never be distributed.",
-                    )
+                    signingConfigs.getByName("debug")
                 }
         }
     }
@@ -336,6 +313,62 @@ composeCompiler {
     if (project.findProperty("composeCompilerMetrics") == "true") {
         metricsDestination = layout.buildDirectory.dir("compose_compiler")
     }
+}
+
+// ─── MB-349 — MB-295's release-signing guard, moved off the configuration path
+//
+// MB-295 was right about the RULE: a release APK signed with the debug key
+// installs fine locally and can never be updated by anyone holding a real
+// build, so producing one silently is a one-way door for the whole install
+// base. It was wrong about WHERE to enforce it. The check lived as a `throw`
+// inside `buildTypes { release { … } }`, and Gradle evaluates that block when
+// it CONFIGURES this project — which it does for every task in the build.
+//
+// So on any machine without a release keystore, i.e. every CI runner, nothing
+// could run at all: ktlint, the SQLDelight migration check, both unit-test
+// suites, assembleDebug, and even the macOS iOS-compile job all died during
+// configuration, before doing a single second of real work. CI went red on
+// 2026-07-25 with `faa9244` and stayed red. The workflow's
+// `-PallowUnsignedRelease=true` escape hatch was passed only to the
+// assembleRelease step — the one place it was not sufficient — because the
+// failure was never about that task.
+//
+// `whenReady` fires after configuration and before execution, which is the
+// earliest point where "is a task that SIGNS something actually going to run?"
+// can be answered. Signing tasks are matched by exact name rather than by a
+// "contains Release" pattern: `lintRelease`, `compileReleaseKotlin` and
+// `packageReleaseResources` all carry Release in the name and none of them
+// produce a distributable, so matching loosely would just reintroduce the bug
+// one level down. `releasePackage` and `bundleRelease` are covered
+// transitively — both depend on the packaging tasks named here.
+val releaseSigningTasks = setOf("packageRelease", "packageReleaseBundle", "validateSigningRelease")
+
+gradle.taskGraph.whenReady {
+    if (releaseSigningConfigured) return@whenReady
+    val signingInGraph = allTasks.any { it.project.path == project.path && it.name in releaseSigningTasks }
+    if (!signingInGraph) return@whenReady
+    if (project.hasProperty("allowUnsignedRelease")) {
+        // Explicit opt-in, used by CI (see .github/workflows/android-tests.yml).
+        // The point of the release build there is to exercise R8 / resource
+        // shrinking / ProGuard rules, which the debug build never touches —
+        // signing is irrelevant to that and CI holds no keystore.
+        logger.warn(
+            "allowUnsignedRelease set — producing a DEBUG-SIGNED release APK. " +
+                "Valid for R8/lint validation only. This artifact CANNOT be " +
+                "distributed: Android refuses same-package installs across " +
+                "signing keys, so shipping it would strand every existing user.",
+        )
+        return@whenReady
+    }
+    throw GradleException(
+        "Release signing is not configured. Set release.keystore.path, " +
+            "release.keystore.password, release.key.alias and " +
+            "release.key.password in local.properties before cutting a " +
+            "distribution build.\n" +
+            "If you only need to validate R8 (CI, local minify check), " +
+            "re-run with -PallowUnsignedRelease=true — that produces a " +
+            "debug-signed APK which must never be distributed.",
+    )
 }
 
 dependencies {
