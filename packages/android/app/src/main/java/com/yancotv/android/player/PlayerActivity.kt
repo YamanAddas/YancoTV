@@ -2480,12 +2480,21 @@ class PlayerActivity : AppCompatActivity() {
         if (item == null) return VodDockData(isPlaying = controller.player.playWhenReady)
         val title = item.cleanTitle?.ifBlank { null } ?: item.title
         val chips = mutableListOf<VodDockChip>()
+        // MB-340 / MB-346 — read the episode ONCE and feed both the type chip
+        // and the kicker. Two reads of the same StateFlow inside one build could
+        // straddle an item swap and describe two different things in one dock.
+        val episode = controller.currentEpisode.value
+        // MB-346 — resolved from `episode`, NOT from item.type alone: a playing
+        // episode's synthesized item is typed MOVIE on purpose, which is what
+        // badged every episode "MOVIE". See dockTypeLabel.
         val typeLabel =
-            when (item.type) {
-                ContentType.MOVIE -> "MOVIE"
-                ContentType.SERIES -> "EPISODE"
-                ContentType.LIVE -> "LIVE"
-            }
+            getString(
+                when (dockTypeLabel(item.type, episode)) {
+                    DockTypeLabel.MOVIE -> R.string.content_type_movie
+                    DockTypeLabel.EPISODE -> R.string.content_type_episode
+                    DockTypeLabel.LIVE -> R.string.content_type_live
+                },
+            )
         chips += VodDockChip(label = typeLabel, tone = VodDockChipTone.PREMIUM)
         item.groupName?.takeIf { it.isNotBlank() }?.let {
             chips += VodDockChip(label = it.uppercase(Locale.ROOT))
@@ -2494,7 +2503,7 @@ class PlayerActivity : AppCompatActivity() {
         // sufficient: onItemChanged hides the dock on every item swap, so it is
         // always rebuilt after a title change. Null for movies, and the dock is
         // never shown for LIVE at all, so both degrade to the brand kicker.
-        val kicker = episodeKicker(controller.currentEpisode.value)?.let { k ->
+        val kicker = episodeKicker(episode)?.let { k ->
             if (k.title != null) getString(R.string.vd_episode_kicker, k.code, k.title) else k.code
         }
         return VodDockData(

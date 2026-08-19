@@ -1101,6 +1101,13 @@
     <string name="vd_pause">Pausa</string>
     <string name="vd_next">Siguiente</string>
     <string name="vd_previous">Anterior</string>
+
+    <!-- MB-346 — singular content-type nouns (PELÍCULA, not the plural section
+         name Películas): these label ONE item. "EN DIRECTO" matches
+         cf_kicker_live_channel / section_live_tv, NOT "en vivo". -->
+    <string name="content_type_movie">PELÍCULA</string>
+    <string name="content_type_episode">EPISODIO</string>
+    <string name="content_type_live">EN DIRECTO</string>
     <string name="vd_ends_at">TERMINA %1$s</string>
 
     <!-- MB-339 — quantity strings.

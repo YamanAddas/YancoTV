@@ -1101,6 +1101,14 @@
     <string name="vd_pause">إيقاف مأقت</string>
     <string name="vd_next">التالي</string>
     <string name="vd_previous">السابق</string>
+
+    <!-- MB-346 — singular content-type nouns, unlike the plural section names
+         (الأفلام / المسلسلات) which title a whole screen. These label ONE item.
+         Arabic has no case, so they stay in their natural form while the Latin
+         locales are authored uppercase. -->
+    <string name="content_type_movie">فيلم</string>
+    <string name="content_type_episode">حلقة</string>
+    <string name="content_type_live">مباشر</string>
     <string name="vd_ends_at">ينتهي %1$s</string>
 
     <!-- MB-339 — quantity strings.

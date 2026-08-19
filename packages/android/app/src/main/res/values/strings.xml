@@ -1159,6 +1159,17 @@
     <string name="vd_previous">Previous</string>
     <string name="vd_episode_kicker" translatable="false">%1$s · %2$s</string>
 
+    <!-- MB-346 — SINGULAR content-type nouns, deliberately surface-neutral
+         rather than vd_-prefixed: the dock, search results and the coverflow
+         overline all label one item with the same word, and three prefixed
+         copies of "MOVIE" would drift apart at the first translation pass.
+         Distinct from the PLURAL section_* names (Movies / Series), which title
+         a whole screen. Authored uppercase in the Latin locales to match the
+         chip slot; Arabic has no case and stays in its natural form. -->
+    <string name="content_type_movie">MOVIE</string>
+    <string name="content_type_episode">EPISODE</string>
+    <string name="content_type_live">LIVE</string>
+
     <!-- MB-339 — quantity strings.
 
          Until now every count was a flat <string>, so Arabic rendered the
