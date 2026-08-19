@@ -24,11 +24,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.yancotv.android.ui.theme.LocalYancoPalette
 
 /**
  * MK.34.2 — the "Midnight Lounge" surface language for the player chrome.
@@ -44,29 +46,65 @@ import androidx.compose.ui.unit.dp
  * the CSS thing at all, the divergence is documented at the point it happens —
  * see [glassSurface] for the one that matters.
  */
-internal object MidnightGlass {
-    // Brief tokens, verbatim. Named for the role rather than the hue so a later
-    // retune does not leave "champagne" pointing at something blue.
-    val BgPage = Color(0xFF111318)
-    val BgSurface = Color(0xFF1A1E27)
-    val BgInset = Color(0xFF151920)
-    val Border = Color(0xFF2B3344)
-    val TextPrimary = Color(0xFFF5F7FA)
-    val TextSecondary = Color(0xFF9BA8BA)
-    val TextDim = Color(0xFF6B7A8D)
+@Immutable
+internal data class GlassTokens(
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textDim: Color,
+    /** Selection, focus rings, the hero fill. The theme's primary accent. */
+    val accent: Color,
+    /** Timeline played fill and the scrubber — related to [accent], not equal. */
+    val accentSoft: Color,
+    /** Lit glass rim. */
+    val rim: Color,
+    val surfaceTop: Color,
+    val surfaceBottom: Color,
+    val inset: Color,
+    val border: Color,
+)
 
-    /** Current selection, focus rings, the hero control. */
-    val Champagne = Color(0xFFE8B87A)
-
-    /** Timeline played portion and navigation chevrons. */
-    val Blue = Color(0xFF5CA9FF)
-
-    /** Small active/status values ONLY — never a surface or a focus ring. */
-    val Mint = Color(0xFF8BE0B4)
-
-    /** Edge highlight that reads as a lit glass rim rather than a bevel. */
-    val RimLight = Color(0xFFF5F7FA).copy(alpha = 0.16f)
-    val InnerHighlight = Color.White.copy(alpha = 0.12f)
+/**
+ * Resolve the glass tokens from the ACTIVE THEME.
+ *
+ * The brief specifies literal hexes — champagne #E8B87A, blue #5CA9FF, a fixed
+ * #1A1E27 surface — and the first version of this file hardcoded them. That was
+ * wrong for this app: palettes are user-switchable through ThemeController, so a
+ * hardcoded set makes the player the one surface that ignores the user's choice,
+ * and it drifts the moment any other palette is edited (user instruction,
+ * 2026-08-19).
+ *
+ * What the brief actually specifies is a set of ROLES — one colour for
+ * selection, a related-but-distinct one for the timeline, a three-step text
+ * ramp, a lit rim over a translucent two-stop surface. Those roles map cleanly
+ * onto YancoPalette, so the design survives intact and follows the theme:
+ *
+ *   champagne (selection / focus / hero) -> Accent
+ *   blue (timeline played + scrubber)    -> AccentSoft
+ *   text ramp                            -> TextPrimary / TextSecondary / TextMuted
+ *   rim                                  -> PanelBorder, already a white alpha
+ *   glass surface                        -> BackgroundElevated over BackgroundDeep
+ *
+ * The accent/accentSoft split is load-bearing rather than decorative: the brief
+ * uses two hues so a focused control never competes with the track for the same
+ * colour. Collapsing both to `Accent` would put an emerald scrubber on an
+ * emerald track and lose the handle. AccentSoft is lighter than Accent in every
+ * shipped palette, so the separation survives a theme swap.
+ */
+@Composable
+internal fun glassTokens(): GlassTokens {
+    val p = LocalYancoPalette.current
+    return GlassTokens(
+        textPrimary = p.TextPrimary,
+        textSecondary = p.TextSecondary,
+        textDim = p.TextMuted,
+        accent = p.Accent,
+        accentSoft = p.AccentSoft,
+        rim = p.PanelBorder,
+        surfaceTop = p.BackgroundElevated,
+        surfaceBottom = p.BackgroundDeep,
+        inset = p.BackgroundRaised,
+        border = p.BorderSubtle,
+    )
 }
 
 /**
@@ -119,23 +157,26 @@ internal val MidnightHex: Shape = androidx.compose.foundation.shape.GenericShape
  *   frame (the timeline ribbon) than the dock does.
  */
 @Composable
-internal fun Modifier.glassSurface(shape: Shape, alpha: Float = 1f): Modifier = this
-    .clip(shape)
-    .background(
-        // CSS `linear-gradient(145deg, …)`. 145deg in CSS runs clockwise from
-        // "to top", landing as a down-and-right diagonal — the offsets below
-        // reproduce that direction rather than a plain vertical, so the lit
-        // edge sits top-left where the rim highlight is.
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF232834).copy(alpha = 0.68f * alpha),
-                Color(0xFF111318).copy(alpha = 0.55f * alpha),
+internal fun Modifier.glassSurface(shape: Shape, alpha: Float = 1f): Modifier {
+    val t = glassTokens()
+    return this
+        .clip(shape)
+        .background(
+            // CSS `linear-gradient(145deg, …)`. 145deg in CSS runs clockwise from
+            // "to top", landing as a down-and-right diagonal — the offsets below
+            // reproduce that direction rather than a plain vertical, so the lit
+            // edge sits top-left where the rim highlight is.
+            Brush.linearGradient(
+                colors = listOf(
+                    t.surfaceTop.copy(alpha = 0.72f * alpha),
+                    t.surfaceBottom.copy(alpha = 0.58f * alpha),
+                ),
+                start = Offset.Zero,
+                end = Offset.Infinite,
             ),
-            start = Offset.Zero,
-            end = Offset.Infinite,
-        ),
-    )
-    .border(1.dp, MidnightGlass.RimLight, shape)
+        )
+        .border(1.dp, t.rim, shape)
+}
 
 /** Size + emphasis tiers. The brief is explicit that these must NOT be equal. */
 internal enum class HexVariant {
@@ -250,43 +291,44 @@ internal fun HexControl(
     content: @Composable (contentColor: Color) -> Unit,
 ) {
     val metrics = hexMetrics(variant)
+    val t = glassTokens()
     val interaction = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
 
     val fill: Brush = when {
         !enabled -> Brush.linearGradient(
-            listOf(MidnightGlass.BgInset.copy(alpha = 0.45f), MidnightGlass.BgInset.copy(alpha = 0.3f)),
+            listOf(t.inset.copy(alpha = 0.45f), t.inset.copy(alpha = 0.3f)),
         )
         // Hero and selected controls take translucent champagne glass with a
         // restrained warm interior — translucent, so the frame still shows
         // through, which is what keeps it from reading as a solid button.
         variant == HexVariant.HERO || selected -> Brush.linearGradient(
             listOf(
-                MidnightGlass.Champagne.copy(alpha = if (isFocused) 0.42f else 0.32f),
-                MidnightGlass.Champagne.copy(alpha = 0.14f),
+                t.accent.copy(alpha = if (isFocused) 0.42f else 0.32f),
+                t.accent.copy(alpha = 0.14f),
             ),
         )
         // Everything else is smoked navy with a thin edge highlight.
         else -> Brush.linearGradient(
             listOf(
-                Color(0xFF232834).copy(alpha = if (isFocused) 0.85f else 0.68f),
-                Color(0xFF111318).copy(alpha = 0.55f),
+                t.surfaceTop.copy(alpha = if (isFocused) 0.9f else 0.72f),
+                t.surfaceBottom.copy(alpha = 0.58f),
             ),
         )
     }
 
     val ring = when {
-        !enabled -> MidnightGlass.Border.copy(alpha = 0.4f)
-        isFocused -> MidnightGlass.Champagne
-        selected || variant == HexVariant.HERO -> MidnightGlass.Champagne.copy(alpha = 0.55f)
-        else -> MidnightGlass.RimLight
+        !enabled -> t.border.copy(alpha = 0.4f)
+        isFocused -> t.accent
+        selected || variant == HexVariant.HERO -> t.accent.copy(alpha = 0.55f)
+        else -> t.rim
     }
 
     val contentColor = when {
-        !enabled -> MidnightGlass.TextDim
-        variant == HexVariant.HERO || selected -> MidnightGlass.TextPrimary
-        isFocused -> MidnightGlass.Champagne
-        else -> MidnightGlass.TextSecondary
+        !enabled -> t.textDim
+        variant == HexVariant.HERO || selected -> t.textPrimary
+        isFocused -> t.accent
+        else -> t.textSecondary
     }
 
     Box(
@@ -316,12 +358,30 @@ internal fun HexControl(
                     Modifier
                 },
             )
-            .semantics {
+            // mergeDescendants — the control must expose ONE node, not a
+            // described container wrapping an undescribed child. Without it the
+            // icon-bearing controls published a second, unlabelled node: the
+            // favourite control reported 67x96 bounds overlapping its neighbour
+            // (every text-bearing control measured exactly right), and
+            // uiautomator's own childNafCheck NPE'd walking the tree. A screen
+            // reader would have hit the same shape — a button, then an anonymous
+            // graphic inside it.
+            .semantics(mergeDescendants = true) {
                 this.contentDescription = contentDescription
                 this.role = Role.Button
             },
         contentAlignment = Alignment.Center,
     ) {
-        content(contentColor)
+        // clearAndSetSemantics on the CONTENT, not just mergeDescendants on the
+        // parent. mergeDescendants alone still let an Icon child drag in
+        // Compose's 48dp minimum-interactive-size expansion: the favourite
+        // control reported 67x96 bounds — 96px is exactly 48dp — overlapping its
+        // neighbour, while every text-bearing control measured 52x52 as drawn.
+        // The drawn hexagon was always correct; the published node was not, and
+        // a TV reader navigating by node would have found a target that did not
+        // match what was on screen.
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.clearAndSetSemantics {}) {
+            content(contentColor)
+        }
     }
 }

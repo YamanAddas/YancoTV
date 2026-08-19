@@ -228,6 +228,7 @@ fun VodPlayerDock(
 
 @Composable
 private fun VodDockMetadata(data: VodDockData) {
+    val glass = glassTokens()
     val reduceMotion = LocalReduceMotion.current
     // Capped at 55% of the width so the block never reaches the middle of the
     // frame, where the reference shot has a face. MB-300's two-line clamp is
@@ -237,7 +238,7 @@ private fun VodDockMetadata(data: VodDockData) {
     Column(modifier = Modifier.fillMaxWidth(0.55f)) {
         Text(
             text = stringResource(R.string.vd_now_playing_label),
-            color = MidnightGlass.Champagne,
+            color = glass.accent,
             fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.8.sp,
@@ -249,7 +250,7 @@ private fun VodDockMetadata(data: VodDockData) {
             Text(
                 // Padded separator: at 14sp a bare "·" collides with digits.
                 text = data.metadataSegments.joinToString("  ·  "),
-                color = MidnightGlass.TextSecondary,
+                color = glass.textSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -284,6 +285,7 @@ private fun VodDockMetadata(data: VodDockData) {
  */
 @Composable
 private fun NowPlayingTitle(title: String, reduceMotion: Boolean) {
+    val glass = glassTokens()
     // The brief's clamp(20px, 1.7vw, 30px) — PHYSICAL pixels at 1920, like every
     // other number in that document. Expressed as a fraction of screen width so
     // it lands on the same physical size at any density: 1.7vw of 1920px is
@@ -292,7 +294,7 @@ private fun NowPlayingTitle(title: String, reduceMotion: Boolean) {
     val fontSize = (widthDp * 0.017f).coerceIn(10f, 15f).sp
     Text(
         text = title,
-        color = MidnightGlass.TextPrimary,
+        color = glass.textPrimary,
         fontSize = fontSize,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = (-0.2).sp,
@@ -349,16 +351,17 @@ private fun Modifier.edgeFade(width: Dp = 22.dp): Modifier = this
  */
 @Composable
 private fun TypeBadge(label: String) {
+    val glass = glassTokens()
     val shape = YancoShapes.HexCapsule
     Box(
         modifier = Modifier
             .clip(shape)
-            .border(1.dp, MidnightGlass.Champagne.copy(alpha = 0.5f), shape)
+            .border(1.dp, glass.accent.copy(alpha = 0.5f), shape)
             .padding(horizontal = 11.dp, vertical = 4.dp),
     ) {
         Text(
             text = label,
-            color = MidnightGlass.Champagne,
+            color = glass.accent,
             fontSize = 8.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.2.sp,
@@ -369,6 +372,7 @@ private fun TypeBadge(label: String) {
 
 @Composable
 private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Unit, onUserInteraction: () -> Unit) {
+    val glass = glassTokens()
     val palette = LocalYancoPalette.current
     val duration = progress.durationMs.coerceAtLeast(1L)
     // MB-340 — with an unknown duration the old `coerceAtLeast(1L)` divisor made
@@ -439,7 +443,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
         // unreadable at three metres anyway.
         Text(
             text = labels.elapsed,
-            color = MidnightGlass.TextPrimary,
+            color = glass.textPrimary,
             fontFamily = FontFamily.Monospace,
             fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
@@ -484,7 +488,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
                     .height(3.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(percent = 50))
-                    .background(MidnightGlass.TextDim.copy(alpha = 0.35f)),
+                    .background(glass.textDim.copy(alpha = 0.35f)),
             ) {
                 // Buffered layer - barely there, so it reads as loaded rather
                 // than competing with the played fill for attention.
@@ -492,7 +496,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
                     modifier = Modifier
                         .height(3.dp)
                         .fillMaxWidth(bufferedPct)
-                        .background(MidnightGlass.TextSecondary.copy(alpha = 0.3f)),
+                        .background(glass.textSecondary.copy(alpha = 0.3f)),
                 )
                 // Played fill - blue, per the token roles: blue is the timeline
                 // and navigation colour, champagne is reserved for selection, so
@@ -501,7 +505,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
                     modifier = Modifier
                         .height(3.dp)
                         .fillMaxWidth(shownPct)
-                        .background(MidnightGlass.Blue),
+                        .background(glass.accentSoft),
                 )
             }
             // Scrubber - a small champagne HEXAGON, not a circle, so the
@@ -512,7 +516,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
                     .offset { IntOffset((shownPct * barWidthPx - 5.dp.toPx()).toInt(), 0) }
                     .size(10.dp)
                     .clip(MidnightHex)
-                    .background(MidnightGlass.Champagne),
+                    .background(glass.accent),
             )
         }
         // MB-340 - was a bare duration, which is the one time fact you can work
@@ -532,7 +536,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
         ) {
             Text(
                 text = labels.remaining ?: labels.elapsed,
-                color = MidnightGlass.TextPrimary,
+                color = glass.textPrimary,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -541,7 +545,7 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
             labels.endsAt?.let { endsAt ->
                 Text(
                     text = stringResource(R.string.vd_ends_at, endsAt),
-                    color = MidnightGlass.TextDim,
+                    color = glass.textDim,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 8.sp,
                     maxLines = 1,
@@ -587,6 +591,7 @@ private fun VodDockTransportRow(
     onUserInteraction: () -> Unit,
     hasNext: Boolean,
 ) {
+    val glass = glassTokens()
     val dockShape = RoundedCornerShape(18.dp)
     val dock = dockMetrics()
     Row(
@@ -707,6 +712,7 @@ private fun DockSecondary(label: String, onClick: () -> Unit) {
 /** Shared label treatment so every control in the dock has one type voice. */
 @Composable
 private fun DockLabel(text: String, tint: Color, size: androidx.compose.ui.unit.TextUnit) {
+    val glass = glassTokens()
     Text(
         text = text,
         color = tint,
@@ -723,12 +729,13 @@ private fun DockLabel(text: String, tint: Color, size: androidx.compose.ui.unit.
  */
 @Composable
 private fun DockDivider() {
+    val glass = glassTokens()
     Box(
         modifier = Modifier
             .padding(horizontal = 4.dp)
             .width(1.dp)
             .height(hexMetrics(HexVariant.SECONDARY).size * 0.62f)
-            .background(MidnightGlass.RimLight),
+            .background(glass.rim),
     )
 }
 
