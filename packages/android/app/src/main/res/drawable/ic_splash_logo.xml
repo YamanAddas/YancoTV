@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MB-350 — the splash logo, sized to survive the splash screen's circular mask.
+
+  The theme pointed windowSplashScreenAnimatedIcon straight at @drawable/ic_logo,
+  which is the 16:9 badge+wordmark lockup (640x360). The splash API masks that
+  icon to the system icon shape — a circle — so a wide image loses both ends and
+  the user sees the logo clipped into a horizontal oval.
+
+  The geometry: the icon canvas is 240dp and only a 160dp-diameter circle is
+  visible. A 16:9 rectangle fits inside a circle of diameter D when its diagonal
+  equals D, so w = D / sqrt(1 + (9/16)^2) = 160 / 1.147 = 139dp. 132x74dp is that
+  bound with margin to spare (diagonal 151dp against the 160dp circle), and it
+  keeps the exact 16:9 ratio so the artwork is never distorted.
+
+  The transparent 240dp square underneath is load-bearing, not padding. Without
+  it this drawable's intrinsic size would be the bitmap's, and the platform
+  scales the icon drawable to fill the canvas — which would blow the logo back up
+  to the full width and re-crop it. The square pins the intrinsic aspect to 1:1
+  so scale-to-canvas preserves the inset instead of eating it.
+
+  Kept as the full lockup rather than swapping to the square ic_logo_mark: the
+  request was for all of the logo with no cuts, and the mark alone would drop the
+  wordmark. The cost is that the logo renders smaller than it used to.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="240dp" android:height="240dp" />
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <bitmap
+            android:src="@drawable/ic_logo"
+            android:gravity="center"
+            android:width="132dp"
+            android:height="74dp" />
+    </item>
+</layer-list>
