@@ -1101,6 +1101,8 @@
     <string name="vd_pause">Pausa</string>
     <string name="vd_next">Siguiente</string>
     <string name="vd_previous">Anterior</string>
+    <!-- MK.34.3 -->
+    <string name="vd_now_playing_label">REPRODUCIENDO AHORA</string>
 
     <!-- MB-346 — singular content-type nouns (PELÍCULA, not the plural section
          name Películas): these label ONE item. "EN DIRECTO" matches

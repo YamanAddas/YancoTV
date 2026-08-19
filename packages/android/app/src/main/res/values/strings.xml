@@ -1073,7 +1073,11 @@
     <string name="pa_buffering">BUFFERING</string>
     <string name="pa_ahead_seconds" translatable="false">%1$ds</string>
     <string name="vc_cant_open_stream">Couldn\'t open this stream</string>
-    <string name="vd_now_playing" translatable="false">NOW PLAYING · YANCO.VOD</string>
+    <!-- MK.34.3 — the Now Playing kicker. Replaces the old brand line
+         "NOW PLAYING · YANCO.VOD": the design brief specifies a plain
+         uppercase label above the title, and the brand suffix was noise
+         competing with the programme name directly beneath it. -->
+    <string name="vd_now_playing_label">NOW PLAYING</string>
     <string name="vd_rewind_10">Rewind 10 seconds</string>
     <string name="vd_forward_10">Forward 10 seconds</string>
     <string name="pc_external_subtitle">External subtitle</string>

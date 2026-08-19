@@ -1,6 +1,7 @@
 package com.yancotv.android.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -31,14 +32,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -46,6 +51,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -60,6 +66,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
+import com.yancotv.android.ui.theme.LocalReduceMotion
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.android.ui.theme.YancoShapes
 
@@ -94,26 +101,25 @@ enum class VodDockVisibility {
  * play-pause button's icon swap inside the transport row.
  */
 data class VodDockData(
-    // MK.31.24 — null means "use the standard NOW PLAYING kicker", resolved
-    // in the metadata block below. A data-class default cannot reach a
-    // Context, and PlayerActivity constructs this off-composition.
-    val kicker: String? = null,
+    /**
+     * The programme title, ALREADY normalized by [nowPlayingFrom]. One line.
+     *
+     * MK.34.3 — this used to be the provider's raw string, which for a Turkish
+     * episode names the show twice and the episode twice; the dock rendered all
+     * of it at 34sp across two lines. Normalization happens in the activity so
+     * this composable stays a renderer.
+     */
     val title: String = "",
-    val chips: List<VodDockChip> = emptyList(),
+    /**
+     * Ordered metadata segments — year, season/episode, episode name. Rendered
+     * joined with " · " on one line under the title. Replaces the old `kicker`,
+     * which was a second copy of the raw string.
+     */
+    val metadataSegments: List<String> = emptyList(),
+    /** Content-type badge text ("EPISODE" / "MOVIE"), or null to omit it. */
+    val typeLabel: String? = null,
     val isPlaying: Boolean = true,
 )
-
-/**
- * Small hex-capsule chip in the metadata row. [tone] picks the visual
- * weight: PREMIUM uses the accent for emphasis (rating badge), MUTED is
- * the default secondary treatment.
- */
-data class VodDockChip(val label: String, val tone: VodDockChipTone = VodDockChipTone.MUTED)
-
-enum class VodDockChipTone {
-    MUTED,
-    PREMIUM,
-}
 
 /**
  * Playback progress in milliseconds. Recomposed by the activity on a
@@ -263,75 +269,141 @@ private fun hexRowShape(corner: Dp): Shape {
 
 @Composable
 private fun VodDockMetadata(data: VodDockData) {
-    val palette = LocalYancoPalette.current
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val reduceMotion = LocalReduceMotion.current
+    // Capped at 55% of the width so the block never reaches the middle of the
+    // frame, where the reference shot has a face. MB-300's two-line clamp is
+    // gone because the title is now one line by construction: it cannot grow
+    // the Column, so it cannot starve the transport row of height, which is
+    // what made the play/pause control measure to zero on long titles.
+    Column(modifier = Modifier.fillMaxWidth(0.55f)) {
         Text(
-            text = data.kicker ?: stringResource(R.string.vd_now_playing),
-            color = palette.Accent,
-            fontSize = 12.sp,
+            text = stringResource(R.string.vd_now_playing_label),
+            color = MidnightGlass.Champagne,
+            fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 2.2.sp,
+            letterSpacing = 2.4.sp,
         )
-        Spacer(Modifier.height(6.dp))
-        // MB-300 — 44sp with no line clamp inside a Column capped at 444dp.
-        // A long VOD title (~117 chars is enough at 100%) grew this Text
-        // until the Column ran out of height, and Compose hands the residual
-        // to the LAST children: the hint strip, then the transport row. A
-        // `Modifier.size(88.dp)` coerced by an incoming 0 constraint measures
-        // to 0 — i.e. the play/pause control silently disappeared on exactly
-        // the titles most likely to be long. Two lines + ellipsis caps the
-        // worst case at 405dp of the 444dp budget even at a 125% font scale.
-        Text(
-            text = data.title.ifBlank { "—" },
-            color = palette.TextPrimary,
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = (-0.8).sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (data.chips.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                data.chips.forEach { chip -> MetadataChip(chip) }
-            }
+        Spacer(Modifier.height(8.dp))
+        NowPlayingTitle(title = data.title.ifBlank { "—" }, reduceMotion = reduceMotion)
+        if (data.metadataSegments.isNotEmpty()) {
+            Spacer(Modifier.height(7.dp))
+            Text(
+                // Padded separator: at 14sp a bare "·" collides with digits.
+                text = data.metadataSegments.joinToString("  ·  "),
+                color = MidnightGlass.TextSecondary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        data.typeLabel?.takeIf { it.isNotBlank() }?.let { label ->
+            Spacer(Modifier.height(11.dp))
+            TypeBadge(label)
         }
     }
 }
 
+/**
+ * MK.34.3 — the programme title. One line, and the ONLY animated element.
+ *
+ * `basicMarquee` already encodes the brief's rule that a title which fits must
+ * stay completely still — it measures the content against the container and
+ * animates only on overflow, so there is no manual scrollWidth/clientWidth
+ * comparison to get wrong. Its defaults also happen to match the brief: 30.dp/s
+ * velocity, and a delay before each pass. Both are stated explicitly here
+ * anyway, because relying on a default that matches a spec by coincidence is
+ * how a library upgrade silently changes a designed behaviour.
+ *
+ * Reduced motion switches to a plain ellipsis rather than a slower scroll: the
+ * accessibility preference asks for no movement, not less of it.
+ *
+ * Direction is not forced. Compose resolves bidi from the text itself, so an
+ * Arabic title lays out RTL and scrolls the way it reads, while a Turkish one
+ * stays LTR — the `dir="auto"` the brief asks for, obtained by not overriding
+ * what the platform already computes.
+ */
 @Composable
-private fun MetadataChip(chip: VodDockChip) {
-    val palette = LocalYancoPalette.current
-    val shape = hexRowShape(6.dp)
-    val fg =
-        when (chip.tone) {
-            VodDockChipTone.PREMIUM -> palette.Accent
-            VodDockChipTone.MUTED -> palette.TextSecondary
-        }
+private fun NowPlayingTitle(title: String, reduceMotion: Boolean) {
+    // The brief's clamp(20px, 1.7vw, 30px), scaled off the real window width.
+    val widthDp = LocalConfiguration.current.screenWidthDp
+    val fontSize = (widthDp * 0.028f).coerceIn(20f, 30f).sp
+    Text(
+        text = title,
+        color = MidnightGlass.TextPrimary,
+        fontSize = fontSize,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.2).sp,
+        maxLines = 1,
+        overflow = if (reduceMotion) TextOverflow.Ellipsis else TextOverflow.Clip,
+        modifier = if (reduceMotion) {
+            Modifier.fillMaxWidth()
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .edgeFade()
+                .basicMarquee(
+                    iterations = Int.MAX_VALUE,
+                    initialDelayMillis = MARQUEE_DELAY_MS,
+                    repeatDelayMillis = MARQUEE_DELAY_MS,
+                    velocity = MARQUEE_VELOCITY,
+                )
+        },
+    )
+}
+
+private const val MARQUEE_DELAY_MS = 1500
+private val MARQUEE_VELOCITY = 30.dp
+
+/**
+ * Soft edges on the title viewport so a scrolling line dissolves instead of
+ * being guillotined by the container edge.
+ *
+ * `BlendMode.DstIn` multiplies the existing alpha, which needs the content in
+ * its own layer to blend against — hence the offscreen compositing strategy.
+ * Without it the blend would apply against the window and punch a transparent
+ * hole through the dock behind the text.
+ */
+private fun Modifier.edgeFade(width: Dp = 22.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = (width.toPx() / size.width).coerceIn(0f, 0.5f)
+        drawRect(
+            brush = Brush.horizontalGradient(
+                0f to Color.Transparent,
+                fade to Color.Black,
+                1f - fade to Color.Black,
+                1f to Color.Transparent,
+            ),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+
+/**
+ * Content-type badge. Small, outlined, hex-derived, and deliberately not
+ * dominant — the brief calls this out, and the champagne is held at half alpha
+ * so it reads as a label rather than competing with the hero control.
+ */
+@Composable
+private fun TypeBadge(label: String) {
+    val shape = YancoShapes.HexCapsule
     Box(
         modifier = Modifier
-            .height(26.dp)
             .clip(shape)
-            .background(palette.BackgroundRaised)
-            .border(1.dp, palette.BorderSubtle, shape)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
+            .border(1.dp, MidnightGlass.Champagne.copy(alpha = 0.5f), shape)
+            .padding(horizontal = 11.dp, vertical = 4.dp),
     ) {
         Text(
-            text = chip.label,
-            color = fg,
-            fontSize = 12.sp,
+            text = label,
+            color = MidnightGlass.Champagne,
+            fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.4.sp,
+            letterSpacing = 1.6.sp,
+            maxLines = 1,
         )
     }
 }
-
-// ---------------------------------------------------------------------
-// Progress bar row. Renders played / buffered / scrub cursor with the
-// in / out time mono labels on either side. DPAD LEFT/RIGHT while the
-// row is focused fires a ±10 s seek via `onSeekTo`.
-// ---------------------------------------------------------------------
 
 @Composable
 private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Unit, onUserInteraction: () -> Unit) {

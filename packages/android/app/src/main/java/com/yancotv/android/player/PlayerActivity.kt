@@ -2478,11 +2478,10 @@ class PlayerActivity : AppCompatActivity() {
      */
     private fun buildDockData(item: ContentItem?): VodDockData {
         if (item == null) return VodDockData(isPlaying = controller.player.playWhenReady)
-        val title = item.cleanTitle?.ifBlank { null } ?: item.title
-        val chips = mutableListOf<VodDockChip>()
         // MB-340 / MB-346 — read the episode ONCE and feed both the type chip
-        // and the kicker. Two reads of the same StateFlow inside one build could
-        // straddle an item swap and describe two different things in one dock.
+        // and the title normalization. Two reads of the same StateFlow inside
+        // one build could straddle an item swap and describe two different
+        // things in one dock.
         val episode = controller.currentEpisode.value
         // MB-346 — resolved from `episode`, NOT from item.type alone: a playing
         // episode's synthesized item is typed MOVIE on purpose, which is what
@@ -2495,21 +2494,27 @@ class PlayerActivity : AppCompatActivity() {
                     DockTypeLabel.LIVE -> R.string.content_type_live
                 },
             )
-        chips += VodDockChip(label = typeLabel, tone = VodDockChipTone.PREMIUM)
-        item.groupName?.takeIf { it.isNotBlank() }?.let {
-            chips += VodDockChip(label = it.uppercase(Locale.ROOT))
-        }
-        // MB-340 — episode context for series. Read once per dock show, which is
-        // sufficient: onItemChanged hides the dock on every item swap, so it is
-        // always rebuilt after a title change. Null for movies, and the dock is
-        // never shown for LIVE at all, so both degrade to the brand kicker.
-        val kicker = episodeKicker(episode)?.let { k ->
-            if (k.title != null) getString(R.string.vd_episode_kicker, k.code, k.title) else k.code
-        }
+        // MK.34.3 — normalize here rather than in the composable, so the dock
+        // stays a renderer and the parsing rules stay unit-testable.
+        //
+        // `item.title`, deliberately NOT `cleanTitle`: the shared cleaner strips
+        // brackets, which eats "(2021)" before this ever sees it, and the year is
+        // a metadata segment the design asks for. Same reasoning and the same
+        // choice as subtitles/buildSubtitleQuery. Everything cleanTitle would
+        // have removed, nowPlayingFrom removes anyway.
+        //
+        // No channel argument: there is no broadcaster field for VOD. See the
+        // NowPlayingMetadata KDoc — the reference's "TRT 1" is burned into the
+        // video, and the Xtream category is a category, not a channel.
+        val nowPlaying = nowPlayingFrom(
+            rawTitle = item.title,
+            season = episode?.seasonNumber,
+            episode = episode?.episodeNumber,
+        )
         return VodDockData(
-            kicker = kicker,
-            title = title,
-            chips = chips,
+            title = nowPlaying.title,
+            metadataSegments = nowPlaying.segments,
+            typeLabel = typeLabel,
             isPlaying = controller.player.playWhenReady,
         )
     }

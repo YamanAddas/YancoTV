@@ -1101,6 +1101,8 @@
     <string name="vd_pause">Pause</string>
     <string name="vd_next">Suivant</string>
     <string name="vd_previous">Précédent</string>
+    <!-- MK.34.3 -->
+    <string name="vd_now_playing_label">LECTURE EN COURS</string>
 
     <!-- MB-346 — singular content-type nouns (FILM, not the plural section name
          Films): these label ONE item. "EN DIRECT" matches
