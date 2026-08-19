@@ -81,6 +81,12 @@ private const val TERMS_OF_SERVICE_URL = "https://example.invalid/yancotv/terms"
  * drawable resized to the same hero footprint, and moved the version
  * label into an arabesque (Cinzel Decorative) face for a more
  * deliberate identity than the default sans.
+ *
+ * MK.29.5 2026-07-26 superseded the drawable half of that: the hero slot
+ * is square, so it takes `ic_logo_mark` — the badge alone — rather than
+ * the 16:9 badge+wordmark lockup, which Fit rendered 140x78 inside the
+ * square. See the comment at the Image call for the measurements. The
+ * arabesque version label is unchanged.
  */
 @Composable
 fun SettingsAboutTab(
