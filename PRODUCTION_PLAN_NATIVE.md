@@ -2507,6 +2507,58 @@ the rail — is dead code (defined, never called), so there is no phone path to 
 in sync. If it is ever revived it will need the scoped-key handling; it cannot
 nest, so it would need a different presentation.
 
+## MK.34 — Player chrome redesign ("Midnight Lounge") — started 2026-08-19
+
+User-supplied design brief plus two reference photographs, approved 2026-08-19.
+Replaces the oversized playback overlay and the options menu with a compact
+glass system: a three-level overlay (Now Playing block, slim timeline ribbon,
+floating control dock) capped at roughly the lower 28% of the video, and a
+detached glass side sheet for options. Hexagons stay as the signature control
+shape; playback behaviour, remote navigation and stream handling are untouched.
+
+**Brief written for the web, implemented in Compose.** The specification is in
+CSS/DOM terms — `clip-path`, `backdrop-filter`, `scrollWidth`, `dir="auto"`,
+`aria-label`, `prefers-reduced-motion`. Each maps: `GenericShape` for the hex,
+theme tokens for the custom properties, `Modifier.basicMarquee` for the overflow
+scroll, `Modifier.semantics` for the ARIA roles, `ANIMATOR_DURATION_SCALE` for
+reduced motion. The intent is followed exactly; the mechanism is Compose.
+
+**Two constraints found during Phase 1 inspection, both reported to the user:**
+
+- **Real backdrop blur is impossible on the primary test device.**
+  `Modifier.blur` / `RenderEffect` are API 31+; the Fire TV AFTDCT31 is API 28
+  and minSdk is 24. Blurring live video also rules out a pre-blurred snapshot.
+  Plan: genuine blur on 31+, layered translucent gradient below it. "Film
+  perceptible through smoked glass" still holds; only the softening is lost.
+- **There is no channel/broadcaster field for VOD.** The reference shows
+  "TRT 1" leading the metadata line, but that mark is burned into the video.
+  The app holds only the Xtream category (`TURKISH YERLI DIZILER` for this
+  title). The brief's own regression case is therefore unsatisfiable as
+  written — its expected output contains a token absent from its input.
+  **User decision 2026-08-19: omit the segment when unknown**, render it only
+  where the channel is genuinely known (LIVE), and never substitute the
+  category. Nothing invented.
+
+### MK.34.1 — Now Playing metadata normalization — shipped
+
+Pure kernel (`NowPlayingMetadata.kt`) splitting a provider string into a title
+plus ordered segments, so the dock stops rendering
+`Tozkoparan İskender — TR - Tozkoparan İskender (2021) (TR) - S01E03 - 3. Bölüm`
+into a 34sp title. Structured `season`/`episode` from `Playable.Episode` beat
+regex parsing; the regex path exists only for items that never went through it.
+13 tests including the brief's regression case, the unspaced `S01E03` form the
+provider actually ships, Arabic preservation, and a tr-TR locale case.
+
+Both negative controls corrected a wrong first guess, which is recorded here
+because the corrections are the useful part: the repeated-title filter does NOT
+fail the brief's own case (the repeat sits mid-string and `episodeName` takes
+the last candidate) so a last-token test was added to pin it; and the
+`Locale.ROOT` argument fails nothing at all, because Kotlin's `lowercase()` is
+already locale-independent — unlike Java's `toLowerCase()`. It is kept as
+documentation with a test guarding the rewrite that would genuinely break it.
+
+### MK.34.2–34.5 — overlay, dock, options sheet, responsiveness — pending
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
