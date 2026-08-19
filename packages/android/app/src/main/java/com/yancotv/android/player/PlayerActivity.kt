@@ -2648,6 +2648,15 @@ class PlayerActivity : AppCompatActivity() {
         keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // ── MB-345 — a deliberate press postpones the dock's 4 s auto-hide ──
+        // The FIRST statement in the method on purpose. Several branches below
+        // return early (the CENTER long-press arm, the MB-338 seek block, the
+        // dock's own BACK handling), so a reset placed after any of them would
+        // miss exactly the keys that take that path. Observes only — it never
+        // consumes the event, so traversal still reaches Compose normally.
+        if (shouldResetDockAutoHide(dockVisible, event.action, event.repeatCount)) {
+            resetDockAutoHide()
+        }
         // ── Long-press CENTER → options overlay (Google TV lacks MENU) ──
         // UP while we own the gesture: either perform the short-press
         // action (show controller / toggle dock) or swallow if the
