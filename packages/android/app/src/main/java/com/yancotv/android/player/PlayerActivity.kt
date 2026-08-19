@@ -2324,13 +2324,15 @@ class PlayerActivity : AppCompatActivity() {
                 visibility = if (dockVisible) VodDockVisibility.VISIBLE else VodDockVisibility.HIDDEN,
                 data = dockData,
                 progress = dockProgress,
-                hasSiblings = queueSnapshot.size > 1,
                 // MB-343 — NEXT is live whenever a next episode is prefetched,
                 // independent of the queue. Episode playback always has a
                 // one-item queue, which is why this button was dead for the
                 // entire binge case it exists to serve.
+                //
+                // MK.34.4 dropped `hasSiblings` and `isTv` with the controls
+                // they gated: PREVIOUS is gone from the reference dock, and the
+                // remote hint strip that `isTv` guarded is gone entirely.
                 hasNext = queueSnapshot.size > 1 || upNextTarget != null,
-                isTv = isTvDevice(),
                 onTogglePlayPause = {
                     val p = controller.player
                     p.playWhenReady = !p.playWhenReady
@@ -2345,11 +2347,6 @@ class PlayerActivity : AppCompatActivity() {
                 },
                 onSkipForward = {
                     commitSeek(+SeekAccelerator.BASE_STEP_SEC)
-                    resetDockAutoHide()
-                },
-                onPrevious = {
-                    ZapLatencyTracer.markZapStart("DOCK_PREV")
-                    controller.previous()
                     resetDockAutoHide()
                 },
                 onNext = {

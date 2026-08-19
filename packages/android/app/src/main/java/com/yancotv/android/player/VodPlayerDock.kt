@@ -3,11 +3,9 @@ package com.yancotv.android.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +20,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,16 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -54,10 +51,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalReduceMotion
 import com.yancotv.android.ui.theme.LocalYancoPalette
+import com.yancotv.android.ui.theme.YancoIcons
 import com.yancotv.android.ui.theme.YancoShapes
 
 /**
@@ -141,33 +136,22 @@ fun VodPlayerDock(
     onTogglePlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
-    onPrevious: () -> Unit,
     onNext: () -> Unit,
     onOpenSheet: (SheetMode) -> Unit,
     onSeekTo: (Long) -> Unit,
     onUserInteraction: () -> Unit,
-    // True when the active queue has more than one item — i.e. prev/next can
-    // actually move to a sibling. False for VOD movies (one-item queue). The
-    // dock hides the ‹ transport button entirely when this is false so the user
-    // isn't staring at a control that no-ops when pressed.
-    hasSiblings: Boolean = true,
-    // MB-343 (W4) — gates › separately from ‹.
+    // MB-343 (W4) — gates the › NEXT control.
     //
-    // This used to ride on [hasSiblings], which made the NEXT button dead for
-    // every episode: `PlaybackController.play(episode)` synthesises a ONE-item
-    // queue, so `queue.size > 1` was always false during a binge and the one
-    // control purpose-built for "go to the next episode" never rendered. That
-    // is what the old comment here meant by "until sibling-episode loading
-    // lands as a follow-up MK" — this is that follow-up.
+    // This used to ride on a `hasSiblings` flag, which made NEXT dead for every
+    // episode: `PlaybackController.play(episode)` synthesises a ONE-item queue,
+    // so `queue.size > 1` was always false during a binge and the one control
+    // purpose-built for "go to the next episode" never rendered.
     //
-    // Split rather than widened because the two directions resolve differently:
-    // NEXT has a prefetched next-episode target (PlayerActivity.upNextTarget),
-    // PREVIOUS does not, so folding them together would light up a ‹ that still
-    // no-ops.
-    hasNext: Boolean = hasSiblings,
-    // MK.28.7 (MB-273) — the "◂▸ SEEK · OK HIDE · ◀ BACK" hint strip
-    // describes inputs a phone doesn't have; render it on TV only.
-    isTv: Boolean = true,
+    // MK.34.4 removed the ‹ PREVIOUS control and `hasSiblings` with it (user
+    // decision): the reference dock has neither, and ‹ lost nothing because the
+    // one-item queue made it dead for episodes anyway. › survives on this flag,
+    // which is backed by PlayerActivity's prefetched next-episode target.
+    hasNext: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (visibility != VodDockVisibility.VISIBLE) return
@@ -187,49 +171,50 @@ fun VodPlayerDock(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Bottom scrim + content column. Gradient matches the scrim-bottom
-        // from the design so the dock reads as a coherent dark band over
-        // whatever frame is behind it.
-        Box(
+        // MK.34.4 — three stacked levels, bottom-anchored. The scrim stays but
+        // is lighter and shorter than the old one: each level now carries its
+        // own glass, so the gradient only has to keep text legible over a bright
+        // frame rather than pretend to be the dock's background.
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(start = 48.dp, end = 48.dp, bottom = 48.dp, top = 48.dp)
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.55f to palette.BackgroundDeep.copy(alpha = 0.55f),
-                        1f to palette.BackgroundDeep.copy(alpha = 0.92f),
+                        0.5f to palette.BackgroundDeep.copy(alpha = 0.42f),
+                        1f to palette.BackgroundDeep.copy(alpha = 0.86f),
                     ),
-                ),
+                )
+                .padding(start = 48.dp, end = 48.dp, bottom = 20.dp, top = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            // Level 1 — Now Playing, pinned to the left safe area. The Box is
+            // what keeps it left while the dock below centres: the Column's
+            // CenterHorizontally would otherwise centre this block too.
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 VodDockMetadata(data = data)
-                Spacer(Modifier.height(26.dp))
-                VodDockProgressRow(
-                    progress = progress,
-                    onSeekTo = onSeekTo,
-                    onUserInteraction = onUserInteraction,
-                )
-                Spacer(Modifier.height(26.dp))
-                VodDockTransportRow(
-                    isPlaying = data.isPlaying,
-                    playPauseFocus = playPauseFocus,
-                    onTogglePlayPause = onTogglePlayPause,
-                    onSkipBack = onSkipBack,
-                    onSkipForward = onSkipForward,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
-                    onOpenSheet = onOpenSheet,
-                    onUserInteraction = onUserInteraction,
-                    hasSiblings = hasSiblings,
-                    hasNext = hasNext,
-                )
-                if (isTv) {
-                    Spacer(Modifier.height(26.dp))
-                    VodDockHintRow()
-                }
             }
+            Spacer(Modifier.height(10.dp))
+            // Level 2 — timeline ribbon.
+            VodDockProgressRow(
+                progress = progress,
+                onSeekTo = onSeekTo,
+                onUserInteraction = onUserInteraction,
+            )
+            Spacer(Modifier.height(9.dp))
+            // Level 3 — the floating dock, centred under the timeline.
+            VodDockTransportRow(
+                isPlaying = data.isPlaying,
+                playPauseFocus = playPauseFocus,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipBack = onSkipBack,
+                onSkipForward = onSkipForward,
+                onNext = onNext,
+                onOpenSheet = onOpenSheet,
+                onUserInteraction = onUserInteraction,
+                hasNext = hasNext,
+            )
         }
     }
 }
@@ -279,26 +264,26 @@ private fun VodDockMetadata(data: VodDockData) {
         Text(
             text = stringResource(R.string.vd_now_playing_label),
             color = MidnightGlass.Champagne,
-            fontSize = 11.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 2.4.sp,
+            letterSpacing = 1.8.sp,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         NowPlayingTitle(title = data.title.ifBlank { "—" }, reduceMotion = reduceMotion)
         if (data.metadataSegments.isNotEmpty()) {
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 // Padded separator: at 14sp a bare "·" collides with digits.
                 text = data.metadataSegments.joinToString("  ·  "),
                 color = MidnightGlass.TextSecondary,
-                fontSize = 14.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         data.typeLabel?.takeIf { it.isNotBlank() }?.let { label ->
-            Spacer(Modifier.height(11.dp))
+            Spacer(Modifier.height(7.dp))
             TypeBadge(label)
         }
     }
@@ -325,9 +310,12 @@ private fun VodDockMetadata(data: VodDockData) {
  */
 @Composable
 private fun NowPlayingTitle(title: String, reduceMotion: Boolean) {
-    // The brief's clamp(20px, 1.7vw, 30px), scaled off the real window width.
+    // The brief's clamp(20px, 1.7vw, 30px) — PHYSICAL pixels at 1920, like every
+    // other number in that document. Expressed as a fraction of screen width so
+    // it lands on the same physical size at any density: 1.7vw of 1920px is
+    // 32.6px, and the 20-30px clamp is 10-15dp on a density-2.0 TV.
     val widthDp = LocalConfiguration.current.screenWidthDp
-    val fontSize = (widthDp * 0.028f).coerceIn(20f, 30f).sp
+    val fontSize = (widthDp * 0.017f).coerceIn(10f, 15f).sp
     Text(
         text = title,
         color = MidnightGlass.TextPrimary,
@@ -397,9 +385,9 @@ private fun TypeBadge(label: String) {
         Text(
             text = label,
             color = MidnightGlass.Champagne,
-            fontSize = 10.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.6.sp,
+            letterSpacing = 1.2.sp,
             maxLines = 1,
         )
     }
@@ -571,12 +559,29 @@ private fun VodDockProgressRow(progress: VodDockProgress, onSeekTo: (Long) -> Un
     }
 }
 
-// ---------------------------------------------------------------------
-// Transport row — 5 primary buttons (prev / -10 / play-pause / +10 /
-// next) + 6 secondary chips (CC / audio / speed / aspect / fav / menu).
-// Primary buttons hold the focus spotlight; chips open downstream sheets.
-// ---------------------------------------------------------------------
-
+/**
+ * MK.34.4 — the floating control dock.
+ *
+ * One centred glass slab rather than a full-width row of free-floating orbs, so
+ * the controls read as a single object sitting on the frame. Reference
+ * proportions are quoted at 1920x1080; the hexagons size themselves off the real
+ * window width via [hexMetrics], so this is not pinned to one resolution.
+ *
+ * **Emphasis is deliberately unequal**, which the brief is explicit about:
+ * HERO play/pause > TRANSPORT (-10 / +10 / next) > SECONDARY (CC … menu). The
+ * control this replaces gave the hero an 88dp orb with a 24dp accent-tinted
+ * shadow and a near-black foreground — a solid green-black button with a glow,
+ * which is exactly the "excessive glow / 3D-game styling" the brief warns off.
+ *
+ * **PREVIOUS is gone, NEXT stays** (user decision, 2026-08-19). The reference
+ * dock has neither, and "remove any stray comma/apostrophe button" describes the
+ * old ‹ and › glyphs precisely — at 52dp they render as loose punctuation. But ›
+ * is MB-343's next-episode control, shipped and device-verified the same day,
+ * and the brief also forbids breaking existing playback actions. ‹ loses nothing:
+ * `play(episode)` synthesises a one-item queue, so it was already dead for every
+ * episode. › is kept and restyled as a proper hexagon in the transport cluster
+ * rather than as a stray mark, which addresses the actual complaint.
+ */
 @Composable
 private fun VodDockTransportRow(
     isPlaying: Boolean,
@@ -584,346 +589,156 @@ private fun VodDockTransportRow(
     onTogglePlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
-    onPrevious: () -> Unit,
     onNext: () -> Unit,
     onOpenSheet: (SheetMode) -> Unit,
     onUserInteraction: () -> Unit,
-    hasSiblings: Boolean,
     hasNext: Boolean,
 ) {
+    val dockShape = RoundedCornerShape(18.dp)
+    val dock = dockMetrics()
     Row(
-        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .glassSurface(dockShape)
+            .padding(horizontal = dock.horizontalPadding, vertical = dock.verticalPadding),
+        horizontalArrangement = Arrangement.spacedBy(dock.gap),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
     ) {
-        // ‹ renders only when the queue has more than one item — otherwise it is
-        // a dead control, because PlaybackController.step coerces to a valid
-        // index and no-ops when target == current. Single-item queues happen
-        // for VOD movies and for the per-episode play path. › is gated on
-        // [hasNext] instead, which MB-343 wires to the prefetched next episode.
-        if (hasSiblings) {
-            TransportButton(
-                label = "‹",
-                contentLabel = stringResource(R.string.vd_previous),
-                size = 52.dp,
-                onClick = {
-                    onUserInteraction()
-                    onPrevious()
-                },
-            )
-            Spacer(Modifier.width(14.dp))
-        }
-        TransportButton(
-            label = "-10",
-            contentLabel = stringResource(R.string.vd_rewind_10),
-            size = 58.dp,
+        HexControl(
+            variant = HexVariant.TRANSPORT,
+            contentDescription = stringResource(R.string.vd_rewind_10),
             onClick = {
                 onUserInteraction()
                 onSkipBack()
             },
-        )
-        Spacer(Modifier.width(14.dp))
-        TransportButton(
-            label = if (isPlaying) "||" else "▶",
-            // MB-343 — was the hardcoded literals "Pause" / "Play", the last
-            // untranslated screen-reader label in this row after vd_previous and
-            // vd_next moved to resources. A string constant in code is invisible
-            // to lint MissingTranslation and to the MK.31 i18n sweep.
-            contentLabel = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
-            size = 88.dp,
-            primary = true,
-            focusRequester = playPauseFocus,
+        ) { tint -> DockLabel("-10", tint, 9.sp) }
+
+        HexControl(
+            variant = HexVariant.HERO,
+            contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
             onClick = {
                 onUserInteraction()
                 onTogglePlayPause()
             },
-        )
-        Spacer(Modifier.width(14.dp))
-        TransportButton(
-            label = "+10",
-            contentLabel = stringResource(R.string.vd_forward_10),
-            size = 58.dp,
+            focusRequester = playPauseFocus,
+        ) { tint -> DockLabel(if (isPlaying) "II" else "▶", tint, 16.sp) }
+
+        HexControl(
+            variant = HexVariant.TRANSPORT,
+            contentDescription = stringResource(R.string.vd_forward_10),
             onClick = {
                 onUserInteraction()
                 onSkipForward()
             },
-        )
+        ) { tint -> DockLabel("+10", tint, 9.sp) }
+
         if (hasNext) {
-            Spacer(Modifier.width(14.dp))
-            TransportButton(
-                label = "›",
-                // MB-343 — was the hardcoded literal "Next". A string constant
-                // in code is invisible to lint MissingTranslation and to the
-                // MK.31 i18n sweep, so this button's screen-reader label was
-                // English in all four locales.
-                contentLabel = stringResource(R.string.vd_next),
-                size = 52.dp,
+            HexControl(
+                variant = HexVariant.TRANSPORT,
+                contentDescription = stringResource(R.string.vd_next),
                 onClick = {
                     onUserInteraction()
                     onNext()
                 },
-            )
+            ) { tint -> DockLabel("›", tint, 16.sp) }
         }
-        Spacer(Modifier.width(30.dp))
-        // Each secondary chip routes to the matching sheet tab. CC → SUBS
-        // because the enum name is SUBS but the user-facing vocab is CC on
-        // remotes. MENU opens on AUDIO as the default landing, matching
-        // the MENU key behaviour elsewhere.
-        SecondaryChip(label = stringResource(R.string.vd_cc), onClick = {
+
+        DockDivider()
+
+        DockSecondary(stringResource(R.string.vd_cc)) {
             onUserInteraction()
             onOpenSheet(SheetMode.SUBS)
-        })
-        Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = stringResource(R.string.vd_audio), onClick = {
+        }
+        DockSecondary(stringResource(R.string.vd_audio)) {
             onUserInteraction()
             onOpenSheet(SheetMode.AUDIO)
-        })
-        Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = stringResource(R.string.vd_speed), onClick = {
+        }
+        DockSecondary(stringResource(R.string.vd_speed)) {
             onUserInteraction()
             onOpenSheet(SheetMode.SPEED)
-        })
-        Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = stringResource(R.string.vd_fit), onClick = {
+        }
+        DockSecondary(stringResource(R.string.vd_fit)) {
             onUserInteraction()
             onOpenSheet(SheetMode.ASPECT)
-        })
-        Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = stringResource(R.string.vd_fav), onClick = {
-            onUserInteraction()
-            onOpenSheet(SheetMode.FAV)
-        })
-        Spacer(Modifier.width(8.dp))
-        SecondaryChip(label = stringResource(R.string.vd_menu), onClick = {
-            onUserInteraction()
-            onOpenSheet(SheetMode.AUDIO)
-        })
-    }
-}
+        }
 
-/**
- * Hex-orb transport button. Pointy-top hex silhouette with a luminous
- * accent glow on focus / primary, matching the YancoVerse lobby orb
- * language (the user's reference photo). The visual weight order is
- * primary > focused > idle:
- *
- *   - primary      → solid Accent → AccentDeep gradient, max glow,
- *                    black foreground (the play-pause hero)
- *   - focused      → dim accent wash + accent border + smaller glow
- *                    (the current cursor)
- *   - idle         → BackgroundElevated → BackgroundDeep gradient,
- *                    BorderSubtle hairline, no glow
- *
- * Glow uses the canonical CategoryRail pattern: `.shadow()` with
- * accent-tinted ambient + spot colors, applied BEFORE `.clip()` so it
- * radiates outside the hex outline.
- */
-@Composable
-private fun TransportButton(
-    label: String,
-    size: Dp,
-    onClick: () -> Unit,
-    primary: Boolean = false,
-    focusRequester: FocusRequester? = null,
-    contentLabel: String = label,
-) {
-    val palette = LocalYancoPalette.current
-    val shape = YancoShapes.PointyHex
-    val interaction = remember { MutableInteractionSource() }
-    var isFocused by remember { mutableStateOf(false) }
-    val bgBrush =
-        when {
-            primary ->
-                Brush.verticalGradient(listOf(palette.Accent, palette.AccentDeep))
-            isFocused ->
-                Brush.verticalGradient(
-                    listOf(
-                        palette.Accent.copy(alpha = 0.28f),
-                        palette.AccentDeep.copy(alpha = 0.18f),
-                    ),
-                )
-            else ->
-                Brush.verticalGradient(
-                    listOf(
-                        palette.BackgroundElevated,
-                        palette.BackgroundDeep.copy(alpha = 0.92f),
-                    ),
-                )
-        }
-    val borderColor =
-        when {
-            primary -> palette.Accent
-            isFocused -> palette.Accent
-            else -> palette.BorderSubtle
-        }
-    val fgColor =
-        when {
-            primary -> Color(0xFF04130C)
-            isFocused -> palette.Accent
-            else -> palette.TextPrimary
-        }
-    val glowElevation =
-        when {
-            primary -> 24.dp
-            isFocused -> 16.dp
-            else -> 0.dp
-        }
-    val baseModifier =
-        Modifier
-            .size(size)
-            .shadow(
-                elevation = glowElevation,
-                shape = shape,
-                ambientColor = palette.Accent,
-                spotColor = palette.Accent,
-            )
-            .clip(shape)
-            .background(bgBrush)
-            .border(if (isFocused || primary) 2.dp else 1.dp, borderColor, shape)
-            .onFocusChanged { isFocused = it.isFocused }
-    val finalModifier =
-        if (focusRequester != null) baseModifier.focusRequester(focusRequester) else baseModifier
-    Box(
-        modifier = finalModifier
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-            )
-            .semantics {
-                contentDescription = contentLabel
-                role = Role.Button
+        HexControl(
+            variant = HexVariant.SECONDARY,
+            contentDescription = stringResource(R.string.vd_fav),
+            onClick = {
+                onUserInteraction()
+                onOpenSheet(SheetMode.FAV)
             },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = fgColor,
-            fontSize = if (size >= 80.dp) 26.sp else 18.sp,
-            fontWeight = FontWeight.Black,
-        )
+        ) { tint ->
+            Icon(
+                imageVector = YancoIcons.Favorites,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
+            )
+        }
+        HexControl(
+            variant = HexVariant.SECONDARY,
+            contentDescription = stringResource(R.string.vd_menu),
+            onClick = {
+                onUserInteraction()
+                onOpenSheet(SheetMode.AUDIO)
+            },
+        ) { tint -> DockLabel("•••", tint, 11.sp) }
     }
 }
 
 /**
- * Hex-pill secondary chip — same orb language as [TransportButton] but
- * silhouetted as a horizontal [YancoShapes.HexCapsule] so multi-letter
- * labels (CC / AUDIO / SPEED / FIT / FAV / MENU) fit the middle runway
- * cleanly. Idle = dim BackgroundElevated; focused = soft accent wash +
- * accent border + accent glow. No "primary" state — these are all peers.
+ * Secondary control carrying a word rather than a glyph.
+ *
+ * Width is derived from the label instead of fixed, because "CC" and "SPEED"
+ * cannot share one box: a regular hexagon's flat top is only half its width, so
+ * a single width either clips the long labels or leaves the short ones swimming.
  */
 @Composable
-private fun SecondaryChip(label: String, onClick: () -> Unit) {
-    val palette = LocalYancoPalette.current
-    val shape = YancoShapes.HexCapsule
-    val interaction = remember { MutableInteractionSource() }
-    var isFocused by remember { mutableStateOf(false) }
-    val bgBrush =
-        if (isFocused) {
-            Brush.verticalGradient(
-                listOf(
-                    palette.Accent.copy(alpha = 0.28f),
-                    palette.AccentDeep.copy(alpha = 0.18f),
-                ),
-            )
-        } else {
-            SolidColor(palette.BackgroundElevated)
-        }
-    val borderColor = if (isFocused) palette.Accent else palette.BorderSubtle
-    val fgColor = if (isFocused) palette.Accent else palette.TextPrimary
+private fun DockSecondary(label: String, onClick: () -> Unit) {
+    val metrics = hexMetrics(HexVariant.SECONDARY)
+    // Text sits at the hexagon's VERTICAL MIDDLE, where the silhouette is at its
+    // full width — not at the narrower flat top — so the label has more room than
+    // the outline suggests. ~5dp per character plus 60% of the height for the two
+    // slanted ends, floored at the square size so "CC" never renders narrower
+    // than a regular hexagon.
+    val width = ((label.length * 5).dp + metrics.size * 0.6f).coerceAtLeast(metrics.size)
+    HexControl(
+        variant = HexVariant.SECONDARY,
+        contentDescription = label,
+        onClick = onClick,
+        width = width,
+    ) { tint -> DockLabel(label, tint, 9.sp) }
+}
+
+/** Shared label treatment so every control in the dock has one type voice. */
+@Composable
+private fun DockLabel(text: String, tint: Color, size: androidx.compose.ui.unit.TextUnit) {
+    Text(
+        text = text,
+        color = tint,
+        fontSize = size,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.6.sp,
+        maxLines = 1,
+    )
+}
+
+/**
+ * The brief's "subtle vertical divider" between transport and secondary groups.
+ * Faint on purpose: it separates two clusters, it is not a control.
+ */
+@Composable
+private fun DockDivider() {
     Box(
         modifier = Modifier
-            .height(42.dp)
-            .shadow(
-                elevation = if (isFocused) 14.dp else 0.dp,
-                shape = shape,
-                ambientColor = palette.Accent,
-                spotColor = palette.Accent,
-            )
-            .clip(shape)
-            .background(bgBrush)
-            .border(if (isFocused) 2.dp else 1.dp, borderColor, shape)
-            .onFocusChanged { isFocused = it.isFocused }
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-            )
-            .semantics {
-                contentDescription = label
-                role = Role.Button
-            }
-            .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = fgColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.4.sp,
-            fontFamily = FontFamily.Monospace,
-        )
-    }
+            .padding(horizontal = 4.dp)
+            .width(1.dp)
+            .height(hexMetrics(HexVariant.SECONDARY).size * 0.62f)
+            .background(MidnightGlass.RimLight),
+    )
 }
 
-// ---------------------------------------------------------------------
-// Remote hint strip at the bottom of the dock. Static copy — matches
-// the design HTML's hint row so the user knows what the remote does
-// while the dock is visible.
-// ---------------------------------------------------------------------
-
-@Composable
-private fun VodDockHintRow() {
-    val palette = LocalYancoPalette.current
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        HintItem(prefix = "◂▸", label = stringResource(R.string.vd_hint_seek))
-        HintItem(prefix = "▾", label = stringResource(R.string.vd_menu))
-        HintItem(prefix = "OK", label = stringResource(R.string.vd_hint_hide))
-        HintItem(prefix = "◀", label = stringResource(R.string.vc_back))
-    }
-}
-
-@Composable
-private fun HintItem(prefix: String, label: String) {
-    val palette = LocalYancoPalette.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = prefix,
-            color = palette.Accent,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.4.sp,
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = label,
-            color = palette.TextMuted,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.4.sp,
-        )
-    }
-}
-
-/**
- * 2026-04-27 — slim chip-route enum. Originally the tab key for
- * PlayerOptionsSheet.kt (a 700-line side sheet with per-tab metadata
- * fields). The sheet was retired when both LIVE and VOD migrated to
- * the new options popup + per-category panels (`PlayerOptionsMenu` /
- * `PlayerOptionsPanelHost`). This enum survives only because the
- * dock's secondary chips still emit a route hint to the activity,
- * which maps it to a `PlayerOptionCategory` for `showOptionsV2`.
- *
- * Could be replaced by `PlayerOptionCategory` directly to drop the
- * mapping; left as a separate UI-side enum so the dock stays
- * unaware of the options-package internals.
- */
 enum class SheetMode {
     AUDIO,
     SUBS,

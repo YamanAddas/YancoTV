@@ -153,36 +153,65 @@ internal enum class HexVariant {
 }
 
 /**
- * Control sizes for [variant] at the current screen width.
+ * Control sizes for [variant], as a FRACTION OF SCREEN WIDTH.
  *
- * The Compose analogue of the brief's `clamp()`: the reference proportions are
- * quoted at 1920x1080, and rather than hard-code that one resolution the tier is
- * scaled by how wide the window actually is and then clamped. A 1280x720 TV and
- * a phone in landscape both land somewhere sensible instead of overflowing.
+ * **The brief's numbers are physical pixels at 1920x1080, not dp**, and the
+ * first version of this file read them as dp. On a Fire TV, which reports
+ * density 2.0, that made every control exactly twice the specified size: the
+ * hero measured 168px against a spec of 78-88px. It also overflowed the dock row
+ * — the last control, the three-dot menu, was crushed from 104px to 48px — and
+ * pushed the whole overlay to 57% of screen height against a 28% cap. One
+ * mis-read unit, three symptoms.
+ *
+ * Sizing off screen WIDTH rather than dp fixes it at every density, which a
+ * simple halving would not have. The ratios below are the brief's midpoints over
+ * 1920, so a device reporting 960dp at density 2.0 and one reporting 1920dp at
+ * density 1.0 both render the same PHYSICAL size — which is the only thing a
+ * viewer three metres away actually perceives.
+ *
+ * The dp floors are an accessibility backstop for small windows, not part of the
+ * design: they stop a phone in landscape shrinking a focus target below what a
+ * D-pad user can see.
  */
 @Immutable
 internal data class HexMetrics(val size: Dp, val borderWidth: Dp)
 
 @Composable
 internal fun hexMetrics(variant: HexVariant): HexMetrics {
-    val widthDp = LocalConfiguration.current.screenWidthDp
-    // 960dp is a 1920px screen at the 2.0 density Android TV reports; the ratio
-    // is what makes this resolution-independent rather than the absolute value.
-    val scale = (widthDp / 960f).coerceIn(0.72f, 1.15f)
-    val base = when (variant) {
-        HexVariant.HERO -> 84.dp
-        HexVariant.TRANSPORT -> 56.dp
-        HexVariant.SECONDARY -> 52.dp
-        HexVariant.MENU_ICON -> 34.dp
+    val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    // Brief midpoints over the 1920px reference: hero 83, transport 56,
+    // secondary 52, menu icon 30.
+    val ratio = when (variant) {
+        HexVariant.HERO -> 0.0432f
+        HexVariant.TRANSPORT -> 0.0292f
+        HexVariant.SECONDARY -> 0.0271f
+        HexVariant.MENU_ICON -> 0.0156f
     }
     val floor = when (variant) {
-        HexVariant.HERO -> 60.dp
-        HexVariant.TRANSPORT -> 42.dp
-        HexVariant.SECONDARY -> 40.dp
-        HexVariant.MENU_ICON -> 28.dp
+        HexVariant.HERO -> 40.dp
+        HexVariant.TRANSPORT -> 27.dp
+        HexVariant.SECONDARY -> 25.dp
+        HexVariant.MENU_ICON -> 18.dp
     }
-    val scaled = (base * scale).coerceAtLeast(floor)
-    return HexMetrics(size = scaled, borderWidth = if (variant == HexVariant.HERO) 2.dp else 1.dp)
+    val size = (widthDp * ratio).dp.coerceAtLeast(floor)
+    return HexMetrics(size = size, borderWidth = if (variant == HexVariant.HERO) 2.dp else 1.dp)
+}
+
+/**
+ * Dock spacing, on the same fraction-of-width basis as [hexMetrics] and for the
+ * same reason — the brief quotes 24-32px padding and 12-18px gaps at 1920.
+ */
+@Immutable
+internal data class DockMetrics(val horizontalPadding: Dp, val gap: Dp, val verticalPadding: Dp)
+
+@Composable
+internal fun dockMetrics(): DockMetrics {
+    val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    return DockMetrics(
+        horizontalPadding = (widthDp * 0.0146f).dp.coerceAtLeast(10.dp),
+        gap = (widthDp * 0.0078f).dp.coerceAtLeast(5.dp),
+        verticalPadding = (widthDp * 0.0057f).dp.coerceAtLeast(4.dp),
+    )
 }
 
 /**
@@ -203,6 +232,17 @@ internal fun HexControl(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Override the width, keeping the tier's height. Null means square.
+     *
+     * The reference renders CC / AUDIO / SPEED / FIT as ELONGATED hexagons, and
+     * it has to: the flat top of a regular hexagon spans only the middle 50% of
+     * its width, so "AUDIO" at a legible size does not fit inside a 52dp one. A
+     * stretched hexagon is the same silhouette, so the set still reads as one
+     * family — [MidnightHex] is percentage-based precisely so it can take a
+     * non-square box without a second shape to keep in sync.
+     */
+    width: Dp? = null,
     selected: Boolean = false,
     enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
@@ -251,7 +291,7 @@ internal fun HexControl(
 
     Box(
         modifier = modifier
-            .size(metrics.size)
+            .size(width = width ?: metrics.size, height = metrics.size)
             .clip(MidnightHex)
             .background(fill)
             .border(if (isFocused) 2.dp else metrics.borderWidth, ring, MidnightHex)
