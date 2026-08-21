@@ -2648,8 +2648,45 @@ no kotlinx-datetime on its compile path, so a default was not an option.
 Migration verification is SKIPPED on Windows hosts — CI's Linux runner is the
 gate for `12.sqm`.
 
-### MK.35.2 — category rails on Home — pending
-### MK.35.3 — recent live channels — pending
+### MK.35.3 — recent live channels — shipped
+
+New `recent_channels` table (13.sqm), FK-free for the same reason as
+content_first_seen. Recorded from `persistResumePoint`, which is already called
+at every moment that ends a viewing, so there is no new lifecycle path to keep in
+sync. Dwell clock is `elapsedRealtime`, not wall clock — a device resyncing its
+clock mid-programme would otherwise compute a nonsense duration.
+
+**The 30 s threshold is the feature.** The browse coverflow auto-previews LIVE
+channels on focus after a 400 ms debounce, so recording on play would make the
+rail a replay of the user's scrolling. Six times the 5 s VOD resume threshold
+because the costs are asymmetric: a wrong resume point costs one seek, a wrong
+recent-channel entry misleads Home until it is pushed out. 6 tests written
+against the scroll-past case specifically.
+
+### MK.35.2 — category rails on Home — shipped
+
+Up to three rails built from the catalogue itself, which nothing on Home did
+before. **Pins win, size is the fallback.** The user could already pin, hide and
+rename categories in Settings and none of it reached Home — pinning something and
+not seeing it there reads as the setting being broken, not as a missing feature.
+
+Size rather than provider order for the fallback: `distinctGroupsForType` orders
+by MIN(sort_order), which is right for Browse (a complete list the user scans)
+and wrong for Home (three rails chosen for them) — provider order surfaces
+whichever bucket sits first in the playlist, as likely to be a near-empty test
+category as anything worth watching. New `topGroupsForType` query.
+
+`pickCategoryRails` is pure and has 11 tests, including the contradictory-settings
+case (pinned AND hidden → hidden wins) and case-insensitive de-duplication,
+because providers ship the same category under different capitalisation across
+playlists and the naive version renders it twice.
+
+Device-verified: rails render with real provider categories and content.
+
+**Known limit:** group renames are stored (`group_preferences.custom_name`) but
+`AppPreferences` exposes no flow for them, so rails show the provider's name.
+`pickCategoryRails` already takes a `displayNames` map and is tested for it —
+wiring is a one-liner once a rename flow exists.
 
 ## Timeline
 

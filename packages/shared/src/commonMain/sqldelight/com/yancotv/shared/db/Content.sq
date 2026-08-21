@@ -132,6 +132,25 @@ WHERE type = ? AND group_name IS NOT NULL
 GROUP BY group_name
 ORDER BY MIN(sort_order);
 
+-- MK.35.2 — biggest categories first, for Home's category rails.
+--
+-- `distinctGroupsForType` orders by MIN(sort_order), i.e. the order the provider
+-- lists its categories. That is right for Browse, where the user is scanning a
+-- complete list, and wrong for Home, where only three or four rails fit: provider
+-- order puts whatever happens to be first in the playlist on the home screen,
+-- which on a 272,419-item catalogue is as likely to be a near-empty test bucket
+-- as anything worth watching. Size is a blunt proxy for "substantial", but it is
+-- a far better one than position.
+--
+-- Only used as a FALLBACK. When the user has pinned categories, those win —
+-- see pickCategoryRails.
+topGroupsForType:
+SELECT group_name, COUNT(*) AS item_count FROM content
+WHERE type = ? AND group_name IS NOT NULL AND group_name != ''
+GROUP BY group_name
+ORDER BY item_count DESC
+LIMIT :limitCount;
+
 -- MK.33.1 — the same list, split by playlist.
 --
 -- Ordered by source then provider order WITHIN each source, not by a global

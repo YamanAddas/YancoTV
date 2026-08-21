@@ -84,6 +84,9 @@
     <!-- MK.35.3 -->
     <string name="home_recent_channels_title">القنوات الأخيرة</string>
     <string name="home_recent_channels_caption">بث مباشر كنت تشاهده</string>
+    <!-- MK.35.2 — category rails. -->
+    <string name="home_eyebrow_browse">تصفح</string>
+    <string name="home_category_caption">مباشرة من مكتبتك</string>
     <string name="home_recent_caption">أفلام ومسلسلات جديدة في مكتبتك</string>
     <string name="home_eyebrow_continue_watching">متابعة المشاهدة</string>
     <string name="home_eyebrow_on_air_now">يُبث الآن</string>

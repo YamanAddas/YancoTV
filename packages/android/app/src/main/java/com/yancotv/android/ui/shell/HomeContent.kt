@@ -133,6 +133,7 @@ fun HomeContent(
     content: ContentRepository = koinInject(),
     sources: com.yancotv.shared.sources.SourceRepository = koinInject(),
     recentChannels: com.yancotv.shared.history.RecentChannelsRepository = koinInject(),
+    prefs: com.yancotv.android.prefs.AppPreferences = koinInject(),
     syncCoordinator: com.yancotv.android.sources.SourceSyncCoordinator = koinInject(),
 ) {
     // Audit catch — without this, on every cold launch with a populated
@@ -227,6 +228,16 @@ fun HomeContent(
     // Tonight rails, and both of those read `liveFavorites` — so a user who had
     // not starred anything saw no live TV on Home at all.
     val recentChannelItems = remember { mutableStateListOf<ContentItem>() }
+
+    // MK.35.2 — category rails.
+    //
+    // Home's six existing rails all depend on the user having already done
+    // something: watched (hero, continue watching), starred (favorites), or
+    // starred a LIVE channel (on now, tonight). With 174,000 movies and 45,252
+    // series freshly synced and nothing curated yet, Home showed the library to
+    // the user not at all. These rails are the only ones that surface the
+    // catalogue itself.
+    val categoryRails = remember { mutableStateListOf<Pair<com.yancotv.shared.content.CategoryRail, List<ContentItem>>>() }
 
     // MK.22.A.5 (MB-222): one shared "now" tick. OnNowTile previously
     // captured `nowSec = remember { System.currentTimeMillis() / 1000 }`
@@ -338,6 +349,46 @@ fun HomeContent(
             syncGeneration++
         }
     }
+    val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
+    val pinnedParents by prefs.pinnedParentsFlow.collectAsState()
+    LaunchedEffect(syncGeneration, hiddenIds, hiddenGroups, pinnedParents) {
+        val built =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    // Movies and series both feed the rails; a user's pinned
+                    // category may be either, and Home does not ask them to
+                    // care which type a category belongs to.
+                    val pinned = (pinnedParents[ContentType.MOVIE].orEmpty() + pinnedParents[ContentType.SERIES].orEmpty())
+                    val bySize =
+                        content.topGroups(ContentType.MOVIE, limit = 12) +
+                            content.topGroups(ContentType.SERIES, limit = 12)
+                    com.yancotv.shared.content.pickCategoryRails(
+                        pinned = pinned,
+                        hidden = hiddenGroups,
+                        bySize = bySize,
+                        limit = 3,
+                    ).mapNotNull { rail ->
+                        // A category can hold movies, series, or both. Ask for
+                        // both and merge rather than guessing a type from the
+                        // name — provider categories are not typed.
+                        val items =
+                            (
+                                content.page(ContentType.MOVIE, group = rail.groupKey, offset = 0, limit = 20) +
+                                    content.page(ContentType.SERIES, group = rail.groupKey, offset = 0, limit = 20)
+                                )
+                                .filter { it.id !in hiddenIds }
+                                .take(20)
+                        // An empty rail is worse than a missing one: it reads as
+                        // a broken screen rather than an absent feature.
+                        if (items.isEmpty()) null else rail to items
+                    }
+                }.getOrElse { emptyList() }
+            }
+        Snapshot.withMutableSnapshot {
+            categoryRails.clear()
+            categoryRails.addAll(built)
+        }
+    }
     LaunchedEffect(syncGeneration, hiddenIds) {
         val channels =
             withContext(Dispatchers.IO) {
@@ -404,6 +455,7 @@ fun HomeContent(
     val isTotallyEmpty =
         continueWatching.isEmpty() &&
             recentChannelItems.isEmpty() &&
+            categoryRails.isEmpty() &&
             nonLiveFavorites.isEmpty() &&
             onNowItems.isEmpty() &&
             upNextItems.isEmpty() &&
@@ -550,6 +602,20 @@ fun HomeContent(
                         val list = snapshot.map { it.channel }
                         val idx = list.indexOfFirst { it.id == item.id }
                         if (idx >= 0) onPlay(list, idx, null)
+                    },
+                )
+            }
+            categoryRails.forEach { (rail, items) ->
+                PosterRail(
+                    eyebrow = stringResource(R.string.home_eyebrow_browse),
+                    title = rail.displayName,
+                    caption = stringResource(R.string.home_category_caption),
+                    items = items,
+                    lockedIds = lockedIds,
+                    resumeByContent = resumeByContent,
+                    onPlay = { item ->
+                        val idx = items.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(items, idx, resumeByContent[item.id]?.episodeId)
                     },
                 )
             }

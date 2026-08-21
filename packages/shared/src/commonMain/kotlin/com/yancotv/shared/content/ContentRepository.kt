@@ -41,6 +41,21 @@ class ContentRepository(private val db: YancoDb) {
     fun groupsHierarchical(type: ContentType): List<CategoryNode> = CategoryTreeBuilder.build(groups(type))
 
     /**
+     * MK.35.2 — categories ordered largest-first, for Home's category rails.
+     *
+     * [groups] returns provider order, which is right for Browse (a complete
+     * list the user scans) and wrong for Home (three rails, chosen for them).
+     * Provider order would put whatever sits first in the playlist on the home
+     * screen — on a 272,419-item catalogue as likely to be a near-empty test
+     * bucket as anything worth watching. Only a fallback: pins win when the user
+     * has any. See `pickCategoryRails`.
+     */
+    fun topGroups(type: ContentType, limit: Long): List<String> = db.contentQueries
+        .topGroupsForType(type.dbValue, limit)
+        .executeAsList()
+        .mapNotNull { it.group_name }
+
+    /**
      * MK.33.1 — this content type's groups, split per playlist.
      *
      * Returns one entry per playlist that actually contributes rows of [type],
