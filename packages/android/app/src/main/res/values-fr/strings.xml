@@ -81,6 +81,9 @@
     <string name="home_favorites_caption">Films et séries que vous avez ajoutés aux favoris</string>
     <string name="home_eyebrow_fresh">NOUVEAUTÉS</string>
     <string name="home_recent_title">Ajouts récents</string>
+    <!-- MK.35.3 -->
+    <string name="home_recent_channels_title">Chaînes récentes</string>
+    <string name="home_recent_channels_caption">La TV en direct que vous regardiez</string>
     <string name="home_recent_caption">Nouveaux films et séries dans votre bibliothèque</string>
     <string name="home_eyebrow_continue_watching">REPRENDRE</string>
     <string name="home_eyebrow_on_air_now">EN DIRECT</string>

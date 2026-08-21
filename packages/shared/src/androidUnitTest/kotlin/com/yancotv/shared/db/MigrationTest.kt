@@ -270,6 +270,47 @@ class MigrationTest {
         assertEquals(1L, defaulted, "a row with no matching content row must survive with FK enforcement on")
     }
 
+    /**
+     * MK.35.3 — 13.sqm creates `recent_channels`.
+     *
+     * Same reasoning as the v12 hop: the build-time verify task is disabled on
+     * Windows, so this runtime test is the only local gate on the schema. It
+     * asserts the FK-free shape rather than just that the SQL ran, because that
+     * property is what makes the table survive a sync.
+     */
+    @Test fun migrationV13ToV14CreatesRecentChannels() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
+        driver.execute(null, "PRAGMA user_version = 13;", 0)
+
+        YancoDb.Schema.migrate(driver, oldVersion = 13, newVersion = 14)
+
+        // A channel that has no content row must still record. The sync DELETEs
+        // every content row for a source before re-inserting, so a cascade here
+        // would empty the list on every refresh.
+        driver.execute(null, "INSERT INTO recent_channels (content_id, watched_at) VALUES ('missing', 1700000000000)", 0)
+
+        // Re-watching moves the entry rather than duplicating it.
+        driver.execute(null, "INSERT OR REPLACE INTO recent_channels (content_id, watched_at) VALUES ('missing', 1700000900000)", 0)
+        val count =
+            driver
+                .executeQuery(null, "SELECT COUNT(*) FROM recent_channels", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertEquals(1L, count, "re-watching must move the row, not add a second one")
+
+        val at =
+            driver
+                .executeQuery(null, "SELECT watched_at FROM recent_channels WHERE content_id = 'missing'", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertEquals(1700000900000L, at, "the newer watch must win")
+    }
+
     @Test fun migrationV11ToV12AddsNullableExpiresAtColumn() {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         driver.execute(null, "PRAGMA foreign_keys = ON;", 0)

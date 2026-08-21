@@ -81,6 +81,9 @@
     <string name="home_favorites_caption">Películas y series que marcaste</string>
     <string name="home_eyebrow_fresh">NOVEDADES</string>
     <string name="home_recent_title">Añadido recientemente</string>
+    <!-- MK.35.3 -->
+    <string name="home_recent_channels_title">Canales recientes</string>
+    <string name="home_recent_channels_caption">TV en directo que estabas viendo</string>
     <string name="home_recent_caption">Nuevas películas y series en tu biblioteca</string>
     <string name="home_eyebrow_continue_watching">CONTINUAR VIENDO</string>
     <string name="home_eyebrow_on_air_now">EN DIRECTO AHORA</string>

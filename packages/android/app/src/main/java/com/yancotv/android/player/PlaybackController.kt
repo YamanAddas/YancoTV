@@ -21,7 +21,9 @@ import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.recording.RecordingDataSink
 import com.yancotv.android.recording.TeeingDataSourceFactory
+import com.yancotv.shared.history.RecentChannelsRepository
 import com.yancotv.shared.history.WatchHistoryRepository
+import com.yancotv.shared.history.shouldRecordChannel
 import com.yancotv.shared.http.CleartextAllowlistInterceptor
 import com.yancotv.shared.playback.Playable
 import com.yancotv.shared.playback.toPlayable
@@ -157,6 +159,16 @@ class PlaybackController(
     private val context: Context,
     private val prefs: AppPreferences,
     private val history: WatchHistoryRepository? = null,
+    /**
+     * MK.35.3 — live channels the user actually watched.
+     *
+     * Separate from [history] because a live stream has no resume offset:
+     * `resumePointDecision` returns null for LIVE by design, which is correct
+     * and is also why live content could never reach Home unless starred.
+     * Nullable for the same reason [history] is — tests that do not exercise
+     * persistence pass neither.
+     */
+    private val recentChannels: RecentChannelsRepository? = null,
     /**
      * MK.14.8 — singleton tee sink wired between [androidx.media3.datasource.okhttp.OkHttpDataSource]
      * and [androidx.media3.datasource.DefaultDataSource]. ExoPlayer's HTTP
@@ -534,6 +546,16 @@ class PlaybackController(
     // sheet) needs to favourite the *series* id, not the episode-as-view
     // id — `favorites.content_id` is FK'd to `content(id)` and episodes
     // don't have content rows.
+    /**
+     * MK.35.3 — when the current item began playing, for the recent-channels
+     * dwell rule.
+     *
+     * `elapsedRealtime`, NOT wall clock: a device that resyncs its clock or
+     * crosses a DST boundary mid-programme would otherwise compute a nonsense
+     * duration and either record a channel nobody watched or skip one they did.
+     */
+    private var currentItemStartedAtMs: Long = 0L
+
     private val _currentEpisode = MutableStateFlow<Playable.Episode?>(null)
 
     // MK.12a.3 — external subtitle side-loaded into the current MediaItem.
@@ -986,6 +1008,10 @@ class PlaybackController(
             cancelSleepTimer()
         }
         _currentItem.value = item
+        // MK.35.3 — start of the dwell window for recent-channel recording.
+        // Set for every item, read only for LIVE; keeping it unconditional means
+        // there is no branch to forget when a new load path is added.
+        currentItemStartedAtMs = android.os.SystemClock.elapsedRealtime()
         // MK.29.3 — promote a pre-play subtitle pick. Runs here, after every
         // caller's `_externalSubtitle.value = null` reset and before
         // buildMediaItem, so the very first prepare() of this stream already
@@ -1126,8 +1152,35 @@ class PlaybackController(
      * [ExoPlayer.getCurrentPosition] is main-thread-only; the DB upsert
      * dispatches to IO to keep main unblocked.
      */
+    /**
+     * Record the current item as a watched channel, if it earned it.
+     *
+     * The dwell rule lives in `shouldRecordChannel` and is the difference
+     * between a useful rail and a replay of the user's scrolling: the browse
+     * coverflow auto-previews LIVE channels on focus after a 400 ms debounce, so
+     * recording on play would log every channel the cursor rested on.
+     */
+    private fun recordRecentChannel(item: ContentItem) {
+        val repo = recentChannels ?: return
+        if (currentItemStartedAtMs == 0L) return
+        val watchedMs = android.os.SystemClock.elapsedRealtime() - currentItemStartedAtMs
+        if (!shouldRecordChannel(item.type, watchedMs)) return
+        scope.launch(Dispatchers.IO) {
+            // Swallowed on purpose: a Home rail that misses one entry is a
+            // cosmetic loss, and this runs on the stop / pause path where
+            // throwing would take down a teardown the user has already left.
+            runCatching { repo.record(item, watchedMs) }
+        }
+    }
+
     fun persistResumePoint() {
         val item = _currentItem.value ?: return
+        // MK.35.3 — recorded here rather than on a timer because this method is
+        // already called at every moment that ends a viewing: stop, next,
+        // previous, a queue change, and the activity's onPause / onStop. A live
+        // channel never gets past resumePointDecision below, so without this
+        // call live content simply never reaches Home.
+        recordRecentChannel(item)
         val pos = player.currentPosition.coerceAtLeast(0L) / 1000L
         val dur = player.duration.takeIf { it > 0L }?.let { it / 1000L }
         // Snapshot the episode on the main thread before launching IO;

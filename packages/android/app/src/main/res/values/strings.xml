@@ -93,6 +93,9 @@
     <string name="home_favorites_caption">Movies and series you starred</string>
     <string name="home_eyebrow_fresh">FRESH</string>
     <string name="home_recent_title">Recently added</string>
+    <!-- MK.35.3 — live channels the user actually watched. -->
+    <string name="home_recent_channels_title">Recent channels</string>
+    <string name="home_recent_channels_caption">Live TV you were watching</string>
     <string name="home_recent_caption">New movies and series in your library</string>
     <string name="home_eyebrow_continue_watching">CONTINUE WATCHING</string>
     <string name="home_eyebrow_on_air_now">ON AIR NOW</string>

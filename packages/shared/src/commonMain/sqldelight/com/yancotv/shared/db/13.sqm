@@ -1,0 +1,22 @@
+-- v13 → v14 (MK.35.3): live channels the user actually watched.
+--
+-- Live content could never reach Home unless the user had starred it. That is a
+-- consequence of a correct decision rather than a bug in it: `resumePointDecision`
+-- returns null for ContentType.LIVE because a live stream has no meaningful
+-- resume offset, so live channels never enter watch_history and therefore never
+-- reach Continue Watching. With 53,167 channels synced and no favourites yet,
+-- Home showed none of them.
+--
+-- "Where was I" and "what do I watch" are different questions; only the first
+-- needs an offset. This table answers the second.
+--
+-- No FOREIGN KEY to content(id), matching content_first_seen and for the same
+-- reason: a sync DELETEs every content row for the source, so a cascade would
+-- erase the list on every refresh. Rotated-out channels are filtered on the read
+-- side by an inner join instead.
+CREATE TABLE recent_channels (
+    content_id TEXT NOT NULL PRIMARY KEY,
+    watched_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_recent_channels_at ON recent_channels(watched_at);

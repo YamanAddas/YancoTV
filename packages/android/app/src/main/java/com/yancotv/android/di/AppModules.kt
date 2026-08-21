@@ -22,6 +22,7 @@ import com.yancotv.shared.epg.EpgRepository
 import com.yancotv.shared.epg.androidGunzip
 import com.yancotv.shared.favorites.FavoritesRepository
 import com.yancotv.shared.handoff.HandoffClient
+import com.yancotv.shared.history.RecentChannelsRepository
 import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.http.CleartextAllowlist
 import com.yancotv.shared.http.CleartextAllowlistInterceptor
@@ -248,6 +249,7 @@ val appModule =
                 context = androidContext(),
                 prefs = get(),
                 history = get(),
+                recentChannels = get(),
                 recordingSink = get(),
                 sources = get(),
                 // MK.SEC.C — player HTTP path enforces the cleartext
@@ -301,6 +303,10 @@ val appModule =
         single { ReminderScheduler(androidContext(), get()) }
         single { FavoritesRepository(db = get(), clock = { System.currentTimeMillis() }) }
         single { WatchHistoryRepository(db = get(), clock = { System.currentTimeMillis() }) }
+        // MK.35.3 — live channels the user watched. Separate from watch history
+        // because a live stream has no resume offset, which is why live content
+        // could never reach Home unless the user had starred it.
+        single { RecentChannelsRepository(db = get(), clock = { System.currentTimeMillis() }) }
         // MK.19.8.3 + 19.8.4 — backup/restore coordinator. Bridges SAF
         // picker results to the pure BackupExporter / BackupImporter
         // engine. Subscribes to SourceSyncCoordinator state so buffered

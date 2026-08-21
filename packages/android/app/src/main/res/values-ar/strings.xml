@@ -81,6 +81,9 @@
     <string name="home_favorites_caption">الأفلام والمسلسلات التي أضفتها للمفضلة</string>
     <string name="home_eyebrow_fresh">جديد</string>
     <string name="home_recent_title">أُضيف حديثاً</string>
+    <!-- MK.35.3 -->
+    <string name="home_recent_channels_title">القنوات الأخيرة</string>
+    <string name="home_recent_channels_caption">بث مباشر كنت تشاهده</string>
     <string name="home_recent_caption">أفلام ومسلسلات جديدة في مكتبتك</string>
     <string name="home_eyebrow_continue_watching">متابعة المشاهدة</string>
     <string name="home_eyebrow_on_air_now">يُبث الآن</string>

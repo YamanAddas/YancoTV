@@ -248,7 +248,11 @@ class ContentRepository(private val db: YancoDb) {
     }
 }
 
-private fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(
+// MK.35.3 — widened from `private` to `internal` so RecentChannelsRepository can
+// map rows without a second copy of this. Duplicating it would be exactly the
+// drift AGENTS.md rule 8 warns about: two mappers, one of which quietly stops
+// applying name_override / logo_override the next time those change.
+internal fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem(
     id = id,
     sourceId = source_id,
     type = contentTypeFromDb(type),

@@ -1,0 +1,56 @@
+-- MK.35.3 — live channels the user actually watched, most recent first.
+--
+-- Live channels can never appear in Continue Watching, by design:
+-- `resumePointDecision` returns null for `ContentType.LIVE` because a live
+-- stream has no meaningful resume offset. That is correct, and it left a hole —
+-- with 53,167 channels synced, the only way ANY live content reached Home was if
+-- the user had starred it, so the On Now / Tonight rails were empty for anyone
+-- who had not curated favourites yet. This table is the other half of that
+-- decision rather than a workaround for it: "where was I" and "what do I watch"
+-- are different questions, and only the first one needs an offset.
+--
+-- **No FOREIGN KEY to content(id)**, for the same reason as content_first_seen:
+-- a sync is a full replacement (`prepareSource` DELETEs every content row for
+-- the source), so a cascade would erase the list on every refresh. Rows key on
+-- the deterministic `ContentIds.*` values the re-INSERT recreates.
+--
+-- Channels the provider drops are handled on the READ side by an inner join
+-- rather than by a sweep: a rotated-out channel simply stops appearing, and
+-- comes back with its original position if the provider restores it.
+CREATE TABLE recent_channels (
+    content_id TEXT NOT NULL PRIMARY KEY,
+    -- ms since epoch. Overwritten on each qualifying watch, so the list is
+    -- "most recently watched", not "first watched".
+    watched_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_recent_channels_at ON recent_channels(watched_at);
+
+-- `INSERT OR REPLACE`, deliberately: re-watching a channel should move it to the
+-- top rather than create a duplicate or keep a stale timestamp.
+recordWatch:
+INSERT OR REPLACE INTO recent_channels (content_id, watched_at) VALUES (?, ?);
+
+-- Inner join drops channels the provider has rotated out, so a dead tile can
+-- never render. LIVE filter is belt-and-braces — only live items are ever
+-- recorded — but it keeps the query honest if that ever changes.
+recentChannels:
+SELECT content.* FROM content
+JOIN recent_channels ON recent_channels.content_id = content.id
+WHERE content.type = 'live'
+ORDER BY recent_channels.watched_at DESC
+LIMIT :limitCount;
+
+-- Cap the table so it cannot grow without bound on a heavy channel-surfer.
+-- Keeps the newest :keepCount rows.
+trimToNewest:
+DELETE FROM recent_channels
+WHERE content_id NOT IN (
+    SELECT content_id FROM recent_channels ORDER BY watched_at DESC LIMIT :keepCount
+);
+
+countAll:
+SELECT COUNT(*) FROM recent_channels;
+
+clearAll:
+DELETE FROM recent_channels;

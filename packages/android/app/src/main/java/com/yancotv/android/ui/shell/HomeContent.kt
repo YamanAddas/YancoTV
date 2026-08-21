@@ -132,6 +132,7 @@ fun HomeContent(
     epg: EpgRepository = koinInject(),
     content: ContentRepository = koinInject(),
     sources: com.yancotv.shared.sources.SourceRepository = koinInject(),
+    recentChannels: com.yancotv.shared.history.RecentChannelsRepository = koinInject(),
     syncCoordinator: com.yancotv.android.sources.SourceSyncCoordinator = koinInject(),
 ) {
     // Audit catch — without this, on every cold launch with a populated
@@ -216,6 +217,16 @@ fun HomeContent(
     val onNowItems = remember { mutableStateListOf<NowPairing>() }
     val upNextItems = remember { mutableStateListOf<NowPairing>() }
     val recentlyAdded = remember { mutableStateListOf<ContentItem>() }
+
+    // MK.35.3 — live channels the user actually watched.
+    //
+    // The gap this fills: resumePointDecision returns null for LIVE by design
+    // (a live stream has no resume offset), so live content can never enter
+    // watch_history and therefore never reaches Continue Watching. With 53,167
+    // channels synced, the ONLY live content on Home came from the On Now /
+    // Tonight rails, and both of those read `liveFavorites` — so a user who had
+    // not starred anything saw no live TV on Home at all.
+    val recentChannelItems = remember { mutableStateListOf<ContentItem>() }
 
     // MK.22.A.5 (MB-222): one shared "now" tick. OnNowTile previously
     // captured `nowSec = remember { System.currentTimeMillis() / 1000 }`
@@ -328,6 +339,17 @@ fun HomeContent(
         }
     }
     LaunchedEffect(syncGeneration, hiddenIds) {
+        val channels =
+            withContext(Dispatchers.IO) {
+                runCatching { recentChannels.recent(limit = 20) }.getOrElse { emptyList() }
+                    .filter { it.id !in hiddenIds }
+            }
+        Snapshot.withMutableSnapshot {
+            recentChannelItems.clear()
+            recentChannelItems.addAll(channels)
+        }
+    }
+    LaunchedEffect(syncGeneration, hiddenIds) {
         val combined =
             withContext(Dispatchers.IO) {
                 runCatching {
@@ -381,6 +403,7 @@ fun HomeContent(
 
     val isTotallyEmpty =
         continueWatching.isEmpty() &&
+            recentChannelItems.isEmpty() &&
             nonLiveFavorites.isEmpty() &&
             onNowItems.isEmpty() &&
             upNextItems.isEmpty() &&
@@ -473,6 +496,21 @@ fun HomeContent(
                         val snapshot = continueWatching.toList()
                         val idx = snapshot.indexOfFirst { it.id == item.id }
                         if (idx >= 0) onPlay(snapshot, idx, resumeByContent[item.id]?.episodeId)
+                    },
+                )
+            }
+            if (recentChannelItems.isNotEmpty()) {
+                PosterRail(
+                    eyebrow = stringResource(R.string.home_eyebrow_for_you),
+                    title = stringResource(R.string.home_recent_channels_title),
+                    caption = stringResource(R.string.home_recent_channels_caption),
+                    items = recentChannelItems,
+                    lockedIds = lockedIds,
+                    resumeByContent = resumeByContent,
+                    onPlay = { item ->
+                        val snapshot = recentChannelItems.toList()
+                        val idx = snapshot.indexOfFirst { it.id == item.id }
+                        if (idx >= 0) onPlay(snapshot, idx, null)
                     },
                 )
             }
