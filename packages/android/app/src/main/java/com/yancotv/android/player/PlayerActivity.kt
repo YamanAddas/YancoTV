@@ -1492,7 +1492,7 @@ class PlayerActivity : AppCompatActivity() {
         // to press BACK. Only restores when the sheet was opened FROM the dock:
         // arriving via the MENU key means there was no dock to return to, and
         // conjuring one would be a surprise rather than a restoration.
-        if (optionsOpenedFromDock) {
+        if (shouldRestoreDockOnOptionsClose(optionsOpenedFromDock)) {
             optionsOpenedFromDock = false
             dockFocusMenuOnOpen = true
             showVodDock()
@@ -2383,22 +2383,10 @@ class PlayerActivity : AppCompatActivity() {
                     // PlayerOptionCategory and uses the V2 surface.
                     optionsOpenedFromDock = true
                     hideVodDock()
-                    val category =
-                        when (mode) {
-                            SheetMode.AUDIO -> com.yancotv.android.player.options.PlayerOptionCategory.AUDIO
-                            SheetMode.SUBS -> com.yancotv.android.player.options.PlayerOptionCategory.SUBTITLES
-                            SheetMode.SPEED -> com.yancotv.android.player.options.PlayerOptionCategory.SPEED
-                            SheetMode.ASPECT -> com.yancotv.android.player.options.PlayerOptionCategory.ASPECT
-                            SheetMode.SLEEP -> com.yancotv.android.player.options.PlayerOptionCategory.SLEEP
-                            SheetMode.RECORD -> com.yancotv.android.player.options.PlayerOptionCategory.RECORD
-                            SheetMode.FAV -> com.yancotv.android.player.options.PlayerOptionCategory.FAVORITES
-                            SheetMode.EXT -> com.yancotv.android.player.options.PlayerOptionCategory.EXTERNAL
-                            // CAST / LOOK had no V2 panel — drop to
-                            // popup root so the user can still navigate
-                            // to whatever they wanted (or pick another
-                            // category).
-                            else -> null
-                        }
+                    // MK.34.10 — mapping lives in optionCategoryFor so a test
+                    // can pin it; SheetMode.MENU returning null is what makes
+                    // the three-dot open the sheet ROOT rather than a panel.
+                    val category = optionCategoryFor(mode)
                     showOptionsV2(category)
                 },
                 onSeekTo = { offsetMs ->

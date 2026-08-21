@@ -220,22 +220,10 @@ internal data class HexMetrics(val size: Dp, val borderWidth: Dp)
 @Composable
 internal fun hexMetrics(variant: HexVariant): HexMetrics {
     val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
-    // Brief midpoints over the 1920px reference: hero 83, transport 56,
-    // secondary 52, menu icon 30.
-    val ratio = when (variant) {
-        HexVariant.HERO -> 0.0432f
-        HexVariant.TRANSPORT -> 0.0292f
-        HexVariant.SECONDARY -> 0.0271f
-        HexVariant.MENU_ICON -> 0.0156f
-    }
-    val floor = when (variant) {
-        HexVariant.HERO -> 40.dp
-        HexVariant.TRANSPORT -> 27.dp
-        HexVariant.SECONDARY -> 25.dp
-        HexVariant.MENU_ICON -> 18.dp
-    }
-    val size = (widthDp * ratio).dp.coerceAtLeast(floor)
-    return HexMetrics(size = size, borderWidth = if (variant == HexVariant.HERO) 2.dp else 1.dp)
+    return HexMetrics(
+        size = PlayerChromeMetrics.hexSizeDp(variant, widthDp).dp,
+        borderWidth = if (variant == HexVariant.HERO) 2.dp else 1.dp,
+    )
 }
 
 /**
@@ -249,9 +237,9 @@ internal data class DockMetrics(val horizontalPadding: Dp, val gap: Dp, val vert
 internal fun dockMetrics(): DockMetrics {
     val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
     return DockMetrics(
-        horizontalPadding = (widthDp * 0.0146f).dp.coerceAtLeast(10.dp),
-        gap = (widthDp * 0.0078f).dp.coerceAtLeast(5.dp),
-        verticalPadding = (widthDp * 0.0057f).dp.coerceAtLeast(4.dp),
+        horizontalPadding = PlayerChromeMetrics.dockPaddingDp(widthDp).dp,
+        gap = PlayerChromeMetrics.dockGapDp(widthDp).dp,
+        verticalPadding = PlayerChromeMetrics.dockVerticalPaddingDp(widthDp).dp,
     )
 }
 

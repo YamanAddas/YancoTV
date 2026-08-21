@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.R
 import com.yancotv.android.player.MidnightHex
+import com.yancotv.android.player.PlayerChromeMetrics
 import com.yancotv.android.player.glassSurface
 import com.yancotv.android.ui.focus.ProvideFocusScrollSpec
 import com.yancotv.android.ui.focus.endwardKey
@@ -149,18 +150,8 @@ fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, o
         ) {
             ProvideFocusScrollSpec {
                 val cfg = LocalConfiguration.current
-                // MK.34.7 — the brief's clamp(320px, 30vw, 440px) and 68vh, in
-                // PHYSICAL pixels at 1920x1080 like every other number in that
-                // document. The previous 320.dp read them as dp, which on a
-                // density-2.0 TV made the sheet 640px wide — and the 560.dp
-                // height cap was 1120px, taller than the screen it was capping.
-                // 30vw is DIMENSIONLESS — 30% of the viewport, whatever the
-                // units. Only the clamp bounds were in physical px (320-440 at
-                // 1920 = 160-220dp at density 2.0). Halving the ratio as well
-                // pinned the sheet to the clamp's floor: it rendered 320px, the
-                // minimum, when the brief's own arithmetic gives 440.
-                val sheetWidth = (cfg.screenWidthDp * 0.30f).coerceIn(160f, 220f).dp
-                val sheetMaxHeight = (cfg.screenHeightDp * 0.68f).dp
+                val sheetWidth = PlayerChromeMetrics.sheetWidthDp(cfg.screenWidthDp.toFloat()).dp
+                val sheetMaxHeight = PlayerChromeMetrics.sheetMaxHeightDp(cfg.screenHeightDp.toFloat()).dp
                 Column(
                     modifier =
                     Modifier

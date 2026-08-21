@@ -2557,7 +2557,42 @@ the last candidate) so a last-token test was added to pin it; and the
 already locale-independent — unlike Java's `toLowerCase()`. It is kept as
 documentation with a test guarding the rewrite that would genuinely break it.
 
-### MK.34.2–34.5 — overlay, dock, options sheet, responsiveness — pending
+### MK.34.2–34.9 — surface language, overlay, dock, sheet, RTL — shipped
+
+`MidnightGlass` (tokens + hexagon + glass, theme-derived after user instruction),
+the three-level overlay, the floating dock, the slim timeline ribbon, the
+detached options sheet, and the LTR pinning that stopped RTL half-mirroring.
+Each slice measured on a Fire TV before commit.
+
+**The recurring defect was units.** Every number in the brief is a physical pixel
+at 1920x1080; dp is what Compose invites. The same mistake landed three times —
+the dock at 2x, the metadata line larger than the title, the sheet at 2x and then
+pinned to its clamp floor — and each was caught only by measuring pixels on the
+TV. That is what MK.34.10 exists to end.
+
+**Not achievable, documented rather than faked:** backdrop blur. Compose has no
+backdrop filter, `Modifier.blur` blurs a composable's own content, and these
+panels sit over a `SurfaceView` that is not in their draw pass. An architecture
+limit, not a version gate.
+
+### MK.34.10 — chrome decisions extracted into testable kernels — shipped
+
+The brief's verification phase asks for eight tests, seven of which check
+on-screen behaviour. This project has no instrumented-test stack and adding one
+is a larger change than the feature, so the RULES were extracted instead:
+`PlayerChromeMetrics` (sizing arithmetic), `dockControlOrder` (focus order, now
+the object the dock actually renders from), `marqueeMode`, `optionCategoryFor`,
+`shouldRestoreDockOnOptionsClose`, `pinsLeftToRight`. 26 tests, asserted in the
+brief's own pixel units.
+
+Negative controls confirm they catch the real defects: reproducing the 2x dp bug
+fails the hero-band test, the halved sheet ratio fails the clamp-ceiling test,
+and a reshuffled control order fails the order test. Each of those cost a
+build-install-`uiautomator` cycle to find the first time.
+
+**Known limit, stated rather than implied:** these pin rules, not pixels. A
+purely visual regression — a wrong colour, a broken gradient — would still pass.
+The visual evidence is the geometry measured on AFTDCT31 in each slice's commit.
 
 ## Timeline
 

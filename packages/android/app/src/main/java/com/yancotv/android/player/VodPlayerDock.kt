@@ -305,8 +305,9 @@ private fun NowPlayingTitle(title: String, reduceMotion: Boolean) {
     // other number in that document. Expressed as a fraction of screen width so
     // it lands on the same physical size at any density: 1.7vw of 1920px is
     // 32.6px, and the 20-30px clamp is 10-15dp on a density-2.0 TV.
-    val widthDp = LocalConfiguration.current.screenWidthDp
-    val fontSize = (widthDp * 0.017f).coerceIn(10f, 15f).sp
+    val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    val fontSize = PlayerChromeMetrics.titleFontSp(widthDp).sp
+    val mode = marqueeMode(reduceMotion)
     Text(
         text = title,
         color = glass.textPrimary,
@@ -314,8 +315,8 @@ private fun NowPlayingTitle(title: String, reduceMotion: Boolean) {
         fontWeight = FontWeight.SemiBold,
         letterSpacing = (-0.2).sp,
         maxLines = 1,
-        overflow = if (reduceMotion) TextOverflow.Ellipsis else TextOverflow.Clip,
-        modifier = if (reduceMotion) {
+        overflow = if (mode == MarqueeMode.ELLIPSIS) TextOverflow.Ellipsis else TextOverflow.Clip,
+        modifier = if (mode == MarqueeMode.ELLIPSIS) {
             Modifier.fillMaxWidth()
         } else {
             Modifier
@@ -636,88 +637,111 @@ private fun VodDockTransportRow(
             horizontalArrangement = Arrangement.spacedBy(dock.gap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HexControl(
-                variant = HexVariant.TRANSPORT,
-                contentDescription = stringResource(R.string.vd_rewind_10),
-                onClick = {
-                    onUserInteraction()
-                    onSkipBack()
-                },
-            ) { tint -> DockLabel("-10", tint, 9.sp) }
+            // MK.34.10 — rendered by WALKING dockControlOrder rather than by
+            // listing the controls here. The brief specifies an exact sequence,
+            // and until now the only place that sequence existed was the order
+            // these calls happened to appear in: nothing could assert it, and a
+            // reorder during a refactor would have been silent because the dock
+            // would still build, still focus and still work. Now the order is
+            // data, and the test and the screen read the same object.
+            dockControlOrder(hasNext).forEach { control ->
+                when (control) {
+                    DockControl.SKIP_BACK ->
+                        HexControl(
+                            variant = HexVariant.TRANSPORT,
+                            contentDescription = stringResource(R.string.vd_rewind_10),
+                            onClick = {
+                                onUserInteraction()
+                                onSkipBack()
+                            },
+                        ) { tint -> DockLabel("-10", tint, 9.sp) }
 
-            HexControl(
-                variant = HexVariant.HERO,
-                contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
-                onClick = {
-                    onUserInteraction()
-                    onTogglePlayPause()
-                },
-                focusRequester = playPauseFocus,
-            ) { tint -> DockLabel(if (isPlaying) "II" else "▶", tint, 16.sp) }
+                    DockControl.PLAY_PAUSE ->
+                        HexControl(
+                            variant = HexVariant.HERO,
+                            contentDescription = stringResource(if (isPlaying) R.string.vd_pause else R.string.vd_play),
+                            onClick = {
+                                onUserInteraction()
+                                onTogglePlayPause()
+                            },
+                            focusRequester = playPauseFocus,
+                        ) { tint -> DockLabel(if (isPlaying) "II" else "\u25B6", tint, 16.sp) }
 
-            HexControl(
-                variant = HexVariant.TRANSPORT,
-                contentDescription = stringResource(R.string.vd_forward_10),
-                onClick = {
-                    onUserInteraction()
-                    onSkipForward()
-                },
-            ) { tint -> DockLabel("+10", tint, 9.sp) }
+                    DockControl.SKIP_FORWARD ->
+                        HexControl(
+                            variant = HexVariant.TRANSPORT,
+                            contentDescription = stringResource(R.string.vd_forward_10),
+                            onClick = {
+                                onUserInteraction()
+                                onSkipForward()
+                            },
+                        ) { tint -> DockLabel("+10", tint, 9.sp) }
 
-            if (hasNext) {
-                HexControl(
-                    variant = HexVariant.TRANSPORT,
-                    contentDescription = stringResource(R.string.vd_next),
-                    onClick = {
-                        onUserInteraction()
-                        onNext()
-                    },
-                ) { tint -> DockLabel("›", tint, 16.sp) }
-            }
+                    DockControl.NEXT ->
+                        HexControl(
+                            variant = HexVariant.TRANSPORT,
+                            contentDescription = stringResource(R.string.vd_next),
+                            onClick = {
+                                onUserInteraction()
+                                onNext()
+                            },
+                        ) { tint -> DockLabel("\u203A", tint, 16.sp) }
 
-            DockDivider()
+                    DockControl.DIVIDER -> DockDivider()
 
-            DockSecondary(stringResource(R.string.vd_cc)) {
-                onUserInteraction()
-                onOpenSheet(SheetMode.SUBS)
-            }
-            DockSecondary(stringResource(R.string.vd_audio)) {
-                onUserInteraction()
-                onOpenSheet(SheetMode.AUDIO)
-            }
-            DockSecondary(stringResource(R.string.vd_speed)) {
-                onUserInteraction()
-                onOpenSheet(SheetMode.SPEED)
-            }
-            DockSecondary(stringResource(R.string.vd_fit)) {
-                onUserInteraction()
-                onOpenSheet(SheetMode.ASPECT)
-            }
+                    DockControl.SUBTITLES ->
+                        DockSecondary(stringResource(R.string.vd_cc)) {
+                            onUserInteraction()
+                            onOpenSheet(SheetMode.SUBS)
+                        }
 
-            HexControl(
-                variant = HexVariant.SECONDARY,
-                contentDescription = stringResource(R.string.vd_fav),
-                onClick = {
-                    onUserInteraction()
-                    onOpenSheet(SheetMode.FAV)
-                },
-            ) { tint ->
-                Icon(
-                    imageVector = YancoIcons.Favorites,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
-                )
+                    DockControl.AUDIO ->
+                        DockSecondary(stringResource(R.string.vd_audio)) {
+                            onUserInteraction()
+                            onOpenSheet(SheetMode.AUDIO)
+                        }
+
+                    DockControl.SPEED ->
+                        DockSecondary(stringResource(R.string.vd_speed)) {
+                            onUserInteraction()
+                            onOpenSheet(SheetMode.SPEED)
+                        }
+
+                    DockControl.ASPECT ->
+                        DockSecondary(stringResource(R.string.vd_fit)) {
+                            onUserInteraction()
+                            onOpenSheet(SheetMode.ASPECT)
+                        }
+
+                    DockControl.FAVORITE ->
+                        HexControl(
+                            variant = HexVariant.SECONDARY,
+                            contentDescription = stringResource(R.string.vd_fav),
+                            onClick = {
+                                onUserInteraction()
+                                onOpenSheet(SheetMode.FAV)
+                            },
+                        ) { tint ->
+                            Icon(
+                                imageVector = YancoIcons.Favorites,
+                                contentDescription = null,
+                                tint = tint,
+                                modifier = Modifier.size(hexMetrics(HexVariant.SECONDARY).size * 0.42f),
+                            )
+                        }
+
+                    DockControl.MENU ->
+                        HexControl(
+                            variant = HexVariant.SECONDARY,
+                            contentDescription = stringResource(R.string.vd_menu),
+                            focusRequester = menuFocus,
+                            onClick = {
+                                onUserInteraction()
+                                onOpenSheet(SheetMode.MENU)
+                            },
+                        ) { tint -> DockLabel("\u2022\u2022\u2022", tint, 11.sp) }
+                }
             }
-            HexControl(
-                variant = HexVariant.SECONDARY,
-                contentDescription = stringResource(R.string.vd_menu),
-                focusRequester = menuFocus,
-                onClick = {
-                    onUserInteraction()
-                    onOpenSheet(SheetMode.MENU)
-                },
-            ) { tint -> DockLabel("•••", tint, 11.sp) }
         }
     }
 }
