@@ -2688,6 +2688,69 @@ Device-verified: rails render with real provider categories and content.
 `pickCategoryRails` already takes a `displayNames` map and is tested for it —
 wiring is a one-liner once a rename flow exists.
 
+### MK.35.4 — the 1.4.0 -> 1.5.0 upgrade gate — shipped
+
+MK.35.1 and MK.35.3 each added a schema hop (`12.sqm`, `13.sqm`) and `11.sqm`
+went out in the same release. **None of the three has ever been through
+SQLDelight's build-time `verifyCommonMainYancoDbMigration` task**, which is
+disabled on Windows (sqlite-jdbc / JBR native-link failure) and could not run in
+CI either — Actions has not allocated a runner for this repo since 2026-08-21.
+Shipping three unverified migrations to a device holding a 345 MB catalogue and
+the user's entire watch history is the largest single risk in v1.5.0.
+
+`UpgradeFrom140Test` is the substitute gate. It builds a database at **schema
+v11** — what 1.4.0 actually shipped, since that release carried migrations only
+through `10.sqm` — and walks it to the current version.
+
+The fixture is generated, not hand-written: the CREATE statements from the `.sq`
+files at commit `f7f38a7`, with SQLDelight's `AS kotlin.X` annotations stripped.
+Indexes, the FTS4 virtual table and the `content_ai` trigger included. That
+faithfulness is the point — the headline assertion compares every `sqlite_master`
+entry between an upgraded database and a freshly created one, which is what the
+disabled Gradle task exists to do, and it only means something if the starting
+shape is real.
+
+Column ORDER is exempt from that comparison, deliberately and with the reasoning
+recorded in the test: `ALTER TABLE ADD COLUMN` can only append, so `expires_at`
+lands last on every upgraded device while `Sources.sq` declares it mid-table.
+Safe only because SQLDelight expands `SELECT *` into an explicit named column
+list at codegen time (so the generated `cursor.getLong(19)` indexes the
+projection, not the table) and because no column-list-free `INSERT INTO t VALUES
+(...)` exists in the repo. Both were checked before the exemption was written; if
+either stops holding, the exemption is wrong.
+
+The other tests pin the upgrade's user-visible contract, which no existing test
+touched:
+
+* **"Recently added" is EMPTY right after the upgrade, not full.** `12.sqm`
+  deliberately does not backfill. The tempting alternative — seeding
+  `content_first_seen` from `content.created_at` — would stamp all 272,419
+  existing titles with the last sync's timestamp and announce the entire
+  catalogue as new.
+* **The first post-upgrade sync is stamped as an initial import.**
+  `content_first_seen` is empty, so `finishSource` must conclude "first import"
+  despite the app having been installed for months with watch history behind it.
+  Drives the real `BulkContentWriter`, not a copy of its rule.
+* **The second sync surfaces only genuinely new titles**, proving the stamp
+  survives the DELETE + re-INSERT every sync performs.
+* **A watched live channel survives the sync that replaces its content row**, and
+  a permanently dropped channel stops rendering while its row is kept.
+
+Negative controls run, each reverted: dropping an index from `12.sqm` reddens
+only the structural test; inverting the initial-import flag reddens exactly the
+two tests that depend on it; adding a backfill to `12.sqm` reddens the empty-rail
+test. Nothing passed for free.
+
+Corroborated on hardware rather than only in the JVM: the Fire TV upgraded a real
+1.4.0 database in place during this milestone. `user_version` read from the
+SQLite header is 14, the 345 MB catalogue and watch history are intact, and Home
+renders.
+
+**Known limit:** this is a stand-in, not the real gate. It asserts what the
+authors thought to assert, whereas `verifyCommonMainYancoDbMigration` compares
+against a generated snapshot of every version. Re-enabling it — on CI, or on a
+non-Windows machine — remains the durable fix.
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.
