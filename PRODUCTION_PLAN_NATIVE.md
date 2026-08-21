@@ -2594,6 +2594,63 @@ build-install-`uiautomator` cycle to find the first time.
 purely visual regression — a wrong colour, a broken gradient — would still pass.
 The visual evidence is the geometry measured on AFTDCT31 in each slice's commit.
 
+## MK.35 — Home that shows something — started 2026-08-19
+
+User: "i want it innovated and actually fixed to show the right things."
+
+Investigation found two problems, one a confirmed defect and one structural.
+
+**Confirmed: "Recently added" never worked.** It sorts by `content.created_at`,
+but a sync is a full replacement — `BulkContentWriter.prepareSource` runs
+`DELETE FROM content WHERE source_id = ?` and the chunked re-INSERT stamps a
+fresh `created_at` on every row. So created_at records when the last sync ran,
+not when an item arrived. On the user's 272,419-item Xtream catalogue refreshing
+every ~52 minutes, the rail showed whichever 60 rows the provider's API returned
+last and reshuffled hourly. Nothing in it was ever new.
+
+**Structural: Home is empty unless you have history.** Six rails, and four only
+appear once the user has watched or starred something (hero + continue watching
+need history; Favorites needs stars; On Now + Tonight need starred LIVE
+channels). With 53,167 live channels and 174,000 movies freshly synced, Home
+showed a hero, continue-watching, and one broken rail. No discovery at all.
+
+**User decisions (2026-08-19):** fix "Recently added" properly rather than drop
+it; add category browsing; add recent LIVE channels. Recent-live is a real gap —
+`resumePointDecision` returns null for LIVE by design, so a live channel can
+never enter watch history and therefore never appears on Home unless favourited.
+Desktop already has a recent-channels store (`core-stores-recent-channels`);
+native has none.
+
+### MK.35.1 — first-seen stamping, so "Recently added" means something — shipped
+
+New `content_first_seen` side table (migration 12.sqm) keyed on the deterministic
+`ContentIds.*` values the re-INSERT recreates. **No FK to content(id)**,
+deliberately: surviving the sync's DELETE is the entire purpose, and an
+`ON DELETE CASCADE` would reintroduce the bug one layer down. Stamped in
+`finishSource` with one bulk `INSERT OR IGNORE`, so existing titles keep their
+original timestamp and only new content_ids get a row.
+
+`from_initial_import` is load-bearing rather than informational. Without it a
+fresh install stamps all 272k items within one second and ordering by first-seen
+produces 60 arbitrary titles — the same broken rail with a new column behind it.
+The first sync is excluded, so the rail is EMPTY after a fresh install and fills
+only when a later sync genuinely brings something.
+
+Existing installs get an empty table and **no backfill**, which is correct rather
+than lazy: backfilling from created_at would stamp everything with the last
+sync's timestamp, the exact meaningless value this exists to stop trusting.
+
+4 tests, and the two that matter assert emptiness. `BulkContentWriter` gained an
+injected clock, matching the module convention (`WatchHistoryRepository`,
+`SourceRepository`, `EpgRepository` all take `clock: () -> Long`); `shared` has
+no kotlinx-datetime on its compile path, so a default was not an option.
+
+Migration verification is SKIPPED on Windows hosts — CI's Linux runner is the
+gate for `12.sqm`.
+
+### MK.35.2 — category rails on Home — pending
+### MK.35.3 — recent live channels — pending
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.

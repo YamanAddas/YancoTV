@@ -293,10 +293,24 @@ LIMIT :limitCount OFFSET :offsetCount;
 -- the wrong order for "what arrived last". Mixes movies + series so the
 -- caller gets a single sorted stream and doesn't have to merge + re-sort
 -- client-side.
+-- MK.35.1 — sorts on content_first_seen, NOT on created_at.
+--
+-- created_at is rewritten for every row on every sync (prepareSource DELETEs
+-- the source's content and the chunked re-INSERT re-stamps it), so ordering by
+-- it returned the tail of the provider's API paging order and reshuffled on
+-- every refresh. See ContentFirstSeen.sq.
+--
+-- `from_initial_import = 0` excludes the first sync's catalogue dump. Nothing
+-- is genuinely new when 272,419 items arrive in one batch, so the rail stays
+-- EMPTY after a fresh install and fills only when a later sync brings
+-- something. An empty rail is hidden by the caller; a rail full of arbitrary
+-- titles is what this replaces.
 recentlyAddedVod:
-SELECT * FROM content
-WHERE type IN ('movie', 'series')
-ORDER BY created_at DESC
+SELECT content.* FROM content
+JOIN content_first_seen ON content_first_seen.content_id = content.id
+WHERE content.type IN ('movie', 'series')
+  AND content_first_seen.from_initial_import = 0
+ORDER BY content_first_seen.first_seen_at DESC
 LIMIT :limitCount;
 
 -- Guide channel list: distinct live channels that have at least one programme

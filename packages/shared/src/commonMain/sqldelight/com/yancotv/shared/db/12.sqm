@@ -1,0 +1,34 @@
+-- v12 → v13 (MK.35.1): when content FIRST appeared, surviving re-syncs.
+--
+-- Home's "Recently added" rail sorted by `content.created_at`, which cannot
+-- mean what the rail needs. A sync is a full replacement — prepareSource runs
+-- `DELETE FROM content WHERE source_id = ?` and the chunked re-INSERT stamps a
+-- fresh created_at on every row — so created_at records when the last sync ran,
+-- not when an item arrived. On a 272,419-item Xtream catalogue refreshing every
+-- ~52 minutes the rail showed whichever 60 rows the provider's API returned
+-- last, reshuffled hourly, and never contained anything genuinely new.
+--
+-- A side table rather than a column on `content`, because a column would be
+-- deleted by that same statement. Rows key on the deterministic ContentIds.*
+-- values the re-INSERT recreates, so the stamp survives while the content row
+-- is replaced under it.
+--
+-- No FOREIGN KEY to content(id) on purpose: ON DELETE CASCADE would wipe this
+-- on every sync and reintroduce the bug one layer down.
+--
+-- Existing installs get an EMPTY table and no backfill, which is correct rather
+-- than lazy. Backfilling from created_at would stamp every existing item with
+-- the last sync's timestamp — precisely the meaningless value this migration
+-- exists to stop trusting. The next sync stamps the catalogue as an initial
+-- import (from_initial_import = 1, excluded from the rail), and the sync after
+-- that starts surfacing real additions. The rail is empty rather than wrong in
+-- the meantime.
+CREATE TABLE content_first_seen (
+    content_id TEXT NOT NULL PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    first_seen_at INTEGER NOT NULL,
+    from_initial_import INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_cfs_recent ON content_first_seen(from_initial_import, first_seen_at);
+CREATE INDEX idx_cfs_source ON content_first_seen(source_id);

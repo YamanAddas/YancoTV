@@ -49,7 +49,20 @@ import kotlinx.serialization.json.Json
  * leaving the schema stable on a crash is more important than the small
  * theoretical speedup.
  */
-class BulkContentWriter(private val driver: SqlDriver, private val logger: Logger = NOOP_LOGGER) {
+class BulkContentWriter(
+    private val driver: SqlDriver,
+    /**
+     * MK.35.1 — ms since epoch for first-seen stamping.
+     *
+     * Required and injected rather than defaulted: `shared` deliberately has no
+     * kotlinx-datetime dependency, and the module's convention is a
+     * platform-supplied clock (WatchHistoryRepository, SourceRepository,
+     * EpgRepository all take this exact shape). Being injectable also makes the
+     * initial-import-vs-new-titles rule testable without wall-clock waits.
+     */
+    private val clock: () -> Long,
+    private val logger: Logger = NOOP_LOGGER,
+) {
     private val json =
         Json {
             encodeDefaults = false
@@ -129,7 +142,26 @@ class BulkContentWriter(private val driver: SqlDriver, private val logger: Logge
      * recreated defensively on the error path too so non-bulk inserts
      * (M3U, Stalker) stay FTS-consistent.
      */
+    /**
+     * How many rows this source has already stamped in `content_first_seen`.
+     *
+     * Zero means the sync that just finished is this source's first, so what it
+     * wrote is an initial catalogue import rather than a set of new titles.
+     */
+    private fun countFirstSeen(sourceId: String): Long =
+        driver.executeQuery(
+            null,
+            "SELECT COUNT(*) FROM content_first_seen WHERE source_id = ?",
+            { cursor -> app.cash.sqldelight.db.QueryResult.Value(if (cursor.next().value) cursor.getLong(0) ?: 0L else 0L) },
+            1,
+        ) { bindString(0, sourceId) }.value
+
     fun finishSource(sourceId: String) {
+        // MK.35.1 — read BEFORE the transaction opens. Whether this source has
+        // ever been stamped is what decides if the catalogue it just wrote is an
+        // initial import or a set of genuine additions, and reading it after the
+        // INSERT below would always answer "yes".
+        val alreadyStamped = countFirstSeen(sourceId) > 0L
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             driver.execute(
@@ -138,6 +170,29 @@ class BulkContentWriter(private val driver: SqlDriver, private val logger: Logge
                     "SELECT id, title, clean_title, group_name FROM content WHERE source_id = ?",
                 1,
             ) { bindString(0, sourceId) }
+            // MK.35.1 — stamp first-seen for this source's catalogue.
+            //
+            // `INSERT OR IGNORE` is what makes this both idempotent and cheap:
+            // rows stamped by an earlier sync keep their ORIGINAL timestamp, and
+            // only content_ids that were not there before get a row. One bulk
+            // statement over the source, not a per-row loop across 272k items.
+            //
+            // The flag marks a source's FIRST sync as an initial import so Home
+            // excludes it. Nothing is genuinely new when the whole catalogue
+            // arrives at once, and without this the rail would show 60 arbitrary
+            // titles again — the same bug with a new column behind it.
+            driver.execute(
+                null,
+                "INSERT OR IGNORE INTO content_first_seen " +
+                    "(content_id, source_id, first_seen_at, from_initial_import) " +
+                    "SELECT id, ?, ?, ? FROM content WHERE source_id = ?",
+                4,
+            ) {
+                bindString(0, sourceId)
+                bindLong(1, clock())
+                bindLong(2, if (alreadyStamped) 0L else 1L)
+                bindString(3, sourceId)
+            }
             driver.execute(
                 null,
                 "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +

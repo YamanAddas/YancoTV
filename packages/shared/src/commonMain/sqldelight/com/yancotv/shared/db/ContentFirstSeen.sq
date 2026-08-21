@@ -1,0 +1,59 @@
+-- MK.35.1 — when an item FIRST appeared in the catalogue, surviving re-syncs.
+--
+-- `content.created_at` cannot answer this and never could. A sync is a full
+-- replacement: `BulkContentWriter.prepareSource` runs
+-- `DELETE FROM content WHERE source_id = ?` and the chunked re-INSERT writes a
+-- fresh `created_at` for every row. So `created_at` means "when the last sync
+-- ran", not "when this arrived", and Home's "Recently added" rail — which sorts
+-- by it — showed whichever 60 rows the provider's API happened to return last,
+-- reshuffling on every refresh. On a 272,419-item Xtream catalogue refreshing
+-- hourly, nothing in that rail was ever actually new.
+--
+-- **No FOREIGN KEY to content(id), deliberately.** Surviving that DELETE is the
+-- entire purpose of this table; an `ON DELETE CASCADE` would wipe it on every
+-- sync and reintroduce the bug one layer down. Rows are keyed on the same
+-- deterministic `ContentIds.*` values the re-INSERT recreates, which is what
+-- makes a side table work at all here.
+--
+-- Orphans (items a provider rotates out) are cleaned when the source is
+-- deleted. They are not swept per-sync: that would mean a 272k-row anti-join on
+-- every refresh to reclaim a few bytes per row.
+CREATE TABLE content_first_seen (
+    content_id TEXT NOT NULL PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    -- ms since epoch, per the all-timestamps-are-milliseconds rule.
+    first_seen_at INTEGER NOT NULL,
+    -- 1 when the row arrived in this source's FIRST sync.
+    --
+    -- Load-bearing rather than informational. Without it, a fresh install would
+    -- stamp all 272k items with one timestamp and "Recently added" would again
+    -- show 60 arbitrary titles — the same broken rail with a new column behind
+    -- it. Nothing is genuinely "new" when everything arrived at once, so the
+    -- initial import is excluded from the rail entirely and the rail stays
+    -- empty until a later sync actually brings something.
+    from_initial_import INTEGER NOT NULL DEFAULT 0
+);
+
+-- Drives the Home rail: filter on the flag, sort on the timestamp.
+CREATE INDEX idx_cfs_recent ON content_first_seen(from_initial_import, first_seen_at);
+CREATE INDEX idx_cfs_source ON content_first_seen(source_id);
+
+-- Has this source ever been stamped? Zero means the sync about to be recorded
+-- is its first, and everything it brought is an initial import rather than new.
+countBySource:
+SELECT COUNT(*) FROM content_first_seen WHERE source_id = ?;
+
+-- Stamp everything this source currently has. `INSERT OR IGNORE` is what makes
+-- it idempotent and cheap: rows already stamped keep their original
+-- first_seen_at, and only genuinely new content_ids get a row. One bulk
+-- statement, not a per-row loop.
+recordFirstSeen:
+INSERT OR IGNORE INTO content_first_seen (content_id, source_id, first_seen_at, from_initial_import)
+SELECT id, :sourceId, :firstSeenAt, :fromInitialImport FROM content WHERE source_id = :sourceId;
+
+deleteBySource:
+DELETE FROM content_first_seen WHERE source_id = ?;
+
+-- Diagnostic for tests and for the plan's claims about rail behaviour.
+countRecent:
+SELECT COUNT(*) FROM content_first_seen WHERE from_initial_import = 0;

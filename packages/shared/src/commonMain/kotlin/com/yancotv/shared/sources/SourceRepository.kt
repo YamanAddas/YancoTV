@@ -425,7 +425,7 @@ class SourceRepository(
      * and Home screens can keep querying while sync is in flight.
      */
     private suspend fun writeM3uBulk(sourceId: String, entries: List<M3uEntry>, now: Long, onProgress: suspend (Int, Int) -> Unit): Int {
-        val bulk = BulkContentWriter(driver, logger)
+        val bulk = BulkContentWriter(driver, clock, logger)
         val total = entries.size
         onProgress(0, total)
         bulk.prepareSource(sourceId)
@@ -504,7 +504,7 @@ class SourceRepository(
         val username = source.usernameOrThrow()
         val password = source.passwordOrThrow()
         val client = XtreamClient(url, username, password, XtreamClientOptions(http, logger))
-        val bulk = BulkContentWriter(driver, logger)
+        val bulk = BulkContentWriter(driver, clock, logger)
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.Authenticating)
         val auth = client.authenticate()
@@ -650,7 +650,7 @@ class SourceRepository(
         val url = source.url ?: error("stalker source missing url")
         val mac = source.macOrThrow()
         val client = StalkerClient(url, mac, StalkerClientOptions(http, logger))
-        val bulk = BulkContentWriter(driver, logger)
+        val bulk = BulkContentWriter(driver, clock, logger)
 
         onProgress(SyncProgress.Phase.FETCHING, 0, 0, SyncDetail.Authenticating)
         val auth = client.authenticate()

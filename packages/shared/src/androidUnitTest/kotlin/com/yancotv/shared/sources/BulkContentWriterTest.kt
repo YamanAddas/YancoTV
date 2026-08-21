@@ -29,6 +29,9 @@ import kotlin.test.assertTrue
  * These tests feed each writer a batch containing a duplicate and assert the
  * sync completes with the expected deduped row count + FTS consistency.
  */
+/** MK.35.1 — fixed clock so first-seen stamping is deterministic in tests. */
+private const val FIXED_NOW = 1_700_000_000_000L
+
 class BulkContentWriterTest {
     private val noopHttp =
         object : HttpClient {
@@ -162,7 +165,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
 
         writer.prepareSource("s1")
         val items =
@@ -191,7 +194,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         writer.prepareSource("s1")
@@ -224,7 +227,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         writer.prepareSource("s1")
@@ -252,7 +255,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
 
         writer.prepareSource("s1")
         val items =
@@ -281,7 +284,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
 
         writer.prepareSource("s1")
         val items =
@@ -307,7 +310,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
 
         writer.prepareSource("s1")
         val items =
@@ -333,7 +336,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
 
         writer.prepareSource("s1")
         val items =
@@ -365,7 +368,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
 
         writer.prepareSource("s1")
         val base = (1..100).map { m3uEntry("Ch$it", "http://a/$it.ts") }.toMutableList()
@@ -408,7 +411,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         // Initial sync — 3 live channels.
@@ -476,7 +479,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         // Initial sync publishes ch1 + ch2.
@@ -551,7 +554,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         // Healthy sync publishes ch1 + ch2, and the user invests in them.
@@ -630,7 +633,7 @@ class BulkContentWriterTest {
         val database = testDatabase()
         val db = database.db
         insertSource(db)
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         // Initial happy-path sync to seed content + a favorite.
@@ -743,7 +746,7 @@ class BulkContentWriterTest {
         val db = database.db
         insertSource(db, id = "a")
         insertSource(db, id = "b")
-        val writer = BulkContentWriter(database.driver)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
         val client = xtreamClient()
 
         // Initial sync of both sources.
