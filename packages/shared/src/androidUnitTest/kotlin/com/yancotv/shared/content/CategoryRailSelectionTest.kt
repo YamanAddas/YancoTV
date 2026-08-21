@@ -37,6 +37,58 @@ class CategoryRailSelectionTest {
     }
 
     @Test
+    fun `what you watch beats what the provider stocks most of`() {
+        // The real failure this tier fixes, measured on a 272,419-item catalogue:
+        // the three biggest categories were German, English and Persian, for a
+        // user whose entire history is Turkish. Size measures the provider's
+        // stock levels, not the viewer.
+        val rails = pickCategoryRails(
+            pinned = emptyList(),
+            hidden = emptySet(),
+            bySize = listOf("DE - FILME 1940/2024", "EN - NEW RELEASE", "IR - PERSIAN SUB/DUB"),
+            watched = listOf("TURKISH YERLI DIZILER"),
+        )
+        assertEquals("TURKISH YERLI DIZILER", rails.first().groupKey)
+        assertEquals(3, rails.size, "size still fills the remaining slots")
+    }
+
+    @Test
+    fun `a pin still outranks a watched category`() {
+        val rails = pickCategoryRails(
+            pinned = listOf("Kids"),
+            hidden = emptySet(),
+            bySize = listOf("Movies"),
+            watched = listOf("Sports"),
+        )
+        assertEquals(listOf("Kids", "Sports", "Movies"), rails.map { it.groupKey })
+    }
+
+    @Test
+    fun `a hidden category is excluded even when watched`() {
+        // Watching something is not consent to see it on the home screen — the
+        // most likely reason to hide a category you have watched is precisely
+        // that you do not want it surfaced.
+        val rails = pickCategoryRails(
+            pinned = emptyList(),
+            hidden = setOf("Adult"),
+            bySize = listOf("Movies"),
+            watched = listOf("Adult"),
+        )
+        assertEquals(listOf("Movies"), rails.map { it.groupKey })
+    }
+
+    @Test
+    fun `a watched category that is also large does not appear twice`() {
+        val rails = pickCategoryRails(
+            pinned = emptyList(),
+            hidden = emptySet(),
+            bySize = listOf("Movies", "Series"),
+            watched = listOf("Movies"),
+        )
+        assertEquals(listOf("Movies", "Series"), rails.map { it.groupKey })
+    }
+
+    @Test
     fun `with no pins it falls back to the biggest categories`() {
         val rails = pickCategoryRails(
             pinned = emptyList(),

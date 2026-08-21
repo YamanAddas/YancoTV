@@ -10,11 +10,24 @@ package com.yancotv.shared.content
  * of that reached Home. Pinning a category and then not seeing it on the home
  * screen is the app ignoring an instruction it already accepted.
  *
- * So the rule is: **pins win, size is the fallback.** A user who has curated
- * gets exactly what they curated. A user who has not gets the biggest categories,
- * which on a 272,419-item catalogue is a far better guess than provider order —
- * that would surface whichever bucket happens to sit first in the playlist, as
- * likely to be a near-empty test category as anything worth watching.
+ * So the rule is a three-tier fallback: **pins, then what you watch, then size.**
+ *
+ * The middle tier exists because size alone gets it badly wrong. Measured on a
+ * real 272,419-item catalogue, the biggest categories were "DE - FILME
+ * 1940/2024", "EN - NEW RELEASE" and "IR - PERSIAN SUB/DUB" — German, English
+ * and Persian — for a user whose entire watch history is Turkish and Arabic.
+ * Size measures what the PROVIDER stocks, not what the viewer wants, and on a
+ * catalogue that dumps every language into one playlist those are barely
+ * related.
+ *
+ * Categories drawn from the user's own history are a real signal and cost
+ * nothing to collect. Deliberately NOT a hardcoded language list: Home already
+ * has one of those for its Recently Added rail, pinned to EN/AR, and it would
+ * have to be edited by hand for every user who is not this one.
+ *
+ * Size remains the last resort, for a fresh install where nothing else is
+ * known. It is still better than provider order, which would surface whichever
+ * bucket happens to sit first in the playlist.
  *
  * Pure and Compose-free so the rule is testable without a database or a screen.
  */
@@ -37,6 +50,12 @@ fun pickCategoryRails(
     pinned: List<String>,
     hidden: Set<String>,
     bySize: List<String>,
+    /**
+     * Categories the user has actually watched from, most recent first. Ranked
+     * above [bySize] because it reflects the viewer rather than the provider's
+     * stock levels.
+     */
+    watched: List<String> = emptyList(),
     displayNames: Map<String, String> = emptyMap(),
     limit: Int = 3,
 ): List<CategoryRail> {
@@ -60,6 +79,7 @@ fun pickCategoryRails(
     }
 
     consider(pinned)
+    consider(watched)
     consider(bySize)
 
     return chosen.map { key ->

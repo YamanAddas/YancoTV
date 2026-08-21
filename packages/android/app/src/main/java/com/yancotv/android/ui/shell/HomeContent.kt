@@ -351,7 +351,27 @@ fun HomeContent(
     }
     val hiddenGroups by prefs.hiddenGroupsFlow.collectAsState()
     val pinnedParents by prefs.pinnedParentsFlow.collectAsState()
-    LaunchedEffect(syncGeneration, hiddenIds, hiddenGroups, pinnedParents) {
+    // MK.35.2a — the categories this user actually watches.
+    //
+    // Size alone got this badly wrong on the real catalogue: the three biggest
+    // categories were German, English and Persian for a user whose entire
+    // history is Turkish and Arabic. Size measures what the PROVIDER stocks,
+    // not what the viewer wants; their own history is a better signal and costs
+    // nothing, since it is already in memory for the rails above.
+    //
+    // Derived OUTSIDE the effect so it can be a KEY. The first version computed
+    // it inside, and the effect keyed only on sync/hidden/pinned — so it ran
+    // once before the history flow had emitted, captured an empty list, and the
+    // rails silently fell back to size. It looked exactly like the feature not
+    // working.
+    val watchedGroups by remember {
+        derivedStateOf {
+            (continueWatching + recentChannelItems)
+                .mapNotNull { it.groupName?.takeIf { g -> g.isNotBlank() } }
+                .distinct()
+        }
+    }
+    LaunchedEffect(syncGeneration, hiddenIds, hiddenGroups, pinnedParents, watchedGroups) {
         val built =
             withContext(Dispatchers.IO) {
                 runCatching {
@@ -366,6 +386,7 @@ fun HomeContent(
                         pinned = pinned,
                         hidden = hiddenGroups,
                         bySize = bySize,
+                        watched = watchedGroups,
                         limit = 3,
                     ).mapNotNull { rail ->
                         // A category can hold movies, series, or both. Ask for
