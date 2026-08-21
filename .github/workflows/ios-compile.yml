@@ -1,0 +1,143 @@
+name: iOS compile
+
+# Split out of android-tests.yml on 2026-08-21, for cost.
+#
+# macOS runners bill at 10x the Linux rate. This job was running on every push
+# to master — including commits that touched only bugs.md or the production
+# plan — to compile Apple targets that ONLY `packages/shared` can affect. That
+# is the most expensive job in the repo doing the most redundant work.
+#
+# It could not be path-filtered while it shared a file with the Android job:
+# GitHub applies `on.push.paths` to a whole workflow, not per job, and filtering
+# jobs individually needs a third-party changed-files action. Splitting the file
+# is what makes the filter possible. The cost is that a PR now shows two status
+# checks instead of one — a deliberate trade, recorded in android-tests.yml's
+# header where the original one-file decision was made.
+#
+# What this gate is for: `:shared` has declared iosX64 / iosArm64 /
+# iosSimulatorArm64 since MK.0.1, but nothing compiled them. The Android build
+# does not, and a missing `actual` is a hard compile error on the iOS targets
+# ALONE — so MK.19.8 could add `BackupCipher` and `sha256Hex` as `expect` in
+# commonMain with no iOS actuals, and both a green Android build and a green CI
+# would say nothing was wrong.
+#
+# KNOWN FAILING as of 2026-08-19: `CCCryptorGCMOneshotEncrypt` /
+# `CCCryptorGCMOneshotDecrypt` are not bound in Kotlin/Native's
+# `platform.CoreCrypto` — the first real run of this gate answered the exact
+# question MK.iOS.0-pre's commit flagged as unverified. Every other error in
+# that run cascades from those two unresolved symbols. This job is expected to
+# stay red until the CoreCrypto binding is resolved; it is reporting a true
+# fact, which is what it was built to do.
+#
+# `workflow_dispatch` is here so the gate can be run on demand — after an
+# iosMain fix, without waiting for a qualifying push.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'packages/shared/**'
+      - '.github/workflows/ios-compile.yml'
+      # packages/shared/CLAUDE.md cannot break a Kotlin/Native compile.
+      - '!**/*.md'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'packages/shared/**'
+      - '.github/workflows/ios-compile.yml'
+      # packages/shared/CLAUDE.md cannot break a Kotlin/Native compile.
+      - '!**/*.md'
+  workflow_dispatch:
+
+# Cancel superseded runs. Worth more here than on Linux: a cancelled macOS run
+# reclaims minutes at 10x the rate.
+concurrency:
+  group: ios-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    # Added 2026-08-10; moved here from android-tests.yml on 2026-08-21.
+    #
+    # The `:shared` module has declared iosX64 / iosArm64 / iosSimulatorArm64
+    # targets since MK.0.1, but nothing ever compiled them: the Android build
+    # doesn't, and the Linux test workflow can't — Kotlin/Native cannot build
+    # Apple targets there. They rotted undetected. This job is the detector.
+    #
+    # Independent of the Android workflow, so an iOS-only break is
+    # distinguishable at a glance from an Android one.
+    name: iOS targets compile
+    runs-on: macos-latest
+    # 45 -> 25 (2026-08-21). At 10x billing an over-generous timeout is an
+    # over-generous bill when something hangs. A warm-cache run compiles well
+    # inside this; a cold one is dominated by the ~/.konan download, which the
+    # cache below exists to avoid.
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: packages/android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        # Required even though this job never builds the Android app:
+        # `:shared` applies the `com.android.library` plugin, so Gradle
+        # cannot CONFIGURE the project without an SDK ("SDK location not
+        # found") — configuration failure would happen long before the
+        # iOS compile tasks run.
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Cache Gradle and Kotlin/Native
+        # `~/.konan` holds the Kotlin/Native toolchain + Apple platform
+        # klibs — a multi-hundred-MB download on a cold runner. Without it
+        # the job spends most of its wall-clock fetching the compiler.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: gradle-konan-${{ runner.os }}-${{ hashFiles('packages/android/gradle/wrapper/gradle-wrapper.properties', 'packages/android/**/build.gradle.kts', 'packages/android/gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-konan-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Compile all iOS targets
+        # The gate. Compiles main + test klibs for all three iOS targets.
+        # A missing `actual` in iosMain fails here.
+        run: ./gradlew :shared:checkIosCompile --console=plain --stacktrace
+
+      - name: Run backup cipher parity suite on the iOS simulator
+        # Compiling proves the CommonCrypto bindings RESOLVE; it does not
+        # prove they are CORRECT. This step executes BackupCipherParityTest
+        # on a real simulator, pinning the iOS PBKDF2 / AES-GCM / SHA-256
+        # output against fixed vectors the Android actual produced. A
+        # divergence here means a password-protected backup written on one
+        # platform cannot be restored on the other.
+        #
+        # Scoped with --tests to this one class on purpose: the rest of
+        # commonTest has never run on a native target and may need its own
+        # shake-out. Widen to the full `:shared:iosSimulatorArm64Test` once
+        # that has been done.
+        run: ./gradlew :shared:iosSimulatorArm64Test --tests "com.yancotv.shared.backup.BackupCipherParityTest" --console=plain --stacktrace
+
+      - name: Upload iOS test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-reports
+          path: packages/shared/build/reports/tests/
+          retention-days: 14
