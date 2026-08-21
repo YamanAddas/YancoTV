@@ -148,13 +148,12 @@ class BulkContentWriter(
      * Zero means the sync that just finished is this source's first, so what it
      * wrote is an initial catalogue import rather than a set of new titles.
      */
-    private fun countFirstSeen(sourceId: String): Long =
-        driver.executeQuery(
-            null,
-            "SELECT COUNT(*) FROM content_first_seen WHERE source_id = ?",
-            { cursor -> app.cash.sqldelight.db.QueryResult.Value(if (cursor.next().value) cursor.getLong(0) ?: 0L else 0L) },
-            1,
-        ) { bindString(0, sourceId) }.value
+    private fun countFirstSeen(sourceId: String): Long = driver.executeQuery(
+        null,
+        "SELECT COUNT(*) FROM content_first_seen WHERE source_id = ?",
+        { cursor -> app.cash.sqldelight.db.QueryResult.Value(if (cursor.next().value) cursor.getLong(0) ?: 0L else 0L) },
+        1,
+    ) { bindString(0, sourceId) }.value
 
     fun finishSource(sourceId: String) {
         // MK.35.1 — read BEFORE the transaction opens. Whether this source has

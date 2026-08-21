@@ -222,6 +222,54 @@ class MigrationTest {
      * that has never synced. And it has to be writable, because the value is
      * captured later from the Xtream handshake, not at insert time.
      */
+    /**
+     * MK.35.1 — 12.sqm creates `content_first_seen`.
+     *
+     * This hop matters more than most because the build-time
+     * `verifyCommonMainYancoDbMigration` task is DISABLED on Windows hosts
+     * (sqlite-jdbc / JBR native-link incompatibility, see :shared build.gradle),
+     * so on a Windows dev machine this runtime test is the ONLY thing standing
+     * between a broken migration and CI. It asserts the shape the `.sq` declares,
+     * not merely that the SQL executed.
+     */
+    @Test fun migrationV12ToV13CreatesContentFirstSeen() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
+        driver.execute(null, "PRAGMA user_version = 12;", 0)
+
+        YancoDb.Schema.migrate(driver, oldVersion = 12, newVersion = 13)
+
+        // The table exists and takes a row.
+        driver.execute(
+            null,
+            "INSERT INTO content_first_seen (content_id, source_id, first_seen_at, from_initial_import) " +
+                "VALUES ('c1', 's1', 1700000000000, 1)",
+            0,
+        )
+        val flag =
+            driver
+                .executeQuery(null, "SELECT from_initial_import FROM content_first_seen WHERE content_id = 'c1'", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertEquals(1L, flag)
+
+        // No FK to content(id), and that is the POINT — the sync deletes every
+        // content row for a source, so a cascade here would wipe the stamps on
+        // every refresh and reintroduce the bug this table exists to fix. The
+        // insert above referenced a content_id that does not exist, with foreign
+        // keys ON; it succeeding is the proof.
+        val defaulted =
+            driver
+                .executeQuery(null, "SELECT COUNT(*) FROM content_first_seen", { cursor ->
+                    cursor.next()
+                    app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+                }, 0)
+                .value
+        assertEquals(1L, defaulted, "a row with no matching content row must survive with FK enforcement on")
+    }
+
     @Test fun migrationV11ToV12AddsNullableExpiresAtColumn() {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
