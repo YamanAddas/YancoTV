@@ -54,3 +54,19 @@ SELECT COUNT(*) FROM recent_channels;
 
 clearAll:
 DELETE FROM recent_channels;
+
+-- MB-351 — drop this source's channels when the source itself is removed.
+--
+-- Scoped through `content.source_id` rather than written as a general
+-- "delete rows whose content is gone" sweep, and the difference is not
+-- stylistic. A sync DELETEs every content row for a source before re-inserting
+-- them, so a sweep keyed on content-existence would erase the user's list any
+-- time it ran near a sync — the exact failure the missing FOREIGN KEY was
+-- designed to prevent, reintroduced as a query. This form can only ever fire on
+-- explicit source removal, and only for that source's rows.
+--
+-- MUST run BEFORE `sources.deleteById`: the FK cascade takes the content rows
+-- with the source, and after that there is nothing left to identify these rows by.
+deleteBySourceContent:
+DELETE FROM recent_channels
+WHERE content_id IN (SELECT id FROM content WHERE source_id = ?);

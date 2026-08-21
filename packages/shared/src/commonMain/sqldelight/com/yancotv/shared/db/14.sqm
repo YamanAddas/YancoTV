@@ -1,0 +1,26 @@
+-- v14 → v15 (MB-351): sweep first-seen stamps left behind by deleted sources.
+--
+-- `content_first_seen` has no FOREIGN KEY to `content(id)` on purpose — a sync
+-- DELETEs every content row for a source, so ON DELETE CASCADE would wipe the
+-- table on every refresh and reintroduce the very bug it exists to fix. The
+-- price of that choice is that removing a source never removed its stamps, and
+-- `deleteBySource` went uncalled from the day it was written.
+--
+-- `SourceRepository.removeSource` now does the cleanup going forward. This
+-- migration is for the debt already on disk: a Fire TV carrying a real
+-- catalogue held 963 stamps for a source with no content rows left, and a user
+-- who had removed a large provider could be holding hundreds of thousands.
+--
+-- Scoped to rows whose `source_id` is absent from `sources` — NOT to rows whose
+-- `content_id` is absent from `content`. The second form looks equivalent and is
+-- actively dangerous: mid-sync, between `prepareSource`'s DELETE and the
+-- re-INSERT, every row in this table has a missing content_id, so that version
+-- would erase the whole thing if a migration ever landed next to a sync. Keying
+-- on the source is safe at any moment, because a source row is only ever removed
+-- deliberately.
+--
+-- Data-only: no schema object is added, altered or dropped, so an upgraded
+-- database stays structurally identical to a fresh one (asserted by
+-- UpgradeFrom140Test, which is unpinned and picks this hop up automatically).
+DELETE FROM content_first_seen
+WHERE source_id NOT IN (SELECT id FROM sources);

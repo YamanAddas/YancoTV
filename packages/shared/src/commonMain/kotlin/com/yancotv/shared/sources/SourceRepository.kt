@@ -251,9 +251,45 @@ class SourceRepository(
         .mapToList(Dispatchers.Default)
         .map { rows -> rows.map { it.toDomain() } }
 
+    /**
+     * MB-351 — removing a source has to clean the two side tables by hand.
+     *
+     * `content_first_seen` and `recent_channels` deliberately carry NO FOREIGN
+     * KEY to `content(id)`. That is not an oversight: a sync is a full
+     * replacement, so `ON DELETE CASCADE` would erase both tables on every
+     * refresh — the bug they were built to avoid. The cost of that choice is
+     * that the one case where a cascade WOULD be right, deleting the source
+     * outright, has to be written out.
+     *
+     * Until now it was not, and `content_first_seen.deleteBySource` sat unused.
+     * A Fire TV carrying a real catalogue held 963 stamps belonging to a source
+     * with no content left; deleting the 272,419-item provider would have
+     * stranded roughly 15 MB of rows that nothing could ever read or remove.
+     *
+     * Ordering is load-bearing, not incidental:
+     *
+     *  * `recent_channels` FIRST, because it keys on `content_id` and can only
+     *    be scoped to this source by joining through `content`. Once the source
+     *    goes, the FK cascade takes that content and the rows become
+     *    unidentifiable — deletable afterwards only by a content-existence
+     *    sweep, which is unsafe near a sync.
+     *  * `content_first_seen` keys on `source_id` directly, so it is
+     *    order-independent; it sits here for symmetry.
+     *  * `sources` LAST, which cascades `content` (and through it `episodes`,
+     *    `favorites`, `watch_history`).
+     *
+     * One transaction, so a failure part-way cannot leave a live source whose
+     * stamps have been thrown away — that state would make the source's next
+     * sync look like a first import and silently suppress its "Recently added"
+     * for a further two syncs.
+     */
     fun removeSource(id: String) {
-        // Content rows cascade via the FK.
-        db.sourcesQueries.deleteById(id)
+        db.transaction {
+            db.recentChannelsQueries.deleteBySourceContent(id)
+            db.contentFirstSeenQueries.deleteBySource(id)
+            // Content rows cascade via the FK.
+            db.sourcesQueries.deleteById(id)
+        }
     }
 
     /**

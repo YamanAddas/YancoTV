@@ -16,7 +16,9 @@ import kotlin.test.assertTrue
  * is at **schema v11**. v1.5.0 adds three hops — `11.sqm` (sources.expires_at),
  * `12.sqm` (content_first_seen) and `13.sqm` (recent_channels) — which
  * SQLDelight applies back-to-back the first time the upgraded binary opens the
- * database.
+ * database. `14.sqm` (MB-351's orphan sweep) landed after that release and is
+ * picked up here automatically, because the walk below targets
+ * `YancoDb.Schema.version` rather than a pinned number.
  *
  * Why this class exists when `MigrationTest` already covers each hop
  * individually and `Stage2MigrationTest` already walks v3 -> current:

@@ -311,6 +311,63 @@ class MigrationTest {
         assertEquals(1700000900000L, at, "the newer watch must win")
     }
 
+    /**
+     * v14 -> v15 (`14.sqm`, MB-351): sweep first-seen stamps whose source is gone.
+     *
+     * Data-only, so unlike every other hop in this file the v14 and v15 SCHEMAS
+     * are byte-identical. That is why the fixture is built with
+     * `Schema.create` and then back-dated with a `user_version` pragma rather
+     * than hand-written: there is no structural difference to reproduce, and a
+     * hand-written copy would only be one more thing to keep in sync.
+     *
+     * The assertion that matters is the second one. A sweep that deleted rows
+     * by missing `content_id` instead of missing `source_id` would pass the
+     * first assertion and destroy live data, because mid-sync — between
+     * `prepareSource`'s DELETE and the re-INSERT — EVERY row in this table has
+     * a content_id that does not resolve.
+     */
+    @Test fun migrationV14ToV15SweepsStampsWhoseSourceIsGone() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
+        YancoDb.Schema.create(driver)
+        driver.execute(null, "PRAGMA user_version = 14;", 0)
+
+        driver.execute(
+            null,
+            "INSERT INTO sources (id, name, type, is_active, priority, channel_count, " +
+                "auto_sync_interval, epg_priority, auto_sync_on_start, created_at, updated_at) " +
+                "VALUES ('src-live', 'Still here', 'm3u_url', 1, 0, 1, 0, 0, 0, 1000, 1000)",
+            0,
+        )
+        // A stamp for a source that still exists, and one for a source that was
+        // deleted before removeSource learned to clean up after itself. Neither
+        // has a content row — that is the normal mid-sync state, and the sweep
+        // must not use it as the signal.
+        driver.execute(
+            null,
+            "INSERT INTO content_first_seen (content_id, source_id, first_seen_at, from_initial_import) " +
+                "VALUES ('c-live', 'src-live', 1000, 1), ('c-orphan', 'src-deleted', 1000, 1)",
+            0,
+        )
+
+        YancoDb.Schema.migrate(driver, oldVersion = 14, newVersion = 15)
+
+        val remaining =
+            driver
+                .executeQuery(null, "SELECT source_id FROM content_first_seen", { cursor ->
+                    val out = mutableListOf<String>()
+                    while (cursor.next().value) out.add(cursor.getString(0).orEmpty())
+                    app.cash.sqldelight.db.QueryResult.Value(out)
+                }, 0)
+                .value
+
+        assertEquals(
+            listOf("src-live"),
+            remaining,
+            "the deleted source's stamp goes; the live source's stays",
+        )
+    }
+
     @Test fun migrationV11ToV12AddsNullableExpiresAtColumn() {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         driver.execute(null, "PRAGMA foreign_keys = ON;", 0)

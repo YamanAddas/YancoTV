@@ -258,6 +258,88 @@ class SourceRepositoryTest {
     }
 
     /**
+     * MB-351 — the two tables the FK cascade cannot reach.
+     *
+     * `content_first_seen` and `recent_channels` carry no FOREIGN KEY to
+     * `content(id)` deliberately: a sync DELETEs every content row for a
+     * source, so a cascade would empty them on every refresh. The consequence
+     * is that source deletion — the one case where a cascade would be right —
+     * has to be written by hand, and for two releases it was not.
+     *
+     * Two sources, so the test distinguishes "cleaned up after the removed
+     * source" from "wiped the table". A fix that called `clearAll()` would pass
+     * a single-source version of this test and destroy the user's data.
+     *
+     * Asserts on `countAll` / `countBySource` rather than on the read queries.
+     * Both read paths INNER JOIN `content`, which the cascade has already
+     * emptied, so a rail-level assertion would pass whether the rows were
+     * deleted or merely orphaned — precisely the bug.
+     */
+    @Test
+    fun `removeSource clears the side tables the FK cannot reach`() {
+        val bundle = testDatabase()
+        val repo =
+            SourceRepository(
+                db = bundle.db,
+                driver = bundle.driver,
+                credentialStore = PlaintextCredentialStore(),
+                http = FakeHttpClient(),
+                fileReader = FakeFileReader(emptyMap()),
+                clock = { 1_000L },
+                idGenerator =
+                run {
+                    var n = 0;
+                    { "side-id-${++n}" }
+                },
+            )
+        val keep = repo.addSource(AddSourceInput(name = "Keep", type = SourceType.M3U_URL, url = "http://keep"))
+        val drop = repo.addSource(AddSourceInput(name = "Drop", type = SourceType.M3U_URL, url = "http://drop"))
+
+        fun channel(id: String, sourceId: String) = bundle.db.contentQueries.insert(
+            id = id,
+            source_id = sourceId,
+            type = "live",
+            title = id,
+            clean_title = id,
+            group_name = null,
+            stream_url = "http://stream/$id",
+            logo_url = null,
+            tvg_id = id,
+            metadata_json = null,
+            sort_order = 0L,
+            created_at = 0L,
+        )
+        channel("ch-keep", keep.id)
+        channel("ch-drop", drop.id)
+
+        bundle.db.contentFirstSeenQueries.recordFirstSeen(keep.id, 1_000L, 1L)
+        bundle.db.contentFirstSeenQueries.recordFirstSeen(drop.id, 1_000L, 1L)
+        bundle.db.recentChannelsQueries.recordWatch("ch-keep", 1_000L)
+        bundle.db.recentChannelsQueries.recordWatch("ch-drop", 2_000L)
+
+        assertEquals(1L, bundle.db.contentFirstSeenQueries.countBySource(drop.id).executeAsOne())
+        assertEquals(2L, bundle.db.recentChannelsQueries.countAll().executeAsOne())
+
+        repo.removeSource(drop.id)
+
+        assertEquals(
+            0L,
+            bundle.db.contentFirstSeenQueries.countBySource(drop.id).executeAsOne(),
+            "the removed source's first-seen stamps must go with it",
+        )
+        assertEquals(
+            1L,
+            bundle.db.contentFirstSeenQueries.countBySource(keep.id).executeAsOne(),
+            "...and the surviving source's stamps must NOT — losing them would make its next sync look like a first import",
+        )
+        assertEquals(
+            1L,
+            bundle.db.recentChannelsQueries.countAll().executeAsOne(),
+            "only the removed source's channel row should be gone from recent_channels",
+        )
+    }
+
+    /**
      * MK.23.D.3 — cancellation mid-flight leaves the DB consistent.
      *
      * Contract under test: when the user cancels a sync (or the
