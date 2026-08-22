@@ -58,10 +58,22 @@ class AndroidKtorHttpClient(ktor: KtorClient, userAgentProvider: () -> String, p
         // Deliberately OUTSIDE [spoolSemaphore]: a recording holds its
         // channel open for hours and would starve every other request.
         if (options.streamLive) {
-            val channel: ByteReadChannel = performGet(url, options).bodyAsChannel()
-            return@withContext channel.toInputStream().use { input ->
-                val source: Source = input.asSource().buffered()
-                source.use { block(it) }
+            // MB-355. This MUST go through performGetStreaming, not
+            // performGet: the latter is `ktor.get()`, which reads the whole
+            // body into memory before returning. A live MPEG-TS body never
+            // ends, so the call never returned and `block` never ran — the
+            // recorder sat at 0 bytes with none of its own timeouts able to
+            // fire, because they all live inside `block`. Measured at 83.7s
+            // to return on a real stream while raw OkHttp had first byte at
+            // 0.8s. The streamLive flag originally only skipped the
+            // temp-file spool below, which addressed the second buffer and
+            // left this one in place.
+            return@withContext performGetStreaming(url, options) { response ->
+                val channel: ByteReadChannel = response.bodyAsChannel()
+                channel.toInputStream().use { input ->
+                    val source: Source = input.asSource().buffered()
+                    source.use { block(it) }
+                }
             }
         }
 

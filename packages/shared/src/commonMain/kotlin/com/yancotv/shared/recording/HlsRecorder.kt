@@ -262,6 +262,24 @@ class HlsRecorder(
 
     private fun finishCompleted(recordId: String, startedAtMs: Long, bytesWritten: Long): RecordResult {
         val secs = (clock.nowMs() - startedAtMs) / 1000L
+        if (bytesWritten == 0L) {
+            // MB-355. Arriving here with nothing written means the server
+            // accepted the request and then ended the body -- or the
+            // duration cap expired -- without ever serving a byte. That is
+            // a FAILED recording, not a completed one. Reporting Success
+            // put a `Play` button on an empty file and recorded "Saved
+            // 0 KB", which is precisely what MB-355 looked like from the
+            // outside; tapping Play then hit ExoPlayer's 3003
+            // unrecognized-input error. `no_response_from_server` is the
+            // vocabulary RecordingService.handleStop already uses for this
+            // exact condition on its own path, so the two agree.
+            return failManifest(
+                recordId,
+                "no_response_from_server",
+                cause = IllegalStateException("stream ended with 0 bytes"),
+                bytesWritten = 0L,
+            )
+        }
         val terminal =
             RecorderState.Completed(
                 recordId = recordId,

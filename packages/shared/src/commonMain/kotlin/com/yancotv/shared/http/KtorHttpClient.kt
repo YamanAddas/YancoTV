@@ -3,8 +3,10 @@ package com.yancotv.shared.http
 import io.ktor.client.HttpClient as KtorClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.timeout
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -87,53 +89,58 @@ open class KtorHttpClient(
         source.use { block(it) }
     }
 
-    protected suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
-        val response: HttpResponse =
-            ktor.get(url) {
-                header("User-Agent", options.headers["User-Agent"] ?: userAgentProvider())
-                for ((k, v) in options.headers) {
-                    if (!k.equals("User-Agent", ignoreCase = true)) header(k, v)
+    /**
+     * Shared request configuration for [performGet] and
+     * [performGetStreaming] so headers and per-request timeouts cannot
+     * drift between the buffered and streaming paths.
+     */
+    private fun HttpRequestBuilder.applyRequestOptions(options: HttpRequestOptions) {
+        header("User-Agent", options.headers["User-Agent"] ?: userAgentProvider())
+        for ((k, v) in options.headers) {
+            if (!k.equals("User-Agent", ignoreCase = true)) header(k, v)
+        }
+        // Honor per-request timeouts. The engine-level defaults
+        // (90s request + 15s connect + 90s socket in
+        // HttpClientFactory.android.kt) are too long for a fast
+        // Xtream auth probe — without these overrides the user
+        // sees "fetching…" for 90s × retries before getting
+        // feedback. MK.6 sync debug: callers pass 30s for auth,
+        // 60s for catalog fetches.
+        //
+        // **MK.REC.RESILIENCE fix-up (2026-05-15).** Both
+        // requestTimeout AND socketTimeout MUST be set in a
+        // SINGLE `timeout {}` block. Each call to
+        // `timeout {}` constructs a fresh
+        // `HttpTimeoutCapabilityConfiguration` and registers it
+        // via `setCapability(HttpTimeoutCapability, …)` — the
+        // second call REPLACES the first's configuration
+        // wholesale, dropping whatever properties weren't set
+        // in the second block. Splitting them produced a real
+        // bug: setting requestTimeoutMillis = Long.MAX_VALUE
+        // (recorder paths) in one block, then
+        // socketTimeoutMillis = 20s in a second block, wiped
+        // the infinity-request-timeout and the engine default
+        // (90s) reapplied. Symptom on Fire TV: a recording
+        // failed at the 90-second mark with
+        // `request_timeout has expired` instead of either
+        // streaming bytes (healthy provider) or
+        // SocketTimeoutException at 20s (dead provider).
+        val explicitRequestTimeout = options.timeoutMs
+            ?: perRequestReadTimeoutMs()
+        val explicitSocketTimeout = options.socketTimeoutMs
+        if (explicitRequestTimeout != null || explicitSocketTimeout != null) {
+            timeout {
+                if (explicitRequestTimeout != null) {
+                    requestTimeoutMillis = explicitRequestTimeout
                 }
-                // Honor per-request timeouts. The engine-level defaults
-                // (90s request + 15s connect + 90s socket in
-                // HttpClientFactory.android.kt) are too long for a fast
-                // Xtream auth probe — without these overrides the user
-                // sees "fetching…" for 90s × retries before getting
-                // feedback. MK.6 sync debug: callers pass 30s for auth,
-                // 60s for catalog fetches.
-                //
-                // **MK.REC.RESILIENCE fix-up (2026-05-15).** Both
-                // requestTimeout AND socketTimeout MUST be set in a
-                // SINGLE `timeout {}` block. Each call to
-                // `timeout {}` constructs a fresh
-                // `HttpTimeoutCapabilityConfiguration` and registers it
-                // via `setCapability(HttpTimeoutCapability, …)` — the
-                // second call REPLACES the first's configuration
-                // wholesale, dropping whatever properties weren't set
-                // in the second block. Splitting them produced a real
-                // bug: setting requestTimeoutMillis = Long.MAX_VALUE
-                // (recorder paths) in one block, then
-                // socketTimeoutMillis = 20s in a second block, wiped
-                // the infinity-request-timeout and the engine default
-                // (90s) reapplied. Symptom on Fire TV: a recording
-                // failed at the 90-second mark with
-                // `request_timeout has expired` instead of either
-                // streaming bytes (healthy provider) or
-                // SocketTimeoutException at 20s (dead provider).
-                val explicitRequestTimeout = options.timeoutMs
-                    ?: perRequestReadTimeoutMs()
-                val explicitSocketTimeout = options.socketTimeoutMs
-                if (explicitRequestTimeout != null || explicitSocketTimeout != null) {
-                    timeout {
-                        if (explicitRequestTimeout != null) {
-                            requestTimeoutMillis = explicitRequestTimeout
-                        }
-                        if (explicitSocketTimeout != null) {
-                            socketTimeoutMillis = explicitSocketTimeout
-                        }
-                    }
+                if (explicitSocketTimeout != null) {
+                    socketTimeoutMillis = explicitSocketTimeout
                 }
             }
+        }
+    }
+
+    private fun requireSuccess(response: HttpResponse, url: String) {
         if (!response.status.isSuccess()) {
             // Redact provider credentials before this string ends up in
             // Android logcat / `sources.last_sync_error` / the on-screen
@@ -146,8 +153,42 @@ open class KtorHttpClient(
                 message = "HTTP ${response.status.value} from ${redactCredentials(url)}",
             )
         }
+    }
+
+    protected suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
+        val response: HttpResponse = ktor.get(url) { applyRequestOptions(options) }
+        requireSuccess(response, url)
         return response
     }
+
+    /**
+     * Issue a GET and hand the response to [block] **without reading the
+     * body first**.
+     *
+     * MB-355. [performGet] uses `ktor.get(url)`, a non-prepared call: Ktor
+     * reads the ENTIRE response body into memory before returning the
+     * `HttpResponse`. That is correct for an API call and catastrophic for
+     * a continuous MPEG-TS live stream, which never ends — so `get()` never
+     * returns, and every bound the caller relies on (the recorder's
+     * `maxDurationMs`, its heartbeat watchdog, its progress logging) sits
+     * inside a block that is never reached. The visible result was a
+     * recording that ran for minutes, wrote 0 bytes, logged nothing and
+     * failed no timeout.
+     *
+     * Measured against a live provider stream on 2026-08-22: `get()` took
+     * **83.7 seconds** to return and then delivered 4.7 MB from memory in
+     * 2 ms, while raw OkHttp against the same URL had first byte at 0.8s.
+     *
+     * `prepareGet(...).execute { }` is Ktor's documented streaming form:
+     * the body stays on the wire and is consumed inside the block. The body
+     * is only valid for the duration of [block] — do not let the response
+     * or its channel escape.
+     */
+    protected suspend fun <T> performGetStreaming(url: String, options: HttpRequestOptions, block: suspend (HttpResponse) -> T): T =
+        ktor.prepareGet(url) { applyRequestOptions(options) }.execute { response ->
+            requireSuccess(response, url)
+            block(response)
+        }
 
     private suspend fun fetchText(url: String, options: HttpRequestOptions): String = withContext(Dispatchers.Default) {
         // Force this off the caller's dispatcher — Ktor dispatches network I/O

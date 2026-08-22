@@ -62,6 +62,29 @@ class MpegTsRecorderTest {
         assertEquals(payload.size.toLong(), terminal.bytesWritten)
     }
 
+    @Test fun emptyBodyFailsInsteadOfReportingSuccess() = runTest {
+        // MB-355 regression. A provider that accepts the GET and then ends
+        // the body without serving a byte used to return Success(0 bytes),
+        // which the Recordings list rendered as "Saved 0 KB" with a Play
+        // button -- and tapping Play hit ExoPlayer's 3003 error. Verified
+        // against the real failure on 2026-08-22: 115s of stream, 0 bytes,
+        // RecordResult.Success.
+        val http = OneShotSourceClient(ByteArray(0))
+
+        val recorder = MpegTsRecorder(http, fixedClock())
+        val sink = Buffer()
+        val result =
+            recorder.record(
+                RecordInput("r-empty", streamUrl, "Catch-up", RecordingFormat.MPEG_TS),
+                sink,
+            )
+
+        val failure = assertIs<RecordResult.Failure>(result)
+        assertEquals("no_response_from_server", failure.reason)
+        assertEquals(0L, failure.bytesWritten)
+        assertIs<RecorderState.Failed>(recorder.state.value)
+    }
+
     @Test fun upstream4xxFailsWithStreamStatusReason() = runTest {
         val http = ErroringSourceClient(HttpResponseError(403, "Forbidden"))
         val recorder = MpegTsRecorder(http, fixedClock())

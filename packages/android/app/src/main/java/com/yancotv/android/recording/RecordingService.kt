@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
@@ -381,6 +382,15 @@ class RecordingService : Service() {
         // Every exit path below this is the caller's responsibility to
         // transition (handleStop -> markCompleted/markFailed via
         // file-size check; onRecorderResult for the fresh-GET path).
+        // MB-355 / MB-356 observability. `markStarted` is a BLOCKING DB
+        // write sitting between "file allocated" and "recorder starts".
+        // If the primary/write connection is leaked (MB-356) this call
+        // parks indefinitely, and the visible result is exactly the
+        // MB-355 signature: the output file exists at 0 bytes, the
+        // recorder never runs, and nothing is logged. Timing it is what
+        // tells those two failures apart instead of guessing.
+        val markStartedAtMs = SystemClock.elapsedRealtime()
+        Log.i(TAG, "alloc[${input.recordId}] path=${output.storagePath}; writing RECORDING row")
         try {
             recordings.markStarted(
                 id = input.recordId,
@@ -390,6 +400,12 @@ class RecordingService : Service() {
                 filePath = output.storagePath,
                 format = input.format,
             )
+            val elapsed = SystemClock.elapsedRealtime() - markStartedAtMs
+            if (elapsed >= SLOW_DB_WRITE_MS) {
+                Log.w(TAG, "markStarted[${input.recordId}] took ${elapsed}ms — write lock contention")
+            } else {
+                Log.i(TAG, "markStarted[${input.recordId}] ok in ${elapsed}ms")
+            }
         } catch (t: Throwable) {
             // markStarted itself threw — almost certainly a duplicate
             // recordId (developer error) or a DB-level corruption. Bail
@@ -525,6 +541,16 @@ class RecordingService : Service() {
     }
 
     private fun onRecorderResult(recordId: String, result: RecordResult) {
+        // Previously this method logged only on its two exceptional
+        // catches, so a normal success AND a normal failure were both
+        // invisible. That is why MB-355's "no log lines between start
+        // and stop" was read as a hang when it was simply silence.
+        when (result) {
+            is RecordResult.Success ->
+                Log.i(TAG, "result[$recordId] SUCCESS ${result.bytesWritten / 1024}KB in ${result.secondsElapsed}s")
+            is RecordResult.Failure ->
+                Log.w(TAG, "result[$recordId] FAILURE reason=${result.reason} bytes=${result.bytesWritten}")
+        }
         try {
             when (result) {
                 is RecordResult.Success ->
@@ -656,6 +682,11 @@ class RecordingService : Service() {
 
     companion object {
         private const val TAG = "YancoRecordingSvc"
+
+        // A healthy markStarted is single-digit ms. 1s means a writer
+        // is queueing behind the primary connection, which is the
+        // MB-356 signature — worth a WARN, not a silent pass.
+        private const val SLOW_DB_WRITE_MS = 1_000L
         private const val CHANNEL_ID = "yanco_recordings"
         private const val NOTIFICATION_ID = 9001
 

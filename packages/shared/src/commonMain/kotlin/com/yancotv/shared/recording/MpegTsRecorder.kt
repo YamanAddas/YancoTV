@@ -42,7 +42,7 @@ class MpegTsRecorder(
     private val http: HttpClient,
     private val clock: RecorderClock,
     private val strategy: RecorderStrategy = RecorderStrategy(),
-    @Suppress("unused") private val logger: Logger = NOOP_LOGGER,
+    private val logger: Logger = NOOP_LOGGER,
 ) {
     private val _state = MutableStateFlow<RecorderState>(RecorderState.Idle)
     val state: StateFlow<RecorderState> = _state.asStateFlow()
@@ -51,13 +51,28 @@ class MpegTsRecorder(
         val startedAt = clock.nowMs()
         val deadlineMs = input.maxDurationMs?.let { startedAt + it }
         var bytesWritten = 0L
+        var nextProgressLogMs = startedAt + PROGRESS_LOG_INTERVAL_MS
 
+        // MB-355 observability. Before this, the recorder was mute: it
+        // took a `logger` annotated `@Suppress("unused")` and never
+        // called it, so a recording that produced a 0-byte file emitted
+        // no evidence of WHERE it stalled -- connect, first byte, or
+        // mid-stream. Three field incidents (2026-05-15, 2026-08-22 x2)
+        // were all diagnosed by guesswork for want of these lines.
+        logger.info("mpegts[${input.recordId}]: opening stream")
         return try {
             http.getSource(input.sourceUrl, options(input.userAgent, input.referer)) { source ->
+                // Reached only once response headers are in. A stall
+                // BEFORE this line is connect/response; AFTER it is the
+                // body. That distinction is the whole point of the log.
+                logger.info(
+                    "mpegts[${input.recordId}]: response open after " +
+                        "${clock.nowMs() - startedAt}ms, reading body",
+                )
                 val staging = Buffer()
                 while (true) {
                     if (deadlineMs != null && clock.nowMs() >= deadlineMs) {
-                        return@getSource finishCompleted(input.recordId, startedAt, bytesWritten)
+                        return@getSource finishCompleted(input.recordId, startedAt, bytesWritten, "deadline")
                     }
                     val read: Long =
                         try {
@@ -81,13 +96,28 @@ class MpegTsRecorder(
                         // Server closed the connection cleanly — the
                         // programme ended (catch-up) or the live stream
                         // was reaped server-side. Either way: completed.
-                        return@getSource finishCompleted(input.recordId, startedAt, bytesWritten)
+                        return@getSource finishCompleted(input.recordId, startedAt, bytesWritten, "eof")
                     }
                     if (read > 0L) {
                         val bytes = staging.readByteArray()
                         sink.write(bytes)
                         sink.flush()
+                        val wasEmpty = bytesWritten == 0L
                         bytesWritten += bytes.size
+                        if (wasEmpty) {
+                            logger.info(
+                                "mpegts[${input.recordId}]: first bytes after " +
+                                    "${clock.nowMs() - startedAt}ms",
+                            )
+                        }
+                        val nowMs = clock.nowMs()
+                        if (nowMs >= nextProgressLogMs) {
+                            nextProgressLogMs = nowMs + PROGRESS_LOG_INTERVAL_MS
+                            logger.info(
+                                "mpegts[${input.recordId}]: ${bytesWritten / 1024}KB in " +
+                                    "${(nowMs - startedAt) / 1000}s",
+                            )
+                        }
                         _state.value =
                             RecorderState.Recording(
                                 recordId = input.recordId,
@@ -98,7 +128,7 @@ class MpegTsRecorder(
                 }
                 // Unreachable; while(true) returns from each branch.
                 @Suppress("UNREACHABLE_CODE")
-                finishCompleted(input.recordId, startedAt, bytesWritten)
+                finishCompleted(input.recordId, startedAt, bytesWritten, "unreachable")
             }
         } catch (e: HttpResponseError) {
             // 4xx / 5xx on the connection itself — distinct from a
@@ -174,8 +204,22 @@ class MpegTsRecorder(
         )
     }
 
-    private fun finishCompleted(recordId: String, startedAtMs: Long, bytesWritten: Long): RecordResult {
+    private fun finishCompleted(recordId: String, startedAtMs: Long, bytesWritten: Long, why: String): RecordResult {
         val secs = (clock.nowMs() - startedAtMs) / 1000L
+        if (bytesWritten == 0L) {
+            // MB-355. Arriving here with nothing written means the server
+            // accepted the request and then ended the body -- or the
+            // duration cap expired -- without ever serving a byte. That is
+            // a FAILED recording, not a completed one. Reporting Success
+            // put a `Play` button on an empty file and recorded "Saved
+            // 0 KB", which is precisely what MB-355 looked like from the
+            // outside; tapping Play then hit ExoPlayer's 3003
+            // unrecognized-input error. `no_response_from_server` is the
+            // vocabulary RecordingService.handleStop already uses for this
+            // exact condition on its own path, so the two agree.
+            return failWithReason(recordId, "no_response_from_server", cause = null, bytesWritten = 0L)
+        }
+        logger.info("mpegts[$recordId]: completed via $why — ${bytesWritten / 1024}KB in ${secs}s")
         _state.value =
             RecorderState.Completed(
                 recordId = recordId,
@@ -186,6 +230,7 @@ class MpegTsRecorder(
     }
 
     private fun failWithReason(recordId: String, reason: String, cause: Throwable?, bytesWritten: Long): RecordResult {
+        logger.warn("mpegts[$recordId]: FAILED reason=$reason after ${bytesWritten / 1024}KB")
         _state.value =
             RecorderState.Failed(
                 recordId = recordId,
@@ -203,5 +248,10 @@ class MpegTsRecorder(
         // sink is just bytes; alignment is the recipient's problem
         // (ExoPlayer handles unaligned TS fine).
         const val CHUNK_SIZE = 16 * 1024
+
+        // Progress cadence. 30s is frequent enough to prove a recording
+        // is alive across a multi-hour catch-up GET without turning
+        // logcat into a firehose (a 3h recording emits ~360 lines).
+        const val PROGRESS_LOG_INTERVAL_MS = 30_000L
     }
 }
