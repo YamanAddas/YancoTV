@@ -582,15 +582,25 @@ class BulkContentWriterTest {
             watched_at = 300L,
         )
 
-        // Provider outage: 200 OK, zero items. prepareSource wipes the
-        // catalog, no chunk is written, finishSource still runs.
+        // Provider outage: 200 OK, zero items. No chunk is written;
+        // finishSource still runs.
         writer.prepareSource("s1")
         writer.finishSource("s1")
 
+        // MB-353 — this assertion used to read `0`, and the comment above it
+        // used to say "prepareSource wipes the catalog". That WAS the
+        // behaviour: the deletion committed before the provider had been
+        // asked for anything, so an outage cost the user their catalogue and
+        // the only question left was whether favourites survived it.
+        //
+        // The deletion is now deferred to the first chunk that carries rows,
+        // so an empty response destroys nothing at all. The favourite
+        // assertions below still matter and still pass — they are simply no
+        // longer the last line of defence.
         assertEquals(
-            0,
+            2,
             db.contentQueries.countBySource("s1").executeAsOne().toInt(),
-            "precondition: the empty sync really did leave the catalog empty",
+            "an empty provider response must leave the previous catalogue standing",
         )
         assertTrue(
             db.favoritesQueries.isFavorite(ch1Id).executeAsOne(),
@@ -605,6 +615,130 @@ class BulkContentWriterTest {
             db.watchHistoryQueries.selectByContent(ch1Id).executeAsList().size,
             "an empty provider response must NOT delete watch history (resume points)",
         )
+    }
+
+    // ───── MB-353: never destroy a catalogue before a replacement exists ─────
+
+    /**
+     * The failure that cost a real user 272,419 items: a sync that starts and
+     * then never delivers.
+     *
+     * `prepareSource` used to DELETE and COMMIT before the provider had been
+     * asked for anything, so a dead URL, an expired subscription, no network,
+     * or a process kill all left the catalogue permanently empty. Observed on a
+     * Fire TV, where a stalled sync left the database at 126 MB instead of
+     * 352 MB and the guide down to 22 channels.
+     *
+     * Nothing here writes a chunk — that is the point.
+     */
+    @Test
+    fun `a sync that never delivers rows leaves the previous catalogue intact`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        val client = xtreamClient()
+
+        writer.prepareSource("s1")
+        writer.writeLiveChunk("s1", client, listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2")), mapOf("1" to "News"), 100L, 0L)
+        writer.finishSource("s1")
+        assertEquals(2, db.contentQueries.countBySource("s1").executeAsOne().toInt())
+
+        // Next sync starts and dies before a single row arrives.
+        val second = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.abortSource("s1")
+
+        assertEquals(
+            2,
+            db.contentQueries.countBySource("s1").executeAsOne().toInt(),
+            "a sync that delivered nothing must not have destroyed anything",
+        )
+    }
+
+    /** The deletion still happens — deferred, not dropped. */
+    @Test
+    fun `the first chunk replaces the previous catalogue rather than adding to it`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val first = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        first.prepareSource("s1")
+        first.writeLiveChunk("s1", client, listOf(liveStream(1, "Ch 1"), liveStream(2, "Ch 2")), mapOf("1" to "News"), 100L, 0L)
+        first.finishSource("s1")
+
+        // A second sync where the provider now offers only one channel. Content
+        // ids are deterministic and the insert is INSERT OR IGNORE, so if the
+        // stale rows were not cleared first they would survive AND shadow the
+        // fresh copy — the catalogue would only ever grow.
+        val second = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.writeLiveChunk("s1", client, listOf(liveStream(3, "Ch 3")), mapOf("1" to "News"), 200L, 0L)
+        second.finishSource("s1")
+
+        assertEquals(
+            1,
+            db.contentQueries.countBySource("s1").executeAsOne().toInt(),
+            "the rotated-out channels must be gone, not merged with the new one",
+        )
+        assertTrue(db.contentQueries.selectById(ContentIds.xtreamLive("s1", "3")).executeAsOneOrNull() != null)
+    }
+
+    /** An interrupted sync is detectable; a completed one is not. */
+    @Test
+    fun `the in-progress marker survives an interrupted sync and clears on a completed one`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        writer.prepareSource("s1")
+        assertTrue(
+            BulkContentWriter.syncWasInterrupted(database.driver, "s1"),
+            "the marker must be set for the whole sync, not just on failure",
+        )
+
+        // Process death: no finishSource, no abortSource.
+        assertTrue(
+            BulkContentWriter.syncWasInterrupted(database.driver, "s1"),
+            "a sync killed mid-flight must stay detectable — sources.channel_count still reports the old size",
+        )
+
+        val second = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.writeLiveChunk("s1", client, listOf(liveStream(1, "Ch 1")), mapOf("1" to "News"), 100L, 0L)
+        second.finishSource("s1")
+        assertFalse(
+            BulkContentWriter.syncWasInterrupted(database.driver, "s1"),
+            "a completed sync must clear the marker",
+        )
+        assertEquals(1, db.contentQueries.countBySource("s1").executeAsOne().toInt())
+    }
+
+    /** Aborting after rows were written still cleans up the half-written set. */
+    @Test
+    fun `abort after a chunk has written still clears the partial catalogue`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val writer = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        writer.prepareSource("s1")
+        writer.writeLiveChunk("s1", client, listOf(liveStream(1, "Ch 1")), mapOf("1" to "News"), 100L, 0L)
+        assertEquals(1, db.contentQueries.countBySource("s1").executeAsOne().toInt())
+
+        writer.abortSource("s1")
+
+        assertEquals(
+            0,
+            db.contentQueries.countBySource("s1").executeAsOne().toInt(),
+            "half-written rows are still swept — only the never-written case is now spared",
+        )
+        assertFalse(BulkContentWriter.syncWasInterrupted(database.driver, "s1"), "abort completes the cleanup, so the marker clears")
     }
 
     /**

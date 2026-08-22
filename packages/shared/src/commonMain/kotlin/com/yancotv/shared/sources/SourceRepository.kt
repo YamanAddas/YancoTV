@@ -312,6 +312,16 @@ class SourceRepository(
             }
 
         logger.info("syncSource[$id] start type=${source.type} name=${source.name}")
+        // MB-353 — a previous sync for this source started and never finished,
+        // so its catalogue is missing an unknown number of rows and
+        // `sources.channel_count` is still reporting the size from the last
+        // COMPLETED sync. No recovery action is needed here — this sync is about
+        // to replace the catalogue anyway — but the line means "the app looked
+        // empty yesterday" can be traced to a specific abandoned run instead of
+        // guessed at, which is how the original incident had to be diagnosed.
+        if (BulkContentWriter.syncWasInterrupted(driver, id)) {
+            logger.warn("syncSource[$id] previous sync never completed — catalogue has been incomplete since; this run replaces it")
+        }
         try {
             send(SyncProgress(SyncProgress.Phase.FETCHING, detail = SyncDetail.Connecting))
             val writer = ContentWriter(db)

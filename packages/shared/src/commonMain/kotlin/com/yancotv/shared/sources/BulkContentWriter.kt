@@ -63,6 +63,9 @@ class BulkContentWriter(
     private val clock: () -> Long,
     private val logger: Logger = NOOP_LOGGER,
 ) {
+    /** MB-353 — which source this instance has already cleared. See [clearIfFirstWrite]. */
+    private var clearedFor: String? = null
+
     private val json =
         Json {
             encodeDefaults = false
@@ -74,17 +77,31 @@ class BulkContentWriter(
     // ───── Sync lifecycle ─────
 
     /**
-     * Clears previous content + FTS rows for [sourceId] and drops the FTS
-     * AFTER-INSERT trigger for the duration of the sync. All wrapped in a
-     * single `IMMEDIATE` transaction so a mid-call crash leaves the schema
-     * either fully cleared or untouched — never half-cleared with the
-     * trigger still firing.
+     * MB-353 — this no longer deletes anything.
+     *
+     * It used to DELETE every `content` and `content_fts` row for the source
+     * and **COMMIT**, before a single replacement row had been fetched. Every
+     * failure after that point — a dead provider URL, an expired subscription,
+     * no network, a process kill, or simply never getting the write connection
+     * back (MB-315) — left the catalogue permanently empty, with no error shown
+     * and `sources.channel_count` still reporting the pre-delete figure.
+     *
+     * Observed on a Fire TV: a sync stalled here, and five hours later the
+     * user's 272,419-item catalogue was gone, the database had fallen from
+     * 352 MB to 126 MB, and the guide had collapsed to 22 channels because the
+     * EPG importer filters against live channels that no longer existed.
+     *
+     * The destruction is now deferred to [clearIfFirstWrite], which runs inside
+     * the first chunk's transaction — so it happens only once replacement rows
+     * are actually in hand, and a total failure costs nothing at all. Partial
+     * failure is still possible (the deletion and some chunks commit, the rest
+     * never arrive) and is what [SYNC_MARKER_PREFIX] exists to make detectable.
      *
      * **Foreign-key handling — the favorites/history-survival fix.**
      * Schema declares `favorites.content_id` and `watch_history.content_id`
      * as `REFERENCES content(id) ON DELETE CASCADE`. With `foreign_keys=ON`
      * (the production default — see DatabaseFactory.android.kt's onOpen),
-     * the `DELETE FROM content WHERE source_id = ?` below cascades and
+     * the `DELETE FROM content WHERE source_id = ?` in [clearIfFirstWrite] cascades and
      * silently wipes every favorite + history row pointing at this
      * source's content. Since `ContentIds.*` are deterministic, the
      * chunked re-INSERT recreates the same content_ids — but the
@@ -103,19 +120,32 @@ class BulkContentWriter(
      *
      * `PRAGMA foreign_keys` is a no-op inside a transaction (per SQLite
      * docs), so it must be issued BEFORE `BEGIN`.
+     * The trigger DROP stays here: it must precede the inserts, and it is
+     * self-healing on the next open via `DatabaseFactory`'s `onOpen` (MB-290).
+     *
+     * `PRAGMA foreign_keys` is a no-op inside a transaction (per SQLite
+     * docs), so it must be issued BEFORE `BEGIN`.
      */
     fun prepareSource(sourceId: String) {
-        driver.execute(null, "PRAGMA foreign_keys = OFF", 0)
+        clearedFor = null
+        // The marker is committed on its own, BEFORE anything destructive can
+        // run, so it survives a process kill that takes the sync with it.
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             driver.execute(
                 null,
-                "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
+                "INSERT OR REPLACE INTO settings (key, value) VALUES ('$SYNC_MARKER_PREFIX' || ?, '1')",
                 1,
             ) { bindString(0, sourceId) }
-            driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
-                bindString(0, sourceId)
-            }
+            driver.execute(null, "COMMIT", 0)
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+
+        driver.execute(null, "PRAGMA foreign_keys = OFF", 0)
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
             driver.execute(null, "DROP TRIGGER IF EXISTS content_ai", 0)
             driver.execute(null, "COMMIT", 0)
         } catch (t: Throwable) {
@@ -125,6 +155,37 @@ class BulkContentWriter(
             runCatching { driver.execute(null, "PRAGMA foreign_keys = ON", 0) }
             throw t
         }
+    }
+
+    /**
+     * Drop the source's previous catalogue, once, inside the caller's already-open
+     * transaction (MB-353).
+     *
+     * Every chunk writer calls this immediately after its `BEGIN`. The first call
+     * for a source does the deletion and the chunk's own INSERTs follow in the
+     * same transaction, so the two either both land or both roll back — the
+     * catalogue is never observably empty as a committed state unless real rows
+     * replaced it. Later calls are a field comparison and cost nothing.
+     *
+     * Deliberately NOT idempotent across instances: a fresh [BulkContentWriter]
+     * is constructed per sync (`SourceRepository`), so [clearedFor] is scoped to
+     * one sync by construction rather than by bookkeeping.
+     *
+     * The old rows must go before the new ones are written, not after: the insert
+     * is `INSERT OR IGNORE` and content ids are deterministic, so leaving the old
+     * rows in place would silently keep every stale row and drop the fresh copy.
+     */
+    private fun clearIfFirstWrite(sourceId: String) {
+        if (clearedFor == sourceId) return
+        driver.execute(
+            null,
+            "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
+            1,
+        ) { bindString(0, sourceId) }
+        driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
+            bindString(0, sourceId)
+        }
+        clearedFor = sourceId
     }
 
     /**
@@ -240,6 +301,10 @@ class BulkContentWriter(
                     "AND EXISTS (SELECT 1 FROM content WHERE source_id = ?)",
                 1,
             ) { bindString(0, sourceId) }
+            // MB-353 — the marker clears in the SAME transaction that completes
+            // the sync, so "the catalogue is complete" and "no sync is in
+            // progress" can never disagree on disk.
+            clearSyncMarkerIn(sourceId)
             driver.execute(null, "COMMIT", 0)
         } catch (t: Throwable) {
             runCatching { driver.execute(null, "ROLLBACK", 0) }
@@ -270,31 +335,50 @@ class BulkContentWriter(
      * clears any partially-written rows for this source, reinstalls the
      * FTS trigger, and re-enables FK. Safe to call even if `prepareSource`
      * never ran.
+     *
+     * **MB-353 — the cleanup is now conditional, and that condition is the
+     * whole point of the fix.** The deletes below exist to remove HALF-WRITTEN
+     * rows. Since [prepareSource] no longer destroys anything, a sync that
+     * aborts before its first chunk has written nothing — the previous
+     * catalogue is intact and complete. Running the deletes unconditionally
+     * would then destroy a perfectly good catalogue on the error path, which is
+     * exactly the failure this bug is about, reintroduced one function along.
+     * Total failures (dead URL, expired subscription, no network) all land here.
      */
     fun abortSource(sourceId: String) {
-        runCatching {
-            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
-            try {
-                driver.execute(
-                    null,
-                    "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
-                    1,
-                ) { bindString(0, sourceId) }
-                driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
-                    bindString(0, sourceId)
+        if (clearedFor == sourceId) {
+            runCatching {
+                driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+                try {
+                    driver.execute(
+                        null,
+                        "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
+                        1,
+                    ) { bindString(0, sourceId) }
+                    driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
+                        bindString(0, sourceId)
+                    }
+                    driver.execute(null, "COMMIT", 0)
+                } catch (t: Throwable) {
+                    runCatching { driver.execute(null, "ROLLBACK", 0) }
                 }
-                driver.execute(
-                    null,
-                    "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +
-                        "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
-                        "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
-                    0,
-                )
-                driver.execute(null, "COMMIT", 0)
-            } catch (t: Throwable) {
-                runCatching { driver.execute(null, "ROLLBACK", 0) }
             }
         }
+        // The trigger is recreated unconditionally: prepareSource drops it
+        // before any chunk runs, so it is missing on every abort path whether
+        // or not rows were written.
+        runCatching {
+            driver.execute(
+                null,
+                "CREATE TRIGGER IF NOT EXISTS content_ai AFTER INSERT ON content BEGIN " +
+                    "INSERT INTO content_fts (content_id, title, clean_title, group_name) " +
+                    "VALUES (new.id, new.title, new.clean_title, new.group_name); END",
+                0,
+            )
+        }
+        // Marker last: it says "this source's catalogue may be incomplete", and
+        // that stops being true only once the cleanup above has run.
+        runCatching { clearSyncMarker(sourceId) }
         // Always re-enable FK on the abort path. If prepareSource ran and
         // turned FK off, leaving it off would silently break cascade
         // semantics for the rest of the connection lifetime.
@@ -323,6 +407,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -376,6 +461,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -421,6 +507,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -482,6 +569,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -529,6 +617,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -575,6 +664,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -620,6 +710,7 @@ class BulkContentWriter(
         if (items.isEmpty()) return 0
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
+            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -668,7 +759,58 @@ class BulkContentWriter(
         ContentType.SERIES -> "series"
     }
 
+    /** Clear the in-progress marker inside the caller's open transaction. */
+    private fun clearSyncMarkerIn(sourceId: String) {
+        driver.execute(null, "DELETE FROM settings WHERE key = '$SYNC_MARKER_PREFIX' || ?", 1) {
+            bindString(0, sourceId)
+        }
+    }
+
+    /** Clear the in-progress marker in its own transaction. */
+    private fun clearSyncMarker(sourceId: String) {
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        try {
+            clearSyncMarkerIn(sourceId)
+            driver.execute(null, "COMMIT", 0)
+        } catch (t: Throwable) {
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            throw t
+        }
+    }
+
     companion object {
+        /**
+         * MB-353 — settings-key prefix marking a sync that started and has not
+         * finished. Full key is `$SYNC_MARKER_PREFIX<sourceId>`.
+         *
+         * Lives in the existing key/value `settings` table on purpose: it needs
+         * no schema migration, and this project currently has no working
+         * migration gate (CI is blocked, see MB-349), so a column would have
+         * shipped unverified.
+         *
+         * Set — and committed — before anything destructive can run, cleared in
+         * the same transaction that completes the sync. A set marker therefore
+         * means exactly one thing: this source's catalogue may be missing rows,
+         * and only a successful sync can be trusted to fix it.
+         */
+        const val SYNC_MARKER_PREFIX = "sync_in_progress:"
+
+        /**
+         * Did a previous sync for [sourceId] start and never finish?
+         *
+         * Survives process death because the marker is committed up front. The
+         * intended response is to re-sync: the rows that are present are valid,
+         * but an unknown number are missing, and nothing else on disk reveals
+         * that — `sources.channel_count` still reports the figure from the last
+         * COMPLETED sync, so a gutted source still advertises its old size.
+         */
+        fun syncWasInterrupted(driver: SqlDriver, sourceId: String): Boolean = driver.executeQuery(
+            null,
+            "SELECT 1 FROM settings WHERE key = '$SYNC_MARKER_PREFIX' || ?",
+            { cursor -> app.cash.sqldelight.db.QueryResult.Value(cursor.next().value) },
+            1,
+        ) { bindString(0, sourceId) }.value
+
         /**
          * Rows per multi-row INSERT statement. 80 × 12 columns = 960
          * parameters, under SQLite's default SQLITE_MAX_VARIABLE_NUMBER
