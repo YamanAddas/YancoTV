@@ -194,7 +194,13 @@ class BulkContentWriter(
      */
     private fun clearIfFirstWrite(sourceId: String) {
         if (clearedFor == sourceId) return
+        // Logged at the START as well as the end, because only a bounded window
+        // makes "no starvation warning" meaningful. With just the end line, a
+        // clean run cannot be told apart from one where nothing tried to write
+        // — a verification attempt was wasted on exactly that.
+        logger.info("clear[$sourceId]: starting (batches of $CLEAR_BATCH_ROWS)")
         var batches = 0
+        var total = 0L
         while (batches < MAX_CLEAR_BATCHES) {
             driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
             val removed =
@@ -226,7 +232,15 @@ class BulkContentWriter(
                 }
             if (removed <= 0L) break
             batches++
+            total += removed
         }
+        // MB-315 — one line per sync, and the reason it is permanent: the
+        // window this loop occupies is exactly the window in which another
+        // writer can be starved. Without its start and end in the log,
+        // "no SQLiteConnectionPool warning appeared" cannot be told apart
+        // from "nothing tried to write while it ran" — a distinction this
+        // bug has already been misdiagnosed on twice.
+        logger.info("clear[$sourceId]: removed $total rows in $batches batches of $CLEAR_BATCH_ROWS")
         clearedFor = sourceId
     }
 
