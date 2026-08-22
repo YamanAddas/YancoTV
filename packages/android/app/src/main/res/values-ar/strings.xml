@@ -215,7 +215,9 @@
     <string name="grp_sec_pinned">الفئات المثبَّتة</string>
     <string name="grp_sec_pinned_sub">ثبّت مجموعات اللغة أو المنطقة في أعلى الشريط. الترتيب يتبع تسلسل التثبيت.</string>
     <string name="grp_unpin_all">إلغاء تثبيت الكل (%1$d)</string>
-    <string name="grp_no_groups">لا توجد مجموعات لـ %1$s. قم بمزامنة مصدر أولاً.</string>
+    <string name="grp_no_groups_live">لا توجد مجموعات للقنوات المباشرة. قم بمزامنة مصدر أولاً.</string>
+    <string name="grp_no_groups_movies">لا توجد مجموعات للأفلام. قم بمزامنة مصدر أولاً.</string>
+    <string name="grp_no_groups_series">لا توجد مجموعات للمسلسلات. قم بمزامنة مصدر أولاً.</string>
 
     <!-- MK.31.5 batch E — Parental + Recordings tab bodies. -->
     <string name="par_title">الرقابة الأبوية</string>

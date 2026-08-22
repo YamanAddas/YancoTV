@@ -215,7 +215,9 @@
     <string name="grp_sec_pinned">Catégories épinglées</string>
     <string name="grp_sec_pinned_sub">Épinglez les groupes de langue ou de région en haut du rail. L\'ordre suit celui de l\'épinglage.</string>
     <string name="grp_unpin_all">Tout détacher (%1$d)</string>
-    <string name="grp_no_groups">Aucun groupe trouvé pour %1$s. Synchronisez d\'abord une source.</string>
+    <string name="grp_no_groups_live">Aucun groupe de TV en direct trouvé. Synchronisez d\'abord une source.</string>
+    <string name="grp_no_groups_movies">Aucun groupe de films trouvé. Synchronisez d\'abord une source.</string>
+    <string name="grp_no_groups_series">Aucun groupe de séries trouvé. Synchronisez d\'abord une source.</string>
 
     <!-- MK.31.5 batch E — Parental + Recordings tab bodies. -->
     <string name="par_title">Contrôle parental</string>

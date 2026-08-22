@@ -215,7 +215,9 @@
     <string name="grp_sec_pinned">Categorías fijadas</string>
     <string name="grp_sec_pinned_sub">Fija los grupos de idioma o región arriba del carrusel. El orden sigue la secuencia en que los fijas.</string>
     <string name="grp_unpin_all">Quitar todo (%1$d)</string>
-    <string name="grp_no_groups">No se encontraron grupos para %1$s. Sincroniza primero una fuente.</string>
+    <string name="grp_no_groups_live">No se encontraron grupos de TV en directo. Sincroniza primero una fuente.</string>
+    <string name="grp_no_groups_movies">No se encontraron grupos de películas. Sincroniza primero una fuente.</string>
+    <string name="grp_no_groups_series">No se encontraron grupos de series. Sincroniza primero una fuente.</string>
 
     <!-- MK.31.5 batch E — Parental + Recordings tab bodies. -->
     <string name="par_title">Control parental</string>

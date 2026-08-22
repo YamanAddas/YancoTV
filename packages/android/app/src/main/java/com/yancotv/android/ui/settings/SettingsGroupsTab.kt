@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -117,7 +118,7 @@ fun SettingsGroupsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koi
                     SettingsChipRow(
                         options = ContentType.values().toList(),
                         selected = selectedType,
-                        label = { typeChipLabel(it).uppercase() },
+                        label = { stringResource(typeChipLabelRes(it)).uppercase() },
                         onSelect = { selectedType = it },
                     )
                 },
@@ -195,7 +196,7 @@ fun SettingsGroupsTab(modifier: Modifier = Modifier, prefs: AppPreferences = koi
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.grp_no_groups, typeChipLabel(selectedType).lowercase()),
+                    text = stringResource(noGroupsMessageRes(selectedType)),
                     color = LocalYancoPalette.current.TextMuted,
                     fontSize = 12.sp,
                 )
@@ -357,8 +358,38 @@ private fun ParentPinRow(label: String, prefixCode: String, kind: PrefixCatalog.
     }
 }
 
-private fun typeChipLabel(type: ContentType): String = when (type) {
-    ContentType.LIVE -> "Live TV"
-    ContentType.MOVIE -> "Movies"
-    ContentType.SERIES -> "Series"
+/**
+ * MB-348 — the chip label as a resource id rather than an English literal.
+ *
+ * Reuses the `section_*` strings the sidebar already ships in all four locales
+ * instead of introducing a parallel set that could drift from them.
+ *
+ * `.uppercase()` at the call site is safe and stays: Kotlin's no-arg
+ * `uppercase()` is locale-INVARIANT (unlike Java's `toUpperCase()`), so the
+ * Turkish dotless-I hazard this bug originally cited does not apply here. On
+ * Arabic it is simply a no-op, since the script has no case.
+ */
+@StringRes
+private fun typeChipLabelRes(type: ContentType): Int = when (type) {
+    ContentType.LIVE -> R.string.section_live_tv
+    ContentType.MOVIE -> R.string.section_movies
+    ContentType.SERIES -> R.string.section_series
+}
+
+/**
+ * MB-348 — the empty-state sentence, one complete string per type.
+ *
+ * Replaces `grp_no_groups` + a spliced `%1$s`. Splicing a noun into a frame
+ * cannot be translated correctly: French needs the article to agree ("de films"
+ * vs "de séries" vs "de TV en direct") and Arabic contracts the preposition
+ * into the article (لـ + الأفلام becomes للأفلام), neither of which a
+ * substitution can produce. The old call site also `.lowercase()`d an
+ * already-translated noun, which is meaningless in Arabic and wrong for any
+ * language that capitalises nouns.
+ */
+@StringRes
+private fun noGroupsMessageRes(type: ContentType): Int = when (type) {
+    ContentType.LIVE -> R.string.grp_no_groups_live
+    ContentType.MOVIE -> R.string.grp_no_groups_movies
+    ContentType.SERIES -> R.string.grp_no_groups_series
 }

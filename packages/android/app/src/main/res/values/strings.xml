@@ -230,7 +230,9 @@
     <string name="grp_sec_pinned">Pinned categories</string>
     <string name="grp_sec_pinned_sub">Pin language / region buckets to the top of the rail. Order follows the sequence you pin them in.</string>
     <string name="grp_unpin_all">Unpin all (%1$d)</string>
-    <string name="grp_no_groups">No groups found for %1$s. Sync a source first.</string>
+    <string name="grp_no_groups_live">No live TV groups found. Sync a source first.</string>
+    <string name="grp_no_groups_movies">No movie groups found. Sync a source first.</string>
+    <string name="grp_no_groups_series">No series groups found. Sync a source first.</string>
 
     <!-- MK.31.5 batch E — Parental + Recordings tab bodies. -->
     <string name="par_title">Parental controls</string>
