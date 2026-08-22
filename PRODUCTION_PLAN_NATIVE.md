@@ -132,7 +132,60 @@ After this queue clears, return to Stage 5 default order (5.2 sideload auto-upda
 
 The MK.* numbering below stays as a reference catalog; what's authoritative going forward is the **5-stage dependency + risk ordering** in this section.
 
-### Status (per 2026-04-25 audit)
+### Status (reconciled 2026-08-22) — READ THIS ONE
+
+The 2026-04-25 block below is preserved for history and is **four months stale**;
+it predates MK.26–MK.35 entirely. It was actively misleading during the
+2026-08-21/22 session (Stage 4.6 shows no tick yet Stage 5.5 describes it as
+shipped), so this section supersedes it.
+
+**Reconciled against git and `bugs.md` with a detector script, not by eye** —
+176 register entries cross-referenced against every commit that names them.
+
+**Shipped since the April block:** MK.21 (Settings redesign), MK.22 (motion),
+MK.23 (test hardening), MK.24 (audit follow-ups), MK.19.8 (backup/restore),
+MK.26 (cast: LAN handoff + Google Cast), MK.27 (phone UX adaptation) + MK.27.HF1,
+MK.28 (full-app audit sweep), MK.29 (browse preview + TV type ramp), MK.30
+(settings scroll / expiry / update awareness), MK.31 (localization: EN/AR/FR/ES +
+RTL), MK.33 (multi-playlist categories), MK.34 (player chrome "Midnight Lounge"),
+MK.35 (Home rails + the 1.4.0→1.5.0 upgrade gate). Stage 4.6 (theme + accent
+picker) shipped — the unticked row in the Stage 4 table is wrong.
+
+**MK.25 (player UX pass) is NOT a shipped milestone and NOT untouched.** Much of
+its intent arrived through bug-fix work instead — seek flash (MB-341), dock time
+labels + episode kicker (MB-340), autoplay-next + up-next card (MB-343), dock
+auto-hide (MB-345), type labels (MB-346) — while the milestone's own slices stay
+written as planned. Treat the MK.25 tables as a menu of what is still missing
+(scrub mode, preview thumbnails, skip-intro), not as untouched scope.
+
+**Genuinely remaining for v1.0** — six feature slices, all Stage 4 unless noted:
+
+| | Slice |
+|---|---|
+| 1 | MK.15 — EPG display options (days fwd/back, row height, jump-to-now, programme dialog, catch-up badge) |
+| 2 | MK.17.1a–17.5 — network + playback prefs (UA presets, test connection, HW decoder pref, buffer tuning) |
+| 3 | MK.18.2 — default external player per content type |
+| 4 | MK.13.4 — multi-favorite-list UI (schema already migrated) |
+| 5 | MK.10 — TV launcher: recommendations channel + voice search (TIF stays deferred) |
+| 6 | MK.11.1/2 — phone PIP + gesture controls (Stage 3) |
+
+Plus **Stage 5.7 distribution, partially done**: GitHub Releases + `update.json`
+work end to end; Play Console and Amazon Appstore listings do not exist.
+
+**Open bugs after reconciliation: 6.** MB-229 (High — unblocked 2026-08-22 when
+MB-230 closed; needs a device retest), MB-200, MB-344, MB-352 (Medium), MB-211,
+MB-348 (Low). MB-230 was closed by this pass: it had sat Open for a month on a
+device soak that had already happened and was recorded in the register's own
+header.
+
+**Blocking everything, and not a plan item:** GitHub Actions has refused every run
+since 2026-08-21 — "recent account payments have failed or your spending limit
+needs to be increased". Migrations `11.sqm` through `14.sqm` have therefore never
+been through `verifyCommonMainYancoDbMigration`; the substitute is
+`UpgradeFrom140Test` (MK.35.4). This is the largest unmitigated risk in the tree
+and only the account owner can clear it.
+
+### Status (per 2026-04-25 audit) — SUPERSEDED, kept for history
 
 **Shipped:** MK.0–MK.8, MK.9.1–9.5 (Stage 1.2 closed 2026-04-25), Stage 1.3 Sentry (2026-04-25), Stage 1.4 R8 baseline (2026-04-25), Stage 1.5 DB migration tests + corruption recovery (2026-04-25), Stage 1.6 perf budget + baseline (2026-04-25), Stage 2.1–2.6 schema backbone v3 → v8 (2026-04-26), MK.12a/b, MK.13.1–13.3, MK.16.shell, MK.16.1, MK.16.sheet, MK.16.player.vod.dock, MK.16.player.vod.chrome, MK.17.1, MK.18.1. **Stages 1 + 2 complete.** D-phase complete. 133 commits pushed to `origin/master` 2026-04-25.
 
