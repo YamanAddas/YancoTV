@@ -170,7 +170,14 @@ written as planned. Treat the MK.25 tables as a menu of what is still missing
 | 6 | MK.11.1/2 — phone PIP + gesture controls (Stage 3) |
 
 Plus **Stage 5.7 distribution, partially done**: GitHub Releases + `update.json`
-work end to end; Play Console and Amazon Appstore listings do not exist.
+work end to end — **confirmed on hardware 2026-08-22**, a Google TV running 1.4.0
+was offered 1.5.3 by the in-app checker and updated successfully with data
+intact. Play Console and Amazon Appstore listings do not exist.
+
+> **Release trap worth keeping:** publishing the GitHub Release alone does
+> nothing for existing installs. They poll `update.json` on the Pages branch, and
+> until that file is bumped they are told they are already current. 1.5.3 was
+> published and briefly invisible to every 1.4.0 device for exactly this reason.
 
 **Open bugs after reconciliation: 6.** MB-229 (High — unblocked 2026-08-22 when
 MB-230 closed; needs a device retest), MB-200, MB-344, MB-352 (Medium), MB-211,
