@@ -91,11 +91,12 @@ class BulkContentWriter(
      * 352 MB to 126 MB, and the guide had collapsed to 22 channels because the
      * EPG importer filters against live channels that no longer existed.
      *
-     * The destruction is now deferred to [clearIfFirstWrite], which runs inside
-     * the first chunk's transaction — so it happens only once replacement rows
-     * are actually in hand, and a total failure costs nothing at all. Partial
-     * failure is still possible (the deletion and some chunks commit, the rest
-     * never arrive) and is what [SYNC_MARKER_PREFIX] exists to make detectable.
+     * The destruction is now deferred to [clearIfFirstWrite], which the chunk
+     * writers call only when they have rows to write — so it happens once
+     * replacement rows are actually in hand, and a total failure costs nothing at
+     * all. Partial failure is still possible (some of the clear and some chunks
+     * commit, the rest never arrive) and is what [SYNC_MARKER_PREFIX] exists to
+     * make detectable.
      *
      * **Foreign-key handling — the favorites/history-survival fix.**
      * Schema declares `favorites.content_id` and `watch_history.content_id`
@@ -158,14 +159,30 @@ class BulkContentWriter(
     }
 
     /**
-     * Drop the source's previous catalogue, once, inside the caller's already-open
-     * transaction (MB-353).
+     * Drop the source's previous catalogue, once, in batched transactions of
+     * [CLEAR_BATCH_ROWS] (MB-353 for WHEN it runs, MB-315 for HOW).
      *
-     * Every chunk writer calls this immediately after its `BEGIN`. The first call
-     * for a source does the deletion and the chunk's own INSERTs follow in the
-     * same transaction, so the two either both land or both roll back — the
-     * catalogue is never observably empty as a committed state unless real rows
-     * replaced it. Later calls are a field comparison and cost nothing.
+     * Every chunk writer calls this BEFORE opening its own transaction, and only
+     * when it actually has rows to write. That ordering is MB-353's guarantee and
+     * the important half: nothing is destroyed until a replacement is in hand, so
+     * a sync that fails to deliver — dead URL, expired subscription, no network,
+     * process kill before first byte — costs nothing at all.
+     *
+     * **It deliberately does NOT run inside the caller's transaction, and that is
+     * a weakening of MB-353's original shape.** The first version ran under the
+     * chunk's `BEGIN`, so the deletion and the first batch of replacement rows
+     * landed atomically. That cannot be batched — the whole point of batching is
+     * to COMMIT partway — so the atomicity is traded for a lock that other
+     * writers can get between batches. Measured on a Fire TV, clearing a
+     * 272,419-item catalogue is ~110 s during which no other write in the app can
+     * proceed; batching cuts the longest continuous hold roughly proportionally
+     * to the batch size, for about +30% total time at 5,000 rows.
+     *
+     * What that costs: a sync interrupted mid-clear leaves a partially deleted
+     * catalogue. Detectable only via the `sync_in_progress` marker written by
+     * [prepareSource], which is why that marker is not optional.
+     *
+     * Later calls are a field comparison and cost nothing.
      *
      * Deliberately NOT idempotent across instances: a fresh [BulkContentWriter]
      * is constructed per sync (`SourceRepository`), so [clearedFor] is scoped to
@@ -177,13 +194,38 @@ class BulkContentWriter(
      */
     private fun clearIfFirstWrite(sourceId: String) {
         if (clearedFor == sourceId) return
-        driver.execute(
-            null,
-            "DELETE FROM content_fts WHERE content_id IN (SELECT id FROM content WHERE source_id = ?)",
-            1,
-        ) { bindString(0, sourceId) }
-        driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
-            bindString(0, sourceId)
+        var batches = 0
+        while (batches < MAX_CLEAR_BATCHES) {
+            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+            val removed =
+                try {
+                    // FTS first, then the content rows it looked them up by.
+                    // Both statements use the same unordered `LIMIT` subquery
+                    // and nothing between them modifies `content`, so within
+                    // this transaction they resolve to the SAME batch of ids.
+                    // Reverse the order and the second statement would have no
+                    // rows left to find, orphaning that batch's FTS entries.
+                    driver.execute(
+                        null,
+                        "DELETE FROM content_fts WHERE content_id IN " +
+                            "(SELECT id FROM content WHERE source_id = ? LIMIT $CLEAR_BATCH_ROWS)",
+                        1,
+                    ) { bindString(0, sourceId) }
+                    val n =
+                        driver.execute(
+                            null,
+                            "DELETE FROM content WHERE id IN " +
+                                "(SELECT id FROM content WHERE source_id = ? LIMIT $CLEAR_BATCH_ROWS)",
+                            1,
+                        ) { bindString(0, sourceId) }.value
+                    driver.execute(null, "COMMIT", 0)
+                    n
+                } catch (t: Throwable) {
+                    runCatching { driver.execute(null, "ROLLBACK", 0) }
+                    throw t
+                }
+            if (removed <= 0L) break
+            batches++
         }
         clearedFor = sourceId
     }
@@ -405,9 +447,9 @@ class BulkContentWriter(
         sortOrderStart: Long,
     ): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -459,9 +501,9 @@ class BulkContentWriter(
         sortOrderStart: Long,
     ): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -505,9 +547,9 @@ class BulkContentWriter(
 
     fun writeSeriesChunk(sourceId: String, items: List<XtreamSeriesInfo>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -567,9 +609,9 @@ class BulkContentWriter(
      */
     fun writeM3uChunk(sourceId: String, items: List<M3uEntry>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -615,9 +657,9 @@ class BulkContentWriter(
 
     fun writeStalkerLiveChunk(sourceId: String, items: List<StalkerChannel>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -662,9 +704,9 @@ class BulkContentWriter(
 
     fun writeStalkerVodChunk(sourceId: String, items: List<StalkerVodItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -708,9 +750,9 @@ class BulkContentWriter(
 
     fun writeStalkerSeriesChunk(sourceId: String, items: List<StalkerSeriesItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
+        clearIfFirstWrite(sourceId)
         driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
-            clearIfFirstWrite(sourceId)
             var i = 0
             var sortOrder = sortOrderStart
             while (i < items.size) {
@@ -794,6 +836,36 @@ class BulkContentWriter(
          * and only a successful sync can be trusted to fix it.
          */
         const val SYNC_MARKER_PREFIX = "sync_in_progress:"
+
+        /**
+         * Rows removed per transaction when clearing a source's old catalogue
+         * (MB-315).
+         *
+         * Replacing a 272,419-item catalogue is ~110 s of deletion (62 s of FTS
+         * index maintenance, 48 s of `content` with its seven indexes). Done in
+         * one transaction that is 110 s during which no other writer in the app
+         * can proceed — a favourite toggle, a resume point, another source's
+         * sync. Measured on a Fire TV, and it is not a bad query plan: an
+         * unqualified `DELETE FROM content_fts` benchmarked at 0.41 s against
+         * the predicated form's 0.47 s on an identical 60k-row table, so there
+         * is no fast path being missed. It is simply that much work.
+         *
+         * A single statement cannot be interrupted, but a loop can. Benchmarked
+         * on the same fixture, batching costs about +30% total time at 5,000
+         * rows and cuts the longest continuous lock hold 6x; 1,000 trades more
+         * total time for a proportionally shorter hold, which is the right way
+         * round — syncs run unattended in the background, stalls happen while
+         * someone is using the app.
+         */
+        const val CLEAR_BATCH_ROWS = 1_000
+
+        /**
+         * Backstop so a malformed predicate cannot spin forever. 10,000 batches
+         * is 10 million rows — far beyond any real catalogue, so hitting it
+         * means the loop is not making progress rather than that the source is
+         * large.
+         */
+        const val MAX_CLEAR_BATCHES = 10_000
 
         /**
          * Did a previous sync for [sourceId] start and never finish?

@@ -742,6 +742,132 @@ class BulkContentWriterTest {
     }
 
     /**
+     * MB-315 — the clear must span more than one transaction, and must still
+     * finish the job.
+     *
+     * Batching is the only lever measured to shorten the write-lock hold (a
+     * single statement cannot be interrupted; a loop can). The risk it
+     * introduces is a loop that stops early and silently leaves half a
+     * catalogue behind, which would look exactly like the data loss MB-353 was
+     * filed for. So: seed more rows than one batch, and assert none survive.
+     */
+    @Test
+    fun `the clear removes every row even when it spans many batches`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val many = (1..(BulkContentWriter.CLEAR_BATCH_ROWS * 2 + 7)).map { liveStream(it, "Ch $it") }
+        val first = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        first.prepareSource("s1")
+        first.writeLiveChunk("s1", client, many, mapOf("1" to "News"), 100L, 0L)
+        first.finishSource("s1")
+        assertEquals(many.size.toLong(), db.contentQueries.countBySource("s1").executeAsOne())
+
+        // Next sync brings a single channel — everything else must be cleared,
+        // which takes three batches at 1,000 per transaction.
+        val second = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.writeLiveChunk("s1", client, listOf(liveStream(99_001, "Only One")), mapOf("1" to "News"), 200L, 0L)
+        second.finishSource("s1")
+
+        assertEquals(
+            1L,
+            db.contentQueries.countBySource("s1").executeAsOne(),
+            "a multi-batch clear that stops early would leave a partial catalogue behind",
+        )
+        assertEquals(
+            1L,
+            db.contentQueries.countByType("live").executeAsOne(),
+            "and the FTS/content pair must stay in step across batches",
+        )
+    }
+
+    /**
+     * A chunk carrying no rows must not trigger the clear.
+     *
+     * Found by a negative control, not by design: moving `clearIfFirstWrite`
+     * above the `items.isEmpty()` guard broke nothing in the suite, because
+     * every existing test that exercises "sync delivers nothing" never calls a
+     * chunk writer at all. Providers do call it — a category that returns 200 OK
+     * with zero items reaches `writeXxxChunk(items = emptyList())` — and if that
+     * cleared the catalogue, MB-353 would be back through a door no test watched.
+     */
+    @Test
+    fun `a chunk with no rows must not clear the catalogue`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val first = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        first.prepareSource("s1")
+        first.writeLiveChunk("s1", client, listOf(liveStream(1, "Ch 1")), mapOf("1" to "News"), 100L, 0L)
+        first.finishSource("s1")
+
+        val second = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.writeLiveChunk("s1", client, emptyList(), mapOf("1" to "News"), 200L, 0L)
+        second.abortSource("s1")
+
+        assertEquals(
+            1L,
+            db.contentQueries.countBySource("s1").executeAsOne(),
+            "an empty chunk carries no replacement, so it must destroy nothing",
+        )
+    }
+
+    /**
+     * The search index must match the catalogue after a replacing sync.
+     *
+     * Also found by a negative control: swapping the order of the two DELETEs in
+     * the batched clear (content before FTS) orphans every batch's index rows,
+     * and the whole suite stayed green because nothing asserted on FTS at all.
+     * The user-visible symptom would be search returning titles the catalogue no
+     * longer has, plus duplicates once finishSource repopulates.
+     */
+    @Test
+    fun `a replacing sync leaves the search index consistent`() {
+        val database = testDatabase()
+        val db = database.db
+        insertSource(db)
+        val client = xtreamClient()
+
+        val first = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        first.prepareSource("s1")
+        first.writeLiveChunk("s1", client, listOf(liveStream(1, "Zebra"), liveStream(2, "Keeper")), mapOf("1" to "News"), 100L, 0L)
+        first.finishSource("s1")
+        assertEquals(1, db.contentQueries.searchFts("Zebra", 50).executeAsList().size)
+
+        // Second sync drops Zebra, KEEPS Keeper (same deterministic id), adds one.
+        // Keeper is the load-bearing case: a channel present in both syncs is the
+        // only way an uncleared index becomes visible, because searchFts INNER
+        // JOINs content and so hides orphan rows whose content is gone. Leave it
+        // out and index rows can pile up unnoticed forever.
+        val second = BulkContentWriter(database.driver, clock = { FIXED_NOW })
+        second.prepareSource("s1")
+        second.writeLiveChunk("s1", client, listOf(liveStream(2, "Keeper"), liveStream(3, "Aardvark")), mapOf("1" to "News"), 200L, 0L)
+        second.finishSource("s1")
+
+        assertEquals(
+            0,
+            db.contentQueries.searchFts("Zebra", 50).executeAsList().size,
+            "a title the provider dropped must not remain findable",
+        )
+        assertEquals(
+            1,
+            db.contentQueries.searchFts("Keeper", 50).executeAsList().size,
+            "a channel present in BOTH syncs must be findable exactly once — twice means its old index row was never cleared",
+        )
+        assertEquals(
+            1,
+            db.contentQueries.searchFts("Aardvark", 50).executeAsList().size,
+            "the new title must be findable exactly once",
+        )
+    }
+
+    /**
      * MK.23.D.1 — finishSource failure path.
      *
      * Today the catch block:
