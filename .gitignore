@@ -72,3 +72,7 @@ packages/android/*.zip
 # user's own data written by Settings -> Backup, and an UNENCRYPTED export
 # carries provider credentials in plain text. Never commit them.
 /backups/
+
+# Android SDK location — per-machine, never committed. The packages/android
+# one (keystore password, Sentry DSN) is ignored by its own .gitignore.
+/local.properties
