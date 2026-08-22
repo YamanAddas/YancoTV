@@ -1,6 +1,9 @@
 package com.yancotv.shared.epg
 
 import app.cash.sqldelight.db.SqlDriver
+import com.yancotv.shared.diag.beginTraced
+import com.yancotv.shared.diag.commitTraced
+import com.yancotv.shared.diag.rollbackTraced
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import com.yancotv.shared.parsers.XmltvProgramme
@@ -40,7 +43,7 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
     fun replaceAll(batches: List<ProgrammeBatch>, onBatch: suspend (written: Int, total: Int) -> Unit = { _, _ -> }, lastRefreshedMs: Long? = null): Result {
         val total = batches.sumOf { it.programmes.size }
         if (total == 0) {
-            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+            beginTraced(driver, logger, "epg.replaceAll")
             try {
                 driver.execute(null, "DELETE FROM epg_programmes", 0)
                 if (lastRefreshedMs != null) {
@@ -48,9 +51,9 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
                         bindString(0, lastRefreshedMs.toString())
                     }
                 }
-                driver.execute(null, "COMMIT", 0)
+                commitTraced(driver, logger, "epg.replaceAll")
             } catch (t: Throwable) {
-                runCatching { driver.execute(null, "ROLLBACK", 0) }
+                runCatching { rollbackTraced(driver, logger, "epg.replaceAll") }
                 throw t
             }
             return Result(0, 0)
@@ -59,7 +62,7 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
         val channels = HashSet<String>()
         var written = 0
 
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "epg.replaceAll")
         try {
             driver.execute(null, "DELETE FROM epg_programmes", 0)
 
@@ -99,9 +102,9 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
                 }
             }
 
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "epg.replaceAll")
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "epg.replaceAll") }
             throw t
         }
 
@@ -144,12 +147,12 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
 
         fun begin() {
             if (open) error("Session already open")
-            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+            beginTraced(driver, logger, "epg.begin")
             try {
                 driver.execute(null, "DELETE FROM epg_programmes", 0)
                 open = true
             } catch (t: Throwable) {
-                runCatching { driver.execute(null, "ROLLBACK", 0) }
+                runCatching { rollbackTraced(driver, logger, "epg.begin") }
                 throw t
             }
         }
@@ -195,10 +198,10 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
                         bindString(0, lastRefreshedMs.toString())
                     }
                 }
-                driver.execute(null, "COMMIT", 0)
+                commitTraced(driver, logger, "epg.commit")
                 open = false
             } catch (t: Throwable) {
-                runCatching { driver.execute(null, "ROLLBACK", 0) }
+                runCatching { rollbackTraced(driver, logger, "epg.commit") }
                 open = false
                 throw t
             }
@@ -206,7 +209,7 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
 
         fun rollback() {
             if (!open) return
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "epg.rollback") }
             open = false
         }
     }

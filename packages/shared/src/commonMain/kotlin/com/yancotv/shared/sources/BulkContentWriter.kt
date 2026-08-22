@@ -3,6 +3,9 @@ package com.yancotv.shared.sources
 import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.content.classifyEntry
 import com.yancotv.shared.content.cleanTitle
+import com.yancotv.shared.diag.beginTraced
+import com.yancotv.shared.diag.commitTraced
+import com.yancotv.shared.diag.rollbackTraced
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
 import com.yancotv.shared.parsers.M3uEntry
@@ -131,26 +134,26 @@ class BulkContentWriter(
         clearedFor = null
         // The marker is committed on its own, BEFORE anything destructive can
         // run, so it survives a process kill that takes the sync with it.
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.prepareSource")
         try {
             driver.execute(
                 null,
                 "INSERT OR REPLACE INTO settings (key, value) VALUES ('$SYNC_MARKER_PREFIX' || ?, '1')",
                 1,
             ) { bindString(0, sourceId) }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.prepareSource")
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.prepareSource") }
             throw t
         }
 
         driver.execute(null, "PRAGMA foreign_keys = OFF", 0)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.prepareSource")
         try {
             driver.execute(null, "DROP TRIGGER IF EXISTS content_ai", 0)
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.prepareSource")
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.prepareSource") }
             // Re-enable FK on the error path so the session doesn't leave
             // FK off if the caller doesn't call abortSource.
             runCatching { driver.execute(null, "PRAGMA foreign_keys = ON", 0) }
@@ -202,7 +205,7 @@ class BulkContentWriter(
         var batches = 0
         var total = 0L
         while (batches < MAX_CLEAR_BATCHES) {
-            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+            beginTraced(driver, logger, "content.clearIfFirstWrite")
             val removed =
                 try {
                     // FTS first, then the content rows it looked them up by.
@@ -224,10 +227,10 @@ class BulkContentWriter(
                                 "(SELECT id FROM content WHERE source_id = ? LIMIT $CLEAR_BATCH_ROWS)",
                             1,
                         ) { bindString(0, sourceId) }.value
-                    driver.execute(null, "COMMIT", 0)
+                    commitTraced(driver, logger, "content.clearIfFirstWrite")
                     n
                 } catch (t: Throwable) {
-                    runCatching { driver.execute(null, "ROLLBACK", 0) }
+                    runCatching { rollbackTraced(driver, logger, "content.clearIfFirstWrite") }
                     throw t
                 }
             if (removed <= 0L) break
@@ -278,7 +281,7 @@ class BulkContentWriter(
         // initial import or a set of genuine additions, and reading it after the
         // INSERT below would always answer "yes".
         val alreadyStamped = countFirstSeen(sourceId) > 0L
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.finishSource")
         try {
             driver.execute(
                 null,
@@ -361,9 +364,9 @@ class BulkContentWriter(
             // the sync, so "the catalogue is complete" and "no sync is in
             // progress" can never disagree on disk.
             clearSyncMarkerIn(sourceId)
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.finishSource")
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.finishSource") }
             runCatching {
                 // Defensive: even if FTS populate failed, make sure the
                 // trigger is back so subsequent non-bulk inserts stay
@@ -404,7 +407,7 @@ class BulkContentWriter(
     fun abortSource(sourceId: String) {
         if (clearedFor == sourceId) {
             runCatching {
-                driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+                beginTraced(driver, logger, "content.abortSource")
                 try {
                     driver.execute(
                         null,
@@ -414,9 +417,9 @@ class BulkContentWriter(
                     driver.execute(null, "DELETE FROM content WHERE source_id = ?", 1) {
                         bindString(0, sourceId)
                     }
-                    driver.execute(null, "COMMIT", 0)
+                    commitTraced(driver, logger, "content.abortSource")
                 } catch (t: Throwable) {
-                    runCatching { driver.execute(null, "ROLLBACK", 0) }
+                    runCatching { rollbackTraced(driver, logger, "content.abortSource") }
                 }
             }
         }
@@ -462,7 +465,7 @@ class BulkContentWriter(
     ): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeLiveChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -498,10 +501,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeLiveChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeLiveChunk") }
             throw t
         }
     }
@@ -516,7 +519,7 @@ class BulkContentWriter(
     ): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeVodChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -551,10 +554,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeVodChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeVodChunk") }
             throw t
         }
     }
@@ -562,7 +565,7 @@ class BulkContentWriter(
     fun writeSeriesChunk(sourceId: String, items: List<XtreamSeriesInfo>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeSeriesChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -602,10 +605,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeSeriesChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeSeriesChunk") }
             throw t
         }
     }
@@ -624,7 +627,7 @@ class BulkContentWriter(
     fun writeM3uChunk(sourceId: String, items: List<M3uEntry>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeM3uChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -661,10 +664,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeM3uChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeM3uChunk") }
             throw t
         }
     }
@@ -672,7 +675,7 @@ class BulkContentWriter(
     fun writeStalkerLiveChunk(sourceId: String, items: List<StalkerChannel>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeStalkerLiveChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -708,10 +711,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeStalkerLiveChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeStalkerLiveChunk") }
             throw t
         }
     }
@@ -719,7 +722,7 @@ class BulkContentWriter(
     fun writeStalkerVodChunk(sourceId: String, items: List<StalkerVodItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeStalkerVodChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -754,10 +757,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeStalkerVodChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeStalkerVodChunk") }
             throw t
         }
     }
@@ -765,7 +768,7 @@ class BulkContentWriter(
     fun writeStalkerSeriesChunk(sourceId: String, items: List<StalkerSeriesItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.writeStalkerSeriesChunk")
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -801,10 +804,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.writeStalkerSeriesChunk")
             return items.size
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.writeStalkerSeriesChunk") }
             throw t
         }
     }
@@ -824,12 +827,12 @@ class BulkContentWriter(
 
     /** Clear the in-progress marker in its own transaction. */
     private fun clearSyncMarker(sourceId: String) {
-        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
+        beginTraced(driver, logger, "content.clearSyncMarker")
         try {
             clearSyncMarkerIn(sourceId)
-            driver.execute(null, "COMMIT", 0)
+            commitTraced(driver, logger, "content.clearSyncMarker")
         } catch (t: Throwable) {
-            runCatching { driver.execute(null, "ROLLBACK", 0) }
+            runCatching { rollbackTraced(driver, logger, "content.clearSyncMarker") }
             throw t
         }
     }
