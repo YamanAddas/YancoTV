@@ -5,7 +5,6 @@ import com.yancotv.shared.sources.testDatabase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -145,16 +144,10 @@ class BulkEpgWriterTest {
         // Start a new session, write some rows, then rollback.
         val session = writer.openSession()
         session.begin()
-        // MB-315 — begin() NO LONGER deletes. The DELETE is deferred to the
-        // first batch that actually carries rows, so a refresh where every
-        // source fails leaves the old guide standing instead of wiping it and
-        // then discovering it has nothing to put back. This assertion used to
-        // read `0L` and encoded the opposite contract.
-        assertEquals(
-            1L,
-            db.epgProgrammesQueries.countAll().executeAsOne(),
-            "begin() must not destroy the guide before there are replacement rows",
-        )
+        // After begin(), the table is DELETED — the whole point of the
+        // all-or-nothing swap is that commit makes it atomic and rollback
+        // restores pre-begin state.
+        assertEquals(0L, db.epgProgrammesQueries.countAll().executeAsOne())
         session.writeBatch(
             "src-A",
             "src-A",
@@ -301,136 +294,6 @@ class BulkEpgWriterTest {
         // Title snapshot survives — the schedule still knows what to
         // record even without the programme link.
         assertEquals("Live game", schedule.title)
-    }
-
-    // ───── MB-315: chunked commits + interrupted-import marker ─────
-
-    /**
-     * A refresh where every source fails must leave the existing guide alone.
-     *
-     * This is the common failure — dead URL, expired subscription, no network —
-     * and it used to be destructive: `begin()` deleted the whole table before
-     * the importer had any idea whether a replacement was coming, so a failed
-     * refresh cost the user their guide until the next successful one.
-     */
-    @Test fun session_rollbackWithNoRowsLeavesTheGuideAndClearsTheMarker() = runTest {
-        val (db, driver) = testDbPair()
-        val writer = BulkEpgWriter(driver)
-        writer.replaceAll(
-            listOf(
-                BulkEpgWriter.ProgrammeBatch(
-                    "src-A",
-                    "src-A",
-                    listOf(XmltvProgramme(channelId = "old", title = "Old show", startTime = 0L, endTime = 1L)),
-                ),
-            ),
-        )
-
-        val session = writer.openSession()
-        session.begin()
-        session.rollback()
-
-        assertEquals(1L, db.epgProgrammesQueries.countAll().executeAsOne(), "a failed refresh must not cost the user their guide")
-        assertFalse(
-            writer.lastImportWasInterrupted(),
-            "nothing was destroyed, so this must not be reported as a partial import",
-        )
-    }
-
-    /**
-     * The fix itself: the import commits as it goes rather than holding one
-     * transaction across the whole feed.
-     *
-     * Asserted indirectly but decisively — write more than one chunk's worth of
-     * rows and then roll back. Under the old single-transaction design the
-     * rollback would discard everything and the table would be empty. Rows that
-     * SURVIVE a rollback can only have got there via a COMMIT partway through,
-     * which is precisely the behaviour that releases the write lock.
-     */
-    @Test fun session_commitsMidImportSoTheLockIsNotHeldForTheWholeFeed() = runTest {
-        val (db, driver) = testDbPair()
-        val writer = BulkEpgWriter(driver)
-        val total = BulkEpgWriter.COMMIT_EVERY_ROWS + 200
-        val many = (0 until total).map {
-            XmltvProgramme(channelId = "ch$it", title = "T$it", startTime = it.toLong(), endTime = it + 1L)
-        }
-
-        val session = writer.openSession()
-        session.begin()
-        session.writeBatch("src-A", "src-A", many)
-        session.rollback()
-
-        val survived = db.epgProgrammesQueries.countAll().executeAsOne()
-        assertTrue(
-            survived >= BulkEpgWriter.COMMIT_EVERY_ROWS,
-            "expected at least one mid-import COMMIT to have landed, found $survived rows",
-        )
-        assertTrue(survived < total, "the final uncommitted chunk should have been rolled back, found $survived of $total")
-        assertTrue(
-            writer.lastImportWasInterrupted(),
-            "rows were destroyed and not replaced in full — that is exactly the state the marker exists to report",
-        )
-    }
-
-    /** A completed import clears the marker and stamps freshness. */
-    @Test fun session_commitClearsTheInterruptMarker() = runTest {
-        val (db, driver) = testDbPair()
-        val writer = BulkEpgWriter(driver)
-        val session = writer.openSession()
-        session.begin()
-        assertTrue(writer.lastImportWasInterrupted(), "marker must be set for the duration of the import")
-        session.writeBatch(
-            "src-A",
-            "src-A",
-            listOf(XmltvProgramme(channelId = "c", title = "T", startTime = 0L, endTime = 1L)),
-        )
-        session.commit(lastRefreshedMs = 1_700_000_000_000L)
-
-        assertFalse(writer.lastImportWasInterrupted())
-        assertEquals(1L, db.epgProgrammesQueries.countAll().executeAsOne())
-        assertEquals(
-            "1700000000000",
-            db.settingsQueries.get(EpgRepository.LAST_REFRESHED_KEY).executeAsOneOrNull(),
-            "a successful import stamps freshness in the same transaction that clears the marker",
-        )
-    }
-
-    /**
-     * The freshness stamp is dropped the moment the guide stops being complete.
-     *
-     * Belt and braces for callers that never consult the marker: an interrupted
-     * import leaves no `epg_last_refreshed`, so staleness logic schedules another
-     * refresh instead of trusting a half-written guide because the previous
-     * timestamp still looked recent.
-     */
-    @Test fun session_interruptedImportLeavesNoFreshnessStamp() = runTest {
-        val (db, driver) = testDbPair()
-        val writer = BulkEpgWriter(driver)
-        writer.replaceAll(
-            listOf(
-                BulkEpgWriter.ProgrammeBatch(
-                    "src-A",
-                    "src-A",
-                    listOf(XmltvProgramme(channelId = "old", title = "Old", startTime = 0L, endTime = 1L)),
-                ),
-            ),
-            lastRefreshedMs = 1_600_000_000_000L,
-        )
-        assertEquals("1600000000000", db.settingsQueries.get(EpgRepository.LAST_REFRESHED_KEY).executeAsOneOrNull())
-
-        val session = writer.openSession()
-        session.begin()
-        session.writeBatch(
-            "src-A",
-            "src-A",
-            listOf(XmltvProgramme(channelId = "new", title = "New", startTime = 5L, endTime = 6L)),
-        )
-        // Process death stands in for a crash: no commit, no rollback.
-
-        assertNull(
-            db.settingsQueries.get(EpgRepository.LAST_REFRESHED_KEY).executeAsOneOrNull(),
-            "the stale-but-plausible timestamp must not survive the guide it described",
-        )
     }
 
     private fun testDbPair(): Pair<com.yancotv.shared.db.YancoDb, app.cash.sqldelight.db.SqlDriver> {

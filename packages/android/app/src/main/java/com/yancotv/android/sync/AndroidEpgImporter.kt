@@ -120,17 +120,6 @@ class AndroidEpgImporter(
                 "EPG stream: user has ${canonicalById.size} live channels with tvg_id (case+whitespace normalised); EPG rows for unknown channels will be filtered out",
             )
 
-            // MB-315 — the import commits in chunks now, so a process death
-            // partway through leaves a guide that is valid but short an unknown
-            // number of rows. No recovery action is needed here: this refresh is
-            // about to replace the whole table anyway, and the missing
-            // `epg_last_refreshed` stamp is what caused it to be scheduled. The
-            // log line exists so that "the guide looked wrong yesterday" can be
-            // traced to a specific interrupted run instead of guessed at.
-            if (writer.lastImportWasInterrupted()) {
-                logger.warn("EPG stream: previous import did not finish — guide has been partial since; this refresh replaces it")
-            }
-
             // Sweep stale temp files from process-killed prior runs. Only
             // touches our `epg-*.bin` prefix so other apps' caches stay
             // intact.
