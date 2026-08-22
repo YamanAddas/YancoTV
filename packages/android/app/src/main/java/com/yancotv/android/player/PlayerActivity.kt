@@ -148,6 +148,18 @@ class PlayerActivity : AppCompatActivity() {
     // Reset whenever a new MediaItem starts (STATE_READY).
     private var autoplayInFlight: Boolean = false
 
+    /**
+     * MB-344 — the ONLY place [autoplayInFlight] is lowered.
+     *
+     * The bug was a boolean written from four call sites with the terminal-
+     * error path missing. Routing every release through one function and one
+     * tested predicate ([shouldReleaseAutoplayGuard]) means the rule can be
+     * read in one place and a new caller cannot invent its own policy.
+     */
+    private fun releaseAutoplayGuard(event: AutoplayGuardEvent) {
+        if (shouldReleaseAutoplayGuard(event)) autoplayInFlight = false
+    }
+
     // MK.25.A.1 — wall-clock of the most recent user seek. Used by the
     // STATE_BUFFERING listener to compute a tiered debounce: long after a
     // recent seek (rebuffer is normal, suppress the overlay), shorter
@@ -452,7 +464,7 @@ class PlayerActivity : AppCompatActivity() {
                         // A new MediaItem reaching READY clears any prior
                         // autoplay-in-flight guard so the next end-of-episode
                         // can fire the autoplay flow again.
-                        autoplayInFlight = false
+                        releaseAutoplayGuard(AutoplayGuardEvent.NEW_ITEM_READY)
                         // Audit catch — successful prepare resets the
                         // transient-network retry budget. Next blip on
                         // this MediaItem (or a future one) gets its own
@@ -1849,6 +1861,25 @@ class PlayerActivity : AppCompatActivity() {
     private fun showStreamError(error: PlaybackException) {
         bufferingShowJob?.cancel()
         bufferingShowJob = null
+        // MB-344 — release the autoplay guard here, and ONLY here among the
+        // error paths.
+        //
+        // `autoplayInFlight` is set before an autoplay (or dock-NEXT) advance
+        // and cleared on the new item's STATE_READY. A target that never
+        // prepares never reaches READY, so the guard latched for the life of
+        // the activity and every later end-of-episode silently declined to
+        // advance — autoplay looked switched off until the user backed out of
+        // the player entirely.
+        //
+        // This is the right choke point because it is the only TERMINAL error
+        // exit. `onPlayerError`'s other two branches (BEHIND_LIVE_WINDOW
+        // re-seek, transient-network retry) deliberately re-prepare and are
+        // expected to reach READY, which clears the guard on the success path;
+        // if their retry fails it falls through to here anyway. Clearing in
+        // those branches instead would drop the guard while a prepare is still
+        // in flight, which is exactly the ExoPlayer double-STATE_ENDED case the
+        // guard exists to absorb.
+        releaseAutoplayGuard(AutoplayGuardEvent.TERMINAL_ERROR)
         chromeError = buildErrorData(error)
         chromeState = VodChromeState.ERROR
         val v = ensureChromeOverlay()
@@ -2008,12 +2039,22 @@ class PlayerActivity : AppCompatActivity() {
             if (nextPlayable == null) {
                 // End of series, episode missing locally, or series row
                 // gone. Drop the guard so a future ENDED can retry.
-                autoplayInFlight = false
+                releaseAutoplayGuard(AutoplayGuardEvent.NO_NEXT_EPISODE)
                 Log.i(TAG, "autoplay: no next episode for series=${episode.seriesId}")
                 return@launch
             }
             Log.i(TAG, "autoplay: advancing to next episode=${nextPlayable.id}")
-            controller.play(nextPlayable)
+            // MB-344 — the second way the guard could latch. If `play` throws
+            // (a malformed stream URL, a controller in a bad state), no
+            // MediaItem is ever prepared, so neither STATE_READY nor
+            // `showStreamError` runs and nothing would ever clear the flag.
+            // Only the failure path clears it: on success the guard must stay
+            // held until the new item reaches READY.
+            runCatching { controller.play(nextPlayable) }
+                .onFailure { t ->
+                    releaseAutoplayGuard(AutoplayGuardEvent.ADVANCE_THREW)
+                    Log.e(TAG, "autoplay: advance to ${nextPlayable.id} threw; guard released", t)
+                }
         }
     }
 
@@ -2179,12 +2220,13 @@ class PlayerActivity : AppCompatActivity() {
         // both paths targeting the same id and episodeLaunchDecision returning
         // SameTarget (a no-op, no re-prepare).
         //
-        // Inherits the guard's pre-existing weakness: it is cleared only on
-        // STATE_READY, so a target that never prepares leaves it latched and
-        // blocks autoplay for the life of the activity. That is a real bug but
-        // it predates this slice and belongs in its own MB-* rather than being
-        // widened here — and a stuck guard is a far better failure than silently
-        // skipping an episode.
+        // Shares the same guard as the automatic path, which is deliberate —
+        // a manual advance and an autoplay advance must not both fire. The
+        // latch this inherited (cleared only on STATE_READY, so a target that
+        // never prepared blocked autoplay for the life of the activity) was
+        // MB-344 and is fixed: release now runs through
+        // [releaseAutoplayGuard], which covers the terminal-error and
+        // advance-threw paths too.
         autoplayInFlight = true
         Log.i(TAG, "up-next: manual advance to ${target.id}")
         controller.play(target)
