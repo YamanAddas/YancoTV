@@ -205,7 +205,7 @@ class BulkContentWriter(
         var batches = 0
         var total = 0L
         while (batches < MAX_CLEAR_BATCHES) {
-            beginTraced(driver, logger, "content.clearIfFirstWrite")
+            driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
             val removed =
                 try {
                     // FTS first, then the content rows it looked them up by.
@@ -227,10 +227,10 @@ class BulkContentWriter(
                                 "(SELECT id FROM content WHERE source_id = ? LIMIT $CLEAR_BATCH_ROWS)",
                             1,
                         ) { bindString(0, sourceId) }.value
-                    commitTraced(driver, logger, "content.clearIfFirstWrite")
+                    driver.execute(null, "COMMIT", 0)
                     n
                 } catch (t: Throwable) {
-                    runCatching { rollbackTraced(driver, logger, "content.clearIfFirstWrite") }
+                    runCatching { driver.execute(null, "ROLLBACK", 0) }
                     throw t
                 }
             if (removed <= 0L) break
@@ -465,7 +465,7 @@ class BulkContentWriter(
     ): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeLiveChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -501,10 +501,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeLiveChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeLiveChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
@@ -519,7 +519,7 @@ class BulkContentWriter(
     ): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeVodChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -554,10 +554,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeVodChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeVodChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
@@ -565,7 +565,7 @@ class BulkContentWriter(
     fun writeSeriesChunk(sourceId: String, items: List<XtreamSeriesInfo>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeSeriesChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -605,10 +605,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeSeriesChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeSeriesChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
@@ -627,7 +627,7 @@ class BulkContentWriter(
     fun writeM3uChunk(sourceId: String, items: List<M3uEntry>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeM3uChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -664,10 +664,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeM3uChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeM3uChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
@@ -675,7 +675,7 @@ class BulkContentWriter(
     fun writeStalkerLiveChunk(sourceId: String, items: List<StalkerChannel>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeStalkerLiveChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -711,10 +711,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeStalkerLiveChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeStalkerLiveChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
@@ -722,7 +722,7 @@ class BulkContentWriter(
     fun writeStalkerVodChunk(sourceId: String, items: List<StalkerVodItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeStalkerVodChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -757,10 +757,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeStalkerVodChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeStalkerVodChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
@@ -768,7 +768,7 @@ class BulkContentWriter(
     fun writeStalkerSeriesChunk(sourceId: String, items: List<StalkerSeriesItem>, categoryNames: Map<String, String>, now: Long, sortOrderStart: Long): Int {
         if (items.isEmpty()) return 0
         clearIfFirstWrite(sourceId)
-        beginTraced(driver, logger, "content.writeStalkerSeriesChunk")
+        driver.execute(null, "BEGIN IMMEDIATE TRANSACTION", 0)
         try {
             var i = 0
             var sortOrder = sortOrderStart
@@ -804,10 +804,10 @@ class BulkContentWriter(
                 }
                 i = end
             }
-            commitTraced(driver, logger, "content.writeStalkerSeriesChunk")
+            driver.execute(null, "COMMIT", 0)
             return items.size
         } catch (t: Throwable) {
-            runCatching { rollbackTraced(driver, logger, "content.writeStalkerSeriesChunk") }
+            runCatching { driver.execute(null, "ROLLBACK", 0) }
             throw t
         }
     }
