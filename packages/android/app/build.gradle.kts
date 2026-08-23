@@ -677,6 +677,20 @@ val releasePackage by tasks.registering {
         aab.copyTo(aabOut, overwrite = true)
         json.copyTo(jsonOut, overwrite = true)
 
+        // MB-364 follow-up — archive the R8 mapping beside the artifacts it
+        // deobfuscates. The Sentry plugin uploads it only when an auth token
+        // is configured; this copy is the fallback that makes a crash from
+        // THIS build readable even when that upload never ran. Named by the
+        // same tag as the binaries so the pairing is unambiguous months
+        // later, and kept OUT of SHA256SUMS (it is for the maintainer, not
+        // a user-verifiable artifact).
+        val mapping = layout.buildDirectory.file("outputs/mapping/release/mapping.txt").get().asFile
+        if (mapping.exists()) {
+            mapping.copyTo(File(outDir, "$tag-mapping.txt"), overwrite = true)
+        } else {
+            logger.warn("releasePackage: no mapping.txt found — R8 mapping NOT archived for $tag")
+        }
+
         // SHA256 sums for the two binaries — gives users (and us) a way
         // to verify the file they're holding is the one we shipped, in
         // case GitHub Releases / a CDN ever serves a corrupted blob.
