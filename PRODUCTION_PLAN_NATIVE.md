@@ -134,6 +134,14 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 
 ### Status (reconciled 2026-08-22) — READ THIS ONE
 
+> **0.9.0 PUBLISHED 2026-08-23.** The native line was renumbered from the
+> overstated 1.x down to an honest pre-1.0 **0.9.0 (versionCode 23)** and
+> published to `YamanAddas/yancotv-releases` (tag `0.9.0-23`,
+> `update.json` bumped so installed 1.5.3 devices are offered it). Signed
+> with the release keystore, sha256-verified, all session fixes confirmed
+> in the shipped DEX. First public build intended for phone testing;
+> MB-371 (guide remote far-jump) remains the headline known issue.
+>
 > **Addendum (reconciled 2026-08-23, end of the overnight session).** The
 > pre-release audit series MB-364..MB-370 plus MB-372 is closed; MK.11.2 and
 > the MK.15 fragment shipped, completing the v1.0 feature scope; MB-355 and
