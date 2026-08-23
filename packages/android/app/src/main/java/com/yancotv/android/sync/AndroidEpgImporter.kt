@@ -14,12 +14,12 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
-import java.util.concurrent.Executors
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.buffer
@@ -216,74 +216,74 @@ class AndroidEpgImporter(
         errors: MutableList<String>,
         recordError: (String?) -> Unit,
     ): EpgRefreshResult {
-                val session = writer.openSession()
-                var anySucceeded = false
-                return try {
-                    session.begin()
-                    for ((idx, df) in downloaded.withIndex()) {
-                        val label = "${idx + 1}/${downloaded.size} (${df.target.sourceKey})"
-                        onProgress.report(context.getString(R.string.epg_parsing, label))
-                        val parseStart = System.currentTimeMillis()
-                        val beforeRows = session.rowsWritten
-                        try {
-                            streamInto(
-                                session = session,
-                                sourceKey = df.target.sourceKey,
-                                sourceIdForDb = if (df.target.sourceKey == GLOBAL) null else df.target.sourceKey,
-                                file = df.file,
-                                canonicalById = canonicalById,
-                                onProgress = onProgress,
-                            )
-                            val written = session.rowsWritten - beforeRows
-                            logger.info(
-                                "EPG parse: ${df.target.sourceKey} ingested $written rows (filtered) in ${System.currentTimeMillis() - parseStart}ms",
-                            )
-                            if (written > 0) anySucceeded = true else errors.add("${df.target.sourceKey}: 0 programmes after filter")
-                        } catch (t: Throwable) {
-                            val msg = t.message ?: t::class.simpleName ?: "unknown"
-                            errors.add("${df.target.sourceKey} parse: $msg")
-                            logger.error("EPG parse failed for ${df.target.sourceKey}: $msg")
-                        }
-                    }
-
-                    if (!anySucceeded) {
-                        session.rollback()
-                        val detail = if (errors.isEmpty()) {
-                            context.getString(R.string.ei_no_rows)
-                        } else {
-                            errors.joinToString(" | ")
-                        }
-                        recordError(detail)
-                        return EpgRefreshResult(ok = false, error = detail)
-                    }
-
-                    onProgress.report(
-                        context.resources.getQuantityString(
-                            R.plurals.epg_writing,
-                            session.rowsWritten,
-                            session.rowsWritten,
-                        ),
+        val session = writer.openSession()
+        var anySucceeded = false
+        return try {
+            session.begin()
+            for ((idx, df) in downloaded.withIndex()) {
+                val label = "${idx + 1}/${downloaded.size} (${df.target.sourceKey})"
+                onProgress.report(context.getString(R.string.epg_parsing, label))
+                val parseStart = System.currentTimeMillis()
+                val beforeRows = session.rowsWritten
+                try {
+                    streamInto(
+                        session = session,
+                        sourceKey = df.target.sourceKey,
+                        sourceIdForDb = if (df.target.sourceKey == GLOBAL) null else df.target.sourceKey,
+                        file = df.file,
+                        canonicalById = canonicalById,
+                        onProgress = onProgress,
                     )
-                    session.commit(lastRefreshedMs = System.currentTimeMillis())
-                    if (errors.isEmpty()) {
-                        recordError(null)
-                    } else {
-                        recordError(context.getString(R.string.ei_partial, errors.joinToString(" | ")))
-                    }
-
-                    logger.info("EPG stream: total ${session.rowsWritten} rows across ${session.channelCount} channels committed")
-                    EpgRefreshResult(
-                        ok = true,
-                        programmeCount = session.rowsWritten,
-                        channelCount = session.channelCount,
+                    val written = session.rowsWritten - beforeRows
+                    logger.info(
+                        "EPG parse: ${df.target.sourceKey} ingested $written rows (filtered) in ${System.currentTimeMillis() - parseStart}ms",
                     )
+                    if (written > 0) anySucceeded = true else errors.add("${df.target.sourceKey}: 0 programmes after filter")
                 } catch (t: Throwable) {
-                    runCatching { session.rollback() }
                     val msg = t.message ?: t::class.simpleName ?: "unknown"
-                    logger.error("EPG stream aborted: $msg")
-                    recordError(msg)
-                    EpgRefreshResult(ok = false, error = msg)
+                    errors.add("${df.target.sourceKey} parse: $msg")
+                    logger.error("EPG parse failed for ${df.target.sourceKey}: $msg")
                 }
+            }
+
+            if (!anySucceeded) {
+                session.rollback()
+                val detail = if (errors.isEmpty()) {
+                    context.getString(R.string.ei_no_rows)
+                } else {
+                    errors.joinToString(" | ")
+                }
+                recordError(detail)
+                return EpgRefreshResult(ok = false, error = detail)
+            }
+
+            onProgress.report(
+                context.resources.getQuantityString(
+                    R.plurals.epg_writing,
+                    session.rowsWritten,
+                    session.rowsWritten,
+                ),
+            )
+            session.commit(lastRefreshedMs = System.currentTimeMillis())
+            if (errors.isEmpty()) {
+                recordError(null)
+            } else {
+                recordError(context.getString(R.string.ei_partial, errors.joinToString(" | ")))
+            }
+
+            logger.info("EPG stream: total ${session.rowsWritten} rows across ${session.channelCount} channels committed")
+            EpgRefreshResult(
+                ok = true,
+                programmeCount = session.rowsWritten,
+                channelCount = session.channelCount,
+            )
+        } catch (t: Throwable) {
+            runCatching { session.rollback() }
+            val msg = t.message ?: t::class.simpleName ?: "unknown"
+            logger.error("EPG stream aborted: $msg")
+            recordError(msg)
+            EpgRefreshResult(ok = false, error = msg)
+        }
     }
 
     private fun sweepStaleTempFiles() {
