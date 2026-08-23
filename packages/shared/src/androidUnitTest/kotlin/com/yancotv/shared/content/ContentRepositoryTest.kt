@@ -248,6 +248,22 @@ class ContentRepositoryTest {
 
     // ───── fixtures ─────
 
+    @Test fun findIdByStreamUrl_pinsExactChannelWhereTvgIdWouldNot() = runTest {
+        // MB-381 — two channels share a junk tvg_id (beIN SD + HD). A tvg_id
+        // lookup returns only the priority pick; findIdByStreamUrl resolves the
+        // EXACT channel by its url, so a scheduled recording's content_id
+        // matches the stream_url it records.
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        insertContent(db, "bein-sd", "src-A", tvgId = "beIN", title = "beIN SD", sortOrder = 0L)
+        insertContent(db, "bein-hd", "src-A", tvgId = "beIN", title = "beIN HD", sortOrder = 1L)
+        val repo = ContentRepository(db)
+        assertEquals("bein-hd", repo.findIdByStreamUrl("http://stream/bein-hd"))
+        assertEquals("bein-sd", repo.findIdByStreamUrl("http://stream/bein-sd"))
+        assertNull(repo.findIdByStreamUrl("http://stream/missing"), "unknown url → null")
+        assertNull(repo.findIdByStreamUrl(""), "blank url → null, no query")
+    }
+
     private fun insertSource(db: YancoDb, id: String, priority: Int) {
         db.sourcesQueries.insert(
             id = id,

@@ -184,6 +184,20 @@ class ContentRepository(private val db: YancoDb) {
         ?.toDomain()
 
     /**
+     * MB-381 — resolve a content row by its exact `stream_url`. Used when
+     * scheduling a recording / resolving catch-up so the stored `content_id`
+     * refers to the SAME channel as the `stream_url` being recorded. Keying on
+     * `tvg_id` instead (via [findLiveByTvgId]) picks an arbitrary highest-
+     * priority row when many channels share a junk tvg_id, which desynchronised
+     * the recorded URL from the content identity. Returns the most recent match
+     * when a URL collides (rare). Null when the URL isn't in the catalogue.
+     */
+    fun findIdByStreamUrl(streamUrl: String): String? {
+        if (streamUrl.isBlank()) return null
+        return db.contentQueries.findIdByStreamUrl(streamUrl).executeAsOneOrNull()
+    }
+
+    /**
      * Pick the highest-priority live channel that carries [tvgId]. Used by
      * catchup resolution: the Guide keys programmes on tvg_id (one guide row
      * per tvg_id even if several sources carry the same feed), so the catchup

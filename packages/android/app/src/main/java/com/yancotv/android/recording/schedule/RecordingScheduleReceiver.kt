@@ -587,7 +587,16 @@ class RecordingScheduleReceiver :
      */
     private fun resolveContentItem(schedule: RecordingScheduleEntry): ContentItem {
         val byId = schedule.contentId?.let { runCatching { content.findById(it) }.getOrNull() }
-        if (byId != null) return byId
+        // MB-381 — force the switched channel's URL to the one we're recording.
+        // The content row's own stream_url can differ from schedule.streamUrl
+        // when they were resolved via a shared tvg_id (e.g. content_id=beIN SD
+        // but stream_url=beIN HD). SWITCH_THEN_TEE relies on the player landing
+        // on schedule.streamUrl so handleStart's URL match routes to live-tee;
+        // switching to the content row's URL instead misses and opens a second
+        // HTTP connection (fatal on a 1-stream provider). Keep the row's
+        // metadata (title/logo) but override the URL. Defensive: also repairs
+        // schedules already stored with the divergence before the creation fix.
+        if (byId != null) return byId.copy(streamUrl = schedule.streamUrl)
         return ContentItem(
             id = schedule.contentId ?: "sched_synth_${schedule.id}",
             sourceId = "sched_synth",

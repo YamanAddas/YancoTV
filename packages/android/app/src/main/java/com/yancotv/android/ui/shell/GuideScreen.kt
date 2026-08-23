@@ -789,10 +789,21 @@ fun GuideScreen(
                     recordingDisclaimerGate {
                         coroutineScope.launch(Dispatchers.IO) {
                             runCatching {
-                                val contentItem =
-                                    contentRepo.findLiveByTvgId(channel.tvgId)
+                                // MB-381 — resolve the content id from the SAME
+                                // stream_url we're about to record, not from a
+                                // tvg_id lookup. When many channels share a junk
+                                // tvg_id, findLiveByTvgId returns an arbitrary
+                                // (higher-priority) row, so content_id and
+                                // stream_url ended up pointing at different
+                                // channels (e.g. beIN SD vs HD) — which made the
+                                // recording's player-switch miss and fall back to
+                                // a second HTTP connection. Fall back to the
+                                // tvg_id pick only when the URL isn't matched.
+                                val contentId =
+                                    contentRepo.findIdByStreamUrl(streamUrl)
+                                        ?: contentRepo.findLiveByTvgId(channel.tvgId)?.id
                                 recordScheduler.schedule(
-                                    contentId = contentItem?.id,
+                                    contentId = contentId,
                                     programmeId = programme.id,
                                     title = programme.title,
                                     streamUrl = streamUrl,
