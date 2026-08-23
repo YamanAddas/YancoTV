@@ -230,6 +230,15 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
+            <!-- MB-373 — Android clears an app's AlarmManager alarms when its
+                 package is replaced (app update). Without re-arming here, a
+                 pending scheduled recording is silently lost until the user
+                 next opens the app. The receiver runs the same reconcile +
+                 rescheduleAll it does on boot. No data scheme: MY_PACKAGE_REPLACED
+                 is delivered only to this app, unlike PACKAGE_REPLACED. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
 
         <!-- Stage 3.1 / MK.14.1e — foreground service that owns every

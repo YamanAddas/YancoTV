@@ -6,6 +6,18 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.1 (versionCode 25) — 2026-08-23
+
+Patch on 1.6.0. Fixes one OTA-relevant issue found while verifying the update
+path.
+
+### Fixed
+- **App updates no longer drop pending recording alarms.** Android clears an
+  app's alarms when its package is replaced; the app now re-arms every
+  scheduled recording on `MY_PACKAGE_REPLACED`, the same way it already does
+  on reboot — so a recording scheduled before an OTA update still fires.
+  (MB-373)
+
 ## 1.6.0 (versionCode 24) — 2026-08-23
 
 Continues the 1.x line from 1.5.3. A large data-safety and stability release:

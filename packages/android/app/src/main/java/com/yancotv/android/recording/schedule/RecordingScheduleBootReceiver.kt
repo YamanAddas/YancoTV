@@ -15,7 +15,9 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 /**
- * MK.14.3 — fires once on `BOOT_COMPLETED`.
+ * MK.14.3 — fires on `BOOT_COMPLETED` and, since MB-373, on
+ * `MY_PACKAGE_REPLACED` (app update). Both clear AlarmManager's registered
+ * alarms, so both need the same reconcile + re-arm.
  *
  * Two responsibilities:
  *
@@ -50,8 +52,14 @@ class RecordingScheduleBootReceiver :
     private val scheduler: RecordingScheduleScheduler by inject()
 
     override fun onReceive(context: Context, intent: Intent) {
+        // MB-373 — MY_PACKAGE_REPLACED (app update) is handled the same way as
+        // boot: package replacement clears AlarmManager alarms exactly like a
+        // reboot does, so the same reconcile + rescheduleAll re-arms every
+        // still-ARMED schedule. Without it a pending recording is lost until
+        // the user next opens the app.
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
-            intent.action != "android.intent.action.QUICKBOOT_POWERON"
+            intent.action != "android.intent.action.QUICKBOOT_POWERON" &&
+            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             return
         }
