@@ -95,6 +95,14 @@ fun SettingsAboutTab(
     updateRepo: UpdateRepository = koinInject(),
     installer: UpdateInstaller = koinInject(),
 ) {
+    // MB-367 — which bundled licence is open in the viewer, or null.
+    var openLicense by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf<Pair<String, Int>?>(null)
+    }
+    openLicense?.let { (title, res) ->
+        LicenseViewerDialog(title = title, textRes = res, onDismiss = { openLicense = null })
+    }
+
     val ctx = LocalContext.current
     val info = remember { buildInfo(ctx) }
     val scroll = rememberScrollState()
@@ -357,7 +365,10 @@ fun SettingsAboutTab(
             SettingsRow(
                 label = "FFmpeg",
                 hint = stringResource(R.string.ab_ffmpeg_hint),
-                onClick = { openUrl(ctx, "https://www.gnu.org/licenses/lgpl-3.0.html") },
+                // In-app viewer, not a browser link: Fire TV ships no
+                // default browser, so ACTION_VIEW http is a silent no-op on
+                // the primary target. Verbatim text bundled from gnu.org.
+                onClick = { openLicense = "FFmpeg — GNU LGPL-3.0" to R.raw.license_lgpl_3_0 },
                 right = { ValueText("LGPL-3.0") },
             )
             SettingsRowSpacer()
@@ -371,13 +382,13 @@ fun SettingsAboutTab(
             SettingsRow(
                 label = "Media3, OkHttp, Ktor, Kotlin, Compose, SQLDelight, Koin, Coil, kotlinx",
                 hint = stringResource(R.string.ab_apache_hint),
-                onClick = { openUrl(ctx, "https://www.apache.org/licenses/LICENSE-2.0") },
+                onClick = { openLicense = "Apache License 2.0" to R.raw.license_apache_2_0 },
                 right = { ValueText("Apache-2.0") },
             )
             SettingsRowSpacer()
             SettingsRow(
                 label = "Sentry SDK",
-                onClick = { openUrl(ctx, "https://github.com/getsentry/sentry-java/blob/main/LICENSE") },
+                onClick = { openLicense = "Sentry SDK — MIT" to R.raw.license_sentry_mit },
                 right = { ValueText("MIT") },
             )
         }
