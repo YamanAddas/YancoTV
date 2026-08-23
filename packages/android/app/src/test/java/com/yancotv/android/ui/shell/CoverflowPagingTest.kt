@@ -1,6 +1,9 @@
 package com.yancotv.android.ui.shell
 
+import com.yancotv.shared.types.ContentItem
+import com.yancotv.shared.types.ContentType
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -66,5 +69,32 @@ class CoverflowPagingTest {
     @Test fun neverPagesFavoritesOrDuringLoad() {
         assertFalse(page(isFavorites = true, loaded = 10, total = 5000, reach = 10), "favorites is an in-memory list, not paged")
         assertFalse(page(loading = true, loaded = 500, total = 5000, reach = 500), "a load already in flight blocks a second")
+    }
+
+    // ── MB-379: EPG now/next window follows the focused tile ──
+    private fun ci(i: Int, tvg: String? = "tvg$i") =
+        ContentItem(id = "c$i", sourceId = "s", type = ContentType.LIVE, title = "ch$i", streamUrl = "u$i", tvgId = tvg, sortOrder = i, createdAt = 0L)
+
+    @Test fun epgWindow_centersOnFocusAndIsBounded() {
+        val items = (0 until 300).map { ci(it) }
+        val ids = epgWindowTvgIds(items, focusedIndex = 150, half = 10)
+        assertEquals(21, ids.size, "window is focus ± half inclusive")
+        assertEquals("tvg140", ids.first())
+        assertEquals("tvg160", ids.last())
+        // The old take-from-start behaviour would have returned tvg0..; prove it follows focus.
+        assertTrue(ids.none { it == "tvg0" }, "must not be anchored to the start of the list")
+    }
+
+    @Test fun epgWindow_clampsAtEdgesAndHandlesEmpty() {
+        val items = (0 until 30).map { ci(it) }
+        assertEquals("tvg0", epgWindowTvgIds(items, focusedIndex = 0, half = 10).first())
+        assertEquals("tvg29", epgWindowTvgIds(items, focusedIndex = 29, half = 10).last())
+        assertTrue(epgWindowTvgIds(emptyList(), focusedIndex = 5, half = 10).isEmpty())
+    }
+
+    @Test fun epgWindow_dropsBlankTvgIdsAndDedupes() {
+        val items = listOf(ci(0, "a"), ci(1, null), ci(2, ""), ci(3, "a"), ci(4, "b"))
+        val ids = epgWindowTvgIds(items, focusedIndex = 2, half = 10)
+        assertEquals(listOf("a", "b"), ids, "blank/null dropped, distinct preserved in order")
     }
 }

@@ -333,14 +333,20 @@ fun CoverflowSectionScreen(
     var nowSeconds by remember { mutableStateOf(System.currentTimeMillis() / 1000L) }
     if (type == ContentType.LIVE) {
         LaunchedEffect(Unit) {
-            snapshotFlow { items.mapNotNull { it.tvgId }.distinct() }
+            // MB-379 — window now/next around the FOCUSED tile rather than the
+            // first 60 loaded. In a large live category (270 of 855 exceed 60)
+            // the old take(60) meant every channel past #60 showed no programme
+            // label even when focused; now the labels follow the user. Results
+            // are merged so tiles just scrolled past keep their label. The
+            // per-channel query has no IN-list limit, so the window can be
+            // generous.
+            snapshotFlow { epgWindowTvgIds(items, focusedIndex) }
                 .distinctUntilChanged()
-                .collect { tvgIds ->
-                    if (tvgIds.isEmpty()) return@collect
-                    val ids = tvgIds.take(60)
+                .collect { ids ->
+                    if (ids.isEmpty()) return@collect
                     nowNextMap =
                         withContext(Dispatchers.IO) {
-                            runCatching { epg.getNowNextBatch(ids) }
+                            runCatching { nowNextMap + epg.getNowNextBatch(ids) }
                                 .onFailure { Log.w("Yanco", "CoverflowSection EPG batch failed: ${it.message}", it) }
                                 .getOrElse { nowNextMap }
                         }
@@ -351,15 +357,11 @@ fun CoverflowSectionScreen(
                 delay(60_000L)
                 if (!restoreFocusOnWindowRegain) continue
                 nowSeconds = System.currentTimeMillis() / 1000L
-                val ids =
-                    items
-                        .mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
-                        .distinct()
-                        .take(60)
+                val ids = epgWindowTvgIds(items, focusedIndex)
                 if (ids.isNotEmpty()) {
                     nowNextMap =
                         withContext(Dispatchers.IO) {
-                            runCatching { epg.getNowNextBatch(ids) }
+                            runCatching { nowNextMap + epg.getNowNextBatch(ids) }
                                 .onFailure { Log.w("Yanco", "CoverflowSection EPG tick failed: ${it.message}", it) }
                                 .getOrElse { nowNextMap }
                         }
@@ -769,6 +771,25 @@ internal fun shouldPageMore(
     if (itemsSize >= maxItems) return false
     return reach.toLong() >= (loaded - 20)
 }
+
+/**
+ * MB-379 — the tvg_ids to fetch now/next EPG for: a window of [half] rows on
+ * each side of [focusedIndex]. The coverflow only shows a handful of orbs, so
+ * there's no need to query an entire large category; but keying off the FOCUS
+ * (not the first N loaded) means the labels follow the user into a big category
+ * instead of stopping at channel 60. Blank/null tvg_ids are dropped; the result
+ * is distinct.
+ */
+internal fun epgWindowTvgIds(items: List<ContentItem>, focusedIndex: Int, half: Int = EPG_WINDOW_HALF): List<String> {
+    if (items.isEmpty()) return emptyList()
+    val center = focusedIndex.coerceIn(0, items.size - 1)
+    val from = (center - half).coerceAtLeast(0)
+    val to = (center + half + 1).coerceAtMost(items.size)
+    return items.subList(from, to).mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }.distinct()
+}
+
+// Half-width (rows) of the now/next EPG window fetched around the focused tile.
+private const val EPG_WINDOW_HALF = 50
 
 /**
  * MK.29.2 — dwell required on a poster before the preview pane loads its
