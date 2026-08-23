@@ -960,14 +960,28 @@ private fun PreviewScrim() {
     )
 }
 
+/**
+ * Idle watermark behind the browse preview.
+ *
+ * MB-348 — the brand mark on every type, deliberately. This used to draw
+ * `brand_plus` for LIVE but the hardcoded English words "MOVIES" / "SERIES"
+ * for the other two, which was both inconsistent and a localization trap:
+ * they render untranslated on an Arabic or French device sitting next to a
+ * fully translated UI.
+ *
+ * Localizing them was considered and rejected (owner decision, 2026-08-22).
+ * This is artwork, not copy — the LIVE arm was always the brand mark, and
+ * mixing a brand mark with a translated category noun is a mixed metaphor.
+ * Drawing `brand_plus` for all three is consistent, carries no localization
+ * debt, and reinforces the brand on every idle screen.
+ *
+ * `type` is retained because the caller distinguishes the arms and a future
+ * per-type treatment (tint, artwork) is plausible; it deliberately no longer
+ * selects the text.
+ */
 @Composable
-private fun PreviewIdleArtwork(type: ContentType) {
-    val brand =
-        when (type) {
-            ContentType.LIVE -> stringResource(R.string.brand_plus)
-            ContentType.MOVIE -> "MOVIES"
-            ContentType.SERIES -> "SERIES"
-        }
+private fun PreviewIdleArtwork(@Suppress("UNUSED_PARAMETER") type: ContentType) {
+    val brand = stringResource(R.string.brand_plus)
     Box(
         modifier =
         Modifier
