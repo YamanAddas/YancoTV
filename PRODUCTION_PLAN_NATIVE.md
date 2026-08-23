@@ -158,16 +158,34 @@ auto-hide (MB-345), type labels (MB-346) — while the milestone's own slices st
 written as planned. Treat the MK.25 tables as a menu of what is still missing
 (scrub mode, preview thumbnails, skip-intro), not as untouched scope.
 
-**Genuinely remaining for v1.0** — six feature slices, all Stage 4 unless noted:
+**Genuinely remaining for v1.0 — RE-VERIFIED AGAINST THE CODE 2026-08-22.**
 
-| | Slice |
-|---|---|
-| 1 | MK.15 — EPG display options (days fwd/back, row height, jump-to-now, programme dialog, catch-up badge) |
-| 2 | MK.17.1a–17.5 — network + playback prefs (UA presets, test connection, HW decoder pref, buffer tuning) |
-| 3 | MK.18.2 — default external player per content type |
-| 4 | MK.13.4 — multi-favorite-list UI (schema already migrated) |
-| 5 | MK.10 — TV launcher: recommendations channel + voice search (TIF stays deferred) |
-| 6 | MK.11.1/2 — phone PIP + gesture controls (Stage 3) |
+The six-slice list this section carried until now was wrong, and wrong in the
+same direction every time: it listed as "remaining" work that had already
+shipped through bug-fix and polish passes. That stale list was consulted four
+separate times in one session before anyone checked it against the tree. Each
+row below was re-verified by grepping for the actual implementation, not by
+reading this document.
+
+| Slice | Verified state | Evidence |
+|---|---|---|
+| MK.10 — TV launcher recommendations + voice search | **SHIPPED** | `RecommendationsSync` + `RecommendationsWorker` exist and are wired (`YancoApp` enqueues periodic + one-shot); `MainActivity` handles `ACTION_SEARCH` via `SearchManager.QUERY`; `res/xml/searchable.xml` present; deep links handled |
+| MK.13.4 — multi-favorite-list UI | **SHIPPED** | `FavoritesScreen` renders `FavoriteListsTabBar`, tracks `selectedListId` and filters rows by `listId`; `ChannelActionsMenu` assigns lists |
+| MK.17.1a–17.5 — network + playback prefs | **SHIPPED** | `SettingsNetworkTab` carries UA presets (`net_preset`), custom UA, test connection, connect/read timeouts; `AppPreferences` has `setDecoderFallback` + `setBufferProfile` |
+| MK.18.2 — default external player per content type | **SHIPPED** | `ExternalPlayerBucket { LIVE, MOVIE, SERIES }` + `setDefaultExternalPlayer`, surfaced in `SettingsPlaybackTab`; the enum's own KDoc cites MK.18.2 |
+| MK.15 — EPG display options | **MOSTLY SHIPPED** | days forward/back (`KEY_EPG_DAYS_FORWARD` / `_BACK`), timeline granularity (`KEY_EPG_TIMELINE_MIN`), jump-to-now chip, programme dialog and catch-up (`onPlayCatchup` + `CatchupService`) all present. **Remaining: guide row height is a fixed `Dimens.rowHeight = 78.dp`, not a user setting.** |
+| MK.11.1 — phone PIP | **SHIPPED** | `onUserLeaveHint` + `enterPictureInPictureMode(params)`, API-gated, `supportsPictureInPicture` in the manifest |
+| MK.11.2 — phone gesture controls | **NOT BUILT** | the only drag handler in the player is `detectHorizontalDragGestures` in `VodPlayerDock` (the scrub bar). No swipe-for-volume / brightness / seek anywhere. |
+
+**So the honest remaining scope for v1.0 is two fragments, not six slices:**
+
+1. **MK.11.2** — phone gesture controls (swipe volume / brightness / seek).
+2. **MK.15 fragment** — expose guide row height as a setting.
+
+**Caveat, stated deliberately:** "SHIPPED" above means *the implementation exists
+and is wired*, verified by reading the code. It does NOT mean each feature has
+been exercised end-to-end on hardware. Treat these as "built, needs a QA pass",
+not "proven".
 
 Plus **Stage 5.7 distribution, partially done**: GitHub Releases + `update.json`
 work end to end — **confirmed on hardware 2026-08-22**, a Google TV running 1.4.0
