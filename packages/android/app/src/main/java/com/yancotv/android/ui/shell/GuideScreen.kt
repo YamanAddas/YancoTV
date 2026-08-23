@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +35,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -53,7 +54,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -993,13 +997,23 @@ private fun GuideGrid(
                     with(density) { (maxWidth - CHANNEL_COL_WIDTH).toPx() }
                         .toInt()
                         .coerceAtLeast(0)
+                // MB-362 — registry of each row's lane entry, so vertical
+                // movement between lanes can be handed over explicitly.
+                // A PLAIN map on purpose, not snapshot state: it is only ever
+                // read inside a key handler, never during composition, so it
+                // must not be able to invalidate anything. This file is
+                // heavily perf-tuned (see the MK.EPG.A/I notes above) and a
+                // stray snapshot read here would re-run the grid per frame.
+                val laneEntries = remember { mutableMapOf<Int, FocusRequester>() }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(guide.channels, key = { it.tvgId }) { channel ->
+                    itemsIndexed(guide.channels, key = { _, ch -> ch.tvgId }) { rowIndex, channel ->
                         ChannelRow(
+                            rowIndex = rowIndex,
+                            laneEntries = laneEntries,
                             channel = channel,
                             windowStart = guide.startTime,
                             windowEnd = guide.endTime,
@@ -1134,6 +1148,8 @@ private fun TimeHeader(
 
 @Composable
 private fun ChannelRow(
+    rowIndex: Int,
+    laneEntries: MutableMap<Int, FocusRequester>,
     channel: EpgGuideChannel,
     windowStart: Long,
     windowEnd: Long,
@@ -1266,12 +1282,48 @@ private fun ChannelRow(
             },
         )
 
+        // MB-362 — publish this row's lane entry so the rows above and
+        // below can hand focus to it. Registered in an effect rather than
+        // during composition so the map is never mutated mid-layout, and
+        // removed on dispose with an identity check so a recycled row that
+        // has already re-registered under the same index is not evicted by
+        // the outgoing one's cleanup.
+        DisposableEffect(rowIndex, laneFocus) {
+            laneEntries[rowIndex] = laneFocus
+            onDispose { if (laneEntries[rowIndex] === laneFocus) laneEntries.remove(rowIndex) }
+        }
+
         // Programme lane. Same flow-Row layout the OLD code used —
         // bare leading gap + alternating ProgrammeBlocks / focusable
         // NoEpgCells (gap fillers) + focusable trailing NoEpgCell.
         Row(
             modifier =
             Modifier
+                // MB-362 — vertical movement between lanes, handed over
+                // explicitly. Compose's directional search would not make
+                // the jump: from a focused block there is a perfectly good
+                // candidate directly below (measured [506,354][1920,462]
+                // under a focused [506,238][1920,346]) and DOWN still did
+                // nothing, while UP escaped to the header. Same class as
+                // MB-361 -- the lanes live in per-row horizontalScroll
+                // containers, and the search does not cross them.
+                //
+                // Returns false when the neighbour is not composed, so the
+                // press falls through to default traversal instead of being
+                // swallowed at the ends of the list.
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) {
+                        false
+                    } else {
+                        val target =
+                            when (event.key) {
+                                Key.DirectionDown -> laneEntries[rowIndex + 1]
+                                Key.DirectionUp -> laneEntries[rowIndex - 1]
+                                else -> null
+                            }
+                        target != null && runCatching { target.requestFocus() }.isSuccess
+                    }
+                }
                 .horizontalScroll(hScroll)
                 .width(timelineWidth)
                 .fillMaxHeight(),

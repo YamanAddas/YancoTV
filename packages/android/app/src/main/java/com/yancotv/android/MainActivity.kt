@@ -30,6 +30,7 @@ import com.yancotv.android.ui.focus.TvContextActionState
 import com.yancotv.android.ui.shell.HomeScreen
 import com.yancotv.android.ui.shell.SearchOverlayState
 import com.yancotv.android.ui.theme.YancoTheme
+import com.yancotv.shared.sources.SyncOnStartDecision
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -265,9 +266,39 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                // MB-363 — sync on start only when the catalogue is actually
+                // stale. `autoSyncOnStartList()` filters on the flag alone, so
+                // this used to rebuild every flagged source on every cold
+                // start: on a 272,910-item catalogue that is a full wipe and
+                // re-download, ~15 minutes with Home, browse and the guide
+                // empty, every single launch.
+                //
+                // `sources.auto_sync_interval` has been in the schema, the
+                // backup format and the restore path since the beginning and
+                // was never once read. This is where it gets read.
                 val targets =
                     withContext(Dispatchers.IO) {
-                        runCatching { sourceRepo.autoSyncOnStartList() }.getOrElse { emptyList() }
+                        runCatching {
+                            val nowMs = System.currentTimeMillis()
+                            sourceRepo.autoSyncOnStartList().filter { source ->
+                                SyncOnStartDecision.shouldSync(
+                                    lastSyncedMs = source.lastSynced,
+                                    // Int column, milliseconds like every other
+                                    // duration in this schema (an Int of ms tops
+                                    // out around 24 days, ample for a sync
+                                    // interval) — no new unit exception.
+                                    autoSyncIntervalMs = source.autoSyncInterval.toLong(),
+                                    nowMs = nowMs,
+                                ).also { due ->
+                                    if (!due) {
+                                        android.util.Log.i(
+                                            "Yanco",
+                                            "auto-sync skipped for ${source.name}: catalogue is fresh",
+                                        )
+                                    }
+                                }
+                            }
+                        }.getOrElse { emptyList() }
                     }
                 for (source in targets) {
                     syncCoordinator.start(source.id, source.name)
