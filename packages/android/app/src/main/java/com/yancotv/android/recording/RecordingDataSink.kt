@@ -78,6 +78,18 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
     private var headerSeen: Boolean = false
     private var headerBuf: ByteArrayOutputStream? = null
 
+    // MB-376 — URL-gated capture. The Tee sees EVERY byte ExoPlayer pulls,
+    // including after the user zaps to a DIFFERENT channel mid-recording — and
+    // [open] was a no-op, so those bytes were appended and the file ended up
+    // channelA…channelB while still reporting success. Bind capture to the
+    // recording's URL: [open] flips [capturing] by comparing the incoming
+    // DataSpec's URL (PATH only, ignoring query so a token/CDN refresh on the
+    // same channel doesn't count as a change) against [expectedUrl]; [write]
+    // drops bytes while not capturing. A null [expectedUrl] keeps the old
+    // capture-everything behaviour for callers that don't supply one.
+    private var expectedUrl: String? = null
+    private var capturing: Boolean = true
+
     /** True while a recording is in progress (between [begin] and [end]). */
     val isActive: Boolean
         get() = synchronized(lock) { output != null }
@@ -96,7 +108,7 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
      * via UI / RecordingService bookkeeping, so this branch shouldn't
      * fire. Tests exercise it.
      */
-    fun begin(stream: OutputStream) {
+    fun begin(stream: OutputStream, expectedUrl: String? = null) {
         synchronized(lock) {
             output?.let { prior ->
                 // MB-206 — fail-open flush on duplicate begin too. If the
@@ -117,6 +129,11 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
             bytesWritten = 0L
             headerSeen = false
             headerBuf = ByteArrayOutputStream()
+            this.expectedUrl = expectedUrl
+            // Live-tee is only chosen when the player is ALREADY on this URL
+            // (RecordingRouting precondition), so the current GET matches —
+            // start capturing. A later [open] for a different URL flips this off.
+            capturing = true
         }
     }
 
@@ -153,6 +170,8 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
             bytesWritten = 0L
             headerSeen = false
             headerBuf = null
+            expectedUrl = null
+            capturing = true
             return total
         }
     }
@@ -166,7 +185,26 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
      * recording.
      */
     override fun open(dataSpec: DataSpec) {
-        // Intentionally empty — see KDoc.
+        // MB-376 — decide whether the bytes about to flow belong to the channel
+        // being recorded. Compare PATH (not query) so a token/CDN query refresh
+        // on the same channel keeps capturing, while a zap to a different
+        // channel (different path / stream id) stops it. No expectedUrl → keep
+        // the old capture-everything behaviour. This does NOT open/close the
+        // file (that's [begin]/[end]) — it only gates [write].
+        onOpenUrl(dataSpec.uri.toString())
+    }
+
+    /**
+     * MB-376 — the URL-gating half of [open], split out so it is unit-testable
+     * on the JVM (constructing a real [DataSpec] needs `android.net.Uri`, a stub
+     * in JVM tests). Sets [capturing] by comparing the incoming URL's path
+     * (query stripped) to [expectedUrl]; a null [expectedUrl] leaves capture on.
+     */
+    internal fun onOpenUrl(url: String) {
+        synchronized(lock) {
+            val expected = expectedUrl ?: return
+            capturing = url.substringBefore('?') == expected.substringBefore('?')
+        }
     }
 
     /**
@@ -183,6 +221,9 @@ class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LO
     @Throws(IOException::class)
     override fun write(buffer: ByteArray, offset: Int, length: Int) {
         synchronized(lock) {
+            // MB-376 — drop bytes that belong to a channel other than the one
+            // being recorded (the user zapped away; [open] flipped this off).
+            if (!capturing) return
             val stream = output ?: return
             try {
                 if (headerSeen) {

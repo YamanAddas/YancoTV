@@ -261,7 +261,9 @@ class RecordingService : Service() {
                 // the stream from this point — it's closed by `end()` in
                 // the finally below.
                 val stream = output.openOutputStream()
-                recordingSink.begin(stream)
+                // MB-376 — bind capture to this recording's URL so a mid-record
+                // channel zap can't append a different channel to the file.
+                recordingSink.begin(stream, input.sourceUrl)
                 try {
                     // Park until handleStop cancels us. Bytes flow through
                     // the tee in parallel on ExoPlayer's load thread.

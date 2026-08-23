@@ -107,6 +107,39 @@ class RecordingDataSinkTest {
     }
 
     @Test
+    fun dropsBytesFromADifferentChannelMidRecording() {
+        // MB-376 — the tee sees every byte ExoPlayer pulls. If the user zaps to
+        // another channel mid-recording, those bytes must NOT land in the file
+        // (which previously became channelA…channelB while still "succeeding").
+        val out = ByteArrayOutputStream()
+        sink.begin(out, expectedUrl = "http://h/live/u/p/544431.ts")
+        // Same channel, token query differs → still captured.
+        sink.onOpenUrl("http://h/live/u/p/544431.ts?token=abc")
+        sink.write(byteArrayOf(1, 2, 3), 0, 3)
+        // User zaps to a DIFFERENT channel (different path) → dropped.
+        sink.onOpenUrl("http://h/live/u/p/999999.ts")
+        sink.write(byteArrayOf(66, 66, 66, 66), 0, 4)
+        // Zap back to the recorded channel → captured again.
+        sink.onOpenUrl("http://h/live/u/p/544431.ts")
+        sink.write(byteArrayOf(4, 5), 0, 2)
+        val total = sink.end()
+        assertEquals(5L, total, "only the same-channel writes (3+2) are kept; the zapped channel's 4 bytes are dropped")
+        assertContentEquals(byteArrayOf(1, 2, 3, 4, 5), out.toByteArray())
+    }
+
+    @Test
+    fun capturesEverythingWhenNoExpectedUrlGiven() {
+        // Back-compat: begin() without a URL keeps the old capture-everything
+        // behaviour (record-current-channel path that doesn't gate).
+        val out = ByteArrayOutputStream()
+        sink.begin(out)
+        sink.onOpenUrl("http://anything/else.ts")
+        sink.write(byteArrayOf(7, 8, 9), 0, 3)
+        assertEquals(3L, sink.end())
+        assertContentEquals(byteArrayOf(7, 8, 9), out.toByteArray())
+    }
+
+    @Test
     fun endIsIdempotent() {
         val out = ByteArrayOutputStream()
         sink.begin(out)
