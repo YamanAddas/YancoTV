@@ -1294,4 +1294,13 @@
         <item quantity="other">%1$d hr ago</item>
     </plurals>
     <string name="gs_counts_join">%1$s · %2$s</string>
+
+    <!-- MB-359 — player chrome strings that were hardcoded English in
+         activity_player.xml, so they rendered untranslated on an Arabic,
+         French or Spanish device beside a fully translated UI. -->
+    <string name="pl_stream_info">STREAM INFO</string>
+    <string name="pl_info_dismiss">INFO to dismiss</string>
+    <string name="pl_jump_to_live">JUMP TO LIVE</string>
+    <string name="pl_casting">Casting</string>
+    <string name="pl_stop_casting">Stop casting</string>
 </resources>

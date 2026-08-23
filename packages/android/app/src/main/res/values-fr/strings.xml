@@ -1231,4 +1231,13 @@
         <item quantity="other">il y a %1$d h</item>
     </plurals>
     <string name="gs_counts_join">%1$s · %2$s</string>
+
+    <!-- MB-359 — player chrome strings that were hardcoded English in
+         activity_player.xml, so they rendered untranslated on an Arabic,
+         French or Spanish device beside a fully translated UI. -->
+    <string name="pl_stream_info">INFOS DU FLUX</string>
+    <string name="pl_info_dismiss">INFO pour fermer</string>
+    <string name="pl_jump_to_live">ALLER AU DIRECT</string>
+    <string name="pl_casting">Diffusion en cours</string>
+    <string name="pl_stop_casting">Arrêter la diffusion</string>
 </resources>
