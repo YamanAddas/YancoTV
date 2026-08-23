@@ -51,13 +51,26 @@ class CatchupService(private val contentRepo: ContentRepository, private val sou
      * rather than pulled off [programme] so callers that already looked up
      * the programme can reuse the id string without a second field access.
      */
-    fun resolve(programme: EpgProgramme, channelTvgId: String = programme.channelTvgId): Resolution {
+    fun resolve(
+        programme: EpgProgramme,
+        channelTvgId: String = programme.channelTvgId,
+        channelStreamUrl: String? = null,
+    ): Resolution {
         val nowSec = clock() / 1000L
         if (programme.startTime > nowSec) {
             return Resolution.Unavailable(UnavailableReason.FUTURE_PROGRAMME)
         }
+        // MB-380 — prefer the EXACT channel the user opened (its stream_url from
+        // the guide row) over a tvg_id re-lookup. findLiveByTvgId returns an
+        // arbitrary highest-priority row, and when many channels share a junk
+        // tvg_id — or simply when its priority order differs from the guide's
+        // MIN(sort_order) winner — that resolves a DIFFERENT channel than the
+        // one on screen, so catch-up replayed the wrong stream. Fall back to the
+        // tvg_id pick only when the url isn't matched (or wasn't supplied).
         val channel =
-            contentRepo.findLiveByTvgId(channelTvgId)
+            channelStreamUrl
+                ?.let { url -> contentRepo.findIdByStreamUrl(url)?.let { id -> contentRepo.findById(id) } }
+                ?: contentRepo.findLiveByTvgId(channelTvgId)
                 ?: return Resolution.Unavailable(UnavailableReason.NO_MATCHING_CHANNEL)
         val metadata = channel.metadataJson?.let { parseMetadata(it) }
 

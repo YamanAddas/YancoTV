@@ -678,7 +678,7 @@ fun GuideScreen(
             }
             val resolved =
                 withContext(Dispatchers.IO) {
-                    runCatching { catchup.resolve(programme) }
+                    runCatching { catchup.resolve(programme, channelStreamUrl = target.channel.streamUrl) }
                         .onFailure { Log.w("Yanco", "GuideScreen.catchup.resolve(${programme.id}) failed: ${it.message}", it) }
                         .getOrNull()
                 }

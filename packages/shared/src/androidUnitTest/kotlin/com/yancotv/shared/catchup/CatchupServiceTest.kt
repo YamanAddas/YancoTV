@@ -53,6 +53,30 @@ class CatchupServiceTest {
         assertTrue(playable.item.id.startsWith("catchup:ch1:"))
     }
 
+    @Test fun resolvesTheExactChannelByStreamUrlNotATvgIdPick() = runTest {
+        // MB-380 — two channels share a tvg_id (beIN SD + HD). resolve() given
+        // the stream_url the user opened must build catch-up from THAT channel,
+        // not the arbitrary tvg_id priority pick (which could be the SD row).
+        val (db, contentRepo, sourceRepo) = bootstrap()
+        val source =
+            sourceRepo.addSource(
+                AddSourceInput(name = "P", type = SourceType.XTREAM, url = "http://provider.com", username = "user1", password = "pass1"),
+            )
+        seedLiveChannel(db, id = "sd", sourceId = source.id, tvgId = "bein", streamUrl = "http://provider.com/live/user1/pass1/1111.ts")
+        seedLiveChannel(db, id = "hd", sourceId = source.id, tvgId = "bein", streamUrl = "http://provider.com/live/user1/pass1/2222.ts")
+
+        val svc = CatchupService(contentRepo, sourceRepo, clock = { (apr15At1430 + oneHour) * 1000L })
+        val result =
+            svc.resolve(
+                programme(channel = "bein", start = apr15At1430, end = apr15At1430 + oneHour),
+                channelStreamUrl = "http://provider.com/live/user1/pass1/2222.ts",
+            )
+
+        val playable = assertIs<CatchupService.Resolution.Playable>(result)
+        assertTrue(playable.item.streamUrl.contains("/2222.ts"), "must build from the HD channel; got ${playable.item.streamUrl}")
+        assertTrue(playable.item.id.startsWith("catchup:hd:"), "resolved the exact (hd) content row; got ${playable.item.id}")
+    }
+
     @Test fun rejectsFutureProgramme() = runTest {
         val (_, contentRepo, sourceRepo) = bootstrap()
         val svc = CatchupService(contentRepo, sourceRepo, clock = { apr15At1430 * 1000L })
