@@ -1240,4 +1240,11 @@
     <string name="pl_jump_to_live">ALLER AU DIRECT</string>
     <string name="pl_casting">Diffusion en cours</string>
     <string name="pl_stop_casting">Arrêter la diffusion</string>
+
+    <!-- MK.15 — guide row height. -->
+    <string name="epg_row_height">Hauteur des lignes du guide</string>
+    <string name="epg_row_height_hint">Les lignes hautes se lisent mieux de loin ; le mode compact affiche plus de chaînes.</string>
+    <string name="epg_row_height_compact">Compact</string>
+    <string name="epg_row_height_standard">Standard</string>
+    <string name="epg_row_height_comfortable">Confortable</string>
 </resources>

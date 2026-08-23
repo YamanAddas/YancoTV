@@ -173,14 +173,22 @@ reading this document.
 | MK.13.4 — multi-favorite-list UI | **SHIPPED** | `FavoritesScreen` renders `FavoriteListsTabBar`, tracks `selectedListId` and filters rows by `listId`; `ChannelActionsMenu` assigns lists |
 | MK.17.1a–17.5 — network + playback prefs | **SHIPPED** | `SettingsNetworkTab` carries UA presets (`net_preset`), custom UA, test connection, connect/read timeouts; `AppPreferences` has `setDecoderFallback` + `setBufferProfile` |
 | MK.18.2 — default external player per content type | **SHIPPED** | `ExternalPlayerBucket { LIVE, MOVIE, SERIES }` + `setDefaultExternalPlayer`, surfaced in `SettingsPlaybackTab`; the enum's own KDoc cites MK.18.2 |
-| MK.15 — EPG display options | **MOSTLY SHIPPED** | days forward/back (`KEY_EPG_DAYS_FORWARD` / `_BACK`), timeline granularity (`KEY_EPG_TIMELINE_MIN`), jump-to-now chip, programme dialog and catch-up (`onPlayCatchup` + `CatchupService`) all present. **Remaining: guide row height is a fixed `Dimens.rowHeight = 78.dp`, not a user setting.** |
+| MK.15 — EPG display options | **SHIPPED 2026-08-23** | days forward/back, timeline granularity, jump-to-now chip, programme dialog, catch-up — and now guide row height as a user setting (`GuideRowHeight` compact/standard/comfortable, Settings → EPG → Density, all four locales). STANDARD is 56dp, exactly the previous hardcoded value, so it ships as a visual no-op. |
 | MK.11.1 — phone PIP | **SHIPPED** | `onUserLeaveHint` + `enterPictureInPictureMode(params)`, API-gated, `supportsPictureInPicture` in the manifest |
 | MK.11.2 — phone gesture controls | **SHIPPED 2026-08-23** | `PlayerGestures` (pure, 11 tests, negative-controlled) + `GestureHudOverlay`; swipe left-half vertical = brightness, right-half vertical = volume, horizontal = seek. Phone only — `onScroll` returns early on `isTvDevice()`, so nothing is classified on TV. |
 
-**Remaining scope for v1.0 — one fragment:**
+**Remaining scope for v1.0 — NONE.** Both fragments shipped 2026-08-23:
 
-1. ~~MK.11.2 — phone gesture controls~~ **shipped 2026-08-23.**
-2. **MK.15 fragment** — expose guide row height as a setting.
+1. ~~MK.11.2 — phone gesture controls~~ **shipped.**
+2. ~~MK.15 fragment — guide row height as a setting~~ **shipped.**
+
+Every feature slice this plan tracked for v1.0 is now built. What stands
+between here and a 1.0 release is verification, not construction: the
+"SHIPPED" rows above mean the implementation exists and is wired, not that
+each has been exercised on hardware. A QA pass across the shipped surface is
+the honest next milestone — tonight's session found MB-361, MB-362 and
+MB-363 by simply trying to use the app, and there is no reason to think that
+well is dry.
 
 **Caveat, stated deliberately:** "SHIPPED" above means *the implementation exists
 and is wired*, verified by reading the code. It does NOT mean each feature has

@@ -1303,4 +1303,11 @@
     <string name="pl_jump_to_live">JUMP TO LIVE</string>
     <string name="pl_casting">Casting</string>
     <string name="pl_stop_casting">Stop casting</string>
+
+    <!-- MK.15 — guide row height. -->
+    <string name="epg_row_height">Guide row height</string>
+    <string name="epg_row_height_hint">Taller rows are easier to read from a distance; compact fits more channels on screen.</string>
+    <string name="epg_row_height_compact">Compact</string>
+    <string name="epg_row_height_standard">Standard</string>
+    <string name="epg_row_height_comfortable">Comfortable</string>
 </resources>

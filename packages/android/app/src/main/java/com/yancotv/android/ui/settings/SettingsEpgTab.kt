@@ -35,6 +35,7 @@ import androidx.work.WorkManager
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
 import com.yancotv.android.prefs.EpgPrefs
+import com.yancotv.android.prefs.GuideRowHeight
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
@@ -360,6 +361,22 @@ fun SettingsEpgTab(
                             val minutes = selection.removeSuffix(" min").toIntOrNull() ?: return@SettingsChipRow
                             scope.launch { prefs.setEpgTimelineMinutes(minutes) }
                         },
+                    )
+                },
+            )
+
+            // MK.15 — guide density. Lives beside the visible-window control
+            // because the two together decide how much guide fits on screen:
+            // one governs the time axis, this one the channel axis.
+            SettingsRow(
+                label = stringResource(R.string.epg_row_height),
+                hint = stringResource(R.string.epg_row_height_hint),
+                content = {
+                    SettingsChipRow(
+                        options = GuideRowHeight.values().toList(),
+                        selected = epgState.rowHeight,
+                        label = { stringResource(it.labelRes) },
+                        onSelect = { picked -> scope.launch { prefs.setEpgRowHeight(picked) } },
                     )
                 },
             )

@@ -104,7 +104,10 @@ import org.koin.compose.koinInject
 // after the channel column on a 1080p TV; phones squeeze tighter. The
 // resulting dp-per-minute is clamped so we never lose readability or
 // overload Compose with absurdly wide canvases.
-private val ROW_HEIGHT = 56.dp
+// MK.15 — the guide row height is a user setting now; this is only the
+// value the setting's STANDARD option resolves to, kept as a named constant
+// so the default stays visible at the point of use.
+private val ROW_HEIGHT_DEFAULT = 56.dp
 private val HEADER_HEIGHT = 28.dp
 private val CHANNEL_COL_WIDTH = 160.dp
 
@@ -899,6 +902,13 @@ private fun GuideGrid(
     pxPerMin: Int,
     modifier: Modifier,
 ) {
+    // MK.15 — user-chosen guide density. Read here rather than threaded down
+    // from GuideScreen so the grid repaints on its own when the setting
+    // changes, without the caller having to know the guide cares.
+    val rowHeightPref: AppPreferences = koinInject()
+    val epgPrefs by rowHeightPref.epgFlow.collectAsState()
+    val rowHeight = epgPrefs.rowHeight.heightDp.dp
+
     val hScroll = rememberScrollState()
     val totalMinutes = ((guide.endTime - guide.startTime) / 60L).toInt()
     val timelineWidth = (totalMinutes * pxPerMin).dp
@@ -1012,6 +1022,7 @@ private fun GuideGrid(
                 ) {
                     itemsIndexed(guide.channels, key = { _, ch -> ch.tvgId }) { rowIndex, channel ->
                         ChannelRow(
+                            rowHeight = rowHeight,
                             rowIndex = rowIndex,
                             laneEntries = laneEntries,
                             channel = channel,
@@ -1148,6 +1159,7 @@ private fun TimeHeader(
 
 @Composable
 private fun ChannelRow(
+    rowHeight: androidx.compose.ui.unit.Dp,
     rowIndex: Int,
     laneEntries: MutableMap<Int, FocusRequester>,
     channel: EpgGuideChannel,
@@ -1264,7 +1276,7 @@ private fun ChannelRow(
         modifier =
         Modifier
             .fillMaxWidth()
-            .height(ROW_HEIGHT)
+            .height(rowHeight)
             .background(LocalYancoPalette.current.BackgroundRaised),
         verticalAlignment = Alignment.CenterVertically,
     ) {

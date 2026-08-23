@@ -1240,4 +1240,11 @@
     <string name="pl_jump_to_live">IR AL DIRECTO</string>
     <string name="pl_casting">Transmitiendo</string>
     <string name="pl_stop_casting">Detener transmisión</string>
+
+    <!-- MK.15 — guide row height. -->
+    <string name="epg_row_height">Altura de fila de la guía</string>
+    <string name="epg_row_height_hint">Las filas altas se leen mejor de lejos; la compacta muestra más canales en pantalla.</string>
+    <string name="epg_row_height_compact">Compacta</string>
+    <string name="epg_row_height_standard">Estándar</string>
+    <string name="epg_row_height_comfortable">Amplia</string>
 </resources>

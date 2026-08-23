@@ -1333,4 +1333,11 @@
     <string name="pl_jump_to_live">الانتقال إلى المباشر</string>
     <string name="pl_casting">جارٍ الإرسال</string>
     <string name="pl_stop_casting">إيقاف الإرسال</string>
+
+    <!-- MK.15 — guide row height. -->
+    <string name="epg_row_height">ارتفاع صف الدليل</string>
+    <string name="epg_row_height_hint">الصفوف الأطول أسهل في القراءة من بعيد؛ والمضغوطة تعرض قنوات أكثر على الشاشة.</string>
+    <string name="epg_row_height_compact">مضغوط</string>
+    <string name="epg_row_height_standard">قياسي</string>
+    <string name="epg_row_height_comfortable">مريح</string>
 </resources>

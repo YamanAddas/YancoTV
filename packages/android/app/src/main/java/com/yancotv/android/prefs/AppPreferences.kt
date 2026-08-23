@@ -257,6 +257,10 @@ class AppPreferences(private val db: YancoDb) {
         _epg.value = _epg.value.copy(timelineMinutes = minutes)
     }
 
+    suspend fun setEpgRowHeight(height: GuideRowHeight) = write(KEY_EPG_ROW_HEIGHT, height.key) {
+        _epg.value = _epg.value.copy(rowHeight = height)
+    }
+
     suspend fun setRecordingFolderUri(uri: String?) = write(KEY_RECORDING_FOLDER_URI, uri.orEmpty()) {
         _recording.value =
             _recording.value.copy(folderUri = uri?.takeIf { it.isNotBlank() })
@@ -446,6 +450,7 @@ class AppPreferences(private val db: YancoDb) {
         timelineMinutes =
         readString(KEY_EPG_TIMELINE_MIN)?.toIntOrNull()
             ?: EpgPrefs.DEFAULT_TIMELINE_MIN,
+        rowHeight = GuideRowHeight.fromKey(readString(KEY_EPG_ROW_HEIGHT)),
     )
 
     private fun readRecording(): RecordingPrefs {
@@ -523,6 +528,7 @@ class AppPreferences(private val db: YancoDb) {
         private const val KEY_BACKUP_FOLDER_URI = "pref_backup_folder_uri"
         private const val KEY_RECORDING_STORAGE_MODE = "pref_recording_storage_mode"
         private const val KEY_EPG_DAYS_BACK = "pref_epg_days_back"
+        private const val KEY_EPG_ROW_HEIGHT = "pref_epg_row_height"
         private const val KEY_EPG_DAYS_FORWARD = "pref_epg_days_forward"
         private const val KEY_EPG_TIMELINE_MIN = "pref_epg_timeline_minutes"
         private const val KEY_DECODER_FALLBACK = "pref_playback_decoder_fallback"
@@ -587,7 +593,12 @@ data class ExternalPlayerPrefs(
  *    a longer span shows more programmes per screen at smaller width.
  *    Allowed: 30 / 60 / 90 / 120 / 180.
  */
-data class EpgPrefs(val daysBack: Int = DEFAULT_DAYS_BACK, val daysForward: Int = DEFAULT_DAYS_FORWARD, val timelineMinutes: Int = DEFAULT_TIMELINE_MIN) {
+data class EpgPrefs(
+    val daysBack: Int = DEFAULT_DAYS_BACK,
+    val daysForward: Int = DEFAULT_DAYS_FORWARD,
+    val timelineMinutes: Int = DEFAULT_TIMELINE_MIN,
+    val rowHeight: GuideRowHeight = GuideRowHeight.STANDARD,
+) {
     companion object {
         // 2026-04-27: cut from 1 day to 0. The hard-coded 2-hour
         // catch-up baseline added in GuideScreen's window math gives a
@@ -741,6 +752,32 @@ data class PlaybackPrefs(
 
 /** MK.17.4 — three preset profiles for `DefaultLoadControl`. Free
  *  sliders are deliberately avoided; pick a profile, ship it. */
+/**
+ * MK.15 — how tall a channel row is in the guide.
+ *
+ * Exposed as a setting because the right density genuinely depends on the
+ * device and the viewing distance: on a phone in the hand, compact fits far
+ * more of a 3,000-channel list on screen; on a TV across a room, comfortable
+ * is what stays readable.
+ *
+ * The default is [STANDARD] on every form factor rather than being chosen by
+ * device type. A per-device default was considered and rejected — it would
+ * silently change the guide for every existing TV user on upgrade, and make
+ * the same account look different on two screens for reasons the user never
+ * asked for. STANDARD is exactly today's 56dp, so this ships as a no-op
+ * until someone chooses otherwise.
+ */
+enum class GuideRowHeight(val key: String, @StringRes val labelRes: Int, val heightDp: Int) {
+    COMPACT("compact", R.string.epg_row_height_compact, 44),
+    STANDARD("standard", R.string.epg_row_height_standard, 56),
+    COMFORTABLE("comfortable", R.string.epg_row_height_comfortable, 72),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): GuideRowHeight = values().firstOrNull { it.key == key } ?: STANDARD
+    }
+}
+
 enum class BufferProfile(
     val key: String,
     @StringRes val labelRes: Int,
