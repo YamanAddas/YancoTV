@@ -1309,4 +1309,8 @@
     <string name="epg_row_height_compact">Compact</string>
     <string name="epg_row_height_standard">Standard</string>
     <string name="epg_row_height_comfortable">Comfortable</string>
+
+    <!-- MB-370 — phone gesture HUD labels. -->
+    <string name="pl_gesture_brightness">Brightness</string>
+    <string name="pl_gesture_volume">Volume</string>
 </resources>

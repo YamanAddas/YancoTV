@@ -1340,4 +1340,8 @@
     <string name="epg_row_height_compact">مضغوط</string>
     <string name="epg_row_height_standard">قياسي</string>
     <string name="epg_row_height_comfortable">مريح</string>
+
+    <!-- MB-370 — phone gesture HUD labels. -->
+    <string name="pl_gesture_brightness">السطوع</string>
+    <string name="pl_gesture_volume">مستوى الصوت</string>
 </resources>

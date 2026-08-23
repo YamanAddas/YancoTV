@@ -16,10 +16,17 @@ import kotlin.math.abs
  * enforce it, so the gate lives at the single call site.
  */
 enum class PlayerGesture {
-    /** Vertical drag on the leading half — screen brightness. */
+    /**
+     * Vertical drag on the LEFT half — screen brightness.
+     *
+     * Physical left, deliberately NOT RTL-mirrored. This is muscle memory
+     * from every major video player (VLC, MX Player, YouTube keep
+     * brightness-left/volume-right in RTL locales too); mirroring it would
+     * "correctly" localize a convention users hold in their hands.
+     */
     BRIGHTNESS,
 
-    /** Vertical drag on the trailing half — media volume. */
+    /** Vertical drag on the RIGHT half — media volume. Same non-mirroring rationale. */
     VOLUME,
 
     /** Horizontal drag anywhere — scrub. */

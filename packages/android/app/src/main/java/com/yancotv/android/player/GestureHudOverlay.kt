@@ -21,9 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yancotv.android.R
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -71,10 +73,14 @@ fun GestureHudOverlay(hudFlow: StateFlow<GestureHud?>) {
 
 @Composable
 private fun LevelBadge(state: GestureHud.Level) {
+    // MB-370 — these were hardcoded English for about three hours before the
+    // Compose-literal sweep caught them. Android lint's HardcodedText only
+    // inspects XML layouts, so nothing automated flags a bare string here;
+    // the sweep in the audit is currently the only detector for this class.
     val label =
         when (state.gesture) {
-            PlayerGesture.BRIGHTNESS -> "Brightness"
-            PlayerGesture.VOLUME -> "Volume"
+            PlayerGesture.BRIGHTNESS -> stringResource(R.string.pl_gesture_brightness)
+            PlayerGesture.VOLUME -> stringResource(R.string.pl_gesture_volume)
             else -> ""
         }
     HudSurface {

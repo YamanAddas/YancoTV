@@ -1247,4 +1247,8 @@
     <string name="epg_row_height_compact">Compacta</string>
     <string name="epg_row_height_standard">Estándar</string>
     <string name="epg_row_height_comfortable">Amplia</string>
+
+    <!-- MB-370 — phone gesture HUD labels. -->
+    <string name="pl_gesture_brightness">Brillo</string>
+    <string name="pl_gesture_volume">Volumen</string>
 </resources>
