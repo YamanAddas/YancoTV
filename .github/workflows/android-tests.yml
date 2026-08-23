@@ -34,13 +34,9 @@ name: Android tests
 #
 # Out of scope (for now — file as future MK if pursued):
 #   * Instrumented tests (`androidTest/`) — none exist today.
-#   * `lintRelease` — NOT enforced yet. It currently reports 24 errors on top
-#     of an already-stale `lint-baseline.xml` (which filters 58 more). Adding
-#     it as a gate today would just break CI, and regenerating the baseline
-#     would bury them — two of the NewApi hits were real API-26-on-minSdk-24
-#     crashes (MB-294, same class as the MB-241 Fire OS 6 startup crash), so
-#     they deserve fixing, not baselining. Enable this step once the error
-#     count is zero.
+#   (was: "`lintRelease` — NOT enforced yet", with 24 errors on a stale
+#   baseline. ENFORCED as of 2026-08-22: the error count is zero, so the
+#   condition that note set for enabling it is met. See the step below.)
 #   (was: "iOS targets belong in a separate macOS workflow" — then covered by
 #   an `ios` job in this file, added 2026-08-10, on the reasoning that one file
 #   gives a PR one status-check set instead of two.
@@ -153,6 +149,26 @@ jobs:
         # First — it's the fastest gate, so a style-only break fails in
         # seconds instead of after the full test + build cycle.
         run: ./gradlew :shared:ktlintCheck :app:ktlintCheck --console=plain --stacktrace
+
+      - name: Android lint (:app:lintRelease)
+        # Enforced as of 2026-08-22, the first time this repo has had a clean
+        # lintRelease. It had never been run to completion before: 18 errors
+        # sat on top of a baseline filtering 182 more, so nothing was watching.
+        #
+        # Not a hypothetical gate. Auditing what the baseline was HIDING is
+        # what surfaced MB-359 — six hardcoded English strings in the live
+        # player layout, which meant an Arabic device showed Latin-script
+        # labels during playback for months while MK.31 claimed full i18n.
+        #
+        # `-PallowUnsignedRelease` is deliberately NOT passed: the signing
+        # guard in app/build.gradle.kts matches packaging tasks by exact name
+        # and excludes lintRelease precisely so this step needs no keystore.
+        #
+        # If this step ever goes red, triage into three buckets — fix real
+        # bugs, suppress false positives AT THE SITE with the verification,
+        # baseline only genuinely-deferred decisions. Do not regenerate the
+        # baseline to make it pass; that is how the last 182 got buried.
+        run: ./gradlew :app:lintRelease --console=plain --stacktrace
 
       - name: Verify SQLDelight migrations
         # The build-time task the header used to claim was already covered.

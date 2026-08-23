@@ -34,7 +34,6 @@ koin = "4.0.1"
 coil = "3.0.4"
 kermit = "2.0.5"
 androidx-work = "2.9.1"
-androidx-security = "1.1.0-alpha06"
 androidx-documentfile = "1.0.1"
 leakcanary = "2.14"
 checker-qual = "3.49.0"
@@ -129,7 +128,6 @@ kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "androidx-work" }
 
 # Security (used for androidx.security, but we prefer raw Keystore for credentials)
-androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "androidx-security" }
 
 # DocumentFile — wraps Storage Access Framework tree URIs as a File-like
 # tree so RecordingService can write recordings into a user-picked folder
