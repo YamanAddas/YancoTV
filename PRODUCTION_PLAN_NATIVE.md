@@ -134,6 +134,20 @@ The MK.* numbering below stays as a reference catalog; what's authoritative goin
 
 ### Status (reconciled 2026-08-22) — READ THIS ONE
 
+> **Addendum (reconciled 2026-08-23, end of the overnight session).** The
+> pre-release audit series MB-364..MB-370 plus MB-372 is closed; MK.11.2 and
+> the MK.15 fragment shipped, completing the v1.0 feature scope; MB-355 and
+> MB-356 are field-verified on hardware (the scheduled-recording fire at
+> 03:44:30 exercised every stage, refused by the provider's 1-connection
+> limit with an honest `stream_458`). The register holds THREE open entries:
+> **MB-371** (guide lane LEFT/RIGHT — parked, three failed attempts
+> documented, touch works), **MB-368** (fat-APK ABI split — deliberate,
+> needs an updater change first), and hosted copies of the policy/licence
+> documents folded into MB-367/372 as owner actions. Known release blockers:
+> none. Known remaining risk: no phone hardware has touched this code, and
+> MB-355's bytes-through-sink sliver on device waits on a free provider
+> connection.
+
 The 2026-04-25 block below is preserved for history and is **four months stale**;
 it predates MK.26–MK.35 entirely. It was actively misleading during the
 2026-08-21/22 session (Stage 4.6 shows no tick yet Stage 5.5 describes it as
