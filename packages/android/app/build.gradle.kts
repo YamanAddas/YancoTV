@@ -605,6 +605,37 @@ afterEvaluate {
 //
 // (which auto-runs assembleRelease + bundleRelease + generateUpdateJson
 // because of `dependsOn`).
+// MB-364 — a distributable build with no crash reporting must be a
+// DELIBERATE choice, never a silent default. `sentryDsn` resolves from the
+// YANCOTV_SENTRY_DSN env var or local.properties `sentry.dsn`; when both are
+// absent the app builds fine and SentryInit silently no-ops — right for a
+// clean-checkout debug build, wrong for something you hand to users. This
+// mirrors the release-signing guard above: `releasePackage` (the only task
+// whose output is meant to be distributed) fails on a blank DSN unless
+// `-PallowNoCrashReporting=true` is passed explicitly. `assembleRelease`
+// alone stays permissive on purpose — CI runs it for R8 validation with no
+// secrets and no intent to distribute.
+val requireCrashReporting by tasks.registering {
+    group = "yancotv"
+    description = "Fails when the release has no Sentry DSN, unless -PallowNoCrashReporting=true."
+    doFirst {
+        if (sentryDsn.isBlank() && !project.hasProperty("allowNoCrashReporting")) {
+            throw GradleException(
+                "Sentry DSN is empty — this build would report NO crashes, silently. " +
+                    "Set YANCOTV_SENTRY_DSN (env) or sentry.dsn in local.properties, " +
+                    "or pass -PallowNoCrashReporting=true to ship without crash reporting on purpose.",
+            )
+        }
+        if (sentryAuthToken.isBlank() && !project.hasProperty("allowNoCrashReporting")) {
+            logger.warn(
+                "SENTRY_AUTH_TOKEN is empty — the R8 mapping will NOT be uploaded, so any " +
+                    "crash from this build will be obfuscated in the dashboard. The DSN is set, " +
+                    "so this is a warning rather than a failure.",
+            )
+        }
+    }
+}
+
 val releasePackage by tasks.registering {
     group = "yancotv"
     description = "Bundle signed APK + AAB + update.json + SHA256SUMS for distribution."
@@ -623,7 +654,7 @@ val releasePackage by tasks.registering {
     inputs.file(updateJsonProvider)
     outputs.dir(outDirProvider)
 
-    dependsOn("assembleRelease", "bundleRelease", generateUpdateJson)
+    dependsOn(requireCrashReporting, "assembleRelease", "bundleRelease", generateUpdateJson)
 
     doLast {
         val versionName = android.defaultConfig.versionName ?: "unknown"

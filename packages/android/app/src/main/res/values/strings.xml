@@ -934,8 +934,7 @@
     <string name="ph_notifications_body">Per-event toggles for EPG reminders, source-sync completion, recording-ready alerts, and update prompts. Routes through WorkManager — unblocked once MK.14 adds the DVR event producer.</string>
     <string name="ph_storage_body">Image cache size, EPG cache size, SQLite DB footprint, and one-tap clear actions. Waiting on a size-aggregator in the shared cache layer so the read is cheap enough to refresh on tab entry.</string>
     <string name="ph_subtitles_title">Subtitles</string>
-    <string name="ph_subtitles_kicker" translatable="false">Milestone MK.12a.3+</string>
-    <string name="ph_subtitles_body">Default caption language, font size, font color, background opacity, and vertical position. Player-overlay picker already ships (MK.12a.3); these are the defaults persisted across restarts.</string>
+    <string name="ph_subtitles_body">Default caption language, text size, color, background opacity and vertical position. You can already adjust subtitles for the current video from the player — the defaults that persist across restarts will live here.</string>
     <string name="sc_intro">Quick reference for the TV-remote and keyboard bindings YancoTV listens for. Shortcuts aren\'t user-configurable yet — let us know in the issues if any clash with your remote.</string>
     <string name="ss_search_in_tab">in %1$s</string>
     <string name="ss_nav_hint">exit  ·  ↑↓ navigate  ·  1-9 jump</string>

@@ -15,7 +15,10 @@ import com.yancotv.android.R
 fun SettingsSubtitlesTab(modifier: Modifier = Modifier) {
     SettingsPlaceholder(
         modifier = modifier,
-        kicker = stringResource(R.string.ph_subtitles_kicker),
+        // MB-365 — was ph_subtitles_kicker ("Milestone MK.12a.3+"), a plan
+        // identifier rendered to users. Same localized kicker as the other
+        // placeholder tabs.
+        kicker = stringResource(R.string.ph_later_milestone),
         title = stringResource(R.string.ph_subtitles_title),
         body =
         stringResource(R.string.ph_subtitles_body),

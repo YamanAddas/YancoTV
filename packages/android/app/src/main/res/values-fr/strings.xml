@@ -903,7 +903,7 @@
     <string name="ph_notifications_body">Options par événement : rappels EPG, fin de synchronisation des sources, alertes d\'enregistrement prêt et invitations à mettre à jour. Passe par WorkManager — débloqué dès que MK.14 ajoutera le producteur d\'événements DVR.</string>
     <string name="ph_storage_body">Taille du cache d\'images, du cache EPG, empreinte de la base SQLite et actions d\'effacement en un geste. En attente d\'un agrégateur de tailles dans la couche de cache partagée pour que la lecture soit assez légère à l\'ouverture de l\'onglet.</string>
     <string name="ph_subtitles_title">Sous-titres</string>
-    <string name="ph_subtitles_body">Langue par défaut des sous-titres, taille et couleur de police, opacité du fond et position verticale. Le sélecteur dans le lecteur est déjà disponible (MK.12a.3) ; il s\'agit ici des valeurs par défaut conservées entre les redémarrages.</string>
+    <string name="ph_subtitles_body">Langue des sous-titres par défaut, taille du texte, couleur, opacité du fond et position verticale. Vous pouvez déjà régler les sous-titres de la vidéo en cours depuis le lecteur — les réglages par défaut conservés entre les redémarrages seront ici.</string>
     <string name="sc_intro">Référence rapide des touches de télécommande et de clavier que YancoTV écoute. Les raccourcis ne sont pas encore configurables — signalez-nous tout conflit avec votre télécommande.</string>
     <string name="ss_search_in_tab">dans %1$s</string>
     <string name="ss_nav_hint">quitter  ·  ↑↓ naviguer  ·  1-9 aller à</string>

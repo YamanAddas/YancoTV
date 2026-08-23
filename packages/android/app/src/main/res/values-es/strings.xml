@@ -903,7 +903,7 @@
     <string name="ph_notifications_body">Interruptores por evento: recordatorios de EPG, fin de sincronización de fuentes, avisos de grabación lista y peticiones de actualización. Pasa por WorkManager: se desbloquea cuando MK.14 añada el productor de eventos de DVR.</string>
     <string name="ph_storage_body">Tamaño de la caché de imágenes, de la caché de EPG, huella de la base SQLite y acciones de borrado con un toque. Pendiente de un agregador de tamaños en la capa de caché compartida para que la lectura sea lo bastante ligera al abrir la pestaña.</string>
     <string name="ph_subtitles_title">Subtítulos</string>
-    <string name="ph_subtitles_body">Idioma predeterminado de los subtítulos, tamaño y color de la fuente, opacidad del fondo y posición vertical. El selector del reproductor ya está disponible (MK.12a.3); estos son los valores predeterminados que se conservan entre reinicios.</string>
+    <string name="ph_subtitles_body">Idioma de subtítulos predeterminado, tamaño del texto, color, opacidad del fondo y posición vertical. Ya puedes ajustar los subtítulos del vídeo actual desde el reproductor — los ajustes predeterminados que persisten entre reinicios estarán aquí.</string>
     <string name="sc_intro">Referencia rápida de las teclas del mando y del teclado que YancoTV atiende. Los atajos aún no se pueden configurar: avísanos en las incidencias si alguno choca con tu mando.</string>
     <string name="ss_search_in_tab">en %1$s</string>
     <string name="ss_nav_hint">salir  ·  ↑↓ navegar  ·  1-9 ir a</string>
