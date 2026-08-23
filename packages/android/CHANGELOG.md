@@ -6,13 +6,12 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
-## 0.9.0 (versionCode 23) — 2026-08-23
+## 1.6.0 (versionCode 24) — 2026-08-23
 
-**Version reset.** Earlier native builds were numbered `1.x`, which overstated
-maturity. This is the honest pre-1.0 line: feature-complete for the intended
-1.0 scope, with a short list of known issues (below) still open. `versionCode`
-continues from the previous build, so existing installs update normally and
-simply see the corrected `0.9.0` label.
+Continues the 1.x line from 1.5.3. A large data-safety and stability release:
+recording actually works now, silent write-loss is fixed, and cold start no
+longer wipes the catalogue. Still short of a 1.0 "everything verified" claim —
+see Known issues.
 
 ### Fixed
 - **Recordings wrote 0 bytes and reported success.** The streaming transport
