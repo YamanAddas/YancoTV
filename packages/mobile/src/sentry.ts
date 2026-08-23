@@ -1,12 +1,24 @@
 import * as Sentry from '@sentry/react-native';
 
-const DSN =
-  'https://f838cd9a9d97b0e990bf6566efdc095b@o4509416043118592.ingest.us.sentry.io/4511239553024000';
+// MB-358 — this used to be a string literal. A Sentry DSN is an ingest key
+// rather than a credential (every shipped client exposes one, by design), so
+// this was never a data-exposure problem — but the repository went public on
+// 2026-08-22, and the native app deliberately keeps its DSN out of source in
+// `packages/android/local.properties`. This was the single place that broke
+// that convention.
+//
+// `packages/mobile/` has been frozen since 2026-04-20 and is never built, so
+// there is nothing to configure: read it from the environment and no-op when
+// absent. If this package is ever revived, set SENTRY_DSN at build time.
+const DSN = process.env.SENTRY_DSN ?? '';
 
 let initialized = false;
 
 export function initSentry() {
   if (initialized) return;
+  // No DSN configured — nothing to report to. Skipping beats initialising
+  // Sentry with an empty string, which it treats as a hard error.
+  if (!DSN) return;
   initialized = true;
 
   Sentry.init({
