@@ -44,6 +44,19 @@
         android:clickable="false"
         android:focusable="false" />
 
+    <!-- MK.11.2 — phone swipe HUD (brightness / volume / seek). Eager like
+         seek_flash and equally quiet when idle: it observes a StateFlow and
+         renders an empty Box while that is null. Never focusable or
+         clickable — it must not intercept the touches that drive it, and it
+         must not appear in the D-pad focus order on TV, where the gestures
+         that feed it are not wired at all. -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/gesture_hud"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
+
     <!-- Zap bar: channel name + now/next, top-start. Fades with Media3 controller. -->
     <LinearLayout
         android:id="@+id/zap_bar"

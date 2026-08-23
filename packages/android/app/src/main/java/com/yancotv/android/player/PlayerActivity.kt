@@ -126,6 +126,12 @@ class PlayerActivity : AppCompatActivity() {
         // so a TV remote keypress flurry doesn't thrash the visual.
         private const val SEEK_FLASH_HIDE_MS = 600L
 
+        // MK.11.2 — how long the swipe HUD lingers after the finger lifts.
+        // Longer than SEEK_FLASH_HIDE_MS on purpose: the flash confirms a
+        // discrete press, whereas this confirms the result of a continuous
+        // adjustment and the user needs a beat to read the final value.
+        private const val GESTURE_HUD_LINGER_MS = 900L
+
         // MK.8.2 — live-edge poll cadence and "you're behind live" floor.
         // 1 s is fine; the subsequent UI write is a single TextView update.
         // 8 s threshold ignores the normal ExoPlayer live latency (a few
@@ -177,6 +183,18 @@ class PlayerActivity : AppCompatActivity() {
     // adds ±10 to the current accumulator; a 600 ms timer clears it. Three
     // presses inside the window show "+30s", not three separate "+10s"
     // flashes — TV remotes spam keys.
+    // MK.11.2 — phone swipe controls. All of this stays inert on TV: the
+    // gate is `isTvDevice()` inside onScroll, so no gesture is ever
+    // classified there and the HUD flow never leaves null.
+    private val gestureHudFlow = kotlinx.coroutines.flow.MutableStateFlow<GestureHud?>(null)
+    private var gestureHudJob: Job? = null
+
+    /** Latched for the life of one drag — see PlayerGestures.classify. */
+    private var activeGesture: PlayerGesture? = null
+    private var gestureStartLevel = 0f
+    private var gestureStartPositionMs = 0L
+    private var gesturePendingSeekMs = 0L
+
     private val seekFlashFlow = kotlinx.coroutines.flow.MutableStateFlow(0)
     private var seekFlashJob: Job? = null
 
@@ -281,6 +299,17 @@ class PlayerActivity : AppCompatActivity() {
                 override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
                     onPlayerSingleTap()
                     return true
+                }
+
+                // MK.11.2 — brightness / volume / seek by swipe.
+                //
+                // Hung off the EXISTING detector rather than adding a second
+                // one: two GestureDetectors on the same view both consume
+                // the stream and the tap-to-toggle would start missing.
+                override fun onScroll(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                    // TV has no touchscreen; never classify anything there.
+                    if (isTvDevice() || e1 == null) return false
+                    return onPlayerScroll(e1, e2)
                 }
             },
         )
@@ -630,6 +659,19 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
+        // MK.11.2 — swipe HUD. Same eager-but-quiet arrangement as
+        // seek_flash: it renders an empty Box until a gesture starts, and on
+        // TV nothing ever starts one.
+        findViewById<androidx.compose.ui.platform.ComposeView>(R.id.gesture_hud)
+            .apply {
+                setViewCompositionStrategy(
+                    androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
+                setThemedContent {
+                    GestureHudOverlay(hudFlow = gestureHudFlow)
+                }
+            }
+
         // MB-343 (W4) — up-next card. Eager for the same reason as seek-flash:
         // it renders nothing while `visible` is false, and the trigger is a
         // 1 Hz tick that must not pay a stub-inflation cost mid-countdown.
@@ -765,7 +807,19 @@ class PlayerActivity : AppCompatActivity() {
         // via KEYCODE_DPAD_CENTER, so phones saw nothing on tap). Controller
         // buttons / dock chips are child / overlay views that consume their
         // own taps first, so only video-area taps reach this and toggle.
-        playerView.setOnTouchListener { _, event -> playerTapDetector.onTouchEvent(event) }
+        playerView.setOnTouchListener { _, event ->
+            val handled = playerTapDetector.onTouchEvent(event)
+            // MK.11.2 — the detector reports scrolls but never the end of one,
+            // so the latch is released here. CANCEL as well as UP: the parent
+            // can steal the gesture mid-drag and a surviving latch would
+            // misread the next touch.
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL,
+                -> endPlayerGesture()
+            }
+            handled
+        }
 
         // Tie our zap bar + program progress to Media3's own controller
         // visibility — one clock governs all overlays so they fade together
@@ -1959,6 +2013,139 @@ class PlayerActivity : AppCompatActivity() {
      * currentLiveOffset`), not `duration`: a progressive MPEG-TS live stream has
      * no live window, so `duration` is `TIME_UNSET` and would clamp to nothing.
      */
+    /**
+     * MK.11.2 — one drag of the phone player's swipe controls.
+     *
+     * The axis is classified ONCE and latched in [activeGesture] for the
+     * rest of the drag. Re-deciding per frame lets a slightly diagonal
+     * swipe flicker between seeking and volume, which ends with the user
+     * having accidentally done both.
+     *
+     * Deltas are computed from the ORIGINAL down event, not accumulated
+     * from `distanceX/Y`. Accumulating drifts, and worse, it makes the
+     * result depend on how many motion events the device happened to
+     * deliver — the same physical swipe would do different amounts on a
+     * 60 Hz phone and a 120 Hz one.
+     */
+    private fun onPlayerScroll(e1: android.view.MotionEvent, e2: android.view.MotionEvent): Boolean {
+        val width = playerView.width
+        val height = playerView.height
+        val totalDx = e2.x - e1.x
+        val totalDy = e2.y - e1.y
+
+        if (activeGesture == null) {
+            val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop.toFloat()
+            val classified = PlayerGestures.classify(e1.x, width, totalDx, totalDy, slop)
+            if (classified == PlayerGesture.NONE) return false
+            activeGesture = classified
+            gestureStartLevel =
+                when (classified) {
+                    PlayerGesture.BRIGHTNESS -> currentBrightness()
+                    PlayerGesture.VOLUME -> currentVolume()
+                    else -> 0f
+                }
+            gestureStartPositionMs = controller.player.currentPosition
+            gesturePendingSeekMs = 0L
+        }
+
+        when (activeGesture) {
+            PlayerGesture.BRIGHTNESS -> {
+                val level = PlayerGestures.applyLevel(gestureStartLevel, PlayerGestures.levelDelta(totalDy, height))
+                applyBrightness(level)
+                showGestureHud(GestureHud.Level(PlayerGesture.BRIGHTNESS, level))
+            }
+            PlayerGesture.VOLUME -> {
+                val level = PlayerGestures.applyLevel(gestureStartLevel, PlayerGestures.levelDelta(totalDy, height))
+                applyVolume(level)
+                showGestureHud(GestureHud.Level(PlayerGesture.VOLUME, level))
+            }
+            PlayerGesture.SEEK -> {
+                // Accumulate only; the seek is committed on release. Seeking
+                // live on every frame thrashes the decoder on a long swipe
+                // and makes the position fight the finger.
+                gesturePendingSeekMs = PlayerGestures.seekDeltaMs(totalDx, width)
+                showGestureHud(GestureHud.Seek(gesturePendingSeekMs))
+            }
+            else -> return false
+        }
+        return true
+    }
+
+    /**
+     * End of a drag — commit anything deferred and unlatch.
+     *
+     * Called for ACTION_UP **and** ACTION_CANCEL. Cancel matters: the parent
+     * can steal the gesture mid-drag, and without this the latch would
+     * survive into the next touch and misinterpret it.
+     */
+    private fun endPlayerGesture() {
+        val gesture = activeGesture ?: return
+        activeGesture = null
+        if (gesture == PlayerGesture.SEEK && gesturePendingSeekMs != 0L) {
+            // Reuse commitSeek: it owns live-edge vs VOD clamping and the
+            // MB-341 "report what actually moved" behaviour. Duplicating
+            // that here would be a second clamp implementation to drift.
+            commitSeek((gesturePendingSeekMs / 1_000L).toInt())
+        }
+        gesturePendingSeekMs = 0L
+        hideGestureHudAfterDelay()
+    }
+
+    /** Current window brightness as 0..1, resolving the "system default" sentinel. */
+    private fun currentBrightness(): Float {
+        val attr = window.attributes.screenBrightness
+        if (attr >= 0f) return attr
+        // BRIGHTNESS_OVERRIDE_NONE — the window is following the system. Read
+        // the system value so the first drag continues from what the user is
+        // actually looking at instead of jumping to an arbitrary midpoint.
+        val system =
+            runCatching {
+                android.provider.Settings.System.getInt(
+                    contentResolver,
+                    android.provider.Settings.System.SCREEN_BRIGHTNESS,
+                ) / 255f
+            }.getOrDefault(0.5f)
+        return system.coerceIn(0f, 1f)
+    }
+
+    private fun applyBrightness(level: Float) {
+        window.attributes =
+            window.attributes.apply { screenBrightness = level.coerceIn(0f, 1f) }
+    }
+
+    private fun audioManager(): android.media.AudioManager? = getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+
+    private fun currentVolume(): Float {
+        val am = audioManager() ?: return 0f
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        if (max <= 0) return 0f
+        return am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / max
+    }
+
+    private fun applyVolume(level: Float) {
+        val am = audioManager() ?: return
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        if (max <= 0) return
+        val target = (level.coerceIn(0f, 1f) * max).roundToInt()
+        // No FLAG_SHOW_UI — we are already drawing our own HUD, and the
+        // system panel on top of it looks broken.
+        runCatching { am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0) }
+    }
+
+    private fun showGestureHud(state: GestureHud) {
+        gestureHudJob?.cancel()
+        gestureHudFlow.value = state
+    }
+
+    private fun hideGestureHudAfterDelay() {
+        gestureHudJob?.cancel()
+        gestureHudJob =
+            lifecycleScope.launch {
+                delay(GESTURE_HUD_LINGER_MS)
+                gestureHudFlow.value = null
+            }
+    }
+
     private fun commitSeek(deltaSec: Int) {
         val p = controller.player
         val isLive = controller.currentItem.value?.type == ContentType.LIVE

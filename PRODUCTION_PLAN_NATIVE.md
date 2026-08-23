@@ -175,11 +175,11 @@ reading this document.
 | MK.18.2 — default external player per content type | **SHIPPED** | `ExternalPlayerBucket { LIVE, MOVIE, SERIES }` + `setDefaultExternalPlayer`, surfaced in `SettingsPlaybackTab`; the enum's own KDoc cites MK.18.2 |
 | MK.15 — EPG display options | **MOSTLY SHIPPED** | days forward/back (`KEY_EPG_DAYS_FORWARD` / `_BACK`), timeline granularity (`KEY_EPG_TIMELINE_MIN`), jump-to-now chip, programme dialog and catch-up (`onPlayCatchup` + `CatchupService`) all present. **Remaining: guide row height is a fixed `Dimens.rowHeight = 78.dp`, not a user setting.** |
 | MK.11.1 — phone PIP | **SHIPPED** | `onUserLeaveHint` + `enterPictureInPictureMode(params)`, API-gated, `supportsPictureInPicture` in the manifest |
-| MK.11.2 — phone gesture controls | **NOT BUILT** | the only drag handler in the player is `detectHorizontalDragGestures` in `VodPlayerDock` (the scrub bar). No swipe-for-volume / brightness / seek anywhere. |
+| MK.11.2 — phone gesture controls | **SHIPPED 2026-08-23** | `PlayerGestures` (pure, 11 tests, negative-controlled) + `GestureHudOverlay`; swipe left-half vertical = brightness, right-half vertical = volume, horizontal = seek. Phone only — `onScroll` returns early on `isTvDevice()`, so nothing is classified on TV. |
 
-**So the honest remaining scope for v1.0 is two fragments, not six slices:**
+**Remaining scope for v1.0 — one fragment:**
 
-1. **MK.11.2** — phone gesture controls (swipe volume / brightness / seek).
+1. ~~MK.11.2 — phone gesture controls~~ **shipped 2026-08-23.**
 2. **MK.15 fragment** — expose guide row height as a setting.
 
 **Caveat, stated deliberately:** "SHIPPED" above means *the implementation exists
