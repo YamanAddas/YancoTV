@@ -3,6 +3,7 @@ package com.yancotv.shared.history
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.yancotv.shared.db.SelectRecentWithContent
+import com.yancotv.shared.db.Watch_history
 import com.yancotv.shared.db.YancoDb
 import com.yancotv.shared.logger.Log
 import com.yancotv.shared.types.ContentItem
@@ -128,22 +129,44 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
             .selectByContentIds(contentIds)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { rows ->
-                if (rows.isEmpty()) return@map emptyMap()
-                rows.groupBy { it.content_id }.mapValues { (_, group) ->
-                    // Container row preferred. Group is already watched_at
-                    // DESC (query orders DESC), so .first() on the
-                    // episode-only fallback yields the most-recent episode.
-                    val row = group.firstOrNull { it.episode_id == null } ?: group.first()
-                    WatchProgress(
-                        contentId = row.content_id,
-                        episodeId = row.episode_id,
-                        positionSeconds = row.position_seconds,
-                        durationSeconds = row.duration_seconds,
-                        watchedAt = row.watched_at,
-                    )
-                }
-            }
+            .map { rows -> resolveContentProgress(rows) }
+    }
+
+    /**
+     * MB-374 — reactive tile-progress map over the ENTIRE watch_history table,
+     * keyed by `content_id`. Same container-preferred resolution as
+     * [entriesByContentFlow] but with no `IN`-list: the browse coverflow
+     * subscribes once and looks each visible tile up by id, so the number of
+     * items a category has paged in never feeds into the SQLite bind-variable
+     * count (999 on API <= 30). watch_history holds one row per watched title —
+     * a small table — so selecting it whole is cheap, and it re-emits on every
+     * write exactly like the batched variant.
+     */
+    fun allProgressFlow(): Flow<Map<String, WatchProgress>> = db.watchHistoryQueries
+        .selectAllProgress()
+        .asFlow()
+        .mapToList(Dispatchers.Default)
+        .map { rows -> resolveContentProgress(rows) }
+
+    /**
+     * Container-preferred resolution shared by [entriesByContentFlow] and
+     * [allProgressFlow] (AGENTS rule 8 — one mapper, no drift). Prefer the
+     * content-level (container) row; fall back to the most-recent episode row.
+     * Rows arrive `watched_at DESC`, so `.first()` on the episode-only fallback
+     * is the newest episode.
+     */
+    private fun resolveContentProgress(rows: List<Watch_history>): Map<String, WatchProgress> {
+        if (rows.isEmpty()) return emptyMap()
+        return rows.groupBy { it.content_id }.mapValues { (_, group) ->
+            val row = group.firstOrNull { it.episode_id == null } ?: group.first()
+            WatchProgress(
+                contentId = row.content_id,
+                episodeId = row.episode_id,
+                positionSeconds = row.position_seconds,
+                durationSeconds = row.duration_seconds,
+                watchedAt = row.watched_at,
+            )
+        }
     }
 
     /**

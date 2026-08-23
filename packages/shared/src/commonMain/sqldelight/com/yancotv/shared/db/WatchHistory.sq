@@ -69,6 +69,17 @@ SELECT * FROM watch_history WHERE content_id IN ? ORDER BY watched_at DESC;
 selectByEpisodeIds:
 SELECT * FROM watch_history WHERE episode_id IN ? ORDER BY watched_at DESC;
 
+-- MB-374 — full-table progress feed for the browse coverflow. watch_history
+-- holds one row per title the user has actually watched (a small table), so
+-- the coverflow subscribes to the whole thing and builds its tile-progress
+-- map in memory rather than passing an IN-list of every loaded tile. That
+-- decouples the browse item cap from SQLite's bind-variable limit (999 on
+-- API <= 30): a large category can now page past 1000 items without this
+-- lookup overflowing its `content_id IN (...)` list. DESC order lets the repo
+-- pick the most-recent row per content group with .first().
+selectAllProgress:
+SELECT * FROM watch_history ORDER BY watched_at DESC;
+
 upsert:
 INSERT OR REPLACE INTO watch_history (id, content_id, episode_id, position_seconds, duration_seconds, watched_at)
 VALUES (?, ?, ?, ?, ?, ?);

@@ -278,30 +278,27 @@ fun CoverflowSectionScreen(
         }
     }
 
-    // MK.28.3 — Tile-progress subscription. Live channels have no resume
-    // points (offset in a continuous stream is meaningless), so skip the
-    // lookup entirely for type == LIVE. For Movies / Series we subscribe
-    // to the visible-window's content IDs and the flow re-emits whenever
-    // the player persists a new resume offset — so the bottom-edge
-    // progress stripe and corner badge auto-update without any manual
-    // refresh. The query is bounded by `items.size` which the screen
-    // already caps at 1000 (line 285), well under SQLite's IN-list limit.
-    val progressIds by remember {
-        derivedStateOf {
-            if (type == ContentType.LIVE) {
-                emptySet()
-            } else {
-                items.map { it.id }.toSet()
-            }
-        }
-    }
-    val watchProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), progressIds) {
-        if (progressIds.isEmpty()) {
+    // MK.28.3 / MB-374 — Tile-progress subscription. Live channels have no
+    // resume points (offset in a continuous stream is meaningless), so skip it
+    // for type == LIVE. For Movies / Series subscribe ONCE to the whole
+    // watch_history feed (a small table — one row per watched title) and look
+    // each visible tile up by id in the resulting map. The flow re-emits
+    // whenever the player persists a new resume offset, so the bottom-edge
+    // progress stripe and corner badge auto-update without any manual refresh.
+    //
+    // Why not the batched entriesByContentFlow(items ids)? That builds a
+    // `content_id IN (...)` list one bind-var per loaded tile, capped at 999 on
+    // API <= 30 — which is precisely what forced the old 1000-item browse cap.
+    // Keying off the full table instead makes the bind-var count constant, so a
+    // large category (MAX_BROWSE_ITEMS below) pages in fully without this
+    // lookup overflowing.
+    val watchProgress by produceState(initialValue = emptyMap<String, WatchProgress>(), type) {
+        if (type == ContentType.LIVE) {
             value = emptyMap()
             return@produceState
         }
         runCatching {
-            watchHistory.entriesByContentFlow(progressIds).collect { value = it }
+            watchHistory.allProgressFlow().collect { value = it }
         }.onFailure { t ->
             Log.w("Yanco", "CoverflowSection watch-progress flow failed: ${t.message}", t)
             value = emptyMap()
@@ -378,12 +375,8 @@ fun CoverflowSectionScreen(
     // (IPTV categories routinely run to thousands).
     var lastVisibleIndex by remember(type, selectedGroup) { mutableStateOf(0) }
     LaunchedEffect(focusedIndex, lastVisibleIndex, total, loaded, isFavoritesFilter) {
-        if (isFavoritesFilter) return@LaunchedEffect
-        if (loading) return@LaunchedEffect
-        if (loaded >= total) return@LaunchedEffect
-        if (items.size >= 1000) return@LaunchedEffect
         val reach = maxOf(focusedIndex, lastVisibleIndex)
-        if (reach < (loaded - 20)) return@LaunchedEffect
+        if (!shouldPageMore(isFavoritesFilter, loading, loaded, total, items.size, reach)) return@LaunchedEffect
         delay(100L)
         if (loading) return@LaunchedEffect
         loading = true
@@ -744,12 +737,59 @@ fun CoverflowSectionScreen(
 internal fun shouldExitCoverflowOnLeft(focusedIndex: Int): Boolean = focusedIndex <= 0
 
 /**
+ * MB-374 — decide whether the coverflow should page in the next 100-item slice.
+ * Extracted from the pagination [LaunchedEffect] so the boundary behaviour is
+ * unit-testable (the inline guard silently capped every category at 1000 —
+ * rows past that were reachable only via search).
+ *
+ * Loads when: not the Favorites virtual list, no load already in flight, more
+ * rows exist ([loaded] < [total]), the in-memory list is under [maxItems], and
+ * the scroll/focus frontier [reach] has come within 20 of the loaded edge
+ * (prefetch before the user hits the end). [reach] is the max of the D-pad
+ * focus index and the LazyRow's last-visible index, so both TV and touch
+ * scrolling advance paging.
+ *
+ * The [maxItems] ceiling is purely a memory backstop for the pathological
+ * unfiltered-"All" case; real categories (≤ ~10k) load in full. It no longer
+ * bounds any SQLite `IN`-list — tile progress moved to a full-table feed
+ * ([com.yancotv.shared.history.WatchHistoryRepository.allProgressFlow]).
+ */
+internal fun shouldPageMore(
+    isFavoritesFilter: Boolean,
+    loading: Boolean,
+    loaded: Long,
+    total: Long,
+    itemsSize: Int,
+    reach: Int,
+    maxItems: Int = MAX_BROWSE_ITEMS,
+): Boolean {
+    if (isFavoritesFilter) return false
+    if (loading) return false
+    if (loaded >= total) return false
+    if (itemsSize >= maxItems) return false
+    return reach.toLong() >= (loaded - 20)
+}
+
+/**
  * MK.29.2 — dwell required on a poster before the preview pane loads its
  * detail metadata. Long enough that holding RIGHT through a category issues
  * no provider calls at all, short enough that stopping on a title fills the
  * description in before the user has finished reading the title.
  */
 private const val PREVIEW_DETAIL_DEBOUNCE_MS = 450L
+
+/**
+ * MB-374 — ceiling on how many items a single browse category pages into
+ * memory. Real provider categories top out near ~10k (a 270k-item catalogue's
+ * biggest movie group was 9,484), so this sits well above that: every real
+ * category loads in full. It only bites the pathological case — scrolling the
+ * unfiltered "All" view of a six-figure catalogue — where it caps memory so the
+ * list can't OOM. Tile-progress lookups no longer depend on this number (see
+ * [com.yancotv.shared.history.WatchHistoryRepository.allProgressFlow]); it is
+ * purely a memory backstop. The old value was 1000, which silently hid the tail
+ * of any large category — the rows were reachable only via search.
+ */
+private const val MAX_BROWSE_ITEMS = 20000
 
 /**
  * Soft cap on the preview plot. The hard guarantee that the action row

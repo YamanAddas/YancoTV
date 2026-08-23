@@ -6,6 +6,25 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.2 (versionCode 26) — 2026-08-23
+
+Patch on 1.6.1. Fixes a content-visibility bug found in field testing.
+
+### Fixed
+- **Large categories no longer stop at 1,000 items.** The browse list capped
+  at 1,000 entries per category, so a big category (some run to thousands)
+  showed only its first slice — the rest were reachable only through search.
+  Categories now load in full as you scroll. Internally, tile "resume"
+  progress moved to a whole-table lookup so the cap could be lifted without
+  tripping SQLite's variable limit on older devices. (MB-374)
+
+### Known issues
+- A provider category that mixes movies and series appears split across the
+  Movies and Series tabs (each tab shows its own half); both halves are still
+  reachable via the other tab and via search. (MB-375)
+- On the TV remote you cannot yet cross a long programme block in the guide;
+  touch works. (MB-371)
+
 ## 1.6.1 (versionCode 25) — 2026-08-23
 
 Patch on 1.6.0. Fixes one OTA-relevant issue found while verifying the update

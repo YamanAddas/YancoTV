@@ -531,6 +531,65 @@ class WatchHistoryRepositoryTest {
         assertEquals(1200L, second["movie-1"]?.positionSeconds, "flow must re-emit on upsert")
     }
 
+    @Test fun allProgressFlow_returnsEveryWatchedTitleKeyedByContentId() = runTest {
+        // MB-374 — the browse coverflow uses this INSTEAD of an IN-list of
+        // every loaded tile, so a large category can page past 1000 items
+        // without overflowing SQLite's bind-variable limit. The whole table
+        // comes back keyed by content_id; unwatched titles are simply absent.
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertContent(db, "movie-unwatched", "src-A", type = "movie")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        var t = 1_000L
+        val repo = WatchHistoryRepository(db, clock = { t })
+
+        repo.upsert("movie-1", positionSeconds = 90L, durationSeconds = 5400L)
+        t = 2_000L
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 700L, durationSeconds = 1800L)
+
+        val snapshot = repo.allProgressFlow().first()
+        assertEquals(2, snapshot.size, "only watched titles appear; the unwatched movie must be absent")
+        assertEquals(90L, snapshot["movie-1"]?.positionSeconds)
+        assertEquals(700L, snapshot["series-1"]?.positionSeconds)
+        assertNull(snapshot["movie-unwatched"], "a title with no watch_history row must not appear")
+    }
+
+    @Test fun allProgressFlow_containerRowPreferredOverEpisode() = runTest {
+        // Shares resolveContentProgress with entriesByContentFlow, so the
+        // container-preferred rule must hold identically — this pins that the
+        // full-table feed goes through the same resolver (AGENTS rule 8).
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-1", contentId = "series-1")
+        var t = 2_000L
+        val repo = WatchHistoryRepository(db, clock = { t })
+        repo.upsert("series-1", episodeId = "ep-1", positionSeconds = 600L, durationSeconds = 1800L)
+        t = 1_500L
+        repo.upsert("series-1", positionSeconds = 42L, durationSeconds = 9000L)
+
+        val entry = assertNotNull(repo.allProgressFlow().first()["series-1"])
+        assertEquals(42L, entry.positionSeconds, "container row must win over episode row")
+        assertNull(entry.episodeId)
+    }
+
+    @Test fun allProgressFlow_reemitsOnUpsert() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "movie-1", "src-A", type = "movie")
+        var t = 1_000L
+        val repo = WatchHistoryRepository(db, clock = { t })
+
+        repo.upsert("movie-1", positionSeconds = 60L, durationSeconds = 3600L)
+        assertEquals(60L, repo.allProgressFlow().first()["movie-1"]?.positionSeconds)
+
+        t = 2_000L
+        repo.upsert("movie-1", positionSeconds = 1200L, durationSeconds = 3600L)
+        assertEquals(1200L, repo.allProgressFlow().first()["movie-1"]?.positionSeconds, "flow must re-emit on upsert")
+    }
+
     @Test fun entriesByEpisodeFlow_keysByEpisodeId() = runTest {
         val db = testDb()
         insertSource(db, "src-A")
