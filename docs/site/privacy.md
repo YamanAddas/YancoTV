@@ -37,8 +37,9 @@ reading of anything beyond what the features above need.
 
 ## Your data, your device
 
-Uninstalling the app deletes everything it stored. Backups you export are
-encrypted with a password you choose and stay wherever you put them.
+Uninstalling the app deletes everything it stored. Backups you export stay
+wherever you put them; protect them with a password when exporting — an
+unprotected backup file contains your provider logins in readable form.
 
 ## Contact
 
