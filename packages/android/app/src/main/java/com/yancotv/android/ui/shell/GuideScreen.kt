@@ -76,6 +76,7 @@ import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.focus.onEndwardKey
 import com.yancotv.android.ui.focus.onStartwardKey
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.LocalYancoPalette
@@ -1223,6 +1224,13 @@ private fun ChannelRow(
         }
     }
 
+    // MB-361 — explicit entry point into the programme lane. Re-keyed on
+    // the channel so a recycled row never points at the previous channel's
+    // node (the MK.8 rule: focus state owned inside the boundary that
+    // scopes it, never hoisted above it).
+    val laneFocus = remember(channel.tvgId) { FocusRequester() }
+    var laneHasTarget by remember(channel.tvgId) { mutableStateOf(false) }
+
     Row(
         modifier =
         Modifier
@@ -1237,6 +1245,12 @@ private fun ChannelRow(
             onClick = onPlayChannel,
             onLongPress = onLongPressChannel,
             onExitLeft = onExitLeftFromChannel,
+            // Consume the press ONLY when there is somewhere to go. A row
+            // with no programmes returns false and keeps Compose's default
+            // traversal, so we never swallow the key and strand the user.
+            onEnterLane = {
+                laneHasTarget && runCatching { laneFocus.requestFocus() }.isSuccess
+            },
         )
 
         // Programme lane. Same flow-Row layout the OLD code used —
@@ -1281,10 +1295,17 @@ private fun ChannelRow(
                 }
                 val durMin = ((clampedEnd - clampedStart) / 60L).toInt().coerceAtLeast(1)
                 key("P-${prog.id}") {
+                    // Target the first PROGRAMME, never the leading gap.
+                    // The gap is deliberately non-focusable (see above) and
+                    // aiming focus at it is the 2026-05-05 scroll-left
+                    // regression this file already documents.
+                    val isLaneEntry = !laneHasTarget
+                    if (isLaneEntry) laneHasTarget = true
                     ProgrammeBlock(
                         programme = prog,
                         widthDp = (durMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
                         onActivate = { onProgrammeAction(prog) },
+                        modifier = if (isLaneEntry) Modifier.focusRequester(laneFocus) else Modifier,
                     )
                 }
                 cursor = clampedEnd
@@ -1315,7 +1336,13 @@ private fun ChannelRow(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPress: () -> Unit, onExitLeft: () -> Unit = {}) {
+private fun ChannelCell(
+    channel: EpgGuideChannel,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+    onExitLeft: () -> Unit = {},
+    onEnterLane: () -> Boolean = { false },
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg = if (focused) LocalYancoPalette.current.BackgroundHover else LocalYancoPalette.current.BackgroundRaised
@@ -1350,6 +1377,23 @@ private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPre
                 onExitLeft()
                 true
             }
+            // MB-361 — hand focus into the programme lane explicitly instead
+            // of leaving it to Compose's geometric focus search.
+            //
+            // The search was failing outright: the lane's first focusable
+            // starts 48px INSIDE this cell's trailing edge (cell right edge
+            // x=504, lane child left edge x=456 on a 1080p Fire TV), because
+            // the lane lives in a `horizontalScroll` whose content is offset
+            // left of the viewport. A candidate that overlaps the focused
+            // node is not "beyond" it in the requested direction, so the
+            // search skipped the entire lane and picked the sidebar instead
+            // — leaving the guide's programmes unreachable by remote, and
+            // with them the ONLY route to scheduling a recording.
+            //
+            // Endward, not DirectionLeft/Right: in RTL the channel column is
+            // on the right and entering the lane is a physical LEFT press.
+            // Mirrors the `onStartwardKey` escape hatch directly above.
+            .onEndwardKey(onEnterLane)
             .focusable(interactionSource = interaction)
             .combinedClickable(
                 interactionSource = interaction,
@@ -1397,7 +1441,7 @@ private fun ChannelCell(channel: EpgGuideChannel, onClick: () -> Unit, onLongPre
 }
 
 @Composable
-private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui.unit.Dp, onActivate: () -> Unit) {
+private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui.unit.Dp, onActivate: () -> Unit, modifier: Modifier = Modifier) {
     // MK.31.22 — resolved here: `semantics {}` is not composable scope.
     val programmeSemantics =
         stringResource(
@@ -1412,7 +1456,7 @@ private fun ProgrammeBlock(programme: EpgProgramme, widthDp: androidx.compose.ui
 
     Column(
         modifier =
-        Modifier
+        modifier
             .width(widthDp)
             .fillMaxHeight()
             .padding(1.dp)
