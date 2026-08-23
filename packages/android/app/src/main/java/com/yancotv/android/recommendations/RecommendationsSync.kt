@@ -1,11 +1,13 @@
 package com.yancotv.android.recommendations
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.media3.common.util.UnstableApi
 import androidx.tvprovider.media.tv.Channel
 import androidx.tvprovider.media.tv.PreviewProgram
 import androidx.tvprovider.media.tv.TvContractCompat
@@ -35,6 +37,17 @@ import com.yancotv.shared.types.ContentType
  * within one period (default 6 hours).
  */
 class RecommendationsSync(private val context: Context, private val history: WatchHistoryRepository) {
+    // Lint `RestrictedApi` fires here and it is structural to
+    // androidx.tvprovider, not a misuse: `PreviewProgram.Builder` is
+    // public API, but the setters it inherits from
+    // `BasePreviewProgram.Builder` and the `PreviewProgramColumns.TYPE_*`
+    // constants behind `TvContractCompat.PreviewPrograms` are annotated
+    // `@RestrictTo(LIBRARY_GROUP)`. There is no public alternative --
+    // building a preview program the documented way produces these
+    // errors, and Google's own samples do too. Suppressed rather than
+    // baselined so the reason travels with the code. (MB-357 sweep,
+    // 2026-08-22.)
+    @SuppressLint("RestrictedApi")
     fun sync(): SyncResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             // TvContractCompat preview-program APIs require API 26+.
@@ -150,6 +163,11 @@ class RecommendationsSync(private val context: Context, private val history: Wat
         return newId
     }
 
+    // MB-357 — `@OptIn`, not `@UnstableApi`. This references a class we
+    // annotated `@UnstableApi`, which propagates media3's opt-in to every
+    // caller. Consuming it here is the correct half of that pair; the wider
+    // swap of the other 64 `@UnstableApi` declarations is tracked as MB-357.
+    @androidx.annotation.OptIn(UnstableApi::class)
     private fun deepLinkFor(itemId: String?): Uri {
         val intent =
             Intent(context, MainActivity::class.java).apply {
@@ -162,6 +180,7 @@ class RecommendationsSync(private val context: Context, private val history: Wat
         return Uri.parse(intent.toUri(0))
     }
 
+    @SuppressLint("RestrictedApi")
     private fun typeFor(t: ContentType): Int = when (t) {
         ContentType.LIVE -> TvContractCompat.PreviewPrograms.TYPE_CHANNEL
         ContentType.MOVIE -> TvContractCompat.PreviewPrograms.TYPE_MOVIE

@@ -1337,6 +1337,11 @@ private const val FFMPEG_PACKAGE_PREFIX = "androidx.media3.decoder.ffmpeg."
  * `app/src/test/.../ResumePointDecisionTest.kt` can exercise the full
  * matrix without instantiating the controller.
  */
+// MB-357 — `@OptIn`, not `@UnstableApi`. This references a class we
+// annotated `@UnstableApi`, which propagates media3's opt-in to every
+// caller. Consuming it here is the correct half of that pair; the wider
+// swap of the other 64 `@UnstableApi` declarations is tracked as MB-357.
+@androidx.annotation.OptIn(UnstableApi::class)
 internal fun resumePointDecision(item: ContentItem?, episode: Playable.Episode?, positionSeconds: Long, durationSeconds: Long?): ResumePointWrite? {
     if (item == null) return null
     if (item.type == ContentType.LIVE) return null

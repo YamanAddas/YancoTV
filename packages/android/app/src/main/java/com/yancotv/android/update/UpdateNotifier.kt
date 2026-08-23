@@ -11,6 +11,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.MainActivity
 import com.yancotv.android.R
 import com.yancotv.android.prefs.AppPreferences
@@ -86,6 +87,14 @@ object UpdateNotifier {
             PackageManager.PERMISSION_GRANTED
     }
 
+    // MB-357 — `@OptIn`, not `@UnstableApi`. This references MainActivity,
+    // which we annotated `@UnstableApi`, propagating media3's opt-in to
+    // every caller. Consuming it here is the correct half of that pair;
+    // the wider swap of the other 64 declarations is tracked as MB-357.
+    // Must be androidx.annotation.OptIn, NOT kotlin.OptIn: Android lint
+    // only recognises the `markerClass` form, so the Kotlin annotation
+    // satisfies the compiler and leaves UnsafeOptInUsageError firing.
+    @androidx.annotation.OptIn(UnstableApi::class)
     private fun build(context: Context, info: UpdateInfo): android.app.Notification {
         val intent =
             Intent(context, MainActivity::class.java).apply {

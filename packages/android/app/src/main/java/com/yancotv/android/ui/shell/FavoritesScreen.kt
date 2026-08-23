@@ -1,5 +1,6 @@
 package com.yancotv.android.ui.shell
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -86,6 +87,14 @@ import org.koin.compose.koinInject
  * are picked up immediately without a manual refresh.
  */
 @UnstableApi
+// FALSE POSITIVE, verified 2026-08-22. Lint claims the `produceState`
+// producer never assigns `value`; it assigns on every path -- an early
+// `value = emptyMap()` for the empty-id case, `collect { value = it }`
+// for the happy path, and `value = emptyMap()` in `onFailure`. The
+// check cannot see assignments nested inside `runCatching { ... collect
+// { ... } }`. Suppressed at the site rather than baselined so the
+// verification travels with the code.
+@SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun FavoritesScreen(
     isTv: Boolean,
