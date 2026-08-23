@@ -54,7 +54,7 @@ private val SAMPLE_VOD_NAME_RES = R.string.ma_sample_movies
 private const val SEED_PREFS = "yanco_debug_seed"
 private const val KEY_VOD_SAMPLE_SEEDED = "vod_sample_seeded"
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class MainActivity : ComponentActivity() {
     // MK.31.1 — apply the in-app language before any resource is resolved.
     // LocaleController.wrap does the whole job rather than relying on

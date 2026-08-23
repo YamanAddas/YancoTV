@@ -64,7 +64,7 @@ import org.koin.android.ext.android.inject
  * handles them on next launch (called from `YancoApp.onCreate` —
  * not this class).
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class RecordingService : Service() {
     private val recordings: RecordingsRepository by inject()
 
@@ -786,7 +786,7 @@ class RecordingService : Service() {
  * Hydrate a [RecordInput] from an Intent's extras. Returns null if
  * required fields are missing — caller logs and bails.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun Intent.toRecordInput(): RecordInput? {
     val id = getStringExtra(RecordingService.EXTRA_RECORD_ID) ?: return null
     val title = getStringExtra(RecordingService.EXTRA_TITLE) ?: return null

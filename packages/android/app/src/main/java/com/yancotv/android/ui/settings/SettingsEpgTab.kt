@@ -64,7 +64,7 @@ import org.koin.compose.koinInject
  * as proper [SettingsSection] / [SettingsRow] rows so the tab matches
  * the rest of Settings.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun SettingsEpgTab(
     modifier: Modifier = Modifier,

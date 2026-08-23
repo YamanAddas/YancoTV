@@ -53,7 +53,7 @@ import java.io.OutputStream
  * URLs go through `MpegTsRecorder`/`HlsRecorder`'s fresh-GET path and
  * don't touch this sink.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class RecordingDataSink(@Suppress("unused") private val logger: Logger = NOOP_LOGGER) : DataSink {
     private val lock = Any()
     private var output: OutputStream? = null

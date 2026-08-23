@@ -22,7 +22,7 @@ import com.yancotv.shared.types.EpgProgramme
  *   - PendingIntent requestCode = stable hash of programme id — replacing a
  *     reminder on the same programme replaces its alarm instead of stacking.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class ReminderScheduler(private val context: Context, private val repo: ReminderRepository) {
     private val alarms: AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

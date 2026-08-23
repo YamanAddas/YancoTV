@@ -54,7 +54,7 @@ import org.koin.dsl.module
  *
  * Desktop has its own TS module system — this file is Android-only.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 val appModule =
     module {
         single<Logger> { AndroidLogger() }

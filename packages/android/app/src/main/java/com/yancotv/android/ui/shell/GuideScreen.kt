@@ -178,7 +178,7 @@ private const val SERIES_LOOKAHEAD_MS: Long = 7L * 24L * 60L * 60_000L
  *    the window horizontally when you focus an off-screen block. Polishing
  *    that needs bringIntoViewRequester wiring — deferred.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun GuideScreen(
     onPlay: (EpgGuideChannel, EpgProgramme?) -> Unit,

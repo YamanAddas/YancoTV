@@ -26,7 +26,7 @@ import org.koin.core.component.inject
  * default; jumping to a channel uninvited would be obnoxious. The user
  * taps the notification to open the app and select the channel manually.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class ReminderAlarmReceiver :
     BroadcastReceiver(),
     KoinComponent {

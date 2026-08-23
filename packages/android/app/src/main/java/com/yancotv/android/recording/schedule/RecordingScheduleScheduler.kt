@@ -28,7 +28,7 @@ import java.util.UUID
  *     of extra bytes per recording at IPTV bitrates; far better than
  *     missing the winning goal.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class RecordingScheduleScheduler(
     private val context: Context,
     private val repo: RecordingScheduleRepository,

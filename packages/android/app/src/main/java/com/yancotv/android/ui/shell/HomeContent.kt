@@ -108,7 +108,7 @@ import org.koin.compose.koinInject
  * Empty state is a branded welcome card shown only when everything
  * (history + favorites + catalogue) is empty.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun HomeContent(
     /**

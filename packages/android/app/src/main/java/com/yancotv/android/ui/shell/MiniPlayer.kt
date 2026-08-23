@@ -39,7 +39,7 @@ import org.koin.compose.koinInject
  * this preview reclaims it on the next `ON_RESUME` by re-binding the
  * Surface to the player.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun MiniPlayer(modifier: Modifier = Modifier, controller: PlaybackController = koinInject()) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle

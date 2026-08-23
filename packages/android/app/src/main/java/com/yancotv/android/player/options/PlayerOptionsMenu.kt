@@ -82,7 +82,7 @@ import com.yancotv.android.ui.theme.YancoIcons
  * via `pointerInput`; doesn't introduce a focusable scrim that would
  * trap CENTER on TV).
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun PlayerOptionsMenu(state: PlayerOptionsState, rows: List<PlayerOptionsRow>, onDismiss: () -> Unit) {
     val visible by state.menuVisible.collectAsState()

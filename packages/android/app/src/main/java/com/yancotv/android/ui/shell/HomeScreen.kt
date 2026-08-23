@@ -76,7 +76,7 @@ internal fun shouldStopPlaybackOnSectionChange(playing: ContentItem?): Boolean =
  * bespoke layouts.
  */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun HomeScreen(
     isTv: Boolean,

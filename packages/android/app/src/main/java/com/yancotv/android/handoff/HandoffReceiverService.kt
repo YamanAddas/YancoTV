@@ -52,7 +52,7 @@ import org.koin.android.ext.android.inject
  * de-risk item for A.5; the canonical Fire TV test target (AFTDCT31) is API 28,
  * where the type attribute is not runtime-enforced.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class HandoffReceiverService : Service() {
     private val controller: PlaybackController by inject()
     private val logger: Logger by inject()

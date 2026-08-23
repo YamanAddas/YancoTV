@@ -42,7 +42,7 @@ import org.koin.core.component.inject
  * before the user unlocks, matching the [com.yancotv.android.reminders.ReminderBootReceiver]
  * pattern that's already in production.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class RecordingScheduleBootReceiver :
     BroadcastReceiver(),
     KoinComponent {

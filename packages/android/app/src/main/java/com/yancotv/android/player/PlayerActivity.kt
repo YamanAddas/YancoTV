@@ -78,7 +78,7 @@ import org.koin.android.ext.android.inject
  *    current live EPG programme. Visible only when Media3 controller is
  *    visible AND the channel is LIVE with a "now" programme.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
     // MK.31.1 — same wrap as MainActivity. AppCompatDelegate would cover this
     // Activity on its own, but going through LocaleController keeps one source

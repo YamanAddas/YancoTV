@@ -86,7 +86,7 @@ import org.koin.compose.koinInject
  * Storage management (cap slider, manual eviction) lives in
  * Settings → Recordings; this screen is the catalog view.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun RecordingsScreen(
     isTv: Boolean,
@@ -666,7 +666,7 @@ private fun RecordingEntry.metaLine(ctx: android.content.Context): String {
  * controller to skip resume-point persistence (no `content` row exists
  * to FK against — see PlaybackController.persistResumePoint).
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun playRecording(controller: PlaybackController, context: Context, entry: RecordingEntry) {
     val streamUrl =
         // Both absolute file paths and content:// URIs are supported.

@@ -112,7 +112,7 @@ internal fun tryStartOrFailSchedule(scheduleId: String, tag: String, startServic
         }
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class RecordingScheduleReceiver :
     BroadcastReceiver(),
     KoinComponent {

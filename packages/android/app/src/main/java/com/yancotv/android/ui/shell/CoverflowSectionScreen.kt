@@ -145,7 +145,7 @@ import org.koin.compose.koinInject
  *     overlay (handled by the caller's [onActivate]).
  */
 @OptIn(ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 // FALSE POSITIVE, verified 2026-08-22. Lint claims the `produceState`
 // producer never assigns `value`; it assigns on every path -- an early
 // `value = emptyMap()` for the empty-id case, `collect { value = it }`
@@ -783,7 +783,7 @@ private fun parsePreviewMetadata(item: ContentItem): ContentMetadata? {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun PreviewPane(
     type: ContentType,
@@ -860,7 +860,7 @@ private fun PreviewPane(
  * channel's logo before playback starts. Keeps the wide 16:9-ish box
  * (weight 0.6 of the row) because that is the shape video actually is.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun LivePreviewFrame(focused: ContentItem?, isPlaying: Boolean, controller: PlaybackController, modifier: Modifier = Modifier) {
     Box(modifier = modifier.previewFrameChrome()) {

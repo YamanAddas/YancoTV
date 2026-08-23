@@ -70,7 +70,7 @@ enum class PanelFocus { Sidebar, Categories, Content }
  *     [categoriesFocus]. BACK from rail bubbles up via [onExitToSidebar].
  */
 @OptIn(ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun BrowseSection(
     type: ContentType,

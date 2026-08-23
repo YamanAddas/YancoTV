@@ -152,7 +152,7 @@ private const val COMPACT_SETTINGS_SW_DP = 600
  * single-pane master/detail (tab list → one tab body full-width); everything
  * wider keeps the unchanged TV two-pane layout. (MK.27.C)
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
     // Keyed off FORM FACTOR, not the slot width: a landscape phone is wide but
@@ -185,7 +185,7 @@ fun SettingsScreen(modifier: Modifier = Modifier, initialTab: SettingsTab = Sett
  * exits Settings — touch-first, no D-pad required.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun SettingsPhoneLayout(initialTab: SettingsTab, onExit: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -330,7 +330,7 @@ private fun PhoneTabTopBar(tab: SettingsTab, onBack: () -> Unit) {
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun SettingsTwoPaneLayout(initialTab: SettingsTab = SettingsTab.General, onExitToMainSidebar: () -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -1053,7 +1053,7 @@ private fun TabItem(entry: SettingsTab, selected: Boolean, onClick: () -> Unit, 
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun ContentPane(current: SettingsTab, activeTabFocus: FocusRequester, modifier: Modifier = Modifier) {
     val panelShape = RoundedCornerShape(28.dp)
@@ -1184,7 +1184,7 @@ private fun Breadcrumb(current: SettingsTab) {
     }
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun TabContent(tab: SettingsTab) {
     when (tab) {

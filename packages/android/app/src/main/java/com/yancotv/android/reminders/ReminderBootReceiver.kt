@@ -16,7 +16,7 @@ import org.koin.core.component.inject
  * isn't needed because the DB lives in credential-encrypted storage and
  * isn't readable until the user unlocks the device anyway.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class ReminderBootReceiver :
     BroadcastReceiver(),
     KoinComponent {

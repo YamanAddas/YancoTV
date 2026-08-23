@@ -22,7 +22,7 @@ import androidx.media3.datasource.TeeDataSource
  * sink instance is shared across all of them — the singleton tee state
  * lives in [RecordingDataSink], not here.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class TeeingDataSourceFactory(private val upstreamFactory: DataSource.Factory, private val sink: RecordingDataSink) : DataSource.Factory {
     override fun createDataSource(): DataSource = TeeDataSource(upstreamFactory.createDataSource(), sink)
 }

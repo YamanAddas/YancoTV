@@ -77,7 +77,7 @@ import kotlinx.coroutines.delay
  * bleeds against the shell. Left-darken gradient + vertical bottom-fade
  * keep the copy readable regardless of the artwork's luminance.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun FeatureHero(
     focused: ContentItem?,
@@ -147,7 +147,7 @@ fun FeatureHero(
     }
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun HeroBackdrop(focused: ContentItem?, playing: ContentItem?, controller: PlaybackController) {
     // Debounce the URL so rapid D-pad traversal doesn't fire a new Coil

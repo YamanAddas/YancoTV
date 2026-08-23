@@ -100,7 +100,7 @@ import org.koin.compose.koinInject
  * ranking already groups by content type via [ContentRepository.search]
  * and users searching for "marvel" want the whole corpus.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 // FALSE POSITIVE, verified 2026-08-22. Lint claims the `produceState`
 // producer never assigns `value`; it assigns on every path -- an early
 // `value = emptyMap()` for the empty-id case, `collect { value = it }`

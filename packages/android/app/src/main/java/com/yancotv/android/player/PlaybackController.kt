@@ -154,7 +154,7 @@ internal fun episodeLaunchDecision(episode: Playable.Episode, currentId: String?
  * changes, wrap the player in a thin MediaSessionCompat without touching
  * the public API here.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackController(
     private val context: Context,
     private val prefs: AppPreferences,

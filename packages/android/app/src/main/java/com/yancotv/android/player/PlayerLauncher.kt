@@ -19,7 +19,7 @@ import org.koin.core.context.GlobalContext
  * player applies — bouncing to a configured VLC/MX would drop those headers and
  * break header-gated streams (release-audit HRS-5).
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 object PlayerLauncher {
     fun launch(ctx: Context, forceInternal: Boolean = false) {
         val koin = runCatching { GlobalContext.get() }.getOrNull()

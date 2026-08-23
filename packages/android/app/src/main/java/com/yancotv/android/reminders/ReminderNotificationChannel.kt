@@ -8,7 +8,7 @@ import androidx.media3.common.util.UnstableApi
 import com.yancotv.android.R
 
 /** Registers the notification channel used by reminder alarms. Idempotent. */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 object ReminderNotificationChannel {
     fun ensureCreated(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

@@ -34,7 +34,7 @@ import com.yancotv.shared.recording.RecordingScheduleEntry
  * fires a few minutes late instead of the alarm-registration crashing
  * the schedule-create flow.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class RecordingScheduleAlarmManager(private val context: Context) {
     private val alarms: AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

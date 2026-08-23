@@ -86,7 +86,7 @@ import org.koin.compose.koinInject
  * Reloads on entry — favorites changes from InfoPanel in other sections
  * are picked up immediately without a manual refresh.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 // FALSE POSITIVE, verified 2026-08-22. Lint claims the `produceState`
 // producer never assigns `value`; it assigns on every path -- an early
 // `value = emptyMap()` for the empty-id case, `collect { value = it }`
@@ -285,7 +285,7 @@ fun FavoritesScreen(
     }
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun FavoritesListBody(
     live: List<ContentItem>,

@@ -105,7 +105,7 @@ import okhttp3.OkHttpClient
  * a soft cap. No tab strip, no kicker, no hex chassis. Just the
  * controls for one category.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun PlayerOptionsPanelHost(
     state: PlayerOptionsState,
@@ -233,7 +233,7 @@ private fun labelFor(c: PlayerOptionCategory): String = when (c) {
 
 // ───── Audio ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun AudioPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickOption: () -> Unit) {
     val tracks = rememberAudioTracks(controller.player)
@@ -264,7 +264,7 @@ private fun AudioPanelContent(controller: PlaybackController, prefs: AppPreferen
 
 private data class AudioTrack(val group: Tracks.Group, val trackIndex: Int, val language: String?, val displayName: String, val selected: Boolean)
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun rememberAudioTracks(player: Player): List<AudioTrack> {
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -296,7 +296,7 @@ private fun rememberAudioTracks(player: Player): List<AudioTrack> {
  * the API churn. The panels — where the user actually reads a track list —
  * pass the localized version.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun readAudioTracks(player: Player, fallbackName: (Int) -> String = { "Track $it" }): List<AudioTrack> {
     val out = mutableListOf<AudioTrack>()
     for (group in player.currentTracks.groups) {
@@ -324,7 +324,7 @@ private fun readAudioTracks(player: Player, fallbackName: (Int) -> String = { "T
     return out
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun applyAudioTrack(player: Player, track: AudioTrack) {
     val params = player.trackSelectionParameters.buildUpon()
     track.language?.takeIf { it.isNotBlank() }?.let { lang ->
@@ -340,7 +340,7 @@ private fun applyAudioTrack(player: Player, track: AudioTrack) {
 // ───── Subtitles ─────
 
 @OptIn(ExperimentalFoundationApi::class)
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun SubtitlesPanelContent(
     controller: PlaybackController,
@@ -457,7 +457,7 @@ private fun SubtitlesPanelContent(
 
 private data class TextTrack(val group: Tracks.Group, val trackIndex: Int, val language: String?, val displayName: String, val selected: Boolean)
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun rememberTextTracks(player: Player): List<TextTrack> {
     // Keyed on `player`: MK.9.4's FFmpeg fallback releases the ExoPlayer and
@@ -480,7 +480,7 @@ private fun rememberTextTracks(player: Player): List<TextTrack> {
     return t
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun rememberTextDisabled(player: Player): Boolean {
     // Keyed on `player` for the same reason as rememberTextTracks.
@@ -501,7 +501,7 @@ private fun rememberTextDisabled(player: Player): Boolean {
 }
 
 /** See [readAudioTracks] for why [fallbackName] is a parameter. */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun readTextTracks(player: Player, fallbackName: (Int) -> String = { "Track $it" }): List<TextTrack> {
     val out = mutableListOf<TextTrack>()
     for (group in player.currentTracks.groups) {
@@ -527,7 +527,7 @@ private fun readTextTracks(player: Player, fallbackName: (Int) -> String = { "Tr
     return out
 }
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun applyTextTrack(player: Player, track: TextTrack) {
     val params = player.trackSelectionParameters.buildUpon()
     params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
@@ -543,7 +543,7 @@ private fun applyTextTrack(player: Player, track: TextTrack) {
 
 // ───── Subtitle Search ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun SubtitleSearchPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     // MK.31.12 — the search coroutine below assigns error text, and a coroutine
@@ -724,7 +724,7 @@ suspend fun cycleAspect(prefs: AppPreferences, forward: Boolean) {
 
 private val SPEED_PRESETS = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun SpeedPanelContent(controller: PlaybackController, prefs: AppPreferences, onPickOption: () -> Unit) {
     val state by prefs.playbackFlow.collectAsState()
@@ -748,14 +748,14 @@ private fun SpeedPanelContent(controller: PlaybackController, prefs: AppPreferen
 
 private fun formatSpeed(speed: Float): String = if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "$speed×"
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 private fun applySpeed(controller: PlaybackController, prefs: AppPreferences, speed: Float, scope: kotlinx.coroutines.CoroutineScope) {
     controller.player.setPlaybackSpeed(speed)
     scope.launch { prefs.setSpeed(speed) }
 }
 
 /** Cycle helper for the popup-row LEFT/RIGHT gesture on Speed. */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 suspend fun cycleSpeed(controller: PlaybackController, prefs: AppPreferences, forward: Boolean) {
     val current = prefs.playbackFlow.value.speed
     val idx =
@@ -774,7 +774,7 @@ suspend fun cycleSpeed(controller: PlaybackController, prefs: AppPreferences, fo
 
 // ───── Sleep ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun SleepPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val sleep by controller.sleepTimer.collectAsState()
@@ -830,7 +830,7 @@ private fun sleepLabel(opt: SleepTimerOption): String = when (opt) {
  * LEFT/RIGHT cycle: track did switch on the player, but the popup
  * label still showed the old language code until the next reopen.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 fun cycleAudioTrack(controller: PlaybackController, forward: Boolean, scope: kotlinx.coroutines.CoroutineScope? = null, prefs: AppPreferences? = null) {
     val tracks = readAudioTracks(controller.player)
     if (tracks.isEmpty()) return
@@ -857,7 +857,7 @@ fun cycleAudioTrack(controller: PlaybackController, forward: Boolean, scope: kot
  * for Off) via [AppPreferences.setSubtitleLanguage] so the popup row's
  * `currentValue` reflects the cycle without reopening.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 fun cycleTextTrack(controller: PlaybackController, forward: Boolean, scope: kotlinx.coroutines.CoroutineScope? = null, prefs: AppPreferences? = null) {
     val player = controller.player
     val tracks = readTextTracks(player)
@@ -988,7 +988,7 @@ private fun EmptyLine(text: String) {
 
 // ───── Record (slice 2b) ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun RecordPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1091,7 +1091,7 @@ private fun detectRecordingFormat(streamUrl: String): RecordingFormat {
 
 // ───── Favorites (slice 2b) ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun FavoritesPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val favorites: FavoritesRepository = org.koin.compose.koinInject()
@@ -1130,7 +1130,7 @@ private fun FavoritesPanelContent(controller: PlaybackController, onPickOption: 
 
 // ───── External player (slice 2b) ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun ExternalPanelContent(controller: PlaybackController, onPickOption: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1187,7 +1187,7 @@ private fun ExternalPanelContent(controller: PlaybackController, onPickOption: (
 
 // ───── Play on TV (MK.26.A.3 — LAN companion-handoff sender) ─────
 
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current

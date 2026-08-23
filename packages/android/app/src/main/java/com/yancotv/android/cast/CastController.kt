@@ -49,7 +49,7 @@ import kotlinx.coroutines.withContext
  * copied (fails on Cast until the Phase 2 hardware transcode). Runtime is only
  * verifiable on a real Chromecast.
  */
-@UnstableApi
+@androidx.annotation.OptIn(UnstableApi::class)
 class CastController(
     private val appContext: Context,
     private val controller: PlaybackController,
