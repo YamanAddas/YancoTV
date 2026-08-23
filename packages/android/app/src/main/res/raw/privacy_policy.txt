@@ -1,0 +1,45 @@
+YancoTV — Privacy Policy
+
+Last updated: 2026-08-23
+
+YancoTV is a media player. It plays content from playlists you configure.
+We run no accounts, no analytics, and no servers of our own.
+
+What the app stores
+
+Everything the app knows lives on your device: your playlist sources,
+channel lists and programme guide, favourites, watch history, resume points,
+recordings and settings. Provider usernames and passwords are stored in your
+device's hardware keystore, not in plain text. Nothing is uploaded to us —
+we have nowhere to upload it to.
+
+What the app sends, and to whom
+
+- Your IPTV provider(s). The app contacts only the provider URLs you add,
+  to fetch playlists, guide data and streams. Your credentials go to your
+  provider — that is how IPTV login works — and to no one else.
+- Crash reports (optional). If "Crash reports" is enabled in
+  Settings → About, crash data (stack trace, device model, OS and app
+  version) is sent to Sentry so bugs can be fixed. No playlists, no
+  credentials, no viewing history. Provider URLs are scrubbed of credentials
+  before any report leaves the device. Turn the toggle off and nothing is
+  sent.
+- Update checks. The app periodically fetches a small version file and,
+  when you accept an update, the new APK from GitHub. This tells GitHub your
+  IP address, as any download does.
+- Subtitles (when you search). Subtitle searches go to OpenSubtitles with
+  the title being searched.
+
+What we never do
+
+No ads, no trackers, no analytics SDKs, no selling or sharing of data, no
+reading of anything beyond what the features above need.
+
+Your data, your device
+
+Uninstalling the app deletes everything it stored. Backups you export are
+encrypted with a password you choose and stay wherever you put them.
+
+Contact
+
+Open an issue at https://github.com/YamanAddas/YancoTV/issues

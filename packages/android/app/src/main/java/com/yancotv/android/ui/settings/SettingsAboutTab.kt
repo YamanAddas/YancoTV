@@ -67,8 +67,6 @@ import org.koin.compose.koinInject
 // receiving the v1 APK: tap Open and they'll see a "Page not found"
 // in the browser — call out in the test invitation email that the
 // documents are in the repo for now.
-private const val PRIVACY_POLICY_URL = "https://example.invalid/yancotv/privacy"
-private const val TERMS_OF_SERVICE_URL = "https://example.invalid/yancotv/terms"
 
 /**
  * About tab — logo + version with an arabesque display face, then a
@@ -316,18 +314,16 @@ fun SettingsAboutTab(
                 },
             )
             SettingsRowSpacer()
+            // MB-372 — these opened https://example.invalid/... (an RFC 2606
+            // reserved-to-never-resolve placeholder) in a browser Fire TV
+            // does not even have. The documents now ship in the APK and open
+            // in the same viewer as the licences: correct on TV, correct
+            // offline, and nothing depends on pages that were never hosted.
             SettingsRow(
                 label = stringResource(R.string.ab_privacy_policy),
                 readOnlyFocusable = false,
                 onClick = {
-                    runCatching {
-                        ctx.startActivity(
-                            android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse(PRIVACY_POLICY_URL),
-                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    }
+                    openLicense = ctx.getString(R.string.ab_privacy_policy) to R.raw.privacy_policy
                 },
                 right = { ValueText(stringResource(R.string.ab_open)) },
             )
@@ -335,14 +331,7 @@ fun SettingsAboutTab(
             SettingsRow(
                 label = stringResource(R.string.ab_terms),
                 onClick = {
-                    runCatching {
-                        ctx.startActivity(
-                            android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse(TERMS_OF_SERVICE_URL),
-                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    }
+                    openLicense = ctx.getString(R.string.ab_terms) to R.raw.terms_of_use
                 },
                 right = { ValueText(stringResource(R.string.ab_open)) },
             )

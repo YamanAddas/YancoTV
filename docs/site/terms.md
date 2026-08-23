@@ -1,0 +1,27 @@
+# YancoTV — Terms of Use
+
+_Last updated: 2026-08-23_
+
+1. **What YancoTV is.** YancoTV is a media player. It ships with no
+   channels, no subscriptions and no content. It plays streams from playlist
+   sources that you supply.
+
+2. **Your content, your responsibility.** You are solely responsible for the
+   sources you add and for having the legal right to watch what they carry
+   in your country. YancoTV's developers do not provide, host, promote, or
+   endorse any content or provider.
+
+3. **Recording.** The recording feature stores streams you already have
+   access to, on your own device, for personal use. Laws on recording vary
+   by country; complying with yours is your responsibility.
+
+4. **No warranty.** The app is provided "as is", without warranty of any
+   kind. It may fail, lose recordings, or misbehave with particular
+   providers or devices.
+
+5. **Open source.** YancoTV includes open-source components under their own
+   licences — see Settings → About → Open-source licences. The app's own
+   source code is available at https://github.com/YamanAddas/YancoTV.
+
+6. **Changes.** These terms may change alongside the app; the current
+   version always lives at this address.
