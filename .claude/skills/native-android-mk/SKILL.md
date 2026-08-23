@@ -14,8 +14,9 @@ Self-audit every edit under `packages/android/` or `packages/shared/` against th
 
 ## Schema units
 
-- **All DB timestamps are milliseconds.** Every `clock()` call in `packages/shared/` writes raw `Clock.System.now().toEpochMilliseconds()`. Do NOT divide by 1000. Applies to `content.created_at`, `epg_programmes.start_time/end_time`, `favorites.added_at`, `watch_history.watched_at`, `sources.last_synced`.
-- **Exception:** `watch_history.position_seconds` and `duration_seconds` — these are media offsets, not wall-clock. Seconds on purpose.
+- **Most DB timestamps are milliseconds.** Every `clock()` call in `packages/shared/` writes raw `Clock.System.now().toEpochMilliseconds()`. Do NOT divide by 1000. Applies to `content.created_at`, `favorites.added_at`, `watch_history.watched_at`, `sources.last_synced`.
+- **Exception 1 — `watch_history.position_seconds` / `duration_seconds`:** media offsets, not wall-clock. Seconds on purpose.
+- **Exception 2 — `epg_programmes.start_time` / `end_time`: XMLTV epoch SECONDS, not ms** (matches xmltv.dtd; `XmltvParser` emits `epochSeconds`). The guide and catch-up compare against `clock() / 1000`. **Do NOT "correct" these to ms** — the schema comment says seconds, the data is ~1.78e9, and flipping them to ms silently breaks catch-up and empties the guide. (MB-390 — this bullet used to wrongly list EPG under the ms rule.)
 - **When adding a timestamp column, document the unit** as a SQLDelight comment: `-- ms since epoch`.
 
 ## Resume-point persistence
