@@ -179,11 +179,21 @@
                 android:resource="@xml/searchable" />
         </activity>
 
+        <!-- MB-354 — landscape is the intended design on every form factor,
+             including phone; portrait support was considered and explicitly
+             dropped (the whole shell is laid out landscape-first, and a TV
+             app that rotates buys nothing). What was NOT intended is the
+             mismatch this replaced: MainActivity is `sensorLandscape` while
+             the player was pinned to `landscape`, so a phone held in
+             reverse-landscape browsed the right way up and then played video
+             upside-down on entering fullscreen. Both are `sensorLandscape`
+             now: still landscape-only, but consistent about which way up.
+             No effect on TV, where the sensor never reports a rotation. -->
         <activity
             android:name=".player.PlayerActivity"
             android:exported="false"
             android:launchMode="singleTask"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:theme="@style/PlayerTheme"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|smallestScreenSize" />

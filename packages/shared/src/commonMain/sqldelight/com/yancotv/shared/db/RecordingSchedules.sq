@@ -1,8 +1,19 @@
 -- Stage 2.1 — user-armed recording schedules. State machine decoupled
 -- from `recordings.status`: a schedule lives independently of the
 -- eventual recording row and remains visible to the user in the
--- "Scheduled" tab even after firing (where it shows the recording_id
--- as a link to the recordings browser entry).
+-- "Scheduled" tab even after firing.
+--
+-- MB-211 — `recording_id` is DEAD. It once held that link, but the MB-208
+-- fix moved to deriving the id deterministically via
+-- `RecordingScheduleScheduler.recordIdForSchedule(scheduleId)`, and the
+-- column has been NULL for every row since. Do NOT start writing it:
+-- reviving the link-early pattern re-arms a latent foot-gun, because the
+-- FK is enforced at UPDATE time and a write against a not-yet-inserted
+-- recordings row throws, leaving the schedule stuck in ARMED. Derive the
+-- id instead. Removal needs the full table-rebuild dance (SQLite on
+-- minSdk 24 has no DROP COLUMN -- 3.35+/API 33+), so it is deliberately
+-- deferred until the next major schema migration, where the rebuild
+-- amortises.
 --
 -- See `3.sqm` for migration semantics + column-level rationale.
 CREATE TABLE recording_schedules (
@@ -17,6 +28,7 @@ CREATE TABLE recording_schedules (
         'scheduled', 'armed', 'firing',
         'completed', 'failed', 'cancelled', 'missed'
     )),
+    -- MB-211: dead column, always NULL. See the header note before use.
     recording_id TEXT REFERENCES recordings(id) ON DELETE SET NULL,
     error TEXT,
     created_at INTEGER NOT NULL, -- ms since epoch

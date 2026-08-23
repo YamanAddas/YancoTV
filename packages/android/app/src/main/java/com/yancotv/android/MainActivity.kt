@@ -49,6 +49,11 @@ private const val SAMPLE_M3U_URL = "https://iptv-org.github.io/iptv/categories/n
 // already-seeded check, so both uses must read the same string.
 private val SAMPLE_VOD_NAME_RES = R.string.ma_sample_movies
 
+// MB-352 — debug-seed bookkeeping. Local-only by design; see the seeding
+// block in onCreate for why this is not in the `settings` table.
+private const val SEED_PREFS = "yanco_debug_seed"
+private const val KEY_VOD_SAMPLE_SEEDED = "vod_sample_seeded"
+
 @UnstableApi
 class MainActivity : ComponentActivity() {
     // MK.31.1 — apply the in-app language before any resource is resolved.
@@ -211,17 +216,51 @@ class MainActivity : ComponentActivity() {
                             // — no network, no HttpClient. Added independently of
                             // the live seed so it shows up even when the user
                             // already has the news source.
+                            //
+                            // **MB-352.** This used to re-add the sample
+                            // whenever it was absent, which made deleting it
+                            // a no-op: it came back on the next launch with
+                            // auto-sync switched back on. A delete the app
+                            // silently undoes is worse than no delete at all.
+                            //
+                            // Seeding is now once-ever, tracked by a local
+                            // flag rather than by "is it currently present?".
+                            // The flag is deliberately SharedPreferences and
+                            // not the `settings` table: this is debug-build
+                            // bookkeeping, and putting it in `settings` would
+                            // carry it through backup/restore onto machines
+                            // where it means nothing.
+                            //
+                            // The four cases are distinct on purpose --
+                            // an established user who removed the sample
+                            // BEFORE this fix has no flag yet, and must not
+                            // be handed the sample one last time.
+                            val seedPrefs = getSharedPreferences(SEED_PREFS, MODE_PRIVATE)
                             val sampleVodName = getString(SAMPLE_VOD_NAME_RES)
-                            if (existing.none { it.name == sampleVodName }) {
-                                val vod =
-                                    sourceRepo.addSource(
-                                        com.yancotv.shared.types.AddSourceInput(
-                                            name = sampleVodName,
-                                            type = com.yancotv.shared.types.SourceType.M3U_FILE,
-                                            filePath = "android.resource://$packageName/raw/sample_catalog",
-                                        ),
-                                    )
-                                sourceRepo.setAutoSyncOnStart(vod.id, true)
+                            when {
+                                seedPrefs.getBoolean(KEY_VOD_SAMPLE_SEEDED, false) -> Unit
+                                existing.any { it.name == sampleVodName } ->
+                                    // present already: adopt it, so a later
+                                    // delete sticks
+                                    seedPrefs.edit().putBoolean(KEY_VOD_SAMPLE_SEEDED, true).apply()
+                                existing.isEmpty() -> {
+                                    // genuine fresh install
+                                    val vod =
+                                        sourceRepo.addSource(
+                                            com.yancotv.shared.types.AddSourceInput(
+                                                name = sampleVodName,
+                                                type = com.yancotv.shared.types.SourceType.M3U_FILE,
+                                                filePath = "android.resource://$packageName/raw/sample_catalog",
+                                            ),
+                                        )
+                                    sourceRepo.setAutoSyncOnStart(vod.id, true)
+                                    seedPrefs.edit().putBoolean(KEY_VOD_SAMPLE_SEEDED, true).apply()
+                                }
+                                else ->
+                                    // has sources, sample absent: they
+                                    // deleted it. Record that and leave it
+                                    // deleted.
+                                    seedPrefs.edit().putBoolean(KEY_VOD_SAMPLE_SEEDED, true).apply()
                             }
                         }
                     }
