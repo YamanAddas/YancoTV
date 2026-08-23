@@ -289,6 +289,20 @@ WHERE type = ? AND group_name = ?
 ORDER BY sort_order
 LIMIT :limitCount OFFSET :offsetCount;
 
+-- MB-382 — merged-category load: several provider categories that strip to the
+-- same base name (e.g. "JAMES BOND 007" + "DE - JAMES BOND 007") are shown as
+-- one chip and loaded together. The group count per merged category is small
+-- (a handful), well under SQLite's IN-list limit. `sort_order` ordering
+-- interleaves the underlying categories in provider position.
+listByTypeAndGroupsPaged:
+SELECT * FROM content
+WHERE type = ? AND group_name IN ?
+ORDER BY sort_order
+LIMIT :limitCount OFFSET :offsetCount;
+
+countByTypeAndGroups:
+SELECT COUNT(*) FROM content WHERE type = ? AND group_name IN ?;
+
 -- MK.33.1 — see countByTypeGroupAndSource. No source_id in ORDER BY: the rows
 -- are already from a single source, so sort_order alone is provider order.
 listByTypeGroupAndSourcePaged:

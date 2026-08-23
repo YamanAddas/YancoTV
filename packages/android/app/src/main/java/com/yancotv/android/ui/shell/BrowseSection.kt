@@ -275,6 +275,19 @@ fun BrowseSection(
             }
         }
 
+    // MB-382 — on the flat path (no smart-grouping, single playlist) fold
+    // provider categories that strip to the same base name into one merged chip
+    // (e.g. "JAMES BOND 007" + "DE - JAMES BOND 007"), TiviMate-style. railRows
+    // is non-null only for the smart-grouping / per-playlist tree paths, which
+    // keep raw provider names, so merge applies exactly when railRows == null.
+    val useMerge = railRows == null
+    val mergedCategories =
+        remember(visibleGroups.toList(), useMerge) {
+            if (useMerge) com.yancotv.shared.content.CategoryMerger.merge(visibleGroups) else emptyList()
+        }
+    val mergedGroupMap =
+        remember(mergedCategories) { mergedCategories.associate { it.displayName to it.rawGroupNames } }
+
     // Selected group persists per type so flipping Live → Movies → Live
     // returns the user to whichever filter they had on Live last time.
     var selectedGroup by rememberSaveable(type) { mutableStateOf(ALL_GROUPS) }
@@ -286,13 +299,27 @@ fun BrowseSection(
             selectedGroup = ALL_GROUPS
         }
     }
+    // MB-382 — if a persisted selection is no longer a valid merged chip (e.g.
+    // after toggling smart-grouping, or a stale raw name from before the merge),
+    // fall back to All so the content pane isn't stranded empty. Only once the
+    // merged list has actually loaded, so we don't reset during first load.
+    LaunchedEffect(mergedGroupMap, useMerge) {
+        if (useMerge &&
+            mergedGroupMap.isNotEmpty() &&
+            selectedGroup != ALL_GROUPS &&
+            selectedGroup != FAVORITES_GROUP &&
+            selectedGroup !in mergedGroupMap
+        ) {
+            selectedGroup = ALL_GROUPS
+        }
+    }
 
     val categoriesVisible = panelFocus != PanelFocus.Content
 
     Row(modifier = modifier.fillMaxSize()) {
         if (categoriesVisible) {
             CategoryRail(
-                groups = if (smartGroupingEnabled) emptyList() else visibleGroups,
+                groups = if (useMerge) mergedCategories.map { it.displayName } else emptyList(),
                 selected = selectedGroup,
                 onSelect = { selectedGroup = it },
                 onEnterContent = {
@@ -321,6 +348,7 @@ fun BrowseSection(
         CoverflowSectionScreen(
             type = type,
             selectedGroup = selectedGroup,
+            mergedGroups = mergedGroupMap,
             onActivate = onActivate,
             onPlayNow = onPlayNow,
             entryFocus = coverflowFocus,

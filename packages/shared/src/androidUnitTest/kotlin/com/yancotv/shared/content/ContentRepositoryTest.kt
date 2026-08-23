@@ -264,6 +264,24 @@ class ContentRepositoryTest {
         assertNull(repo.findIdByStreamUrl(""), "blank url → null, no query")
     }
 
+    @Test fun pageByGroups_loadsAllUnderlyingCategoriesMerged() = runTest {
+        // MB-382 — a merged category (JAMES BOND 007 + DE - JAMES BOND 007)
+        // loads content from every underlying provider group, in sort_order.
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        insertContent(db, "en1", "src-A", tvgId = null, title = "007 Octopussy", type = "movie", groupName = "JAMES BOND 007", sortOrder = 0L)
+        insertContent(db, "de1", "src-A", tvgId = null, title = "DE Goldfinger", type = "movie", groupName = "DE - JAMES BOND 007", sortOrder = 1L)
+        insertContent(db, "de2", "src-A", tvgId = null, title = "DE Skyfall", type = "movie", groupName = "DE - JAMES BOND 007", sortOrder = 2L)
+        insertContent(db, "other", "src-A", tvgId = null, title = "Other", type = "movie", groupName = "COMEDY", sortOrder = 3L)
+        val repo = ContentRepository(db)
+        val groups = listOf("JAMES BOND 007", "DE - JAMES BOND 007")
+        assertEquals(3L, repo.countByGroups(ContentType.MOVIE, groups))
+        val page = repo.pageByGroups(ContentType.MOVIE, groups, offset = 0L, limit = 100L)
+        assertEquals(listOf("en1", "de1", "de2"), page.map { it.id }, "merged load, provider sort_order")
+        assertEquals(0L, repo.countByGroups(ContentType.MOVIE, emptyList()), "empty groups -> 0, no query")
+        assertTrue(repo.pageByGroups(ContentType.MOVIE, emptyList(), 0L, 100L).isEmpty())
+    }
+
     private fun insertSource(db: YancoDb, id: String, priority: Int) {
         db.sourcesQueries.insert(
             id = id,

@@ -86,6 +86,27 @@ class ContentRepository(private val db: YancoDb) {
         }
     }
 
+    /**
+     * MB-382 — count across a merged category's underlying provider group
+     * names ([CategoryMerger]). The list is small (a handful of names), so the
+     * `IN` clause stays well under SQLite's bind-variable limit.
+     */
+    fun countByGroups(type: ContentType, groups: List<String>): Long = if (groups.isEmpty()) {
+        0L
+    } else {
+        db.contentQueries.countByTypeAndGroups(type.dbValue, groups).executeAsOne()
+    }
+
+    /** MB-382 — page across a merged category's underlying provider group names. */
+    fun pageByGroups(type: ContentType, groups: List<String>, offset: Long, limit: Long): List<ContentItem> = if (groups.isEmpty()) {
+        emptyList()
+    } else {
+        db.contentQueries
+            .listByTypeAndGroupsPaged(type.dbValue, groups, limit, offset)
+            .executeAsList()
+            .map { it.toDomain() }
+    }
+
     /** @param sourceId see [count]. */
     fun page(type: ContentType, group: String? = null, offset: Long, limit: Long, sourceId: String? = null): List<ContentItem> {
         val t = type.dbValue

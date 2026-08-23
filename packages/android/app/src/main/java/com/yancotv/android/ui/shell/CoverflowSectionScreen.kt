@@ -158,6 +158,13 @@ import org.koin.compose.koinInject
 fun CoverflowSectionScreen(
     type: ContentType,
     selectedGroup: String,
+    /**
+     * MB-382 — merged-category resolver: display name (the chip label, which is
+     * the value carried in [selectedGroup] for a merged chip) → the underlying
+     * provider `group_name`s to load together. Empty for the smart-grouping /
+     * source-bucketed paths, which keep the single-group filter.
+     */
+    mergedGroups: Map<String, List<String>> = emptyMap(),
     onActivate: (List<ContentItem>, Int) -> Unit,
     /**
      * MK.29.3 — start playback immediately, bypassing the detail page.
@@ -207,6 +214,9 @@ fun CoverflowSectionScreen(
     val filter = resolveGroupFilter(selectedGroup)
     val groupFilter = filter.groupName
     val sourceFilter = filter.sourceId
+    // MB-382 — when the selected chip is a merged category, load across all its
+    // underlying provider group_names instead of the single-group filter.
+    val mergedRawNames = mergedGroups[selectedGroup]
     val isFavoritesFilter = isFavoritesFilter(selectedGroup)
 
     // Stop playback + reset anchor on category change so the new first orb's
@@ -247,14 +257,18 @@ fun CoverflowSectionScreen(
             hasLoaded = false
             total =
                 withContext(Dispatchers.IO) {
-                    runCatching { repo.count(type, groupFilter, sourceFilter) }
+                    runCatching {
+                        if (mergedRawNames != null) repo.countByGroups(type, mergedRawNames) else repo.count(type, groupFilter, sourceFilter)
+                    }
                         .onFailure { Log.w("Yanco", "CoverflowSection.count failed: ${it.message}", it) }
                         .getOrElse { 0L }
                 }
             loaded = 0L
             val first =
                 withContext(Dispatchers.IO) {
-                    runCatching { repo.page(type, groupFilter, 0L, 100L, sourceFilter) }
+                    runCatching {
+                        if (mergedRawNames != null) repo.pageByGroups(type, mergedRawNames, 0L, 100L) else repo.page(type, groupFilter, 0L, 100L, sourceFilter)
+                    }
                         .onFailure { Log.w("Yanco", "CoverflowSection.page first failed: ${it.message}", it) }
                         .getOrElse { emptyList() }
                 }
@@ -384,7 +398,15 @@ fun CoverflowSectionScreen(
         loading = true
         val page =
             withContext(Dispatchers.IO) {
-                runCatching { repo.page(type, groupFilter, loaded, 100L, sourceFilter) }
+                runCatching {
+                    if (mergedRawNames !=
+                        null
+                    ) {
+                        repo.pageByGroups(type, mergedRawNames, loaded, 100L)
+                    } else {
+                        repo.page(type, groupFilter, loaded, 100L, sourceFilter)
+                    }
+                }
                     .onFailure { Log.w("Yanco", "CoverflowSection.page tail failed: ${it.message}", it) }
                     .getOrElse { emptyList() }
             }
