@@ -126,6 +126,26 @@ class UpdateChecker(
             logger.warn("UpdateChecker: manifest has blank downloadUrl; treating as no-update")
             return UpdateCheckOutcome.Failed("The update is missing a download link.")
         }
+        // MB-369 — refuse a cleartext download link outright. The manifest
+        // itself is fetched over the user-configured endpoint, but the APK
+        // is EXECUTABLE payload: an http:// link would hand an on-path
+        // attacker a file-substitution slot. Android's installer would still
+        // reject a foreign signature, so this is defence in depth — but it
+        // is one line, and it removes the only point where an attacker gets
+        // to serve anything at all.
+        if (!remote.downloadUrl.startsWith("https://", ignoreCase = true)) {
+            logger.warn("UpdateChecker: refusing non-HTTPS downloadUrl")
+            return UpdateCheckOutcome.Failed("The update has an insecure download link.")
+        }
+        // MB-369 — a manifest that PROMISES a digest but ships a malformed
+        // one is a broken release, not a skippable field: installing
+        // unverifiable-when-promised is exactly what the field exists to
+        // prevent. Absent stays fine (pre-MB-369 manifests).
+        val sha = remote.sha256?.trim()?.lowercase()
+        if (sha != null && !sha.matches(Regex("^[0-9a-f]{64}$"))) {
+            logger.warn("UpdateChecker: manifest sha256 is malformed; refusing")
+            return UpdateCheckOutcome.Failed("The update's integrity data is unreadable.")
+        }
         if (remote.versionCode <= currentVersionCode) {
             logger.info(
                 "UpdateChecker: remote versionCode=${remote.versionCode} <= current=$currentVersionCode — no update",
@@ -142,6 +162,7 @@ class UpdateChecker(
                 downloadUrl = remote.downloadUrl,
                 releaseNotes = remote.releaseNotes,
                 minOsApi = remote.minOsApi,
+                sha256 = sha,
             ),
         )
     }
@@ -158,7 +179,21 @@ class UpdateChecker(
  * Public result type — UI consumes this to render a "new version
  * available" prompt.
  */
-data class UpdateInfo(val versionCode: Int, val versionName: String, val downloadUrl: String, val releaseNotes: String?, val minOsApi: Int?)
+data class UpdateInfo(
+    val versionCode: Int,
+    val versionName: String,
+    val downloadUrl: String,
+    val releaseNotes: String?,
+    val minOsApi: Int?,
+    /**
+     * MB-369 — SHA-256 of the APK at [downloadUrl], lowercase hex, when the
+     * manifest declares one. Null for older manifests (the published 1.5.3
+     * `update.json` predates the field) — the installer then skips the
+     * digest check and relies on Android's signature enforcement alone,
+     * which is the pre-MB-369 behaviour.
+     */
+    val sha256: String? = null,
+)
 
 /**
  * Detailed result for a manual update check. Keeps "no update" and
@@ -196,4 +231,6 @@ internal data class UpdateManifest(
      * floor declared".
      */
     val minOsApi: Int? = null,
+    /** MB-369 — optional APK digest; see [UpdateInfo.sha256]. */
+    val sha256: String? = null,
 )

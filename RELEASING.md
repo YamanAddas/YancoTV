@@ -45,6 +45,11 @@ notes are the scar tissue. Desktop releases are unrelated (see CHANGELOG.md).
    `yancotv-<ver>-<code>.apk` + `.aab` + `update.json` + `SHA256SUMS` +
    `yancotv-<ver>-<code>-mapping.txt`.
 
+   `update.json` now carries the APK's `sha256` (MB-369) — emitted
+   automatically when the release APK exists. The in-app updater verifies it
+   before installing, so publish the update.json that releasePackage
+   produced, not a hand-edited one.
+
    Guard behaviour (MB-364): fails on a blank Sentry DSN unless you pass
    `-PallowNoCrashReporting=true`. A blind release is a keystroke, not a default.
 

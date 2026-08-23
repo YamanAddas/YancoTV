@@ -172,8 +172,17 @@ class UpdateInstaller(private val appContext: Context, private val sharedHttp: O
         if (targetFile.exists() && targetFile.length() > 0L) {
             // Same versionCode already downloaded — skip the round trip
             // and jump to ready. The user could still tap Install.
-            _state.value = State.ReadyToInstall(targetFile, info.versionName)
-            return
+            //
+            // MB-369 — but only after the cached file passes the digest the
+            // manifest now carries. Without this, one corrupt or truncated
+            // earlier download sat here as ReadyToInstall FOREVER: this
+            // short-circuit re-offered the same broken file on every check.
+            if (ApkChecksum.matches(targetFile, info.sha256)) {
+                _state.value = State.ReadyToInstall(targetFile, info.versionName)
+                return
+            }
+            logger.warn("UpdateInstaller: cached APK failed sha256 — deleting and re-downloading")
+            targetFile.delete()
         }
         targetFile.parentFile?.mkdirs()
         _state.value = State.Downloading(percent = 0, versionName = info.versionName)
@@ -211,6 +220,15 @@ class UpdateInstaller(private val appContext: Context, private val sharedHttp: O
                                 }
                             }
                         }
+                    }
+                    // MB-369 — verify BEFORE the rename that publishes the
+                    // file to the ReadyToInstall path. Android's installer
+                    // would still reject a wrong-signature APK, so this is
+                    // defence in depth — its real everyday value is catching
+                    // truncation and CDN corruption with a clear message
+                    // instead of an opaque installer failure.
+                    if (!ApkChecksum.matches(partial, info.sha256)) {
+                        error("integrity check failed — downloaded APK does not match the manifest sha256")
                     }
                     if (!partial.renameTo(targetFile)) error("rename failed")
                 }

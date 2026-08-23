@@ -221,4 +221,48 @@ class UpdateCheckerTest {
         checker.check()
         assertEquals("https://my.example/v1/update.json", http.lastUrl)
     }
+    // ── MB-369 — download-link integrity ────────────────────────────
+
+    @Test fun httpDownloadUrlIsRefused() = runTest {
+        val http = FakeHttpClient(
+            Result.success("""{"versionCode": 99, "versionName": "9.9", "downloadUrl": "http://x/y.apk"}"""),
+        )
+        val checker = UpdateChecker(http, endpointUrl = "https://e/u.json", currentVersionCode = 1)
+        assertNull(checker.check(), "an http:// APK link is a file-substitution slot; must refuse")
+    }
+
+    @Test fun sha256IsCarriedThroughNormalized() = runTest {
+        val hex = "A".repeat(64)
+        val http = FakeHttpClient(
+            Result.success(
+                """{"versionCode": 99, "versionName": "9.9", "downloadUrl": "https://x/y.apk", "sha256": "$hex"}""",
+            ),
+        )
+        val checker = UpdateChecker(http, endpointUrl = "https://e/u.json", currentVersionCode = 1)
+        assertEquals("a".repeat(64), checker.check()?.sha256, "sha must survive, lowercased")
+    }
+
+    @Test fun absentSha256StaysInstallable() = runTest {
+        // the published 1.5.3 manifest predates the field — a fleet of real
+        // devices depends on this staying valid
+        val http = FakeHttpClient(
+            Result.success("""{"versionCode": 99, "versionName": "9.9", "downloadUrl": "https://x/y.apk"}"""),
+        )
+        val checker = UpdateChecker(http, endpointUrl = "https://e/u.json", currentVersionCode = 1)
+        val info = checker.check()
+        assertEquals(99, info?.versionCode)
+        assertNull(info?.sha256)
+    }
+
+    @Test fun malformedSha256IsRefusedNotSkipped() = runTest {
+        // promising a digest and shipping garbage is a broken release;
+        // installing unverifiable-when-promised defeats the field's purpose
+        val http = FakeHttpClient(
+            Result.success(
+                """{"versionCode": 99, "versionName": "9.9", "downloadUrl": "https://x/y.apk", "sha256": "nope"}""",
+            ),
+        )
+        val checker = UpdateChecker(http, endpointUrl = "https://e/u.json", currentVersionCode = 1)
+        assertNull(checker.check())
+    }
 }

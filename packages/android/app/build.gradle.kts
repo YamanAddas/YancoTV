@@ -559,6 +559,32 @@ val generateUpdateJson by tasks.registering {
             )
         if (releaseNotes != null) payload["releaseNotes"] = releaseNotes
 
+        // MB-369 — SHA-256 of the release APK, when it exists, so the
+        // in-app updater can verify the download before invoking the
+        // installer. Omitted (never faked) when:
+        //  - the APK has not been built in this invocation (standalone
+        //    generateUpdateJson run) — hashing a stale file would pin the
+        //    WRONG digest to the new version and brick the update;
+        //  - update.testBump is set — that mode advertises versionCode+1
+        //    while pointing at the CURRENT build, so a digest would only
+        //    ever mismatch. Absent sha = "no digest check", the documented
+        //    pre-MB-369 behaviour the fleet already relies on.
+        val releaseApk = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
+        if (!testBump && releaseApk.exists()) {
+            val md = MessageDigest.getInstance("SHA-256")
+            releaseApk.inputStream().use { input ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n == -1) break
+                    md.update(buf, 0, n)
+                }
+            }
+            payload["sha256"] = md.digest().joinToString("") { b -> "%02x".format(b) }
+        } else if (!testBump) {
+            logger.lifecycle("generateUpdateJson: no release APK on disk — update.json emitted WITHOUT sha256")
+        }
+
         val target = outputFile.get().asFile
         target.parentFile.mkdirs()
         target.writeText(
