@@ -6,6 +6,39 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.3 (versionCode 27) — 2026-08-23
+
+A content-visibility and recording-correctness release, from an audit prompted
+by categories that showed partial content.
+
+### Fixed
+- **Categories a provider split by a country/language prefix now show together.**
+  e.g. `JAMES BOND 007` and `DE - JAMES BOND 007` were separate lists (the
+  English one had a single film); they now merge into one "James Bond 007" with
+  all of them. Category names lose their country prefix and same-named
+  categories merge across languages (TiviMate-style). (MB-383)
+- **Recording no longer captures the wrong channel if you change channel while
+  recording.** (MB-376)
+- **Scheduled recordings record the channel you picked** — not an arbitrary
+  same-EPG-id channel, which previously could fail on a one-stream provider.
+  (MB-381)
+- **Catch-up plays the exact channel you opened**, not another that shares its
+  EPG id. (MB-380)
+- **Channel-surf (up/down in the player) covers your current category**, not
+  just the first 200 channels of the whole list. (MB-378)
+- **Channels no longer display as a bare "|"** when their name cleans down to
+  punctuation. (MB-377)
+- **Now/next EPG labels in the grid follow what you're browsing** instead of
+  stopping at the first 60 channels. (MB-379)
+
+### Known issues
+- The Guide lists only channels that have EPG data (~5% of a large channel
+  list); the rest are in Live TV browse. A fix is scoped. (MB-382)
+- A provider category that mixes movies and series still appears split across
+  the Movies and Series tabs. (MB-375)
+- On a TV remote you can't yet cross a long programme block in the guide; touch
+  works. (MB-371)
+
 ## 1.6.2 (versionCode 26) — 2026-08-23
 
 Patch on 1.6.1. Fixes a content-visibility bug found in field testing.
