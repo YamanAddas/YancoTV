@@ -155,7 +155,7 @@
     <string name="pb_bucket_live">Live TV</string>
     <string name="pb_bucket_movie">Movies</string>
     <string name="pb_bucket_series">Series &amp; episodes</string>
-    <string name="pb_kicker_live" translatable="false">LIVE</string>
+    <string name="pb_kicker_live">LIVE</string>
     <string name="pb_kicker_vod" translatable="false">VOD</string>
     <string name="pb_kicker_episodes">EPISODES</string>
 
@@ -990,8 +990,8 @@
     <string name="sd_untitled">Untitled source</string>
     <string name="sd_moments_ago">Moments ago</string>
     <string name="sd_min_ago">%1$d min ago</string>
-    <string name="sd_dur_hm" translatable="false">%1$dh %2$dm</string>
-    <string name="sd_dur_dh" translatable="false">%1$dd %2$dh</string>
+    <string name="sd_dur_hm">%1$dh %2$dm</string>
+    <string name="sd_dur_dh">%1$dd %2$dh</string>
 
     <!-- MK.31.21 fixups + recordings tab -->
     <string name="rt_advanced">ADVANCED</string>
@@ -1016,8 +1016,8 @@
     <string name="gs_subtitle" translatable="false">%1$s · %2$s%3$s</string>
     <string name="rel_just_now_lower">just now</string>
     <string name="rs_count_suffix" translatable="false">· %1$d</string>
-    <string name="rs_dur_hm" translatable="false">%1$dh %2$dm</string>
-    <string name="rs_dur_m" translatable="false">%1$dm</string>
+    <string name="rs_dur_hm">%1$dh %2$dm</string>
+    <string name="rs_dur_m">%1$dm</string>
     <string name="rs_size_gb" translatable="false">%1$s GB</string>
     <string name="rs_size_mb" translatable="false">%1$d MB</string>
     <string name="rs_size_kb" translatable="false">%1$d KB</string>

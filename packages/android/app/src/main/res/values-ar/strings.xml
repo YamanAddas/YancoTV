@@ -1344,4 +1344,13 @@
     <!-- MB-370 — phone gesture HUD labels. -->
     <string name="pl_gesture_brightness">السطوع</string>
     <string name="pl_gesture_volume">مستوى الصوت</string>
+
+    <!-- MB-366 — duration abbreviations + LIVE kicker. The h/m/d
+         letters are language-specific; these were wrongly marked
+         translatable="false" in the base file. -->
+    <string name="pb_kicker_live">مباشر</string>
+    <string name="sd_dur_hm">%1$d س %2$d د</string>
+    <string name="sd_dur_dh">%1$d يوم %2$d س</string>
+    <string name="rs_dur_hm">%1$d س %2$d د</string>
+    <string name="rs_dur_m">%1$d د</string>
 </resources>

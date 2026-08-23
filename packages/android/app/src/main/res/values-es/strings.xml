@@ -1251,4 +1251,13 @@
     <!-- MB-370 — phone gesture HUD labels. -->
     <string name="pl_gesture_brightness">Brillo</string>
     <string name="pl_gesture_volume">Volumen</string>
+
+    <!-- MB-366 — duration abbreviations + LIVE kicker. The h/m/d
+         letters are language-specific; these were wrongly marked
+         translatable="false" in the base file. -->
+    <string name="pb_kicker_live">EN VIVO</string>
+    <string name="sd_dur_hm">%1$d h %2$d min</string>
+    <string name="sd_dur_dh">%1$d d %2$d h</string>
+    <string name="rs_dur_hm">%1$d h %2$d min</string>
+    <string name="rs_dur_m">%1$d min</string>
 </resources>
