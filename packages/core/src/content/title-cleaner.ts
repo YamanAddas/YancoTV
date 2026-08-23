@@ -45,8 +45,13 @@ export function cleanTitle(rawTitle: string): string {
   // Trim again after pattern removal
   title = title.trim();
 
-  // If cleaning emptied the title, return the original
-  if (!title) return rawTitle.trim();
+  // MB-377 — a title stripped to only punctuation/separators (e.g.
+  // "(MX) (VIX 01) | (2098-12-31 08:00:01)" reduces to "|") is as useless as
+  // an empty one; the old `!title` guard missed it, so such rows all rendered
+  // identically. Fall back to the raw title when the cleaned result has no
+  // letter or digit in any script. The empty string also fails this test, so
+  // it subsumes the old guard.
+  if (!/[\p{L}\p{N}]/u.test(title)) return rawTitle.trim();
 
   return title;
 }

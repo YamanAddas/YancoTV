@@ -54,6 +54,13 @@ describe('Title Cleaner', () => {
       expect(cleanTitle('HD')).toBe('HD');
     });
 
+    it('keeps the raw title when cleaning leaves only punctuation (MB-377)', () => {
+      const raw = '(MX) (VIX 01) | (2098-12-31 08:00:01)';
+      const cleaned = cleanTitle(raw);
+      expect(/[\p{L}\p{N}]/u.test(cleaned)).toBe(true);
+      expect(cleaned).toBe(raw);
+    });
+
     it('trims whitespace', () => {
       expect(cleanTitle('  CNN  ')).toBe('CNN');
     });

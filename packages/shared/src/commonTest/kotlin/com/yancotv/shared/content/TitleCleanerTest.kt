@@ -3,6 +3,7 @@ package com.yancotv.shared.content
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TitleCleanerTest {
     // --- cleanTitle ---
@@ -51,6 +52,16 @@ class TitleCleanerTest {
 
     @Test fun returnsOriginalIfCleaningEmptiesTitle() {
         assertEquals("HD", cleanTitle("HD"))
+    }
+
+    @Test fun keepsRawWhenCleaningLeavesOnlyPunctuation() {
+        // MB-377 — bracket/prefix stripping can reduce a title to a lone
+        // separator ("|"), which used to slip past the empty guard and render
+        // 300+ channels identically. Must fall back to the raw title instead.
+        val raw = "(MX) (VIX 01) | (2098-12-31 08:00:01)"
+        val cleaned = cleanTitle(raw)
+        assertTrue(cleaned.any { it.isLetterOrDigit() }, "cleaned title must not be punctuation-only, was '$cleaned'")
+        assertEquals(raw, cleaned)
     }
 
     @Test fun trimsWhitespace() {

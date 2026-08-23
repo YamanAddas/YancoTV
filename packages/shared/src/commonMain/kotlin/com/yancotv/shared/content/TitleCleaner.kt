@@ -40,7 +40,14 @@ fun cleanTitle(rawTitle: String): String {
 
     title = title.trim()
 
-    if (title.isEmpty()) return rawTitle.trim()
+    // MB-377 — a title stripped down to only punctuation/separators (e.g.
+    // "(MX) (VIX 01) | (2098-12-31 08:00:01)" reduces to "|") is as useless as
+    // an empty one, but the old `isEmpty()` guard let it through, so every such
+    // row rendered identically (315 rows on a real catalogue all showed "|").
+    // Treat a result with no letter or digit in ANY script as empty and fall
+    // back to the raw title, which at least stays distinguishable. `none` is
+    // also true for the empty string, so this subsumes the old guard.
+    if (title.none { it.isLetterOrDigit() }) return rawTitle.trim()
 
     return title
 }
