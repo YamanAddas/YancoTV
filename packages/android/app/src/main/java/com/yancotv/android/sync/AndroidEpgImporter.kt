@@ -17,7 +17,9 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
+import java.util.concurrent.Executors
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.buffer
@@ -158,9 +160,65 @@ class AndroidEpgImporter(
                 }
 
                 // ───── Phase 2: parse + write (transaction held only here) ─────
+                //
+                // **MB-356.** This phase MUST run thread-confined. Android's
+                // `SQLiteSession` is thread-local: `execSQL("BEGIN")` binds the
+                // transaction to the calling thread's session, which owns the
+                // primary connection until THAT thread commits. Phase 2 holds
+                // one transaction across the whole streaming import while
+                // `streamInto` suspends to report progress between batches --
+                // and on `Dispatchers.IO` (a 64-thread pool) a resume is free
+                // to land on a different thread. When it does, COMMIT runs
+                // against a session with no transaction, the original thread
+                // never gives the connection back, and every subsequent write
+                // in the app -- favourites, watch history, resume points,
+                // recording state -- blocks forever with the pool reporting
+                // `0 active` and naming no running statement. Restarting the
+                // process is the only recovery.
+                //
+                // A single-thread dispatcher removes the hazard outright:
+                // `withContext` resumes on the dispatcher of the context it
+                // was called in, so every suspension inside this block comes
+                // back to the same thread, including returns from progress
+                // callbacks that hop to Main internally.
+                //
+                // NOT `Dispatchers.IO.limitedParallelism(1)` -- that bounds
+                // concurrency to one task at a time but makes no promise about
+                // WHICH thread runs it, which is the only property that
+                // matters here.
+                val dbExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "yanco-epg-db") }
+                try {
+                    dbExecutor.asCoroutineDispatcher().use { dbDispatcher ->
+                        withContext(dbDispatcher) {
+                            runPhase2(downloaded, canonicalById, onProgress, errors, ::recordError)
+                        }
+                    }
+                } finally {
+                    dbExecutor.shutdown()
+                }
+            } finally {
+                // Always clean up our temp files — Phase-1 successes,
+                // Phase-2 thrown-mid, and anything we managed to add to
+                // `downloaded` before an outer abort.
+                downloaded.forEach { runCatching { it.file.delete() } }
+            }
+        }
+
+    /**
+     * Phase 2 of [refresh], extracted so it can be run on its own
+     * single-thread dispatcher. See the MB-356 note at the call site: every
+     * DB statement of the session transaction must run on one thread.
+     */
+    private suspend fun runPhase2(
+        downloaded: List<DownloadedTarget>,
+        canonicalById: Map<String, String>,
+        onProgress: Progress,
+        errors: MutableList<String>,
+        recordError: (String?) -> Unit,
+    ): EpgRefreshResult {
                 val session = writer.openSession()
                 var anySucceeded = false
-                try {
+                return try {
                     session.begin()
                     for ((idx, df) in downloaded.withIndex()) {
                         val label = "${idx + 1}/${downloaded.size} (${df.target.sourceKey})"
@@ -196,7 +254,7 @@ class AndroidEpgImporter(
                             errors.joinToString(" | ")
                         }
                         recordError(detail)
-                        return@withContext EpgRefreshResult(ok = false, error = detail)
+                        return EpgRefreshResult(ok = false, error = detail)
                     }
 
                     onProgress.report(
@@ -226,13 +284,7 @@ class AndroidEpgImporter(
                     recordError(msg)
                     EpgRefreshResult(ok = false, error = msg)
                 }
-            } finally {
-                // Always clean up our temp files — Phase-1 successes,
-                // Phase-2 thrown-mid, and anything we managed to add to
-                // `downloaded` before an outer abort.
-                downloaded.forEach { runCatching { it.file.delete() } }
-            }
-        }
+    }
 
     private fun sweepStaleTempFiles() {
         runCatching {

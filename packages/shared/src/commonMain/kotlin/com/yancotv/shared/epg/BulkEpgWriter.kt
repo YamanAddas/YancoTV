@@ -3,6 +3,7 @@ package com.yancotv.shared.epg
 import app.cash.sqldelight.db.SqlDriver
 import com.yancotv.shared.diag.beginTraced
 import com.yancotv.shared.diag.commitTraced
+import com.yancotv.shared.diag.currentThreadName
 import com.yancotv.shared.diag.rollbackTraced
 import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.logger.NOOP_LOGGER
@@ -139,6 +140,25 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
      */
     inner class Session {
         private var open = false
+
+        /**
+         * MB-356. The thread that ran BEGIN, remembered so that a close on a
+         * DIFFERENT thread can be reported.
+         *
+         * Android's `SQLiteSession` is thread-local and `execSQL("BEGIN")` is
+         * intercepted into it, so the primary connection is owned by the
+         * thread that opened the transaction and is only returned when THAT
+         * thread commits or rolls back. This session deliberately spans a
+         * streaming import, and its caller suspends between batches to report
+         * progress — a legal coroutine thread-migration point. If the resume
+         * lands on another thread, COMMIT hits a session with no transaction,
+         * the connection is never given back, and every later write in the app
+         * starves forever with the pool reporting `0 active` and no running
+         * statement. Neither statement errors on its own, which is why the
+         * failure is invisible without this check.
+         */
+        private var beginThread: String? = null
+
         var rowsWritten: Int = 0
             private set
 
@@ -148,12 +168,33 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
         fun begin() {
             if (open) error("Session already open")
             beginTraced(driver, logger, "epg.begin")
+            beginThread = currentThreadName()
             try {
                 driver.execute(null, "DELETE FROM epg_programmes", 0)
                 open = true
             } catch (t: Throwable) {
                 runCatching { rollbackTraced(driver, logger, "epg.begin") }
                 throw t
+            }
+        }
+
+        /**
+         * Report a close that is happening on a different thread than the
+         * BEGIN. Warn only — this is a detector, not a guard: throwing here
+         * would convert a leaked connection into a crash, and the caller has
+         * no way to migrate back to the original thread anyway. The real fix
+         * is to confine the transaction to one thread (see
+         * `AndroidEpgImporter`, which runs this session on a dedicated
+         * single-thread dispatcher).
+         */
+        private fun checkCloseThread(op: String) {
+            val began = beginThread ?: return
+            val now = currentThreadName()
+            if (began != now) {
+                logger.error(
+                    "MB-356: epg session $op on '$now' but BEGIN was on '$began' — " +
+                        "the primary SQLite connection is now leaked and every write will starve until restart",
+                )
             }
         }
 
@@ -188,6 +229,7 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
 
         fun commit(lastRefreshedMs: Long? = null) {
             if (!open) error("Session not open")
+            checkCloseThread("COMMIT")
             try {
                 if (lastRefreshedMs != null) {
                     driver.execute(
@@ -209,8 +251,10 @@ class BulkEpgWriter(private val driver: SqlDriver, private val logger: Logger = 
 
         fun rollback() {
             if (!open) return
+            checkCloseThread("ROLLBACK")
             runCatching { rollbackTraced(driver, logger, "epg.rollback") }
             open = false
+            beginThread = null
         }
     }
 

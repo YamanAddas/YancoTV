@@ -126,6 +126,46 @@ class BulkEpgWriterTest {
         assertEquals("77", db.settingsQueries.get(EpgRepository.LAST_REFRESHED_KEY).executeAsOne())
     }
 
+    @Test fun session_closedOnAnotherThreadIsReported() = runTest {
+        // MB-356 regression. Android's SQLiteSession is thread-local, so a
+        // transaction begun on one thread and committed on another leaks the
+        // primary connection permanently and NEITHER statement errors -- the
+        // app just stops persisting writes until it is restarted. The session
+        // deliberately spans a streaming import whose caller suspends between
+        // batches, so a thread migration is legal and silent. This asserts the
+        // detector speaks up; the hazard itself is removed by running the
+        // import on a single-thread dispatcher (AndroidEpgImporter).
+        val (_, driver) = testDbPair()
+        val logged = mutableListOf<String>()
+        val capturing =
+            object : com.yancotv.shared.logger.Logger {
+                override fun info(msg: String) {
+                    logged.add(msg)
+                }
+                override fun warn(msg: String) {
+                    logged.add(msg)
+                }
+                override fun error(msg: String) {
+                    logged.add(msg)
+                }
+            }
+        val writer = BulkEpgWriter(driver, capturing)
+        val session = writer.openSession()
+        session.begin()
+        session.writeBatch("src-A", "src-A", listOf(XmltvProgramme(channelId = "c1", title = "T", startTime = 1L, endTime = 2L)))
+
+        // commit from a DIFFERENT thread, which is what a coroutine resume
+        // onto another Dispatchers.IO worker does in production
+        val other = Thread { session.commit(lastRefreshedMs = 5L) }
+        other.start()
+        other.join()
+
+        assertTrue(
+            logged.any { it.contains("MB-356") && it.contains("COMMIT") },
+            "closing the session on another thread must be reported; logged=$logged",
+        )
+    }
+
     @Test fun session_rollbackRestoresOldData() = runTest {
         val (db, driver) = testDbPair()
         val writer = BulkEpgWriter(driver)
