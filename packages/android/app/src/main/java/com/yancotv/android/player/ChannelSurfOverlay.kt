@@ -81,21 +81,41 @@ fun ChannelSurfOverlay(
     var nowNext by remember { mutableStateOf<Map<String, NowNext>>(emptyMap()) }
     val general by prefs.generalFlow.collectAsState()
 
-    // Load a sensible page of live channels once on open. 200 is enough to
-    // cover most personal lists without paying a paginated-load cost while
-    // the overlay is open — surf sessions are typically a handful of rows.
-    LaunchedEffect(Unit) {
+    // MB-378 — surf the CURRENT channel's category, not the first 200 of the
+    // whole catalogue. With tens of thousands of live channels the playing
+    // channel was almost never in that global 200 (so focus fell to row 0) and
+    // ~99% of channels were unreachable by surfing. Scope to the channel's
+    // group so the current channel is present and its whole category is
+    // surfable; fall back to a large global window for channels with no group.
+    // Re-keyed on currentContentId so zapping to another category reloads.
+    LaunchedEffect(currentContentId) {
         val loaded =
             withContext(Dispatchers.IO) {
-                runCatching { repo.page(ContentType.LIVE, null, 0L, 200L) }
-                    .getOrElse { emptyList() }
+                runCatching {
+                    val group = currentContentId
+                        ?.let { repo.findById(it) }
+                        ?.groupName
+                        ?.takeIf { it.isNotBlank() }
+                    if (group != null) {
+                        repo.page(ContentType.LIVE, group, 0L, SURF_MAX_ITEMS)
+                    } else {
+                        repo.page(ContentType.LIVE, null, 0L, SURF_MAX_ITEMS)
+                    }
+                }.getOrElse { emptyList() }
             }
         items = loaded
-        val tvgIds = loaded.mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
-        if (tvgIds.isNotEmpty()) {
+        // now/next for a bounded window around the current channel. The
+        // per-channel query has no IN-list limit, but querying an entire large
+        // category on open is needless work when surf only shows a few rows.
+        val currentIdx = loaded.indexOfFirst { it.id == currentContentId }.coerceAtLeast(0)
+        val windowIds = loaded
+            .drop((currentIdx - SURF_EPG_HALF_WINDOW).coerceAtLeast(0))
+            .take(SURF_EPG_HALF_WINDOW * 2)
+            .mapNotNull { it.tvgId?.takeIf { id -> id.isNotBlank() } }
+        if (windowIds.isNotEmpty()) {
             nowNext =
                 withContext(Dispatchers.IO) {
-                    runCatching { epg.getNowNextBatch(tvgIds) }.getOrElse { emptyMap() }
+                    runCatching { epg.getNowNextBatch(windowIds) }.getOrElse { emptyMap() }
                 }
         }
     }
@@ -190,6 +210,17 @@ fun ChannelSurfOverlay(
 
 /** MK.10.4 — TiviMate-style auto-dismiss after no scroll for this long. */
 private const val IDLE_TIMEOUT_MS: Long = 5_000L
+
+// MB-378 — how many live channels to load into the surf overlay. Covers the
+// largest real live category (≈1,001 on a 53k-channel catalogue) so a
+// category-scoped surf holds the whole category; also the fallback window for
+// channels with no group.
+private const val SURF_MAX_ITEMS: Long = 1_500L
+
+// Half-width (in rows) of the now/next EPG window fetched around the current
+// channel. Surf shows a few rows at a time, so there's no need to query EPG for
+// an entire category on open.
+private const val SURF_EPG_HALF_WINDOW: Int = 50
 
 @Composable
 private fun SurfRow(
