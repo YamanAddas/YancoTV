@@ -1229,7 +1229,20 @@ private fun ChannelRow(
     // node (the MK.8 rule: focus state owned inside the boundary that
     // scopes it, never hoisted above it).
     val laneFocus = remember(channel.tvgId) { FocusRequester() }
-    var laneHasTarget by remember(channel.tvgId) { mutableStateOf(false) }
+
+    // Derived, NOT state written during composition. The first version of
+    // this fix flipped a `mutableStateOf` inside the render loop to mark the
+    // entry block; writing state during composition is an anti-pattern --
+    // it schedules another recomposition and the value can be lost or loop.
+    // The entry point is a pure function of the programmes already computed,
+    // so compute it here and compare by id in the loop. Null means the row
+    // has nothing focusable and the key press must not be consumed.
+    val laneEntryId =
+        remember(visibleProgrammes, windowStart, windowEnd) {
+            visibleProgrammes.firstOrNull { p ->
+                p.endTime.coerceAtMost(windowEnd) > p.startTime.coerceAtLeast(windowStart)
+            }?.id
+        }
 
     Row(
         modifier =
@@ -1249,7 +1262,7 @@ private fun ChannelRow(
             // with no programmes returns false and keeps Compose's default
             // traversal, so we never swallow the key and strand the user.
             onEnterLane = {
-                laneHasTarget && runCatching { laneFocus.requestFocus() }.isSuccess
+                laneEntryId != null && runCatching { laneFocus.requestFocus() }.isSuccess
             },
         )
 
@@ -1299,13 +1312,11 @@ private fun ChannelRow(
                     // The gap is deliberately non-focusable (see above) and
                     // aiming focus at it is the 2026-05-05 scroll-left
                     // regression this file already documents.
-                    val isLaneEntry = !laneHasTarget
-                    if (isLaneEntry) laneHasTarget = true
                     ProgrammeBlock(
                         programme = prog,
                         widthDp = (durMin * pxPerMin).dp.coerceAtLeast(MIN_PROG_WIDTH),
                         onActivate = { onProgrammeAction(prog) },
-                        modifier = if (isLaneEntry) Modifier.focusRequester(laneFocus) else Modifier,
+                        modifier = if (prog.id == laneEntryId) Modifier.focusRequester(laneFocus) else Modifier,
                     )
                 }
                 cursor = clampedEnd
