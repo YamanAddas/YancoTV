@@ -194,7 +194,11 @@ class BackupExporter(private val db: YancoDb, private val credentialStore: Crede
             scheduledStart = row.scheduled_start,
             scheduledEnd = row.scheduled_end,
             state = row.state,
-            recordingId = row.recording_id,
+            // MB-211 — the column is gone from schema v16. The FIELD stays
+            // in the backup format deliberately: dropping it would make new
+            // exports unreadable by older builds for no benefit, and the
+            // value was NULL on every row anyway.
+            recordingId = null,
             seriesKey = row.series_key,
             createdAt = row.created_at,
             updatedAt = row.updated_at,

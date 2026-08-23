@@ -69,7 +69,6 @@ class Stage2MigrationTest {
             scheduled_start = 1_700_000_000_000L,
             scheduled_end = 1_700_007_200_000L,
             state = "scheduled",
-            recording_id = null,
             error = null,
             created_at = 1_700_000_000_000L,
             updated_at = 1_700_000_000_000L,

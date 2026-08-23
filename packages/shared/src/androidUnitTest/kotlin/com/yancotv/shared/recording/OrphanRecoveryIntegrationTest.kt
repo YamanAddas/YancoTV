@@ -67,7 +67,7 @@ class OrphanRecoveryIntegrationTest {
             filePath = "/storage/cl-mid.ts",
             format = RecordingFormat.HLS,
         )
-        seedTimeSchedules.linkRecording(schedule.id, recordingId)
+        seedTimeSchedules.transitionTo(schedule.id, com.yancotv.shared.recording.RecordingScheduleState.FIRING)
 
         // Now switch to reboot-time repos for the sweep phase.
         val recordings = RecordingsRepository(db, clock = { rebootMs })

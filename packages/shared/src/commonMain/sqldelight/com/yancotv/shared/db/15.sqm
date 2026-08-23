@@ -1,0 +1,111 @@
+-- MB-211 — drop the dead `recording_id` column from `recording_schedules`.
+--
+-- The column once held a back-reference to the recording a schedule
+-- triggered. The MB-208 fix replaced it with deterministic derivation via
+-- `RecordingScheduleScheduler.recordIdForSchedule(scheduleId)`, and nothing
+-- in production has written it since — verified by grep before this ran:
+-- `linkRecording` existed on the repository and in the .sq, but its only
+-- callers were tests. Every row in the wild is NULL.
+--
+-- It is removed rather than left alone because the FK was a latent foot-gun:
+-- it is enforced at UPDATE time, so anyone reviving the link-early pattern
+-- would write against a not-yet-inserted `recordings` row, the write would
+-- throw, and the schedule would strand in ARMED.
+--
+-- SQLite on minSdk 24 has no DROP COLUMN (3.35+/API 33+) and no RENAME
+-- COLUMN (3.25+/API 30+), so this is the full table-rebuild dance.
+--
+-- Ordering matters and is deliberate. Note there is NO `ALTER TABLE ...
+-- RENAME TO` here, which is the obvious way to do this and is wrong:
+-- SQLite stores the renamed table's DDL with the name QUOTED, so an
+-- upgraded database ends up with `CREATE TABLE "recording_schedules"`
+-- while a fresh install has `CREATE TABLE recording_schedules`. Function
+-- is identical, text is not — and schema comparison is exactly how
+-- migrations are verified here. `UpgradeFrom140Test` caught it:
+--   expected:<CREATE TABLE [recording_schedules] >
+--   but was: <CREATE TABLE ["recording_schedules"] >
+-- So the data goes out to a scratch table and comes back into a freshly
+-- created one under the real name, which leaves the canonical DDL text
+-- byte-identical to a fresh install:
+--   1. create a scratch table and copy every row out
+--   2. drop the original
+--   3. create the real table again, without the dead column
+--   4. copy the rows back
+--   5. drop the scratch table
+--   6. recreate all three indexes, dropped along with the original
+-- Columns are named explicitly at every copy — never SELECT *, which
+-- would silently mis-map if column order ever differed.
+--
+-- Foreign keys are NOT disabled here. SQLDelight runs migrations inside a
+-- transaction, and Android's SQLiteOpenHelper.onUpgrade runs with FKs off by
+-- default, so a PRAGMA here would be both redundant and a lie about what
+-- guarantees this migration relies on. The remaining FKs (content,
+-- epg_programmes) are re-declared identically below, so nothing is loosened.
+
+CREATE TABLE recording_schedules_scratch (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT,
+    programme_id TEXT,
+    title TEXT NOT NULL,
+    stream_url TEXT NOT NULL,
+    scheduled_start INTEGER NOT NULL,
+    scheduled_end INTEGER NOT NULL,
+    state TEXT NOT NULL,
+    error TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    series_key TEXT
+);
+
+INSERT INTO recording_schedules_scratch (
+    id, content_id, programme_id, title, stream_url,
+    scheduled_start, scheduled_end, state, error,
+    created_at, updated_at, series_key
+)
+SELECT
+    id, content_id, programme_id, title, stream_url,
+    scheduled_start, scheduled_end, state, error,
+    created_at, updated_at, series_key
+FROM recording_schedules;
+
+DROP TABLE recording_schedules;
+
+CREATE TABLE recording_schedules (
+    id TEXT PRIMARY KEY NOT NULL,
+    content_id TEXT REFERENCES content(id) ON DELETE SET NULL,
+    programme_id TEXT REFERENCES epg_programmes(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    stream_url TEXT NOT NULL,
+    scheduled_start INTEGER NOT NULL, -- ms since epoch
+    scheduled_end INTEGER NOT NULL,   -- ms since epoch
+    state TEXT NOT NULL CHECK(state IN (
+        'scheduled', 'armed', 'firing',
+        'completed', 'failed', 'cancelled', 'missed'
+    )),
+    error TEXT,
+    created_at INTEGER NOT NULL, -- ms since epoch
+    updated_at INTEGER NOT NULL, -- ms since epoch
+    series_key TEXT
+);
+
+INSERT INTO recording_schedules (
+    id, content_id, programme_id, title, stream_url,
+    scheduled_start, scheduled_end, state, error,
+    created_at, updated_at, series_key
+)
+SELECT
+    id, content_id, programme_id, title, stream_url,
+    scheduled_start, scheduled_end, state, error,
+    created_at, updated_at, series_key
+FROM recording_schedules_scratch;
+
+DROP TABLE recording_schedules_scratch;
+
+CREATE INDEX idx_recording_schedules_scheduled_start
+    ON recording_schedules(scheduled_start ASC);
+
+CREATE INDEX idx_recording_schedules_state
+    ON recording_schedules(state);
+
+CREATE INDEX idx_recording_schedules_series_key
+    ON recording_schedules(series_key);

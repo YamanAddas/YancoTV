@@ -60,7 +60,6 @@ class RecordingScheduleRepositoryTest {
         assertEquals("prog-1", entry.programmeId)
         assertEquals(1_700_000_100_000L, entry.scheduledStart)
         assertEquals(1_700_000_200_000L, entry.scheduledEnd)
-        assertNull(entry.recordingId)
         assertNull(entry.error)
     }
 
@@ -113,20 +112,23 @@ class RecordingScheduleRepositoryTest {
         assertEquals(RecordingScheduleState.ARMED, armed.state)
     }
 
-    @Test fun armedFiresViaLinkRecording() {
+    // MB-211 — was `armedFiresViaLinkRecording`, which asserted that firing
+    // stored a recording id. Nothing is stored any more: the id is derived
+    // from the schedule id, so what remains worth asserting is the state
+    // transition itself.
+    @Test fun armedTransitionsToFiring() {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         repo.transitionTo("s", RecordingScheduleState.ARMED)
-        val firing = repo.linkRecording("s", "rec-x")
+        val firing = repo.transitionTo("s", RecordingScheduleState.FIRING)
         assertEquals(RecordingScheduleState.FIRING, firing.state)
-        assertEquals("rec-x", firing.recordingId)
     }
 
     @Test fun firingCompletesCleanly() {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         repo.transitionTo("s", RecordingScheduleState.ARMED)
-        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.FIRING)
         val done = repo.transitionTo("s", RecordingScheduleState.COMPLETED)
         assertEquals(RecordingScheduleState.COMPLETED, done.state)
     }
@@ -150,7 +152,7 @@ class RecordingScheduleRepositoryTest {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         repo.transitionTo("s", RecordingScheduleState.ARMED)
-        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.FIRING)
         val cancelled = repo.transitionTo("s", RecordingScheduleState.CANCELLED)
         assertEquals(RecordingScheduleState.CANCELLED, cancelled.state)
     }
@@ -159,7 +161,7 @@ class RecordingScheduleRepositoryTest {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         repo.transitionTo("s", RecordingScheduleState.ARMED)
-        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.FIRING)
         val failed =
             repo.transitionTo(
                 "s",
@@ -204,7 +206,7 @@ class RecordingScheduleRepositoryTest {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         assertFailsWith<IllegalArgumentException> {
-            repo.linkRecording("s", "rec-x")
+            repo.transitionTo("s", RecordingScheduleState.FIRING)
         }
     }
 
@@ -226,7 +228,7 @@ class RecordingScheduleRepositoryTest {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         repo.transitionTo("s", RecordingScheduleState.ARMED)
-        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.FIRING)
         repo.transitionTo("s", RecordingScheduleState.CANCELLED)
         assertFailsWith<IllegalArgumentException> {
             repo.transitionTo("s", RecordingScheduleState.COMPLETED)
@@ -244,7 +246,7 @@ class RecordingScheduleRepositoryTest {
         val repo = makeRepo()
         repo.insert("s", null, null, "T", "u", 1L, 100L)
         repo.transitionTo("s", RecordingScheduleState.ARMED)
-        repo.linkRecording("s", "rec-x")
+        repo.transitionTo("s", RecordingScheduleState.FIRING)
         repo.transitionTo("s", RecordingScheduleState.COMPLETED)
         // Second attempt — whether by handleEnd or by handleStop.
         assertFailsWith<IllegalArgumentException> {
@@ -337,7 +339,7 @@ class RecordingScheduleRepositoryTest {
         val repo = makeRepo()
         repo.insert("rebooted", null, null, "Rebooted", "u", 1L, 100L)
         repo.transitionTo("rebooted", RecordingScheduleState.ARMED)
-        repo.linkRecording("rebooted", "rec-orphan")
+        repo.transitionTo("rebooted", RecordingScheduleState.FIRING)
         // Reboot wiped the recording but the schedule's still in FIRING.
 
         val result = repo.reconcileAfterBoot()
@@ -375,92 +377,11 @@ class RecordingScheduleRepositoryTest {
         assertTrue(repo.allFlow().first().isEmpty())
     }
 
-    /**
-     * MK.23.D.7 — schedule.recording_id FK SET NULL.
-     *
-     * `recording_schedules.recording_id` declares
-     * `REFERENCES recordings(id) ON DELETE SET NULL` (3.sqm:20).
-     * Intent: when the user deletes a completed recording from the
-     * Recordings browser, the schedule history must keep the row so
-     * the user can see "this scheduled recording fired and ran" in
-     * their history; the recording_id link going null is the
-     * representation of "the file is gone but the schedule existed".
-     *
-     * Without this FK the dead recording_id would silently point at
-     * nothing — manageable, but a future SELECT that JOINs on
-     * recording_id would either lose the schedule (INNER JOIN) or
-     * have to defensively handle missing rows. SET NULL makes the
-     * "no longer linked" state explicit.
-     *
-     * MB-211 already documents that recording_id is a "dead column"
-     * because the production path derives it deterministically rather
-     * than persisting a back-reference. This test guards the FK
-     * behaviour anyway — if MB-211 is ever revisited and the link-
-     * early pattern revived, the FK contract must still hold.
-     *
-     * Uses its own makeDb that turns FK back ON — the rest of the
-     * file deliberately disables FK to focus on state-machine logic.
-     */
-    @Test fun deletingRecordingNullsScheduleRecordingId_doesNotCascade() {
-        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-        driver.execute(null, "PRAGMA foreign_keys = ON;", 0)
-        YancoDb.Schema.create(driver)
-        val db = YancoDb(driver)
-
-        // Insert a recording row R via the generated query so the
-        // schedule's FK link is satisfied at insert time.
-        db.recordingsQueries.insert(
-            id = "rec-1",
-            content_id = "ch-1",
-            title = "Game",
-            stream_url = "http://stream/x",
-            file_path = "content://media/x.ts",
-            status = "completed",
-            started_at = 1_000L,
-            ended_at = 1_010L,
-            duration_seconds = 10,
-            file_size_bytes = 1024L,
-            error = null,
-            format = "mpeg_ts",
-        )
-
-        // Insert a schedule S linked to R. Use the raw query so we can
-        // set recording_id directly without going through the repo's
-        // state-machine guards.
-        db.recordingSchedulesQueries.insert(
-            id = "sched-1",
-            content_id = null,
-            programme_id = null,
-            title = "Game",
-            stream_url = "http://stream/x",
-            scheduled_start = 1_000L,
-            scheduled_end = 1_010L,
-            state = "completed",
-            recording_id = "rec-1",
-            error = null,
-            created_at = 1L,
-            updated_at = 1L,
-            series_key = null,
-        )
-        assertEquals(
-            "rec-1",
-            db.recordingSchedulesQueries.selectById("sched-1").executeAsOne().recording_id,
-        )
-
-        // User deletes the recording.
-        db.recordingsQueries.deleteById("rec-1")
-
-        // Schedule must survive (NOT cascade-deleted).
-        val schedule = db.recordingSchedulesQueries.selectById("sched-1").executeAsOneOrNull()
-        assertNotNull(schedule, "schedule must NOT be cascade-deleted when its recording is removed")
-        // recording_id must be NULL via SET NULL.
-        assertNull(
-            schedule!!.recording_id,
-            "ON DELETE SET NULL must null out recording_id when the recording is deleted",
-        )
-        // State + title snapshot survive — the user can still see
-        // "this fired" in history even after the file is gone.
-        assertEquals("completed", schedule.state)
-        assertEquals("Game", schedule.title)
-    }
+    // MB-211 — the `deletingRecordingNullsScheduleRecordingId_doesNotCascade`
+    // test lived here. It guarded ON DELETE SET NULL on
+    // `recording_schedules.recording_id`. That column and its FK were
+    // removed in schema v16, so the behaviour it asserted no longer
+    // exists to assert. Deleting a recording still leaves the schedule
+    // row untouched — now by construction rather than by FK action,
+    // since nothing links them any more.
 }

@@ -175,13 +175,13 @@ class RecordingScheduleScheduler(
                 }
             }
             RecordingScheduleState.FIRING -> {
-                // Recording id is derived deterministically from the
-                // schedule id (see [recordIdForSchedule] for the
-                // rationale — schedule.recording_id stays NULL because
-                // the schema's FK can't be set before the recordings
-                // row exists). Use the derivation here so cancel-during-fire
-                // can reach the right active recording.
-                val recId = entry.recordingId ?: recordIdForSchedule(scheduleId)
+                // Recording id is derived deterministically from the schedule
+                // id (see [recordIdForSchedule]). There is nothing stored to
+                // prefer over it: MB-211 removed the `recording_id` column in
+                // schema v16 because its FK could not be satisfied before the
+                // recordings row existed. Derivation reaches the right active
+                // recording for cancel-during-fire.
+                val recId = recordIdForSchedule(scheduleId)
                 // **MB-219 (2026-05-15, revised).** Pre-claim CANCELLED on the
                 // SCHEDULE only — not the recording row — and pass
                 // `userInitiated = true` through `RecordingService.stop` so

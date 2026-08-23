@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Stage 1.5 — DB migration test harness.
@@ -1372,5 +1373,104 @@ class MigrationTest {
                 1700000000000, 1700000000000
             );
         """
+    }
+
+    /**
+     * v15 → v16 (`15.sqm`, MB-211): drop the dead `recording_id` column from
+     * `recording_schedules`.
+     *
+     * This is the only DESTRUCTIVE migration in the ladder — SQLite on
+     * minSdk 24 has no DROP COLUMN, so the table is rebuilt. A rebuild that
+     * loses rows or scrambles columns would take a user's whole schedule
+     * list with it, so this asserts every surviving field individually
+     * rather than just counting rows.
+     *
+     * The seed deliberately sets `recording_id` to a NON-NULL value even
+     * though production never wrote one: if the copy were mis-mapped, a
+     * column full of NULLs could hide the error.
+     */
+    @Test fun migrationV15ToV16DropsRecordingIdAndKeepsEveryOtherField() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        YancoDb.Schema.create(driver)
+        driver.execute(null, "PRAGMA user_version = 15;", 0)
+
+        // Rebuild the pre-v16 shape: the generated schema is already v16,
+        // so re-create the table WITH the dead column to migrate from.
+        driver.execute(null, "DROP TABLE recording_schedules;", 0)
+        driver.execute(
+            null,
+            """
+            CREATE TABLE recording_schedules (
+                id TEXT PRIMARY KEY NOT NULL,
+                content_id TEXT,
+                programme_id TEXT,
+                title TEXT NOT NULL,
+                stream_url TEXT NOT NULL,
+                scheduled_start INTEGER NOT NULL,
+                scheduled_end INTEGER NOT NULL,
+                state TEXT NOT NULL,
+                recording_id TEXT,
+                error TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                series_key TEXT
+            );
+            """.trimIndent(),
+            0,
+        )
+        driver.execute(
+            null,
+            """
+            INSERT INTO recording_schedules
+                (id, content_id, programme_id, title, stream_url,
+                 scheduled_start, scheduled_end, state, recording_id, error,
+                 created_at, updated_at, series_key)
+            VALUES
+                ('sched-keep', 'ch-9', 'prog-9', 'Cup Final', 'http://x/live.ts',
+                 1700000000000, 1700007200000, 'armed', 'rec-should-vanish', 'prior error',
+                 1699000000000, 1699500000000, 'ch-9::Cup Final');
+            """.trimIndent(),
+            0,
+        )
+
+        YancoDb.Schema.migrate(driver, oldVersion = 15, newVersion = 16)
+
+        val row = YancoDb(driver).recordingSchedulesQueries.selectById("sched-keep").executeAsOne()
+        assertEquals("ch-9", row.content_id)
+        assertEquals("prog-9", row.programme_id)
+        assertEquals("Cup Final", row.title)
+        assertEquals("http://x/live.ts", row.stream_url)
+        assertEquals(1700000000000L, row.scheduled_start)
+        assertEquals(1700007200000L, row.scheduled_end)
+        assertEquals("armed", row.state)
+        assertEquals("prior error", row.error)
+        assertEquals(1699000000000L, row.created_at)
+        assertEquals(1699500000000L, row.updated_at)
+        assertEquals("ch-9::Cup Final", row.series_key)
+
+        // The column is actually gone, not merely unused.
+        val cols = mutableListOf<String>()
+        driver.executeQuery(null, "PRAGMA table_info(recording_schedules);", { cursor ->
+            while (cursor.next().value) cols.add(cursor.getString(1) ?: "")
+            app.cash.sqldelight.db.QueryResult.Unit
+        }, 0)
+        assertTrue(cols.isNotEmpty(), "table_info must return columns")
+        assertTrue("recording_id" !in cols, "recording_id must be gone; got $cols")
+
+        // The rebuild drops indexes with the table — they must come back,
+        // or every schedule query degrades to a scan.
+        val indexes = mutableListOf<String>()
+        driver.executeQuery(
+            null,
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='recording_schedules';",
+            { cursor ->
+                while (cursor.next().value) indexes.add(cursor.getString(0) ?: "")
+                app.cash.sqldelight.db.QueryResult.Unit
+            },
+            0,
+        )
+        assertTrue("idx_recording_schedules_scheduled_start" in indexes, "lost start index: $indexes")
+        assertTrue("idx_recording_schedules_state" in indexes, "lost state index: $indexes")
+        assertTrue("idx_recording_schedules_series_key" in indexes, "lost series_key index: $indexes")
     }
 }

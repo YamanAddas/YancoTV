@@ -3,17 +3,16 @@
 -- eventual recording row and remains visible to the user in the
 -- "Scheduled" tab even after firing.
 --
--- MB-211 — `recording_id` is DEAD. It once held that link, but the MB-208
--- fix moved to deriving the id deterministically via
--- `RecordingScheduleScheduler.recordIdForSchedule(scheduleId)`, and the
--- column has been NULL for every row since. Do NOT start writing it:
--- reviving the link-early pattern re-arms a latent foot-gun, because the
--- FK is enforced at UPDATE time and a write against a not-yet-inserted
--- recordings row throws, leaving the schedule stuck in ARMED. Derive the
--- id instead. Removal needs the full table-rebuild dance (SQLite on
--- minSdk 24 has no DROP COLUMN -- 3.35+/API 33+), so it is deliberately
--- deferred until the next major schema migration, where the rebuild
--- amortises.
+-- MB-211 — there is deliberately NO `recording_id` column. One existed
+-- until schema v16 (see `15.sqm`), holding a back-reference to the
+-- recording a schedule triggered. The MB-208 fix replaced it with
+-- deterministic derivation via
+-- `RecordingScheduleScheduler.recordIdForSchedule(scheduleId)`, after which
+-- nothing wrote it and every row was NULL.
+--
+-- Do not reintroduce it. The FK it carried was enforced at UPDATE time, so
+-- the link-early pattern wrote against a not-yet-inserted `recordings` row,
+-- threw, and stranded the schedule in ARMED. Derive the id instead.
 --
 -- See `3.sqm` for migration semantics + column-level rationale.
 CREATE TABLE recording_schedules (
@@ -28,8 +27,6 @@ CREATE TABLE recording_schedules (
         'scheduled', 'armed', 'firing',
         'completed', 'failed', 'cancelled', 'missed'
     )),
-    -- MB-211: dead column, always NULL. See the header note before use.
-    recording_id TEXT REFERENCES recordings(id) ON DELETE SET NULL,
     error TEXT,
     created_at INTEGER NOT NULL, -- ms since epoch
     updated_at INTEGER NOT NULL, -- ms since epoch
@@ -77,9 +74,9 @@ ORDER BY scheduled_start ASC;
 insert:
 INSERT INTO recording_schedules (
     id, content_id, programme_id, title, stream_url,
-    scheduled_start, scheduled_end, state, recording_id, error,
+    scheduled_start, scheduled_end, state, error,
     created_at, updated_at, series_key
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectBySeriesKey:
 SELECT * FROM recording_schedules
@@ -89,11 +86,6 @@ ORDER BY scheduled_start ASC;
 setState:
 UPDATE recording_schedules
 SET state = ?, updated_at = ?, error = ?
-WHERE id = ?;
-
-linkRecording:
-UPDATE recording_schedules
-SET state = ?, recording_id = ?, updated_at = ?
 WHERE id = ?;
 
 deleteById:

@@ -384,7 +384,10 @@ class BackupImporter(
                 scheduled_start = r.scheduledStart,
                 scheduled_end = r.scheduledEnd,
                 state = r.state,
-                recording_id = r.recordingId,
+                // MB-211 — `r.recordingId` is intentionally ignored. The column
+                // no longer exists (schema v16) and every archived value was
+                // NULL, so restoring an older backup simply drops a field that
+                // never carried information.
                 error = null,
                 created_at = r.createdAt,
                 updated_at = r.updatedAt,

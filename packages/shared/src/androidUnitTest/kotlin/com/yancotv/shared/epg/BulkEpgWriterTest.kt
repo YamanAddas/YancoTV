@@ -292,7 +292,6 @@ class BulkEpgWriterTest {
             scheduled_start = 1_000_000L,
             scheduled_end = 1_010_000L,
             state = "armed",
-            recording_id = null,
             error = null,
             created_at = 1L,
             updated_at = 1L,

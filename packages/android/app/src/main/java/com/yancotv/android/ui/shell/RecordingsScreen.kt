@@ -237,9 +237,8 @@ fun RecordingsScreen(
                             // the already-collected `rows` list — cheap and
                             // keeps the row composable free of repo plumbing.
                             val derivedRecId =
-                                remember(schedule.id, schedule.recordingId) {
-                                    schedule.recordingId
-                                        ?: RecordingScheduleScheduler.recordIdForSchedule(schedule.id)
+                                remember(schedule.id) {
+                                    RecordingScheduleScheduler.recordIdForSchedule(schedule.id)
                                 }
                             val linked =
                                 remember(derivedRecId, rows) {

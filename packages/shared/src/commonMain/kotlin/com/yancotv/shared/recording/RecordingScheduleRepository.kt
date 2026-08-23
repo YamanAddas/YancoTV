@@ -13,10 +13,10 @@ import kotlinx.coroutines.flow.map
  *
  * Decoupled from [RecordingStatus] (the recording row's state) on
  * purpose: a schedule lives independently of the eventual recording it
- * spawns. After firing, the schedule retains its history entry and
- * links to the recording row via [RecordingScheduleEntry.recordingId];
- * deleting the recording does not cascade-delete the schedule (FK is
- * `ON DELETE SET NULL`).
+ * spawns. After firing, the schedule retains its history entry; the
+ * recording it produced is found by DERIVING the id
+ * (`RecordingScheduleScheduler.recordIdForSchedule`), not by storing a
+ * link. MB-211 removed the stored `recording_id` column in schema v16.
  *
  * Transition graph:
  *
@@ -33,8 +33,9 @@ import kotlinx.coroutines.flow.map
  * OS. Survives across app restart only if persisted; this is the
  * source of truth for whether a fire is "live" in the system.
  *
- * **ARMED → FIRING**: when the alarm fires. The recording row is
- * created at this point and linked via [linkRecording].
+ * **ARMED → FIRING**: when the alarm fires. The recording row is created
+ * at this point; its id is derived from the schedule id rather than
+ * stored (MB-208, and MB-211 which removed the stored column).
  *
  * **MISSED**: terminal state for "we couldn't run this". Causes:
  *   - device was off when the alarm window passed (`device_offline`)
@@ -94,7 +95,6 @@ data class RecordingScheduleEntry(
     val scheduledStart: Long,
     val scheduledEnd: Long,
     val state: RecordingScheduleState,
-    val recordingId: String?,
     val error: String?,
     val createdAt: Long,
     val updatedAt: Long,
@@ -140,7 +140,6 @@ class RecordingScheduleRepository(private val db: YancoDb, private val clock: ()
             scheduled_start = scheduledStart,
             scheduled_end = scheduledEnd,
             state = RecordingScheduleState.SCHEDULED.sql,
-            recording_id = null,
             error = null,
             created_at = now,
             updated_at = now,
@@ -209,26 +208,6 @@ class RecordingScheduleRepository(private val db: YancoDb, private val clock: ()
             id = id,
         )
         return getById(id) ?: error("update succeeded but row missing: $id")
-    }
-
-    /**
-     * Move a schedule to FIRING and link it to the freshly-created
-     * recording row. Atomic write (state + recording_id + updated_at).
-     * Caller is the broadcast receiver after RecordingService has
-     * inserted the recording row.
-     */
-    fun linkRecording(id: String, recordingId: String): RecordingScheduleEntry {
-        val current = getById(id) ?: error("schedule $id missing — cannot link recording")
-        require(current.state == RecordingScheduleState.ARMED) {
-            "schedule $id is ${current.state.name}; can only link from ARMED"
-        }
-        db.recordingSchedulesQueries.linkRecording(
-            state = RecordingScheduleState.FIRING.sql,
-            recording_id = recordingId,
-            updated_at = clock(),
-            id = id,
-        )
-        return getById(id) ?: error("link succeeded but row missing: $id")
     }
 
     fun deleteById(id: String) {
@@ -340,7 +319,6 @@ class RecordingScheduleRepository(private val db: YancoDb, private val clock: ()
         scheduledStart = scheduled_start,
         scheduledEnd = scheduled_end,
         state = RecordingScheduleState.fromSql(state),
-        recordingId = recording_id,
         error = error,
         createdAt = created_at,
         updatedAt = updated_at,

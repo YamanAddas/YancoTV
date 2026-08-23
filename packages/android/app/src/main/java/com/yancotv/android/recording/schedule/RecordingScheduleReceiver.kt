@@ -328,12 +328,11 @@ class RecordingScheduleReceiver :
             return
         }
         // Derive the recordId from the schedule id (same as
-        // [startRecording]). schedule.recordingId is intentionally null
-        // — see the FK-timing comment in [startRecording] — so we
-        // can't read it here.
-        val recordId =
-            schedule.recordingId
-                ?: RecordingScheduleScheduler.recordIdForSchedule(scheduleId)
+        // [startRecording]). There is nothing stored to read: MB-211 removed
+        // the `recording_id` column in schema v16, because the value was
+        // always NULL and its FK was a live foot-gun — see the FK-timing
+        // comment in [startRecording]. Derivation is the only source.
+        val recordId = RecordingScheduleScheduler.recordIdForSchedule(scheduleId)
         Log.i(TAG, "end[$scheduleId] stopping recording $recordId")
         // Always send the stop intent — even on the row-missing path —
         // so any in-flight pre-markStarted launch (e.g. resolveOutputOrFail
