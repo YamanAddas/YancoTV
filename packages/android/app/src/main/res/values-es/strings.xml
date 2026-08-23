@@ -1260,4 +1260,12 @@
     <string name="sd_dur_dh">%1$d d %2$d h</string>
     <string name="rs_dur_hm">%1$d h %2$d min</string>
     <string name="rs_dur_m">%1$d min</string>
+
+    <!-- MB-367 — open-source licences section. -->
+    <string name="ab_sec_licenses">Licencias de código abierto</string>
+    <string name="ab_licenses_sub">Esta aplicación se basa en software de código abierto.</string>
+    <string name="ab_ffmpeg_hint">Decodificación de audio/vídeo y proxy de emisión. Abre la licencia LGPL-3.0.</string>
+    <string name="ab_ffmpeg_sources">Fuentes del componente FFmpeg</string>
+    <string name="ab_ffmpeg_sources_hint">Código fuente e instrucciones de compilación de los componentes FFmpeg.</string>
+    <string name="ab_apache_hint">Abre la licencia Apache 2.0.</string>
 </resources>

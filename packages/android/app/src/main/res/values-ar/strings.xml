@@ -1353,4 +1353,12 @@
     <string name="sd_dur_dh">%1$d يوم %2$d س</string>
     <string name="rs_dur_hm">%1$d س %2$d د</string>
     <string name="rs_dur_m">%1$d د</string>
+
+    <!-- MB-367 — open-source licences section. -->
+    <string name="ab_sec_licenses">تراخيص المصدر المفتوح</string>
+    <string name="ab_licenses_sub">هذا التطبيق مبني على برمجيات مفتوحة المصدر.</string>
+    <string name="ab_ffmpeg_hint">فك ترميز الصوت والفيديو. يفتح ترخيص LGPL-3.0.</string>
+    <string name="ab_ffmpeg_sources">مصادر مكوّن FFmpeg</string>
+    <string name="ab_ffmpeg_sources_hint">شفرة المصدر وتعليمات البناء لمكوّنات FFmpeg.</string>
+    <string name="ab_apache_hint">يفتح رخصة Apache 2.0.</string>
 </resources>

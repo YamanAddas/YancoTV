@@ -340,6 +340,48 @@ fun SettingsAboutTab(
             )
         }
 
+        // MB-367 — open-source attribution. The app ships LGPL-3.0 FFmpeg
+        // (both the ffmpeg-kit shared libraries and a vendored JNI shim that
+        // statically links FFmpeg) plus a large Apache-2.0 stack; until this
+        // section existed there was no acknowledgement anywhere in the app.
+        // Rows link to the canonical licence texts rather than bundling
+        // them: a bundled text must be VERBATIM, and hand-typing licence
+        // text is exactly how subtle corruption ships. The FFmpeg row also
+        // points at the source repository, which carries the shim's Java
+        // sources and the documented build recipe -- the LGPL relink
+        // material for the statically linked part.
+        SettingsSection(
+            title = stringResource(R.string.ab_sec_licenses),
+            sub = stringResource(R.string.ab_licenses_sub),
+        ) {
+            SettingsRow(
+                label = "FFmpeg",
+                hint = stringResource(R.string.ab_ffmpeg_hint),
+                onClick = { openUrl(ctx, "https://www.gnu.org/licenses/lgpl-3.0.html") },
+                right = { ValueText("LGPL-3.0") },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = stringResource(R.string.ab_ffmpeg_sources),
+                hint = stringResource(R.string.ab_ffmpeg_sources_hint),
+                onClick = { openUrl(ctx, "https://github.com/YamanAddas/YancoTV") },
+                right = { ValueText(stringResource(R.string.ab_open)) },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Media3, OkHttp, Ktor, Kotlin, Compose, SQLDelight, Koin, Coil, kotlinx",
+                hint = stringResource(R.string.ab_apache_hint),
+                onClick = { openUrl(ctx, "https://www.apache.org/licenses/LICENSE-2.0") },
+                right = { ValueText("Apache-2.0") },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Sentry SDK",
+                onClick = { openUrl(ctx, "https://github.com/getsentry/sentry-java/blob/main/LICENSE") },
+                right = { ValueText("MIT") },
+            )
+        }
+
         // ───── Diagnostics ─────
         // Renamed from "Build" — these are debugging fields, not user
         // identity. Combined version + build into one row, dropped the
@@ -667,5 +709,16 @@ private fun buildInfo(ctx: Context): BuildInfo {
         )
     } catch (_: PackageManager.NameNotFoundException) {
         BuildInfo(version = "?", versionCode = 0L, packageName = pkg)
+    }
+}
+
+private fun openUrl(ctx: android.content.Context, url: String) {
+    runCatching {
+        ctx.startActivity(
+            android.content.Intent(
+                android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse(url),
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }

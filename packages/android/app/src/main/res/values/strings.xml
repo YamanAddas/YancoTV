@@ -1313,4 +1313,12 @@
     <!-- MB-370 — phone gesture HUD labels. -->
     <string name="pl_gesture_brightness">Brightness</string>
     <string name="pl_gesture_volume">Volume</string>
+
+    <!-- MB-367 — open-source licences section. -->
+    <string name="ab_sec_licenses">Open-source licences</string>
+    <string name="ab_licenses_sub">This app is built on open-source software.</string>
+    <string name="ab_ffmpeg_hint">Audio/video decoding and the cast proxy. Opens the LGPL-3.0 licence.</string>
+    <string name="ab_ffmpeg_sources">FFmpeg component sources</string>
+    <string name="ab_ffmpeg_sources_hint">Source code and build instructions for the FFmpeg components, including relinking material.</string>
+    <string name="ab_apache_hint">Opens the Apache License 2.0.</string>
 </resources>
