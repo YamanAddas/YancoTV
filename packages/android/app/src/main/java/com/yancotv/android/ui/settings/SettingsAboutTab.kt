@@ -380,6 +380,34 @@ fun SettingsAboutTab(
                 onClick = { openLicense = "Sentry SDK — MIT" to R.raw.license_sentry_mit },
                 right = { ValueText("MIT") },
             )
+            SettingsRowSpacer()
+            // ffmpeg-kit's TLS build ships these inside the AAR as raw
+            // resources already — GnuTLS and GMP are LGPL components in the
+            // APK, so they get named here too, reading the texts the
+            // library itself bundled.
+            SettingsRow(
+                label = "GnuTLS",
+                onClick = { openLicense = "GnuTLS — GNU LGPL" to com.arthenica.ffmpegkit.R.raw.license_gnutls },
+                right = { ValueText("LGPL") },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "GMP",
+                onClick = { openLicense = "GMP — GNU LGPL" to com.arthenica.ffmpegkit.R.raw.license_gmp },
+                right = { ValueText("LGPL") },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "Nettle",
+                onClick = { openLicense = "Nettle" to com.arthenica.ffmpegkit.R.raw.license_nettle },
+                right = { ValueText("LGPL/GPL2+") },
+            )
+            SettingsRowSpacer()
+            SettingsRow(
+                label = "libiconv",
+                onClick = { openLicense = "libiconv — GNU LGPL" to com.arthenica.ffmpegkit.R.raw.license_libiconv },
+                right = { ValueText("LGPL") },
+            )
         }
 
         // ───── Diagnostics ─────
