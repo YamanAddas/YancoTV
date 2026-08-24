@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +48,8 @@ import com.yancotv.android.sync.EpgSyncWorker
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
+import com.yancotv.android.ui.focus.placedFocus
 import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
@@ -83,12 +86,25 @@ fun GuideSyncPanel(
     compact: Boolean,
     onRefreshed: () -> Unit,
     modifier: Modifier = Modifier,
+    // MB-400 — when set, binds the full-panel "Refresh EPG now" button as
+    // the pane's entry focus target. Only the `compact = false` layout
+    // places it; the compact strip sits above a populated grid that owns
+    // its own focus, so it deliberately ignores the anchor.
+    entryAnchor: PlacedFocusAnchor? = null,
     epg: EpgRepository = koinInject(),
     sourceRepo: SourceRepository = koinInject(),
     coordinator: SourceSyncCoordinator = koinInject(),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // MB-400 — PlacedFocusAnchor latches `isPlaced` and never clears it on
+    // its own. Releasing it here means a later empty-guide state re-arms
+    // the anchor from scratch instead of firing requestFocus() at a
+    // requester whose node left the tree when the grid took over.
+    DisposableEffect(entryAnchor) {
+        onDispose { entryAnchor?.reset() }
+    }
 
     var stats by remember { mutableStateOf<EpgStats?>(null) }
     var sources by remember { mutableStateOf<List<Source>>(emptyList()) }
@@ -345,6 +361,12 @@ fun GuideSyncPanel(
                 YancoPrimaryButton(
                     onClick = { doRefreshEpg() },
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
+                    // MB-400 — the entry anchor rides this button rather
+                    // than a 0-dp trap: it stays focusable while disabled
+                    // (MB-395 again), so even the zero-sources case parks
+                    // the cursor somewhere the user can SEE, and D-pad
+                    // walks from here to the rest of the panel.
+                    modifier = entryAnchor?.let { Modifier.placedFocus(it) } ?: Modifier,
                 ) {
                     Text(stringResource(R.string.gs_refresh_epg_now))
                 }

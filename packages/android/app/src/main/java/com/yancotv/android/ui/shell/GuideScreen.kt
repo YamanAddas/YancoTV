@@ -47,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,8 +81,10 @@ import com.yancotv.android.recording.schedule.RecordingScheduleScheduler
 import com.yancotv.android.reminders.ReminderScheduler
 import com.yancotv.android.ui.components.ButtonSize
 import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.focus.PlacedFocusAnchor
 import com.yancotv.android.ui.focus.onEndwardKey
 import com.yancotv.android.ui.focus.onStartwardKey
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.parental.ChannelActionsMenu
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.catchup.CatchupService
@@ -173,6 +176,97 @@ private const val GUIDE_MAX_RETAINED_PROGRAMMES = 50_000
 private const val SERIES_LOOKAHEAD_MS: Long = 7L * 24L * 60L * 60_000L
 
 /**
+ * MB-400 — where Guide entry focus actually lands.
+ *
+ * The shell drives the Guide through the same Sidebar → Categories →
+ * Content cascade as the browse sections, but the Guide's rail is
+ * conditional: it only mounts when the EPG has groups to filter by
+ * (`groups.isNotEmpty()`). With no programme data there is no pill, so
+ * `PanelFocus.Categories` named a destination that didn't exist —
+ * `pillAnchor.awaitAndRequest()` suspended forever on a node that would
+ * never be placed and the pane ended up with zero focused nodes while
+ * the sync panel sat there holding four reachable controls.
+ *
+ * Resolving the target as a value (rather than branching on `panelFocus`
+ * inside the effect) means every consumer — entry, window-regain,
+ * data-arrives-later — agrees on one answer, and it's unit-testable
+ * without the Compose runtime.
+ */
+internal enum class GuideFocusTarget {
+    /** The CategoryRail's selected pill. Only valid while the rail is mounted. */
+    Rail,
+
+    /** The sync/diagnostics panel's first control ("Refresh EPG now"). */
+    SyncPanel,
+
+    /** The right pane wrapper, which forwards into the timeline grid. */
+    Grid,
+
+    /**
+     * Nothing here for the Guide to focus: the shell sidebar owns it, or
+     * the pane is mid-load and rendering the text-only placeholder that
+     * has no focusable child at all.
+     */
+    None,
+}
+
+/**
+ * Pure resolver for [GuideFocusTarget]. The three data arguments mirror
+ * the screen's own render conditions exactly — [railHasGroups] is the
+ * rail's mount gate, [guideEmpty] and [guideLoading] are the right
+ * pane's two nested branches — so the target can only ever name a
+ * composable that is actually on screen.
+ *
+ * [guideLoading] earns its place on the reload path, not on entry:
+ * pressing "Refresh EPG now" bumps the guide's reload tick, which swaps
+ * the sync panel out for the text-only loading placeholder and back. If
+ * both states resolved to `SyncPanel` the effect would never re-fire,
+ * and the button the user just pressed would come back unfocused.
+ */
+internal fun guideFocusTarget(panelFocus: PanelFocus, railHasGroups: Boolean, guideEmpty: Boolean, guideLoading: Boolean): GuideFocusTarget {
+    val pane =
+        when {
+            !guideEmpty -> GuideFocusTarget.Grid
+            guideLoading -> GuideFocusTarget.None
+            else -> GuideFocusTarget.SyncPanel
+        }
+    return when (panelFocus) {
+        PanelFocus.Sidebar -> GuideFocusTarget.None
+        // Categories is only a real destination when the rail is mounted.
+        // Otherwise fall through to whatever the right pane is showing —
+        // the Guide-with-no-data case the shell can't see from up there.
+        PanelFocus.Categories -> if (railHasGroups) GuideFocusTarget.Rail else pane
+        PanelFocus.Content -> pane
+    }
+}
+
+/**
+ * MB-400 — move focus to [target]. One implementation shared by the
+ * entry effect and the window-regain restore so the two can't drift.
+ *
+ * Both anchors go through [PlacedFocusAnchor.awaitAndRequest], which
+ * suspends until the node is placed — no delay ladder, and a target that
+ * appears a few frames late (the sync panel, which only renders once the
+ * initial load resolves to "no data") still gets focus rather than
+ * silently losing the request.
+ */
+private suspend fun applyGuideFocus(target: GuideFocusTarget, pillAnchor: PlacedFocusAnchor, syncPanelAnchor: PlacedFocusAnchor, gridFocus: FocusRequester) {
+    when (target) {
+        GuideFocusTarget.Rail -> pillAnchor.awaitAndRequest()
+        GuideFocusTarget.SyncPanel -> syncPanelAnchor.awaitAndRequest()
+        // The grid wrapper is a plain focusGroup with no onPlaced hook to
+        // await, so one frame stands in for it: the descendant search runs
+        // after the freshly-composed LazyColumn has had a layout pass.
+        // Same barrier HomeScreen uses before mainContentFocus.
+        GuideFocusTarget.Grid -> {
+            withFrameNanos { }
+            runCatching { gridFocus.requestFocus() }
+        }
+        GuideFocusTarget.None -> Unit
+    }
+}
+
+/**
  * 2D EPG guide: channels on the Y axis, time on the X axis. Horizontal
  * scroll is shared across the header and every channel row so the time
  * labels stay aligned.
@@ -201,6 +295,13 @@ fun GuideScreen(
     panelFocus: PanelFocus = PanelFocus.Categories,
     onPanelFocusChanged: (PanelFocus) -> Unit = {},
     onExitToSidebar: () -> Unit = {},
+    // MB-400 — reports whether the Guide currently has a category rail to
+    // land on. The shell forwards sidebar entry (click or RIGHT) into
+    // Categories for the browse sections and the Guide alike, but the
+    // Guide's rail is conditional on the EPG having groups — something
+    // only this screen can see. Without the report the shell keeps naming
+    // a destination that isn't mounted.
+    onCategoriesAvailable: (Boolean) -> Unit = {},
     epg: EpgRepository = koinInject(),
     scheduler: ReminderScheduler = koinInject(),
     catchup: CatchupService = koinInject(),
@@ -243,19 +344,60 @@ fun GuideScreen(
     // future Schedule clicks pass through immediately.
     val recordingDisclaimerGate = com.yancotv.android.recording.rememberRecordingDisclaimerGate()
 
+    // MB-400 — hoisted above the focus anchors below (it used to sit just
+    // before the Row): the entry-focus resolver needs to know whether the
+    // right pane is showing the grid or the sync panel, and a val read at
+    // the bottom of the function isn't in scope up here. Pure derivation
+    // from `channels`, so hoisting it changes nothing else.
+    val guide =
+        if (channels.isEmpty()) {
+            null
+        } else {
+            EpgGuideData(
+                channels = channels,
+                startTime = windowStartState,
+                endTime = windowEndState,
+            )
+        }
+    val guideEmpty = guide == null
+
     // MK.guide.groups — focus anchors for the cascade (mirrors
     // BrowseSection's pattern). Pill anchor uses the placed-focus
     // primitive so requestFocus() always lands on a placed node;
     // gridFocus is a plain FocusRequester targeting the right-pane
     // wrapper.
-    val pillAnchor = com.yancotv.android.ui.focus.rememberPlacedFocusAnchor()
+    //
+    // MB-400 — syncPanelAnchor is the third destination: the empty-guide
+    // branch of the right pane. A placed anchor rather than a bare
+    // requester precisely because that branch appears LATE (the initial
+    // load has to resolve to "no data" first), so the request has to wait
+    // for placement instead of racing it.
+    val pillAnchor = rememberPlacedFocusAnchor()
+    val syncPanelAnchor = rememberPlacedFocusAnchor()
     val gridFocus = remember { FocusRequester() }
-    LaunchedEffect(panelFocus) {
-        when (panelFocus) {
-            PanelFocus.Categories -> pillAnchor.awaitAndRequest()
-            PanelFocus.Content -> runCatching { gridFocus.requestFocus() }
-            PanelFocus.Sidebar -> { /* shell sidebar owns focus */ }
-        }
+    // MB-400 — the rail's mount gate, lifted to a val so the resolver and
+    // the render below can't disagree about whether a pill exists.
+    val railHasGroups = groups.isNotEmpty()
+    val focusTarget = guideFocusTarget(panelFocus, railHasGroups, guideEmpty, loading)
+    // Keyed on the resolved TARGET, not on panelFocus. Two reasons:
+    //   - With no rail, the shell writes Categories over Sidebar without
+    //     the destination actually changing; a panelFocus key would re-run
+    //     the effect for a move that isn't one.
+    //   - The target changes on its own when the pane swaps under a parked
+    //     cursor (a refresh finishes and the sync panel gives way to the
+    //     grid, or a group filter empties the grid). That disposes the
+    //     focused node, so it has to move focus too — a panelFocus key
+    //     never fires there and the selector goes dark.
+    LaunchedEffect(focusTarget) {
+        applyGuideFocus(focusTarget, pillAnchor, syncPanelAnchor, gridFocus)
+    }
+    // MB-400 — keep the shell's entry routing in step with what's mounted.
+    // Gated on `loading` so the initial fetch doesn't publish a transient
+    // "no rail" for a user who does have EPG data; the shell keeps its
+    // previous answer for that window, and the resolver above covers the
+    // pane either way.
+    LaunchedEffect(railHasGroups, loading) {
+        if (!loading) onCategoriesAvailable(railHasGroups)
     }
     // MK.28.5 (MB-265) — window-regain focus restore, ported from
     // CoverflowSectionScreen. The Guide launches PlayerActivity on every
@@ -265,8 +407,11 @@ fun GuideScreen(
     // symptom class on a screen that never got the handler).
     val guideWindowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
     // rememberUpdatedState: LaunchedEffect(Unit) never restarts, so a plain
-    // capture would freeze panelFocus at its first-composition value.
-    val currentPanelFocus by rememberUpdatedState(panelFocus)
+    // capture would freeze the target at its first-composition value.
+    // MB-400 — restores through the same resolver as entry, so coming back
+    // from the player on an empty guide lands on the sync panel instead of
+    // awaiting a pill that was never mounted.
+    val currentFocusTarget by rememberUpdatedState(focusTarget)
     LaunchedEffect(Unit) {
         var seenUnfocused = false
         snapshotFlow { guideWindowInfo.isWindowFocused }.collect { windowFocused ->
@@ -274,11 +419,7 @@ fun GuideScreen(
                 seenUnfocused = true
             } else if (seenUnfocused) {
                 seenUnfocused = false
-                when (currentPanelFocus) {
-                    PanelFocus.Categories -> pillAnchor.awaitAndRequest()
-                    PanelFocus.Content -> runCatching { gridFocus.requestFocus() }
-                    PanelFocus.Sidebar -> { /* shell sidebar owns focus */ }
-                }
+                applyGuideFocus(currentFocusTarget, pillAnchor, syncPanelAnchor, gridFocus)
             }
         }
     }
@@ -448,18 +589,6 @@ fun GuideScreen(
         }
     }
 
-    val guide =
-        if (channels.isEmpty()) {
-            null
-        } else {
-            EpgGuideData(
-                channels = channels,
-                startTime = windowStartState,
-                endTime = windowEndState,
-            )
-        }
-    val guideEmpty = guide == null
-
     // MK.8.7.c — channel long-press action menu. Resolve the Guide's
     // EpgGuideChannel (which only carries tvg_id) into a real ContentItem
     // via ContentRepository.findLiveByTvgId so the menu can key its
@@ -526,7 +655,18 @@ fun GuideScreen(
     // when the rail itself is focused bubbles up to the shell.
     var gridHasFocus by remember { mutableStateOf(false) }
     BackHandler(enabled = gridHasFocus) {
-        onPanelFocusChanged(PanelFocus.Categories)
+        if (railHasGroups) {
+            onPanelFocusChanged(PanelFocus.Categories)
+        } else {
+            // MB-400 — with no rail there is nothing to fall back to.
+            // Routing to Categories here would resolve straight back to
+            // the sync panel (same target, so the effect wouldn't even
+            // re-fire) and leave panelFocus lying about where the cursor
+            // is: BACK would read as a dead press. Go out to the shell
+            // sidebar instead, which is what CategoryRail does with BACK.
+            onPanelFocusChanged(PanelFocus.Sidebar)
+            onExitToSidebar()
+        }
     }
     // MK.20.3 — guide rail honours the same smart-grouping toggle as the
     // Live/Movies/Series rails. `groups` here is already provider-ordered
@@ -576,7 +716,7 @@ fun GuideScreen(
     // grid, which already flips `panelFocus` back to Categories.
     val categoriesVisible = panelFocus != PanelFocus.Content
     Row(modifier = modifier.fillMaxSize()) {
-        if (categoriesVisible && groups.isNotEmpty()) {
+        if (categoriesVisible && railHasGroups) {
             CategoryRail(
                 groups = if (guideSmartEnabled) emptyList() else groups,
                 selected = railSelected,
@@ -633,9 +773,16 @@ fun GuideScreen(
                     // Diagnostics panel for stuck/empty guides. Carries the
                     // refresh + re-sync actions so users don't have to dig
                     // through Settings.
+                    //
+                    // MB-400 — entryAnchor makes "Refresh EPG now" the
+                    // Guide's entry focus in this branch. Without it the
+                    // pane rendered four reachable controls that nothing
+                    // ever focused, so entering the Guide with no EPG data
+                    // left the whole pane unreachable from the sidebar.
                     GuideSyncPanel(
                         compact = false,
                         onRefreshed = { reloadTick++ },
+                        entryAnchor = syncPanelAnchor,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

@@ -287,6 +287,17 @@ fun HomeScreen(
         if (sidebarHasFocus) panelFocus = PanelFocus.Sidebar
     }
 
+    // MB-400 — does the Guide currently have a category rail to land on?
+    // GuideScreen reports it up (the rail only mounts when the EPG has
+    // groups), so sidebar entry can pick a destination that exists rather
+    // than always naming Categories. Starts true and GuideScreen withholds
+    // the report until its first load settles, so the answer is either
+    // "not measured yet" (Categories, which GuideScreen's own resolver
+    // then redirects for that one entry) or measured and right.
+    // Deliberately NOT saveable — a stale "false" restored after the user
+    // has since synced an EPG would outlive the state it described.
+    var guideHasCategories by remember { mutableStateOf(true) }
+
     // Re-focus content when the detail overlay is dismissed. Compose
     // doesn't automatically reassign focus to the underlying rail / chip
     // bar when a focusGroup leaves composition, so the selector would
@@ -386,9 +397,17 @@ fun HomeScreen(
                     section = newSection
                     // Guide also has a CategoryRail (MK.guide.groups), so
                     // treat it like the browse sections: forward into
-                    // Categories, not Content. GuideScreen's
-                    // LaunchedEffect(panelFocus) lands focus on the rail.
-                    if (newSection.contentType != null || newSection == AppSection.Guide) {
+                    // Categories, not Content. GuideScreen's focus effect
+                    // lands focus on the rail.
+                    //
+                    // MB-400 — but only while that rail exists. A Guide with
+                    // no programme data renders the sync panel with no rail
+                    // beside it, so Categories named a node that was never
+                    // mounted: requestFocus() no-op'd, the pane ended up
+                    // with zero focused nodes and the sync panel's controls
+                    // were unreachable. With no rail the Guide is a
+                    // Content destination like Favorites or Search.
+                    if (newSection.contentType != null || (newSection == AppSection.Guide && guideHasCategories)) {
                         panelFocus = PanelFocus.Categories
                     } else {
                         panelFocus = PanelFocus.Content
@@ -422,7 +441,12 @@ fun HomeScreen(
                     // categories rail; non-browse sections jump straight
                     // into their content. The sidebar collapses to icon-only
                     // because expanded = (panelFocus == Sidebar).
-                    if (contentType != null || section == AppSection.Guide) {
+                    //
+                    // MB-400 — same rail-exists guard as onSelect above:
+                    // RIGHT into a data-less Guide has to target Content,
+                    // or the press writes Categories, nothing is focusable
+                    // there, and focus stays parked on the sidebar.
+                    if (contentType != null || (section == AppSection.Guide && guideHasCategories)) {
                         panelFocus = PanelFocus.Categories
                     } else {
                         panelFocus = PanelFocus.Content
@@ -522,6 +546,7 @@ fun HomeScreen(
                         panelFocus = panelFocus,
                         onPanelFocusChanged = { panelFocus = it },
                         onExitToSidebar = { runCatching { sidebarFocus.requestFocus() } },
+                        onCategoriesAvailable = { guideHasCategories = it },
                         onPlay = { channel, _ ->
                             val item = guideChannelToContentItem(channel) ?: return@GuideScreen
                             gatedPlay(item.id) {
