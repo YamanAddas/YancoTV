@@ -515,8 +515,23 @@ val generateUpdateJson by tasks.registering {
 
     val outputFile = layout.buildDirectory.file("outputs/update.json")
     outputs.file(outputFile)
-    // Re-run when any input changes — so a bump-only edit (no source diff)
-    // still rewrites the JSON.
+    // MB-399 — NEVER up-to-date. The `sha256` below is computed from the
+    // release APK on disk, but that APK cannot be declared as a task input:
+    // it is produced by packageRelease in the SAME invocation, so declaring
+    // it trips Gradle's implicit-dependency validation. With only the
+    // version properties declared, a source-only change (version unchanged)
+    // left this task UP-TO-DATE and the JSON kept the PREVIOUS build's
+    // digest — while the APK beside it had changed. That ships a manifest
+    // whose sha256 matches nothing: `UpdateInstaller` verifies the download
+    // against it and hard-fails with "integrity check failed", so every
+    // in-app update breaks. Caught cutting 1.6.7, which was rebuilt three
+    // times after the first 1.6.7 run pinned its digest.
+    //
+    // Re-running unconditionally is correct for a task whose entire job is
+    // to snapshot the artifact that exists right now, and it is cheap
+    // (one SHA-256 pass over ~55 MB).
+    outputs.upToDateWhen { false }
+    // Kept for provenance in build scans; they no longer gate execution.
     inputs.property("versionCode", android.defaultConfig.versionCode ?: 1)
     inputs.property("versionName", android.defaultConfig.versionName ?: "?")
     inputs.property(
