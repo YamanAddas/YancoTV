@@ -155,6 +155,8 @@ android {
         // Empty = updates disabled (the checker short-circuits before
         // any HTTP call).
         buildConfigField("String", "UPDATE_ENDPOINT", "\"$updateEndpoint\"")
+        // MK.STORE — overridden to true by the `storeRelease` build type.
+        buildConfigField("boolean", "STORE_BUILD", "false")
         // Audit catch — AGENTS.md threat-model section promises forks
         // can override via the `OPENSUBTITLES_API_KEY` env var, but the
         // pre-fix build only read local.properties. Layered fallback
@@ -218,6 +220,51 @@ android {
                 } else {
                     signingConfigs.getByName("debug")
                 }
+        }
+
+        // MK.STORE — build for an APP STORE (Google Play, Amazon Appstore) as
+        // opposed to the sideload channel `release` serves.
+        //
+        // Stores ship their own update mechanism and BOTH forbid an app that
+        // downloads and installs executable code itself (Play: "Device and
+        // Network Abuse"; Amazon's content policy is equivalent). Our in-app
+        // updater does exactly that, so a store build must not carry it:
+        //
+        //   - UPDATE_ENDPOINT is forced empty, which the existing gate already
+        //     understands end to end — UpdateChecker.isConfigured goes false,
+        //     UpdateRepository.triggerCheckOutcome short-circuits to Disabled,
+        //     and SettingsAboutTab hides the toggle, the "Check now" button and
+        //     the last-checked row, showing "updates handled by your store"
+        //     copy instead. No dead controls, no code deleted.
+        //   - REQUEST_INSTALL_PACKAGES is stripped from the manifest by
+        //     src/storeRelease/AndroidManifest.xml (tools:node="remove"), so the
+        //     permission never reaches a reviewer. Declaring a permission the
+        //     build cannot use is itself a rejection risk.
+        //
+        // A SEPARATE BUILD TYPE, deliberately not a product flavor: flavors
+        // rewrite the output path of EVERY variant (app-release.apk becomes
+        // app-<flavor>-release.apk), which would silently break `releasePackage`
+        // and `generateUpdateJson` — the sideload pipeline that is live and
+        // verified (MB-399). A new build type adds paths without touching the
+        // existing ones, so `release` stays byte-for-byte the channel we ship.
+        //
+        //   ./gradlew :app:bundleStoreRelease     -> .aab  for Google Play
+        //   ./gradlew :app:assembleStoreRelease   -> .apk  for Amazon / Fire TV
+        //
+        // Same applicationId and same signing key as `release` on purpose: this
+        // is the same app, and a store listing that later has to absorb existing
+        // sideload installs cannot do so across a signing-key change.
+        create("storeRelease") {
+            initWith(getByName("release"))
+            // :shared publishes only debug/release — tell AGP which of its
+            // variants this build type consumes, or dependency resolution fails.
+            matchingFallbacks += listOf("release")
+            buildConfigField("String", "UPDATE_ENDPOINT", "\"\"")
+            // Distinguishes "no updater because a STORE delivers updates" from
+            // "no updater because this build has no endpoint configured" (a dev
+            // build). Same disabled machinery, but the user-facing copy differs
+            // and the dev-build wording would be nonsense on a store listing.
+            buildConfigField("boolean", "STORE_BUILD", "true")
         }
     }
 
@@ -341,7 +388,21 @@ composeCompiler {
 // produce a distributable, so matching loosely would just reintroduce the bug
 // one level down. `releasePackage` and `bundleRelease` are covered
 // transitively — both depend on the packaging tasks named here.
-val releaseSigningTasks = setOf("packageRelease", "packageReleaseBundle", "validateSigningRelease")
+// MK.STORE — the storeRelease build type produces distributables too
+// (bundleStoreRelease for Play, assembleStoreRelease for Amazon), so its
+// packaging tasks must trip the same guard. Without them a machine with no
+// keystore would emit a silently DEBUG-SIGNED store artifact — the worst
+// possible thing to upload, since Play locks the first key it sees and a
+// debug-signed listing could never absorb the existing sideload installs.
+val releaseSigningTasks =
+    setOf(
+        "packageRelease",
+        "packageReleaseBundle",
+        "validateSigningRelease",
+        "packageStoreRelease",
+        "packageStoreReleaseBundle",
+        "validateSigningStoreRelease",
+    )
 
 gradle.taskGraph.whenReady {
     if (releaseSigningConfigured) return@whenReady

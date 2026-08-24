@@ -6,6 +6,18 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## Unreleased
+
+### Added
+- **A `storeRelease` build type for Google Play / Amazon Appstore submissions.**
+  Both stores forbid an app that downloads and installs code itself, so this
+  variant compiles the in-app updater out (`UPDATE_ENDPOINT` empty) and strips
+  `REQUEST_INSTALL_PACKAGES` from the manifest; About shows "Updates arrive
+  through the app store you installed YancoTV from" instead of a Check-now
+  button. Same package name and same signing key as the sideload build. The
+  sideload channel (`release` + GitHub Releases + in-app updater) is unchanged.
+  See [docs/store/SUBMISSION.md](../../docs/store/SUBMISSION.md).
+
 ## 1.6.7 (versionCode 31) — 2026-08-24
 
 ### Fixed

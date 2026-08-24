@@ -847,6 +847,7 @@
     <string name="as_portal_url">URL du portail</string>
     <string name="ab_updates_on">YancoTV vous avertira quand une nouvelle version sera prête.</string>
     <string name="ab_updates_off">La vérification des mises à jour n\'est pas configurée pour cette version (aucun point de publication).</string>
+    <string name="ab_updates_store">Les mises à jour arrivent via la boutique d\'applications depuis laquelle vous avez installé YancoTV.</string>
     <string name="ab_checking">Vérification…</string>
     <string name="ab_check_now">Vérifier</string>
     <string name="ab_open">Ouvrir</string>

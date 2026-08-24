@@ -876,6 +876,7 @@
     <string name="ab_version_row" translatable="false">v %1$s</string>
     <string name="ab_updates_on">YancoTV will tell you when a new version is ready.</string>
     <string name="ab_updates_off">Update checks aren\'t wired for this build (no release endpoint configured).</string>
+    <string name="ab_updates_store">Updates arrive through the app store you installed YancoTV from.</string>
     <string name="ab_checking">Checking…</string>
     <string name="ab_check_now">Check now</string>
     <string name="ab_open">Open</string>

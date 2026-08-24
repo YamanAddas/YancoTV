@@ -847,6 +847,7 @@
     <string name="as_portal_url">عنوان البوابة</string>
     <string name="ab_updates_on">سيُخبرك YancoTV عند توفّر إصدار جديد.</string>
     <string name="ab_updates_off">فحص التحديثات غير مُهيَّأ في هذه النسخة (لا يوجد عنوان إصدارات).</string>
+    <string name="ab_updates_store">تصل التحديثات عبر متجر التطبيقات الذي ثبَّتت منه يانكو تي في.</string>
     <string name="ab_checking">جارٍ الفحص…</string>
     <string name="ab_check_now">افحص الآن</string>
     <string name="ab_open">فتح</string>

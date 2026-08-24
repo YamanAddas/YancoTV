@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MK.STORE — store-channel manifest overlay (Google Play, Amazon Appstore).
+
+    Merged on top of the main manifest for the `storeRelease` build type only;
+    `release` (the sideload channel) is untouched.
+
+    REQUEST_INSTALL_PACKAGES exists in the main manifest for the in-app
+    updater, which downloads a newer APK and hands it to the system installer.
+    Both stores forbid an app that installs executable code itself, and they
+    ship their own update path, so the store build drops the permission
+    entirely. The updater code is inert here anyway — the storeRelease build
+    type forces BuildConfig.UPDATE_ENDPOINT to "", which UpdateChecker treats
+    as "updates disabled" — so removing the permission takes away nothing the
+    build can still do, and keeps a permission a reviewer would question off
+    the listing. The About screen swaps its copy accordingly (BuildConfig
+    .STORE_BUILD -> "Updates arrive through the app store…"), so the user is
+    told where updates come from rather than seeing the dev-build wording.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+
+</manifest>

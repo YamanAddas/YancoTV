@@ -183,10 +183,17 @@ fun SettingsAboutTab(
         // mirrors this state from UpdateChecker.isConfigured.
         val isConfigured = updateRepo.isConfigured
         val updatesSub =
-            if (isConfigured) {
-                stringResource(R.string.ab_updates_on)
-            } else {
-                stringResource(R.string.ab_updates_off)
+            when {
+                isConfigured -> stringResource(R.string.ab_updates_on)
+                // MK.STORE — a Play / Amazon build has the updater compiled out
+                // (UPDATE_ENDPOINT forced empty) because both stores forbid an
+                // app that installs code itself and deliver updates themselves.
+                // Same disabled state as a dev build, completely different
+                // reason: "not wired for this build (no release endpoint)" is
+                // developer copy and reads as breakage on a store listing.
+                com.yancotv.android.BuildConfig.STORE_BUILD ->
+                    stringResource(R.string.ab_updates_store)
+                else -> stringResource(R.string.ab_updates_off)
             }
         val updatesRight: (@Composable () -> Unit)? =
             if (isConfigured) {
