@@ -95,7 +95,13 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
                         error = null
                     },
                     singleLine = true,
-                    enabled = !working && lockoutSec <= 0,
+                    // MB-395 family — `!working` used to disable the field for
+                    // the sub-second verify window, dropping focus from under
+                    // the caret. The verify coroutine reads a captured copy of
+                    // `pin`, so live edits during it are harmless. Lockout
+                    // still disables: that's a lasting state, entered while
+                    // focus is on the Unlock button, not here.
+                    enabled = lockoutSec <= 0,
                     label = { Text(stringResource(R.string.pin_label)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
@@ -139,9 +145,25 @@ fun PinEntryDialog(title: String, body: String? = null, repo: ParentalRepository
         },
         confirmButton = {
             TextButton(
-                enabled = !working && lockoutSec <= 0 && pin.length >= MIN_PIN_LENGTH,
+                // MB-395 family — a Material3 TextButton that disables while
+                // focused falls out of the focus system, so on TV a wrong PIN
+                // (`working` flip + the `pin = ""` reset dropping the length
+                // gate) hopped focus from Unlock onto Cancel — one accidental
+                // CENTER away from closing the gate. Only the lockout (a
+                // lasting, explained state) may disable; `working` and the
+                // short-PIN case are guarded in onClick instead: verifyPin on
+                // a short/blank PIN just reports "Incorrect PIN", which is
+                // honest feedback rather than a dead control.
+                enabled = lockoutSec <= 0,
                 onClick = {
                     if (working) return@TextButton
+                    // Short/blank PIN: feedback without calling verifyPin —
+                    // a verify would count toward the brute-force lockout,
+                    // and a fat-fingered CENTER on an empty field shouldn't.
+                    if (pin.length < MIN_PIN_LENGTH) {
+                        error = incorrectText
+                        return@TextButton
+                    }
                     working = true
                     scope.launch {
                         // MK.28.3 (MB-251) — verifyPin reads the settings row

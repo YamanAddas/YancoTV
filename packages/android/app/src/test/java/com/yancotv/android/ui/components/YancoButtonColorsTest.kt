@@ -81,14 +81,21 @@ class YancoButtonColorsTest {
         assertEquals(false, c.borderWidthIsFocus)
     }
 
-    @Test fun solidPrimaryDisabledIsStillDisabledEvenIfFocused() {
-        // Hypothetical: a screen that doesn't filter out focus on
-        // disabled buttons. Border must NOT promote to FocusRing — the
-        // user can't act on it anyway, lighting it up is a lie.
+    @Test fun solidPrimaryFocusedWhileDisabledShowsDimmedFrame() {
+        // MB-395 — focused + disabled is a REAL state now: buttons stay
+        // focusable while logically disabled (removing focusability is
+        // what threw TV focus onto the main sidebar when "Check now" /
+        // Save disabled themselves mid-press). The cursor parked on a
+        // disabled button must stay visible — but at a dimmed alpha of
+        // the ring, never the full FocusRing, so it doesn't promise an
+        // action the button won't perform. Text stays muted.
         val c = primarySolidColors(palette, focused = true, enabled = false)
+        assertEquals(palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
         assertNotEquals(palette.FocusRing, c.borderColor)
         assertEquals(palette.TextMuted, c.textColor)
-        assertEquals(false, c.borderWidthIsFocus)
+        // Focus width still applies — thickness + dim ring is the
+        // parked-cursor signature.
+        assertEquals(true, c.borderWidthIsFocus)
     }
 
     // ── translucent primary ────────────────────────────────────────
@@ -178,6 +185,48 @@ class YancoButtonColorsTest {
         assertEquals(palette.TextMuted, c.textColor)
     }
 
+    // ── parked cursor on a disabled button (MB-395) ───────────────
+    // Buttons never leave the focus system when logically disabled, so
+    // every variant must render a visible-but-dimmed frame when the
+    // cursor sits on a disabled button. Full ring = actionable; dimmed
+    // ring = "you are here, but this control is busy/unavailable"; no
+    // ring at all = the cursor vanished, which is the original bug.
+
+    @Test fun translucentPrimaryFocusedWhileDisabledShowsDimmedFrame() {
+        val c = primaryTranslucentColors(palette, focused = true, enabled = false)
+        assertEquals(palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.TextMuted, c.textColor)
+        assertTrue(c.borderWidthIsFocus)
+    }
+
+    @Test fun secondaryFocusedWhileDisabledShowsDimmedFrame() {
+        val c = secondaryColors(palette, focused = true, enabled = false)
+        assertEquals(palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.TextMuted, c.textColor)
+        assertTrue(c.borderWidthIsFocus)
+    }
+
+    @Test fun dangerFocusedWhileDisabledShowsDimmedErrorFrame() {
+        // Danger dims its OWN hue, not FocusRing — destructive stays
+        // visually distinct from neutral in every state.
+        val c = dangerColors(palette, focused = true, enabled = false)
+        assertEquals(palette.Error.copy(alpha = DisabledFocusFrameAlpha), c.borderColor)
+        assertEquals(palette.TextMuted, c.textColor)
+        assertTrue(c.borderWidthIsFocus)
+    }
+
+    @Test fun dimmedFrameIsPaletteDerivedAcrossThemes() {
+        // Same guard as focusRingAlwaysComesFromPaletteNotAHardcodedColor,
+        // for the parked-cursor state: the dim frame must follow the
+        // theme's FocusRing token, not a pinned colour.
+        listOf(FrostedEmerald, MidnightSapphire, WarmAmber).forEach { p ->
+            val expected = p.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
+            assertEquals(expected, primarySolidColors(p, focused = true, enabled = false).borderColor)
+            assertEquals(expected, primaryTranslucentColors(p, focused = true, enabled = false).borderColor)
+            assertEquals(expected, secondaryColors(p, focused = true, enabled = false).borderColor)
+        }
+    }
+
     // ── cross-palette guards ──────────────────────────────────────
 
     @Test fun focusRingAlwaysComesFromPaletteNotAHardcodedColor() {
@@ -232,8 +281,9 @@ class YancoButtonColorsTest {
     }
 
     @Test fun solidPrimaryDisabledStopsAreMutedRegardlessOfFocus() {
-        // Disabled buttons cannot be focused (in practice) but if they
-        // somehow are, the fill must NOT promote — that would lie to
+        // Disabled buttons ARE focusable since MB-395 (the cursor can
+        // park on them), but the FILL must still not promote — only the
+        // dimmed frame marks the cursor; a lit gradient would lie to
         // the user that they can act.
         val restDisabled = primarySolidGradientStops(palette, focused = false, enabled = false)
         val focusDisabled = primarySolidGradientStops(palette, focused = true, enabled = false)

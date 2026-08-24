@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -130,46 +132,36 @@ fun YancoPrimaryButton(
         label = "primaryScale",
     )
 
-    val fill: Brush
-    val borderColor: Color
-    val borderWidth: androidx.compose.ui.unit.Dp
-    val textColor: Color
-    if (translucent) {
-        fill =
+    // Border + text resolve through the unit-tested pure functions below —
+    // the composable used to duplicate them inline, which let the two drift.
+    val colors =
+        if (translucent) {
+            primaryTranslucentColors(palette, focused = focused, enabled = enabled)
+        } else {
+            primarySolidColors(palette, focused = focused, enabled = enabled)
+        }
+    // Solid variant — rest paints the DARKER end of the accent ramp
+    // so focus has somewhere brighter to go. Pre-MK.UI.BTN-fix2 rest
+    // used `Accent → AccentDeep` (today's focus state), which on TV
+    // looked already-lit; the focus state on top of that had nowhere
+    // to climb, so the selector read as "the button got a little
+    // brighter" rather than "this one is selected." Swapping rest
+    // to `AccentDeep → AccentMuted` gives the eye a clear off→on
+    // step when the cursor lands.
+    val fill: Brush =
+        if (translucent) {
             Brush.verticalGradient(
                 listOf(
                     palette.Accent.copy(alpha = if (focused && enabled) 0.32f else 0.18f),
                     palette.Accent.copy(alpha = if (focused && enabled) 0.20f else 0.10f),
                 ),
             )
-        borderColor =
-            when {
-                !enabled -> palette.Accent.copy(alpha = 0.20f)
-                focused -> palette.FocusRing
-                else -> palette.Accent.copy(alpha = 0.55f)
-            }
-        borderWidth = if (focused && enabled) 1.5.dp else 1.dp
-        textColor =
-            when {
-                !enabled -> palette.TextMuted
-                focused -> palette.AccentGlow
-                else -> palette.Accent
-            }
-    } else {
-        // Solid variant — rest paints the DARKER end of the accent ramp
-        // so focus has somewhere brighter to go. Pre-MK.UI.BTN-fix2 rest
-        // used `Accent → AccentDeep` (today's focus state), which on TV
-        // looked already-lit; the focus state on top of that had nowhere
-        // to climb, so the selector read as "the button got a little
-        // brighter" rather than "this one is selected." Swapping rest
-        // to `AccentDeep → AccentMuted` gives the eye a clear off→on
-        // step when the cursor lands.
-        fill = primaryFillBrush(palette, enabled = enabled, focused = focused && enabled)
-        borderColor =
-            if (focused && enabled) palette.FocusRing else Color.White.copy(alpha = 0.18f)
-        borderWidth = if (focused && enabled) 1.5.dp else 1.dp
-        textColor = if (enabled) OnAccentInk else palette.TextMuted
-    }
+        } else {
+            primaryFillBrush(palette, enabled = enabled, focused = focused && enabled)
+        }
+    val borderColor = colors.borderColor
+    val borderWidth = if (colors.borderWidthIsFocus) 1.5.dp else 1.dp
+    val textColor = colors.textColor
 
     Row(
         modifier =
@@ -202,10 +194,19 @@ fun YancoPrimaryButton(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                enabled = enabled,
+                // MB-395 — the NODE stays enabled (= focusable) even while the
+                // button is logically disabled. `clickable(enabled = false)`
+                // removes the node from the focus system, so a button that
+                // disables itself on its own click (About "Check now", EPG
+                // Refresh, Save-while-dirty…) evaporated TV focus mid-press;
+                // Compose's fallback search then escaped the screen and landed
+                // on HomeScreen's sidebar — which reads as "settings threw me
+                // back to the main menu". Logical enablement lives in the
+                // onClick guard + semantics + the muted visuals instead.
                 role = Role.Button,
-                onClick = onClick,
+                onClick = { if (enabled) onClick() },
             )
+            .semantics { if (!enabled) disabled() }
             .padding(horizontal = m.horizontalPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -256,24 +257,15 @@ fun YancoSecondaryButton(
         label = "secondaryScale",
     )
 
+    val colors = secondaryColors(palette, focused = focused, enabled = enabled)
     val bgColor =
         when {
             !enabled -> Color.White.copy(alpha = 0.02f)
             focused -> palette.Accent.copy(alpha = 0.18f)
             else -> Color.White.copy(alpha = 0.04f)
         }
-    val borderColor =
-        when {
-            !enabled -> palette.BorderSubtle
-            focused -> palette.FocusRing
-            else -> palette.PanelBorder
-        }
-    val textColor =
-        when {
-            !enabled -> palette.TextMuted
-            focused -> palette.AccentGlow
-            else -> palette.TextPrimary
-        }
+    val borderColor = colors.borderColor
+    val textColor = colors.textColor
 
     Row(
         modifier =
@@ -293,17 +285,26 @@ fun YancoSecondaryButton(
             .clip(shape)
             .background(bgColor)
             .border(
-                width = if (focused && enabled) 1.5.dp else 1.dp,
+                width = if (colors.borderWidthIsFocus) 1.5.dp else 1.dp,
                 color = borderColor,
                 shape = shape,
             )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                enabled = enabled,
+                // MB-395 — the NODE stays enabled (= focusable) even while the
+                // button is logically disabled. `clickable(enabled = false)`
+                // removes the node from the focus system, so a button that
+                // disables itself on its own click (About "Check now", EPG
+                // Refresh, Save-while-dirty…) evaporated TV focus mid-press;
+                // Compose's fallback search then escaped the screen and landed
+                // on HomeScreen's sidebar — which reads as "settings threw me
+                // back to the main menu". Logical enablement lives in the
+                // onClick guard + semantics + the muted visuals instead.
                 role = Role.Button,
-                onClick = onClick,
+                onClick = { if (enabled) onClick() },
             )
+            .semantics { if (!enabled) disabled() }
             .padding(horizontal = m.horizontalPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -349,19 +350,15 @@ fun YancoDangerButton(
         label = "dangerScale",
     )
 
+    val colors = dangerColors(palette, focused = focused, enabled = enabled)
     val bgColor =
         when {
             !enabled -> palette.Error.copy(alpha = 0.06f)
             focused -> palette.Error.copy(alpha = 0.32f)
             else -> palette.Error.copy(alpha = 0.16f)
         }
-    val borderColor =
-        when {
-            !enabled -> palette.Error.copy(alpha = 0.16f)
-            focused -> palette.Error
-            else -> palette.Error.copy(alpha = 0.4f)
-        }
-    val textColor = if (enabled) palette.Error else palette.TextMuted
+    val borderColor = colors.borderColor
+    val textColor = colors.textColor
 
     Row(
         modifier =
@@ -381,17 +378,26 @@ fun YancoDangerButton(
             .clip(shape)
             .background(bgColor)
             .border(
-                width = if (focused && enabled) 1.5.dp else 1.dp,
+                width = if (colors.borderWidthIsFocus) 1.5.dp else 1.dp,
                 color = borderColor,
                 shape = shape,
             )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                enabled = enabled,
+                // MB-395 — the NODE stays enabled (= focusable) even while the
+                // button is logically disabled. `clickable(enabled = false)`
+                // removes the node from the focus system, so a button that
+                // disables itself on its own click (About "Check now", EPG
+                // Refresh, Save-while-dirty…) evaporated TV focus mid-press;
+                // Compose's fallback search then escaped the screen and landed
+                // on HomeScreen's sidebar — which reads as "settings threw me
+                // back to the main menu". Logical enablement lives in the
+                // onClick guard + semantics + the muted visuals instead.
                 role = Role.Button,
-                onClick = onClick,
+                onClick = { if (enabled) onClick() },
             )
+            .semantics { if (!enabled) disabled() }
             .padding(horizontal = m.horizontalPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -455,17 +461,36 @@ private fun primaryFillBrush(palette: YancoPalette, enabled: Boolean, focused: B
  */
 internal data class YancoButtonColors(val borderColor: Color, val textColor: Color, val borderWidthIsFocus: Boolean)
 
+/**
+ * MB-395 — buttons stay FOCUSABLE while logically disabled (a disabled
+ * clickable falls out of the focus system, and a button that disables
+ * itself on its own click evaporated TV focus onto the main sidebar).
+ * That makes "focused + disabled" a real, reachable state: the cursor is
+ * parked on a button it cannot activate. The frame must still mark the
+ * cursor — a TV screen with no visible focus is a dead end — but at
+ * [DisabledFocusFrameAlpha] of the ring colour so it doesn't promise an
+ * action the button won't perform. Fill and text stay in their muted
+ * disabled forms; only the frame carries the cursor.
+ */
+internal const val DisabledFocusFrameAlpha = 0.45f
+
 internal fun primarySolidColors(palette: YancoPalette, focused: Boolean, enabled: Boolean): YancoButtonColors = YancoButtonColors(
-    borderColor = if (focused && enabled) palette.FocusRing else Color.White.copy(alpha = 0.18f),
+    borderColor =
+    when {
+        focused && enabled -> palette.FocusRing
+        focused -> palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
+        else -> Color.White.copy(alpha = 0.18f)
+    },
     textColor = if (enabled) OnAccentInk else palette.TextMuted,
-    borderWidthIsFocus = focused && enabled,
+    borderWidthIsFocus = focused,
 )
 
 internal fun primaryTranslucentColors(palette: YancoPalette, focused: Boolean, enabled: Boolean): YancoButtonColors = YancoButtonColors(
     borderColor =
     when {
+        focused && enabled -> palette.FocusRing
+        focused -> palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
         !enabled -> palette.Accent.copy(alpha = 0.20f)
-        focused -> palette.FocusRing
         else -> palette.Accent.copy(alpha = 0.55f)
     },
     textColor =
@@ -474,14 +499,15 @@ internal fun primaryTranslucentColors(palette: YancoPalette, focused: Boolean, e
         focused -> palette.AccentGlow
         else -> palette.Accent
     },
-    borderWidthIsFocus = focused && enabled,
+    borderWidthIsFocus = focused,
 )
 
 internal fun secondaryColors(palette: YancoPalette, focused: Boolean, enabled: Boolean): YancoButtonColors = YancoButtonColors(
     borderColor =
     when {
+        focused && enabled -> palette.FocusRing
+        focused -> palette.FocusRing.copy(alpha = DisabledFocusFrameAlpha)
         !enabled -> palette.BorderSubtle
-        focused -> palette.FocusRing
         else -> palette.PanelBorder
     },
     textColor =
@@ -490,16 +516,19 @@ internal fun secondaryColors(palette: YancoPalette, focused: Boolean, enabled: B
         focused -> palette.AccentGlow
         else -> palette.TextPrimary
     },
-    borderWidthIsFocus = focused && enabled,
+    borderWidthIsFocus = focused,
 )
 
 internal fun dangerColors(palette: YancoPalette, focused: Boolean, enabled: Boolean): YancoButtonColors = YancoButtonColors(
     borderColor =
     when {
+        focused && enabled -> palette.Error
+        // Danger keeps its own hue even for the parked-cursor frame —
+        // destructive stays visually distinct from neutral at every state.
+        focused -> palette.Error.copy(alpha = DisabledFocusFrameAlpha)
         !enabled -> palette.Error.copy(alpha = 0.16f)
-        focused -> palette.Error
         else -> palette.Error.copy(alpha = 0.4f)
     },
     textColor = if (enabled) palette.Error else palette.TextMuted,
-    borderWidthIsFocus = focused && enabled,
+    borderWidthIsFocus = focused,
 )

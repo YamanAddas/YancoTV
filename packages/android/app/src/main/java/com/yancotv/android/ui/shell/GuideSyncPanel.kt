@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +44,9 @@ import com.yancotv.android.R
 import com.yancotv.android.sources.SourceSyncCoordinator
 import com.yancotv.android.sync.EpgSyncReason
 import com.yancotv.android.sync.EpgSyncWorker
+import com.yancotv.android.ui.components.ButtonSize
+import com.yancotv.android.ui.components.YancoPrimaryButton
+import com.yancotv.android.ui.components.YancoSecondaryButton
 import com.yancotv.android.ui.focus.snapToTopNearStart
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.epg.EpgRepository
@@ -232,12 +232,16 @@ fun GuideSyncPanel(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
             }
-            OutlinedButton(
+            // MB-395 — shared button family, not raw M3: an M3 button that
+            // disables itself on its own click (`running` flips here) falls
+            // out of the focus system and TV focus escapes to the app
+            // sidebar. The Yanco family stays focusable while disabled.
+            YancoSecondaryButton(
                 onClick = { doRefreshEpg() },
                 enabled = !running && !syncing,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.Accent),
+                size = ButtonSize.Compact,
             ) {
-                Text(stringResource(R.string.gs_refresh_epg), fontSize = 12.sp)
+                Text(stringResource(R.string.gs_refresh_epg))
             }
         }
         return
@@ -335,17 +339,18 @@ fun GuideSyncPanel(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
+                // MB-395 — Yanco family for both: these disable themselves on
+                // click (`running`/`syncing` flip), which on raw M3 buttons
+                // dropped TV focus onto the app sidebar.
+                YancoPrimaryButton(
                     onClick = { doRefreshEpg() },
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text(stringResource(R.string.gs_refresh_epg_now))
                 }
-                OutlinedButton(
+                YancoSecondaryButton(
                     onClick = { doResyncSources() },
                     enabled = !running && !syncing && activeSources.isNotEmpty(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalYancoPalette.current.TextPrimary),
                 ) {
                     Text(stringResource(R.string.gs_resync_sources))
                 }
@@ -397,7 +402,10 @@ fun GuideSyncPanel(
                     bare = true,
                     modifier = Modifier.weight(1f),
                 )
-                Button(
+                // MB-395 — Yanco family: this button disables the moment the
+                // save commits (draft == saved), which on raw M3 dropped TV
+                // focus out of the panel right after pressing SAVE.
+                YancoPrimaryButton(
                     onClick = {
                         scope.launch {
                             val cleaned = globalUrlDraft.trim().ifBlank { null }
@@ -416,7 +424,6 @@ fun GuideSyncPanel(
                         }
                     },
                     enabled = globalUrlDraft.trim() != (savedGlobalUrl ?: ""),
-                    colors = ButtonDefaults.buttonColors(containerColor = LocalYancoPalette.current.Accent),
                 ) {
                     Text(
                         if (globalUrlDraft.isBlank() && savedGlobalUrl != null) {
