@@ -6,6 +6,23 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.4 (versionCode 28) — 2026-08-23
+
+### Fixed
+- **The Guide now shows all your channels**, not just the ones that happen to
+  have EPG data (it was showing roughly 6% of a large channel list). Channels
+  with no programme data appear with a "No information" row and still play.
+  (MB-382)
+
+Also includes internal robustness fixes for M3U catch-up, Stalker catalogue
+paging, and content classification (these only affect M3U/Stalker sources) and
+a desktop catch-up window fix — no visible change for Xtream users.
+
+### Known issues
+- On a TV remote you can't yet move left/right across a long programme block in
+  the Guide; touch works. (MB-371)
+- Casting works for H.264 content; H.265/HEVC isn't transcoded yet.
+
 ## 1.6.3 (versionCode 27) — 2026-08-23
 
 A content-visibility and recording-correctness release, from an audit prompted
