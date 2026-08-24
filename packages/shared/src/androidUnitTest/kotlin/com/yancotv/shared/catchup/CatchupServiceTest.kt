@@ -128,6 +128,56 @@ class CatchupServiceTest {
         assertTrue(playable.item.streamUrl.contains("shift="), "got: ${playable.item.streamUrl}")
     }
 
+    @Test fun rejectsCatchupWhenChannelHasNoArchive() = runTest {
+        // MB-393 — a past programme on a channel WITHOUT tv_archive must NOT be
+        // offered catch-up (the timeshift URL returns a non-media 200 that fails
+        // playback). Verified on a Google TV: a 4K channel with no tv_archive
+        // was offered "Play catch-up" and failed.
+        val (db, contentRepo, sourceRepo) = bootstrap()
+        val source =
+            sourceRepo.addSource(
+                AddSourceInput(name = "P", type = SourceType.XTREAM, url = "http://provider.com", username = "u", password = "p"),
+            )
+        seedLiveChannel(
+            db,
+            id = "ch-noarch",
+            sourceId = source.id,
+            tvgId = "eleven.uhd",
+            streamUrl = "http://provider.com/live/u/p/483973.ts",
+            metadataJson = """{"streamId":483973}""", // no tvArchive / tvArchiveDuration
+        )
+        val svc = CatchupService(contentRepo, sourceRepo, clock = { (apr15At1430 + oneHour) * 1000L })
+        val result =
+            svc.resolve(programme(channel = "eleven.uhd", start = apr15At1430, end = apr15At1430 + oneHour))
+        assertIs<CatchupService.Resolution.Unavailable>(result)
+        assertEquals(CatchupService.UnavailableReason.ARCHIVE_UNSUPPORTED, (result as CatchupService.Resolution.Unavailable).reason)
+    }
+
+    @Test fun rejectsCatchupWhenArchiveFlagOnButZeroDuration() = runTest {
+        // MB-393 — tv_archive=1 with a 0-day duration is contradictory: the flag
+        // says "archive on" but there's no window to seek into. Must reject, not
+        // build a URL against a 0-day archive. Locks in AND semantics (both
+        // fields > 0), matching desktop catchup-service.ts.
+        val (db, contentRepo, sourceRepo) = bootstrap()
+        val source =
+            sourceRepo.addSource(
+                AddSourceInput(name = "P", type = SourceType.XTREAM, url = "http://provider.com", username = "u", password = "p"),
+            )
+        seedLiveChannel(
+            db,
+            id = "ch-zero",
+            sourceId = source.id,
+            tvgId = "zero.dur",
+            streamUrl = "http://provider.com/live/u/p/999.ts",
+            metadataJson = """{"tvArchive":1,"tvArchiveDuration":0}""",
+        )
+        val svc = CatchupService(contentRepo, sourceRepo, clock = { (apr15At1430 + oneHour) * 1000L })
+        val result =
+            svc.resolve(programme(channel = "zero.dur", start = apr15At1430, end = apr15At1430 + oneHour))
+        assertIs<CatchupService.Resolution.Unavailable>(result)
+        assertEquals(CatchupService.UnavailableReason.ARCHIVE_UNSUPPORTED, (result as CatchupService.Resolution.Unavailable).reason)
+    }
+
     @Test fun rejectsOutsideArchiveWindow() = runTest {
         val (db, contentRepo, sourceRepo) = bootstrap()
         val source =
@@ -188,7 +238,17 @@ class CatchupServiceTest {
         return Bootstrap(database.db, ContentRepository(database.db), sourceRepo)
     }
 
-    private fun seedLiveChannel(db: YancoDb, id: String, sourceId: String, tvgId: String, streamUrl: String, metadataJson: String? = null) {
+    // Default metadata advertises archive so the Xtream catch-up tests below get
+    // a Playable (MB-393 gates catch-up on tv_archive). Tests that need a
+    // non-archive or windowed channel pass their own metadataJson.
+    private fun seedLiveChannel(
+        db: YancoDb,
+        id: String,
+        sourceId: String,
+        tvgId: String,
+        streamUrl: String,
+        metadataJson: String? = """{"tvArchive":1,"tvArchiveDuration":7}""",
+    ) {
         db.contentQueries.insert(
             id = id,
             source_id = sourceId,

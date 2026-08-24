@@ -35,6 +35,10 @@ class CatchupService(private val contentRepo: ContentRepository, private val sou
         FUTURE_PROGRAMME,
         NO_MATCHING_CHANNEL,
         OUTSIDE_ARCHIVE_WINDOW,
+
+        // MB-393 — the channel does not advertise catch-up/archive at all
+        // (Xtream tv_archive != 1 and no tv_archive_duration).
+        ARCHIVE_UNSUPPORTED,
         UNSUPPORTED_SOURCE,
         MISSING_CREDENTIALS,
         MISSING_METADATA,
@@ -51,11 +55,7 @@ class CatchupService(private val contentRepo: ContentRepository, private val sou
      * rather than pulled off [programme] so callers that already looked up
      * the programme can reuse the id string without a second field access.
      */
-    fun resolve(
-        programme: EpgProgramme,
-        channelTvgId: String = programme.channelTvgId,
-        channelStreamUrl: String? = null,
-    ): Resolution {
+    fun resolve(programme: EpgProgramme, channelTvgId: String = programme.channelTvgId, channelStreamUrl: String? = null): Resolution {
         val nowSec = clock() / 1000L
         if (programme.startTime > nowSec) {
             return Resolution.Unavailable(UnavailableReason.FUTURE_PROGRAMME)
@@ -74,23 +74,36 @@ class CatchupService(private val contentRepo: ContentRepository, private val sou
                 ?: return Resolution.Unavailable(UnavailableReason.NO_MATCHING_CHANNEL)
         val metadata = channel.metadataJson?.let { parseMetadata(it) }
 
-        // Archive window check: Xtream's tvArchiveDuration is in days. If the
-        // provider advertises one and the programme start falls outside it,
-        // bail before we build an URL the provider will 404 on.
-        val archiveDays = metadata?.tvArchiveDuration
-        if (archiveDays != null && archiveDays > 0) {
-            val cutoff = nowSec - archiveDays * 86_400L
-            if (programme.startTime < cutoff) {
-                return Resolution.Unavailable(UnavailableReason.OUTSIDE_ARCHIVE_WINDOW)
-            }
-        }
-
         val source =
             sourceRepo.getById(channel.sourceId)
                 ?: return Resolution.Unavailable(UnavailableReason.UNSUPPORTED_SOURCE)
 
         return when (source.type) {
-            SourceType.XTREAM -> resolveXtream(channel, programme)
+            SourceType.XTREAM -> {
+                // MB-393 — only offer catch-up when the channel actually advertises
+                // archive support. Without this a past programme on a NON-archive
+                // channel was still offered "Play catch-up"; the timeshift URL then
+                // returns a non-media 200 that ExoPlayer rejects as
+                // ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED. (Found on a Google TV: a
+                // 4K channel with no tv_archive was offered catch-up and failed.)
+                // Requires BOTH tv_archive AND a non-zero tv_archive_duration — a
+                // 0-day window gives us nothing to seek into. Matches the desktop
+                // gate in catchup-service.ts (`tvArchive === 0 || duration === 0`).
+                val tvArchive = metadata?.tvArchive ?: 0
+                val archiveDays = metadata?.tvArchiveDuration ?: 0
+                if (tvArchive == 0 || archiveDays == 0) {
+                    return Resolution.Unavailable(UnavailableReason.ARCHIVE_UNSUPPORTED)
+                }
+                // Archive window: tvArchiveDuration is in DAYS. Bail if the
+                // programme predates the window the provider keeps.
+                val cutoff = nowSec - archiveDays * 86_400L
+                if (programme.startTime < cutoff) {
+                    return Resolution.Unavailable(UnavailableReason.OUTSIDE_ARCHIVE_WINDOW)
+                }
+                resolveXtream(channel, programme)
+            }
+            // M3U catch-up is decided by catchup-type / catchup-source, not the
+            // Xtream tv_archive flag — unchanged by MB-393.
             SourceType.M3U_URL,
             SourceType.M3U_FILE,
             -> resolveM3u(channel, programme, metadata, nowSec)

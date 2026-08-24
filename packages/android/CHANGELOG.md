@@ -6,6 +6,18 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.6 (versionCode 30) — 2026-08-23
+
+### Fixed
+- **Catch-up is no longer offered on channels that don't support it.** A past
+  programme on a live channel with no archive (e.g. some 4K feeds) used to show
+  "Play catch-up", then failed to play with a container error. Catch-up now
+  appears only on channels the provider actually keeps an archive for. (MB-393)
+
+### Verified this cycle
+- **Recording** was re-verified end-to-end on hardware: a live recording writes
+  a real, valid file and finalizes cleanly (no truncation).
+
 ## 1.6.5 (versionCode 29) — 2026-08-23
 
 ### Fixed

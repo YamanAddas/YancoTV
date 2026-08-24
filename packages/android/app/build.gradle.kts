@@ -139,8 +139,8 @@ android {
         applicationId = "com.yancotv.android"
         minSdk = 24
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.6.5"
+        versionCode = 30
+        versionName = "1.6.6"
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
