@@ -1,0 +1,39 @@
+Política de privacidad
+
+Última actualización: 23 de agosto de 2026
+
+YancoTV es un reproductor multimedia. Reproduce el contenido de las listas que tú configuras. No hay cuentas, no hay analítica y no hay ningún servidor nuestro por medio.
+
+Qué guarda la aplicación
+
+Todo lo que la aplicación sabe vive en tu dispositivo: las fuentes de tus listas, los canales y la guía de programación, los favoritos, el historial, los puntos de reanudación, las grabaciones y los ajustes. Los usuarios y contraseñas del proveedor se guardan en el almacén de claves del hardware, no en texto plano. Nada se sube a nosotros: no tenemos ningún sitio al que subirlo.
+
+Qué envía la aplicación, y a quién
+
+- Tu proveedor o proveedores de IPTV. La aplicación solo contacta con las URL de proveedor que tú añades, para obtener listas, datos de guía y streams. Tus credenciales van a tu proveedor —así funciona el inicio de sesión IPTV— y a nadie más.
+
+- Informes de fallos, si los activas. Vienen desactivados. Con «Informes de fallos» activado en Ajustes → Acerca de, los datos del fallo (traza, modelo de dispositivo, sistema operativo y versión de la app) se envían a Sentry para poder corregirlo. Ni listas, ni credenciales, ni historial de visionado. Las URL de proveedor se limpian de credenciales antes de que ningún informe salga del dispositivo. Desactiva el interruptor y no se envía nada.
+
+- Comprobación de actualizaciones. La aplicación descarga periódicamente un pequeño archivo de versión y, cuando aceptas una actualización, el nuevo APK desde GitHub. Eso le comunica a GitHub tu dirección IP, como cualquier descarga.
+
+- Búsquedas de subtítulos, cuando haces una. El título que buscas se envía a OpenSubtitles. Nada más, y solo cuando pides subtítulos.
+
+Lo que nunca hacemos
+
+Sin anuncios. Sin rastreadores. Sin SDK de analítica. Sin vender ni compartir datos. Sin leer nada más allá de lo que necesitan las funciones anteriores.
+
+Tus datos, tu dispositivo
+
+Desinstalar la aplicación borra todo lo que había guardado. Las copias de seguridad que exportes se quedan donde tú las pongas: protégelas con contraseña al exportarlas, porque un archivo de copia sin proteger contiene tus credenciales de proveedor en texto legible.
+
+Este sitio web
+
+Este sitio es estático y lo sirve GitHub Pages. No pone cookies ni ejecuta analítica. Tu elección de idioma se guarda en el almacenamiento de tu propio navegador y nunca sale de tu dispositivo. GitHub registra las peticiones a sus servidores, como cualquier alojamiento web, y el botón de descarga te lleva a GitHub.
+
+Cambios
+
+La copia de esta política que hay dentro de la aplicación y la de esta página son el mismo documento y cambian a la vez. Cuando cambian, se mueve la fecha de arriba.
+
+Contacto
+
+Cualquier duda sobre todo esto: contact@yancoverse.com.

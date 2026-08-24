@@ -46,9 +46,16 @@ import kotlinx.coroutines.launch
  * D-pad: UP/DOWN scroll a page-third at a time; BACK dismisses (the Dialog's
  * own onDismissRequest). The scroll surface itself takes focus on open so
  * the very first key press works.
+ *
+ * [monospace] is true for licence texts — they are verbatim, hard-wrapped at
+ * a fixed column, and a proportional font would break that layout. It is
+ * false for our own prose (privacy policy, terms), which ships translated:
+ * those files are deliberately NOT hard-wrapped so the composable can wrap
+ * them per locale, and Arabic in particular has no business being rendered
+ * through a monospace family.
  */
 @Composable
-fun LicenseViewerDialog(title: String, @RawRes textRes: Int, onDismiss: () -> Unit) {
+fun LicenseViewerDialog(title: String, @RawRes textRes: Int, onDismiss: () -> Unit, monospace: Boolean = true) {
     val ctx = LocalContext.current
     val body = remember(textRes) {
         runCatching { ctx.resources.openRawResource(textRes).bufferedReader().readText() }
@@ -103,9 +110,9 @@ fun LicenseViewerDialog(title: String, @RawRes textRes: Int, onDismiss: () -> Un
                 Text(
                     text = body,
                     color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    fontFamily = FontFamily.Monospace,
+                    fontSize = if (monospace) 12.sp else 14.sp,
+                    lineHeight = if (monospace) 17.sp else 21.sp,
+                    fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
                     modifier = Modifier.verticalScroll(scroll).padding(end = 8.dp),
                 )
             }

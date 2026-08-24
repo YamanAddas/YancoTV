@@ -1,0 +1,33 @@
+Conditions d'utilisation
+
+Dernière mise à jour: 23 août 2026
+
+En bref : YancoTV est un lecteur. Il n'arrive avec rien à regarder, et ce que vous lui donnez à lire relève de votre responsabilité.
+
+1. Ce qu'est YancoTV
+
+YancoTV est un lecteur multimédia. Il est livré sans chaînes, sans abonnement et sans contenu d'aucune sorte. Il lit les flux provenant des sources de listes que vous fournissez.
+
+2. Votre contenu, votre responsabilité
+
+Vous êtes seul responsable des sources que vous ajoutez et du droit légal de regarder ce qu'elles contiennent dans votre pays. Les développeurs de YancoTV ne fournissent, n'hébergent, ne vendent, ne promeuvent ni ne cautionnent aucun contenu ni aucun fournisseur, et aucune liste de fournisseurs n'est intégrée à l'application.
+
+3. Enregistrement
+
+La fonction d'enregistrement conserve des flux auxquels vous avez déjà accès, sur votre propre appareil, pour un usage personnel. Les lois sur l'enregistrement varient selon les pays, et respecter la vôtre vous incombe.
+
+4. Aucune garantie
+
+L'application est fournie « en l'état », sans garantie d'aucune sorte. Elle peut échouer, perdre des enregistrements ou mal se comporter avec un fournisseur ou un appareil donné. Gardez vos propres sauvegardes de ce à quoi vous tenez.
+
+5. D'où viennent les versions
+
+Les versions ne sont publiées que sur ce site et sur la page des versions GitHub (https://github.com/YamanAddas/yancotv-releases/releases) du projet. Une copie venue d'ailleurs ne vient pas de nous, et rien de ce qui est écrit ici ne s'y applique.
+
+6. Logiciels libres
+
+YancoTV intègre des composants libres sous leurs propres licences — la liste complète se trouve dans l'application, sous Paramètres → À propos → Licences open source, avec le texte des licences. Le code de YancoTV lui-même est sur github.com/YamanAddas/YancoTV, sous licence MIT.
+
+7. Modifications
+
+Ces conditions peuvent évoluer en même temps que l'application. La version en vigueur se trouve toujours à cette adresse et dans l'application, et la date en haut indique sa dernière modification.

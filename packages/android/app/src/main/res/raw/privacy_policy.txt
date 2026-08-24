@@ -1,46 +1,39 @@
-YancoTV — Privacy Policy
+Privacy policy
 
-Last updated: 2026-08-23
+Last updated: 23 August 2026
 
-YancoTV is a media player. It plays content from playlists you configure.
-We run no accounts, no analytics, and no servers of our own.
+YancoTV is a media player. It plays content from playlists you configure. There are no accounts, no analytics, and no servers of ours in the middle.
 
 What the app stores
 
-Everything the app knows lives on your device: your playlist sources,
-channel lists and programme guide, favourites, watch history, resume points,
-recordings and settings. Provider usernames and passwords are stored in your
-device's hardware keystore, not in plain text. Nothing is uploaded to us —
-we have nowhere to upload it to.
+Everything the app knows lives on your device: your playlist sources, channel lists and programme guide, favourites, watch history, resume points, recordings and settings. Provider usernames and passwords are stored in your device's hardware keystore, not in plain text. Nothing is uploaded to us — we have nowhere to upload it to.
 
 What the app sends, and to whom
 
-- Your IPTV provider(s). The app contacts only the provider URLs you add,
-  to fetch playlists, guide data and streams. Your credentials go to your
-  provider — that is how IPTV login works — and to no one else.
-- Crash reports (optional). If "Crash reports" is enabled in
-  Settings → About, crash data (stack trace, device model, OS and app
-  version) is sent to Sentry so bugs can be fixed. No playlists, no
-  credentials, no viewing history. Provider URLs are scrubbed of credentials
-  before any report leaves the device. Turn the toggle off and nothing is
-  sent.
-- Update checks. The app periodically fetches a small version file and,
-  when you accept an update, the new APK from GitHub. This tells GitHub your
-  IP address, as any download does.
-- Subtitles (when you search). Subtitle searches go to OpenSubtitles with
-  the title being searched.
+- Your IPTV provider or providers. The app contacts only the provider URLs you add, to fetch playlists, guide data and streams. Your credentials go to your provider — that is how IPTV login works — and to no one else.
+
+- Crash reports, if you turn them on. They are off by default. With "Crash reports" enabled in Settings → About, crash data (stack trace, device model, OS and app version) is sent to Sentry so the bug can be fixed. No playlists, no credentials, no viewing history. Provider URLs are stripped of credentials before any report leaves the device. Switch the toggle off and nothing is sent.
+
+- Update checks. The app periodically fetches a small version file, and the new APK from GitHub when you accept an update. That tells GitHub your IP address, as any download does.
+
+- Subtitle searches, when you run one. The title you are searching for goes to OpenSubtitles. Nothing else does, and only when you ask for subtitles.
 
 What we never do
 
-No ads, no trackers, no analytics SDKs, no selling or sharing of data, no
-reading of anything beyond what the features above need.
+No ads. No trackers. No analytics SDK. No selling or sharing of data. No reading of anything beyond what the features above need.
 
 Your data, your device
 
-Uninstalling the app deletes everything it stored. Backups you export stay
-wherever you put them; protect them with a password when exporting — an
-unprotected backup file contains your provider logins in readable form.
+Uninstalling the app deletes everything it stored. Backups you export stay wherever you put them — protect them with a password when exporting, because an unprotected backup file contains your provider logins in readable form.
+
+This website
+
+This site is static and served by GitHub Pages. It sets no cookies and runs no analytics. Your language choice is kept in your browser's own storage and never leaves your device. GitHub logs requests to its servers, as any web host does, and the download button sends you to GitHub.
+
+Changes
+
+The copy of this policy inside the app and the copy on this page are the same document, and they change together. When they change, the date at the top moves.
 
 Contact
 
-Open an issue at https://github.com/YamanAddas/YancoTV/issues
+Questions about any of this: contact@yancoverse.com.

@@ -1,0 +1,39 @@
+Politique de confidentialité
+
+Dernière mise à jour: 23 août 2026
+
+YancoTV est un lecteur multimédia. Il lit le contenu des listes que vous configurez. Il n'y a ni compte, ni analyse d'audience, ni serveur à nous au milieu.
+
+Ce que l'application conserve
+
+Tout ce que l'application connaît reste sur votre appareil : vos sources de listes, les chaînes et le guide des programmes, les favoris, l'historique, les points de reprise, les enregistrements et les réglages. Les identifiants et mots de passe du fournisseur sont conservés dans le coffre de clés matériel de votre appareil, pas en clair. Rien ne nous est envoyé — nous n'avons nulle part où l'envoyer.
+
+Ce que l'application envoie, et à qui
+
+- Votre ou vos fournisseurs IPTV. L'application ne contacte que les URL de fournisseur que vous ajoutez, pour récupérer les listes, les données de guide et les flux. Vos identifiants vont à votre fournisseur — c'est ainsi que fonctionne une connexion IPTV — et à personne d'autre.
+
+- Les rapports de plantage, si vous les activez. Ils sont désactivés par défaut. Avec « Rapports de plantage » activé dans Paramètres → À propos, les données du plantage (pile d'appels, modèle d'appareil, système et version de l'application) sont envoyées à Sentry pour que le bug soit corrigé. Ni listes, ni identifiants, ni historique de visionnage. Les URL de fournisseur sont débarrassées des identifiants avant qu'un rapport ne quitte l'appareil. Coupez l'interrupteur et plus rien n'est envoyé.
+
+- La vérification des mises à jour. L'application récupère régulièrement un petit fichier de version, puis le nouvel APK depuis GitHub quand vous acceptez une mise à jour. Cela communique votre adresse IP à GitHub, comme n'importe quel téléchargement.
+
+- Les recherches de sous-titres, quand vous en lancez une. Le titre recherché est envoyé à OpenSubtitles. Rien d'autre, et uniquement quand vous demandez des sous-titres.
+
+Ce que nous ne faisons jamais
+
+Pas de publicité. Pas de traceurs. Pas de SDK d'analyse. Aucune vente ni partage de données. Aucune lecture de quoi que ce soit au-delà de ce que les fonctions ci-dessus exigent.
+
+Vos données, votre appareil
+
+Désinstaller l'application efface tout ce qu'elle avait conservé. Les sauvegardes que vous exportez restent là où vous les mettez — protégez-les par mot de passe à l'export, car un fichier de sauvegarde non protégé contient vos identifiants de fournisseur en clair.
+
+Ce site
+
+Ce site est statique et hébergé par GitHub Pages. Il ne dépose aucun cookie et n'exécute aucune analyse d'audience. Votre choix de langue est conservé dans le stockage de votre navigateur et ne quitte jamais votre appareil. GitHub journalise les requêtes à ses serveurs, comme tout hébergeur, et le bouton de téléchargement vous envoie chez GitHub.
+
+Modifications
+
+La copie de cette politique dans l'application et celle de cette page sont un seul et même document : elles changent ensemble. Quand elles changent, la date en haut change aussi.
+
+Contact
+
+Une question sur tout ça : contact@yancoverse.com.

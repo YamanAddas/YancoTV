@@ -1,0 +1,33 @@
+Términos de uso
+
+Última actualización: 23 de agosto de 2026
+
+En corto: YancoTV es un reproductor. No trae nada que ver, y aquello a lo que lo apuntes es responsabilidad tuya.
+
+1. Qué es YancoTV
+
+YancoTV es un reproductor multimedia. No incluye canales, ni suscripciones, ni contenido de ningún tipo. Reproduce streams de las fuentes de lista que tú aportas.
+
+2. Tu contenido, tu responsabilidad
+
+Eres el único responsable de las fuentes que añades y de tener derecho legal a ver lo que contienen en tu país. Los desarrolladores de YancoTV no proporcionan, alojan, venden, promocionan ni respaldan ningún contenido ni ningún proveedor, y no hay ninguna lista de proveedores integrada donde elegir.
+
+3. Grabación
+
+La función de grabación almacena streams a los que ya tienes acceso, en tu propio dispositivo y para uso personal. Las leyes sobre grabación varían de un país a otro, y cumplir la tuya es cosa tuya.
+
+4. Sin garantía
+
+La aplicación se ofrece «tal cual», sin garantía de ningún tipo. Puede fallar, perder grabaciones o comportarse mal con un proveedor o un dispositivo concreto. Guarda tus propias copias de lo que no quieras perder.
+
+5. De dónde salen las versiones
+
+Las versiones se publican únicamente en este sitio y en la página de versiones de GitHub (https://github.com/YamanAddas/yancotv-releases/releases) del proyecto. Una copia de cualquier otro sitio no viene de nosotros, y nada de lo escrito aquí se le aplica.
+
+6. Código abierto
+
+YancoTV incluye componentes de código abierto con sus propias licencias: la lista completa está en la aplicación, en Ajustes → Acerca de → Licencias de código abierto, junto con los textos de las licencias. El código del propio YancoTV está en github.com/YamanAddas/YancoTV, bajo licencia MIT.
+
+7. Cambios
+
+Estos términos pueden cambiar junto con la aplicación. La versión vigente está siempre en esta dirección y dentro de la app, y la fecha de arriba indica cuándo se movió por última vez.
