@@ -152,9 +152,16 @@ export class StalkerClient {
         if (parsed.success) allChannels.push(parsed.data);
       }
 
-      totalItems = pageTotal || allChannels.length;
       lastPageReached = page;
-      if (allChannels.length >= totalItems) break;
+      if (pageTotal > 0) {
+        totalItems = pageTotal;
+        if (allChannels.length >= totalItems) break;
+      } else {
+        // MB-386 — total_items absent/0; the old `|| length` fallback broke the
+        // loop after page 1. Page until a page yields no items.
+        totalItems = allChannels.length;
+        if (items.length === 0) break;
+      }
     }
 
     if (lastPageReached === MAX_PAGES && allChannels.length < totalItems) {
@@ -194,9 +201,15 @@ export class StalkerClient {
         if (parsed.success) allItems.push(parsed.data);
       }
 
-      totalItems = pageTotal || allItems.length;
       lastPageReached = page;
-      if (allItems.length >= totalItems) break;
+      if (pageTotal > 0) {
+        totalItems = pageTotal;
+        if (allItems.length >= totalItems) break;
+      } else {
+        // MB-386 — see getLiveChannels.
+        totalItems = allItems.length;
+        if (items.length === 0) break;
+      }
     }
 
     if (lastPageReached === MAX_PAGES && allItems.length < totalItems) {
@@ -236,9 +249,15 @@ export class StalkerClient {
         if (parsed.success) allSeries.push(parsed.data);
       }
 
-      totalItems = pageTotal || allSeries.length;
       lastPageReached = page;
-      if (allSeries.length >= totalItems) break;
+      if (pageTotal > 0) {
+        totalItems = pageTotal;
+        if (allSeries.length >= totalItems) break;
+      } else {
+        // MB-386 — see getLiveChannels.
+        totalItems = allSeries.length;
+        if (items.length === 0) break;
+      }
     }
 
     if (lastPageReached === MAX_PAGES && allSeries.length < totalItems) {

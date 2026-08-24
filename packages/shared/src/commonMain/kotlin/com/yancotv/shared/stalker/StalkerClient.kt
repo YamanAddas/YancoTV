@@ -193,9 +193,19 @@ class StalkerClient(portalUrl: String, private val macAddress: String, options: 
             }
 
             val t = num(js?.get("total_items"), 0)
-            totalItems = if (t != 0) t else all.size
             lastPageReached = page
-            if (all.size >= totalItems) break
+            if (t > 0) {
+                totalItems = t
+                if (all.size >= totalItems) break
+            } else {
+                // MB-386 — the portal omitted or zeroed total_items. The old
+                // `totalItems = all.size` fallback broke the loop after page 1,
+                // silently dropping the rest of the catalogue. Trust total_items
+                // only when positive; otherwise keep paging until a page returns
+                // no items (MAX_PAGES still caps a misbehaving portal).
+                totalItems = all.size
+                if (items.isEmpty()) break
+            }
             page++
         }
 
@@ -254,9 +264,19 @@ class StalkerClient(portalUrl: String, private val macAddress: String, options: 
             }
 
             val t = num(js?.get("total_items"), 0)
-            totalItems = if (t != 0) t else all.size
             lastPageReached = page
-            if (all.size >= totalItems) break
+            if (t > 0) {
+                totalItems = t
+                if (all.size >= totalItems) break
+            } else {
+                // MB-386 — the portal omitted or zeroed total_items. The old
+                // `totalItems = all.size` fallback broke the loop after page 1,
+                // silently dropping the rest of the catalogue. Trust total_items
+                // only when positive; otherwise keep paging until a page returns
+                // no items (MAX_PAGES still caps a misbehaving portal).
+                totalItems = all.size
+                if (items.isEmpty()) break
+            }
             page++
         }
 
@@ -315,9 +335,19 @@ class StalkerClient(portalUrl: String, private val macAddress: String, options: 
             }
 
             val t = num(js?.get("total_items"), 0)
-            totalItems = if (t != 0) t else all.size
             lastPageReached = page
-            if (all.size >= totalItems) break
+            if (t > 0) {
+                totalItems = t
+                if (all.size >= totalItems) break
+            } else {
+                // MB-386 — the portal omitted or zeroed total_items. The old
+                // `totalItems = all.size` fallback broke the loop after page 1,
+                // silently dropping the rest of the catalogue. Trust total_items
+                // only when positive; otherwise keep paging until a page returns
+                // no items (MAX_PAGES still caps a misbehaving portal).
+                totalItems = all.size
+                if (items.isEmpty()) break
+            }
             page++
         }
 
