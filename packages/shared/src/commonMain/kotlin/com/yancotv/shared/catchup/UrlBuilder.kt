@@ -75,27 +75,38 @@ fun buildM3uCatchupUrl(
 
     if (catchupSource.isEmpty() && catchupType.isEmpty()) return null
 
-    var template = catchupSource.ifEmpty { originalUrl }
-
-    if (catchupType == "append" && catchupSource.isEmpty()) {
-        return "$originalUrl?utc=$correctedStart&lutc=$correctedStart&duration=$programmeDuration"
-    }
-
-    if (catchupType == "shift" && catchupSource.isEmpty()) {
-        val shift = nowSecs - correctedStart
-        return "$originalUrl?utc=$correctedStart&lutc=$correctedStart&shift=$shift"
+    // MB-385 — no catchup-source template: build from the TYPE. "default" is the
+    // most common PVR-IPTV-Simple / Kodi keyword and means "append utc params to
+    // the live URL"; an empty-but-present type is treated the same. A genuinely
+    // unknown type with no template can't be built, so return null (the caller
+    // shows "catch-up unavailable") instead of the old fall-through that set
+    // template=originalUrl and returned the LIVE url — silently playing live
+    // when the user tapped a past programme.
+    if (catchupSource.isEmpty()) {
+        // (catchupType is non-empty here — an empty type with empty source was
+        // already handled by the both-empty guard above.)
+        return when (catchupType.lowercase()) {
+            "shift", "timeshift" -> appendCatchupParams(originalUrl, correctedStart, programmeDuration, nowSecs, shift = true)
+            "append", "default" -> appendCatchupParams(originalUrl, correctedStart, programmeDuration, nowSecs, shift = false)
+            else -> null
+        }
     }
 
     val civil = civilFromEpochSeconds(correctedStart)
 
-    template =
-        template
+    var template =
+        catchupSource
             .replace(Regex("""\{start\}"""), correctedStart.toString())
             .replace(Regex("""\{end\}"""), (correctedStart + programmeDuration).toString())
             .replace(Regex("""\{duration\}"""), programmeDuration.toString())
             .replace(Regex("""\{timestamp\}"""), correctedStart.toString())
             .replace(Regex("""\{utc\}"""), correctedStart.toString())
-            .replace(Regex("""\{lutc\}"""), correctedStart.toString())
+            // MB-388 — {lutc} is "now", not the programme start. Providers compute
+            // the archive offset as lutc-utc; lutc==utc made them play live.
+            .replace(Regex("""\{lutc\}"""), nowSecs.toString())
+            // MB-388 — {offset} = seconds back from now (Kodi specifier); was
+            // left as a literal, breaking any catchup-source that used it.
+            .replace(Regex("""\{offset\}"""), (nowSecs - correctedStart).coerceAtLeast(0L).toString())
             .replace(Regex("""\{Y\}"""), civil.year.toString())
             .replace(Regex("""\{m\}"""), civil.month.toString().padStart(2, '0'))
             .replace(Regex("""\{d\}"""), civil.day.toString().padStart(2, '0'))
@@ -113,4 +124,21 @@ fun buildM3uCatchupUrl(
     }
 
     return template
+}
+
+/**
+ * MB-388 — build an append/shift-style catch-up URL from the live URL when the
+ * provider gives a type but no catchup-source template. Uses `&` when the URL
+ * already carries a query so it doesn't produce a double `?` (which the
+ * provider parses as one value and drops the utc params). `lutc` is the CURRENT
+ * time: providers derive the archive offset as `lutc - utc`, so the old
+ * `lutc == utc` made them serve live.
+ */
+private fun appendCatchupParams(originalUrl: String, utc: Long, duration: Long, nowSecs: Long, shift: Boolean): String {
+    val sep = if (originalUrl.contains('?')) "&" else "?"
+    return if (shift) {
+        "$originalUrl${sep}utc=$utc&lutc=$nowSecs&shift=${(nowSecs - utc).coerceAtLeast(0L)}"
+    } else {
+        "$originalUrl${sep}utc=$utc&lutc=$nowSecs&duration=$duration"
+    }
 }

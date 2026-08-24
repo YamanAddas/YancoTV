@@ -65,33 +65,37 @@ export function buildM3uCatchupUrl(
 ): string | null {
   const catchupSource = String(metadata.catchupSource ?? '');
   const catchupType = String(metadata.catchupType ?? '');
+  const nowSecs = Math.floor(Date.now() / 1000);
 
   if (!catchupSource && !catchupType) return null;
 
-  let template = catchupSource || originalUrl;
-
-  // If catchup type is "append", just append the start/duration to the URL
-  if (catchupType === 'append' && !catchupSource) {
-    return `${originalUrl}?utc=${programmeStart}&lutc=${programmeStart}&duration=${programmeDuration}`;
-  }
-
-  // If catchup type is "shift", use standard shift format
-  if (catchupType === 'shift' && !catchupSource) {
-    const nowSecs = Math.floor(Date.now() / 1000);
-    const shift = nowSecs - programmeStart;
-    return `${originalUrl}?utc=${programmeStart}&lutc=${programmeStart}&shift=${shift}`;
+  // MB-385 — no catchup-source template: build from the TYPE. "default" is the
+  // common Kodi keyword and means append; an unknown type we can't build
+  // returns null (caller shows unavailable) instead of the old fall-through
+  // that returned the LIVE url and silently played live.
+  if (!catchupSource) {
+    const t = catchupType.toLowerCase();
+    if (t === 'shift' || t === 'timeshift') {
+      return appendCatchupParams(originalUrl, programmeStart, programmeDuration, nowSecs, true);
+    }
+    if (t === 'append' || t === 'default') {
+      return appendCatchupParams(originalUrl, programmeStart, programmeDuration, nowSecs, false);
+    }
+    return null;
   }
 
   // Replace placeholders in the catchup-source template
   const startDate = new Date(programmeStart * 1000);
 
-  template = template
+  let template = catchupSource
     .replace(/\{start\}/g, String(programmeStart))
     .replace(/\{end\}/g, String(programmeStart + programmeDuration))
     .replace(/\{duration\}/g, String(programmeDuration))
     .replace(/\{timestamp\}/g, String(programmeStart))
     .replace(/\{utc\}/g, String(programmeStart))
-    .replace(/\{lutc\}/g, String(programmeStart))
+    // MB-388 — {lutc} is "now" (offset = lutc-utc); {offset} = seconds back.
+    .replace(/\{lutc\}/g, String(nowSecs))
+    .replace(/\{offset\}/g, String(Math.max(0, nowSecs - programmeStart)))
     .replace(/\{Y\}/g, String(startDate.getUTCFullYear()))
     .replace(/\{m\}/g, String(startDate.getUTCMonth() + 1).padStart(2, '0'))
     .replace(/\{d\}/g, String(startDate.getUTCDate()).padStart(2, '0'))
@@ -106,4 +110,23 @@ export function buildM3uCatchupUrl(
   }
 
   return template;
+}
+
+/**
+ * MB-388 — build an append/shift-style catch-up URL from the live URL. Uses `&`
+ * when the URL already has a query (no double `?`); `lutc` is the CURRENT time
+ * (providers derive the archive offset as `lutc - utc`, so `lutc == utc` served
+ * live).
+ */
+function appendCatchupParams(
+  originalUrl: string,
+  utc: number,
+  duration: number,
+  nowSecs: number,
+  shift: boolean,
+): string {
+  const sep = originalUrl.includes('?') ? '&' : '?';
+  return shift
+    ? `${originalUrl}${sep}utc=${utc}&lutc=${nowSecs}&shift=${Math.max(0, nowSecs - utc)}`
+    : `${originalUrl}${sep}utc=${utc}&lutc=${nowSecs}&duration=${duration}`;
 }

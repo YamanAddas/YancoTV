@@ -104,16 +104,39 @@ describe('Catch-up Service — URL Builders', () => {
     });
 
     it('builds append-style catchup URL', () => {
+      const now = Math.floor(Date.now() / 1000);
       const url = buildM3uCatchupUrl(
         'http://stream.com/ch1',
         { catchupType: 'append' },
         start,
         duration,
-      );
+      )!;
 
-      expect(url).toBe(
-        `http://stream.com/ch1?utc=${start}&lutc=${start}&duration=${duration}`,
-      );
+      expect(url).toContain(`utc=${start}`);
+      expect(url).toContain(`duration=${duration}`);
+      // MB-388 — lutc is "now", not the programme start.
+      expect(url).not.toContain(`lutc=${start}`);
+      expect(Number(new URL(url).searchParams.get('lutc'))).toBeGreaterThanOrEqual(now);
+    });
+
+    it('builds append-style URL for the "default" type (was silently live)', () => {
+      // MB-385 — "default" is the common Kodi keyword; the old code returned
+      // the LIVE url for it.
+      const url = buildM3uCatchupUrl('http://stream.com/ch1', { catchupType: 'default' }, start, duration)!;
+      expect(url).toContain(`utc=${start}`);
+      expect(url).toContain(`duration=${duration}`);
+    });
+
+    it('returns null for an unknown type without a template', () => {
+      // MB-385 — must not silently play live.
+      expect(buildM3uCatchupUrl('http://stream.com/ch1', { catchupType: 'flussonic' }, start, duration)).toBeNull();
+    });
+
+    it('uses & when the live URL already has a query (no double ?)', () => {
+      // MB-388
+      const url = buildM3uCatchupUrl('http://stream.com/ch1?token=abc', { catchupType: 'append' }, start, duration)!;
+      expect(url).toContain('?token=abc&utc=');
+      expect(url).not.toContain('??');
     });
 
     it('builds shift-style catchup URL', () => {
@@ -125,10 +148,11 @@ describe('Catch-up Service — URL Builders', () => {
         { catchupType: 'shift' },
         recentStart,
         duration,
-      );
+      )!;
 
       expect(url).toContain(`utc=${recentStart}`);
-      expect(url).toContain(`lutc=${recentStart}`);
+      // MB-388 — lutc is now, not the programme start.
+      expect(Number(new URL(url).searchParams.get('lutc'))).toBeGreaterThanOrEqual(now);
       expect(url).toContain('shift=');
     });
 

@@ -109,7 +109,8 @@ class UrlBuilderTest {
                 now,
             )
         assertEquals(
-            "http://stream.com/ch1?utc=$start&lutc=$start&duration=$duration",
+            // MB-388 — lutc is "now", not the programme start.
+            "http://stream.com/ch1?utc=$start&lutc=$now&duration=$duration",
             url,
         )
     }
@@ -126,8 +127,40 @@ class UrlBuilderTest {
             )
         assertNotNull(url)
         assertTrue(url.contains("utc=$recentStart"))
-        assertTrue(url.contains("lutc=$recentStart"))
+        assertTrue(url.contains("lutc=$now"), "MB-388: lutc is now, was: $url")
         assertTrue(url.contains("shift=600"))
+    }
+
+    @Test fun buildsAppendForDefaultType() {
+        // MB-385 — "default" is the common Kodi keyword and means append; the
+        // old code returned the LIVE url for it (silently played live).
+        val url = buildM3uCatchupUrl("http://stream.com/ch1", mapOf("catchupType" to "default"), start, duration, now)
+        assertEquals("http://stream.com/ch1?utc=$start&lutc=$now&duration=$duration", url)
+    }
+
+    @Test fun returnsNullForUnknownTypeWithoutTemplate() {
+        // MB-385 — a type we can't build (no source template) must return null
+        // so the caller shows "unavailable", NOT silently play the live stream.
+        assertNull(buildM3uCatchupUrl("http://stream.com/ch1", mapOf("catchupType" to "flussonic"), start, duration, now))
+    }
+
+    @Test fun usesAmpersandWhenLiveUrlAlreadyHasQuery() {
+        // MB-388 — no double '?', which the provider parses as one value and
+        // drops the utc params.
+        val url = buildM3uCatchupUrl("http://stream.com/ch1?token=abc", mapOf("catchupType" to "append"), start, duration, now)
+        assertEquals("http://stream.com/ch1?token=abc&utc=$start&lutc=$now&duration=$duration", url)
+    }
+
+    @Test fun substitutesOffsetTokenInTemplate() {
+        // MB-388 — {offset} = seconds back from now; was left literal.
+        val url = buildM3uCatchupUrl(
+            "http://stream.com/ch1",
+            mapOf("catchupSource" to "http://archive.com/play?offset={offset}&d={duration}"),
+            start,
+            duration,
+            now,
+        )
+        assertEquals("http://archive.com/play?offset=${now - start}&d=$duration", url)
     }
 
     @Test fun replacesPlaceholdersInCatchupSourceTemplate() {
