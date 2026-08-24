@@ -6,6 +6,28 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.7 (versionCode 31) — 2026-08-24
+
+### Fixed
+- **TV: Settings no longer "kicks you back to the main menu" after pressing
+  buttons like About → "Check now".** Any button that disabled itself while you
+  were on it (Check now, EPG Refresh/Re-sync, Save buttons, Set/Remove PIN…)
+  silently dropped the remote's focus onto the app sidebar; one more OK press
+  then landed you on Home. Buttons now hold your position — while one is busy
+  or unavailable the highlight stays on it with a dimmed ring. (MB-395)
+- **Phone: the keyboard no longer hides the field you're typing in.** In the
+  landscape-only layout, the add-source dialog could leave the active text box
+  crushed out of view behind the on-screen keyboard; the dialog now stays above
+  the keyboard and scrolls the focused field into view. (MB-396)
+- **Cast: the "Cast to" device picker starts scanning before you open it**, so
+  Chromecasts appear in the list instead of the picker opening empty and slowly
+  filling. If a Chromecast still doesn't appear: it must be on the same Wi-Fi
+  network as the phone (no guest network / VPN), and note that Fire TV sticks
+  can't receive Google Cast — use "Play on TV" to a YancoTV install instead.
+  (MB-397)
+- **PIN dialog: a wrong PIN no longer bounces the TV highlight from "Unlock"
+  onto "Cancel".** (part of MB-395)
+
 ## 1.6.6 (versionCode 30) — 2026-08-23
 
 ### Fixed
