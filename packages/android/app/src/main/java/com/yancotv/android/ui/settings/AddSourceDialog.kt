@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -182,11 +184,24 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
             dismissOnClickOutside = !saving,
             dismissOnBackPress = !saving,
             usePlatformDefaultWidth = false,
+            // MB-396 — let the IME insets flow into this window so the
+            // imePadding below is the (deterministic, API-independent)
+            // mechanism that keeps the dialog above the keyboard. The
+            // platform's own dialog resize/pan behaviour varies by API
+            // level and was leaving the focused field behind the IME on
+            // a landscape phone.
+            decorFitsSystemWindows = false,
         ),
     ) {
         Column(
             modifier =
             Modifier
+                // MB-396 — with decorFitsSystemWindows=false the window is
+                // edge-to-edge; these paddings are counted into the column's
+                // measured size, so the Dialog's centering places the visible
+                // content fully inside the safe area and above the keyboard.
+                .systemBarsPadding()
+                .imePadding()
                 // Audit catch — was widthIn(min = 560.dp), which a 360-380dp
                 // phone clipped horizontally on the entry-point first-run
                 // dialog. Drop the min so phone scales to fit; keep the
@@ -199,192 +214,204 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                 .background(LocalYancoPalette.current.BackgroundRaised)
                 .border(1.dp, LocalYancoPalette.current.BorderSubtle, RoundedCornerShape(16.dp)),
         ) {
-            // Header
-            Column(
-                modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 28.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.add_title),
-                    color = LocalYancoPalette.current.TextPrimary,
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    // Audit catch — was "Scroll with the D-pad. Press OK on
-                    // a field to type." which is wrong on touch. Rewritten
-                    // form-factor-agnostic so the same string works on
-                    // Fire TV remote AND phone.
-                    text = stringResource(R.string.add_intro),
-                    color = LocalYancoPalette.current.TextMuted,
-                    fontSize = 14.sp,
-                )
-            }
-
-            Divider()
-
+            // MB-396 — the header + intro scroll WITH the fields. They were
+            // fixed chrome above the scroll area; together with the pinned
+            // footer that left ~0dp for the field column once a landscape
+            // phone's IME took its half of the window — the row being typed
+            // into was simply not on screen. Inside the scroll, tight space
+            // costs the decoration first and the focused field's
+            // bringIntoView always has room to land. Footer stays pinned.
             Column(
                 modifier =
                 Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 28.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .verticalScroll(rememberScrollState()),
             ) {
-                SectionLabel(stringResource(R.string.as_sec_source_type))
-                // Two rows of two chips — keeps the layout readable on
-                // phone widths where 4 inline chips overflow. Audit
-                // catch: M3U_FILE + STALKER were never wired into this
-                // dialog despite SourcesScreen advertising them.
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        TypeChip(
-                            label = stringResource(R.string.add_type_xtream),
-                            description = stringResource(R.string.add_type_xtream_desc),
-                            selected = type == SourceType.XTREAM,
-                            onSelect = { type = SourceType.XTREAM },
-                        )
-                        TypeChip(
-                            label = stringResource(R.string.add_type_m3u_url),
-                            description = stringResource(R.string.add_type_m3u_url_desc),
-                            selected = type == SourceType.M3U_URL,
-                            onSelect = { type = SourceType.M3U_URL },
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        TypeChip(
-                            label = stringResource(R.string.add_type_m3u_file),
-                            description = stringResource(R.string.add_type_m3u_file_desc),
-                            selected = type == SourceType.M3U_FILE,
-                            onSelect = { type = SourceType.M3U_FILE },
-                        )
-                        TypeChip(
-                            label = stringResource(R.string.add_type_stalker),
-                            description = stringResource(R.string.add_type_stalker_desc),
-                            selected = type == SourceType.STALKER,
-                            onSelect = { type = SourceType.STALKER },
-                        )
-                    }
+                Column(
+                    modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp, vertical = 22.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.add_title),
+                        color = LocalYancoPalette.current.TextPrimary,
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        // Audit catch — was "Scroll with the D-pad. Press OK on
+                        // a field to type." which is wrong on touch. Rewritten
+                        // form-factor-agnostic so the same string works on
+                        // Fire TV remote AND phone.
+                        text = stringResource(R.string.add_intro),
+                        color = LocalYancoPalette.current.TextMuted,
+                        fontSize = 14.sp,
+                    )
                 }
 
-                SectionLabel("Details")
-                SettingsClickToEditField(
-                    label = stringResource(R.string.add_name),
-                    hint = stringResource(R.string.add_name_hint),
-                    value = name,
-                    onValueChange = { name = it },
-                    bare = true,
-                )
-                if (type == SourceType.M3U_FILE) {
-                    // SAF-backed file picker. The button is the focus
-                    // target; the picker hands back a content:// URI
-                    // and we take persistent read permission so the
-                    // source survives process restarts.
-                    SettingsRow(
-                        label = stringResource(R.string.add_m3u_file),
-                        hint = if (fileDisplayName.isNotBlank()) {
-                            stringResource(R.string.as_file_selected, fileDisplayName)
-                        } else {
-                            stringResource(R.string.as_file_hint)
-                        },
-                        onClick = {
-                            filePickerLauncher.launch(
-                                arrayOf(
-                                    "audio/x-mpegurl",
-                                    "audio/mpegurl",
-                                    "application/x-mpegurl",
-                                    "application/vnd.apple.mpegurl",
-                                    "*/*",
-                                ),
+                Divider()
+
+                Column(
+                    modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp, vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    SectionLabel(stringResource(R.string.as_sec_source_type))
+                    // Two rows of two chips — keeps the layout readable on
+                    // phone widths where 4 inline chips overflow. Audit
+                    // catch: M3U_FILE + STALKER were never wired into this
+                    // dialog despite SourcesScreen advertising them.
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            TypeChip(
+                                label = stringResource(R.string.add_type_xtream),
+                                description = stringResource(R.string.add_type_xtream_desc),
+                                selected = type == SourceType.XTREAM,
+                                onSelect = { type = SourceType.XTREAM },
                             )
-                        },
-                    )
-                } else {
+                            TypeChip(
+                                label = stringResource(R.string.add_type_m3u_url),
+                                description = stringResource(R.string.add_type_m3u_url_desc),
+                                selected = type == SourceType.M3U_URL,
+                                onSelect = { type = SourceType.M3U_URL },
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            TypeChip(
+                                label = stringResource(R.string.add_type_m3u_file),
+                                description = stringResource(R.string.add_type_m3u_file_desc),
+                                selected = type == SourceType.M3U_FILE,
+                                onSelect = { type = SourceType.M3U_FILE },
+                            )
+                            TypeChip(
+                                label = stringResource(R.string.add_type_stalker),
+                                description = stringResource(R.string.add_type_stalker_desc),
+                                selected = type == SourceType.STALKER,
+                                onSelect = { type = SourceType.STALKER },
+                            )
+                        }
+                    }
+
+                    SectionLabel("Details")
                     SettingsClickToEditField(
-                        label = when (type) {
-                            SourceType.XTREAM -> stringResource(R.string.as_host_url)
-                            SourceType.STALKER -> stringResource(R.string.as_portal_url)
-                            else -> stringResource(R.string.as_m3u_url)
-                        },
-                        hint = when (type) {
-                            SourceType.XTREAM -> "http://host:port"
-                            SourceType.STALKER -> "http://portal.tv/c/ or http://portal.tv/stalker_portal/c/"
-                            else -> "https://provider.tv/list.m3u"
-                        },
-                        value = url,
-                        onValueChange = { url = it },
+                        label = stringResource(R.string.add_name),
+                        hint = stringResource(R.string.add_name_hint),
+                        value = name,
+                        onValueChange = { name = it },
+                        bare = true,
+                    )
+                    if (type == SourceType.M3U_FILE) {
+                        // SAF-backed file picker. The button is the focus
+                        // target; the picker hands back a content:// URI
+                        // and we take persistent read permission so the
+                        // source survives process restarts.
+                        SettingsRow(
+                            label = stringResource(R.string.add_m3u_file),
+                            hint = if (fileDisplayName.isNotBlank()) {
+                                stringResource(R.string.as_file_selected, fileDisplayName)
+                            } else {
+                                stringResource(R.string.as_file_hint)
+                            },
+                            onClick = {
+                                filePickerLauncher.launch(
+                                    arrayOf(
+                                        "audio/x-mpegurl",
+                                        "audio/mpegurl",
+                                        "application/x-mpegurl",
+                                        "application/vnd.apple.mpegurl",
+                                        "*/*",
+                                    ),
+                                )
+                            },
+                        )
+                    } else {
+                        SettingsClickToEditField(
+                            label = when (type) {
+                                SourceType.XTREAM -> stringResource(R.string.as_host_url)
+                                SourceType.STALKER -> stringResource(R.string.as_portal_url)
+                                else -> stringResource(R.string.as_m3u_url)
+                            },
+                            hint = when (type) {
+                                SourceType.XTREAM -> "http://host:port"
+                                SourceType.STALKER -> "http://portal.tv/c/ or http://portal.tv/stalker_portal/c/"
+                                else -> "https://provider.tv/list.m3u"
+                            },
+                            value = url,
+                            onValueChange = { url = it },
+                            keyboardType = KeyboardType.Uri,
+                            bare = true,
+                        )
+                    }
+
+                    if (type == SourceType.XTREAM) {
+                        SectionLabel(stringResource(R.string.as_sec_credentials))
+                        SettingsClickToEditField(
+                            label = stringResource(R.string.add_username),
+                            hint = null,
+                            value = username,
+                            onValueChange = { username = it },
+                            bare = true,
+                        )
+                        SettingsClickToEditField(
+                            label = stringResource(R.string.add_password),
+                            hint = null,
+                            value = password,
+                            onValueChange = { password = it },
+                            transformation = PasswordVisualTransformation(),
+                            keyboardType = KeyboardType.Password,
+                            bare = true,
+                        )
+                    }
+
+                    if (type == SourceType.STALKER) {
+                        SectionLabel(stringResource(R.string.as_sec_device_identity))
+                        SettingsClickToEditField(
+                            label = stringResource(R.string.add_mac),
+                            hint = stringResource(R.string.add_mac_hint),
+                            value = macAddress,
+                            onValueChange = { macAddress = it },
+                            bare = true,
+                        )
+                    }
+
+                    SectionLabel(stringResource(R.string.as_sec_epg))
+                    SettingsClickToEditField(
+                        label = stringResource(R.string.add_epg_url),
+                        hint = stringResource(R.string.add_epg_url_hint),
+                        value = epgUrl,
+                        onValueChange = { epgUrl = it },
                         keyboardType = KeyboardType.Uri,
                         bare = true,
                     )
-                }
 
-                if (type == SourceType.XTREAM) {
-                    SectionLabel(stringResource(R.string.as_sec_credentials))
+                    // MK.17.5 — advanced HTTP overrides. Most users leave
+                    // these blank; providers that gate on UA / Referer will
+                    // surface the requirement in their docs.
+                    SectionLabel(stringResource(R.string.as_sec_advanced))
                     SettingsClickToEditField(
-                        label = stringResource(R.string.add_username),
-                        hint = null,
-                        value = username,
-                        onValueChange = { username = it },
+                        label = stringResource(R.string.add_ua),
+                        hint = stringResource(R.string.add_ua_hint),
+                        value = userAgent,
+                        onValueChange = { userAgent = it },
                         bare = true,
                     )
                     SettingsClickToEditField(
-                        label = stringResource(R.string.add_password),
-                        hint = null,
-                        value = password,
-                        onValueChange = { password = it },
-                        transformation = PasswordVisualTransformation(),
-                        keyboardType = KeyboardType.Password,
+                        label = stringResource(R.string.add_referer),
+                        hint = stringResource(R.string.add_referer_hint),
+                        value = referer,
+                        onValueChange = { referer = it },
+                        keyboardType = KeyboardType.Uri,
                         bare = true,
                     )
+
+                    validationError?.let { ErrorBanner(text = it) }
+                    saveError?.let { ErrorBanner(text = stringResource(R.string.add_save_failed, it)) }
                 }
-
-                if (type == SourceType.STALKER) {
-                    SectionLabel(stringResource(R.string.as_sec_device_identity))
-                    SettingsClickToEditField(
-                        label = stringResource(R.string.add_mac),
-                        hint = stringResource(R.string.add_mac_hint),
-                        value = macAddress,
-                        onValueChange = { macAddress = it },
-                        bare = true,
-                    )
-                }
-
-                SectionLabel(stringResource(R.string.as_sec_epg))
-                SettingsClickToEditField(
-                    label = stringResource(R.string.add_epg_url),
-                    hint = stringResource(R.string.add_epg_url_hint),
-                    value = epgUrl,
-                    onValueChange = { epgUrl = it },
-                    keyboardType = KeyboardType.Uri,
-                    bare = true,
-                )
-
-                // MK.17.5 — advanced HTTP overrides. Most users leave
-                // these blank; providers that gate on UA / Referer will
-                // surface the requirement in their docs.
-                SectionLabel(stringResource(R.string.as_sec_advanced))
-                SettingsClickToEditField(
-                    label = stringResource(R.string.add_ua),
-                    hint = stringResource(R.string.add_ua_hint),
-                    value = userAgent,
-                    onValueChange = { userAgent = it },
-                    bare = true,
-                )
-                SettingsClickToEditField(
-                    label = stringResource(R.string.add_referer),
-                    hint = stringResource(R.string.add_referer_hint),
-                    value = referer,
-                    onValueChange = { referer = it },
-                    keyboardType = KeyboardType.Uri,
-                    bare = true,
-                )
-
-                validationError?.let { ErrorBanner(text = it) }
-                saveError?.let { ErrorBanner(text = stringResource(R.string.add_save_failed, it)) }
             }
 
             Divider()
