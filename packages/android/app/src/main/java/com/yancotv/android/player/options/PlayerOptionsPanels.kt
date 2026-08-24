@@ -1212,6 +1212,12 @@ private fun PlayOnTvPanelContent(controller: PlaybackController, onDismissAll: (
     }
     val discovered by discovery.devices.collectAsState()
 
+    // MB-397 — warm Google Cast discovery in parallel with the LAN browse, so
+    // the system picker behind the Chromecast row opens with routes already
+    // found instead of scanning from zero. Gated on Play Services internally;
+    // main thread by CAF requirement (LaunchedEffect runs on Main).
+    LaunchedEffect(Unit) { castController.warmDiscovery() }
+
     // Episode-first: currentItem is a synthesized MOVIE-typed view of an
     // episode, so toPlayable() on it would mis-tag the handoff kind.
     val playable: Playable? = currentEpisode ?: currentItem?.toPlayable()

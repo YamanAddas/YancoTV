@@ -134,6 +134,21 @@ class CastController(
         return castContext
     }
 
+    /**
+     * MB-397 — start Cast device discovery BEFORE the user opens the system
+     * picker. Play Services' Cast MediaRouteProvider is only registered with
+     * MediaRouter once [CastContext] first exists; until then the router knows
+     * no Cast routes, so a picker opened cold begins its scan from zero and
+     * sits on "searching" while nearby devices trickle in (a Chromecast can
+     * take several seconds to surface — long enough that users close the
+     * dialog believing their device isn't there). Called when the "Play on
+     * TV" panel opens so the route list is warm by the time the Chromecast
+     * row is picked. No-op without Play Services. Main-thread only (CAF).
+     */
+    fun warmDiscovery() {
+        ensureContext()
+    }
+
     /** Show the system device picker. Caller passes an AppCompat Activity context. */
     fun showDevicePicker(activityContext: Context) {
         val selector = ensureContext()?.mergedSelector ?: return
