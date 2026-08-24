@@ -404,80 +404,58 @@ WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
 GROUP BY c.tvg_id
 ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC;
 
+-- MB-382 — the guide now lists ALL live channels, not only those with a tvg_id
+-- AND loaded EPG (which showed ~3k of 53k). Group by tvg_id when present so
+-- HD/SD variants of the same channel still collapse to one row; channels with
+-- no tvg_id group by their own id, so each appears (they show "No information"
+-- since they have no EPG). Programmes are attached in EpgRepository by tvg_id.
+-- `id` is the representative row (the MIN(sort_order) one) — used as the stable
+-- guide-row key. Junk tvg_ids shared by unrelated channels still collapse (they
+-- carry the wrong EPG anyway) — tracked separately.
 guideChannelsAllPaged:
-SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
+SELECT c.id, c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
 FROM content c
-WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND EXISTS (
-    SELECT 1 FROM epg_programmes ep
-    WHERE ep.channel_tvg_id = c.tvg_id
-      AND ep.end_time > :startTime AND ep.start_time < :endTime
-  )
-GROUP BY c.tvg_id
-ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC
+WHERE c.type = 'live'
+GROUP BY COALESCE(NULLIF(c.tvg_id, ''), c.id)
+ORDER BY MIN(c.sort_order) ASC, c.id ASC
 LIMIT :limit OFFSET :offset;
 
+-- MB-382 — see guideChannelsAllPaged. All live channels for one playlist.
 guideChannelsBySourcePaged:
-SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
+SELECT c.id, c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
 FROM content c
-WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND c.source_id = :sourceId
-  AND EXISTS (
-    SELECT 1 FROM epg_programmes ep
-    WHERE ep.channel_tvg_id = c.tvg_id
-      AND ep.end_time > :startTime AND ep.start_time < :endTime
-  )
-GROUP BY c.tvg_id
-ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC
+WHERE c.type = 'live' AND c.source_id = :sourceId
+GROUP BY COALESCE(NULLIF(c.tvg_id, ''), c.id)
+ORDER BY MIN(c.sort_order) ASC, c.id ASC
 LIMIT :limit OFFSET :offset;
 
+-- MB-382 — count matches guideChannelsAllPaged's row identity (all live
+-- channels, grouped by tvg_id-or-id).
 countGuideChannelsAll:
-SELECT COUNT(DISTINCT c.tvg_id) FROM content c
-WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND EXISTS (
-    SELECT 1 FROM epg_programmes ep
-    WHERE ep.channel_tvg_id = c.tvg_id
-      AND ep.end_time > :startTime AND ep.start_time < :endTime
-  );
+SELECT COUNT(DISTINCT COALESCE(NULLIF(c.tvg_id, ''), c.id)) FROM content c
+WHERE c.type = 'live';
 
 countGuideChannelsBySource:
-SELECT COUNT(DISTINCT c.tvg_id) FROM content c
-WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND c.source_id = :sourceId
-  AND EXISTS (
-    SELECT 1 FROM epg_programmes ep
-    WHERE ep.channel_tvg_id = c.tvg_id
-      AND ep.end_time > :startTime AND ep.start_time < :endTime
-  );
+SELECT COUNT(DISTINCT COALESCE(NULLIF(c.tvg_id, ''), c.id)) FROM content c
+WHERE c.type = 'live' AND c.source_id = :sourceId;
 
 -- MK.guide.groups — group-filtered guide channel listing. Mirrors
 -- guideChannelsAllPaged but constrains to a single group_name. Used by
 -- GuideScreen's group chip strip so the user can narrow the guide to
 -- (e.g.) Sports without scrolling through every live channel.
 -- MK.EPG.H — provider order, see comment block above guideChannelsAll.
+-- MB-382 — see guideChannelsAllPaged. All live channels in one group.
 guideChannelsByGroupPaged:
-SELECT c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
+SELECT c.id, c.tvg_id, c.title, c.clean_title, c.logo_url, c.stream_url, MIN(c.sort_order) AS sort_order
 FROM content c
-WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND c.group_name = :groupName
-  AND EXISTS (
-    SELECT 1 FROM epg_programmes ep
-    WHERE ep.channel_tvg_id = c.tvg_id
-      AND ep.end_time > :startTime AND ep.start_time < :endTime
-  )
-GROUP BY c.tvg_id
-ORDER BY MIN(c.sort_order) ASC, c.tvg_id ASC
+WHERE c.type = 'live' AND c.group_name = :groupName
+GROUP BY COALESCE(NULLIF(c.tvg_id, ''), c.id)
+ORDER BY MIN(c.sort_order) ASC, c.id ASC
 LIMIT :limit OFFSET :offset;
 
 countGuideChannelsByGroup:
-SELECT COUNT(DISTINCT c.tvg_id) FROM content c
-WHERE c.type = 'live' AND c.tvg_id IS NOT NULL AND c.tvg_id != ''
-  AND c.group_name = :groupName
-  AND EXISTS (
-    SELECT 1 FROM epg_programmes ep
-    WHERE ep.channel_tvg_id = c.tvg_id
-      AND ep.end_time > :startTime AND ep.start_time < :endTime
-  );
+SELECT COUNT(DISTINCT COALESCE(NULLIF(c.tvg_id, ''), c.id)) FROM content c
+WHERE c.type = 'live' AND c.group_name = :groupName;
 
 -- Live-only group list with EPG coverage. Drives the guide's group
 -- chip strip so the picker only shows groups the user can actually

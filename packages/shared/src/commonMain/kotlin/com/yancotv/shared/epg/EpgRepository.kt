@@ -153,19 +153,22 @@ class EpgRepository(
         // the unfiltered All path. Combining group + source isn't
         // supported yet (no caller needs it); add a dedicated query if
         // a future surface does.
+        // MB-382 — the channel queries no longer take start/end (they list ALL
+        // live channels, not just EPG-covered ones); start/end are still used
+        // below to fetch each channel's programmes.
         val channels =
             when {
                 groupName != null ->
-                    db.contentQueries.guideChannelsByGroupPaged(groupName, startTime, endTime, limit, offset).executeAsList().map {
-                        GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
+                    db.contentQueries.guideChannelsByGroupPaged(groupName, limit, offset).executeAsList().map {
+                        GuideChannelRow(it.id, it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
                     }
                 sourceId != null ->
-                    db.contentQueries.guideChannelsBySourcePaged(sourceId, startTime, endTime, limit, offset).executeAsList().map {
-                        GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
+                    db.contentQueries.guideChannelsBySourcePaged(sourceId, limit, offset).executeAsList().map {
+                        GuideChannelRow(it.id, it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
                     }
                 else ->
-                    db.contentQueries.guideChannelsAllPaged(startTime, endTime, limit, offset).executeAsList().map {
-                        GuideChannelRow(it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
+                    db.contentQueries.guideChannelsAllPaged(limit, offset).executeAsList().map {
+                        GuideChannelRow(it.id, it.tvg_id, it.title, it.clean_title, it.logo_url, it.stream_url, it.sort_order)
                     }
             }
         if (channels.isEmpty()) {
@@ -180,11 +183,10 @@ class EpgRepository(
         // does one index seek per IN-list element using
         // `idx_epg_channel_end_start`, and Kotlin groups the rows by
         // tvg_id in one O(N) pass over the result.
-        // Mirror the original loop's `tvgId ?: continue` — null tvg_ids
-        // are skipped. Empty strings are already filtered upstream by
-        // every guideChannels* query (`tvg_id IS NOT NULL AND tvg_id !=
-        // ''`), so we don't need a redundant guard here.
-        val tvgIds = channels.mapNotNull { it.tvgId }
+        // MB-382 — the guide now lists channels with no tvg_id, so filter null
+        // AND blank here (the channel queries no longer do): a blank tvg_id has
+        // no EPG mapping and would just waste an IN-list slot.
+        val tvgIds = channels.mapNotNull { it.tvgId?.takeIf { t -> t.isNotBlank() } }
         val programmesByTvgId: Map<String, List<EpgProgramme>> =
             if (tvgIds.isEmpty()) {
                 emptyMap()
@@ -204,11 +206,14 @@ class EpgRepository(
 
         val result = ArrayList<EpgGuideChannel>(channels.size)
         for (ch in channels) {
-            val tvgId = ch.tvgId ?: continue
-            val progs = programmesByTvgId[tvgId] ?: emptyList()
+            // MB-382 — no longer skip channels without a tvg_id; they appear with
+            // an empty programme list (the UI renders "No information"). Programmes
+            // attach by tvg_id only when the channel has one.
+            val progs = ch.tvgId?.let { programmesByTvgId[it] } ?: emptyList()
             result.add(
                 EpgGuideChannel(
-                    tvgId = tvgId,
+                    id = ch.id,
+                    tvgId = ch.tvgId,
                     name = ch.cleanTitle?.takeIf { it.isNotBlank() } ?: ch.title,
                     logoUrl = ch.logoUrl,
                     streamUrl = ch.streamUrl,
@@ -221,10 +226,12 @@ class EpgRepository(
     }
 
     /** Total distinct live channels with guide data in the window. Used by the guide's "X of Y" header. */
+    // MB-382 — start/end kept for signature stability (callers pass the window)
+    // but the count now covers ALL live channels, not just EPG-covered ones.
     fun countGuideChannels(startTime: Long, endTime: Long, sourceId: String? = null, groupName: String? = null): Long = when {
-        groupName != null -> db.contentQueries.countGuideChannelsByGroup(groupName, startTime, endTime).executeAsOne()
-        sourceId != null -> db.contentQueries.countGuideChannelsBySource(sourceId, startTime, endTime).executeAsOne()
-        else -> db.contentQueries.countGuideChannelsAll(startTime, endTime).executeAsOne()
+        groupName != null -> db.contentQueries.countGuideChannelsByGroup(groupName).executeAsOne()
+        sourceId != null -> db.contentQueries.countGuideChannelsBySource(sourceId).executeAsOne()
+        else -> db.contentQueries.countGuideChannelsAll().executeAsOne()
     }
 
     /** MK.guide.groups — distinct live group names with guide-covered
@@ -439,6 +446,9 @@ class EpgRepository(
     private data class EpgTarget(val url: String, val sourceKey: String)
 
     private data class GuideChannelRow(
+        /** MB-382 — stable guide-row identity (the representative content id).
+         *  Used because ~85% of live channels have no tvg_id. */
+        val id: String,
         val tvgId: String?,
         val title: String,
         val cleanTitle: String?,

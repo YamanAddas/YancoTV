@@ -361,7 +361,7 @@ fun GuideScreen(
         // Defensive dedup: LazyColumn crashes hard on duplicate keys, and the
         // SQL is supposed to return one row per tvg_id — but this belt-and-
         // suspenders keeps the UI alive if the query ever regresses.
-        channels = loaded.second.channels.distinctBy { it.tvgId }
+        channels = loaded.second.channels.distinctBy { it.id }
         allLoaded = channels.size >= totalChannels.toInt() || loaded.second.channels.isEmpty()
         // If the selected group disappeared from the catalog (provider
         // refreshed and dropped it), fall back to All so the user isn't
@@ -431,8 +431,8 @@ fun GuideScreen(
             // Same defensive dedup: if a page overlaps with what's already loaded
             // (e.g. two calls racing, or a tvg_id appearing on a page boundary)
             // we drop the duplicates so LazyColumn keys stay unique.
-            val existing = channels.mapTo(HashSet(channels.size)) { it.tvgId }
-            val newOnly = nextPage.channels.distinctBy { it.tvgId }.filter { it.tvgId !in existing }
+            val existing = channels.mapTo(HashSet(channels.size)) { it.id }
+            val newOnly = nextPage.channels.distinctBy { it.id }.filter { it.id !in existing }
             val appended = channels + newOnly
             channels = appended
             allLoaded = nextPage.channels.isEmpty() || appended.size >= totalChannels.toInt()
@@ -469,37 +469,36 @@ fun GuideScreen(
     // scope when passed down.
     var actionsFor by remember { mutableStateOf<ContentItem?>(null) }
     val onChannelLongPress: (EpgGuideChannel) -> Unit = { channel ->
-        val tvg = channel.tvgId
-        if (tvg.isNotBlank()) {
-            // Set a placeholder immediately; the LaunchedEffect below
-            // upgrades it to the real DB-resolved ContentItem.
-            actionsFor =
-                ContentItem(
-                    id = "guide:$tvg",
-                    sourceId = "",
-                    type = com.yancotv.shared.types.ContentType.LIVE,
-                    title = channel.name,
-                    cleanTitle = channel.name,
-                    groupName = null,
-                    streamUrl = channel.streamUrl ?: "",
-                    logoUrl = channel.logoUrl,
-                    tvgId = tvg,
-                    metadataJson = null,
-                    sortOrder = 0,
-                    createdAt = 0L,
-                )
-        }
+        // MB-382 — the guide row now carries its content id, so resolve the
+        // action target by id (works for channels with no tvg_id too, which are
+        // now in the guide). Placeholder shown immediately (sourceId blank);
+        // the LaunchedEffect below upgrades it to the real DB row.
+        actionsFor =
+            ContentItem(
+                id = channel.id,
+                sourceId = "",
+                type = com.yancotv.shared.types.ContentType.LIVE,
+                title = channel.name,
+                cleanTitle = channel.name,
+                groupName = null,
+                streamUrl = channel.streamUrl ?: "",
+                logoUrl = channel.logoUrl,
+                tvgId = channel.tvgId,
+                metadataJson = null,
+                sortOrder = 0,
+                createdAt = 0L,
+            )
     }
 
-    // Upgrade the placeholder to the real ContentItem (with a valid db id)
-    // so lock/hide writes reach the right row.
-    LaunchedEffect(actionsFor?.tvgId) {
+    // Upgrade the placeholder to the real ContentItem (with sourceId etc.)
+    // so lock/hide/rename writes reach the right row.
+    LaunchedEffect(actionsFor?.id) {
         val snapshot = actionsFor ?: return@LaunchedEffect
-        if (snapshot.id.startsWith("guide:")) {
+        if (snapshot.sourceId.isBlank()) {
             val real =
                 withContext(Dispatchers.IO) {
-                    runCatching { snapshot.tvgId?.let { contentRepo.findLiveByTvgId(it) } }
-                        .onFailure { Log.w("Yanco", "GuideScreen.findLiveByTvgId(${snapshot.tvgId}) failed: ${it.message}", it) }
+                    runCatching { contentRepo.findById(snapshot.id) }
+                        .onFailure { Log.w("Yanco", "GuideScreen.findById(${snapshot.id}) failed: ${it.message}", it) }
                         .getOrNull()
                 }
             if (real != null) actionsFor = real
@@ -719,7 +718,9 @@ fun GuideScreen(
                         }?.id
                     val key =
                         RecordingScheduleScheduler.seriesKeyFor(
-                            target.channel.tvgId,
+                            // MB-382 — programme.channelTvgId is non-null (a programme
+                            // always has a tvg_id); channel.tvgId is now nullable.
+                            target.programme.channelTvgId,
                             target.programme.title,
                         )
                     isSeriesBound =
@@ -750,7 +751,7 @@ fun GuideScreen(
                 // MB-250 — upsert + AlarmManager.setExact off-main; can block
                 // behind the whole-import EPG transaction (freeze → ANR).
                 coroutineScope.launch(Dispatchers.IO) {
-                    runCatching { scheduler.set(target.channel.tvgId, target.programme) }
+                    runCatching { scheduler.set(target.programme.channelTvgId, target.programme) }
                 }
                 reminderSet = true
                 actionTarget = null
@@ -801,7 +802,7 @@ fun GuideScreen(
                                 // tvg_id pick only when the URL isn't matched.
                                 val contentId =
                                     contentRepo.findIdByStreamUrl(streamUrl)
-                                        ?: contentRepo.findLiveByTvgId(channel.tvgId)?.id
+                                        ?: contentRepo.findLiveByTvgId(programme.channelTvgId)?.id
                                 recordScheduler.schedule(
                                     contentId = contentId,
                                     programmeId = programme.id,
@@ -842,7 +843,7 @@ fun GuideScreen(
                         coroutineScope.launch(Dispatchers.IO) {
                             runCatching {
                                 val contentItem =
-                                    contentRepo.findLiveByTvgId(channel.tvgId)
+                                    contentRepo.findLiveByTvgId(programme.channelTvgId)
                                 // epg_programmes.start_time/end_time are
                                 // XMLTV epoch SECONDS (parser at
                                 // XmltvParser.kt:186 returns epochSeconds).
@@ -857,14 +858,14 @@ fun GuideScreen(
                                 val nowSec = System.currentTimeMillis() / 1000L
                                 val matches =
                                     epg.findFutureByChannelAndTitle(
-                                        tvgId = channel.tvgId,
+                                        tvgId = programme.channelTvgId,
                                         title = programme.title,
                                         nowSec = nowSec,
                                         windowSec = SERIES_LOOKAHEAD_MS / 1000L,
                                     )
                                 recordScheduler.scheduleSeries(
                                     contentId = contentItem?.id,
-                                    channelTvgId = channel.tvgId,
+                                    channelTvgId = programme.channelTvgId,
                                     title = programme.title,
                                     streamUrl = streamUrl,
                                     programmes =
@@ -884,7 +885,7 @@ fun GuideScreen(
                 val channel = target.channel
                 val programme = target.programme
                 val key =
-                    RecordingScheduleScheduler.seriesKeyFor(channel.tvgId, programme.title)
+                    RecordingScheduleScheduler.seriesKeyFor(programme.channelTvgId, programme.title)
                 coroutineScope.launch(Dispatchers.IO) {
                     runCatching { recordScheduler.cancelSeries(key) }
                         .onFailure { Log.w("Yanco", "cancelSeries failed for $key", it) }
@@ -1031,7 +1032,7 @@ private fun GuideGrid(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    itemsIndexed(guide.channels, key = { _, ch -> ch.tvgId }) { rowIndex, channel ->
+                    itemsIndexed(guide.channels, key = { _, ch -> ch.id }) { rowIndex, channel ->
                         ChannelRow(
                             rowHeight = rowHeight,
                             rowIndex = rowIndex,
@@ -1267,7 +1268,7 @@ private fun ChannelRow(
     // the channel so a recycled row never points at the previous channel's
     // node (the MK.8 rule: focus state owned inside the boundary that
     // scopes it, never hoisted above it).
-    val laneFocus = remember(channel.tvgId) { FocusRequester() }
+    val laneFocus = remember(channel.id) { FocusRequester() }
 
     // Derived, NOT state written during composition. The first version of
     // this fix flipped a `mutableStateOf` inside the render loop to mark the
@@ -1396,6 +1397,22 @@ private fun ChannelRow(
                 }
                 cursor = clampedEnd
                 firstEmitted = false
+            }
+            // MB-382 — channel has NO EPG in this window (common now that
+            // channels with no tvg_id are listed in the guide). Fill the lane
+            // with one focusable "No information" cell so the row is still a
+            // real, playable channel rather than a blank strip.
+            if (firstEmitted) {
+                val fullMin = ((windowEnd - windowStart) / 60L).toInt().coerceAtLeast(1)
+                key("N-empty-${channel.id}") {
+                    NoEpgCell(
+                        startTime = windowStart,
+                        endTime = windowEnd,
+                        widthDp = (fullMin * pxPerMin).dp,
+                        onPlayLive = onPlayChannel,
+                        onLongPress = onLongPressChannel,
+                    )
+                }
             }
             // **Trailing focusable cell** so the right edge of every
             // row is reachable — pre-MK.EPG.A this area was unallocated

@@ -26,7 +26,13 @@ typealias NowNextMap = Map<String, NowNext>
 
 @Serializable
 data class EpgGuideChannel(
-    val tvgId: String,
+    /** MB-382 — stable guide-row identity (the representative content id). Used
+     *  as the key because ~85% of live channels ship no tvg_id, so [tvgId]
+     *  can't identify a row. */
+    val id: String,
+    /** Nullable — a channel with no tvg_id has no EPG mapping and renders
+     *  "No information"; programmes attach by tvg_id only when present. */
+    val tvgId: String?,
     /** Channel display name (joined from content table) */
     val name: String,
     val logoUrl: String? = null,

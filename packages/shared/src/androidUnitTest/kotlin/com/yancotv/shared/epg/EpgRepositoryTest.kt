@@ -267,6 +267,29 @@ class EpgRepositoryTest {
         assertTrue(page.channels.isEmpty())
     }
 
+    @Test fun `getGuideData includes channels with no tvg_id and no EPG (MB-382)`() = runTest {
+        val (db, driver) = newDbPair()
+        insertSource(db, "src-A", null)
+        val now = 1_700_000_000L
+        // A channel WITH tvg_id + EPG.
+        insertContent(db, "ch-epg", "src-A", "c1", "With EPG", sortOrder = 0L)
+        insertProgramme(db, "c1", now - 100L, now + 100L, "src-A")
+        // A channel with NO tvg_id and NO EPG — previously excluded from the guide.
+        insertContent(db, "ch-noepg", "src-A", null, "No EPG Channel", sortOrder = 1L)
+
+        val repo = EpgRepository(db, driver, FakeHttpClient(), clock = { now * 1000L })
+        val page = repo.getGuideData(now - 3600L, now + 3600L)
+
+        val ids = page.channels.map { it.id }.toSet()
+        assertTrue("ch-epg" in ids, "EPG channel present")
+        assertTrue("ch-noepg" in ids, "MB-382: no-tvg_id / no-EPG channel now appears in the guide")
+        val noEpg = page.channels.first { it.id == "ch-noepg" }
+        assertNull(noEpg.tvgId, "no-tvg_id channel keeps a null tvgId")
+        assertTrue(noEpg.programmes.isEmpty(), "no-EPG channel has an empty programme list (renders 'No information')")
+        val withEpg = page.channels.first { it.id == "ch-epg" }
+        assertTrue(withEpg.programmes.isNotEmpty(), "the EPG channel keeps its programmes")
+    }
+
     @Test fun `getGuideData dedupes channels with multiple content variants sharing tvg_id`() = runTest {
         val (db, driver) = newDbPair()
         val now = 1_700_000_000L
@@ -835,7 +858,7 @@ class EpgRepositoryTest {
         db: com.yancotv.shared.db.YancoDb,
         id: String,
         sourceId: String,
-        tvgId: String,
+        tvgId: String?,
         title: String,
         sortOrder: Long = 0L,
         groupName: String? = null,
