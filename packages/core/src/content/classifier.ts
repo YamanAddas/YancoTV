@@ -60,8 +60,9 @@ export function classifyEntry(entry: M3uEntry): ContentType {
 
   // --- Series indicators (check first — more specific) ---
 
-  // Title has S01E02 / Season X Episode Y pattern
-  if (/S\d{1,2}\s*E\d{1,3}/i.test(title) || /Season\s+\d/i.test(title)) {
+  // MB-387 — a series title needs an EPISODE marker (SxxExx / "Season N Episode
+  // M" / NxMM), not a bare "Season N" which movies carry ("Open Season 2").
+  if (/(S\d{1,2}\s*E\d{1,3})|(Season\s+\d+\s*[:\-]?\s*Episode\s+\d+)|(\d{1,2}x\d{1,3})/i.test(title)) {
     return 'series';
   }
 
@@ -89,7 +90,7 @@ export function classifyEntry(entry: M3uEntry): ContentType {
   // regex so query-strings and fragments don't block the match.
   if (/\.(mp4|mkv|avi|mov|m4v|webm|flv|wmv)(\?|#|$)/i.test(url)) {
     // Some series come as video files — S01E02 wins.
-    if (/S\d{1,2}\s*E\d{1,3}/i.test(title)) return 'series';
+    if (/(S\d{1,2}\s*E\d{1,3})|(Season\s+\d+\s*[:\-]?\s*Episode\s+\d+)|(\d{1,2}x\d{1,3})/i.test(title)) return 'series';
     return 'movie';
   }
 

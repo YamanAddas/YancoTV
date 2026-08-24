@@ -48,8 +48,11 @@ private fun matchesAny(group: String, patterns: List<String>): Boolean {
     return false
 }
 
-private val SERIES_SE_REGEX = Regex("""S\d{1,2}\s*E\d{1,3}""", RegexOption.IGNORE_CASE)
-private val SEASON_REGEX = Regex("""Season\s+\d""", RegexOption.IGNORE_CASE)
+// MB-387 — a series title needs an EPISODE marker (SxxExx or "… Episode N"),
+// not a bare "Season N". Movies routinely carry "Season" in their name
+// ("Open Season 2", "Making The Witcher: Season 3", "Silent Season") and were
+// mis-typed as series by the old bare-`Season\s+\d` rule.
+private val SERIES_EPISODE_REGEX = Regex("""(S\d{1,2}\s*E\d{1,3})|(Season\s+\d+\s*[:\-]?\s*Episode\s+\d+)|(\d{1,2}x\d{1,3})""", RegexOption.IGNORE_CASE)
 private val VIDEO_EXT_REGEX =
     Regex("""\.(mp4|mkv|avi|mov|m4v|webm|flv|wmv)(\?|#|$)""", RegexOption.IGNORE_CASE)
 
@@ -61,7 +64,7 @@ fun classifyEntry(entry: M3uEntry): ContentType {
     val duration = entry.duration
 
     // --- Series indicators (check first — more specific) ---
-    if (SERIES_SE_REGEX.containsMatchIn(title) || SEASON_REGEX.containsMatchIn(title)) {
+    if (SERIES_EPISODE_REGEX.containsMatchIn(title)) {
         return ContentType.SERIES
     }
 
@@ -83,7 +86,7 @@ fun classifyEntry(entry: M3uEntry): ContentType {
     }
 
     if (VIDEO_EXT_REGEX.containsMatchIn(url)) {
-        if (SERIES_SE_REGEX.containsMatchIn(title)) return ContentType.SERIES
+        if (SERIES_EPISODE_REGEX.containsMatchIn(title)) return ContentType.SERIES
         return ContentType.MOVIE
     }
 

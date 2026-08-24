@@ -26,8 +26,15 @@ describe('Content Classifier', () => {
       expect(classifyEntry(makeEntry({ title: 'Show s3e12 Episode' }))).toBe('series');
     });
 
-    it('classifies series by "Season X" in title', () => {
-      expect(classifyEntry(makeEntry({ title: 'The Office Season 2' }))).toBe('series');
+    it('classifies series by Season+Episode / NxMM (MB-387)', () => {
+      expect(classifyEntry(makeEntry({ title: 'The Office Season 2 Episode 5' }))).toBe('series');
+      expect(classifyEntry(makeEntry({ title: 'Friends 3x10' }))).toBe('series');
+    });
+
+    it('does not force series from a bare "Season N" (MB-387)', () => {
+      // Movies carry "Season" in their name; must not override a movie signal.
+      expect(classifyEntry(makeEntry({ title: 'Open Season 2', groupTitle: 'Movies' }))).toBe('movie');
+      expect(classifyEntry(makeEntry({ title: 'Making The Witcher: Season 3', streamUrl: 'http://x/movie/1.mp4' }))).toBe('movie');
     });
 
     it('classifies series by group name', () => {

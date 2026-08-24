@@ -31,8 +31,22 @@ class ClassifierTest {
     }
 
     @Test
-    fun classifiesSeriesBySeasonX() {
-        assertEquals(ContentType.SERIES, classifyEntry(makeEntry(title = "The Office Season 2")))
+    fun classifiesSeriesBySeasonEpisode() {
+        // MB-387 — an EPISODE marker is required: "Season N Episode M" and NxMM.
+        assertEquals(ContentType.SERIES, classifyEntry(makeEntry(title = "The Office Season 2 Episode 5")))
+        assertEquals(ContentType.SERIES, classifyEntry(makeEntry(title = "Friends 3x10")))
+    }
+
+    @Test
+    fun bareSeasonInTitleDoesNotForceSeries() {
+        // MB-387 — movies routinely carry "Season" in their name ("Open Season 2",
+        // "Making The Witcher: Season 3"); a bare "Season N" must not override a
+        // movie signal (group / video URL).
+        assertEquals(ContentType.MOVIE, classifyEntry(makeEntry(title = "Open Season 2", groupTitle = "Movies")))
+        assertEquals(
+            ContentType.MOVIE,
+            classifyEntry(makeEntry(title = "Making The Witcher: Season 3", streamUrl = "http://x/movie/1.mp4")),
+        )
     }
 
     @Test
