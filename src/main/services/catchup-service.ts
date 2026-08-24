@@ -85,10 +85,13 @@ export function getCatchupUrl(
         return { ok: true, value: { available: false, archiveHours: 0 } };
       }
 
-      // Check programme age doesn't exceed archive window
+      // Check programme age doesn't exceed archive window.
+      // MB-389 — tv_archive_duration is in DAYS, not hours. Comparing the age in
+      // HOURS to it meant a 3-day archive hid catch-up for anything older than
+      // 3 HOURS. The native CatchupService compares in days (* 86400); match it.
       const nowSecs = Math.floor(Date.now() / 1000);
-      const ageHours = (nowSecs - programmeStart) / 3600;
-      if (ageHours > tvArchiveDuration) {
+      const ageDays = (nowSecs - programmeStart) / 86400;
+      if (ageDays > tvArchiveDuration) {
         return {
           ok: true,
           value: { available: false, archiveHours: tvArchiveDuration },
