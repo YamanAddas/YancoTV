@@ -89,16 +89,34 @@ fun SettingsClickToEditField(
     var editing by remember { mutableStateOf(false) }
     val editFocus = remember { FocusRequester() }
     val readOnlyFocus = remember { FocusRequester() }
+    // MB-398 — has this field been in edit mode at least once? See below.
+    var hasEdited by remember { mutableStateOf(false) }
 
     LaunchedEffect(editing) {
         if (editing) {
+            hasEdited = true
             runCatching { editFocus.requestFocus() }
-        } else {
-            // MB-302 — always hand focus back to the read-only row. An earlier
-            // version gated this on a "was this a deliberate exit" flag; on TV
-            // that distinction is unreachable (the IME owns the D-pad while
-            // open, so the field can only lose focus by the IME closing) and
-            // the flag just left nothing focused and a dead D-pad.
+        } else if (hasEdited) {
+            // MB-302 — hand focus back to the read-only row after an edit. An
+            // earlier version gated this on a "was this a deliberate exit"
+            // flag; on TV that distinction is unreachable (the IME owns the
+            // D-pad while open, so the field can only lose focus by the IME
+            // closing) and the flag just left nothing focused and a dead
+            // D-pad. `hasEdited` is NOT that flag: every exit from edit mode
+            // still requests, deliberate or not — it only excludes the
+            // never-edited case.
+            //
+            // MB-398 — that never-edited case is why this needs a gate at
+            // all. `LaunchedEffect(editing)` also runs on FIRST composition,
+            // where editing is false, so every field grabbed focus onto its
+            // own row the moment it appeared. On a screen with several of
+            // them the last one to compose won and dragged the scroll
+            // container to itself: the Add-source dialog opened scrolled to
+            // its bottom (focus on Referer, the source-type chips not even
+            // rendered), and settings tabs jumped to their last field.
+            // Screens now own their entry focus (moveFocus into the pane, or
+            // an explicit PlacedFocusAnchor) instead of losing it to whichever
+            // field happened to compose last.
             runCatching { readOnlyFocus.requestFocus() }
         }
     }

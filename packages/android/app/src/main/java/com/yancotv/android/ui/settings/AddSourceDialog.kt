@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.yancotv.android.R
 import com.yancotv.android.ui.components.YancoPrimaryButton
 import com.yancotv.android.ui.components.YancoSecondaryButton
+import com.yancotv.android.ui.focus.placedFocus
+import com.yancotv.android.ui.focus.rememberPlacedFocusAnchor
 import com.yancotv.android.ui.theme.LocalYancoPalette
 import com.yancotv.shared.types.AddSourceInput
 import com.yancotv.shared.types.SourceType
@@ -115,6 +118,14 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
             }
         }
     var validationError by remember { mutableStateOf<String?>(null) }
+
+    // MB-398 — deterministic focus-on-open, so the dialog opens at the TOP
+    // (source-type chips) instead of wherever a stray focus request dragged
+    // the scroll container. Pairs with the SettingsClickToEditField fix: the
+    // fields no longer grab focus on first composition, so this anchor is
+    // what decides the entry point rather than whichever field composed last.
+    // The request is issued inside the Dialog content (below).
+    val firstChipAnchor = rememberPlacedFocusAnchor()
 
     // MK.31.20 — resolved here in composable scope: `submit()` below is a
     // plain local function, where `stringResource` is not available.
@@ -193,6 +204,10 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
             decorFitsSystemWindows = false,
         ),
     ) {
+        // MB-398 — land focus on the first chip once it is actually placed.
+        // Keyed on Unit: one request for the life of the dialog, so the SAF
+        // file-picker round-trip doesn't yank focus back up to the chips.
+        LaunchedEffect(Unit) { firstChipAnchor.awaitAndRequest() }
         Column(
             modifier =
             Modifier
@@ -273,6 +288,11 @@ fun AddSourceDialog(onDismiss: () -> Unit, onSubmit: (AddSourceInput) -> Unit, s
                                 description = stringResource(R.string.add_type_xtream_desc),
                                 selected = type == SourceType.XTREAM,
                                 onSelect = { type = SourceType.XTREAM },
+                                // MB-398 — placedFocus binds to the next focus
+                                // node down the chain (the chip's own
+                                // focusable); no extra .focusable() wrapper
+                                // (Backup-tab lesson).
+                                modifier = Modifier.placedFocus(firstChipAnchor),
                             )
                             TypeChip(
                                 label = stringResource(R.string.add_type_m3u_url),
@@ -476,7 +496,7 @@ private fun ErrorBanner(text: String) {
 }
 
 @Composable
-private fun TypeChip(label: String, description: String, selected: Boolean, onSelect: () -> Unit) {
+private fun TypeChip(label: String, description: String, selected: Boolean, onSelect: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val bg =
@@ -493,7 +513,7 @@ private fun TypeChip(label: String, description: String, selected: Boolean, onSe
         }
     Column(
         modifier =
-        Modifier
+        modifier
             .widthIn(min = 180.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(bg)

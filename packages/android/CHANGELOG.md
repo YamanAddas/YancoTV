@@ -27,6 +27,11 @@ increases (the in-app updater and Android's package manager both rely on it).
   (MB-397)
 - **PIN dialog: a wrong PIN no longer bounces the TV highlight from "Unlock"
   onto "Cancel".** (part of MB-395)
+- **Screens with text fields no longer open jumped to their LAST field.** Every
+  click-to-edit field grabbed the highlight as it appeared, so the one nearest
+  the bottom won: Add Source opened scrolled past the source-type buttons, and
+  settings tabs landed mid-page. Add Source now opens at the top on "Xtream",
+  and each tab starts at its first row. (MB-398)
 
 ## 1.6.6 (versionCode 30) — 2026-08-23
 
