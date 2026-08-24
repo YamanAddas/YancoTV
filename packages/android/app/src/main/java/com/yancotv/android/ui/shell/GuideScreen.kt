@@ -1264,6 +1264,28 @@ private fun ChannelRow(
         }
     }
 
+    // MB-371 — when a lane HAS focus it composes ALL its programmes, not just
+    // the viewport-filtered window. Root cause of "RIGHT jumps to the channel
+    // below after ~2 cells": the viewport filter drops the cell the user is
+    // scrolling toward, so D-pad RIGHT finds no next cell in-row and Compose
+    // sends focus down. One channel's day is only ~30-50 cells (cheap for the
+    // single focused row); unfocused rows keep the filter (there are ~15
+    // visible). The shared horizontal scroll + touch are unchanged.
+    var laneHasFocus by remember(channel.id) { mutableStateOf(false) }
+    val laneProgrammes by remember(channel.id, windowStart, windowEnd) {
+        derivedStateOf {
+            if (!laneHasFocus) {
+                visibleProgrammes
+            } else {
+                channel.programmes.filter { p ->
+                    val pe = p.endTime.coerceAtMost(windowEnd)
+                    val ps = p.startTime.coerceAtLeast(windowStart)
+                    pe > ps
+                }
+            }
+        }
+    }
+
     // MB-361 — explicit entry point into the programme lane. Re-keyed on
     // the channel so a recycled row never points at the previous channel's
     // node (the MK.8 rule: focus state owned inside the boundary that
@@ -1349,12 +1371,16 @@ private fun ChannelRow(
                     }
                 }
                 .horizontalScroll(hScroll)
+                // MB-371 — track whether this lane holds focus; when it does it
+                // composes all its programmes (above) so RIGHT never runs off the
+                // filtered window and gets evicted to the row below.
+                .onFocusChanged { laneHasFocus = it.hasFocus }
                 .width(timelineWidth)
                 .fillMaxHeight(),
         ) {
             var cursor = windowStart
             var firstEmitted = true
-            for (prog in visibleProgrammes) {
+            for (prog in laneProgrammes) {
                 val clampedStart = prog.startTime.coerceAtLeast(windowStart)
                 val clampedEnd = prog.endTime.coerceAtMost(windowEnd)
                 if (clampedEnd <= clampedStart) continue
