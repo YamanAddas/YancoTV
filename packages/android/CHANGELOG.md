@@ -6,6 +6,13 @@ the repo-root [CHANGELOG.md](../../CHANGELOG.md).
 Versioning: `versionName` is the human label; `versionCode` only ever
 increases (the in-app updater and Android's package manager both rely on it).
 
+## 1.6.5 (versionCode 29) — 2026-08-23
+
+### Fixed
+- **Guide: the TV remote now moves right/left across a whole channel's
+  programmes** instead of jumping down to the next channel after the first
+  couple. (MB-371)
+
 ## 1.6.4 (versionCode 28) — 2026-08-23
 
 ### Fixed
