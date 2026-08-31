@@ -125,8 +125,8 @@ class BackupCipherParityTest {
 
     /**
      * Zero-length plaintext is legal in GCM and yields a bare tag. On
-     * Kotlin/Native it is also the null-pointer path through
-     * `CCCryptorGCMOneshotEncrypt`.
+     * Kotlin/Native it short-circuits the CTR keystream entirely — the
+     * tag is computed over an empty ciphertext plus the lengths block.
      */
     @Test
     fun decryptBytes_readsAFixedEmptyPlaintextVector() {
@@ -134,6 +134,29 @@ class BackupCipherParityTest {
         val vector = "055aea70715c4e3407d8719c7acc2380467b5fca5fb0996721c9b278"
         assertEquals((12 + 0 + 16) * 2, vector.length)
         assertEquals(0, cipher.decryptBytes(vector, key).size)
+    }
+
+    /**
+     * Published AES-256-GCM reference vectors — McGrew & Viega, "The
+     * Galois/Counter Mode of Operation", test cases 13 and 14 (the pair
+     * every mainstream implementation pins). Third-party ground truth
+     * for the cipher itself, complementing the Android-produced interop
+     * blob above: these pin both actuals to the *standard*, not merely
+     * to each other. That matters doubly since the iOS actual assembles
+     * GCM locally over the raw AES primitive (see AesGcm.ios.kt) — a
+     * GHASH slip fails here on every target, including against the JVM's
+     * JCE on the Android side. Routed through decryptBytes because
+     * encryptHex draws a fresh random IV and cannot be pinned.
+     */
+    @Test
+    fun decryptBytes_matchesPublishedGcmVectors() {
+        val key = ByteArray(32)
+        val zeroIvHex = "000000000000000000000000"
+        // TC13 — empty plaintext under the all-zero key/IV: bare tag.
+        assertEquals(0, cipher.decryptBytes(zeroIvHex + "530f8afbc74536b9a963b4f1c4cb738b", key).size)
+        // TC14 — one all-zero block.
+        val plaintext = cipher.decryptBytes(zeroIvHex + "cea7403d4d606b6e074ec5d3baf39d18" + "d0d1c8a799996bf0265b98b5d48ab919", key)
+        assertTrue(plaintext.contentEquals(ByteArray(16)))
     }
 
     @Test

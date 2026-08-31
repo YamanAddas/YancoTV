@@ -2,35 +2,32 @@
 
 package com.yancotv.shared.backup
 
-import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
-import platform.CoreCrypto.CCCryptorGCMOneshotDecrypt
-import platform.CoreCrypto.CCCryptorGCMOneshotEncrypt
 import platform.CoreCrypto.CCKeyDerivationPBKDF
-import platform.CoreCrypto.kCCAlgorithmAES
 import platform.CoreCrypto.kCCPBKDF2
 import platform.CoreCrypto.kCCPRFHmacAlgSHA256
 import platform.Security.SecRandomCopyBytes
 import platform.Security.kSecRandomDefault
 
 /**
- * iOS actual for [BackupCipher] — CommonCrypto, not CryptoKit.
+ * iOS actual for [BackupCipher] — CommonCrypto for the KDF and RNG, a
+ * local SP 800-38D GCM assembly ([AesGcm]) for the cipher.
  *
  * CryptoKit is the idiomatic Apple choice for AES-GCM, but it is a
  * Swift-only framework and Kotlin/Native can only import Objective-C and
- * C interfaces. CommonCrypto is the reachable primitive, and it exposes
- * everything this class needs: `CCKeyDerivationPBKDF` for the KDF and the
- * one-shot GCM pair for the cipher.
- *
- * Note the GCM entry points are `CCCryptorGCMOneshotEncrypt` /
- * `…Decrypt` (iOS 11+), **not** the older `CCCryptorGCM` /
- * `CCCryptorGCMFinal` — those are deprecated and have a documented
- * history of mishandling the auth tag.
+ * C interfaces. MK.iOS.0-pre.2 originally wrote this against
+ * CommonCrypto's `CCCryptorGCMOneshotEncrypt` / `…Decrypt` and carried
+ * an explicit "unverified: is that pair bound at all?" flag. The first
+ * ios-compile gate run (2026-08-19) answered no — every CommonCrypto GCM
+ * entry point is private SPI, invisible to Kotlin/Native's public-header
+ * klibs and an App Store liability besides. The public surface that IS
+ * bound — `CCKeyDerivationPBKDF`, `SecRandomCopyBytes`, and one-shot AES
+ * via `CCCrypt` — is enough: [AesGcm] builds the GCM mode on the raw AES
+ * primitive and documents its own correctness pinning.
  *
  * ### Wire-format parity with androidMain
  *
@@ -61,31 +58,32 @@ actual class BackupCipher {
         // Android runs PBEKeySpec(CharArray) through PBKDF2WithHmacSHA256,
         // whose JCE implementation encodes the password as UTF-8 — and its
         // API 24/25 compat fallback spells that out with
-        // `String(password).toByteArray(Charsets.UTF_8)`. Same bytes here.
-        val passwordBytes = password.encodeToByteArray()
+        // `String(password).toByteArray(Charsets.UTF_8)`. The Kotlin/Native
+        // binding maps the C `const char *password` parameter to a Kotlin
+        // `String?` and marshals it as UTF-8 itself — same bytes — so the
+        // password goes in directly; only the byte LENGTH is computed here.
+        // (MK.iOS.0-pre predicted typing nudges on first Mac compile; this
+        // was one — a CPointer built by hand is rejected where the binding
+        // wants the String. Android's zero-the-CharArray hygiene has no
+        // equivalent on this path: the transient C buffer is owned and
+        // freed by the interop layer.)
+        val passwordByteLen = password.encodeToByteArray().size
         val out = ByteArray(KEY_BYTES)
         val status =
-            try {
-                passwordBytes.withPtr { pw ->
-                    salt.withPtr { saltPtr ->
-                        out.withPtr { outPtr ->
-                            CCKeyDerivationPBKDF(
-                                kCCPBKDF2,
-                                pw,
-                                passwordBytes.size.toULong(),
-                                saltPtr?.reinterpret<UByteVar>(),
-                                salt.size.toULong(),
-                                kCCPRFHmacAlgSHA256,
-                                iterations.toUInt(),
-                                outPtr?.reinterpret<UByteVar>(),
-                                KEY_BYTES.toULong(),
-                            )
-                        }
-                    }
+            salt.usePinned { saltPinned ->
+                out.usePinned { outPinned ->
+                    CCKeyDerivationPBKDF(
+                        kCCPBKDF2,
+                        password,
+                        passwordByteLen.toULong(),
+                        saltPinned.addressOf(0).reinterpret<UByteVar>(),
+                        salt.size.toULong(),
+                        kCCPRFHmacAlgSHA256,
+                        iterations.toUInt(),
+                        outPinned.addressOf(0).reinterpret<UByteVar>(),
+                        KEY_BYTES.toULong(),
+                    )
                 }
-            } finally {
-                // Android zeroes its CharArray in a finally; same hygiene.
-                passwordBytes.fill(0)
             }
         check(status == CC_SUCCESS) { "PBKDF2 derivation failed (CCCryptorStatus $status)" }
         return out
@@ -96,76 +94,33 @@ actual class BackupCipher {
         // Fresh 96-bit IV per call (NIST SP 800-38D §8.2.1), same as
         // androidMain. Never reuse an IV under a derived key.
         val iv = randomBytes(IV_BYTES)
-        val cipherText = ByteArray(plaintext.size)
-        val tag = ByteArray(TAG_BYTES)
-        val status =
-            key.withPtr { keyPtr ->
-                iv.withPtr { ivPtr ->
-                    plaintext.withPtr { inPtr ->
-                        cipherText.withPtr { outPtr ->
-                            tag.withPtr { tagPtr ->
-                                CCCryptorGCMOneshotEncrypt(
-                                    kCCAlgorithmAES,
-                                    keyPtr, KEY_BYTES.toULong(),
-                                    ivPtr, IV_BYTES.toULong(),
-                                    null, 0uL,
-                                    inPtr, plaintext.size.toULong(),
-                                    outPtr,
-                                    tagPtr, TAG_BYTES.toULong(),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        check(status == CC_SUCCESS) { "AES-GCM encrypt failed (CCCryptorStatus $status)" }
-        return encodeHex(iv) + encodeHex(cipherText) + encodeHex(tag)
+        // AesGcm.seal returns ciphertext||tag as one blob — the same shape
+        // JCE's doFinal hands androidMain, so both sides end up writing
+        // hex(iv) + hex(blob) and the wire layout cannot drift.
+        return encodeHex(iv) + encodeHex(AesGcm.seal(key, iv, plaintext))
     }
 
     actual fun decryptBytes(hex: String, key: ByteArray): ByteArray {
         require(key.size == KEY_BYTES) { "AES-256-GCM requires a $KEY_BYTES-byte key" }
         val all = decodeHex(hex)
         // androidMain only checks `> 12` and lets the JCE reject a missing
-        // tag; being explicit fails with a readable message rather than a
-        // bare CommonCrypto status code.
+        // tag; being explicit fails with a readable message instead.
         require(all.size >= IV_BYTES + TAG_BYTES) { "ciphertext shorter than IV + tag" }
         val iv = all.copyOfRange(0, IV_BYTES)
         val cipherText = all.copyOfRange(IV_BYTES, all.size - TAG_BYTES)
         val tag = all.copyOfRange(all.size - TAG_BYTES, all.size)
-        val out = ByteArray(cipherText.size)
-        val status =
-            key.withPtr { keyPtr ->
-                iv.withPtr { ivPtr ->
-                    cipherText.withPtr { inPtr ->
-                        out.withPtr { outPtr ->
-                            tag.withPtr { tagPtr ->
-                                CCCryptorGCMOneshotDecrypt(
-                                    kCCAlgorithmAES,
-                                    keyPtr, KEY_BYTES.toULong(),
-                                    ivPtr, IV_BYTES.toULong(),
-                                    null, 0uL,
-                                    inPtr, cipherText.size.toULong(),
-                                    outPtr,
-                                    tagPtr, TAG_BYTES.toULong(),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        // CommonCrypto does the constant-time tag comparison internally and
-        // returns a non-success status on mismatch, satisfying the expect
-        // declaration's "throws on tag mismatch" contract (androidMain
-        // surfaces this as AEADBadTagException).
-        check(status == CC_SUCCESS) { "AES-GCM decrypt failed — tag mismatch or corrupt ciphertext" }
-        return out
+        // AesGcm.open verifies the tag (constant-time) before returning any
+        // plaintext and throws on mismatch — the expect declaration's
+        // "throws on tag mismatch" contract, which androidMain meets via
+        // AEADBadTagException.
+        return AesGcm.open(key, iv, cipherText, tag)
     }
 
     actual fun randomSaltHex(): String = encodeHex(randomBytes(SALT_BYTES))
 
     private fun randomBytes(count: Int): ByteArray {
         val out = ByteArray(count)
-        val status = out.withPtr { ptr -> SecRandomCopyBytes(kSecRandomDefault, count.toULong(), ptr) }
+        val status = out.usePinned { pinned -> SecRandomCopyBytes(kSecRandomDefault, count.toULong(), pinned.addressOf(0)) }
         check(status == CC_SUCCESS) { "SecRandomCopyBytes failed (OSStatus $status)" }
         return out
     }
@@ -212,14 +167,3 @@ actual class BackupCipher {
         const val MAX_ITERATIONS = 1_000_000
     }
 }
-
-/**
- * Runs [block] with a pointer to this array's first byte, or `null` when
- * the array is empty.
- *
- * `Pinned.addressOf(0)` throws on an empty ByteArray, but `(NULL, 0)` is a
- * valid argument pair for every CommonCrypto entry point used here — and
- * empty input is reachable: AES-GCM over a zero-length plaintext is legal
- * and yields a bare tag.
- */
-private inline fun <R> ByteArray.withPtr(block: (CPointer<ByteVar>?) -> R): R = if (isEmpty()) block(null) else usePinned { block(it.addressOf(0)) }

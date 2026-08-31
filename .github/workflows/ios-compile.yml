@@ -21,13 +21,13 @@ name: iOS compile
 # commonMain with no iOS actuals, and both a green Android build and a green CI
 # would say nothing was wrong.
 #
-# KNOWN FAILING as of 2026-08-19: `CCCryptorGCMOneshotEncrypt` /
-# `CCCryptorGCMOneshotDecrypt` are not bound in Kotlin/Native's
-# `platform.CoreCrypto` — the first real run of this gate answered the exact
-# question MK.iOS.0-pre's commit flagged as unverified. Every other error in
-# that run cascades from those two unresolved symbols. This job is expected to
-# stay red until the CoreCrypto binding is resolved; it is reporting a true
-# fact, which is what it was built to do.
+# RESOLVED 2026-08-31 (MK.iOS.0-pre.6): the 2026-08-19 red run was the gate
+# doing its job — `CCCryptorGCMOneshotEncrypt` / `…Decrypt` turned out to be
+# private-SPI-only, never bound in Kotlin/Native's `platform.CoreCrypto`.
+# `AesGcm.ios.kt` now assembles SP 800-38D GCM over the public `CCCrypt` AES
+# primitive (same wire format; parity suite pins it, including published
+# McGrew/Viega vectors). First green local run: checkIosCompile + 401/401 on
+# iosSimulatorArm64Test. See PRODUCTION_PLAN_NATIVE.md § MK.iOS.0-pre.6.
 #
 # `workflow_dispatch` is here so the gate can be run on demand — after an
 # iosMain fix, without waiting for a qualifying push.
