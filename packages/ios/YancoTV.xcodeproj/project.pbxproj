@@ -7,15 +7,63 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00946145A94EE04D002B1D6C /* RootShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F446BF9DAFE37CB7AFFAC2 /* RootShell.swift */; };
+		03168D8DD92AF8AA17259B14 /* Dimens.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD133C41B3CECB2DEC3BC46 /* Dimens.swift */; };
 		0A81510ED6E108794879133C /* YancoTVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 055679D2C7F7D918E571D50D /* YancoTVApp.swift */; };
+		185EDC7C47258045FD580BB1 /* LibraryScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 017CEE95506925C013D85EB9 /* LibraryScreens.swift */; };
 		191A1AAE2A0248F34FE99229 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79CFB31EEF17979E6E4AF76 /* ContentView.swift */; };
+		1C451F9BDFDFD3CB1B4900B5 /* HomeHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9FF8E805C460F97EB06EF0 /* HomeHero.swift */; };
+		234235BF1DFE7390CCBE907C /* YancoType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 443CC2B5ADF7225803569615 /* YancoType.swift */; };
+		2B86B619D348135D8FAFE236 /* YancoShapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD50236F8B995953D9D056DB /* YancoShapes.swift */; };
+		2E4B1D7D0D838B7919921D27 /* YancoPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08B40098284145A5349F1EBC /* YancoPalette.swift */; };
+		3344D1E031B7165FCE5E9FAE /* HexSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0310A6226C60C39F778B71 /* HexSurface.swift */; };
+		3D618220FEE88133BCC23490 /* RailTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B7AB6069FB1B4AC5BACF83 /* RailTile.swift */; };
+		471385AFFDA907075CD31B65 /* CoverflowScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 772A5C1D4E8B84EF7E3DEF76 /* CoverflowScreen.swift */; };
+		5CC00153311A7CB581FBC2AD /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F67F0627E9A0C4923F17C9B /* HomeScreen.swift */; };
+		63C32337642FC2DD44AC2241 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38079FC8C875636C29350081 /* FlowLayout.swift */; };
+		6F75639FB7D81E988A7769D5 /* DetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084509375E5C2E29CE97B58 /* DetailScreen.swift */; };
+		871E641E8EF55F1C3D28D411 /* SampleContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE5982BC8F1CAE8D8E6973E /* SampleContent.swift */; };
+		8C7E01986A00DB945C5B02CB /* CinematicBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F36798148EE5ED5489BAD4D /* CinematicBackground.swift */; };
+		A1D14EAB21839982E3D9159B /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A43113031F518AB66DB2828 /* Badges.swift */; };
+		A3077CA367468EA67B574F1B /* AppSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C891E7FECBD01534751359B6 /* AppSidebar.swift */; };
+		B1AA0A8F9AA458EC05C40595 /* WheelRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4885537D182A5BD0891515D /* WheelRail.swift */; };
+		C3B7AD924D0686A403579F4F /* RailHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CF512F842B812D411852AC /* RailHeader.swift */; };
+		C68E67B0B6D753133222B99E /* ShellState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC783A18251916E12E7377D7 /* ShellState.swift */; };
+		CD658915C8E365CC2B82DE4B /* CategoryChipBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 022B916966C0F6CC19BFE90F /* CategoryChipBar.swift */; };
+		E4D39C993B9ED494BED6D405 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B06D882130DE0E7D5805A9 /* Artwork.swift */; };
 		EDB67B3C135493D552E80685 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F073C826B00759B61E3A67BF /* Assets.xcassets */; };
+		F4130A5CEDCE605C2DDC48B5 /* YancoButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 896BC49130D5389DDEBE1EA0 /* YancoButton.swift */; };
+		FED196A081E451E76F3E0456 /* AppSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7460AFDCE6079AD4F7187646 /* AppSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		017CEE95506925C013D85EB9 /* LibraryScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryScreens.swift; sourceTree = "<group>"; };
+		022B916966C0F6CC19BFE90F /* CategoryChipBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryChipBar.swift; sourceTree = "<group>"; };
 		055679D2C7F7D918E571D50D /* YancoTVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoTVApp.swift; sourceTree = "<group>"; };
+		05B7AB6069FB1B4AC5BACF83 /* RailTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailTile.swift; sourceTree = "<group>"; };
+		08B40098284145A5349F1EBC /* YancoPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoPalette.swift; sourceTree = "<group>"; };
+		0A0310A6226C60C39F778B71 /* HexSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HexSurface.swift; sourceTree = "<group>"; };
 		10E37832DB8246B52F732B56 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2084509375E5C2E29CE97B58 /* DetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailScreen.swift; sourceTree = "<group>"; };
+		23CF512F842B812D411852AC /* RailHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailHeader.swift; sourceTree = "<group>"; };
+		38079FC8C875636C29350081 /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
+		443CC2B5ADF7225803569615 /* YancoType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoType.swift; sourceTree = "<group>"; };
+		4F36798148EE5ED5489BAD4D /* CinematicBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CinematicBackground.swift; sourceTree = "<group>"; };
+		5F67F0627E9A0C4923F17C9B /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		7460AFDCE6079AD4F7187646 /* AppSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSection.swift; sourceTree = "<group>"; };
+		772A5C1D4E8B84EF7E3DEF76 /* CoverflowScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverflowScreen.swift; sourceTree = "<group>"; };
+		87F446BF9DAFE37CB7AFFAC2 /* RootShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootShell.swift; sourceTree = "<group>"; };
+		896BC49130D5389DDEBE1EA0 /* YancoButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoButton.swift; sourceTree = "<group>"; };
+		8EE5982BC8F1CAE8D8E6973E /* SampleContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleContent.swift; sourceTree = "<group>"; };
+		99B06D882130DE0E7D5805A9 /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
+		9A43113031F518AB66DB2828 /* Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badges.swift; sourceTree = "<group>"; };
+		AAD133C41B3CECB2DEC3BC46 /* Dimens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dimens.swift; sourceTree = "<group>"; };
+		B4885537D182A5BD0891515D /* WheelRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WheelRail.swift; sourceTree = "<group>"; };
+		C891E7FECBD01534751359B6 /* AppSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSidebar.swift; sourceTree = "<group>"; };
+		CC783A18251916E12E7377D7 /* ShellState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellState.swift; sourceTree = "<group>"; };
 		D6F98CCDBAC245A0B2B6197E /* YancoTV.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YancoTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD50236F8B995953D9D056DB /* YancoShapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoShapes.swift; sourceTree = "<group>"; };
+		EC9FF8E805C460F97EB06EF0 /* HomeHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeHero.swift; sourceTree = "<group>"; };
 		F073C826B00759B61E3A67BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F79CFB31EEF17979E6E4AF76 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -28,8 +76,29 @@
 				F79CFB31EEF17979E6E4AF76 /* ContentView.swift */,
 				10E37832DB8246B52F732B56 /* Info.plist */,
 				055679D2C7F7D918E571D50D /* YancoTVApp.swift */,
+				9C3E5E659944E5B66A30F6C7 /* Components */,
+				4D8356FD92958DD90933B520 /* Model */,
+				0B876B1BCEE2EE9F24961610 /* Nav */,
+				E28A5072C6DD034FD55D0847 /* Shell */,
+				AFD5F50AB6B986F0C3088F12 /* Theme */,
 			);
 			path = YancoTV;
+			sourceTree = "<group>";
+		};
+		0B876B1BCEE2EE9F24961610 /* Nav */ = {
+			isa = PBXGroup;
+			children = (
+				7460AFDCE6079AD4F7187646 /* AppSection.swift */,
+			);
+			path = Nav;
+			sourceTree = "<group>";
+		};
+		4D8356FD92958DD90933B520 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				8EE5982BC8F1CAE8D8E6973E /* SampleContent.swift */,
+			);
+			path = Model;
 			sourceTree = "<group>";
 		};
 		6A9CC82ABD745465C65B2DBD = {
@@ -46,6 +115,49 @@
 				D6F98CCDBAC245A0B2B6197E /* YancoTV.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9C3E5E659944E5B66A30F6C7 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				99B06D882130DE0E7D5805A9 /* Artwork.swift */,
+				9A43113031F518AB66DB2828 /* Badges.swift */,
+				4F36798148EE5ED5489BAD4D /* CinematicBackground.swift */,
+				38079FC8C875636C29350081 /* FlowLayout.swift */,
+				0A0310A6226C60C39F778B71 /* HexSurface.swift */,
+				05B7AB6069FB1B4AC5BACF83 /* RailTile.swift */,
+				B4885537D182A5BD0891515D /* WheelRail.swift */,
+				896BC49130D5389DDEBE1EA0 /* YancoButton.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		AFD5F50AB6B986F0C3088F12 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				AAD133C41B3CECB2DEC3BC46 /* Dimens.swift */,
+				08B40098284145A5349F1EBC /* YancoPalette.swift */,
+				DD50236F8B995953D9D056DB /* YancoShapes.swift */,
+				443CC2B5ADF7225803569615 /* YancoType.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		E28A5072C6DD034FD55D0847 /* Shell */ = {
+			isa = PBXGroup;
+			children = (
+				C891E7FECBD01534751359B6 /* AppSidebar.swift */,
+				022B916966C0F6CC19BFE90F /* CategoryChipBar.swift */,
+				772A5C1D4E8B84EF7E3DEF76 /* CoverflowScreen.swift */,
+				2084509375E5C2E29CE97B58 /* DetailScreen.swift */,
+				EC9FF8E805C460F97EB06EF0 /* HomeHero.swift */,
+				5F67F0627E9A0C4923F17C9B /* HomeScreen.swift */,
+				017CEE95506925C013D85EB9 /* LibraryScreens.swift */,
+				23CF512F842B812D411852AC /* RailHeader.swift */,
+				87F446BF9DAFE37CB7AFFAC2 /* RootShell.swift */,
+				CC783A18251916E12E7377D7 /* ShellState.swift */,
+			);
+			path = Shell;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -141,8 +253,32 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FED196A081E451E76F3E0456 /* AppSection.swift in Sources */,
+				A3077CA367468EA67B574F1B /* AppSidebar.swift in Sources */,
+				E4D39C993B9ED494BED6D405 /* Artwork.swift in Sources */,
+				A1D14EAB21839982E3D9159B /* Badges.swift in Sources */,
+				CD658915C8E365CC2B82DE4B /* CategoryChipBar.swift in Sources */,
+				8C7E01986A00DB945C5B02CB /* CinematicBackground.swift in Sources */,
 				191A1AAE2A0248F34FE99229 /* ContentView.swift in Sources */,
+				471385AFFDA907075CD31B65 /* CoverflowScreen.swift in Sources */,
+				6F75639FB7D81E988A7769D5 /* DetailScreen.swift in Sources */,
+				03168D8DD92AF8AA17259B14 /* Dimens.swift in Sources */,
+				63C32337642FC2DD44AC2241 /* FlowLayout.swift in Sources */,
+				3344D1E031B7165FCE5E9FAE /* HexSurface.swift in Sources */,
+				1C451F9BDFDFD3CB1B4900B5 /* HomeHero.swift in Sources */,
+				5CC00153311A7CB581FBC2AD /* HomeScreen.swift in Sources */,
+				185EDC7C47258045FD580BB1 /* LibraryScreens.swift in Sources */,
+				C3B7AD924D0686A403579F4F /* RailHeader.swift in Sources */,
+				3D618220FEE88133BCC23490 /* RailTile.swift in Sources */,
+				00946145A94EE04D002B1D6C /* RootShell.swift in Sources */,
+				871E641E8EF55F1C3D28D411 /* SampleContent.swift in Sources */,
+				C68E67B0B6D753133222B99E /* ShellState.swift in Sources */,
+				B1AA0A8F9AA458EC05C40595 /* WheelRail.swift in Sources */,
+				F4130A5CEDCE605C2DDC48B5 /* YancoButton.swift in Sources */,
+				2E4B1D7D0D838B7919921D27 /* YancoPalette.swift in Sources */,
+				2B86B619D348135D8FAFE236 /* YancoShapes.swift in Sources */,
 				0A81510ED6E108794879133C /* YancoTVApp.swift in Sources */,
+				234235BF1DFE7390CCBE907C /* YancoType.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

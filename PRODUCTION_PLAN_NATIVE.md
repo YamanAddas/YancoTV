@@ -1313,7 +1313,7 @@ Scoped as a separate milestone block once Android ships. Rough shape:
 |---|---|
 | MK.iOS.0-pre | ✅ **Shipped 2026-08-10** — unrot the declared iOS targets: write the two missing `iosMain` actuals, add a compile gate so they can't rot again. Detail below. |
 | MK.iOS.0 | ✅ **Shipped 2026-08-31** — `packages/ios/` scaffold: XcodeGen [project.yml](packages/ios/project.yml) (SwiftUI, Swift 6, iOS 17+, iPhone+iPad), `Shared` static framework wired via an `embedAndSignAppleFrameworkForXcode` pre-build phase (`-lsqlite3` added for SQLiter — a static Kotlin framework doesn't carry the system sqlite it binds), proof-of-bridge screen (Kotlin `Platform()` + real `parseM3u` render from Swift) verified launching on iPhone 17 Pro and iPad Pro 11" (M5) iOS 26.5 simulators. Build/run commands + bridge notes in [packages/ios/CLAUDE.md](packages/ios/CLAUDE.md) |
-| MK.iOS.1 | SwiftUI shell — adaptive for iPhone vs iPad (split view on iPad) |
+| MK.iOS.1 | ✅ **Shipped 2026-08-31** — SwiftUI shell as a faithful port of the TV design system, adaptive iPhone vs iPad. Detail below. |
 | MK.iOS.2 | Sources + credentials via iOS Keychain |
 | MK.iOS.3 | Playback — AVPlayer default, VLCKit fallback for DTS/TrueHD |
 | MK.iOS.4 | EPG / catchup / favorites / search reusing shared KMP |
@@ -1357,6 +1357,39 @@ The ios-compile gate went red on its first real run (2026-08-19) for exactly the
 **Verified on this Mac (2026-08-31):** `:shared:checkIosCompile` green — the six iOS klib compiles pass for the first time in the project's history. `:shared:iosSimulatorArm64Test`: **401 tests / 0 failures**, `BackupCipherParityTest` 21/21 — Android-produced interop vector decrypts, published vectors match, tamper rejection fires. JVM side re-run green (JCE independently validated the new published vectors), ktlint clean. Cross-platform password-backup restore is now test-proven in both directions of the contract, not just Android-side.
 
 **Threat-model note:** GHASH here is hand-rolled arithmetic — normally a hard no. Accepted because (a) no public Apple C API for GCM exists and the alternatives are private SPI (App Store risk) or a multi-MB static OpenSSL dependency for one function; (b) the implementation is branch-free; (c) the realistic attacker holds the backup *file* — an offline setting where implementation timing is irrelevant; and (d) three independent test layers (published vectors, JCE-produced interop blob, round-trips) pin correctness on every target.
+
+### MK.iOS.1 — SwiftUI shell (shipped 2026-08-31)
+
+**Scope decision.** The 2026-08-10 note below says the iOS UI would be "a fresh SwiftUI design, not a port". That was overridden by the user on 2026-08-31: the ask is the *same* app on iOS, so this milestone ports the TV design system rather than reinterpreting it. Every token, shape and treatment below is transcribed from `packages/android/ui/theme/` and `ui/components/`, not reinvented.
+
+| Layer | Ported from | Notes |
+|---|---|---|
+| `Theme/YancoPalette.swift` | `theme/Palette.kt` | All 21 tokens x 4 palettes, same hex values, same field names. Delivered through an `EnvironmentValues` key mirroring `LocalYancoPalette` |
+| `Theme/YancoShapes.swift` | `theme/Shapes.kt` | `CutCornerCard` (22/16/32), `HexCapsule`, `HexPill`, `ChipBevel`, `ButtonBevel`, `PointyHex` — same paths, same clamps |
+| `Theme/YancoType.swift` | `theme/Typography.kt` | The full 12→34 ramp 1:1, including MK.29.4's compression. Compose `lineHeight` (line box) converted to SwiftUI `lineSpacing` (inter-line gap) |
+| `Components/HexSurface.swift` | `components/HexSurface.kt` | Scale 1.06, lift 10, elevation 6→28 accent-tinted, 2pt FocusRing rim, accent 14% inner wash, 1pt specular hairline, one spring (0.75 / 420 → response 0.31) |
+| `Components/CinematicBackground.swift` | `components/CinematicBackground.kt` | Radial accent wash at 5% + vertical 0→35%. The Kotlin's `Offset(260,220) r=1400` is raw px at density 2, so (130,110) r=700 in points |
+| `Components/WheelRail.swift` | `components/WheelRail.kt` | Home rails: ±38°, scale→0.82, alpha→0.60, pivot lerping to the card's inner edge, centre-snap |
+| `Shell/CoverflowScreen.swift` | `shell/CoverflowSectionScreen.kt` | Browse wheel: ±58°, 1.18 centre scale, 0.07 scale/step, 0.18 alpha/step, 4pt translate/step, fixed centre pivot. **Kept separate from WheelRail** — two different wheels by design |
+| `Shell/AppSidebar.swift` | `shell/AppSidebar.kt` | 92 ⟷ 260 over 180ms, gradient panel, 4pt accent rail with 12pt glow, 52pt rows on a 10pt radius (the one surface that opts out of the cut-corner family, MB-113) |
+| `Shell/CategoryChipBar.swift` | `shell/CategoryChipBar.kt` | 38pt `ChipBevel`, Favorites → All → 1x20 separator → groups, selected wash 32%/22%, border reserved for press only (MB-112) |
+| `Shell/HomeScreen.swift` + `HomeHero` + `RailTile` | `shell/HomeContent.kt` | 320pt hero with 7s auto-advance and pips, rail headers (overline / TitleL / caption at a 3pt baseline nudge), 220pt tiles with 16:9 art, scrims, badges and progress stripes |
+
+**Deliberate divergences**, each because the TV assumption does not hold on a hand-held device:
+
+1. **Focus → press.** There is no D-pad focus on iOS. `HexSurface`'s parameter is named `lit` rather than `focused` so the code does not lie; the three visual signals are unchanged. The Android rule *fill encodes selection, border encodes focus* is preserved everywhere.
+2. **Sidebar on compact.** A 92pt rail is 24% of an iPhone's width. Regular width gets the real morphing sidebar; compact gets a bottom bar in the same vocabulary, with `AppSection.compactOverflow` holding the other four destinations. Nothing is dropped.
+3. **Preview pane stacks when the lane is portrait.** The TV lane is 628x335 — wider than tall, so side-by-side is right there and on a landscape iPad. Keeping it on a portrait lane stranded the artwork at 0.6 width with hundreds of points of dead air.
+4. **`FlowLayout`** (`Components/FlowLayout.swift`) reproduces Compose's `FlowRow` for the CTA cluster. Not optional: the LIVE metadata column is 0.4 of the lane (≈180pt), and an `HStack` there either compresses the hex buttons into slivers or overflows the column. Both were observed before this landed.
+5. **Wheel height capped.** 0.38 of a 540pt TV viewport is 205pt — about what a 200pt orb needs. 0.38 of a 1210pt iPad is 460pt of air. Above the cap the surplus goes to the preview.
+
+**Artwork.** `Components/Artwork.swift` generates deterministic key art (FNV-1a seeded — Swift's `hashValue` is per-process salted and would reshuffle the library every launch) from a two-tone ground, an off-centre bloom, hex outlines from the shape library, and a vignette. A placeholder image *host* was tried first and rejected: a network dependency on a screen that needs none, blank when offline, and the host used during development was 503ing within the hour. `TileArt` keeps the remote path wired, so MK.iOS.2 supplies real provider URLs without touching the views.
+
+**Sample data** lives in `Model/SampleContent.swift` and is explicitly scaffolding — `YancoItem` tracks the fields `ContentItem` already exposes over the bridge so MK.iOS.2 is a data-source swap, not a UI rewrite. No business logic is reimplemented there.
+
+**Debug hook:** `SIMCTL_CHILD_YANCO_START_SECTION=liveTv xcrun simctl launch …` opens straight onto a section, so every screen can be captured without driving the UI. `#if DEBUG` only.
+
+**Verified:** builds clean and runs on iPhone 17 Pro and iPad Pro 11" (M5), iOS 26.5 — Home, Live TV, Movies, Series, Favorites, Search, and the three placeholder sections.
 
 ### Correction to the 2026-04-20 sharing estimate
 
