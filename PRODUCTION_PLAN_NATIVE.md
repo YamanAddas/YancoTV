@@ -1312,13 +1312,14 @@ Scoped as a separate milestone block once Android ships. Rough shape:
 | Phase | Scope |
 |---|---|
 | MK.iOS.0-pre | ✅ **Shipped 2026-08-10** — unrot the declared iOS targets: write the two missing `iosMain` actuals, add a compile gate so they can't rot again. Detail below. |
-| MK.iOS.0 | Xcode project scaffold, Kotlin `shared` framework imported, SwiftUI "Hello" screen |
+| MK.iOS.0 | ✅ **Shipped 2026-08-31** — `packages/ios/` scaffold: XcodeGen [project.yml](packages/ios/project.yml) (SwiftUI, Swift 6, iOS 17+, iPhone+iPad), `Shared` static framework wired via an `embedAndSignAppleFrameworkForXcode` pre-build phase (`-lsqlite3` added for SQLiter — a static Kotlin framework doesn't carry the system sqlite it binds), proof-of-bridge screen (Kotlin `Platform()` + real `parseM3u` render from Swift) verified launching on iPhone 17 Pro and iPad Pro 11" (M5) iOS 26.5 simulators. Build/run commands + bridge notes in [packages/ios/CLAUDE.md](packages/ios/CLAUDE.md) |
 | MK.iOS.1 | SwiftUI shell — adaptive for iPhone vs iPad (split view on iPad) |
 | MK.iOS.2 | Sources + credentials via iOS Keychain |
 | MK.iOS.3 | Playback — AVPlayer default, VLCKit fallback for DTS/TrueHD |
 | MK.iOS.4 | EPG / catchup / favorites / search reusing shared KMP |
 | MK.iOS.5 | PIP + AirPlay + Chromecast |
 | MK.iOS.6 | App Store submission |
+| MK.iOS.7 | **macOS** (added 2026-08-31 — user ask). Near-term: the iPad app runs on Apple silicon via the "My Mac (Designed for iPad)" destination — builds verified to reach the signing step; Xcode refuses ad-hoc for iOS-on-Mac, so it needs a Team picked in Signing & Capabilities (free personal team suffices; one click, then ▶). Later candidate: a native macOS SwiftUI target — needs `macosArm64` in `:shared` plus a small `macosMain` actual set (Platform via NSProcessInfo, DB path; the crypto/HTTP actuals port as-is since CommonCrypto/Darwin exist on macOS) |
 
 ### MK.iOS.0-pre — iOS target rot + detector (shipped 2026-08-10)
 

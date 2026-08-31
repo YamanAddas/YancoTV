@@ -1,0 +1,84 @@
+# YancoTV iOS — XcodeGen project definition (MK.iOS.0).
+#
+# Regenerate the .xcodeproj after editing this file:
+#   xcodegen generate          (from packages/ios/)
+#
+# The Kotlin `shared` framework is built by the "Build Shared KMP
+# Framework" pre-build phase below, which shells out to the Gradle
+# wrapper in ../android (the KMP module is a subproject of that build).
+# `embedAndSignAppleFrameworkForXcode` reads Xcode's CONFIGURATION /
+# SDK_NAME / ARCHS env vars and drops the right framework slice into
+# ../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME), which
+# FRAMEWORK_SEARCH_PATHS points at. The framework is static
+# (isStatic = true in shared/build.gradle.kts), so there is nothing to
+# embed at runtime — link flags are all that is needed.
+name: YancoTV
+options:
+  bundleIdPrefix: com.yancotv
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+settings:
+  MARKETING_VERSION: "0.1.0"
+  CURRENT_PROJECT_VERSION: "1"
+  SWIFT_VERSION: "6.0"
+targets:
+  YancoTV:
+    type: application
+    platform: iOS
+    sources:
+      - path: YancoTV
+    info:
+      path: YancoTV/Info.plist
+      properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIUserInterfaceStyle: Dark
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UISupportedInterfaceOrientations~iphone:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yancotv.ios
+        PRODUCT_NAME: YancoTV
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        # The Gradle pre-build phase writes framework outputs outside the
+        # target's declared inputs/outputs; Xcode's user-script sandbox
+        # would block it.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-framework"
+          - "Shared"
+          # SQLDelight's NativeSqliteDriver (SQLiter) binds the system
+          # sqlite3; a static Kotlin framework doesn't carry the library,
+          # so the app links it.
+          - "-lsqlite3"
+    preBuildScripts:
+      - name: Build Shared KMP Framework
+        basedOnDependencyAnalysis: false
+        script: |
+          # Xcode strips the login shell's environment; point JAVA_HOME at
+          # the Homebrew OpenJDK 17 this repo builds with unless the caller
+          # already exported one.
+          export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+          cd "$SRCROOT/../android"
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode

@@ -1,0 +1,7 @@
+# Xcode user state — machine-local, never shared
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Build products
+build/
+DerivedData/
