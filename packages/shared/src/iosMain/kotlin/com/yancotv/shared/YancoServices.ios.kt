@@ -4,6 +4,7 @@ import com.yancotv.shared.content.ContentRepository
 import com.yancotv.shared.db.DatabaseFactory
 import com.yancotv.shared.db.YancoDatabase
 import com.yancotv.shared.favorites.FavoritesRepository
+import com.yancotv.shared.history.WatchHistoryRepository
 import com.yancotv.shared.http.HttpClient
 import com.yancotv.shared.http.createHttpClient
 import com.yancotv.shared.logger.Logger
@@ -68,6 +69,14 @@ class YancoServices(
     val content: ContentRepository = ContentRepository(database.db)
 
     val favorites: FavoritesRepository = FavoritesRepository(database.db, ::nowMillis)
+
+    /**
+     * Resume points. `positionFor` already encodes the rules the player
+     * must not re-derive: it returns a content-level row or null (never an
+     * arbitrary episode's offset), and returns null past 95% so re-opening
+     * a finished title restarts instead of seeking to the credits.
+     */
+    val history: WatchHistoryRepository = WatchHistoryRepository(database.db, ::nowMillis)
 
     /**
      * Scope for work Swift starts and may abandon (a sync the user backs out

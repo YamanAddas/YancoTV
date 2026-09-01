@@ -53,7 +53,7 @@ struct HomeScreen: View {
                     // no sources gets a route forward, not an empty rail.
                     emptyHome
                 } else {
-                    HomeHero(slides: heroSlides) { state.detailItem = $0 }
+                    HomeHero(slides: heroSlides) { state.play($0) }
                         .padding(.horizontal, pageInset)
 
                     rail(

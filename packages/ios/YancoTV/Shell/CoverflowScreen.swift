@@ -460,7 +460,7 @@ private struct PreviewPane: View {
                     symbol: "play.fill",
                     primary: true
                 ) {
-                    state.detailItem = item
+                    state.play(item)
                 }
                 HexCta(
                     title: state.isFavorite(item) ? "In favorites" : "Favorite",

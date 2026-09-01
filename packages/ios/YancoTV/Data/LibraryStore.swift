@@ -206,6 +206,33 @@ final class LibraryStore {
         syncPhase = nil
     }
 
+    // MARK: - Resume points
+
+    /// Where playback should start, in seconds. `positionFor` returns nil
+    /// past 95%, so a finished title restarts rather than seeking to the
+    /// credits — that rule lives in the shared repository and is not
+    /// re-derived here.
+    func resumePosition(for contentID: String) async -> Double? {
+        await SharedServices.shared.run { services in
+            services.history.positionFor(contentId: contentID)?.doubleValue
+        }
+    }
+
+    /// Persists a resume point. Live channels are skipped — the shared
+    /// repository treats them as a no-op anyway, and writing a position for
+    /// a stream with no meaningful offset would pollute Continue Watching.
+    func savePosition(for item: YancoItem, seconds: Double, duration: Double?) {
+        guard item.kind != .live, seconds > 0 else { return }
+        SharedServices.shared.perform { services in
+            services.history.upsert(
+                contentId: item.id,
+                episodeId: nil,
+                positionSeconds: Int64(seconds),
+                durationSeconds: duration.map { KotlinLong(value: Int64($0)) }
+            )
+        }
+    }
+
     /// Human-readable one-liner for the sync banner.
     var syncStatusText: String? {
         guard let syncPhase else { return nil }
@@ -299,7 +326,8 @@ extension YancoItem {
             nextTitle: nil,
             resume: nil,
             seasonSummary: nil,
-            artworkURL: item.displayLogoUrl.flatMap(URL.init(string:))
+            artworkURL: item.displayLogoUrl.flatMap(URL.init(string:)),
+            streamURL: item.streamUrl
         )
     }
 }

@@ -125,6 +125,54 @@ struct ButtonBevelShape: Shape {
     }
 }
 
+/// Flat-top hexagon with points at the left and right mid-edges — the
+/// silhouette every player-dock control uses.
+///
+/// A one-for-one translation of the design brief's
+/// `clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)`.
+/// Percentage-based on purpose: the same shape stretches correctly into
+/// the elongated word chips (AUDIO, SPEED) without needing a second one.
+///
+/// Distinct from [PointyHexShape], which points top and bottom.
+struct MidnightHexShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.25, y: 0))
+        path.addLine(to: CGPoint(x: w * 0.75, y: 0))
+        path.addLine(to: CGPoint(x: w, y: h * 0.5))
+        path.addLine(to: CGPoint(x: w * 0.75, y: h))
+        path.addLine(to: CGPoint(x: w * 0.25, y: h))
+        path.addLine(to: CGPoint(x: 0, y: h * 0.5))
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Rect with the top-left and bottom-right corners cut diagonally —
+/// `polygon(c 0, W 0, W H−c, W−c H, 0 H, 0 c)`.
+///
+/// Used only by the player's buffering and error overlays. Note the cut
+/// corners are the *opposite* pair from [CutCornerCardShape], which is why
+/// it is a separate shape rather than a parameter.
+struct HexRowShape: Shape {
+    var corner: CGFloat = 10
+
+    func path(in rect: CGRect) -> Path {
+        let c = min(corner, min(rect.width, rect.height) * 0.5)
+        var path = Path()
+        path.move(to: CGPoint(x: c, y: 0))
+        path.addLine(to: CGPoint(x: rect.width, y: 0))
+        path.addLine(to: CGPoint(x: rect.width, y: rect.height - c))
+        path.addLine(to: CGPoint(x: rect.width - c, y: rect.height))
+        path.addLine(to: CGPoint(x: 0, y: rect.height))
+        path.addLine(to: CGPoint(x: 0, y: c))
+        path.closeSubpath()
+        return path
+    }
+}
+
 /// Pointy-top hexagon — vertices at top-center and bottom-center, flat
 /// verticals at H/4 and 3H/4. Symmetric, so it reads identically at any
 /// aspect ratio.

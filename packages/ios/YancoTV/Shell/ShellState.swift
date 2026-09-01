@@ -19,6 +19,8 @@ final class ShellState {
 
     var section: AppSection = .home
     var detailItem: YancoItem?
+    /// Presenting the full-screen player. Nil when it is dismissed.
+    var playingItem: YancoItem?
     var favoriteIDs: Set<String> = []
     /// Selected category per browse section. `nil` == the "All" pill.
     var selectedGroup: [String: String] = [:]
@@ -34,6 +36,21 @@ final class ShellState {
             section = parsed
         }
         #endif
+    }
+
+    /// Opens the player for `item`.
+    ///
+    /// Series containers are not playable — the shared `toPlayable()`
+    /// returns null for them and for blank URLs, and callers are required
+    /// to short-circuit rather than open a player on nothing. A container
+    /// opens its detail page instead, which is where episode selection
+    /// will live.
+    func play(_ item: YancoItem) {
+        if item.isPlayable {
+            playingItem = item
+        } else {
+            detailItem = item
+        }
     }
 
     func isFavorite(_ item: YancoItem) -> Bool { favoriteIDs.contains(item.id) }

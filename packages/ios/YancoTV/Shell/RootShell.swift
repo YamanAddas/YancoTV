@@ -22,6 +22,9 @@ import SwiftUI
 struct RootShell: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var state = ShellState()
+    /// One player for the whole app — the same rule as Android's single
+    /// ExoPlayer. Owned here so it survives navigation between sections.
+    @State private var playback = PlaybackController()
     @State private var sidebarExpanded = true
     @State private var showsOverflow = false
 
@@ -48,7 +51,25 @@ struct RootShell: View {
         .environment(\.yancoPalette, .frostedEmerald)
         .preferredColorScheme(.dark)
         .animation(.easeOut(duration: 0.2), value: state.detailItem)
-        .task { await state.library.refresh() }
+        .task {
+            playback.attach(library: state.library)
+            await state.library.refresh()
+            #if DEBUG
+            // Opens the player on the first live channel, so playback can
+            // be exercised and captured without driving the UI:
+            //   SIMCTL_CHILD_YANCO_DEBUG_PLAY=1 xcrun simctl launch …
+            if ProcessInfo.processInfo.environment["YANCO_DEBUG_PLAY"] == "1",
+               let first = state.library.live.first {
+                state.play(first)
+            }
+            #endif
+        }
+        .fullScreenCover(item: $state.playingItem) { item in
+            PlayerScreen(item: item, controller: playback, state: state) {
+                state.playingItem = nil
+            }
+            .environment(\.yancoPalette, .frostedEmerald)
+        }
     }
 
     // MARK: - Layouts

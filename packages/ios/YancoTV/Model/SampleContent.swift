@@ -49,6 +49,11 @@ struct YancoItem: Identifiable, Hashable {
     /// for the large share of provider URLs that 404 — [ProceduralArt] is
     /// what renders underneath either way.
     let artworkURL: URL?
+    /// The playable stream. Nil for fixtures and for series containers,
+    /// which are not `Playable` — the shared `toPlayable()` returns null for
+    /// them and callers must short-circuit rather than open a player on a
+    /// blank URL.
+    let streamURL: String?
 
     init(
         id: String,
@@ -67,7 +72,8 @@ struct YancoItem: Identifiable, Hashable {
         nextTitle: String? = nil,
         resume: Double? = nil,
         seasonSummary: String? = nil,
-        artworkURL: URL? = nil
+        artworkURL: URL? = nil,
+        streamURL: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -86,6 +92,14 @@ struct YancoItem: Identifiable, Hashable {
         self.resume = resume
         self.seasonSummary = seasonSummary
         self.artworkURL = artworkURL
+        self.streamURL = streamURL
+    }
+
+    /// Series containers carry no stream of their own; everything else does
+    /// once it comes from a real source.
+    var isPlayable: Bool {
+        guard let streamURL, !streamURL.isEmpty else { return false }
+        return kind != .series
     }
 
     /// Two-or-three letter monogram, the fallback every IPTV UI needs

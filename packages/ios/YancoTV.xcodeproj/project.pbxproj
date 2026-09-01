@@ -21,11 +21,15 @@
 		3D618220FEE88133BCC23490 /* RailTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B7AB6069FB1B4AC5BACF83 /* RailTile.swift */; };
 		471385AFFDA907075CD31B65 /* CoverflowScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 772A5C1D4E8B84EF7E3DEF76 /* CoverflowScreen.swift */; };
 		5CC00153311A7CB581FBC2AD /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F67F0627E9A0C4923F17C9B /* HomeScreen.swift */; };
+		61B2EFA3E5A1DF225888E3A2 /* VideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFDE64F1B4A25A8472441BCA /* VideoSurface.swift */; };
 		63C32337642FC2DD44AC2241 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38079FC8C875636C29350081 /* FlowLayout.swift */; };
 		678EAD364249F3288BBEE8EB /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4E45ECF9247F8FF9BD688C /* LibraryStore.swift */; };
 		6F75639FB7D81E988A7769D5 /* DetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084509375E5C2E29CE97B58 /* DetailScreen.swift */; };
 		871E641E8EF55F1C3D28D411 /* SampleContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE5982BC8F1CAE8D8E6973E /* SampleContent.swift */; };
+		87B7DD42549B26A7C16C3259 /* PlayerChromeMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89653D1439F90651FD785EC1 /* PlayerChromeMetrics.swift */; };
 		8C7E01986A00DB945C5B02CB /* CinematicBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F36798148EE5ED5489BAD4D /* CinematicBackground.swift */; };
+		9564BBE2B798866ED0B77ADD /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFFAFBCBCAAC9E14C0E553E2 /* PlaybackController.swift */; };
+		988F0353FCD494D74FDE0478 /* PlayerScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80784A00098A760BAC20D9E8 /* PlayerScreen.swift */; };
 		A1D14EAB21839982E3D9159B /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A43113031F518AB66DB2828 /* Badges.swift */; };
 		A3077CA367468EA67B574F1B /* AppSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C891E7FECBD01534751359B6 /* AppSidebar.swift */; };
 		B1AA0A8F9AA458EC05C40595 /* WheelRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4885537D182A5BD0891515D /* WheelRail.swift */; };
@@ -37,6 +41,7 @@
 		E4D39C993B9ED494BED6D405 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B06D882130DE0E7D5805A9 /* Artwork.swift */; };
 		EDB67B3C135493D552E80685 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F073C826B00759B61E3A67BF /* Assets.xcassets */; };
 		F4130A5CEDCE605C2DDC48B5 /* YancoButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 896BC49130D5389DDEBE1EA0 /* YancoButton.swift */; };
+		FC791655B47AC8A743384519 /* PlayerOverlays.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0E365E947E58F6DDF1925C /* PlayerOverlays.swift */; };
 		FED196A081E451E76F3E0456 /* AppSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7460AFDCE6079AD4F7187646 /* AppSection.swift */; };
 /* End PBXBuildFile section */
 
@@ -58,22 +63,27 @@
 		5F67F0627E9A0C4923F17C9B /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
 		7460AFDCE6079AD4F7187646 /* AppSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSection.swift; sourceTree = "<group>"; };
 		772A5C1D4E8B84EF7E3DEF76 /* CoverflowScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverflowScreen.swift; sourceTree = "<group>"; };
+		80784A00098A760BAC20D9E8 /* PlayerScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerScreen.swift; sourceTree = "<group>"; };
 		87F446BF9DAFE37CB7AFFAC2 /* RootShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootShell.swift; sourceTree = "<group>"; };
+		89653D1439F90651FD785EC1 /* PlayerChromeMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerChromeMetrics.swift; sourceTree = "<group>"; };
 		896BC49130D5389DDEBE1EA0 /* YancoButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoButton.swift; sourceTree = "<group>"; };
 		8EE5982BC8F1CAE8D8E6973E /* SampleContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleContent.swift; sourceTree = "<group>"; };
 		99B06D882130DE0E7D5805A9 /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
 		9A43113031F518AB66DB2828 /* Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badges.swift; sourceTree = "<group>"; };
 		A36414B1A91B20C86F8D73A9 /* KeychainCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainCredentialStore.swift; sourceTree = "<group>"; };
 		AAD133C41B3CECB2DEC3BC46 /* Dimens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dimens.swift; sourceTree = "<group>"; };
+		AFDE64F1B4A25A8472441BCA /* VideoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoSurface.swift; sourceTree = "<group>"; };
 		B4885537D182A5BD0891515D /* WheelRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WheelRail.swift; sourceTree = "<group>"; };
 		BE694CBA34DB40D8402CB6D4 /* SharedServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedServices.swift; sourceTree = "<group>"; };
 		C891E7FECBD01534751359B6 /* AppSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSidebar.swift; sourceTree = "<group>"; };
 		CC783A18251916E12E7377D7 /* ShellState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellState.swift; sourceTree = "<group>"; };
 		D6F98CCDBAC245A0B2B6197E /* YancoTV.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YancoTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD50236F8B995953D9D056DB /* YancoShapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YancoShapes.swift; sourceTree = "<group>"; };
+		DFFAFBCBCAAC9E14C0E553E2 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		EC9FF8E805C460F97EB06EF0 /* HomeHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeHero.swift; sourceTree = "<group>"; };
 		F073C826B00759B61E3A67BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F79CFB31EEF17979E6E4AF76 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		FF0E365E947E58F6DDF1925C /* PlayerOverlays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerOverlays.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -88,6 +98,7 @@
 				FC79F05CF0EA55FE85E93A4E /* Data */,
 				4D8356FD92958DD90933B520 /* Model */,
 				0B876B1BCEE2EE9F24961610 /* Nav */,
+				89E7C130E063F6E83004687F /* Player */,
 				E28A5072C6DD034FD55D0847 /* Shell */,
 				AFD5F50AB6B986F0C3088F12 /* Theme */,
 			);
@@ -116,6 +127,18 @@
 				03CF39A975F4EA9307B53053 /* YancoTV */,
 				8B89488A748069D858197F06 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		89E7C130E063F6E83004687F /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				DFFAFBCBCAAC9E14C0E553E2 /* PlaybackController.swift */,
+				89653D1439F90651FD785EC1 /* PlayerChromeMetrics.swift */,
+				FF0E365E947E58F6DDF1925C /* PlayerOverlays.swift */,
+				80784A00098A760BAC20D9E8 /* PlayerScreen.swift */,
+				AFDE64F1B4A25A8472441BCA /* VideoSurface.swift */,
+			);
+			path = Player;
 			sourceTree = "<group>";
 		};
 		8B89488A748069D858197F06 /* Products */ = {
@@ -290,6 +313,10 @@
 				1F784141736B7AEC6EEAC426 /* KeychainCredentialStore.swift in Sources */,
 				185EDC7C47258045FD580BB1 /* LibraryScreens.swift in Sources */,
 				678EAD364249F3288BBEE8EB /* LibraryStore.swift in Sources */,
+				9564BBE2B798866ED0B77ADD /* PlaybackController.swift in Sources */,
+				87B7DD42549B26A7C16C3259 /* PlayerChromeMetrics.swift in Sources */,
+				FC791655B47AC8A743384519 /* PlayerOverlays.swift in Sources */,
+				988F0353FCD494D74FDE0478 /* PlayerScreen.swift in Sources */,
 				C3B7AD924D0686A403579F4F /* RailHeader.swift in Sources */,
 				3D618220FEE88133BCC23490 /* RailTile.swift in Sources */,
 				00946145A94EE04D002B1D6C /* RootShell.swift in Sources */,
@@ -297,6 +324,7 @@
 				DC16ABE0C1A9F2AEAE09B80D /* SharedServices.swift in Sources */,
 				C68E67B0B6D753133222B99E /* ShellState.swift in Sources */,
 				C6FB0A688E14F3A8F7F31F7D /* SourcesScreen.swift in Sources */,
+				61B2EFA3E5A1DF225888E3A2 /* VideoSurface.swift in Sources */,
 				B1AA0A8F9AA458EC05C40595 /* WheelRail.swift in Sources */,
 				F4130A5CEDCE605C2DDC48B5 /* YancoButton.swift in Sources */,
 				2E4B1D7D0D838B7919921D27 /* YancoPalette.swift in Sources */,

@@ -1315,7 +1315,7 @@ Scoped as a separate milestone block once Android ships. Rough shape:
 | MK.iOS.0 | ✅ **Shipped 2026-08-31** — `packages/ios/` scaffold: XcodeGen [project.yml](packages/ios/project.yml) (SwiftUI, Swift 6, iOS 17+, iPhone+iPad), `Shared` static framework wired via an `embedAndSignAppleFrameworkForXcode` pre-build phase (`-lsqlite3` added for SQLiter — a static Kotlin framework doesn't carry the system sqlite it binds), proof-of-bridge screen (Kotlin `Platform()` + real `parseM3u` render from Swift) verified launching on iPhone 17 Pro and iPad Pro 11" (M5) iOS 26.5 simulators. Build/run commands + bridge notes in [packages/ios/CLAUDE.md](packages/ios/CLAUDE.md) |
 | MK.iOS.1 | ✅ **Shipped 2026-08-31** — SwiftUI shell as a faithful port of the TV design system, adaptive iPhone vs iPad. Detail below. |
 | MK.iOS.2 | ✅ **Shipped 2026-08-31** — sources, Keychain credentials, and the real content pipeline. Detail below. |
-| MK.iOS.3 | Playback — AVPlayer default, VLCKit fallback for DTS/TrueHD |
+| MK.iOS.3 | ✅ **Shipped 2026-08-31** — AVPlayer + the Midnight Lounge dock. VLCKit fallback split out as MK.iOS.3b. Detail below. |
 | MK.iOS.4 | EPG / catchup / favorites / search reusing shared KMP |
 | MK.iOS.5 | PIP + AirPlay + Chromecast |
 | MK.iOS.6 | App Store submission |
@@ -1420,6 +1420,31 @@ The milestone that ends the fixture. `SampleContent` is no longer what the app s
 **Bridge facts worth keeping:** Kotlin default arguments generate no Obj-C overloads, so `logger:` is required at the call site even though `commonMain` defaults it. A nested Kotlin enum arrives as a *class* (`SyncProgress.Phase`, a `KotlinEnum` subclass) whose cases are class properties, not a Swift enum.
 
 **Not yet, and deliberately:** playback (MK.iOS.3 — tapping an item opens detail, not a player); EPG now/next, so live tiles show the group rather than the programme (MK.iOS.4); favourites are still session-local rather than through `FavoritesRepository`; the add-source form covers M3U URL and Xtream only — M3U file needs a document picker and Stalker a MAC field. **Xtream is wired but has only been exercised against the shared client's tests, not a live account** — no credentials to test with.
+
+### MK.iOS.3 — playback (shipped 2026-08-31)
+
+Live TV plays. Verified end to end against a real HLS channel from a synced source.
+
+> ### ⚠️ MK.16's dock description in this file is STALE — do not port from it
+>
+> The MK.16.player.vod.dock entry above describes a **superseded** design: a 44sp gradient title, a hex-clipped 8dp track, an 88dp glowing play orb, a `PREV` control and a remote hint strip. MK.34.2–34.10 replaced all of it with the Midnight Lounge system, and `VodDockTransportRow`'s own KDoc repudiates the old hero directly — *"a solid green-black button with a glow, which is exactly the 'excessive glow / 3D-game styling' the brief warns off."*
+>
+> The iOS dock was built from that stale text first and had to be rewritten against the shipped code. **The code is the spec; this file lagged it.** The MK.16 entry is left as-is for its history, with this warning attached.
+
+**What the shipped design actually is**, and what iOS now matches: one bottom-anchored column — metadata (kicker / small solid title at 10–15pt / `  ·  `-joined meta line / outlined hex type badge), a glass capsule progress ribbon (3pt pill track, `AccentSoft` played fill, `TextSecondary`@30% buffered, a **10pt hexagonal** scrubber), and a **single** glass slab holding transport *and* secondary controls separated by a 1pt divider — not two strips. Every control is `MidnightHexShape` (flat-top, points left/right). No glow, no shadow, no scale-on-press: focus is a 2pt ring and a small fill-opacity lift, nothing else.
+
+| Piece | Notes |
+|---|---|
+| `PlaybackController` | One `AVPlayer`, item swapped via `replaceCurrentItem` — the same single-player rule as Android's ExoPlayer. Resume-point discipline carried over: **every transition that loads a new item flushes the outgoing position first**, because lifecycle hooks alone miss zap-through-player and queue-replace |
+| `PlayerChromeMetrics` | Sizes are fractions of container width, not fixed points — the brief's numbers are physical px at 1920x1080. **Compact floors raised** (54/39/36 vs 40/27/25): at iPhone widths every original floor binds and the 1.48 : 1.08 : 1 emphasis ratio flattens to nothing. The Kotlin KDoc calls the floors "an accessibility backstop, not part of the design", which licenses this |
+| `glassSurface` | Two-stop tint + 1pt rim over `.ultraThinMaterial`. Android omits the blur *only* because Compose cannot sample a `SurfaceView` behind an overlay; the brief asked for `backdrop-filter: blur(18px)`, and `AVPlayerLayer` + a material genuinely composites — so this is **more** faithful than the reference render, not a deviation |
+| Resume | `WatchHistoryRepository` from the shared module. `positionFor` already returns null past 95%, so a finished title restarts rather than seeking to the credits — that rule is not re-derived on this side |
+| LTR pinning | The ribbon and slab force left-to-right regardless of locale. Seek is physical: mirroring the visuals would make the fill grow toward a LEFT press |
+| Empty-track guard | MB-340 — `duration <= 0` renders an empty track, never a full one |
+
+**Format support, stated plainly.** AVPlayer handles HLS and progressive MP4 but **not raw MPEG-TS**, which a meaningful share of live IPTV still serves. ExoPlayer does, which is why Android has no equivalent problem. `PlaybackController.describe` names this specifically rather than letting it read as a network error and sending the user to debug the wrong thing. Closing it is **MK.iOS.3b (VLCKit)** — a real dependency decision (a large binary, and the repo's "no third-party Swift dependencies without strong justification" rule), so it is its own milestone rather than a footnote here.
+
+**Not ported yet:** PiP (MK.iOS.5); the seek-flash and gesture-HUD overlays; the title marquee (`basicMarquee` with its 1500ms delays and 30dp/s velocity, plus the 22dp edge fade); `NEXT` episode; and CC / AUDIO / SPEED / MENU, which need track selection and the options sheet — they render disabled rather than hidden so the slab keeps its shape. The `NowPlayingMetadata` title normaliser is also unported, so a messy provider title still shows raw.
 
 ### Correction to the 2026-04-20 sharing estimate
 

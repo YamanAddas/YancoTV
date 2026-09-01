@@ -120,7 +120,9 @@ struct DetailScreen: View {
                     title: item.kind == .live ? "Watch live" : (item.resume != nil ? "Resume" : "Play now"),
                     symbol: "play.fill",
                     primary: true
-                ) {}
+                ) {
+                    state.play(item)
+                }
                 HexCta(
                     title: state.isFavorite(item) ? "In favorites" : "Favorite",
                     symbol: state.isFavorite(item) ? "heart.fill" : "heart",
