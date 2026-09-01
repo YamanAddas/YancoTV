@@ -22,12 +22,29 @@ settings:
   MARKETING_VERSION: "0.1.0"
   CURRENT_PROJECT_VERSION: "1"
   SWIFT_VERSION: "6.0"
+packages:
+  # MK.iOS.3b — the software decoder. AVPlayer speaks HLS and MP4 but not
+  # raw MPEG-TS, which a large share of live IPTV still serves; every
+  # serious iOS IPTV player bundles a decoder for exactly this reason.
+  #
+  # LGPLv2.1-or-later. VideoLAN relicensed libVLC from GPL specifically to
+  # make App Store distribution possible (VLC itself returned to the store
+  # in 2013 on that basis), so a closed-source app may link it — dynamically,
+  # with attribution and an offer of source. See docs/LICENSES.md.
+  #
+  # An SPM wrapper rather than CocoaPods: Pods would mean a workspace and a
+  # second source of project truth alongside XcodeGen.
+  VLCKitSPM:
+    url: https://github.com/tylerjonesio/vlckit-spm
+    from: 3.5.1
 targets:
   YancoTV:
     type: application
     platform: iOS
     sources:
       - path: YancoTV
+    dependencies:
+      - package: VLCKitSPM
     info:
       path: YancoTV/Info.plist
       properties:
@@ -48,6 +65,32 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # Cleartext traffic — the same deliberate, accepted threat-model
+        # decision the Android manifest records with
+        # `android:usesCleartextTraffic="true"`. See the "Cleartext traffic"
+        # section in AGENTS.md; that rationale is authoritative and this is
+        # its iOS half.
+        #
+        # Why: IPTV providers routinely serve plain HTTP — playlists,
+        # `player_api.php`, MPEG-TS streams, XMLTV dumps. The host set is
+        # user-configured at runtime, so a static ATS exception domain list
+        # cannot be written ahead of time; ATS is read once from this plist
+        # and has no runtime mutation API, exactly as Android's
+        # network_security_config has none.
+        #
+        # What it exposes: someone on the same Wi-Fi can MITM provider
+        # traffic. Xtream credentials already travel in those URLs as query
+        # parameters, so cleartext does not make that materially worse.
+        #
+        # What it must NOT become: a licence for credential-bearing HTTP to
+        # anywhere outside a user-configured provider host. Android answers
+        # this with an application-layer allow-list seeded from the
+        # `sources` table (MK.SEC.A/B/C, bugs.md MB-203). **iOS has no
+        # equivalent yet** — that is the open half of this decision and is
+        # tracked as MK.iOS.SEC. Flag any new plain-HTTP call site in review
+        # until it lands.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yancotv.ios

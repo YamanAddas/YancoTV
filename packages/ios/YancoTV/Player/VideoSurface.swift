@@ -1,57 +1,53 @@
-import AVFoundation
-import AVKit
 import SwiftUI
+import UIKit
 
-/// The video surface — an `AVPlayerLayer` in a `UIViewRepresentable`.
+/// Hosts whichever engine is currently playing.
 ///
-/// `VideoPlayer` from AVKit would be less code but brings Apple's own
-/// transport controls, which cannot be restyled. The whole point of this
-/// milestone is the Yanco dock, so the layer is hosted directly and the
-/// chrome is drawn over it.
+/// Each engine vends its own `UIView` — an `AVPlayerLayer`-backed view for
+/// AVFoundation, a plain view libVLC renders into. This wrapper just
+/// mounts it, so the player UI never knows which engine is behind the
+/// picture.
 ///
-/// The layer is also what Picture-in-Picture attaches to.
-struct VideoSurface: UIViewRepresentable {
-    let player: AVPlayer
-    var gravity: AVLayerVideoGravity = .resizeAspect
+/// `AVKit.VideoPlayer` would have been less code for the AVPlayer case,
+/// but it brings Apple's own transport controls, which cannot be
+/// restyled — and it has no answer at all for VLC.
+struct EngineSurface: UIViewRepresentable {
+    /// The identity of the engine, so SwiftUI rebuilds the representable
+    /// when the controller swaps engines mid-stream (the format fallback).
+    let engineID: ObjectIdentifier
+    let makeSurface: () -> UIView
 
-    func makeUIView(context: Context) -> PlayerLayerView {
-        let view = PlayerLayerView()
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = gravity
-        view.backgroundColor = .black
-        return view
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .black
+        mount(makeSurface(), in: container)
+        return container
     }
 
-    func updateUIView(_ view: PlayerLayerView, context: Context) {
-        if view.playerLayer.player !== player {
-            view.playerLayer.player = player
-        }
-        view.playerLayer.videoGravity = gravity
+    func updateUIView(_ container: UIView, context: Context) {
+        let current = makeSurface()
+        guard container.subviews.first !== current else { return }
+        container.subviews.forEach { $0.removeFromSuperview() }
+        mount(current, in: container)
+    }
+
+    private func mount(_ view: UIView, in container: UIView) {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            view.topAnchor.constraint(equalTo: container.topAnchor),
+            view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
     }
 }
 
-/// A UIView whose backing layer *is* the player layer, so it resizes with
-/// the view rather than needing manual frame bookkeeping.
-final class PlayerLayerView: UIView {
-    override static var layerClass: AnyClass { AVPlayerLayer.self }
-
-    var playerLayer: AVPlayerLayer {
-        // Safe by construction: `layerClass` above guarantees the type.
-        layer as! AVPlayerLayer
-    }
-}
-
-/// Aspect-ratio modes the user can cycle, matching the dock's ASPECT chip.
+/// Aspect modes the dock's FIT chip cycles.
 enum VideoAspect: String, CaseIterable {
     case fit = "FIT"
     case fill = "FILL"
 
-    var gravity: AVLayerVideoGravity {
-        switch self {
-        case .fit: return .resizeAspect
-        case .fill: return .resizeAspectFill
-        }
-    }
-
+    var isFill: Bool { self == .fill }
     var next: VideoAspect { self == .fit ? .fill : .fit }
 }

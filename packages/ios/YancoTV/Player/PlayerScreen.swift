@@ -41,8 +41,13 @@ struct PlayerScreen: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                VideoSurface(player: controller.player, gravity: aspect.gravity)
+                if let engine = controller.engine {
+                    EngineSurface(
+                        engineID: ObjectIdentifier(engine),
+                        makeSurface: { engine.surface }
+                    )
                     .ignoresSafeArea()
+                }
 
                 if controller.isBuffering && controller.errorMessage == nil {
                     BufferingOverlay()
@@ -331,6 +336,7 @@ struct PlayerScreen: View {
             hexControl("SPEED", size: m.secondary, font: 9, wide: true, enabled: false) {}
             hexControl(aspect.rawValue, size: m.secondary, font: 9, wide: true) {
                 aspect = aspect.next
+                controller.setAspectFill(aspect.isFill)
             }
             hexControl(
                 "♥", size: m.secondary, font: 11,

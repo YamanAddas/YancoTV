@@ -41,9 +41,11 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :shared:checkIosCompile
 
 1. **Shared logic lives in `../shared/`** — if Swift code starts re-implementing a parser/classifier/repo, stop and use (or extend) the KMP module instead. Rule 8 in [AGENTS.md](../../AGENTS.md).
 2. **Credentials go in the iOS Keychain** (MK.iOS.2) — never UserDefaults, never SQLite, never logs. Mirror `redactCredentials` behavior at every rendering site.
-3. **ATS/cleartext:** not configured yet. When MK.iOS.2/3 land real provider traffic, port the cleartext threat-model decision from [AGENTS.md](../../AGENTS.md) deliberately (`NSAllowsArbitraryLoads` + the same application-layer host allow-list rationale) — do not cargo-cult it in before there is network code.
-4. **One `MK.iOS.*` sub-task per commit.** Don't push without an explicit ask.
-5. **No feature work outside the active plan** — amend PRODUCTION_PLAN_NATIVE.md first.
+3. **ATS/cleartext:** `NSAllowsArbitraryLoads` is on, as the deliberate iOS half of the cleartext threat-model decision in [AGENTS.md](../../AGENTS.md) — providers serve plain HTTP and the host set is user-configured at runtime, so a static ATS exception list cannot be written ahead of time. **The other half is missing:** Android backs this with an application-layer allow-list seeded from the `sources` table (MK.SEC.A/B/C, MB-203); iOS has no equivalent yet (MK.iOS.SEC). Until it lands, flag any new plain-HTTP call site in review, and never add credential-bearing HTTP outside a user-configured provider host.
+4. **Playback goes through `PlaybackEngine`** — never talk to `AVPlayer` or `VLCMediaPlayer` from a view. Same rule as desktop's `IPlayer`. `PlaybackController` owns one engine at a time and swaps it; `EngineRouter` picks, and an unsupported-format failure promotes to VLC once.
+5. **VLCKit is LGPL.** Keep it dynamically linked, never re-target it as a static archive, and never swap in a custom libVLC built with GPL modules — that would pull YancoTV itself under GPL. See [docs/LICENSES.md](../../docs/LICENSES.md).
+6. **One `MK.iOS.*` sub-task per commit.** Don't push without an explicit ask.
+7. **No feature work outside the active plan** — amend PRODUCTION_PLAN_NATIVE.md first.
 
 ## Layout
 

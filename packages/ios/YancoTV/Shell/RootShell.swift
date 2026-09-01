@@ -62,6 +62,22 @@ struct RootShell: View {
                let first = state.library.live.first {
                 state.play(first)
             }
+            // Plays an arbitrary URL, so engine routing and the MPEG-TS
+            // fallback can be exercised against a stream that isn't in the
+            // library:
+            //   SIMCTL_CHILD_YANCO_DEBUG_PLAY_URL=http://…/play/x  simctl launch …
+            if let raw = ProcessInfo.processInfo.environment["YANCO_DEBUG_PLAY_URL"] {
+                state.play(
+                    YancoItem(
+                        id: "debug-url",
+                        title: "Debug stream",
+                        kind: .live,
+                        group: "Debug",
+                        backdropSeed: "debug",
+                        streamURL: raw
+                    )
+                )
+            }
             #endif
         }
         .fullScreenCover(item: $state.playingItem) { item in

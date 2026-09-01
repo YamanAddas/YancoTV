@@ -1,21 +1,32 @@
 import AVFoundation
-import Combine
 import Foundation
 import SwiftUI
 
-/// AVPlayer wrapper — the iOS counterpart to Android's `PlaybackController`.
+/// Owns playback — the iOS counterpart to Android's `PlaybackController`.
 ///
-/// The Android hard rule is "one ExoPlayer, owned by the controller, never
-/// constructed elsewhere". Same rule here: one `AVPlayer`, and the item is
-/// swapped with `replaceCurrentItem` rather than building a second player.
+/// The Android hard rule is "one ExoPlayer, owned by the controller,
+/// never constructed elsewhere". Same rule here, one level up: the
+/// controller owns exactly one **engine** at a time and swaps it when a
+/// stream needs a different one. Views never touch an engine directly.
+///
+/// ### Engine selection and fallback
+///
+/// `EngineRouter` guesses from the URL, and a format failure promotes to
+/// VLC and retries once. This mirrors what the rest of the category does
+/// — engine chains rather than a single player — because no one engine
+/// covers what IPTV providers actually serve.
+///
+/// The retry is deliberately narrow: only an *unsupported format* falls
+/// back. Retrying a 403 or a timeout on a second engine just fails twice
+/// as slowly and buries the real cause.
 ///
 /// ### Resume-point discipline
 ///
-/// Carried over from `native-android-mk` because the failure mode is
+/// Carried over from `native-android-mk`, because the failure mode is
 /// identical on either platform: **every transition that loads a new item
 /// persists the outgoing position first**. Lifecycle hooks alone miss the
-/// zap-through-player and queue-replace cases, so [load] and [teardown]
-/// both flush before they do anything else.
+/// zap-through-player and queue-replace cases, so `load` and `teardown`
+/// both flush before doing anything else.
 @MainActor
 @Observable
 final class PlaybackController {
@@ -27,28 +38,30 @@ final class PlaybackController {
     private(set) var duration: Double = 0
     private(set) var bufferedTime: Double = 0
     private(set) var errorMessage: String?
+    /// Which engine is driving playback. Surfaced in the dock's
+    /// diagnostics so a support question has an answer.
+    private(set) var engineKind: EngineKind = .avPlayer
 
-    /// Live streams have no meaningful duration or scrub target.
     var isLive: Bool { item?.kind == .live }
 
-    let player = AVPlayer()
+    @ObservationIgnored private(set) var engine: (any PlaybackEngine)?
+    @ObservationIgnored private var library: LibraryStore?
+    @ObservationIgnored private var ticker: Task<Void, Never>?
+    @ObservationIgnored private var triedVLC = false
+    @ObservationIgnored private var pendingResume: Double = 0
+    @ObservationIgnored private var aspectFill = false
 
-    private var library: LibraryStore?
-    private var timeObserver: Any?
-    private var statusObservation: NSKeyValueObservation?
-    private var bufferObservation: NSKeyValueObservation?
-    private var stallObservation: NSKeyValueObservation?
-
-    // MARK: - Lifecycle
+    private static let userAgent = "YancoTV/1.0 (iOS)"
 
     func attach(library: LibraryStore) {
         self.library = library
     }
 
-    /// Loads `item` and starts playback, seeking to its stored resume point.
+    // MARK: - Loading
+
     func load(_ item: YancoItem) async {
-        // Persist the *outgoing* item before anything replaces it.
         flushPosition()
+        teardownEngine()
 
         guard let raw = item.streamURL, let url = URL(string: raw) else {
             self.item = item
@@ -62,77 +75,87 @@ final class PlaybackController {
         currentTime = 0
         duration = 0
         bufferedTime = 0
+        triedVLC = false
 
         configureAudioSession()
+        pendingResume = item.kind == .live ? 0 : (await library?.resumePosition(for: item.id) ?? 0)
 
-        let resume = await library?.resumePosition(for: item.id)
-
-        let asset = AVURLAsset(
-            url: url,
-            options: [
-                // Providers commonly gate playlists and streams on a
-                // recognised player UA; the default Darwin one gets 403s.
-                "AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": Self.userAgent]
-            ]
-        )
-        let playerItem = AVPlayerItem(asset: asset)
-        observe(playerItem)
-        player.replaceCurrentItem(with: playerItem)
-
-        if let resume, resume > 0, item.kind != .live {
-            await player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
-        }
-        player.play()
-        isPlaying = true
-        startTimeObserver()
+        start(engine: EngineRouter.preferredEngine(for: url), url: url)
     }
 
+    private func start(engine kind: EngineKind, url: URL) {
+        let engine: any PlaybackEngine
+        switch kind {
+        case .vlc where vlcEngineAvailable:
+            #if canImport(VLCKitSPM)
+            engine = VLCPlaybackEngine()
+            #else
+            engine = AVPlaybackEngine()
+            #endif
+        default:
+            engine = AVPlaybackEngine()
+        }
+
+        engine.delegate = self
+        engine.setAspectFill(aspectFill)
+        self.engine = engine
+        engineKind = engine.kind
+        if engine.kind == .vlc { triedVLC = true }
+
+        engine.load(url: url, userAgent: Self.userAgent, startAt: pendingResume)
+        engine.play()
+        isPlaying = true
+        startTicker()
+    }
+
+    // MARK: - Transport
+
     func togglePlayPause() {
+        guard let engine else { return }
         if isPlaying {
-            player.pause()
-            // A pause is a natural commit point, and on iOS it is often the
-            // last thing that happens before the app is suspended.
+            engine.pause()
+            // A pause is a natural commit point and often the last thing
+            // that happens before the app is suspended.
             flushPosition()
         } else {
-            player.play()
+            engine.play()
         }
         isPlaying.toggle()
     }
 
     func seek(to seconds: Double) {
-        guard !isLive, duration > 0 else { return }
+        guard !isLive, duration > 0, let engine else { return }
         let clamped = max(0, min(seconds, duration))
         currentTime = clamped
-        player.seek(
-            to: CMTime(seconds: clamped, preferredTimescale: 600),
-            toleranceBefore: .zero,
-            toleranceAfter: .zero
-        )
+        engine.seek(to: clamped)
     }
 
-    func skip(_ delta: Double) {
-        seek(to: currentTime + delta)
+    func skip(_ delta: Double) { seek(to: currentTime + delta) }
+
+    func setAspectFill(_ fill: Bool) {
+        aspectFill = fill
+        engine?.setAspectFill(fill)
     }
 
-    /// Stops playback and releases observers. Flushes first — closing the
-    /// player is exactly the transition a lifecycle hook would miss.
     func teardown() {
         flushPosition()
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        stopTimeObserver()
-        statusObservation = nil
-        bufferObservation = nil
-        stallObservation = nil
+        teardownEngine()
         isPlaying = false
         item = nil
         errorMessage = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        try? AVAudioSession.sharedInstance()
+            .setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     // MARK: - Internals
 
-    private static let userAgent = "YancoTV/1.0 (iOS)"
+    private func teardownEngine() {
+        ticker?.cancel()
+        ticker = nil
+        engine?.delegate = nil
+        engine?.teardown()
+        engine = nil
+    }
 
     private func configureAudioSession() {
         // `.playback` keeps audio going with the ring switch silenced and
@@ -142,60 +165,21 @@ final class PlaybackController {
         try? session.setActive(true)
     }
 
-    private func observe(_ playerItem: AVPlayerItem) {
-        statusObservation = playerItem.observe(\.status, options: [.new]) { [weak self] item, _ in
-            Task { @MainActor in
-                guard let self else { return }
-                switch item.status {
-                case .readyToPlay:
-                    self.isBuffering = false
-                    let seconds = item.duration.seconds
-                    self.duration = seconds.isFinite && seconds > 0 ? seconds : 0
-                case .failed:
-                    self.isBuffering = false
-                    self.errorMessage = Self.describe(item.error)
-                default:
-                    break
+    /// 2Hz, matching the Android dock's progress ticker. Polling rather
+    /// than per-engine time callbacks so both engines report identically.
+    private func startTicker() {
+        ticker?.cancel()
+        ticker = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, let engine = self.engine else { return }
+                self.currentTime = engine.currentTime
+                self.bufferedTime = engine.bufferedTime
+                if self.duration == 0, engine.duration > 0 {
+                    self.duration = engine.duration
                 }
             }
         }
-
-        bufferObservation = playerItem.observe(\.loadedTimeRanges, options: [.new]) { [weak self] item, _ in
-            Task { @MainActor in
-                guard let range = item.loadedTimeRanges.first?.timeRangeValue else { return }
-                self?.bufferedTime = range.start.seconds + range.duration.seconds
-            }
-        }
-
-        stallObservation = playerItem.observe(\.isPlaybackLikelyToKeepUp, options: [.new]) { [weak self] item, _ in
-            Task { @MainActor in
-                self?.isBuffering = !item.isPlaybackLikelyToKeepUp
-            }
-        }
-    }
-
-    private func startTimeObserver() {
-        stopTimeObserver()
-        timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
-            queue: .main
-        ) { [weak self] time in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.currentTime = time.seconds
-                if self.duration == 0, let d = self.player.currentItem?.duration.seconds,
-                   d.isFinite, d > 0 {
-                    self.duration = d
-                }
-            }
-        }
-    }
-
-    private func stopTimeObserver() {
-        if let timeObserver {
-            player.removeTimeObserver(timeObserver)
-        }
-        timeObserver = nil
     }
 
     private func flushPosition() {
@@ -206,30 +190,35 @@ final class PlaybackController {
             duration: duration > 0 ? duration : nil
         )
     }
+}
 
-    /// Turns AVFoundation's opaque failures into something a user can act
-    /// on.
-    ///
-    /// The one worth naming explicitly is the format: AVPlayer handles HLS
-    /// and progressive MP4 but **not raw MPEG-TS**, which a large share of
-    /// live IPTV still serves. ExoPlayer does, which is why Android has no
-    /// equivalent message. Saying "this stream format isn't supported yet"
-    /// is honest; letting it read as a network error would send the user
-    /// chasing the wrong problem. VLCKit closes this gap — see MK.iOS.3b.
-    private static func describe(_ error: Error?) -> String {
-        guard let error = error as NSError? else { return "Playback failed." }
-        switch error.code {
-        case -11828, -11829, -11800:
-            return "This stream format isn't supported by iOS playback yet. "
-                + "HLS (.m3u8) streams play; raw MPEG-TS needs the VLC engine."
-        case -1009:
-            return "No internet connection."
-        case -1001:
-            return "The provider timed out."
-        case -1003, -1200:
-            return "Couldn't reach the provider."
-        default:
-            return error.localizedDescription
+extension PlaybackController: PlaybackEngineDelegate {
+    func engineDidBecomeReady(duration: Double) {
+        isBuffering = false
+        if duration > 0 { self.duration = duration }
+    }
+
+    func engineBufferingChanged(_ buffering: Bool) {
+        isBuffering = buffering
+    }
+
+    func engineDidFail(message: String, formatUnsupported: Bool) {
+        // The one case worth a second attempt: AVFoundation could not open
+        // the container. Promote to VLC and retry, once.
+        if formatUnsupported,
+           !triedVLC,
+           vlcEngineAvailable,
+           let raw = item?.streamURL,
+           let url = URL(string: raw) {
+            teardownEngine()
+            isBuffering = true
+            start(engine: .vlc, url: url)
+            return
         }
+
+        isBuffering = false
+        errorMessage = formatUnsupported && !vlcEngineAvailable
+            ? "This stream's format needs the VLC engine, which isn't available in this build."
+            : message
     }
 }

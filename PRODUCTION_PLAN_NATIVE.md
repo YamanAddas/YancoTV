@@ -1446,6 +1446,28 @@ Live TV plays. Verified end to end against a real HLS channel from a synced sour
 
 **Not ported yet:** PiP (MK.iOS.5); the seek-flash and gesture-HUD overlays; the title marquee (`basicMarquee` with its 1500ms delays and 30dp/s velocity, plus the 22dp edge fade); `NEXT` episode; and CC / AUDIO / SPEED / MENU, which need track selection and the options sheet — they render disabled rather than hidden so the slab keeps its shape. The `NowPlayingMetadata` title normaliser is also unported, so a messy provider title still shows raw.
 
+### MK.iOS.3b — VLCKit fallback engine (shipped 2026-08-31)
+
+MPEG-TS plays. **Verified:** libVLC decodes and renders live video inside the app, and `EngineRouter` sends an extensionless provider URL to it without being asked.
+
+**Why this stopped being optional.** The first pass framed VLCKit as a heavy dependency to weigh carefully. That was over-cautious: every serious iOS IPTV player bundles a software decoder, because AVFoundation does not demux MPEG-TS and a large share of live IPTV is MPEG-TS. The engine-chain pattern is the category norm, not a compromise.
+
+| Piece | Notes |
+|---|---|
+| `PlaybackEngine` | The abstraction, mirroring desktop's `IPlayer` rule. Views never touch a player |
+| `AVPlaybackEngine` | HLS + MP4. Preferred when it can cope: hardware decode, lowest battery, and the only path to AirPlay and system PiP |
+| `VLCPlaybackEngine` | Everything else — MPEG-TS above all, plus MKV/AVI and `rtsp://`. Guarded by `#if canImport(VLCKitSPM)` so a resolution failure degrades to an AVPlayer-only app that still builds |
+| `EngineRouter` | Guesses from the URL. Extensionless (the common Xtream live shape) routes to **VLC**: guessing wrong toward VLC costs a software decode, guessing wrong toward AVPlayer costs a failed load, a visible error and a re-buffer |
+| Fallback | An *unsupported-format* failure promotes to VLC once. Deliberately narrow — retrying a 403 or a timeout on a second engine just fails twice as slowly and buries the cause |
+
+**Licensing.** LGPL-2.1-or-later, dynamically linked. libVLC was relicensed from GPL by VideoLAN in 2011 precisely to make App Store distribution possible, and VLC returned to the store in 2013 on that basis. YancoTV stays closed-source; the obligations (attribution, user notice, offer of source) and the GPL-module trap are recorded in [docs/LICENSES.md](docs/LICENSES.md). **The user-facing notice is still owed** — an in-app acknowledgements screen is required to discharge it and is not built yet.
+
+**Size, measured not estimated.** The wrapper artifact is **~778 MB** to download (all Apple platforms and architectures). In a debug simulator build the app bundle is **145 MB**, of which **119 MB is `MobileVLCKit.framework`**. Device builds and App Store thinning cut that; the `.ipa` delta has not been measured and should be before any release claim. If CI download cost bites, an iOS-only framework is the lever.
+
+**ATS.** `NSAllowsArbitraryLoads` is now on — the iOS half of the cleartext decision AGENTS.md documents for Android. The **other half is missing**: Android backs it with an application-layer allow-list seeded from the `sources` table (MK.SEC.A/B/C, MB-203). iOS has no equivalent. Tracked as **MK.iOS.SEC**; until it lands, plain-HTTP call sites need review scrutiny.
+
+**Known gaps:** aspect-fill is AVPlayer-only (libVLC needs a crop geometry computed from the view ratio — a fit-only toggle beats a broken one); VLC reports no loaded-range, so the ribbon's buffered layer tracks the play head on that engine; PiP and AirPlay remain AVPlayer-only, which is inherent.
+
 ### Correction to the 2026-04-20 sharing estimate
 
 The decision log records "KMP shares ~60% of code vs two full ports." Measured 2026-08-10: `commonMain` is **13,635 lines against 52,778 in `packages/android/`** — roughly **20%**, not 60%.
