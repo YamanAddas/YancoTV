@@ -80,24 +80,24 @@ final class LibraryStore {
         }
 
         isLoading = true
-        let snapshot = await SharedServices.shared.run { services -> LibrarySnapshot in
-            LibrarySnapshot(
-                sources: services.sources.getAll().map(SourceSummary.init(kotlin:)),
-                live: services.content.page(
-                    type: .live, group: nil, offset: 0, limit: 300, sourceId: nil
-                ).map(YancoItem.init(kotlin:)),
-                movies: services.content.page(
-                    type: .movie, group: nil, offset: 0, limit: 300, sourceId: nil
-                ).map(YancoItem.init(kotlin:)),
-                series: services.content.page(
-                    type: .series, group: nil, offset: 0, limit: 300, sourceId: nil
-                ).map(YancoItem.init(kotlin:))
+        // One guarded bridge crossing. `librarySnapshot` wraps the reads in
+        // Kotlin, because an exception reaching Swift terminates the
+        // process rather than raising.
+        let snapshot = await SharedServices.shared.run { services -> Snapshot in
+            let raw = services.librarySnapshot(limit: Int64(Self.pageLimit))
+            return Snapshot(
+                sources: raw.sources.map(SourceSummary.init(kotlin:)),
+                live: raw.live.map(YancoItem.init(kotlin:)),
+                movies: raw.movies.map(YancoItem.init(kotlin:)),
+                series: raw.series.map(YancoItem.init(kotlin:)),
+                error: raw.error
             )
         }
         sources = snapshot.sources
         live = snapshot.live
         movies = snapshot.movies
         series = snapshot.series
+        if let error = snapshot.error { lastError = error }
         isLoading = false
 
         #if DEBUG
@@ -140,7 +140,7 @@ final class LibraryStore {
         password: String?
     ) async {
         lastError = nil
-        let created = await SharedServices.shared.run { services -> String? in
+        let outcome = await SharedServices.shared.run { services -> (id: String?, error: String?) in
             let input = AddSourceInput(
                 name: name,
                 type: type.kotlin,
@@ -153,20 +153,40 @@ final class LibraryStore {
                 userAgent: nil,
                 referer: nil
             )
-            // addSource validates and can throw on malformed input; the
-            // message is the user's only clue about what was wrong.
-            return services.sources.addSource(input: input).id
+            // `addSourceSafely` catches Kotlin's `require(...)` failures.
+            // Calling `addSource` directly would kill the app on malformed
+            // input rather than raise, because nothing in the shared module
+            // is annotated `@Throws`.
+            let result = services.addSourceSafely(input: input)
+            return (result.sourceId, result.error)
+        }
+        if let error = outcome.error {
+            lastError = error
+            return
         }
         await refresh()
-        if let created { await sync(sourceID: created) }
+        if let id = outcome.id { await sync(sourceID: id) }
     }
 
     func removeSource(_ id: String) async {
-        await SharedServices.shared.run { services in
-            services.sources.removeSource(id: id)
+        let error = await SharedServices.shared.run { services in
+            services.removeSourceSafely(id: id)
         }
+        if let error { lastError = error }
         await refresh()
     }
+
+    /// How many items per content type are read into memory.
+    ///
+    /// **A real provider catalogue is far larger than this.** A 10,000-
+    /// channel Xtream account shows only the first 1,000 here, silently.
+    /// The shared `ContentRepository` is fully paginated
+    /// (`page(type:group:offset:limit:sourceId:)`) and Android drives it
+    /// that way; the iOS shell does not page yet. Tracked as MK.iOS.PAGE —
+    /// raising this constant is not the fix, it only moves the cliff.
+    /// `nonisolated` so it can be read inside the Sendable closure that
+    /// runs on the shared queue.
+    nonisolated static let pageLimit = 1000
 
     // MARK: - Sync
 
@@ -243,12 +263,14 @@ final class LibraryStore {
     }
 }
 
-/// One trip across the queue boundary instead of four.
-private struct LibrarySnapshot: Sendable {
+/// Swift-side snapshot. Named `Snapshot` because `LibrarySnapshot` is now
+/// the Kotlin type it is mapped from.
+private struct Snapshot: Sendable {
     let sources: [SourceSummary]
     let live: [YancoItem]
     let movies: [YancoItem]
     let series: [YancoItem]
+    let error: String?
 }
 
 /// The source kinds the iOS add-source form offers. `M3U_FILE` and

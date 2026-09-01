@@ -61,7 +61,7 @@ struct PlayerScreen: View {
                     VStack(spacing: 0) {
                         topBar
                         Spacer(minLength: 0)
-                        dock(metrics)
+                        dock(metrics, width: geo.size.width)
                     }
                     // Without an explicit width the trailing `Spacer` in the
                     // top bar expands into the ZStack's unbounded proposal
@@ -111,15 +111,19 @@ struct PlayerScreen: View {
 
     // MARK: - Dock
 
-    private func dock(_ m: PlayerChromeMetrics.Dock) -> some View {
-        VStack(spacing: 0) {
-            metadata(m)
+    private func dock(_ m: PlayerChromeMetrics.Dock, width: CGFloat) -> some View {
+        // Inner width after the dock's own horizontal padding — the base
+        // the 0.55 and 0.78 fractions are taken from.
+        let inner = max(width - (compact ? Space.xl : Space.page) * 2, 1)
+
+        return VStack(spacing: 0) {
+            metadata(m, inner: inner)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer().frame(height: 6)
 
             if !controller.isLive {
-                progressRibbon(m)
+                progressRibbon(m, inner: inner)
                 Spacer().frame(height: 6)
             }
 
@@ -145,7 +149,7 @@ struct PlayerScreen: View {
 
     // MARK: Metadata
 
-    private func metadata(_ m: PlayerChromeMetrics.Dock) -> some View {
+    private func metadata(_ m: PlayerChromeMetrics.Dock, inner: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("NOW PLAYING")
                 .font(.system(size: 9, weight: .semibold))
@@ -179,7 +183,10 @@ struct PlayerScreen: View {
         }
         // 55% of the inner width, so the block never reaches the centre of
         // the frame "where the reference shot has a face".
-        .frame(maxWidth: .infinity * 0.55, alignment: .leading)
+        //
+        // This was `.infinity * 0.55`, which is just infinity — the
+        // constraint silently did nothing and the block ran full width.
+        .frame(maxWidth: inner * 0.55, alignment: .leading)
     }
 
     private var metadataLine: String {
@@ -217,7 +224,7 @@ struct PlayerScreen: View {
 
     private var displayedTime: Double { scrubbing ? scrubTarget : controller.currentTime }
 
-    private func progressRibbon(_ m: PlayerChromeMetrics.Dock) -> some View {
+    private func progressRibbon(_ m: PlayerChromeMetrics.Dock, inner: CGFloat) -> some View {
         HStack(spacing: m.horizontalPadding) {
             Text(DockTime.clock(displayedTime))
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
@@ -241,7 +248,8 @@ struct PlayerScreen: View {
         .padding(.horizontal, m.horizontalPadding)
         .padding(.vertical, m.verticalPadding)
         .glassSurface(Capsule(), palette: palette, alpha: 0.75)
-        .frame(maxWidth: .infinity * 0.78)
+        // Same bug as the metadata block: `.infinity * 0.78` is infinity.
+        .frame(maxWidth: inner * 0.78)
         // Seek keys and drags are physical, so the ribbon never mirrors.
         .environment(\.layoutDirection, .leftToRight)
     }

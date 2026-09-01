@@ -49,7 +49,12 @@ final class AVPlaybackEngine: NSObject, PlaybackEngine {
     }
 
     func play() { player.play() }
-    func pause() { player.pause() }
+
+    @discardableResult
+    func pause() -> Bool {
+        player.pause()
+        return true
+    }
 
     func seek(to seconds: Double) {
         player.seek(

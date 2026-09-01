@@ -44,7 +44,14 @@ final class PlaybackController {
 
     var isLive: Bool { item?.kind == .live }
 
-    @ObservationIgnored private(set) var engine: (any PlaybackEngine)?
+    /// **Must stay observable.** `PlayerScreen` reads this to mount the
+    /// engine's video surface; marking it `@ObservationIgnored` meant the
+    /// view registered no dependency on it, so a format fallback swapped
+    /// the engine underneath a surface that never re-mounted — the picture
+    /// stayed on the dead AVPlayer view and the fallback silently did
+    /// nothing on screen.
+    private(set) var engine: (any PlaybackEngine)?
+
     @ObservationIgnored private var library: LibraryStore?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var triedVLC = false
@@ -113,14 +120,19 @@ final class PlaybackController {
     func togglePlayPause() {
         guard let engine else { return }
         if isPlaying {
-            engine.pause()
+            // Not every stream can pause — a live feed with no buffer
+            // behind it cannot. Flipping `isPlaying` regardless left the
+            // dock showing ▶ while audio kept playing, so the engine is
+            // asked whether it actually paused.
+            guard engine.pause() else { return }
             // A pause is a natural commit point and often the last thing
             // that happens before the app is suspended.
             flushPosition()
+            isPlaying = false
         } else {
             engine.play()
+            isPlaying = true
         }
-        isPlaying.toggle()
     }
 
     func seek(to seconds: Double) {

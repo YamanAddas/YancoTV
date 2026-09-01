@@ -31,7 +31,11 @@ protocol PlaybackEngine: AnyObject {
 
     func load(url: URL, userAgent: String, startAt: Double)
     func play()
-    func pause()
+    /// Returns whether the stream actually paused. A live feed with no
+    /// buffer behind it cannot, and the caller must not flip its own
+    /// playing state when it didn't.
+    @discardableResult
+    func pause() -> Bool
     func seek(to seconds: Double)
     func setAspectFill(_ fill: Bool)
     func teardown()

@@ -8,6 +8,10 @@ struct SourcesScreen: View {
     @Bindable var library: LibraryStore
 
     @State private var showsAdd = false
+    /// Removing a source deletes its entire catalogue. Android gates the
+    /// same action behind `ConfirmDangerDialog`; one stray tap should not
+    /// discard a 10,000-channel sync.
+    @State private var pendingRemoval: SourceSummary?
 
     private var inset: CGFloat { sizeClass == .compact ? Space.xl : Space.section }
 
@@ -41,6 +45,24 @@ struct SourcesScreen: View {
         }
         .sheet(isPresented: $showsAdd) {
             AddSourceSheet(library: library)
+        }
+        .confirmationDialog(
+            "Remove \(pendingRemoval?.name ?? "")?",
+            isPresented: .init(
+                get: { pendingRemoval != nil },
+                set: { if !$0 { pendingRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove source", role: .destructive) {
+                if let id = pendingRemoval?.id {
+                    Task { await library.removeSource(id) }
+                }
+                pendingRemoval = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRemoval = nil }
+        } message: {
+            Text("Its channels, movies and series are removed from your library. The provider account itself is untouched.")
         }
     }
 
@@ -97,7 +119,7 @@ struct SourcesScreen: View {
                         Task { await library.sync(sourceID: source.id) }
                     }
                     HexCta(title: "Remove", symbol: "trash") {
-                        Task { await library.removeSource(source.id) }
+                        pendingRemoval = source
                     }
                 }
                 .fixedSize()
@@ -167,7 +189,11 @@ struct AddSourceSheet: View {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
         guard !url.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
         if kind.needsCredentials {
-            return !username.isEmpty && !password.isEmpty
+            // Trimmed, because Kotlin validates with `isNullOrBlank()`: a
+            // single space passed this guard and then failed `require(...)`
+            // on the other side of a bridge that cannot raise.
+            return !username.trimmingCharacters(in: .whitespaces).isEmpty
+                && !password.trimmingCharacters(in: .whitespaces).isEmpty
         }
         return true
     }
@@ -229,11 +255,15 @@ struct AddSourceSheet: View {
                 name: trimmedName,
                 type: kind,
                 url: trimmedURL,
-                username: kind.needsCredentials ? username : nil,
-                password: kind.needsCredentials ? password : nil
+                username: kind.needsCredentials
+                    ? username.trimmingCharacters(in: .whitespaces) : nil,
+                password: kind.needsCredentials
+                    ? password.trimmingCharacters(in: .whitespaces) : nil
             )
             submitting = false
-            dismiss()
+            // Stay open when it failed, so the message is visible next to
+            // the field that caused it.
+            if library.lastError == nil { dismiss() }
         }
     }
 

@@ -1448,7 +1448,11 @@ Live TV plays. Verified end to end against a real HLS channel from a synced sour
 
 ### MK.iOS.3b — VLCKit fallback engine (shipped 2026-08-31)
 
-MPEG-TS plays. **Verified:** libVLC decodes and renders live video inside the app, and `EngineRouter` sends an extensionless provider URL to it without being asked.
+**Verification status — read this before trusting the headline.** The first version of this entry said "MPEG-TS plays", which is more than was tested. Precisely what was verified on 2026-08-31:
+
+- ✅ **libVLC decodes and renders live video in-app** — forced onto a known-good HLS stream via `YANCO_DEBUG_ENGINE=vlc`.
+- ✅ **Routing works** — an extensionless provider URL reached VLC unprompted (`creating player instance using shared library` in the log).
+- ❌ **MPEG-TS decode itself is UNVERIFIED.** The public `.ts` endpoints tried were offline, so the one thing the milestone exists for has not been observed working end to end. The pieces are individually proven and the failure mode if it is wrong would be a VLC error rather than a crash — but it is not evidence, and it should be the first thing checked against a real provider.
 
 **Why this stopped being optional.** The first pass framed VLCKit as a heavy dependency to weigh carefully. That was over-cautious: every serious iOS IPTV player bundles a software decoder, because AVFoundation does not demux MPEG-TS and a large share of live IPTV is MPEG-TS. The engine-chain pattern is the category norm, not a compromise.
 
@@ -1465,6 +1469,24 @@ MPEG-TS plays. **Verified:** libVLC decodes and renders live video inside the ap
 **Size, measured not estimated.** The wrapper artifact is **~778 MB** to download (all Apple platforms and architectures). In a debug simulator build the app bundle is **145 MB**, of which **119 MB is `MobileVLCKit.framework`**. Device builds and App Store thinning cut that; the `.ipa` delta has not been measured and should be before any release claim. If CI download cost bites, an iOS-only framework is the lever.
 
 **ATS.** `NSAllowsArbitraryLoads` is now on — the iOS half of the cleartext decision AGENTS.md documents for Android. The **other half is missing**: Android backs it with an application-layer allow-list seeded from the `sources` table (MK.SEC.A/B/C, MB-203). iOS has no equivalent. Tracked as **MK.iOS.SEC**; until it lands, plain-HTTP call sites need review scrutiny.
+
+### MK.iOS.3b-rt — red-team pass (same day)
+
+Reviewing the above adversarially rather than admiring it found four defects, three of them shipped and live:
+
+| # | Defect | Why it mattered |
+|---|---|---|
+| 1 | **`addSource` could hard-kill the app.** Nothing in the shared module is annotated `@Throws`, and a Kotlin exception reaching Swift *terminates the process* rather than raising. `SourceRepository.addSource` validates with `require(...)`, and Kotlin checks `isNullOrBlank()` while the Swift form only checked `isEmpty` — so **a username of a single space crashed the app from a text field** | The worst class of bug here: reachable by ordinary use, no error, no log, just gone. Fixed with `addSourceSafely` / `removeSourceSafely` / `librarySnapshot` wrappers in `iosMain` that catch and return data, plus trimming on the Swift side |
+| 2 | **`@ObservationIgnored` on `PlaybackController.engine`** while `PlayerScreen` reads it to mount the video surface | Registered no observation dependency, so the engine swap on format fallback would never re-mount the surface — the picture would stay on the dead AVPlayer view. **The MK.iOS.3b headline feature would have silently not worked on screen** |
+| 3 | **`.frame(maxWidth: .infinity * 0.55)`** on the metadata block and `.infinity * 0.78` on the progress ribbon | `infinity * 0.55` *is* infinity. Both constraints were no-ops and both elements ran full width — the dock had been rendering wrong since it landed, and it looked plausible enough not to notice |
+| 4 | **Pause desync on unpausable live streams.** `isPlaying` flipped unconditionally while libVLC reports `canPause == false` and keeps playing | Dock showed ▶ over playing audio. `pause()` now returns whether it actually paused |
+
+Also tightened while in there: removing a source is gated behind a confirmation (it discards the whole catalogue; Android gates the same action with `ConfirmDangerDialog`), and the add-source sheet stays open on failure so the error sits next to the field that caused it.
+
+**Found and left open, deliberately:**
+
+- **`MK.iOS.PAGE` — the library is truncated.** `LibraryStore` reads a flat 1,000 items per content type into memory. A 10,000-channel Xtream account shows the first 1,000 and says nothing. The shared `ContentRepository` is fully paginated and Android drives it that way; the iOS shell does not page yet. Raising the constant only moves the cliff.
+- **`EngineRouter` sends extensionless HTTP(S) to VLC**, on the reasoning that extensionless is usually the Xtream live shape. That is right for Xtream and wrong for any provider serving HLS behind a redirect, which then gets software-decoded — worse battery, no AirPlay. Because the fallback exists, trying AVPlayer first and demoting on format failure may be the better default. Needs measuring against real providers before flipping.
 
 **Known gaps:** aspect-fill is AVPlayer-only (libVLC needs a crop geometry computed from the view ratio — a fit-only toggle beats a broken one); VLC reports no loaded-range, so the ribbon's buffered layer tracks the play head on that engine; PiP and AirPlay remain AVPlayer-only, which is inherent.
 

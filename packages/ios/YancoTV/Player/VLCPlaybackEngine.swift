@@ -69,10 +69,15 @@ final class VLCPlaybackEngine: NSObject, PlaybackEngine {
 
     func play() { player.play() }
 
-    func pause() {
+    @discardableResult
+    func pause() -> Bool {
         // `pause()` on libVLC is a toggle, which double-fires if the
-        // caller already tracks state. `canPause` guards the no-op case.
-        if player.canPause { player.pause() }
+        // caller already tracks state — and a live feed with no buffer
+        // behind it reports `canPause == false` and simply keeps going.
+        // Reporting that back stops the dock claiming it paused.
+        guard player.canPause else { return false }
+        player.pause()
+        return true
     }
 
     func seek(to seconds: Double) {

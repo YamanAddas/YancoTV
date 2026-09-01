@@ -13,6 +13,10 @@ import com.yancotv.shared.sources.CredentialStore
 import com.yancotv.shared.sources.IosFileContentReader
 import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.sources.SyncProgress
+import com.yancotv.shared.types.AddSourceInput
+import com.yancotv.shared.types.ContentItem
+import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.Source
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -84,6 +88,65 @@ class YancoServices(
      */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    // ------------------------------------------------------------------
+    // Safe boundary
+    //
+    // **A Kotlin exception that reaches Swift terminates the process.**
+    // Kotlin/Native only converts exceptions into Swift errors for
+    // functions marked `@Throws`, and nothing in `commonMain` is — it was
+    // written for Android, where an exception is merely an exception.
+    //
+    // `SourceRepository.addSource` validates with `require(...)`, so a
+    // username of a single space is enough to hard-kill the app from a
+    // text field. Anything Swift calls that can throw goes through a
+    // wrapper here and comes back as data.
+    // ------------------------------------------------------------------
+
+    fun addSourceSafely(input: AddSourceInput): AddSourceOutcome =
+        try {
+            AddSourceOutcome(sourceId = sources.addSource(input).id, error = null)
+        } catch (t: Throwable) {
+            logger.error("addSourceSafely failed: ${t.message}")
+            AddSourceOutcome(sourceId = null, error = t.message ?: "Could not add this source.")
+        }
+
+    /** Returns an error message, or null on success. */
+    fun removeSourceSafely(id: String): String? =
+        try {
+            sources.removeSource(id)
+            null
+        } catch (t: Throwable) {
+            logger.error("removeSourceSafely failed: ${t.message}")
+            t.message ?: "Could not remove this source."
+        }
+
+    /**
+     * One guarded read for everything the shell shows.
+     *
+     * Also one bridge crossing instead of four, and it honours the Android
+     * rule that DB reads need a try/catch because a single corrupted row
+     * otherwise takes down the whole screen.
+     */
+    fun librarySnapshot(limit: Long): LibrarySnapshot =
+        try {
+            LibrarySnapshot(
+                sources = sources.getAll(),
+                live = content.page(ContentType.LIVE, null, 0, limit, null),
+                movies = content.page(ContentType.MOVIE, null, 0, limit, null),
+                series = content.page(ContentType.SERIES, null, 0, limit, null),
+                error = null,
+            )
+        } catch (t: Throwable) {
+            logger.error("librarySnapshot failed: ${t.message}")
+            LibrarySnapshot(
+                sources = emptyList(),
+                live = emptyList(),
+                movies = emptyList(),
+                series = emptyList(),
+                error = t.message ?: "Could not read the library.",
+            )
+        }
+
     /**
      * Runs [SourceRepository.syncSource] and reports progress through
      * callbacks.
@@ -150,6 +213,18 @@ class YancoServices(
  * call.
  */
 internal fun nowMillis(): Long = (NSDate().timeIntervalSince1970 * 1000.0).toLong()
+
+/** Result of [YancoServices.addSourceSafely]. */
+data class AddSourceOutcome(val sourceId: String?, val error: String?)
+
+/** Everything the shell reads in one guarded pass. */
+data class LibrarySnapshot(
+    val sources: List<Source>,
+    val live: List<ContentItem>,
+    val movies: List<ContentItem>,
+    val series: List<ContentItem>,
+    val error: String?,
+)
 
 /** Cancellation token for an in-flight sync. */
 class SyncHandle(private val job: Job) {
