@@ -202,9 +202,7 @@ private struct ContentOrb: View {
 
     private var artBox: some View {
         TileArt(
-            url: kind == .live
-                ? Artwork.backdrop(item.backdropSeed, width: 400)
-                : Artwork.poster(item.posterSeed ?? item.backdropSeed, width: 400),
+            url: item.artworkURL,
             seed: item.posterSeed ?? item.backdropSeed,
             monogram: item.monogram,
             group: item.group,
@@ -378,9 +376,7 @@ private struct PreviewPane: View {
 
     private func frame(_ item: YancoItem) -> some View {
         TileArt(
-            url: kind == .live
-                ? Artwork.backdrop(item.backdropSeed, width: 800)
-                : Artwork.poster(item.posterSeed ?? item.backdropSeed, width: 500),
+            url: item.artworkURL,
             seed: kind == .live ? item.backdropSeed : (item.posterSeed ?? item.backdropSeed),
             monogram: item.monogram,
             group: item.group

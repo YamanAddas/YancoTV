@@ -42,7 +42,7 @@ struct CategoryChipBar: View {
                     .fill(palette.BorderSubtle)
                     .frame(width: 1, height: 20)
 
-                ForEach(SampleContent.groups(for: kind), id: \.self) { group in
+                ForEach(state.groups(for: kind), id: \.self) { group in
                     chip(label: group, symbol: nil, selected: state.group(for: kind) == group) {
                         state.setGroup(group, for: kind)
                     }

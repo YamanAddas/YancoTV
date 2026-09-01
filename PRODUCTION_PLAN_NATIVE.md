@@ -1314,7 +1314,7 @@ Scoped as a separate milestone block once Android ships. Rough shape:
 | MK.iOS.0-pre | ✅ **Shipped 2026-08-10** — unrot the declared iOS targets: write the two missing `iosMain` actuals, add a compile gate so they can't rot again. Detail below. |
 | MK.iOS.0 | ✅ **Shipped 2026-08-31** — `packages/ios/` scaffold: XcodeGen [project.yml](packages/ios/project.yml) (SwiftUI, Swift 6, iOS 17+, iPhone+iPad), `Shared` static framework wired via an `embedAndSignAppleFrameworkForXcode` pre-build phase (`-lsqlite3` added for SQLiter — a static Kotlin framework doesn't carry the system sqlite it binds), proof-of-bridge screen (Kotlin `Platform()` + real `parseM3u` render from Swift) verified launching on iPhone 17 Pro and iPad Pro 11" (M5) iOS 26.5 simulators. Build/run commands + bridge notes in [packages/ios/CLAUDE.md](packages/ios/CLAUDE.md) |
 | MK.iOS.1 | ✅ **Shipped 2026-08-31** — SwiftUI shell as a faithful port of the TV design system, adaptive iPhone vs iPad. Detail below. |
-| MK.iOS.2 | Sources + credentials via iOS Keychain |
+| MK.iOS.2 | ✅ **Shipped 2026-08-31** — sources, Keychain credentials, and the real content pipeline. Detail below. |
 | MK.iOS.3 | Playback — AVPlayer default, VLCKit fallback for DTS/TrueHD |
 | MK.iOS.4 | EPG / catchup / favorites / search reusing shared KMP |
 | MK.iOS.5 | PIP + AirPlay + Chromecast |
@@ -1399,6 +1399,27 @@ The ios-compile gate went red on its first real run (2026-08-19) for exactly the
 **Debug hook:** `SIMCTL_CHILD_YANCO_START_SECTION=liveTv xcrun simctl launch …` opens straight onto a section, so every screen can be captured without driving the UI. `#if DEBUG` only.
 
 **Verified:** builds clean and runs on iPhone 17 Pro and iPad Pro 11" (M5), iOS 26.5 — Home, Live TV, Movies, Series, Favorites, Search, and the three placeholder sections.
+
+### MK.iOS.2 — sources, credentials, real content (shipped 2026-08-31)
+
+The milestone that ends the fixture. `SampleContent` is no longer what the app shows — it is opt-in behind `YANCO_SAMPLE=1` for design captures, and a fresh install now gets the real first-run empty state.
+
+**Nothing about sync was reimplemented.** `SourceRepository.syncSource()` already returns `Flow<SyncProgress>` and owns fetch → parse → classify → bulk-write for all four source types. iOS calls it. Verified end to end against a live playlist: `addSource` → credentials encrypted → HTTPS fetch → *the shared Kotlin M3U parser* → SQLDelight → rails, logging `Parsed 8 entries from M3U … inserted=8`.
+
+| Piece | Where | Notes |
+|---|---|---|
+| `KeychainCredentialStore` | `packages/ios/YancoTV/Data/` (Swift) | A 256-bit key in the Keychain; secrets sealed under it with CryptoKit AES-GCM, sealed box into the BLOB column — the same shape as Android's Keystore. `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`: *AfterFirstUnlock* so background refresh works on a locked device, *ThisDeviceOnly* so the key is excluded from iCloud and encrypted backups |
+| `YancoServices` | `shared/src/iosMain/` | Android's Koin module as a plain class. Koin is KMP-native, but exporting a scope across the Obj-C bridge means asking for dependencies by type and getting `Any?`; typed properties give Swift real types |
+| `startSync` bridge | `shared/src/iosMain/` | `Flow` has no Obj-C representation, so the flow is drained in Kotlin and surfaced as `onProgress` / `onComplete` callbacks plus a `SyncHandle` for cancellation |
+| `IosFileContentReader` | `shared/src/iosMain/` | `NSString.stringWithContentsOfFile`. Keeps the interface's default `readSource`; streaming (MB-230's fix on Android) waits for the document picker |
+| `SharedServices` | `packages/ios/YancoTV/Data/` (Swift) | The concurrency boundary. Kotlin objects are not `Sendable` and SQLDelight blocks, so everything runs on one serial queue and **only Swift value types cross back** — that invariant is what makes the `@unchecked Sendable` honest |
+| `LibraryStore` | `packages/ios/YancoTV/Data/` (Swift) | `@Observable` over the repositories; maps `ContentItem` → the existing `YancoItem`, so no view changed when real data replaced the fixture |
+
+**Why the credential store is Swift and the cipher was Kotlin.** They look like the same decision and are not. `BackupCipher` must agree byte-for-byte with Android or a cross-platform restore breaks, so it lives in `commonMain`'s `expect`/`actual`. `CredentialStore`'s own contract says the ciphertext is opaque and the key is device-bound — nothing ever has to read it elsewhere. That removes the only argument for hand-rolling Keychain access through CFDictionary-with-manual-CFRelease in Kotlin, and lets CryptoKit (Swift-only, unreachable from Kotlin/Native — the same constraint that shaped `AesGcm.ios.kt`) do the work.
+
+**Bridge facts worth keeping:** Kotlin default arguments generate no Obj-C overloads, so `logger:` is required at the call site even though `commonMain` defaults it. A nested Kotlin enum arrives as a *class* (`SyncProgress.Phase`, a `KotlinEnum` subclass) whose cases are class properties, not a Swift enum.
+
+**Not yet, and deliberately:** playback (MK.iOS.3 — tapping an item opens detail, not a player); EPG now/next, so live tiles show the group rather than the programme (MK.iOS.4); favourites are still session-local rather than through `FavoritesRepository`; the add-source form covers M3U URL and Xtream only — M3U file needs a document picker and Stalker a MAC field. **Xtream is wired but has only been exercised against the shared client's tests, not a live account** — no credentials to test with.
 
 ### Correction to the 2026-04-20 sharing estimate
 

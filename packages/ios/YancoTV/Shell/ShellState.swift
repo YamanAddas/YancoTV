@@ -12,9 +12,14 @@ import SwiftUI
 @MainActor
 @Observable
 final class ShellState {
+    /// The user's real library. Replaces `SampleContent` as the source of
+    /// truth; the fixture is still reachable behind `YANCO_SAMPLE=1` for
+    /// design captures.
+    let library = LibraryStore()
+
     var section: AppSection = .home
     var detailItem: YancoItem?
-    var favoriteIDs: Set<String> = Set(SampleContent.favorites.map(\.id))
+    var favoriteIDs: Set<String> = []
     /// Selected category per browse section. `nil` == the "All" pill.
     var selectedGroup: [String: String] = [:]
     var searchQuery: String = ""
@@ -51,7 +56,7 @@ final class ShellState {
 
     /// Items for a browse section, filtered by the active category pill.
     func items(for kind: ContentKind) -> [YancoItem] {
-        let all = SampleContent.items(for: kind)
+        let all = library.items(for: kind)
         switch group(for: kind) {
         case .none:
             return all
@@ -62,18 +67,24 @@ final class ShellState {
         }
     }
 
+    func groups(for kind: ContentKind) -> [String] {
+        library.groups(for: kind)
+    }
+
+    var allItems: [YancoItem] {
+        library.live + library.movies + library.series
+    }
+
     var favoriteItems: [YancoItem] {
-        (SampleContent.channels + SampleContent.movies + SampleContent.series)
-            .filter { favoriteIDs.contains($0.id) }
+        allItems.filter { favoriteIDs.contains($0.id) }
     }
 
     var searchResults: [YancoItem] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces).lowercased()
         guard !query.isEmpty else { return [] }
-        return (SampleContent.channels + SampleContent.movies + SampleContent.series)
-            .filter {
-                $0.title.lowercased().contains(query) || $0.group.lowercased().contains(query)
-            }
+        return allItems.filter {
+            $0.title.lowercased().contains(query) || $0.group.lowercased().contains(query)
+        }
     }
 }
 

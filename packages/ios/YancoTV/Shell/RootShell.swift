@@ -48,6 +48,7 @@ struct RootShell: View {
         .environment(\.yancoPalette, .frostedEmerald)
         .preferredColorScheme(.dark)
         .animation(.easeOut(duration: 0.2), value: state.detailItem)
+        .task { await state.library.refresh() }
     }
 
     // MARK: - Layouts
@@ -111,11 +112,7 @@ struct RootShell: View {
                 message: "Scheduled and completed recordings, once playback and the recording pipeline are wired on iOS."
             )
         case .settings:
-            SectionPlaceholder(
-                overline: "MK.iOS.2",
-                title: "Settings",
-                message: "Sources, credentials in the iOS Keychain, parental controls, appearance and playback preferences."
-            )
+            SourcesScreen(library: state.library)
         }
     }
 }

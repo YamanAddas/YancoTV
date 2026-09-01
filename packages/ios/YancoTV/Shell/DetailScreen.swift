@@ -47,7 +47,7 @@ struct DetailScreen: View {
     private var hero: some View {
         ZStack(alignment: .bottomLeading) {
             TileArt(
-                url: Artwork.backdrop(item.backdropSeed, width: 1400),
+                url: item.artworkURL,
                 seed: item.backdropSeed,
                 monogram: item.monogram,
                 group: item.group
@@ -77,7 +77,7 @@ struct DetailScreen: View {
 
     private var poster: some View {
         TileArt(
-            url: Artwork.poster(item.posterSeed ?? item.backdropSeed, width: 500),
+            url: item.artworkURL,
             seed: item.posterSeed ?? item.backdropSeed,
             monogram: item.monogram,
             group: item.group

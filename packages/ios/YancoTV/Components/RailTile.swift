@@ -85,7 +85,7 @@ struct RailTile: View {
 
     private var artBox: some View {
         TileArt(
-            url: Artwork.backdrop(item.backdropSeed, width: 640),
+            url: item.artworkURL,
             seed: item.backdropSeed,
             monogram: item.monogram,
             group: item.group,

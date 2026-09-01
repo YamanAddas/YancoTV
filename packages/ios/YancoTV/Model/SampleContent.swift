@@ -45,6 +45,10 @@ struct YancoItem: Identifiable, Hashable {
     let resume: Double?
     /// Series only — "3 Seasons · 28 Episodes".
     let seasonSummary: String?
+    /// Provider artwork (`tvg-logo` / `stream_icon`). Nil for fixtures and
+    /// for the large share of provider URLs that 404 — [ProceduralArt] is
+    /// what renders underneath either way.
+    let artworkURL: URL?
 
     init(
         id: String,
@@ -62,7 +66,8 @@ struct YancoItem: Identifiable, Hashable {
         nowProgress: Double? = nil,
         nextTitle: String? = nil,
         resume: Double? = nil,
-        seasonSummary: String? = nil
+        seasonSummary: String? = nil,
+        artworkURL: URL? = nil
     ) {
         self.id = id
         self.title = title
@@ -80,6 +85,7 @@ struct YancoItem: Identifiable, Hashable {
         self.nextTitle = nextTitle
         self.resume = resume
         self.seasonSummary = seasonSummary
+        self.artworkURL = artworkURL
     }
 
     /// Two-or-three letter monogram, the fallback every IPTV UI needs

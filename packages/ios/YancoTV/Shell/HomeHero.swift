@@ -78,7 +78,7 @@ struct HomeHero: View {
     private func heroFrame(_ slide: HeroSlide) -> some View {
         ZStack(alignment: .bottomLeading) {
             TileArt(
-                url: Artwork.backdrop(slide.item.backdropSeed, width: 1200),
+                url: slide.item.artworkURL,
                 seed: slide.item.backdropSeed,
                 monogram: slide.item.monogram,
                 group: slide.item.group,

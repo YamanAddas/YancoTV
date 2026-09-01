@@ -17,23 +17,29 @@ struct HomeScreen: View {
     private var tileWidth: CGFloat { compact ? 200 : ShellDim.posterTile }
     private var railHeight: CGFloat { tileWidth * 9 / 16 + 88 }
 
+    /// Up to three slides drawn from what the library actually has —
+    /// resumable titles first, then live channels. EPG programme titles
+    /// arrive with MK.iOS.4; until then a live slide leads with the channel.
     private var heroSlides: [HomeHero.HeroSlide] {
-        var slides: [HomeHero.HeroSlide] = SampleContent.continueWatching.prefix(1).map {
-            .init(
-                item: $0,
-                eyebrow: "CONTINUE WATCHING",
-                symbol: "play.fill",
-                headline: $0.title,
-                subhead: "\(Int((1 - ($0.resume ?? 0)) * 100))% left • pick up where you stopped"
-            )
-        }
-        slides += SampleContent.channels.prefix(2).map {
+        var slides: [HomeHero.HeroSlide] = state.allItems
+            .filter { $0.resume != nil }
+            .prefix(1)
+            .map {
+                .init(
+                    item: $0,
+                    eyebrow: "CONTINUE WATCHING",
+                    symbol: "play.fill",
+                    headline: $0.title,
+                    subhead: "\(Int((1 - ($0.resume ?? 0)) * 100))% left • pick up where you stopped"
+                )
+            }
+        slides += state.library.live.prefix(3 - slides.count).map {
             .init(
                 item: $0,
                 eyebrow: "ON AIR NOW",
                 symbol: "dot.radiowaves.left.and.right",
                 headline: $0.nowTitle ?? $0.title,
-                subhead: "\($0.title)  •  20:00 – 22:00"
+                subhead: $0.nowTitle == nil ? $0.group : $0.title
             )
         }
         return slides
@@ -42,61 +48,74 @@ struct HomeScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xxxl) {
-                HomeHero(slides: heroSlides) { state.detailItem = $0 }
-                    .padding(.horizontal, pageInset)
+                if state.library.isEmpty {
+                    // Mirrors the Android `EmptyHome` card: an install with
+                    // no sources gets a route forward, not an empty rail.
+                    emptyHome
+                } else {
+                    HomeHero(slides: heroSlides) { state.detailItem = $0 }
+                        .padding(.horizontal, pageInset)
 
-                rail(
-                    eyebrow: "FOR YOU",
-                    title: "Continue watching",
-                    caption: "Jump back where you left off",
-                    items: SampleContent.continueWatching,
-                    style: .poster
-                )
+                    rail(
+                        eyebrow: "FOR YOU",
+                        title: "Continue watching",
+                        caption: "Jump back where you left off",
+                        items: state.allItems.filter { $0.resume != nil },
+                        style: .poster
+                    )
 
-                rail(
-                    eyebrow: "ON AIR",
-                    title: "On now",
-                    caption: "Live right this second on your favorite channels",
-                    items: Array(SampleContent.channels.prefix(6)),
-                    style: .onNow
-                )
+                    rail(
+                        eyebrow: "ON AIR",
+                        title: "Live now",
+                        caption: "Channels from your sources",
+                        items: Array(state.library.live.prefix(20)),
+                        style: .poster
+                    )
 
-                rail(
-                    eyebrow: "YOUR LIBRARY",
-                    title: "Favorites",
-                    caption: "Movies and series you starred",
-                    items: state.favoriteItems,
-                    style: .poster
-                )
+                    rail(
+                        eyebrow: "YOUR LIBRARY",
+                        title: "Favorites",
+                        caption: "Everything you starred",
+                        items: state.favoriteItems,
+                        style: .poster
+                    )
 
-                rail(
-                    eyebrow: "TONIGHT",
-                    title: "Up next",
-                    caption: "Starting soon on your favorite channels",
-                    items: Array(SampleContent.channels.suffix(4)),
-                    style: .upNext
-                )
+                    rail(
+                        eyebrow: "BROWSE",
+                        title: "Movies",
+                        caption: "Straight from your library",
+                        items: Array(state.library.movies.prefix(20)),
+                        style: .poster
+                    )
 
-                rail(
-                    eyebrow: "BROWSE",
-                    title: "Movies",
-                    caption: "Straight from your library",
-                    items: SampleContent.movies,
-                    style: .poster
-                )
-
-                rail(
-                    eyebrow: "BROWSE",
-                    title: "Series",
-                    caption: "Straight from your library",
-                    items: SampleContent.series,
-                    style: .poster
-                )
+                    rail(
+                        eyebrow: "BROWSE",
+                        title: "Series",
+                        caption: "Straight from your library",
+                        items: Array(state.library.series.prefix(20)),
+                        style: .poster
+                    )
+                }
             }
             .padding(.top, Space.xl)
             .padding(.bottom, Space.section)
         }
         .background(palette.BackgroundDeep)
+    }
+
+    private var emptyHome: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            SectionPlaceholder(
+                overline: "YANCOTV+",
+                title: "Your cinematic IPTV suite",
+                message: "Add an M3U playlist or an Xtream Codes account and your channels, movies and series land here."
+            )
+            HexCta(title: "Add your first source", symbol: "plus", primary: true) {
+                state.section = .settings
+            }
+            .fixedSize()
+            .padding(.horizontal, pageInset)
+        }
     }
 
     @ViewBuilder
