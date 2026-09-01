@@ -1385,6 +1385,15 @@ The ios-compile gate went red on its first real run (2026-08-19) for exactly the
 
 **Artwork.** `Components/Artwork.swift` generates deterministic key art (FNV-1a seeded — Swift's `hashValue` is per-process salted and would reshuffle the library every launch) from a two-tone ground, an off-centre bloom, hex outlines from the shape library, and a vignette. A placeholder image *host* was tried first and rejected: a network dependency on a screen that needs none, blank when offline, and the host used during development was 503ing within the hour. `TileArt` keeps the remote path wired, so MK.iOS.2 supplies real provider URLs without touching the views.
 
+**MK.iOS.1a — orb artwork rework (2026-08-31, same day).** The first pass drew a flat two-tone gradient with a faint monogram; in the hex orbs it read as a coloured blob and the user rejected it. Reworked:
+
+- **Genre-keyed hues** (`GenrePalette`). Hashing the *title* for hue gives every card an unrelated colour, which reads as noise on a rail. The hue family now comes from the provider category and only the variation comes from the title, so a rail of Sci-Fi reads as a set while individual titles stay distinct.
+- **Mesh colour field** — `MeshGradient` (iOS 18+, layered gradients below that) over nine seed-jittered stops: dark corners, mid edges, bright core. Baking the falloff into the field is what makes it read as lit from within rather than as flat colour under a vignette.
+- **Focal bloom, hex constellation, specular sweep, edge falloff** — the constellation is drawn from `PointyHexShape`, so the generated art belongs to the same shape language as the cards containing it.
+- **Orb chrome**: gradient bevel stroke (a flat stroke reads as a sticker), a second dimmer ring inset 4pt for machined thickness, and a genre-hued ambient shadow on *every* orb — without it the off-centre cards sat on flat black like cut-outs.
+- **Footer fixed**: `HexCapsuleShape` cuts `clamp(h*0.28, 10, 36)` off each side, so the flat bottom edge at 140pt runs x=36…104. The progress stripe was being clipped to a sliver by the diagonal; it and the new quality chip are now inset inside that edge.
+- **Hue-averaging bug**: the core colour used `(hueA + hueB) / 2`, which is wrong across the wheel's 0/1 seam. Drama is amber `0.07` + rose `0.95` — two neighbouring warm hues whose linear mean is `0.51`, cyan, the exact complement. Every Drama tile had a cold blue core inside a warm frame. Now uses a circular midpoint.
+
 **Sample data** lives in `Model/SampleContent.swift` and is explicitly scaffolding — `YancoItem` tracks the fields `ContentItem` already exposes over the bridge so MK.iOS.2 is a data-source swap, not a UI rewrite. No business logic is reimplemented there.
 
 **Debug hook:** `SIMCTL_CHILD_YANCO_START_SECTION=liveTv xcrun simctl launch …` opens straight onto a section, so every screen can be captured without driving the UI. `#if DEBUG` only.

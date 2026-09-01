@@ -81,6 +81,7 @@ struct HomeHero: View {
                 url: Artwork.backdrop(slide.item.backdropSeed, width: 1200),
                 seed: slide.item.backdropSeed,
                 monogram: slide.item.monogram,
+                group: slide.item.group,
                 lit: false
             )
             .id(slide.id)

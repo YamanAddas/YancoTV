@@ -188,6 +188,18 @@ private struct ContentOrb: View {
         return item.group
     }
 
+    /// The hex's side bevels: `HexCapsuleShape` cuts `clamp(h * 0.28, 10,
+    /// 36)` off each side, so at 140 the flat bottom edge runs from x=36
+    /// to x=104. Anything pinned to the bottom has to stay inside that or
+    /// it gets clipped to a sliver by the diagonal.
+    private var sideCut: CGFloat { min(max(140 * 0.28, 10), 36) }
+
+    /// Ambient bed colour, taken from the same genre hue the artwork uses
+    /// so the glow belongs to the card rather than tinting it.
+    private var genreGlow: Color {
+        Color(hue: GenrePalette.hues(for: item.group).0, saturation: 0.65, brightness: 0.75)
+    }
+
     private var artBox: some View {
         TileArt(
             url: kind == .live
@@ -195,6 +207,7 @@ private struct ContentOrb: View {
                 : Artwork.poster(item.posterSeed ?? item.backdropSeed, width: 400),
             seed: item.posterSeed ?? item.backdropSeed,
             monogram: item.monogram,
+            group: item.group,
             lit: isCentered
         )
         // Live channel logos are letterboxed inside the hex (Fit + 16pt
@@ -208,27 +221,86 @@ private struct ContentOrb: View {
                 endPoint: .bottom
             )
         )
+        .overlay(alignment: .bottom) { footer }
         .clipShape(YancoShapes.hexCapsule)
-        .overlay {
-            YancoShapes.hexCapsule
-                .stroke(
-                    isCentered ? palette.FocusRing : palette.PanelBorder,
-                    lineWidth: isCentered ? 2 : 1
-                )
-        }
-        .overlay(alignment: .bottom) {
-            if let resume = item.resume, kind != .live {
-                ProgressStripe(progress: resume)
-                    .clipShape(YancoShapes.hexCapsule)
-            }
-        }
+        .overlay { innerRing }
+        .overlay { outerBevel }
+        // Two shadows: the accent one is the focus signal and belongs to
+        // the centred card alone, but every card gets a faint bed in its
+        // own genre hue. Without it the off-centre orbs sit on flat black
+        // and the rail reads as cut-out stickers rather than lit objects.
+        .shadow(color: genreGlow.opacity(isCentered ? 0.5 : 0.28), radius: isCentered ? 26 : 12, y: 6)
         .shadow(
-            color: isCentered ? palette.Accent.opacity(0.55) : .black.opacity(0.4),
-            radius: isCentered ? 22 : 5,
-            y: isCentered ? 8 : 2
+            color: isCentered ? palette.Accent.opacity(0.45) : .black.opacity(0.45),
+            radius: isCentered ? 22 : 6,
+            y: isCentered ? 9 : 3
         )
         .scaleEffect(pressed ? 0.94 : 1)
         .animation(.spring(response: 0.25, dampingFraction: 0.75), value: pressed)
+    }
+
+    /// Outer edge. A flat stroke reads as a sticker; a gradient one reads
+    /// as a bevel catching light from the upper left, which is the same
+    /// story `HexSurface`'s specular hairline tells on the rectangular
+    /// cards.
+    private var outerBevel: some View {
+        YancoShapes.hexCapsule
+            .stroke(
+                LinearGradient(
+                    colors: isCentered
+                        ? [palette.AccentSoft, palette.Accent, palette.AccentDeep]
+                        : [
+                            palette.PanelBorder,
+                            palette.BorderSubtle,
+                            palette.BackgroundDeep.opacity(0.9),
+                        ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: isCentered ? 2 : 1
+            )
+    }
+
+    /// A second, dimmer ring set in from the first. Two edges a few points
+    /// apart is what gives the hex a machined thickness instead of a
+    /// drawn outline.
+    private var innerRing: some View {
+        YancoShapes.hexCapsule
+            .stroke(
+                Color.white.opacity(isCentered ? 0.18 : 0.07),
+                lineWidth: 1
+            )
+            .padding(4)
+    }
+
+    /// Scrim plus status, pinned inside the hex's flat bottom edge.
+    @ViewBuilder
+    private var footer: some View {
+        VStack(spacing: 5) {
+            if kind != .live, let quality = item.quality {
+                Text(quality)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.6)
+                    .foregroundStyle(quality == "4K" ? palette.Premium : palette.TextSecondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(palette.BackgroundDeep.opacity(0.72), in: Capsule())
+            }
+            if let resume = item.resume, kind != .live {
+                ProgressStripe(progress: resume, height: 3)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(.horizontal, sideCut * 0.55)
+        .padding(.bottom, 10)
+        .background(alignment: .bottom) {
+            LinearGradient(
+                colors: [.clear, palette.BackgroundDeep.opacity(0.85)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 58)
+        }
     }
 }
 
@@ -289,7 +361,14 @@ private struct PreviewPane: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            // Compact hides the artwork frame, so the metadata is short —
+            // centring it in a tall pane leaves it stranded in the middle
+            // with dead space above and below. Top-align there.
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: compact ? .topLeading : .leading
+            )
             .padding(.horizontal, inset)
             .padding(.vertical, Space.lg)
         } else {
@@ -303,7 +382,8 @@ private struct PreviewPane: View {
                 ? Artwork.backdrop(item.backdropSeed, width: 800)
                 : Artwork.poster(item.posterSeed ?? item.backdropSeed, width: 500),
             seed: kind == .live ? item.backdropSeed : (item.posterSeed ?? item.backdropSeed),
-            monogram: item.monogram
+            monogram: item.monogram,
+            group: item.group
         )
         .aspectRatio(kind == .live ? 16.0 / 9.0 : ShellDim.posterAspect, contentMode: .fit)
         .overlay {

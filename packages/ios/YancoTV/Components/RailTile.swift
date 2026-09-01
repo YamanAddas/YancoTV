@@ -88,6 +88,7 @@ struct RailTile: View {
             url: Artwork.backdrop(item.backdropSeed, width: 640),
             seed: item.backdropSeed,
             monogram: item.monogram,
+            group: item.group,
             lit: pressed
         )
         .aspectRatio(16.0 / 9.0, contentMode: .fit)

@@ -49,7 +49,8 @@ struct DetailScreen: View {
             TileArt(
                 url: Artwork.backdrop(item.backdropSeed, width: 1400),
                 seed: item.backdropSeed,
-                monogram: item.monogram
+                monogram: item.monogram,
+                group: item.group
             )
             .frame(height: heroHeight)
             .clipped()
@@ -78,7 +79,8 @@ struct DetailScreen: View {
         TileArt(
             url: Artwork.poster(item.posterSeed ?? item.backdropSeed, width: 500),
             seed: item.posterSeed ?? item.backdropSeed,
-            monogram: item.monogram
+            monogram: item.monogram,
+            group: item.group
         )
         .frame(width: posterWidth, height: posterWidth / ShellDim.posterAspect)
         .clipShape(YancoShapes.cutCornerCard)
