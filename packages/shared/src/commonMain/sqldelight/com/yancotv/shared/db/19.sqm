@@ -1,0 +1,13 @@
+-- MK.iOS.UX4 — per-episode artwork and air date.
+--
+-- `get_series_info` returns `movie_image`, `air_date` and `duration_secs`
+-- inside each episode's `info` object; the parser read only `duration` and
+-- `season` and dropped the rest, and `episodes.duration` was written as
+-- NULL unconditionally. Measured over 998 episodes across 40 sampled
+-- series on the live account: still 49% non-empty, air date 63%,
+-- duration_secs 99%.
+--
+-- Existing rows keep NULL here. They refill on the next detail open, which
+-- re-fetches and upserts the season the viewer is looking at anyway.
+ALTER TABLE episodes ADD COLUMN still_url TEXT;
+ALTER TABLE episodes ADD COLUMN air_date TEXT;

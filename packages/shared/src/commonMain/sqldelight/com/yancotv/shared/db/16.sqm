@@ -1,0 +1,37 @@
+-- MB-391 — repair clean titles left with a stranded leading separator.
+--
+-- `cleanTitle` strips quality tags, so `"4K: V SPORT ᵁᴴᴰ ³⁸⁴⁰ᴾ"` lost its
+-- `4K` and stored `": V SPORT ᵁᴴᴰ ³⁸⁴⁰ᴾ"` — the colon had separated the
+-- tag from the name, and with the tag gone it separated nothing. The
+-- cleaner now trims edge separators, but `clean_title` is computed once at
+-- import: without this, every existing install keeps the bad text until the
+-- user re-syncs a whole catalogue. On the account this was found on that is
+-- 273,869 items to re-download for a cosmetic fix, which nobody will do.
+--
+-- Measured on that account before the fix: 6,903 live rows began with a
+-- separator, each rendering as ": SKY SPORT…" in a label already short
+-- enough to truncate.
+--
+-- `TRIM(X, Y)` removes any character of Y from both ends of X. The set is
+-- the separators providers actually use — `.` and `,` are deliberately
+-- absent, since trimming a trailing dot would turn `M.A.S.H.` into
+-- `M.A.S.H`, a different kind of wrong from the one being fixed. It matches
+-- `EDGE_SEPARATORS` in TitleCleaner.kt / title-cleaner.ts.
+--
+-- The `!= ''` guard preserves MB-377: a title that trims away to nothing is
+-- left as it is, because the row's stored value already went through the
+-- "no letter or digit anywhere → keep the raw title" fallback at write
+-- time, and re-trimming it here would undo that.
+--
+-- `content_fts` is deliberately NOT rebuilt. It has no UPDATE trigger (see
+-- the note by `content_ai` — per-row FTS triggers made a resync take
+-- minutes), and it does not need one here: `unicode61` treats `:` `|` `-`
+-- as token separators, so the indexed tokens are identical either way and
+-- search results do not change. Rebuilding would mean a full FTS delete and
+-- reinsert of the catalogue during an upgrade, which is exactly the O(N²)
+-- cost MK.6.d removed.
+UPDATE content
+SET clean_title = TRIM(clean_title, ' :|/-–—')
+WHERE clean_title IS NOT NULL
+  AND TRIM(clean_title, ' :|/-–—') != clean_title
+  AND TRIM(clean_title, ' :|/-–—') != '';

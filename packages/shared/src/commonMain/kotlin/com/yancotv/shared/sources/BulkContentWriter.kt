@@ -14,6 +14,7 @@ import com.yancotv.shared.stalker.StalkerSeriesItem
 import com.yancotv.shared.stalker.StalkerVodItem
 import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.TmdbType
 import com.yancotv.shared.xtream.XtreamClient
 import com.yancotv.shared.xtream.XtreamLiveStream
 import com.yancotv.shared.xtream.XtreamSeriesInfo
@@ -482,6 +483,12 @@ class BulkContentWriter(
                                 streamId = s.streamId.toLong(),
                                 tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
                                 tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
+                                // The provider's own channel number. It was
+                                // returned on every live stream and thrown
+                                // away — 0 of 53,207 rows carried one on a
+                                // real account — so the guide fell back to
+                                // the playlist position instead.
+                                channelNumber = if (s.num != 0) s.num else null,
                             )
                         val groupName = categoryNames[s.categoryId] ?: s.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.xtreamLive(sourceId, s.streamId.toString()))
@@ -535,6 +542,14 @@ class BulkContentWriter(
                             ContentMetadata(
                                 streamId = v.streamId.toLong(),
                                 rating = v.rating.ifBlank { null },
+                                // Both come down with the bulk list and were
+                                // being dropped — 92% and 36% non-empty on
+                                // the live account — leaving the per-item
+                                // `get_vod_info` call, made only when a
+                                // detail page opens, as the sole source.
+                                tmdbId = v.tmdbId.toLongOrNull(),
+                                tmdbType = v.tmdbId.toLongOrNull()?.let { TmdbType.MOVIE },
+                                youtubeTrailer = v.trailer.ifBlank { null },
                             )
                         val groupName = categoryNames[v.categoryId] ?: v.categoryId.ifBlank { null }
                         bindString(p++, ContentIds.xtreamVod(sourceId, v.streamId.toString()))

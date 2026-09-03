@@ -6,6 +6,7 @@ import com.yancotv.shared.logger.Logger
 import com.yancotv.shared.sources.SourceRepository
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
+import com.yancotv.shared.types.DETAIL_SCHEMA
 import com.yancotv.shared.types.ContentType
 import com.yancotv.shared.types.EpisodeInfo
 import com.yancotv.shared.types.Result
@@ -49,22 +50,91 @@ class ContentDetailService(
      * sync-time value was empty). [metadata] is fully populated with
      * whatever we could load. [episodes] is only non-empty for series.
      */
-    data class Loaded(val item: ContentItem, val metadata: ContentMetadata, val episodes: List<EpisodeInfo>)
+    /**
+     * [refreshInBackground] is set when what is being returned is usable but
+     * out of date — the caller should render it and re-run [load] with
+     * [force] on its own scope so the next open is better. Nothing here does
+     * that itself: this class has no scope, and inventing one would make a
+     * detail read outlive the screen that asked for it.
+     */
+    data class Loaded(
+        val item: ContentItem,
+        val metadata: ContentMetadata,
+        val episodes: List<EpisodeInfo>,
+        val refreshInBackground: Boolean = false,
+    )
 
-    suspend fun load(item: ContentItem): Loaded {
+    /**
+     * Whether a cached blob is worth going back to the provider for.
+     *
+     * Two reasons. Something the page needs is **missing** — a movie with
+     * no plot, a series with no episodes — which is the original rule. Or
+     * the blob predates the current extraction generation: the fields this
+     * build renders were parsed away when it was written, so they look
+     * absent for the same reason a provider that has none does, and no
+     * amount of null-checking can tell those apart. See [DETAIL_SCHEMA].
+     *
+     * Either way there has to be an id to fetch against.
+     */
+    internal fun needsFetch(type: ContentType, cached: ContentMetadata): Boolean {
+        val fetchable = when (type) {
+            ContentType.MOVIE -> cached.streamId != null
+            ContentType.SERIES -> cached.seriesId != null
+            else -> false
+        }
+        return fetchable && (isMissingEssentials(type, cached) || isStale(type, cached))
+    }
+
+    /** Nothing worth rendering is cached — this fetch has to be waited for. */
+    private fun isMissingEssentials(type: ContentType, cached: ContentMetadata): Boolean =
+        when (type) {
+            ContentType.MOVIE -> cached.plot.isNullOrBlank()
+            ContentType.SERIES -> cached.episodes.isNullOrEmpty()
+            else -> false
+        }
+
+    /**
+     * Whether an old blob is missing something *this* type now renders.
+     *
+     * Scoped by type on purpose. Generation 1 added per-episode fields, so
+     * a movie blob written by generation 0 is complete — treating it as
+     * stale would put a provider round-trip in front of every movie page
+     * the viewer has ever opened, once, and get nothing back for it.
+     *
+     * **When bumping [DETAIL_SCHEMA], add the types the new generation
+     * actually affects here.** A generation that reads a new *movie* field
+     * has to list MOVIE, or those blobs will stand forever.
+     */
+    private fun isStale(type: ContentType, cached: ContentMetadata): Boolean {
+        if (cached.detailSchema >= DETAIL_SCHEMA) return false
+        return when (type) {
+            ContentType.SERIES -> true // 1 — still, air date, runtime
+            else -> false
+        }
+    }
+
+    suspend fun load(item: ContentItem, force: Boolean = false): Loaded {
         val cached = item.metadataJson?.let { parseMetadata(it) } ?: ContentMetadata()
-        // Decide if a refresh is worth making the user wait for. A movie is
-        // worth enriching only if we don't have a plot; a series if we
-        // don't have episodes. Everything else renders on cache.
-        val needsFetch =
-            when (item.type) {
-                ContentType.MOVIE -> cached.plot.isNullOrBlank() && cached.streamId != null
-                ContentType.SERIES -> cached.episodes.isNullOrEmpty() && cached.seriesId != null
-                else -> false
-            }
-
-        if (!needsFetch) {
+        if (!force && !needsFetch(item.type, cached)) {
             return Loaded(item, cached, cached.episodes.orEmpty())
+        }
+        // **A stale cache is shown, not waited for.**
+        //
+        // "Stale" here means the blob is complete by the old rules and only
+        // predates the current extraction generation — there is something
+        // good to render right now. Awaiting the provider for it turns a
+        // screen that used to open instantly into one that waits, and when
+        // the provider is unreachable `request` retries three times with
+        // 1s/3s/8s backoff, so an offline viewer would sit for twelve
+        // seconds of sleep plus four timeouts in front of an episode list
+        // already on the device — and again on every open, because a failed
+        // fetch correctly stamps nothing.
+        //
+        // So the caller gets the cache immediately and is told to enrich in
+        // the background; the *next* open has the richer copy. A cache with
+        // nothing to show still blocks, because there is nothing else to do.
+        if (!force && isStale(item.type, cached) && !isMissingEssentials(item.type, cached)) {
+            return Loaded(item, cached, cached.episodes.orEmpty(), refreshInBackground = true)
         }
 
         val creds =
@@ -138,7 +208,13 @@ class ContentDetailService(
                     episode_number = ep.episodeNumber.toLong(),
                     title = ep.title,
                     stream_url = ep.streamUrl,
-                    duration = null,
+                    // The provider sends `duration_secs` on 99% of episodes
+                    // and this column had been hard-wired to null since it
+                    // was added, so nothing outside the metadata blob ever
+                    // knew how long an episode was.
+                    duration = ep.durationSeconds?.toLong(),
+                    still_url = ep.stillUrl,
+                    air_date = ep.airDate,
                 )
             }.onFailure {
                 logger.warn("ContentDetailService.persistEpisodes(${ep.id}): ${it.message}")
@@ -169,6 +245,16 @@ class ContentDetailService(
                     tmdbId = v.tmdbId?.toLong() ?: cached.tmdbId,
                     tmdbType = cached.tmdbType ?: v.tmdbId?.let { TmdbType.MOVIE },
                     detailFetchedAt = nowMs(),
+                    // Same rule as the series path: an `Ok` that carried
+                    // nothing must not mark the cache as current. Harmless
+                    // today because generation 1 does not list MOVIE, and a
+                    // trap for generation 2 if it were left unconditional.
+                    detailSchema =
+                    if (v.plot.isNotBlank() || v.cast.isNotBlank() || v.genre.isNotBlank()) {
+                        DETAIL_SCHEMA
+                    } else {
+                        cached.detailSchema
+                    },
                 )
             }
             is Result.Err -> {
@@ -205,6 +291,9 @@ class ContentDetailService(
                                         e.containerExtension,
                                     ),
                                     duration = e.info.duration?.takeIf { it.isNotBlank() },
+                                    stillUrl = e.info.stillUrl?.takeIf { it.isNotBlank() },
+                                    airDate = e.info.airDate?.takeIf { it.isNotBlank() },
+                                    durationSeconds = e.info.durationSecs?.takeIf { it > 0 },
                                 ),
                             )
                         }
@@ -218,6 +307,16 @@ class ContentDetailService(
                     rating = d.info.rating.ifBlank { cached.rating },
                     episodes = flat.takeIf { it.isNotEmpty() } ?: cached.episodes,
                     detailFetchedAt = nowMs(),
+                    // Only when the response actually carried episodes.
+                    //
+                    // `Result.Ok` with an empty map is routine — a provider
+                    // that sends `"episodes": []` (an array, not an object)
+                    // parses to nothing — and the line above then keeps the
+                    // *old* generation's episode list. Stamping the current
+                    // generation over that would mark data that has none of
+                    // the new fields as current, and it would never be
+                    // asked for again.
+                    detailSchema = if (flat.isNotEmpty()) DETAIL_SCHEMA else cached.detailSchema,
                 )
             }
             is Result.Err -> {

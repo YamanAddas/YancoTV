@@ -275,6 +275,18 @@ class SourceRepository(
      *    sweep, which is unsafe near a sync.
      *  * `content_first_seen` keys on `source_id` directly, so it is
      *    order-independent; it sits here for symmetry.
+     *  * `content_fts` BEFORE `sources`, and for the same reason as
+     *    `recent_channels`: `deleteFtsBySource` resolves its rows through
+     *    `SELECT id FROM content WHERE source_id = ?`, so once the cascade
+     *    has taken the content rows the subquery matches nothing and the
+     *    index entries are stranded. `content_fts` is an FTS4 virtual
+     *    table — it carries no foreign key and the per-row `content_ad`
+     *    trigger was deleted in MK.6.d for being O(N²), so nothing else
+     *    will ever collect them. Measured: removing a 12,884-row source
+     *    left all 12,884 FTS entries behind, permanently, growing with
+     *    every removal. Search still returned the right answers (the join
+     *    against `content` finds nothing), which is precisely why it went
+     *    unnoticed.
      *  * `sources` LAST, which cascades `content` (and through it `episodes`,
      *    `favorites`, `watch_history`).
      *
@@ -287,7 +299,10 @@ class SourceRepository(
         db.transaction {
             db.recentChannelsQueries.deleteBySourceContent(id)
             db.contentFirstSeenQueries.deleteBySource(id)
-            // Content rows cascade via the FK.
+            db.contentQueries.deleteFtsBySource(id)
+            // Content rows cascade via the FK. That cascade only fires
+            // where foreign keys are enforced — Android's `onOpen` and,
+            // since MK.iOS.PAGE.2, the iOS driver config too.
             db.sourcesQueries.deleteById(id)
         }
     }

@@ -30,6 +30,23 @@ private val STRIP_PATTERNS: List<Regex> =
         Regex("""\s{2,}"""),
     )
 
+/**
+ * Separators left stranded at an edge once the strips above have run.
+ *
+ * `"4K: V SPORT ᵁᴴᴰ"` loses its `4K` to the quality pattern and trims to
+ * `": V SPORT ᵁᴴᴰ"` — the colon was a *separator between* the tag and the
+ * name, and with the tag gone it separates nothing. Measured on a real
+ * 273,869-item account: **6,903 live channels** stored a clean title
+ * beginning with one, and every one of them rendered with a leading `": "`
+ * that also ate two characters from an already-truncating label.
+ *
+ * Only the characters providers actually use as separators, and only at
+ * the edges. `.` and `,` are deliberately absent — stripping a trailing
+ * dot would turn `M.A.S.H.` into `M.A.S.H`, which is a different kind of
+ * wrong from the one being fixed.
+ */
+private val EDGE_SEPARATORS = Regex("""^[\s:|/\-–—]+|[\s:|/\-–—]+$""")
+
 /** Clean an IPTV title by removing provider noise. */
 fun cleanTitle(rawTitle: String): String {
     var title = rawTitle.trim()
@@ -38,7 +55,7 @@ fun cleanTitle(rawTitle: String): String {
         title = pattern.replace(title, " ")
     }
 
-    title = title.trim()
+    title = EDGE_SEPARATORS.replace(title, "")
 
     // MB-377 — a title stripped down to only punctuation/separators (e.g.
     // "(MX) (VIX 01) | (2098-12-31 08:00:01)" reduces to "|") is as useless as
@@ -97,6 +114,52 @@ fun extractSeasonEpisode(title: String): SeasonEpisode? {
     }
 
     return null
+}
+
+/**
+ * The episode's own name, with the provider's boilerplate removed.
+ *
+ * Xtream providers routinely put the whole series identity into every
+ * episode title, so a season list reads as a column of near-identical
+ * strings with the one distinguishing word at the far right — measured on
+ * a real account: `TR - Hakan: Muhafız (2018) (TR) - S01E01 - 1. Bölüm`,
+ * where the episode is called "1. Bölüm".
+ *
+ * [extractShowName] is the mirror of this: it keeps the part before the
+ * SxxExx marker, and this keeps the part after.
+ *
+ * Falls back, in order, to the raw title and then to `Episode N`, so a row
+ * is never blank. [seriesTitle] is compared against so an episode titled
+ * only with the series name is treated as having no title of its own.
+ */
+fun cleanEpisodeTitle(rawTitle: String, seriesTitle: String, episodeNumber: Int): String {
+    val trimmed = rawTitle.trim()
+    val fallback = "Episode $episodeNumber"
+    if (trimmed.isEmpty()) return fallback
+
+    // Everything after the SxxExx marker and its separator, when there is
+    // anything there. `- 1. Bölüm` -> `1. Bölüm`.
+    // Find the marker first, then take whatever follows it — rather than
+    // capturing the tail in one pattern. When a title ends *at* the marker
+    // (`Show - S01E07`) there is no episode name, and the tail must come
+    // back empty so the fallback runs; a single capturing pattern instead
+    // fails to match and leaves the whole boilerplate title standing.
+    //
+    // `(?!\d)` is load-bearing too: without it `S01E07` backtracks to
+    // match `S01E0`, leaving the trailing `7` as the "title".
+    val marker =
+        Regex("""S\d{1,2}\s*E\d{1,3}(?!\d)""", RegexOption.IGNORE_CASE).find(trimmed)
+
+    val candidate =
+        (if (marker != null) trimmed.substring(marker.range.last + 1) else trimmed)
+            .trim(' ', '-', '–', '—', ':')
+
+    // A title that is only the series name says nothing the page has not
+    // already said above the list.
+    if (candidate.isEmpty() || candidate.equals(seriesTitle.trim(), ignoreCase = true)) {
+        return fallback
+    }
+    return candidate
 }
 
 /** Extract the show name from a series title (strip S01E02 and everything after). */

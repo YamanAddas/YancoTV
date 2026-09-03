@@ -311,6 +311,53 @@ describe('XtreamClient', () => {
         expect(result.value.episodes['1'][0].title).toBe('Pilot');
       }
     });
+
+    // Mirrors `getSeriesInfoKeepsPerEpisodeArtworkAndDates` in the Kotlin
+    // client. The provider puts a still, an air date and a runtime inside
+    // each episode's `info`; all three were parsed away.
+    it('keeps per-episode artwork and dates', async () => {
+      mockHttpGet({
+        info: { name: 'Hakan' },
+        seasons: [{ season_number: 1, name: 'Season 1' }],
+        episodes: {
+          '1': [
+            {
+              id: '79026',
+              episode_num: 1,
+              title: '1. Bolum',
+              container_extension: 'mkv',
+              info: {
+                duration: '00:45:32',
+                duration_secs: 2732,
+                air_date: '2018-12-14',
+                movie_image: 'https://image.tmdb.org/t/p/w185/x.jpg',
+              },
+            },
+            // Half of episodes carry none of it, measured on a live account.
+            {
+              id: '79027',
+              episode_num: 2,
+              title: '2. Bolum',
+              container_extension: 'mkv',
+              info: { duration: '00:44:10', movie_image: '' },
+            },
+          ],
+        },
+      });
+
+      const result = await client.getSeriesInfo(49525);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const eps = result.value.episodes['1'];
+        expect(eps[0].info.stillUrl).toBe('https://image.tmdb.org/t/p/w185/x.jpg');
+        expect(eps[0].info.airDate).toBe('2018-12-14');
+        expect(eps[0].info.durationSecs).toBe(2732);
+        // An empty string is absence, not a URL to try to load.
+        expect(eps[1].info.stillUrl).toBeUndefined();
+        expect(eps[1].info.airDate).toBeUndefined();
+        expect(eps[1].info.durationSecs).toBeUndefined();
+      }
+    });
   });
 
   describe('getLiveCategories', () => {

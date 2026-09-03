@@ -149,6 +149,18 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
         .map { rows -> resolveContentProgress(rows) }
 
     /**
+     * The same map, read once.
+     *
+     * SwiftUI has no `Flow`, so iOS reads this per browse page rather than
+     * subscribing. Whole-table for the reason [allProgressFlow] gives: an
+     * `IN` list would put the number of paged-in items into SQLite's
+     * bind-variable count, and `watch_history` holds one row per watched
+     * title — a small table, cheap to select entire.
+     */
+    fun allProgress(): Map<String, WatchProgress> =
+        resolveContentProgress(db.watchHistoryQueries.selectAllProgress().executeAsList())
+
+    /**
      * Container-preferred resolution shared by [entriesByContentFlow] and
      * [allProgressFlow] (AGENTS rule 8 — one mapper, no drift). Prefer the
      * content-level (container) row; fall back to the most-recent episode row.
@@ -184,26 +196,40 @@ class WatchHistoryRepository(private val db: YancoDb, private val clock: () -> L
             .selectByEpisodeIds(episodeIds)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { rows ->
-                if (rows.isEmpty()) return@map emptyMap()
-                // groupBy by the non-null episode_id, then pick the most-
-                // recent row per group (already DESC). Rows are guaranteed
-                // non-null on episode_id because SQL's `IN` on a non-null
-                // column filters NULLs — but defensively keep only non-null.
-                rows.mapNotNull { row ->
-                    val key = row.episode_id ?: return@mapNotNull null
-                    key to row
-                }.groupBy({ it.first }, { it.second }).mapValues { (_, group) ->
-                    val row = group.first()
-                    WatchProgress(
-                        contentId = row.content_id,
-                        episodeId = row.episode_id,
-                        positionSeconds = row.position_seconds,
-                        durationSeconds = row.duration_seconds,
-                        watchedAt = row.watched_at,
-                    )
-                }
-            }
+            .map(::resolveEpisodeProgress)
+    }
+
+    /**
+     * The same map, read once — the shape SwiftUI needs, which has no
+     * `Flow`. Mirrors [allProgress] beside [allProgressFlow].
+     */
+    fun entriesByEpisode(episodeIds: Set<String>): Map<String, WatchProgress> {
+        if (episodeIds.isEmpty()) return emptyMap()
+        return resolveEpisodeProgress(
+            db.watchHistoryQueries.selectByEpisodeIds(episodeIds).executeAsList(),
+        )
+    }
+
+    /** One mapper for both readers (AGENTS rule 8 — no drift). */
+    private fun resolveEpisodeProgress(rows: List<Watch_history>): Map<String, WatchProgress> {
+        if (rows.isEmpty()) return emptyMap()
+        // groupBy by the non-null episode_id, then pick the most-recent row
+        // per group (already DESC). Rows are guaranteed non-null on
+        // episode_id because SQL's `IN` on a non-null column filters NULLs
+        // — but defensively keep only non-null.
+        return rows.mapNotNull { row ->
+            val key = row.episode_id ?: return@mapNotNull null
+            key to row
+        }.groupBy({ it.first }, { it.second }).mapValues { (_, group) ->
+            val row = group.first()
+            WatchProgress(
+                contentId = row.content_id,
+                episodeId = row.episode_id,
+                positionSeconds = row.position_seconds,
+                durationSeconds = row.duration_seconds,
+                watchedAt = row.watched_at,
+            )
+        }
     }
 
     /**

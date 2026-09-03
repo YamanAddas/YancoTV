@@ -1,0 +1,27 @@
+CREATE TABLE epg_channel_names (
+    name_key TEXT NOT NULL,
+    -- Which guide this came from. Ambiguity is judged inside one guide;
+    -- across guides the same name is redundancy, not a clash.
+    source_key TEXT NOT NULL,
+    tvg_id TEXT NOT NULL,
+    PRIMARY KEY (name_key, source_key)
+);
+
+CREATE INDEX idx_epg_channel_names_key ON epg_channel_names(name_key);
+
+deleteAll:
+DELETE FROM epg_channel_names;
+
+insert:
+INSERT OR REPLACE INTO epg_channel_names (name_key, source_key, tvg_id) VALUES (?, ?, ?);
+
+-- Resolve a page of names. `source_key = :preferred` sorts first so a
+-- channel gets its own provider's guide when both cover it.
+resolveKeys:
+SELECT name_key, tvg_id, source_key
+FROM epg_channel_names
+WHERE name_key IN ?
+ORDER BY CASE WHEN source_key = ? THEN 0 ELSE 1 END;
+
+count:
+SELECT COUNT(*) FROM epg_channel_names;

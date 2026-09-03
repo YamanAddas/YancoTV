@@ -607,6 +607,32 @@ class WatchHistoryRepositoryTest {
         assertEquals(600L, snapshot["ep-S01E02"]?.positionSeconds)
     }
 
+    /**
+     * The read-once form SwiftUI uses, which has no Flow. Same rows, same
+     * keys — it shares [entriesByEpisodeFlow]'s mapper so the two cannot
+     * drift apart.
+     */
+    @Test fun entriesByEpisode_matchesTheFlow() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A")
+        insertContent(db, "series-1", "src-A", type = "series")
+        insertEpisode(db, id = "ep-S01E01", contentId = "series-1")
+        insertEpisode(db, id = "ep-S01E02", contentId = "series-1")
+        val repo = WatchHistoryRepository(db, clock = { 1_000L })
+
+        repo.upsert("series-1", episodeId = "ep-S01E01", positionSeconds = 300L, durationSeconds = 1800L)
+        repo.upsert("series-1", episodeId = "ep-S01E02", positionSeconds = 600L, durationSeconds = 1800L)
+
+        val once = repo.entriesByEpisode(setOf("ep-S01E01", "ep-S01E02"))
+        assertEquals(repo.entriesByEpisodeFlow(setOf("ep-S01E01", "ep-S01E02")).first(), once)
+        assertEquals(300L, once["ep-S01E01"]?.positionSeconds)
+        // The series is the content row; the episode is the episode row.
+        // Writing the episode's id into content_id — which iOS did — leaves
+        // a row that `selectRecentWithContent`'s inner join throws away.
+        assertEquals("series-1", once["ep-S01E01"]?.contentId)
+        assertTrue(repo.entriesByEpisode(emptySet()).isEmpty())
+    }
+
     @Test fun entriesByEpisodeFlow_emptyInputEmitsEmptyMap() = runTest {
         val db = testDb()
         val repo = WatchHistoryRepository(db, clock = { 0L })
@@ -724,6 +750,8 @@ class WatchHistoryRepositoryTest {
             title = null,
             stream_url = "http://stream/$id",
             duration = null,
+            still_url = null,
+            air_date = null,
         )
     }
 }

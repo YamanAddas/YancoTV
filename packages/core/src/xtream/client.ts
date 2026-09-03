@@ -92,6 +92,12 @@ export interface XtreamSeriesEpisode {
   info: {
     duration?: string;
     season?: number;
+    /** Episode still (`movie_image`). Present on roughly half of episodes. */
+    stillUrl?: string;
+    /** First broadcast (`air_date`), provider-phrased — usually `YYYY-MM-DD`. */
+    airDate?: string;
+    /** Runtime in seconds (`duration_secs`). Present on nearly all episodes. */
+    durationSecs?: number;
   };
 }
 

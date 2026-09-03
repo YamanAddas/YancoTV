@@ -181,12 +181,27 @@ class Stage2MigrationTest {
 
     private companion object {
         /**
-         * Hand-crafted v3 schema. Includes every table that a Stage 2
-         * migration ALTERs, CREATEs, or backfills against. Tables that
-         * Stage 2 doesn't touch (epg_programmes children, episodes,
-         * downloads, etc.) aren't included unless they're FK targets.
+         * Hand-crafted v3 schema. Includes every table that a migration
+         * from v3 onward ALTERs, CREATEs, or backfills against. Tables no
+         * migration touches (epg_programmes children, downloads, etc.)
+         * aren't included unless they're FK targets.
+         *
+         * `episodes` is here because 19.sqm ALTERs it. It has existed since
+         * the genesis schema (MK.2), so a real v3 database has it — it was
+         * omitted from this fixture only while nothing after v3 touched it.
          */
         fun v3Schema(): List<String> = listOf(
+            """
+                CREATE TABLE episodes (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    content_id TEXT NOT NULL REFERENCES content(id) ON DELETE CASCADE,
+                    season_number INTEGER,
+                    episode_number INTEGER,
+                    title TEXT,
+                    stream_url TEXT NOT NULL,
+                    duration INTEGER
+                );
+            """.trimIndent(),
             """
                 CREATE TABLE sources (
                     id TEXT PRIMARY KEY NOT NULL,

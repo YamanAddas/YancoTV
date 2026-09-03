@@ -141,6 +141,12 @@ WHERE p.channel_tvg_id IN ? AND p.end_time > ? AND p.start_time < ?
   )
 ORDER BY p.channel_tvg_id, COALESCE(s.epg_priority, 0) DESC, p.start_time;
 
+-- One programme, by id. Used by catch-up and reminders, which are handed a
+-- programme id by the UI and must read the authoritative row rather than
+-- trust fields that made a round trip through the client.
+byId:
+SELECT * FROM epg_programmes WHERE id = ? LIMIT 1;
+
 insert:
 INSERT INTO epg_programmes (id, source_id, channel_tvg_id, title, description, start_time, end_time, category, icon_url)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);

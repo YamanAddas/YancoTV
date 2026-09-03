@@ -240,6 +240,12 @@ const xtreamEpisodeInfoSchema = z
   .object({
     duration: z.unknown().optional(),
     season: z.unknown().optional(),
+    // Per-episode extras. Measured over 998 episodes across 40 sampled
+    // series on a live account: movie_image non-empty on 49%, air_date on
+    // 63%, duration_secs on 99%. (`plot` is 0% — never sent.)
+    movie_image: z.unknown().optional(),
+    air_date: z.unknown().optional(),
+    duration_secs: z.unknown().optional(),
   })
   .passthrough();
 
@@ -261,6 +267,14 @@ const xtreamEpisodeItemSchema = z
       info: {
         duration: raw.info?.duration ? String(raw.info.duration) : undefined,
         season: raw.info?.season ? Number(raw.info.season) || undefined : undefined,
+        stillUrl: raw.info?.movie_image ? String(raw.info.movie_image) : undefined,
+        airDate: raw.info?.air_date ? String(raw.info.air_date) : undefined,
+        // Truncated to match the Kotlin client, which reads this through
+        // `numOf` into an `Int` — a provider that sends "2732.9" must not
+        // give the two ports different numbers (AGENTS.md rule 8).
+        durationSecs: raw.info?.duration_secs
+          ? Math.trunc(Number(raw.info.duration_secs)) || undefined
+          : undefined,
       },
     }),
   );

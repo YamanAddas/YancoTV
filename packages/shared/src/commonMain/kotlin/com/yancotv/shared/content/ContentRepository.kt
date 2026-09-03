@@ -30,6 +30,17 @@ class ContentRepository(private val db: YancoDb) {
     fun groups(type: ContentType): List<String> = db.contentQueries.distinctGroupsForType(type.dbValue).executeAsList()
 
     /**
+     * The same categories as [groups], each with how many rows it holds.
+     *
+     * Same ordering (provider order), one aggregate query rather than a
+     * count per category — see the note on `groupTalliesForType`.
+     */
+    fun groupTallies(type: ContentType): List<Pair<String, Int>> =
+        db.contentQueries
+            .groupTalliesForType(type.dbValue) { name, count -> name to count.toInt() }
+            .executeAsList()
+
+    /**
      * MK.20.2 — Group list bucketed by detected language/region prefix.
      * Top level preserves provider order; multi-child buckets collapse the
      * `AR | …` / `EN | …` siblings into a single `Arabic` / `English`
@@ -148,22 +159,9 @@ class ContentRepository(private val db: YancoDb) {
      * leading/trailing whitespace only.
      */
     fun search(query: String, limit: Long = 100): List<ContentItem> {
-        val trimmed = query.trim()
-        if (trimmed.isEmpty()) return emptyList()
-        // Prefix wildcard so typing "mar" matches "Marvel". Users typing
-        // a full word still match — the `*` only widens, never narrows.
-        val ftsQuery =
-            buildString {
-                val tokens = trimmed.split(Regex("\\s+"))
-                tokens.forEachIndexed { i, tok ->
-                    if (tok.isEmpty()) return@forEachIndexed
-                    if (i > 0) append(' ')
-                    // Escape double-quotes per FTS4 syntax (they delimit phrases).
-                    append('"').append(tok.replace("\"", "\"\"")).append("\"*")
-                }
-            }
+        val fts = ftsQueryOrNull(query) ?: return emptyList()
         return db.contentQueries
-            .searchFts(ftsQuery, limit)
+            .searchFts(fts, limit)
             .executeAsList()
             .map { it.toDomain() }
     }
@@ -175,28 +173,29 @@ class ContentRepository(private val db: YancoDb) {
      * search-rails UI calls this once per [ContentType] so each rail
      * gets its own slice.
      */
-    fun searchByType(query: String, type: ContentType, limit: Long = 100): List<ContentItem> {
-        val trimmed = query.trim()
-        if (trimmed.isEmpty()) return emptyList()
-        val ftsQuery =
-            buildString {
-                val tokens = trimmed.split(Regex("\\s+"))
-                tokens.forEachIndexed { i, tok ->
-                    if (tok.isEmpty()) return@forEachIndexed
-                    if (i > 0) append(' ')
-                    append('"').append(tok.replace("\"", "\"\"")).append("\"*")
-                }
-            }
-        val typeKey =
-            when (type) {
-                ContentType.LIVE -> "live"
-                ContentType.MOVIE -> "movie"
-                ContentType.SERIES -> "series"
-            }
+    fun searchByType(query: String, type: ContentType, limit: Long = 100): List<ContentItem> =
+        searchByTypePaged(query, type, offset = 0L, limit = limit)
+
+    /**
+     * MK.iOS.PAGE.2 — paged [searchByType].
+     *
+     * A search that matches more rows than one page used to stop at the
+     * limit with nothing saying so — the same silent truncation the browse
+     * paging removed. Pair with [searchCountByType] to show how much is
+     * being held back.
+     */
+    fun searchByTypePaged(query: String, type: ContentType, offset: Long, limit: Long): List<ContentItem> {
+        val fts = ftsQueryOrNull(query) ?: return emptyList()
         return db.contentQueries
-            .searchFtsByType(ftsQuery, typeKey, limit)
+            .searchFtsByTypePaged(fts, type.dbValue, limit, offset)
             .executeAsList()
             .map { it.toDomain() }
+    }
+
+    /** MK.iOS.PAGE.2 — total matches for [query] within [type]. */
+    fun searchCountByType(query: String, type: ContentType): Long {
+        val fts = ftsQueryOrNull(query) ?: return 0L
+        return db.contentQueries.countSearchFtsByType(fts, type.dbValue).executeAsOne()
     }
 
     fun findById(id: String): ContentItem? = db.contentQueries
@@ -267,7 +266,15 @@ class ContentRepository(private val db: YancoDb) {
             episodeNumber = row.episode_number?.toInt() ?: 0,
             title = row.title.orEmpty(),
             streamUrl = row.stream_url,
-            duration = row.duration?.toString(),
+            // `duration` is the provider's own `HH:MM:SS` string everywhere
+            // else it appears, and this column holds an integer count of
+            // seconds — `toString()` on it produced "2732" where the UI
+            // prints a runtime, which was harmless only while the column
+            // was written as NULL unconditionally. The seconds have their
+            // own field.
+            durationSeconds = row.duration?.toInt(),
+            stillUrl = row.still_url,
+            airDate = row.air_date,
         )
     }
 
@@ -293,7 +300,9 @@ class ContentRepository(private val db: YancoDb) {
             episodeNumber = next.episode_number?.toInt() ?: 0,
             title = next.title.orEmpty(),
             streamUrl = next.stream_url,
-            duration = next.duration?.toString(),
+            durationSeconds = next.duration?.toInt(),
+            stillUrl = next.still_url,
+            airDate = next.air_date,
         )
     }
 }
@@ -318,6 +327,36 @@ internal fun com.yancotv.shared.db.Content.toDomain(): ContentItem = ContentItem
     nameOverride = name_override,
     logoOverride = logo_override,
 )
+
+/**
+ * Turns a user's typing into an FTS4 MATCH expression, or null when there
+ * is nothing to search for.
+ *
+ * Was copy-pasted between [ContentRepository.search] and
+ * `searchByType` — two copies of the escaping rules, one of which would
+ * eventually stop matching the other. `internal` so it can be tested
+ * directly: this is where a search stops being a `LIKE` and starts being
+ * something a user would call smart, and it is worth pinning down.
+ *
+ * Three things it does:
+ * - **Every token gets a trailing `*`**, so "mar" finds "Marvel". A full
+ *   word still matches — the wildcard only widens.
+ * - **Every token is quoted**, so punctuation a user types (`beIN:`,
+ *   `AR|`) is data rather than FTS operator syntax. An unquoted `-` or
+ *   `*` mid-query is otherwise a NOT / wildcard and silently changes what
+ *   was asked for.
+ * - **Embedded double quotes are doubled**, per FTS4's phrase escaping.
+ *
+ * Tokens are joined by whitespace, which FTS4 reads as AND — so more
+ * words narrows, which is what typing more usually means.
+ */
+internal fun ftsQueryOrNull(query: String): String? {
+    val tokens = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (tokens.isEmpty()) return null
+    return tokens.joinToString(" ") { token ->
+        "\"" + token.replace("\"", "\"\"") + "\"*"
+    }
+}
 
 private val ContentType.dbValue: String
     get() =

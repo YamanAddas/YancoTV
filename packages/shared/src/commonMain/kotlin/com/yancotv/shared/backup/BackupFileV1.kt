@@ -67,6 +67,16 @@ data class BackupRecords(
     val groupPreferences: List<GroupPreferenceRecord>,
     val settings: List<SettingsKv>,
     val reminders: List<ReminderRecord>,
+    /**
+     * Channels the viewer keeps coming back to.
+     *
+     * Defaulted so a backup written before this field existed still reads.
+     * It is behaviour rather than configuration, like `watchHistory` — and
+     * `watchHistory` has always been carried, so leaving this out made the
+     * one inconsistency people notice: everything came back except the list
+     * that says where you were.
+     */
+    val recentChannels: List<RecentChannelRecord> = emptyList(),
 )
 
 @Serializable
@@ -190,6 +200,13 @@ data class GroupPreferenceRecord(
 
 @Serializable
 data class SettingsKv(val key: String, val value: String)
+
+@Serializable
+data class RecentChannelRecord(
+    val contentId: String,
+    /** ms since epoch. */
+    val watchedAt: Long,
+)
 
 @Serializable
 data class ReminderRecord(

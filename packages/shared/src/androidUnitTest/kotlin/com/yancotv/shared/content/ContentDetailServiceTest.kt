@@ -11,9 +11,11 @@ import com.yancotv.shared.sources.testDatabase
 import com.yancotv.shared.types.ContentItem
 import com.yancotv.shared.types.ContentMetadata
 import com.yancotv.shared.types.ContentType
+import com.yancotv.shared.types.DETAIL_SCHEMA
 import com.yancotv.shared.types.EpisodeInfo
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -91,6 +93,40 @@ class ContentDetailServiceTest {
         clock = { 1_000_000L },
     )
 
+    /**
+     * The refetch decision, which `load` can only express by making a
+     * network call the test harness has no credentials for. Asserted
+     * directly instead.
+     */
+    @Test fun refetchesABlobFromAnOlderExtractionGeneration() {
+        val svc = makeService(testDatabase().db)
+        val complete = ContentMetadata(
+            seriesId = 100L,
+            episodes = listOf(
+                EpisodeInfo(id = "e1", seasonNumber = 1, episodeNumber = 1, title = "Pilot", streamUrl = "u"),
+            ),
+            detailSchema = DETAIL_SCHEMA,
+        )
+        assertFalse(svc.needsFetch(ContentType.SERIES, complete))
+
+        // Same blob, written before stills and air dates were parsed. Every
+        // field the old rule looks at is present, so only the generation
+        // marks it as incomplete.
+        assertTrue(svc.needsFetch(ContentType.SERIES, complete.copy(detailSchema = 0)))
+
+        // Generation 1 added per-episode fields only, so a complete movie
+        // blob from generation 0 is not stale — re-fetching it would put a
+        // provider round-trip in front of every movie ever opened and get
+        // nothing back.
+        val movie = ContentMetadata(plot = "A hacker discovers reality", streamId = 42L)
+        assertFalse(svc.needsFetch(ContentType.MOVIE, movie))
+        assertTrue(svc.needsFetch(ContentType.MOVIE, movie.copy(plot = null)))
+
+        // Still nothing to fetch against, whatever the generation says.
+        assertFalse(svc.needsFetch(ContentType.MOVIE, ContentMetadata(streamId = null)))
+        assertFalse(svc.needsFetch(ContentType.LIVE, ContentMetadata()))
+    }
+
     @Test fun movieWithCachedPlotSkipsFetch() = runTest {
         val bundle = testDatabase()
         val svc = makeService(bundle.db)
@@ -111,17 +147,43 @@ class ContentDetailServiceTest {
         assertNull(loaded.metadata.plot)
     }
 
-    @Test fun seriesWithCachedEpisodesSkipsFetch() = runTest {
+    /**
+     * A cached episode list is returned without waiting on the provider.
+     *
+     * Note what this can and cannot show: `makeService` builds its
+     * `SourceRepository` over a second, empty database, so
+     * `xtreamCredentials` is always null and `load` would bail before any
+     * request either way. `refreshInBackground` is the observable part —
+     * false means the fetch decision never even reached the network, true
+     * means the caller is expected to render this and refresh separately.
+     */
+    @Test fun seriesWithCachedEpisodesIsReturnedWithoutWaiting() = runTest {
         val bundle = testDatabase()
         val svc = makeService(bundle.db)
         val cachedEpisodes =
             listOf(
                 EpisodeInfo(id = "e1", seasonNumber = 1, episodeNumber = 1, title = "Pilot", streamUrl = "u"),
             )
-        val cached = ContentMetadata(seriesId = 100L, episodes = cachedEpisodes)
-        val loaded = svc.load(seriesItem(cached))
+        val current = ContentMetadata(
+            seriesId = 100L,
+            episodes = cachedEpisodes,
+            detailSchema = DETAIL_SCHEMA,
+        )
+        val loaded = svc.load(seriesItem(current))
         assertEquals(1, loaded.episodes.size)
         assertEquals("Pilot", loaded.episodes[0].title)
+        assertFalse(loaded.refreshInBackground, "a current blob needs no refresh at all")
+
+        // The same list written by an older generation: still rendered
+        // immediately, with the refresh handed to the caller rather than
+        // made the price of opening the page.
+        val stale = svc.load(seriesItem(current.copy(detailSchema = 0)))
+        assertEquals(1, stale.episodes.size)
+        assertTrue(stale.refreshInBackground)
+
+        // Nothing cached at all is the case that must still block.
+        val empty = svc.load(seriesItem(ContentMetadata(seriesId = 100L)))
+        assertFalse(empty.refreshInBackground)
     }
 
     @Test fun liveItemReturnsImmediately() = runTest {

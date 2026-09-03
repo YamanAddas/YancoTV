@@ -275,6 +275,84 @@ class SourceRepositoryTest {
      * emptied, so a rail-level assertion would pass whether the rows were
      * deleted or merely orphaned — precisely the bug.
      */
+    /**
+     * `content_fts` is an FTS4 virtual table: no foreign key, and the
+     * per-row `content_ad` delete trigger was removed in MK.6.d for being
+     * O(N²) on a whole-catalog resync. So the FK cascade that takes
+     * `content` cannot take its index entries, and nothing else will —
+     * they are stranded for the life of the install and grow with every
+     * source the user removes.
+     *
+     * It hid because search still returns the right answers: every search
+     * query joins `content_fts` back to `content`, and orphaned entries
+     * match no content row. Measured on a real catalogue, removing a
+     * 12,884-row source left all 12,884 FTS entries behind.
+     *
+     * `deleteFtsBySource` resolves rows via `SELECT id FROM content WHERE
+     * source_id = ?`, so it has to run BEFORE the cascade empties
+     * `content` — that ordering is what this test pins down.
+     */
+    @Test
+    fun `removeSource clears the FTS index the cascade cannot reach`() {
+        val bundle = testDatabase()
+        val repo =
+            SourceRepository(
+                db = bundle.db,
+                driver = bundle.driver,
+                credentialStore = PlaintextCredentialStore(),
+                http = FakeHttpClient(),
+                fileReader = FakeFileReader(emptyMap()),
+                clock = { 1_000L },
+                idGenerator =
+                run {
+                    var n = 0;
+                    { "fts-id-${++n}" }
+                },
+            )
+        val keep = repo.addSource(AddSourceInput(name = "Keep", type = SourceType.M3U_URL, url = "http://keep"))
+        val drop = repo.addSource(AddSourceInput(name = "Drop", type = SourceType.M3U_URL, url = "http://drop"))
+
+        fun channel(id: String, sourceId: String) = bundle.db.contentQueries.insert(
+            id = id,
+            source_id = sourceId,
+            type = "live",
+            title = id,
+            clean_title = id,
+            group_name = null,
+            stream_url = "http://stream/$id",
+            logo_url = null,
+            tvg_id = id,
+            metadata_json = null,
+            sort_order = 0L,
+            created_at = 0L,
+        )
+        // The `content_ai` insert trigger populates content_fts for us.
+        channel("ch-keep", keep.id)
+        channel("ch-drop", drop.id)
+
+        fun ftsRows(): Long = bundle.driver
+            .executeQuery(null, "SELECT COUNT(*) FROM content_fts", { cursor ->
+                cursor.next()
+                app.cash.sqldelight.db.QueryResult.Value(cursor.getLong(0))
+            }, 0)
+            .value ?: 0L
+
+        assertEquals(2L, ftsRows(), "both channels should be indexed to begin with")
+
+        repo.removeSource(drop.id)
+
+        assertEquals(
+            1L,
+            ftsRows(),
+            "the removed source's FTS entries must go with it — nothing else can ever collect them",
+        )
+        assertEquals(
+            1L,
+            bundle.db.contentQueries.countBySource(keep.id).executeAsOne(),
+            "and the surviving source's content must be untouched",
+        )
+    }
+
     @Test
     fun `removeSource clears the side tables the FK cannot reach`() {
         val bundle = testDatabase()

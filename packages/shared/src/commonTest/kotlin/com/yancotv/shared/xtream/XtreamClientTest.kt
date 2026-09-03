@@ -5,6 +5,7 @@ import com.yancotv.shared.http.HttpRequestOptions
 import com.yancotv.shared.types.Result
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -340,6 +341,62 @@ class XtreamClientTest {
     }
 
     // --- getSeriesInfo ---
+
+    /**
+     * The extras the provider puts inside an episode's `info` — a still, an
+     * air date, a runtime in seconds. All three were parsed away for the
+     * life of the client, so an episode list had a number and a title and
+     * nothing else to look at.
+     */
+    @Test
+    fun getSeriesInfoKeepsPerEpisodeArtworkAndDates() = runTest {
+        val http = FakeHttpClient()
+        http.enqueue(
+            mapOf(
+                "info" to mapOf("name" to "Hakan"),
+                "seasons" to listOf(mapOf("season_number" to 1, "name" to "Season 1")),
+                "episodes" to
+                    mapOf(
+                        "1" to
+                            listOf(
+                                mapOf(
+                                    "id" to "79026",
+                                    "episode_num" to 1,
+                                    "title" to "1. Bolum",
+                                    "container_extension" to "mkv",
+                                    "info" to
+                                        mapOf(
+                                            "duration" to "00:45:32",
+                                            "duration_secs" to 2732,
+                                            "air_date" to "2018-12-14",
+                                            "movie_image" to "https://image.tmdb.org/t/p/w185/x.jpg",
+                                        ),
+                                ),
+                                // The same call routinely returns episodes
+                                // with none of it — half of them, measured.
+                                mapOf(
+                                    "id" to "79027",
+                                    "episode_num" to 2,
+                                    "title" to "2. Bolum",
+                                    "container_extension" to "mkv",
+                                    "info" to mapOf("duration" to "00:44:10", "movie_image" to ""),
+                                ),
+                            ),
+                    ),
+            ),
+        )
+
+        val result = makeClient(http).getSeriesInfo(49525)
+        assertTrue(result is Result.Ok)
+        val eps = result.value.episodes["1"]!!
+        assertEquals("https://image.tmdb.org/t/p/w185/x.jpg", eps[0].info.stillUrl)
+        assertEquals("2018-12-14", eps[0].info.airDate)
+        assertEquals(2732, eps[0].info.durationSecs)
+        // An empty string is absence, not a URL to try to load.
+        assertNull(eps[1].info.stillUrl)
+        assertNull(eps[1].info.airDate)
+        assertNull(eps[1].info.durationSecs)
+    }
 
     @Test
     fun getSeriesInfoParsesResponse() = runTest {

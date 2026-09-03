@@ -132,6 +132,23 @@ WHERE type = ? AND group_name IS NOT NULL
 GROUP BY group_name
 ORDER BY MIN(sort_order);
 
+-- MK.iOS.CAT — the same list, carrying each category's size.
+--
+-- The Android shell prints the count beside every category name in the
+-- vertical rail, and the iOS panel that mirrors it needs the same numbers.
+-- Getting them by calling `countByTypeAndGroup` once per row would be 855
+-- queries on a real account (measured); this is one aggregate over the
+-- same `type, group_name` index the plain list already walks.
+--
+-- Ordering matches `distinctGroupsForType` exactly — MIN(sort_order), i.e.
+-- provider order — so the two lists are interchangeable and a caller can
+-- swap in the counted one without the categories moving.
+groupTalliesForType:
+SELECT group_name AS name, COUNT(*) AS item_count FROM content
+WHERE type = ? AND group_name IS NOT NULL
+GROUP BY group_name
+ORDER BY MIN(sort_order);
+
 -- MK.35.2 — biggest categories first, for Home's category rails.
 --
 -- `distinctGroupsForType` orders by MIN(sort_order), i.e. the order the provider
@@ -165,10 +182,19 @@ WHERE type = ? AND group_name IS NOT NULL
 GROUP BY source_id, group_name
 ORDER BY source_id, first_sort;
 
+-- `CROSS JOIN` with `content_fts` on the LEFT is load-bearing, not style.
+-- SQLite has no cost statistics for a virtual table, and left to itself it
+-- will happily pick `content` as the outer loop — driving on
+-- `idx_content_type` and re-running the whole MATCH once per row. Measured
+-- on a 273,869-item provider, that plan turned a search count into 3m22s
+-- of 100% CPU; forcing FTS to drive made the same query 0.09s. CROSS JOIN
+-- is SQLite's documented way to pin the loop order, and it costs nothing
+-- when the planner would have chosen right anyway (verified: the plan and
+-- timing of the two SELECTs below are unchanged by it).
 searchFts:
 SELECT c.*
-FROM content c
-JOIN content_fts f ON f.content_id = c.id
+FROM content_fts f
+CROSS JOIN content c ON c.id = f.content_id
 WHERE content_fts MATCH :query
 ORDER BY c.type, c.sort_order
 LIMIT :limitCount;
@@ -178,13 +204,38 @@ LIMIT :limitCount;
 -- a 100-row limit entirely within live, leaving zero movies/series in
 -- the results. Caller hits this three times (one per type) so each
 -- rail gets its own slice independently.
-searchFtsByType:
+--
+-- MK.iOS.PAGE.2 — paged, so a query with more matches than one page can
+-- be walked instead of stopping at the limit with nothing on screen
+-- saying so. `OFFSET 0` is exactly the old unpaged behaviour, so this
+-- replaced the unpaged query rather than sitting beside it: two search
+-- statements that must stay in sync is the drift AGENTS.md rule 8 warns
+-- about.
+searchFtsByTypePaged:
 SELECT c.*
-FROM content c
-JOIN content_fts f ON f.content_id = c.id
+FROM content_fts f
+CROSS JOIN content c ON c.id = f.content_id
 WHERE content_fts MATCH :query AND c.type = :type
 ORDER BY c.sort_order
-LIMIT :limitCount;
+LIMIT :limitCount OFFSET :offsetCount;
+
+-- MK.iOS.PAGE.2 — total matches for a query within one content type.
+-- Without it the UI cannot tell "100 results" from "the first 100 of
+-- 1,020", which is the same silent truncation MK.iOS.PAGE removed from
+-- browse.
+--
+-- **This is the query that made the CROSS JOIN above mandatory.** It has
+-- no ORDER BY and no LIMIT, so nothing nudged the planner toward the
+-- right loop order, and it picked the catastrophic one: 53,207 outer rows
+-- x one full MATCH each = 3m22s at 100% CPU on a real provider — on iOS
+-- that also blocks the serial database queue, so the whole app stops.
+-- With FTS pinned as the outer table it is 0.09s, and 0.55s for a
+-- single-letter prefix across 175,064 films.
+countSearchFtsByType:
+SELECT COUNT(*)
+FROM content_fts f
+CROSS JOIN content c ON c.id = f.content_id
+WHERE content_fts MATCH :query AND c.type = :type;
 
 insert:
 INSERT INTO content (

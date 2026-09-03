@@ -11,6 +11,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readRemaining
@@ -155,7 +156,50 @@ open class KtorHttpClient(
         }
     }
 
+    /**
+     * The application-layer cleartext allow-list (MK.SEC.A), for this
+     * client's own traffic.
+     *
+     * ### Why it is a settable property rather than a constructor argument
+     *
+     * The allow-list is derived from the `sources` table, and the HTTP
+     * client is built *before* `SourceRepository` — the same ordering
+     * problem the Android interceptor solves with a lazy provider. So the
+     * default permits everything, which is exactly the behaviour before
+     * this existed, and the platform wiring replaces it once the source
+     * list is queryable. A client nobody wires is no worse than it was.
+     *
+     * ### What it covers, and what it cannot
+     *
+     * This is the app's *own* HTTP: catalogue sync, the Xtream panel API,
+     * EPG, detail enrichment. **Playback is not covered on iOS** — libVLC
+     * opens its own sockets and AVFoundation its own connections, neither
+     * of which is reachable from here. Android has a second enforcement
+     * point for player traffic (MK.SEC.C wraps Media3's
+     * `HttpDataSource.Factory`); iOS has no equivalent hook, and a
+     * host-check before handing a URL to an engine would not be the same
+     * thing: it cannot see the redirects the engine follows, and an M3U
+     * playlist legitimately lists streams on hosts that are not the source
+     * host, so enforcing there would refuse working playlists while still
+     * missing every redirect. Stated plainly rather than papered over.
+     */
+    var cleartextAllowlist: () -> CleartextAllowlist = { PermitAllCleartextAllowlist }
+
+    /**
+     * Refuses plain HTTP to a host the user has not configured as a source.
+     *
+     * HTTPS is never consulted: the threat this addresses is an on-path
+     * attacker reading cleartext, and encrypted traffic is not that.
+     */
+    protected fun guardCleartext(url: String) {
+        val parsed = runCatching { Url(url) }.getOrNull() ?: return
+        if (!parsed.protocol.name.equals("http", ignoreCase = true)) return
+        if (cleartextAllowlist().isHostAllowed(parsed.host)) return
+        throw CleartextBlockedException(parsed.host)
+    }
+
     protected suspend fun performGet(url: String, options: HttpRequestOptions): HttpResponse {
+        guardCleartext(url)
         val response: HttpResponse = ktor.get(url) { applyRequestOptions(options) }
         requireSuccess(response, url)
         return response
@@ -184,11 +228,13 @@ open class KtorHttpClient(
      * is only valid for the duration of [block] — do not let the response
      * or its channel escape.
      */
-    protected suspend fun <T> performGetStreaming(url: String, options: HttpRequestOptions, block: suspend (HttpResponse) -> T): T =
-        ktor.prepareGet(url) { applyRequestOptions(options) }.execute { response ->
+    protected suspend fun <T> performGetStreaming(url: String, options: HttpRequestOptions, block: suspend (HttpResponse) -> T): T {
+        guardCleartext(url)
+        return ktor.prepareGet(url) { applyRequestOptions(options) }.execute { response ->
             requireSuccess(response, url)
             block(response)
         }
+    }
 
     private suspend fun fetchText(url: String, options: HttpRequestOptions): String = withContext(Dispatchers.Default) {
         // Force this off the caller's dispatcher — Ktor dispatches network I/O

@@ -124,6 +124,71 @@ class BackupRoundTripTest {
         assertTrue(importer.pendingLinks.value.isEmpty())
     }
 
+    /**
+     * Recently-watched channels were the one behavioural list a backup did
+     * not carry, while `watch_history` always has — so a restore brought
+     * back everything except where you had been.
+     */
+    @Test fun roundTrip_carriesRecentlyWatchedChannels() {
+        val src = testDb()
+        seedSource(src)
+        seedContent(src, "ch-1")
+        seedContent(src, "ch-2")
+        src.recentChannelsQueries.recordWatch(content_id = "ch-1", watched_at = 500L)
+        src.recentChannelsQueries.recordWatch(content_id = "ch-2", watched_at = 900L)
+
+        val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", 8, 1000L)
+        assertEquals(2, file.records.recentChannels.size)
+
+        val dest = testDb()
+        BackupImporter(dest, PlaintextCredentialStore()).import(file, currentSchemaVersion = 8)
+
+        val restored = dest.recentChannelsQueries.selectAllForBackup().executeAsList()
+        assertEquals(2, restored.size)
+        // Newest first, so the list still reads as "where you were".
+        assertEquals("ch-2", restored.first().content_id)
+        assertEquals(900L, restored.first().watched_at)
+    }
+
+    /**
+     * Newest-wins rather than skip-if-present: the row carries no intent
+     * beyond its timestamp, and a restore must not make the list older
+     * than what is already on the device.
+     */
+    @Test fun import_keepsTheNewerWatchTime() {
+        val src = testDb()
+        seedSource(src)
+        seedContent(src, "ch-1")
+        src.recentChannelsQueries.recordWatch(content_id = "ch-1", watched_at = 100L)
+        val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", 8, 1000L)
+
+        val dest = testDb()
+        seedSource(dest)
+        seedContent(dest, "ch-1")
+        // The device has watched it more recently than the backup did.
+        dest.recentChannelsQueries.recordWatch(content_id = "ch-1", watched_at = 900L)
+
+        BackupImporter(dest, PlaintextCredentialStore()).import(file, currentSchemaVersion = 8)
+
+        assertEquals(
+            900L,
+            dest.recentChannelsQueries.selectAllForBackup().executeAsList().single().watched_at,
+        )
+    }
+
+    /** A backup written before the field existed still reads. */
+    @Test fun import_toleratesABackupWithoutRecentChannels() {
+        val src = testDb()
+        seedSource(src)
+        val file = BackupExporter(src, PlaintextCredentialStore()).export("0.1.0", 8, 1000L)
+        val older = file.copy(
+            records = file.records.copy(recentChannels = emptyList()),
+        )
+        val dest = testDb()
+        BackupImporter(dest, PlaintextCredentialStore()).import(older, currentSchemaVersion = 8)
+        assertEquals(0, dest.recentChannelsQueries.selectAllForBackup().executeAsList().size)
+    }
+
     @Test fun roundTrip_passwordMode_credsDecryptAfterImport() {
         val src = testDb()
         seedSource(src, username = "secret-user", password = "secret-pass")

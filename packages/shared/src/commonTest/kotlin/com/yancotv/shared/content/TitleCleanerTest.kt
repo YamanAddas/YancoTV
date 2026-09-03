@@ -228,4 +228,65 @@ class TitleCleanerTest {
     @Test fun showNameEmptyAfterCleaning() {
         assertEquals("S01E01", extractShowName("S01E01"))
     }
+
+    // ───── cleanEpisodeTitle (MK.iOS.5) ─────
+
+    @Test
+    fun `cleanEpisodeTitle keeps only what follows the SxxExx marker`() {
+        // Verbatim from a real provider account.
+        assertEquals(
+            "1. Bölüm",
+            cleanEpisodeTitle("TR - Hakan: Muhafız (2018) (TR) - S01E01 - 1. Bölüm", "Hakan: Muhafız", 1),
+        )
+        assertEquals(
+            "Winter Is Coming",
+            cleanEpisodeTitle("Game of Thrones S01E01 - Winter Is Coming", "Game of Thrones", 1),
+        )
+        assertEquals("Pilot", cleanEpisodeTitle("Show S2E5: Pilot", "Show", 5))
+    }
+
+    @Test
+    fun `cleanEpisodeTitle falls back rather than rendering a blank row`() {
+        assertEquals("Episode 3", cleanEpisodeTitle("", "Show", 3))
+        assertEquals("Episode 3", cleanEpisodeTitle("   ", "Show", 3))
+        // Marker present but nothing after it.
+        assertEquals("Episode 7", cleanEpisodeTitle("Show - S01E07", "Show", 7))
+        // Title is only the series name, which says nothing new.
+        assertEquals("Episode 2", cleanEpisodeTitle("Breaking Bad", "Breaking Bad", 2))
+        assertEquals("Episode 2", cleanEpisodeTitle("  breaking bad  ", "Breaking Bad", 2))
+    }
+
+    @Test
+    fun `cleanEpisodeTitle leaves a title with no marker alone`() {
+        assertEquals("The Reunion", cleanEpisodeTitle("The Reunion", "Friends", 1))
+    }
+
+    // MB-391 — a separator that only existed to divide a stripped tag from
+    // the name has nothing left to divide. 6,903 live channels on a real
+    // account rendered as ": SKY SPORT…" before this.
+    @Test
+    fun `cleanTitle drops a separator orphaned by a strip`() {
+        assertEquals("V SPORT", cleanTitle("4K: V SPORT UHD"))
+        assertEquals("ELEVEN SPORTS 1", cleanTitle("4K: ELEVEN SPORTS 1 UHD"))
+        assertEquals("BBC One", cleanTitle("HD | BBC One"))
+        assertEquals("Arte", cleanTitle("Arte - HD"))
+        assertEquals("Rai Uno", cleanTitle("1080p / Rai Uno"))
+    }
+
+    @Test
+    fun `cleanTitle keeps punctuation that is part of the name`() {
+        // Interior separators are the name's own; only edges are trimmed.
+        assertEquals("Sky Sports: Main Event", cleanTitle("Sky Sports: Main Event"))
+        assertEquals("Canal+", cleanTitle("Canal+ HD"))
+        // A trailing dot is not a separator — `.` is excluded on purpose.
+        assertEquals("M.A.S.H.", cleanTitle("M.A.S.H. HD"))
+    }
+
+    @Test
+    fun `cleanTitle still falls back when only separators remain`() {
+        // MB-377 holds: trimming must not turn a punctuation-only title
+        // into an empty one.
+        assertEquals("|", cleanTitle("|"))
+        assertEquals("- HD -", cleanTitle("- HD -"))
+    }
 }

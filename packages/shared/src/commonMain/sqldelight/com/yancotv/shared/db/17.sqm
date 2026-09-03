@@ -1,0 +1,23 @@
+-- MK.iOS.EPG.2 — a name index for channels the guide cannot be matched to
+-- by id.
+--
+-- A programme is joined to a channel by `tvg_id`, and most channels have
+-- none: measured on a real 53,207-channel account, 7,841 carry one and
+-- 6,333 of those find a guide. That leaves ~46,000 rows that no amount of
+-- guide data can reach, because there is nothing to join on.
+--
+-- Their *names* can be joined on. The provider writes `TNT SPORTS ᵁᴴᴰ
+-- ³⁸⁴⁰ᴾ`; the XMLTV file writes `TNT Sports` under the opaque id
+-- `TNTSports.uk`. `EpgNameKey` reduces both to the same key.
+--
+-- Only **unambiguous** keys are stored: `EpgNameKey.uniqueIndex` drops any
+-- key claimed by two different channels (real files carry `13emeRue.mu`
+-- and `13emerue.fr`), so the PRIMARY KEY here is a fact about the data
+-- rather than a constraint that could reject a write. A wrong match puts
+-- the wrong programme on a channel, which is worse than a blank line.
+--
+-- Rebuilt wholesale on every EPG refresh, like `epg_programmes`.
+CREATE TABLE epg_channel_names (
+    name_key TEXT PRIMARY KEY NOT NULL,
+    tvg_id TEXT NOT NULL
+);

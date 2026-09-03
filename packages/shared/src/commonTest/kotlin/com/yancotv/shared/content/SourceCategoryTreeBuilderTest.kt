@@ -28,7 +28,7 @@ class SourceCategoryTreeBuilderTest {
     }
 
     @Test
-    fun `caller order is preserved, not source id order`() {
+    fun `caller order is preserved - not source id order`() {
         // The caller passes the user's `sources` row order so the rail matches
         // the Sources screen. Ids here sort the opposite way on purpose.
         val tree = SourceCategoryTreeBuilder.build(

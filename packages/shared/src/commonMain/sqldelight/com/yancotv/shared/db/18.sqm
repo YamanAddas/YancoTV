@@ -1,0 +1,26 @@
+-- MK.iOS.EPG.3 — scope the channel-name index by guide.
+--
+-- The name index was global, and `EpgNameKey.uniqueIndex` dropped any key
+-- claimed by two channels. Within one guide that is right: a real XMLTV
+-- file carries `13emeRue.mu` and `13emerue.fr`, different feeds with the
+-- same name, and neither is a safe answer.
+--
+-- Across two guides it is wrong. Two providers both listing "BBC One" is
+-- redundancy, not ambiguity — either id yields the right programmes for
+-- that channel. Treating it as a clash meant **adding a second EPG source
+-- reduced coverage**: measured, adding a 756-channel guide took the index
+-- from 3,893 keys to 3,869, knocking out working entries from the first
+-- guide and contributing almost nothing of its own.
+--
+-- Keyed by guide now, so ambiguity is judged inside one file and a
+-- channel's own provider is preferred at resolve time.
+DROP TABLE IF EXISTS epg_channel_names;
+
+CREATE TABLE epg_channel_names (
+    name_key TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    tvg_id TEXT NOT NULL,
+    PRIMARY KEY (name_key, source_key)
+);
+
+CREATE INDEX idx_epg_channel_names_key ON epg_channel_names(name_key);

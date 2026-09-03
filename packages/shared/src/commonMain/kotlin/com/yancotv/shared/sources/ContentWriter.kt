@@ -142,6 +142,10 @@ class ContentWriter(private val db: YancoDb) {
                         streamId = s.streamId.toLong(),
                         tvArchive = if (s.tvArchive != 0) s.tvArchive else null,
                         tvArchiveDuration = if (s.tvArchiveDuration != 0) s.tvArchiveDuration else null,
+                        // The provider's own channel number. Returned on
+                        // every live stream and thrown away until now, so
+                        // the guide fell back to the playlist position.
+                        channelNumber = if (s.num != 0) s.num else null,
                     )
                 db.contentQueries.insert(
                     id = id,

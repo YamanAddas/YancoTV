@@ -73,6 +73,14 @@ data class XtreamVodStream(
     val categoryId: String,
     val containerExtension: String,
     val directSource: String,
+    /**
+     * Carried by the bulk list and, until now, only ever read from the
+     * per-item `get_vod_info` call — which is made when a detail page
+     * opens, so a browse row had none of it. Measured on the live account
+     * over 175,137 movies: `tmdb` non-empty on 92%, `trailer` on 36%.
+     */
+    val tmdbId: String = "",
+    val trailer: String = "",
 )
 
 data class XtreamSeriesInfo(
@@ -88,9 +96,36 @@ data class XtreamSeriesInfo(
     val rating: String,
     val categoryId: String,
     val lastModified: String,
+    /**
+     * More of the bulk list that was being discarded. Measured over 4,000
+     * of the account's 45,622 series: `backdrop_path` non-empty on 90%,
+     * `tmdb` 91%, `youtube_trailer` 56%, `episode_run_time` 49%.
+     *
+     * `backdrop_path` matters most — it is a list of 1280px-wide 16:9
+     * stills, which is what a detail hero wants. Without it the hero fills
+     * a wide band with the 2:3 poster and crops it to a waistline.
+     */
+    val backdropUrl: String = "",
+    val youtubeTrailer: String = "",
+    val tmdbId: String = "",
+    val episodeRunTime: String = "",
 )
 
-data class XtreamEpisodeInfo(val duration: String? = null, val season: Int? = null)
+data class XtreamEpisodeInfo(
+    val duration: String? = null,
+    val season: Int? = null,
+    /**
+     * Per-episode extras the provider returns inside `info` and that we
+     * used to throw away wholesale. Measured over 998 episodes across 40
+     * randomly-sampled series on the live account: `movie_image` present
+     * and non-empty on 49%, `air_date` 63%, `duration_secs` 99%. (`plot`
+     * and `tmdb_id` are 0% — the provider never sends them, so there is
+     * nothing to read and no field here for them.)
+     */
+    val stillUrl: String? = null,
+    val airDate: String? = null,
+    val durationSecs: Int? = null,
+)
 
 data class XtreamSeriesEpisode(val id: String, val episodeNum: Int, val title: String, val containerExtension: String, val info: XtreamEpisodeInfo)
 
@@ -402,6 +437,8 @@ class XtreamClient(url: String, private val username: String, private val passwo
         categoryId = strOf(s["category_id"]),
         containerExtension = strOf(s["container_extension"], "mp4"),
         directSource = strOf(s["direct_source"]),
+        tmdbId = strOf(s["tmdb"]),
+        trailer = strOf(s["trailer"]),
     )
 
     suspend fun getSeriesList(categoryId: String? = null): Result<List<XtreamSeriesInfo>, Throwable> {
@@ -523,6 +560,12 @@ class XtreamClient(url: String, private val username: String, private val passwo
         rating = strOf(s["rating"]),
         categoryId = strOf(s["category_id"]),
         lastModified = strOf(s["last_modified"]),
+        // `backdrop_path` is an array — the provider ships up to seven
+        // stills per series. The first is TMDB's own primary.
+        backdropUrl = s["backdrop_path"].arr()?.firstOrNull()?.let { strOf(it) }.orEmpty(),
+        youtubeTrailer = strOf(s["youtube_trailer"]),
+        tmdbId = strOf(s["tmdb"]),
+        episodeRunTime = strOf(s["episode_run_time"]).takeIf { it.isNotBlank() && it != "0" }.orEmpty(),
     )
 
     suspend fun getSeriesInfo(seriesId: Int): Result<XtreamSeriesDetail, Throwable> {
@@ -559,6 +602,9 @@ class XtreamClient(url: String, private val username: String, private val passwo
                             XtreamEpisodeInfo(
                                 duration = epInfo?.get("duration")?.let { if (truthyOf(it)) strOf(it) else null },
                                 season = epInfo?.get("season")?.let { if (truthyOf(it)) numOf(it) else null },
+                                stillUrl = epInfo?.get("movie_image")?.let { if (truthyOf(it)) strOf(it) else null },
+                                airDate = epInfo?.get("air_date")?.let { if (truthyOf(it)) strOf(it) else null },
+                                durationSecs = epInfo?.get("duration_secs")?.let { if (truthyOf(it)) numOf(it) else null },
                             ),
                         )
                     }

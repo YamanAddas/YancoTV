@@ -64,6 +64,7 @@ class BackupExporter(private val db: YancoDb, private val credentialStore: Crede
                 groupPreferences = exportGroupPreferences(),
                 settings = exportSettings(),
                 reminders = exportReminders(),
+                recentChannels = exportRecentChannels(),
             )
 
         val recordCounts =
@@ -81,6 +82,7 @@ class BackupExporter(private val db: YancoDb, private val credentialStore: Crede
                 "groupPreferences" to records.groupPreferences.size,
                 "settings" to records.settings.size,
                 "reminders" to records.reminders.size,
+                "recentChannels" to records.recentChannels.size,
             )
 
         // Stable checksum: serialize records compact (no whitespace),
@@ -268,6 +270,17 @@ class BackupExporter(private val db: YancoDb, private val credentialStore: Crede
     }
 
     private fun exportSettings(): List<SettingsKv> = db.settingsQueries.selectAll().executeAsList().map { SettingsKv(it.key, it.value_) }
+
+    /**
+     * Read with `selectAllForBackup`, not `recentChannels`: the latter
+     * joins `content` and so drops rows whose channel is not in the
+     * catalogue at this moment, which is exactly what a backup must not do
+     * — the catalogue is restored separately and may not be present yet.
+     */
+    private fun exportRecentChannels(): List<RecentChannelRecord> =
+        db.recentChannelsQueries.selectAllForBackup().executeAsList().map {
+            RecentChannelRecord(contentId = it.content_id, watchedAt = it.watched_at)
+        }
 
     private fun exportReminders(): List<ReminderRecord> = db.remindersQueries.selectAll().executeAsList().map {
         ReminderRecord(

@@ -2860,6 +2860,105 @@ authors thought to assert, whereas `verifyCommonMainYancoDbMigration` compares
 against a generated snapshot of every version. Re-enabling it — on CI, or on a
 non-Windows machine — remains the durable fix.
 
+## MK.36 — reconciling the shared core with the iOS fork — started 2026-09-03
+
+**Why this milestone exists.** `YamanAddas/YancoTV-iOS` is not an iOS-only repo — it is a
+fork of this whole monorepo, and this repo's `master` is a strict ancestor of it. Ninety-eight
+commits accumulated there, and a large minority of them are **not iOS code**: they advance
+`packages/shared/` (the KMP core both platforms run on) and `packages/core/` (its TypeScript
+twin). Four schema migrations, a name-based EPG index, playlist-divider detection, browse-row
+facts, Unicode letterform folding, and a query-plan fix worth 3m22s -> 0.09s all landed there
+and none of them exist here. That is AGENTS.md rule 8 drifting in real time, and the cost of
+untangling it grows with every session on either side.
+
+**Scope of 36.1 (this slice): take the shared core, wire nothing.** No `app/` changes. The
+merge is deliberately inert at the UI layer so that a regression, if there is one, is
+attributable to the core and not to new wiring landing at the same time.
+
+### MK.36.1 — import the shared core, wire nothing — shipped 2026-09-03
+
+Taken wholesale from `ios/master` (`24b36acf`):
+`packages/shared/src/{commonMain,commonTest,androidMain,androidUnitTest}`, plus the
+TypeScript mirrors `packages/core/src/content/title-cleaner.ts`, `packages/core/src/xtream/`
+and their tests. The TS half is not optional: `title-cleaner.ts` is the desktop twin of
+`TitleCleaner.kt` and taking one without the other splits the two ports on what a clean title
+is, which is the exact duplication rule 8 forbids.
+
+**Why the app compiles untouched.** Every public API change is additive — new functions, new
+data-class fields carrying defaults. `ContentRepository` gains `groupTallies`,
+`searchByTypePaged`, `searchCountByType`; `WatchHistoryRepository` gains `allProgress` and
+`entriesByEpisode` (both non-Flow readers SwiftUI needs) and extracts `resolveEpisodeProgress`
+so the two readers cannot drift; `ContentMetadata` and `EpisodeInfo` gain optional fields.
+Nothing was removed or re-signed.
+
+**What this switches on by itself — the whole list:**
+
+- **Search stops timing out.** `searchFts` / `searchFtsByTypePaged` / `countSearchFtsByType`
+  now lead with `content_fts` and `CROSS JOIN` to `content`, forcing FTS to drive the plan
+  instead of letting SQLite pick a scan of `content`. Measured on the fork: 3m22s -> 0.09s.
+  This is not a latent iOS-only win — `SearchScreen` already carries a
+  `searchByType(...) timed out` warning log, so this repo has been hitting the bad plan in
+  production. `searchByType` delegates to `searchByTypePaged`, so the call site needed no edit.
+- **6,903 live channels stop rendering as `": SKY SPORT ..."`.** `TitleCleaner` strips
+  separators the quality-tag strips orphaned at an edge (`EDGE_SEPARATORS`), and `16.sqm`
+  repairs `clean_title` values already written, so no resync is required. `.` and `,` are
+  deliberately outside the set — trimming a trailing dot would turn `M.A.S.H.` into `M.A.S.H`.
+  The MB-377 fallback still runs *after* the new trim (verified by reading the ordering in
+  `cleanTitle`), so a title that reduces to nothing keeps its raw form.
+- **Channel numbers, TMDB ids and trailers reach the database.** All three came down with the
+  bulk Xtream response and were discarded — measured on a real account, 0 of 53,207 live rows
+  carried a channel number. Applies after one resync: `BulkContentWriter` clears a source's
+  rows before writing, so existing rows are replaced rather than skipped.
+
+**Schema 15 -> 19, and how it was gated.** `verifyCommonMainYancoDbMigration` is disabled on
+Windows (see MK.35.4), so the substitute gates carried this:
+
+| Gate | Range walked | Result |
+|---|---|---|
+| `UpgradeFrom140Test` | v11 (what 1.4.0 shipped) -> `Schema.version` | 7 tests, green |
+| `MigrationTest` | full chain | 15 tests, green |
+| `Stage2MigrationTest` | v3 -> `Schema.version`, `episodes` added to the fixture for `19.sqm` | 3 tests, green |
+
+Full suite: **824 tests, 0 failures, 0 errors**. `:app:assembleDebug` green.
+
+### What is deliberately NOT switched on, and why each needs real work
+
+Naming these here because the merge makes them *look* available. They are not.
+
+- **EPG name matching is the big one, and it is not free.** `EpgNameKey` and
+  `epg_channel_names` arrive, but nothing on Android will ever populate that table.
+  `EpgRepository.refresh()` builds the index and **Android does not call it** — it has
+  `AndroidEpgImporter`, which exists precisely because the shared path materialises the whole
+  XMLTV body and OOMs on Fire TV (MB-230). Three separate blockers: the importer parses only
+  `<programme>` and never reads `<channel>`, so it has no `display-name` data at all; the index
+  is never built; and its memory strategy drops programmes whose channel id is not already in
+  the user's `tvg_id` set, which discards exactly the channels name-matching exists for, before
+  matching could help. Compounding it, `EpgNameKey.uniqueIndex` needs per-channel programme
+  counts to break ties, which are only known at end of stream — while the widened id set is
+  needed *before* programmes stream past. Tractable, because the importer already streams to a
+  temp file and can read it twice, but it is a redesign of the import filter under the heap
+  constraint that caused MB-230. Own slice, own device verification.
+- **`UpNextDecision` is a duplicate, not a feature.** `com.yancotv.shared.playback.UpNextDecision`
+  is byte-identical to this repo's `com.yancotv.android.player.UpNextDecision` except
+  `internal object` -> `object`. It is our own file lifted to `commonMain`. The correct action
+  is to delete the Android copy and repoint imports — a dedupe, gaining nothing but removing a
+  drift surface.
+- **`PlaylistDividers` needs a different call site here.** 909 of 273,869 rows on the real
+  account are banner rows (`##### beIN SP⚽RTS ᴴᴰ #####`), all `live`, all reported playable,
+  all sorting to the front of a group — one of them was the first tile on Home, and tapping it
+  opened a spinner that never resolved. The rule is sound and tested. But its only call site is
+  `YancoServices.ios.kt`, filtering *after* the read, which on a paged browse would drift the
+  count against the page. Android should push it into SQL or apply it at write time.
+- **`DownloadsRepository` is capability without a consumer.** There is no download manager,
+  service or UI on Android. Merging it costs nothing and does nothing until someone builds the
+  Android half.
+
+**Not verified in this slice:** nothing ran on a device — no Fire TV or phone was reachable on
+the network. Specifically outstanding: the wall-clock cost of `16.sqm` on a real 273,869-row
+catalogue at first launch after upgrade (a full scan computing `TRIM` twice per row, updating
+~6,900), and the search-plan improvement measured on Android hardware rather than inferred from
+the fork's numbers. Both are device checks, not code changes.
+
 ## Timeline
 
 **Removed by user decision 2026-04-25.** Work proceeds at user's pace — sessions resume when user is rested. The 5-stage roadmap at the top of this file replaces week-based estimates. Historical estimates from before 2026-04-25 are preserved in git history if a back-reference is ever needed.

@@ -91,6 +91,37 @@ class EpgRepository(
      * grouping in Kotlin. If profiling ever says otherwise we can add a
      * collection-IN query to EpgProgrammes.sq.
      */
+    /**
+     * Resolves channel *names* to guide ids, for rows that carry no
+     * `tvg_id`.
+     *
+     * [names] are raw channel titles; they are normalised here rather than
+     * by the caller so the two sides cannot drift apart in how they spell
+     * a key. Names that reduce to nothing matchable, or that the index
+     * dropped as ambiguous, are simply absent from the result.
+     */
+    fun resolveTvgIdsByName(names: List<String>, preferSourceId: String = ""): Map<String, String> {
+        if (names.isEmpty()) return emptyMap()
+        val keyByName = names.mapNotNull { name ->
+            EpgNameKey.keyFor(name)?.let { name to it }
+        }.toMap()
+        if (keyByName.isEmpty()) return emptyMap()
+
+        // Ordered so the channel's own provider's guide comes first; the
+        // first row per key wins.
+        val idByKey = mutableMapOf<String, String>()
+        for (row in db.epgChannelNamesQueries
+            .resolveKeys(keyByName.values.toSet(), preferSourceId)
+            .executeAsList()
+        ) {
+            idByKey.getOrPut(row.name_key) { row.tvg_id }
+        }
+
+        return keyByName.mapNotNull { (name, key) ->
+            idByKey[key]?.let { name to it }
+        }.toMap()
+    }
+
     fun getNowNextBatch(tvgIds: List<String>): NowNextMap {
         if (tvgIds.isEmpty()) return emptyMap()
         val now = nowSeconds()
@@ -123,6 +154,10 @@ class EpgRepository(
         .futureByChannelAndTitle(tvgId, title, nowSec, nowSec + windowSec)
         .executeAsList()
         .map { it.toDomain() }
+
+    /** One programme by id, for catch-up and reminders. */
+    fun programmeById(id: String): EpgProgramme? =
+        db.epgProgrammesQueries.byId(id).executeAsOneOrNull()?.toDomain()
 
     fun getProgrammesForChannel(tvgId: String, startTime: Long, endTime: Long): List<EpgProgramme> = db.epgProgrammesQueries
         .forChannelRange(tvgId, startTime, endTime)
@@ -284,6 +319,10 @@ class EpgRepository(
 
         val errors = mutableListOf<String>()
         val batches = mutableListOf<BulkEpgWriter.ProgrammeBatch>()
+        // Per guide, not pooled: two guides naming the same channel is
+        // redundancy, and pooling them made it look like ambiguity.
+        val channelsBySource = mutableMapOf<String, MutableList<Pair<String, String?>>>()
+        val programmeCounts = mutableMapOf<String, Int>()
 
         targets.forEachIndexed { idx, t ->
             onProgress("Fetching EPG ${idx + 1}/${targets.size} (${t.sourceKey})")
@@ -309,6 +348,20 @@ class EpgRepository(
                             programmes = result.programmes,
                         ),
                     )
+                    // The parser has always produced these and the writer
+                    // has always discarded them. They are what lets a
+                    // channel with no `tvg_id` find its guide — see
+                    // `EpgNameKey`.
+                    channelsBySource
+                        .getOrPut(t.sourceKey) { mutableListOf() }
+                        .addAll(result.channels.map { it.id to it.displayName })
+                    // How much listing each channel actually has, which is
+                    // what decides a contested name — see `uniqueIndex`.
+                    result.programmes.groupingBy { it.channelId }.eachCount()
+                        .forEach { (channelId, count) ->
+                            programmeCounts[channelId] =
+                                (programmeCounts[channelId] ?: 0) + count
+                        }
                 }
             } catch (error: Throwable) {
                 // Redact before logging / persisting: Ktor + OkHttp exception
@@ -343,6 +396,22 @@ class EpgRepository(
             }
         val writeMs = clock() - writeStart
         logger.info("EPG bulk write: ${result.rowsWritten} rows across ${result.channels} channels in ${writeMs}ms")
+
+        val indexBySource =
+            channelsBySource.mapValues { (_, list) -> EpgNameKey.uniqueIndex(list, programmeCounts) }
+        val keyCount = indexBySource.values.sumOf { it.size }
+        onProgress("Indexing $keyCount channel names")
+        db.epgChannelNamesQueries.transaction {
+            db.epgChannelNamesQueries.deleteAll()
+            indexBySource.forEach { (sourceKey, index) ->
+                index.forEach { (key, tvgId) ->
+                    db.epgChannelNamesQueries.insert(key, sourceKey, tvgId)
+                }
+            }
+        }
+        logger.info(
+            "EPG name index: $keyCount unambiguous keys across ${indexBySource.size} guides",
+        )
 
         clearLastError()
         if (errors.isNotEmpty()) {

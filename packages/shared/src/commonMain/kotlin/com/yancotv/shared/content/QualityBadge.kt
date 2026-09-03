@@ -29,8 +29,14 @@ enum class QualityBadge(val label: String) {
         /** Extracts unique badges in the order they appear. */
         fun parse(title: String): List<QualityBadge> {
             if (title.isBlank()) return emptyList()
+            // Providers style titles with superscript letterforms —
+            // `ᵁᴴᴰ ³⁸⁴⁰ᴾ` rather than `UHD 3840P`. Those are different
+            // code points, so the word-boundary match below finds nothing
+            // in them: measured at 0 badges across 1,300 live channels on
+            // a real account before this fold was added.
+            val folded = UnicodeStyleFold.fold(title)
             val seen = LinkedHashSet<QualityBadge>()
-            REGEX.findAll(title).forEach { match ->
+            REGEX.findAll(folded).forEach { match ->
                 normalize(match.value)?.let(seen::add)
             }
             return seen.toList()

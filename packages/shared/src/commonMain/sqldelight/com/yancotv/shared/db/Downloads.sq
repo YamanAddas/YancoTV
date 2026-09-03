@@ -41,3 +41,6 @@ WHERE id = ?;
 
 deleteById:
 DELETE FROM downloads WHERE id = ?;
+
+updateResumable:
+UPDATE downloads SET resumable = ? WHERE id = ?;

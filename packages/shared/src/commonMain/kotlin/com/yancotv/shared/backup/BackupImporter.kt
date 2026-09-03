@@ -87,6 +87,8 @@ class BackupImporter(
         restored["settings"] = importSettings(file.records.settings, skipped)
         restored["groupPreferences"] = importGroupPreferences(file.records.groupPreferences, skipped)
         restored["reminders"] = importReminders(file.records.reminders, skipped)
+        restored["recentChannels"] =
+            importRecentChannels(file.records.recentChannels, skipped)
         restored["recordings"] = importRecordings(file.records.recordings, skipped)
         restored["recordingSchedules"] = importRecordingSchedules(file.records.recordingSchedules, skipped)
 
@@ -281,6 +283,36 @@ class BackupImporter(
             )
         }
         return records.size
+    }
+
+    /**
+     * Restores the recently-watched list.
+     *
+     * Newest-wins rather than skip-if-present: unlike a reminder, this row
+     * carries no user intent beyond its timestamp, and a restore should not
+     * make the list *older* than what is already on the device.
+     */
+    private fun importRecentChannels(
+        records: List<RecentChannelRecord>,
+        skipped: MutableMap<String, Int>,
+    ): Int {
+        var written = 0
+        for (r in records) {
+            val existing = db.recentChannelsQueries
+                .selectAllForBackup()
+                .executeAsList()
+                .firstOrNull { it.content_id == r.contentId }
+            if (existing != null && existing.watched_at >= r.watchedAt) {
+                skipped["recentChannels"] = (skipped["recentChannels"] ?: 0) + 1
+                continue
+            }
+            db.recentChannelsQueries.recordWatch(
+                content_id = r.contentId,
+                watched_at = r.watchedAt,
+            )
+            written++
+        }
+        return written
     }
 
     private fun importReminders(records: List<ReminderRecord>, skipped: MutableMap<String, Int>): Int {

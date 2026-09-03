@@ -124,3 +124,21 @@ private val HTTP_HOST_REGEX = Regex(
     """^http://(?:[^/@\s]+@)?(\[[0-9a-fA-F:]+]|[^/:?#\s]+)""",
     RegexOption.IGNORE_CASE,
 )
+
+/**
+ * Thrown when this client is asked for plain HTTP to a host the user has
+ * not configured as a source.
+ *
+ * Deliberately **not** the Android `CleartextNotAllowedException`, which
+ * extends `java.io.IOException` so it travels OkHttp's error path. There is
+ * no common `IOException` that both targets agree on across Ktor versions,
+ * and changing the Android type's supertype would change how existing
+ * Android callers catch it. Two names, one meaning, each honest about the
+ * layer it belongs to.
+ *
+ * The host is carried but the URL is not: a provider URL holds the
+ * subscriber's credentials in its query string, and this message is
+ * logged.
+ */
+class CleartextBlockedException(val host: String) :
+    Exception("Plain HTTP to \"$host\" is not allowed: it is not one of the configured sources.")

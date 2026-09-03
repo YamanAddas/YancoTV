@@ -126,4 +126,31 @@ describe('Title Cleaner', () => {
       expect(extractShowName('CNN Live')).toBe('CNN Live');
     });
   });
+
+  // MB-391 — a separator that only existed to divide a stripped tag from
+  // the name has nothing left to divide. 6,903 live channels on a real
+  // account rendered as ": SKY SPORT..." before this.
+  describe('orphaned separators', () => {
+    it('drops a separator left behind by a strip', () => {
+      expect(cleanTitle('4K: V SPORT UHD')).toBe('V SPORT');
+      expect(cleanTitle('4K: ELEVEN SPORTS 1 UHD')).toBe('ELEVEN SPORTS 1');
+      expect(cleanTitle('HD | BBC One')).toBe('BBC One');
+      expect(cleanTitle('Arte - HD')).toBe('Arte');
+      expect(cleanTitle('1080p / Rai Uno')).toBe('Rai Uno');
+    });
+
+    it('keeps punctuation that is part of the name', () => {
+      expect(cleanTitle('Sky Sports: Main Event')).toBe('Sky Sports: Main Event');
+      expect(cleanTitle('Canal+ HD')).toBe('Canal+');
+      // A trailing dot is not a separator — '.' is excluded on purpose.
+      expect(cleanTitle('M.A.S.H. HD')).toBe('M.A.S.H.');
+    });
+
+    it('still falls back when only separators remain', () => {
+      // MB-377 holds: trimming must not turn a punctuation-only title into
+      // an empty one.
+      expect(cleanTitle('|')).toBe('|');
+      expect(cleanTitle('- HD -')).toBe('- HD -');
+    });
+  });
 });

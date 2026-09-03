@@ -5,7 +5,9 @@ CREATE TABLE episodes (
     episode_number INTEGER,
     title TEXT,
     stream_url TEXT NOT NULL,
-    duration INTEGER
+    duration INTEGER,               -- runtime in seconds (provider `duration_secs`)
+    still_url TEXT,                 -- episode still; ~half of episodes have one
+    air_date TEXT                   -- first broadcast, provider-phrased (usually YYYY-MM-DD)
 );
 
 CREATE INDEX idx_episodes_content ON episodes(content_id, season_number, episode_number);
@@ -28,12 +30,25 @@ WHERE stream_url = :streamUrl
 LIMIT 1;
 
 insert:
-INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration, still_url, air_date)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 upsert:
-INSERT OR REPLACE INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO episodes (id, content_id, season_number, episode_number, title, stream_url, duration, still_url, air_date)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteByContent:
 DELETE FROM episodes WHERE content_id = ?;
+
+-- MK.iOS.FACTS — season and episode counts for a batch of series.
+--
+-- Only covers series whose episodes have been fetched: `get_series_info` is
+-- a per-series call made when a detail page opens, so on a 45,598-series
+-- catalogue this returns rows for the handful the viewer has looked at and
+-- grows from there. Filling it for everything would be 45,598 network
+-- calls, which is not a browse row's price.
+seasonCountsFor:
+SELECT content_id, COUNT(DISTINCT season_number) AS seasons, COUNT(*) AS episodes
+FROM episodes
+WHERE content_id IN ?
+GROUP BY content_id;

@@ -153,6 +153,106 @@ class ContentRepositoryTest {
         assertTrue(repo.searchByType("   ", ContentType.LIVE).isEmpty())
     }
 
+    // ───── MK.iOS.PAGE.2 — paged search + honest counts ─────
+
+    @Test fun searchCountByType_reportsTotalPastTheLimit() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        for (i in 0 until 150) {
+            insertContent(db, "live-$i", "src-A", "c$i", "Marvel Live $i", type = "live")
+        }
+        insertContent(db, "movie-1", "src-A", null, "Marvel Movie", type = "movie")
+        val repo = ContentRepository(db)
+
+        // The page caps at 100; the count must not. This gap is the whole
+        // point — it is what lets the UI say "100 of 150" instead of
+        // showing 100 and implying that is all there is.
+        assertEquals(100, repo.searchByType("Marvel", ContentType.LIVE, limit = 100L).size)
+        assertEquals(150L, repo.searchCountByType("Marvel", ContentType.LIVE))
+        assertEquals(1L, repo.searchCountByType("Marvel", ContentType.MOVIE))
+        assertEquals(0L, repo.searchCountByType("Marvel", ContentType.SERIES))
+    }
+
+    @Test fun searchCountByType_blankQueryIsZeroNotEverything() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        insertContent(db, "ch-1", "src-A", "c1", "Channel", type = "live")
+        val repo = ContentRepository(db)
+        // A blank query must count nothing. Falling through to the DB with
+        // an empty MATCH is a syntax error on some builds and "everything"
+        // on others; neither is what an empty search box means.
+        assertEquals(0L, repo.searchCountByType("", ContentType.LIVE))
+        assertEquals(0L, repo.searchCountByType("   ", ContentType.LIVE))
+    }
+
+    @Test fun searchByTypePaged_walksEveryMatchExactlyOnce() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        for (i in 0 until 250) {
+            insertContent(db, "live-$i", "src-A", "c$i", "Marvel Live $i", type = "live")
+        }
+        val repo = ContentRepository(db)
+
+        val seen = mutableListOf<String>()
+        var offset = 0L
+        while (true) {
+            val page = repo.searchByTypePaged("Marvel", ContentType.LIVE, offset, 100L)
+            if (page.isEmpty()) break
+            seen += page.map { it.id }
+            offset += page.size
+        }
+        // No gaps, no duplicates — the same property browse paging has to
+        // hold, checked here because search now walks offsets too.
+        assertEquals(250, seen.size)
+        assertEquals(250, seen.toSet().size)
+        assertEquals(repo.searchCountByType("Marvel", ContentType.LIVE), seen.size.toLong())
+    }
+
+    @Test fun searchByTypePaged_offsetPastEndReturnsEmpty() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        insertContent(db, "live-1", "src-A", "c1", "Marvel Live", type = "live")
+        val repo = ContentRepository(db)
+        assertTrue(repo.searchByTypePaged("Marvel", ContentType.LIVE, 500L, 100L).isEmpty())
+    }
+
+    /**
+     * Punctuation a user actually types must be searched for, not
+     * interpreted. `-` is NOT in FTS4 and a bare `*` is a wildcard, so an
+     * unquoted token silently changes the question being asked.
+     */
+    @Test fun ftsQueryOrNull_quotesEveryTokenAndAppendsPrefixWildcard() {
+        assertEquals("\"mar\"*", ftsQueryOrNull("mar"))
+        // Case is left alone: unicode61 folds it at match time, so lowering
+        // here would be a second, redundant place for that rule to live.
+        assertEquals("\"beIN\"* \"sports\"*", ftsQueryOrNull("  beIN   sports  "))
+        assertEquals("\"beIN:\"*", ftsQueryOrNull("beIN:"))
+        assertEquals("\"AR|\"* \"news-24\"*", ftsQueryOrNull("AR| news-24"))
+        // Embedded double quotes are doubled, per FTS4 phrase escaping.
+        assertEquals("\"say\"\"what\"*", ftsQueryOrNull("say\"what"))
+    }
+
+    @Test fun ftsQueryOrNull_nullWhenThereIsNothingToSearchFor() {
+        assertNull(ftsQueryOrNull(""))
+        assertNull(ftsQueryOrNull("   "))
+        assertNull(ftsQueryOrNull("\t\n "))
+    }
+
+    @Test fun searchByType_findsArabicTitlesByPrefix() = runTest {
+        val db = testDb()
+        insertSource(db, "src-A", priority = 0)
+        insertContent(db, "ar-1", "src-A", "a1", "قناة الجزيرة", type = "live")
+        insertContent(db, "ar-2", "src-A", "a2", "قناة العربية", type = "live")
+        insertContent(db, "en-1", "src-A", "e1", "BBC News", type = "live")
+        val repo = ContentRepository(db)
+
+        // unicode61 tokenises Arabic into real words rather than one opaque
+        // blob, so a prefix search works the same as it does in Latin.
+        assertEquals(2, repo.searchByType("قناة", ContentType.LIVE).size)
+        assertEquals(1, repo.searchByType("الجزيرة", ContentType.LIVE).size)
+        assertEquals(2L, repo.searchCountByType("قناة", ContentType.LIVE))
+    }
+
     @Test fun page_offsetPastEndReturnsEmpty() = runTest {
         val db = testDb()
         insertSource(db, "src-A", priority = 0)

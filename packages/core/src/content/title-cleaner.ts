@@ -34,6 +34,20 @@ const STRIP_PATTERNS: RegExp[] = [
   /\s{2,}/g,
 ];
 
+/**
+ * Separators left stranded at an edge once the strips above have run.
+ *
+ * "4K: V SPORT UHD" loses its `4K` to the quality pattern and trims to
+ * ": V SPORT UHD" — the colon separated the tag from the name, and with the
+ * tag gone it separates nothing. Measured on a real 273,869-item account:
+ * 6,903 live channels stored a clean title beginning with one.
+ *
+ * Only the characters providers use as separators, and only at the edges.
+ * `.` and `,` are deliberately absent — trimming a trailing dot would turn
+ * "M.A.S.H." into "M.A.S.H".
+ */
+const EDGE_SEPARATORS = /^[\s:|/\-\u2013\u2014]+|[\s:|/\-\u2013\u2014]+$/g;
+
 /** Clean an IPTV title by removing provider noise */
 export function cleanTitle(rawTitle: string): string {
   let title = rawTitle.trim();
@@ -42,8 +56,9 @@ export function cleanTitle(rawTitle: string): string {
     title = title.replace(pattern, ' ');
   }
 
-  // Trim again after pattern removal
-  title = title.trim();
+  // Trim again after pattern removal, and drop any separator the strips
+  // above orphaned at an edge.
+  title = title.replace(EDGE_SEPARATORS, '');
 
   // MB-377 — a title stripped to only punctuation/separators (e.g.
   // "(MX) (VIX 01) | (2098-12-31 08:00:01)" reduces to "|") is as useless as

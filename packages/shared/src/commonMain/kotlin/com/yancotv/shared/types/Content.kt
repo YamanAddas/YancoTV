@@ -95,7 +95,29 @@ data class Episode(
 data class SubtitleTrack(val language: String, val url: String)
 
 @Serializable
-data class EpisodeInfo(val id: String, val seasonNumber: Int, val episodeNumber: Int, val title: String, val streamUrl: String, val duration: String? = null)
+data class EpisodeInfo(
+    val id: String,
+    val seasonNumber: Int,
+    val episodeNumber: Int,
+    val title: String,
+    val streamUrl: String,
+    val duration: String? = null,
+    /** Episode still from the provider — about half of episodes have one. */
+    val stillUrl: String? = null,
+    /** First-broadcast date as the provider phrases it, usually `YYYY-MM-DD`. */
+    val airDate: String? = null,
+    /** Runtime in seconds. Present on nearly every episode. */
+    val durationSeconds: Int? = null,
+)
+
+/**
+ * Current generation of the detail-extraction code. Bump this whenever a
+ * new field is read out of a provider response, so cached blobs written by
+ * the previous generation are refetched instead of standing forever.
+ *
+ * 1 — MK.iOS.UX4: per-episode still, air date and runtime in seconds.
+ */
+const val DETAIL_SCHEMA: Int = 1
 
 /** Parsed metadata from the metadata_json column */
 @Serializable
@@ -111,11 +133,33 @@ data class ContentMetadata(
     val youtubeTrailer: String? = null,
     val backdropUrl: String? = null,
     val subtitles: List<SubtitleTrack>? = null,
+    /**
+     * Which generation of the extraction code wrote this blob.
+     *
+     * A cached detail is only ever refetched when something the UI needs is
+     * *missing*, which is right until the app starts needing a field the
+     * old code never read. Episode stills and air dates were parsed away
+     * until MK.iOS.UX4, so every series already opened held a complete-
+     * looking episode list with neither — and no rule that would ever ask
+     * the provider again. Bumping [DETAIL_SCHEMA] re-enriches each title
+     * once, the next time it is opened.
+     */
+    val detailSchema: Int = 0,
     val seriesId: Long? = null,
     val streamId: Long? = null,
     val stalkerId: String? = null,
     val duration: String? = null,
     val tvArchive: Int? = null,
+    /**
+     * The provider's own channel number (Xtream `num`).
+     *
+     * Was being discarded at sync: measured on a real account, **0 of
+     * 53,207 live rows carried one** while the provider returned it for
+     * every stream. The guide has been standing in with `content.sort_order`
+     * — the playlist position — which is usually but not always the same
+     * number.
+     */
+    val channelNumber: Int? = null,
     val tvArchiveDuration: Int? = null,
     val catchupType: String? = null,
     val catchupSource: String? = null,
