@@ -3006,6 +3006,34 @@ Verified: 828 shared tests (2 new), 0 failures; `:app:testDebugUnitTest`, `:app:
 **Not verified on device.** Home's own rail tile was left alone; it is a separate composable and
 belongs in its own slice.
 
+### MB-401 — the coverflow orb's caption line never reaches the screen — open
+
+Found while verifying MK.36.4 on the Chromecast (1920x1080 @ density 2 = 960x540 dp).
+
+`ContentOrb` renders three children in a `Column` of fixed `.height(OrbHeight)` = 200 dp: the
+140 dp art box, the title, and a caption. **The caption is never laid out.** A `uiautomator` dump of
+the Movies wheel contains a `TextView` for every orb title and none for any caption — no text node
+anywhere in the tree carries the `·` separator except the preview pane's own facts line.
+
+The content is correct; only the rendering is missing. The same value reaches the artwork's
+`contentDescription`, which reads `Roza, 2022  ·  ★ 3.5` and `Parçalı Yıllar, 2026  ·  ★ 8.0` — so
+the data path is sound and TalkBack announces it. It is the visible line that is lost.
+
+Arithmetic: the art box is 140 dp, plus `Space.sm` twice and two text lines is roughly 192 dp
+against the 200 dp box — which fits only while the orb is at scale 1. The centred orb is drawn at
+`scaleBase = 1.18f`, i.e. 236 dp inside a wheel band that gets `weight(0.38f)` of a 540 dp viewport
+(~205 dp). Measured on the device, the centred title's own baseline sits at y=1061 of 1080.
+
+**Not introduced by MK.36.4.** That commit changed only *which string* `sub` holds; the render
+condition (`if (sub.isNotBlank())`) and every layout constant are untouched, and the group name it
+replaced was equally non-blank. The line has been getting clipped for as long as the fixed height
+and the centre scale have coexisted.
+
+Fix is a layout decision, not a one-liner — raise `OrbHeight`, shrink the art box, drop the centre
+scale, or size the orb from the measured lane the way `ShellMetrics` does on iOS (which is the
+MK.37 portrait work). Deliberately not bundled into MK.36.4: it is a design change to the wheel and
+wants to be looked at on a TV, not inferred from a dump.
+
 ### What is deliberately NOT switched on, and why each needs real work
 
 Naming these here because the merge makes them *look* available. They are not.
