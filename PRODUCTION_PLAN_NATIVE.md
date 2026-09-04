@@ -3998,6 +3998,67 @@ came out *larger* in dp than the phone case (hero ≈ 80 dp against 48 on a phon
 would — but it is not a measurement of the phone numbers. Those still rest on the width formula,
 which the 1920 render did confirm exactly: CC 52 px, AUDIO 81 px, FIT 61 px, gap 15 px.
 
+### MK.39 — EPG by name, not only by id — step zero measured, not started
+
+The complaint underneath this: **88% of the owner's live channels can never show a programme**,
+no matter how good the guide is. A programme is matched to a channel by `tvg_id`, and most rows
+do not carry one.
+
+**Measured on the owner's own Windows catalogue, 2026-09-04**, with the real `EpgNameKey` rather
+than a copy written for the occasion — the second copy is the mistake this session already fixed
+twice:
+
+| | rows | share |
+|---|---|---|
+| live rows | 50,342 | |
+| carrying a `tvg_id` | 7,483 | 14.9% |
+| **currently showing a guide** | **6,020** | **12.0%** |
+| distinct channels in the guide | 3,377 | |
+
+**What name matching would add: +3,396 rows, taking coverage to 9,416 — 12.0% to 18.7%, a 1.56x
+increase.**
+
+That is a **lower bound**, and deliberately so. It counts only rows whose normalised name matches a
+key already proven to work, i.e. the "same channel, other quality" win: the provider lists
+`4K: SKY SPORTS F1 ᵁᴴᴰ ³⁸⁴⁰ᴾ`, `SKY SPORTS F1 FHD` and `SKY SPORTS F1` as three rows, one of which
+happens to carry an id. The largest such families are ordinary channels, not edge cases —
+`nickelodeon` covers 62 rows, `cartoonnetwork` 55, `eurosport1` and `eurosport2` 54 each. The
+remaining win — guide channels whose *display name* matches a row that has no id at all — cannot be
+measured yet, because **neither port stores the guide's display names**.
+
+**The engine already exists, and nothing calls it.** `packages/shared` carries the whole feature,
+imported from the iOS fork in MK.36: `EpgNameKey` (a carefully-reasoned normaliser with its own
+measurements in its KDoc), the `epg_channel_names` table, migrations 17 and 18, five SQL queries,
+the index build inside `EpgRepository.refresh()`, and `resolveTvgIdsByName`. `resolveTvgIdsByName`
+has **zero callers anywhere in this repository**.
+
+Android does not merely fail to call it — it cannot, because it does not use `EpgRepository.refresh()`
+at all. `AndroidEpgImporter` is a separate streaming importer written for the 254k-row memory
+problem, and it **filters every programme against the user's existing `tvg_id` set**. So the raw
+material for name matching is discarded at import, before anything could index it.
+
+**One thing checked and found already correct.** `EpgNameKey.keyFor` rejects any key under four
+characters, and that looked over-broad: it throws away `TF1`, `QVC`, `ATV`, `STC`, `LA 1` — real,
+recognisable channels. Measured rather than argued: lowering the floor to three gains **379 more
+rows**, and puts **497 rows** under keys that are demonstrably contested (the same three-character
+key claimed by rows carrying different `tvg_id`s in the owner's own catalogue). A wrong guide is
+worse than none, so the floor stays at four. Recorded because the next person will have the same
+suspicion.
+
+### What the work is
+
+1. **Store the names.** `AndroidEpgImporter` parses `<channel>` blocks already; write
+   `EpgNameKey.uniqueIndex(...)` into `epg_channel_names` per guide, as `EpgRepository.refresh()`
+   does. Desktop's `epg-service.ts` throws them away in one line —
+   `const { programmes } = await parseXmltv(buffer)` — and would need the same.
+2. **Stop discarding the raw material.** The importer's `tvg_id` filter is there for memory, not
+   correctness; it needs to keep rows whose channel resolves by name.
+3. **Resolve at read time.** `resolveTvgIdsByName(names, preferSourceId)` already exists and is
+   already tested.
+
+Not started. Step 1 is the measurable one: re-run the measurement with names stored and the true
+number replaces the lower bound above.
+
 ### Remaining slices
 
 | Slice | Scope |
