@@ -3940,11 +3940,16 @@ cannot disagree — and the device confirmed the formula exactly: CC 52 px, AUDI
 gap 15 px, which are the numbers the fit calculation uses. At 1920 there is ~500 dp of headroom, so
 nothing drops on a television and the TV render is unchanged.
 
-**Not yet seen on a narrow screen.** The overflow branch is proven by the tests and by the width
-formula matching the renderer, not by a phone: the only device carrying the owner's catalogue is the
-television, and the phone's debug seed points at streams that 404. `adb shell wm size 1280x720`
-would produce the 640 dp case on the TV in about ten seconds — worth doing, but not on the owner's
-television unasked.
+**Seen on glass, at a size the dock cannot fit.** `wm size 1280x720` on the Google TV (reset
+immediately after) rendered: `-10`, play, `+10`, NEXT, `⋯` — all five secondaries dropped, the
+divider dropped with them because it then separated nothing, and `⋯` survived. That is exactly what
+`DockFitTest` asserts, now observed rather than argued.
+
+One honest caveat on that run: the size override also changed the effective density, so the controls
+came out *larger* in dp than the phone case (hero ≈ 80 dp against 48 on a phone) rather than the
+640 dp figures in the table above. It exercised the overflow branch hard — harder than a phone
+would — but it is not a measurement of the phone numbers. Those still rest on the width formula,
+which the 1920 render did confirm exactly: CC 52 px, AUDIO 81 px, FIT 61 px, gap 15 px.
 
 ### Remaining slices
 
