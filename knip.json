@@ -32,7 +32,7 @@
     "packages/core": {
       "entry": [
         "src/index.ts",
-        "src/{parsers,clients,content,types,schemas,stalker,xtream,http,catchup,parental,stores}/index.ts"
+        "src/{parsers,content,types,schemas,stalker,xtream,http,catchup,parental,stores}/index.ts"
       ],
       "project": [
         "src/**/*.ts"

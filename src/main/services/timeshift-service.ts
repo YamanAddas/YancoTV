@@ -1,7 +1,6 @@
 import log from 'electron-log/main';
 import { BrowserWindow } from 'electron';
 import { IpcChannels } from '../../shared/ipc-channels';
-import { getLivePlaybackArgs } from '../player/mpv-args';
 
 // ---------------------------------------------------------------------------
 // Timeshift Service
@@ -32,17 +31,6 @@ let state: TimeshiftState = {
 
 // Default buffer size: 30 minutes of rewind
 const DEFAULT_BUFFER_SECONDS = 30 * 60;
-
-/**
- * Get mpv args to enable timeshift buffering for live TV.
- * @deprecated Use `getLivePlaybackArgs()` from `src/main/player/mpv-args.ts`.
- *   Kept as a thin re-export so consumers/tests don't break while the call
- *   sites migrate. The new module separates VOD and live tuning and fixes
- *   the stutter caused by the old `--cache-pause=no` on VOD streams.
- */
-export function getTimeshiftMpvArgs(bufferSeconds?: number): string[] {
-  return getLivePlaybackArgs({ isLive: true, liveBufferSeconds: bufferSeconds });
-}
 
 /**
  * Activate timeshift mode (called when user pauses live TV).

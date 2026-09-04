@@ -1,7 +1,7 @@
 {
   "name": "@yancotv/core",
   "version": "0.1.0",
-  "description": "Shared business logic for YancoTV (parsers, clients, types, schemas). Platform-agnostic.",
+  "description": "Shared business logic for YancoTV (parsers, types, schemas, Xtream/Stalker clients). Platform-agnostic.",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -30,12 +30,6 @@
       "react-native": "./src/parsers/index.ts",
       "types": "./dist/parsers/index.d.ts",
       "default": "./dist/parsers/index.js"
-    },
-    "./clients": {
-      "source": "./src/clients/index.ts",
-      "react-native": "./src/clients/index.ts",
-      "types": "./dist/clients/index.d.ts",
-      "default": "./dist/clients/index.js"
     },
     "./content": {
       "source": "./src/content/index.ts",

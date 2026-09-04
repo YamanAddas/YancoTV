@@ -1,149 +1,110 @@
 import { describe, it, expect } from 'vitest';
-import { groupCategories } from '@yancotv/core';
+import { groupCategoriesSmart } from '@yancotv/core';
 
-describe('Category Grouping', () => {
-  describe('groupCategories', () => {
-    it('returns empty groups and ungrouped for empty input', () => {
-      const result = groupCategories([]);
-      expect(result.groups).toEqual([]);
-      expect(result.ungrouped).toEqual([]);
-    });
+/**
+ * Tests for the grouping function the app actually uses.
+ *
+ * This file previously covered `groupCategories`, which had been deprecated in
+ * favour of `groupCategoriesSmart` and was called by nothing but these tests —
+ * so the only grouping coverage in the repo pointed at dead code while the live
+ * path had none. The deprecated function is gone; these assertions were written
+ * against observed behaviour of the replacement and then checked for
+ * sensibleness rather than simply enshrining whatever it happened to do.
+ *
+ * `groupCategoriesSmart` organises raw provider group names under detected
+ * language/country sections. Group names are shown in FULL — the prefix is a
+ * routing signal, never stripped from the label, because the full name is also
+ * what content filtering keys on.
+ */
+describe('groupCategoriesSmart', () => {
+  const names = (children: { originalGroupName: string }[]) =>
+    children.map((c) => c.originalGroupName);
 
-    it('puts single categories into ungrouped', () => {
-      const result = groupCategories(['News', 'Sports', 'Music']);
-      expect(result.groups).toEqual([]);
-      expect(result.ungrouped).toEqual(['Music', 'News', 'Sports']); // sorted
-    });
+  it('returns empty structures for no input', () => {
+    expect(groupCategoriesSmart([])).toEqual({ sections: [], ungrouped: [] });
+  });
 
-    it('groups categories sharing a pipe-separated prefix', () => {
-      const result = groupCategories([
-        'AR | Sports',
-        'AR | News',
-        'AR | Movies',
-      ]);
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('AR');
-      expect(result.groups[0].children).toEqual([
-        'AR | Movies',
-        'AR | News',
-        'AR | Sports',
-      ]); // sorted by suffix
-      expect(result.groups[0].childLabels).toEqual(['Movies', 'News', 'Sports']);
-      expect(result.ungrouped).toEqual([]);
-    });
+  it('groups by a language prefix', () => {
+    const r = groupCategoriesSmart(['AR | BEIN SPORTS', 'AR | MBC']);
+    expect(r.sections).toHaveLength(1);
+    expect(r.sections[0].key).toBe('ar');
+    expect(r.sections[0].label).toBe('Arabic');
+    expect(names(r.sections[0].children)).toEqual(['AR | BEIN SPORTS', 'AR | MBC']);
+    expect(r.ungrouped).toEqual([]);
+  });
 
-    it('groups categories sharing a dash-separated prefix', () => {
-      const result = groupCategories([
-        'UK - Drama',
-        'UK - Comedy',
-        'UK - News',
-      ]);
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('UK');
-      expect(result.groups[0].childLabels).toEqual(['Comedy', 'Drama', 'News']);
-    });
+  it('keeps the full original group name, prefix included', () => {
+    // The label doubles as the content filter key, so stripping the prefix
+    // here would silently break filtering as well as the display.
+    const r = groupCategoriesSmart(['AR | MBC', 'AR | ROTANA']);
+    expect(names(r.sections[0].children)).toContain('AR | MBC');
+  });
 
-    it('groups categories sharing a slash-separated prefix', () => {
-      const result = groupCategories([
-        'Arabic / Sports',
-        'Arabic / Entertainment',
-      ]);
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('Arabic');
-    });
+  it('recognises a prefix regardless of which separator follows it', () => {
+    const pipe = groupCategoriesSmart(['AR | MBC', 'AR | ROTANA']);
+    const dash = groupCategoriesSmart(['AR - MBC', 'AR - ROTANA']);
+    expect(pipe.sections[0].key).toBe(dash.sections[0].key);
+  });
 
-    it('groups categories sharing a colon-separated prefix', () => {
-      const result = groupCategories([
-        'FR : Cinema',
-        'FR : Documentaire',
-      ]);
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('FR');
-    });
+  it('detects Arabic from the script alone, with no prefix', () => {
+    const r = groupCategoriesSmart(['قنوات عربية', 'أفلام']);
+    expect(r.sections).toHaveLength(1);
+    expect(r.sections[0].key).toBe('ar');
+    expect(r.ungrouped).toEqual([]);
+  });
 
-    it('requires 2+ categories to form a group', () => {
-      const result = groupCategories([
-        'US | Sports',
-        'UK | News',
-        'UK | Drama',
-      ]);
-      // UK forms a group (2 members), US is ungrouped (only 1)
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('UK');
-      expect(result.ungrouped).toContain('US | Sports');
-    });
+  it('leaves names with no language signal ungrouped', () => {
+    const r = groupCategoriesSmart(['Sports', 'Music']);
+    expect(r.sections).toEqual([]);
+    expect(names(r.ungrouped).sort()).toEqual(['Music', 'Sports']);
+  });
 
-    it('handles mixed grouped and ungrouped categories', () => {
-      const result = groupCategories([
-        'AR | News',
-        'AR | Sports',
-        'General',
-        'Music',
-      ]);
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('AR');
-      expect(result.ungrouped).toEqual(['General', 'Music']); // sorted
-    });
+  /**
+   * A section of one is noise: it costs a collapsible header to show a single
+   * row. Pinned because it is the rule most likely to be "simplified" away by
+   * someone who sees a detected prefix land in `ungrouped` and reads it as a
+   * detection failure.
+   */
+  it('does not create a section for a single member', () => {
+    const r = groupCategoriesSmart(['EN | NEWS']);
+    expect(r.sections).toEqual([]);
+    expect(names(r.ungrouped)).toEqual(['EN | NEWS']);
+  });
 
-    it('handles multiple different prefix groups', () => {
-      const result = groupCategories([
-        'US | News',
-        'US | Sports',
-        'UK | Drama',
-        'UK | Comedy',
-        'FR | Cinema',
-        'FR | Documentaire',
-      ]);
-      expect(result.groups).toHaveLength(3);
-      expect(result.groups.map((g) => g.prefix)).toEqual(['FR', 'UK', 'US']); // sorted
-    });
+  it('needs two members of the SAME language, not two members overall', () => {
+    const r = groupCategoriesSmart(['AR | MBC', 'EN | NEWS']);
+    expect(r.sections).toEqual([]);
+    expect(names(r.ungrouped).sort()).toEqual(['AR | MBC', 'EN | NEWS']);
+  });
 
-    it('prefers pipe separator over dash (higher priority)', () => {
-      // " | " is checked before " - " in SEPARATORS
-      const result = groupCategories([
-        'AR | Sport - Live',
-        'AR | Sport - Replay',
-      ]);
-      expect(result.groups).toHaveLength(1);
-      expect(result.groups[0].prefix).toBe('AR');
-      expect(result.groups[0].childLabels).toEqual(['Sport - Live', 'Sport - Replay']);
-    });
+  it('separates several languages into their own sections', () => {
+    const r = groupCategoriesSmart([
+      'AR | MBC', 'AR | ROTANA',
+      'FR | CINEMA', 'FR | SPORT',
+      'DE | NEWS', 'DE | SPORT',
+    ]);
+    expect(r.sections.map((s) => s.key).sort()).toEqual(['ar', 'de', 'fr']);
+    for (const section of r.sections) expect(section.children).toHaveLength(2);
+    expect(r.ungrouped).toEqual([]);
+  });
 
-    it('skips empty strings', () => {
-      const result = groupCategories(['', 'News', '', 'Sports']);
-      expect(result.groups).toEqual([]);
-      expect(result.ungrouped).toEqual(['News', 'Sports']);
-    });
+  it('mixes grouped and ungrouped in one result', () => {
+    const r = groupCategoriesSmart(['AR | MBC', 'AR | ROTANA', 'Sports']);
+    expect(r.sections).toHaveLength(1);
+    expect(names(r.ungrouped)).toEqual(['Sports']);
+  });
 
-    it('sorts groups alphabetically by prefix', () => {
-      const result = groupCategories([
-        'ZZ | A',
-        'ZZ | B',
-        'AA | C',
-        'AA | D',
-      ]);
-      expect(result.groups[0].prefix).toBe('AA');
-      expect(result.groups[1].prefix).toBe('ZZ');
-    });
+  it('survives empty strings and duplicates without throwing', () => {
+    expect(() => groupCategoriesSmart(['', '', 'AR | MBC', 'AR | MBC'])).not.toThrow();
+  });
 
-    it('sorts ungrouped categories alphabetically', () => {
-      const result = groupCategories(['Zebra', 'Apple', 'Mango']);
-      expect(result.ungrouped).toEqual(['Apple', 'Mango', 'Zebra']);
-    });
-
-    it('handles separator-only strings gracefully', () => {
-      // " | " at start means empty prefix → no parse
-      const result = groupCategories([' | Something', 'Normal']);
-      // tryParse requires idx > 0 for prefix, so " | Something" starts at idx=0 → no parse
-      expect(result.ungrouped).toContain(' | Something');
-    });
-
-    it('handles categories with only prefix and no suffix', () => {
-      // "AR | " — suffix would be empty after trim → tryParse returns null
-      const result = groupCategories(['AR | ', 'AR | Sports']);
-      // "AR | " has empty suffix, should fall into ungrouped
-      // "AR | Sports" has only 1 member so also ungrouped
-      expect(result.groups).toEqual([]);
-    });
+  it('gives every section a stable key and a human label', () => {
+    const r = groupCategoriesSmart(['FR | CINEMA', 'FR | SPORT']);
+    for (const s of r.sections) {
+      expect(s.key).toBeTruthy();
+      expect(s.label).toBeTruthy();
+      // The icon is optional — a detected language need not have a flag.
+      expect(s.icon === null || typeof s.icon === 'string').toBe(true);
+    }
   });
 });

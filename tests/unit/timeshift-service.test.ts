@@ -9,7 +9,6 @@ vi.mock('electron', () => ({
 }));
 
 import {
-  getTimeshiftMpvArgs,
   activateTimeshift,
   deactivateTimeshift,
   getTimeshiftState,
@@ -22,38 +21,6 @@ describe('Timeshift Service', () => {
     deactivateTimeshift();
   });
 
-  describe('getTimeshiftMpvArgs (deprecated wrapper)', () => {
-    it('returns live-playback mpv flags with default buffer', () => {
-      const args = getTimeshiftMpvArgs();
-
-      expect(args).toContain('--cache=yes');
-      // Replaced the old `--cache-pause=no` (which caused VOD stutter) with
-      // `--cache-pause-wait=1` — mpv briefly holds instead of stuttering when
-      // the buffer drains, then drops frames to return to the live edge.
-      expect(args).toContain('--cache-pause-wait=1');
-      expect(args).toContain('--cache-pause-initial=yes');
-
-      // Default is 30 minutes = 1800s * 2MB/s bytes
-      const expectedBytes = 1800 * 2 * 1024 * 1024;
-      expect(args).toContain(`--demuxer-max-bytes=${expectedBytes}`);
-      expect(args).toContain(`--demuxer-max-back-bytes=${expectedBytes}`);
-    });
-
-    it('accepts custom buffer duration', () => {
-      const args = getTimeshiftMpvArgs(600); // 10 minutes
-
-      const expectedBytes = 600 * 2 * 1024 * 1024;
-      expect(args).toContain(`--demuxer-max-bytes=${expectedBytes}`);
-      expect(args).toContain(`--demuxer-max-back-bytes=${expectedBytes}`);
-    });
-
-    it('includes transport hardening (auto-reconnect) for flaky IPTV servers', () => {
-      const args = getTimeshiftMpvArgs();
-      const reconnect = args.find((a) => a.startsWith('--stream-lavf-o='));
-      expect(reconnect).toBeDefined();
-      expect(reconnect).toContain('reconnect=1');
-    });
-  });
 
   describe('state machine', () => {
     it('starts inactive', () => {

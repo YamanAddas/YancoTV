@@ -12,12 +12,10 @@ export {
 export type { ParsedGroup } from './grouping/group-parser.js';
 export {
   groupCategoriesSmart,
-  groupCategories,
 } from './grouping/category-grouping.js';
 export type {
   SmartChild,
   SmartSection,
   SmartGroupedCategories,
   CategoryGroup,
-  GroupedCategories,
 } from './grouping/category-grouping.js';

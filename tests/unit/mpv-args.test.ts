@@ -18,6 +18,34 @@ describe('mpv-args — playback', () => {
     expect(args).toEqual(getVodPlaybackArgs({ isLive: false }));
   });
 
+  // Moved here from timeshift-service.test.ts, which exercised these through
+  // `getTimeshiftMpvArgs` — a deprecated wrapper that only delegated to this
+  // function. The assertions are about live playback args, so they belong with
+  // the function that builds them.
+  it('uses a 30-minute buffer by default', () => {
+    const args = getLivePlaybackArgs({ isLive: true });
+    const expectedBytes = 1800 * 2 * 1024 * 1024;
+    expect(args).toContain(`--demuxer-max-bytes=${expectedBytes}`);
+    expect(args).toContain(`--demuxer-max-back-bytes=${expectedBytes}`);
+  });
+
+  it('enables caching without the VOD-stuttering pause flag', () => {
+    const args = getLivePlaybackArgs({ isLive: true });
+    expect(args).toContain('--cache=yes');
+    // Replaced the old `--cache-pause=no` (which caused VOD stutter) with
+    // `--cache-pause-wait=1` — mpv briefly holds instead of stuttering when the
+    // buffer drains, then drops frames to return to the live edge.
+    expect(args).toContain('--cache-pause-wait=1');
+    expect(args).toContain('--cache-pause-initial=yes');
+  });
+
+  it('hardens the transport with auto-reconnect for flaky IPTV servers', () => {
+    const args = getLivePlaybackArgs({ isLive: true });
+    const reconnect = args.find((a) => a.startsWith('--stream-lavf-o='));
+    expect(reconnect).toBeDefined();
+    expect(reconnect).toContain('reconnect=1');
+  });
+
   it('honors a custom live buffer size', () => {
     const args = getLivePlaybackArgs({ isLive: true, liveBufferSeconds: 60 });
     const bytes = 60 * 2 * 1024 * 1024;
